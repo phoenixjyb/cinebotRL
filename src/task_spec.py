@@ -203,3 +203,31 @@ def enforce_action_limits(action: List[float]) -> List[float]:
     """Placeholder for clamping/rate-limiting actions before sending to low-level controller."""
 
     raise NotImplementedError("Implement actuator-aware clamping once hardware specs are finalised")
+
+
+# ============================================================================
+# Isaac Lab Task Registration
+# ============================================================================
+
+def register_isaac_lab_tasks():
+    """Register custom Isaac Lab tasks.
+    
+    This function should be called during Isaac Lab environment initialization
+    to make our custom tasks available for training.
+    """
+    try:
+        import gymnasium as gym
+        from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnv, MobileMMTrackEEEnvCfg
+        
+        # Register the tracking task
+        gym.register(
+            id="MobileMMTrackEE-v0",
+            entry_point="rl_platform.tasks.mobile_mm:MobileMMTrackEEEnv",
+            kwargs={"cfg": MobileMMTrackEEEnvCfg()},
+        )
+        
+        print("[task_spec] Registered Isaac Lab task: MobileMMTrackEE-v0")
+        
+    except ImportError as e:
+        print(f"[task_spec] Could not register Isaac Lab tasks: {e}")
+        print("[task_spec] This is expected if running outside Isaac Lab environment")

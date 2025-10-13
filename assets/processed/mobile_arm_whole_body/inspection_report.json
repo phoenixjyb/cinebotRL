@@ -1,0 +1,179 @@
+{
+  "package_name": "mobile_arm_whole_body",
+  "urdf_path": "H:\\wSpace\\cinebotRL\\assets_own\\mobile_arm_whole_body\\urdf\\arm_on_car_center_rotZ_neg90.urdf",
+  "root_link": "chassis_center_link",
+  "link_count": 9,
+  "joint_count": 8,
+  "issues": [
+    {
+      "severity": "warning",
+      "code": "link.missing_inertial",
+      "message": "Link 'chassis_center_link' is missing inertial parameters"
+    },
+    {
+      "severity": "warning",
+      "code": "link.missing_visual",
+      "message": "Link 'chassis_center_link' has no visual geometry"
+    },
+    {
+      "severity": "warning",
+      "code": "link.missing_collision",
+      "message": "Link 'chassis_center_link' has no collision geometry"
+    },
+    {
+      "link": "left_arm_link1",
+      "severity": "warning",
+      "code": "mesh.missing_scale",
+      "message": "Mesh 'package://mobile_arm_whole_body/meshes/left_arm_link1.STL' referenced by link 'left_arm_link1' has no scale. Expected uniform scale 0.001 for CAD units -> metres"
+    },
+    {
+      "link": "left_arm_link5",
+      "severity": "warning",
+      "code": "mesh.missing_scale",
+      "message": "Mesh 'package://mobile_arm_whole_body/meshes/left_arm_link5.STL' referenced by link 'left_arm_link5' has no scale. Expected uniform scale 0.001 for CAD units -> metres"
+    },
+    {
+      "link": "left_arm_link6",
+      "severity": "warning",
+      "code": "mesh.missing_scale",
+      "message": "Mesh 'package://mobile_arm_whole_body/meshes/left_arm_link6.STL' referenced by link 'left_arm_link6' has no scale. Expected uniform scale 0.001 for CAD units -> metres"
+    },
+    {
+      "link": "left_gripper_link",
+      "severity": "warning",
+      "code": "mesh.missing_scale",
+      "message": "Mesh 'package://mobile_arm_whole_body/meshes/left_gripper_link.STL' referenced by link 'left_gripper_link' has no scale. Expected uniform scale 0.001 for CAD units -> metres"
+    },
+    {
+      "link": "left_arm_link3",
+      "severity": "warning",
+      "code": "mesh.missing_scale",
+      "message": "Mesh 'package://mobile_arm_whole_body/meshes/left_arm_link3.STL' referenced by link 'left_arm_link3' has no scale. Expected uniform scale 0.001 for CAD units -> metres"
+    },
+    {
+      "link": "left_arm_link2",
+      "severity": "warning",
+      "code": "mesh.missing_scale",
+      "message": "Mesh 'package://mobile_arm_whole_body/meshes/left_arm_link2.STL' referenced by link 'left_arm_link2' has no scale. Expected uniform scale 0.001 for CAD units -> metres"
+    },
+    {
+      "link": "left_arm_base_link",
+      "severity": "warning",
+      "code": "mesh.missing_scale",
+      "message": "Mesh 'package://mobile_arm_whole_body/meshes/left_arm_base_link.STL' referenced by link 'left_arm_base_link' has no scale. Expected uniform scale 0.001 for CAD units -> metres"
+    },
+    {
+      "link": "left_arm_link4",
+      "severity": "warning",
+      "code": "mesh.missing_scale",
+      "message": "Mesh 'package://mobile_arm_whole_body/meshes/left_arm_link4.STL' referenced by link 'left_arm_link4' has no scale. Expected uniform scale 0.001 for CAD units -> metres"
+    }
+  ],
+  "link_summaries": [
+    {
+      "name": "chassis_center_link",
+      "has_inertial": false,
+      "has_visual": false,
+      "has_collision": false,
+      "visual_meshes": [],
+      "collision_meshes": []
+    },
+    {
+      "name": "left_arm_base_link",
+      "has_inertial": true,
+      "has_visual": true,
+      "has_collision": true,
+      "visual_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_base_link.STL"
+      ],
+      "collision_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_base_link.STL"
+      ]
+    },
+    {
+      "name": "left_arm_link1",
+      "has_inertial": true,
+      "has_visual": true,
+      "has_collision": true,
+      "visual_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link1.STL"
+      ],
+      "collision_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link1.STL"
+      ]
+    },
+    {
+      "name": "left_arm_link2",
+      "has_inertial": true,
+      "has_visual": true,
+      "has_collision": true,
+      "visual_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link2.STL"
+      ],
+      "collision_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link2.STL"
+      ]
+    },
+    {
+      "name": "left_arm_link3",
+      "has_inertial": true,
+      "has_visual": true,
+      "has_collision": true,
+      "visual_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link3.STL"
+      ],
+      "collision_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link3.STL"
+      ]
+    },
+    {
+      "name": "left_arm_link4",
+      "has_inertial": true,
+      "has_visual": true,
+      "has_collision": true,
+      "visual_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link4.STL"
+      ],
+      "collision_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link4.STL"
+      ]
+    },
+    {
+      "name": "left_arm_link5",
+      "has_inertial": true,
+      "has_visual": true,
+      "has_collision": true,
+      "visual_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link5.STL"
+      ],
+      "collision_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link5.STL"
+      ]
+    },
+    {
+      "name": "left_arm_link6",
+      "has_inertial": true,
+      "has_visual": true,
+      "has_collision": true,
+      "visual_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link6.STL"
+      ],
+      "collision_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_arm_link6.STL"
+      ]
+    },
+    {
+      "name": "left_gripper_link",
+      "has_inertial": true,
+      "has_visual": true,
+      "has_collision": true,
+      "visual_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_gripper_link.STL"
+      ],
+      "collision_meshes": [
+        "package://mobile_arm_whole_body/meshes/left_gripper_link.STL"
+      ]
+    }
+  ],
+  "kinematic_tree": "chassis_center_link\n\u2514\u2500arm_mount_joint:fixed -> left_arm_base_link\n  \u2514\u2500left_arm_joint1:revolute -> left_arm_link1\n    \u2514\u2500left_arm_joint2:revolute -> left_arm_link2\n      \u2514\u2500left_arm_joint3:revolute -> left_arm_link3\n        \u2514\u2500left_arm_joint4:revolute -> left_arm_link4\n          \u2514\u2500left_arm_joint5:revolute -> left_arm_link5\n            \u2514\u2500left_arm_joint6:revolute -> left_arm_link6\n              \u2514\u2500left_gripper_joint:fixed -> left_gripper_link"
+}

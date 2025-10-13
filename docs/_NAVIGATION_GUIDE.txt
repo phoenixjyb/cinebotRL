@@ -1,0 +1,51 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                 📚 CinebotRL Documentation                        ║
+║                     Navigation Guide                              ║
+╚══════════════════════════════════════════════════════════════════╝
+
+🎯 START HERE → README.md (Documentation Index)
+   └─ Lists all documents by topic and use case
+
+⚡ QUICK HELP → QUICK_REFERENCE.md (One-Page Cheat Sheet)
+   └─ Most common commands and workflows
+
+📁 DOCUMENT STRUCTURE
+   │
+   ├─ 📂 setup/              (Installation & Configuration)
+   │   ├─ wsl_setup_guide.md          ← Verify WSL environment
+   │   ├─ windows_setup_guide.md      ← Windows Isaac Sim/Lab
+   │   └─ ros2_communication_setup.md ← ROS 2 networking
+   │
+   ├─ 📂 architecture/       (Understanding the System)
+   │   ├─ overview.md                 ← High-level architecture  
+   │   ├─ ros2_communication.md       ← How ROS 2 bridge works
+   │   └─ python_environments.md      ← Why multiple Pythons
+   │
+   ├─ 📂 workflows/          (How-To Guides)
+   │   └─ daily_workflow.md           ← Common daily tasks
+   │
+   ├─ �� reference/          (Technical Details)
+   │   └─ troubleshooting.md          ← Fix common issues
+   │
+   └─ 📂 tracking/           (Project History)
+       └─ phase0_environment.md       ← Setup log
+
+🔍 FIND WHAT YOU NEED
+
+   → Verify setup?        scripts/wsl/check_wsl_setup.sh
+   → Setup WSL?           setup/wsl_setup_guide.md
+   → Setup Windows?       setup/windows_setup_guide.md
+   → Understand system?   architecture/overview.md
+   → Fix errors?          reference/troubleshooting.md
+   → Daily commands?      QUICK_REFERENCE.md
+
+📋 LEGACY DOCUMENTS (see MIGRATION.md)
+
+   Old scattered files have been reorganized.
+   Check MIGRATION.md for the mapping.
+
+═══════════════════════════════════════════════════════════════════
+
+💡 TIP: Bookmark README.md as your documentation homepage!
+
+═══════════════════════════════════════════════════════════════════

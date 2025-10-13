@@ -25,76 +25,65 @@ The calibrated URDF is in `assets_own/mobile_manipulator_PPR_base_corrected.urdf
 - Apply uniform `0.001` mesh scale in the Isaac Sim Asset Converter so USD lands under `assets_own/usd/mobile_manipulator_PPR_base_corrected.usd`.
 - Validate the generated USD with the asset inspector (`src/asset_inspector`) and capture reports in `assets/processed/mobile_arm_whole_body/`.
 
-### Articulation Configuration Snippet
+### Articulation Configuration Snippet (to be added)
 ```python
-# src/isaaclab_assets/robots/mobile_mm.py
-from pathlib import Path
-import isaaclab.sim as sim_utils
-from isaaclab.assets import ArticulationCfg
-from isaaclab.actuators import ImplicitActuatorCfg
+# src/rl_platform/robots/mobile_mm.py
+from rl_platform.robots.mobile_mm import get_mobile_mm_assets
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-ASSETS_ROOT = PROJECT_ROOT / "assets_own"
+assets = get_mobile_mm_assets()
+assets.validate()
 
-MOBILE_MM_CFG = ArticulationCfg(
-    spawn=sim_utils.UsdFileCfg(
-        usd_path=str(ASSETS_ROOT / "usd" / "mobile_manipulator_PPR_base_corrected.usd"),
-        rigid_props=sim_utils.RigidBodyPropertiesCfg(
-            rigid_body_enabled=True,
-            max_linear_velocity=50.0,
-            max_angular_velocity=50.0,
-            max_depenetration_velocity=5.0,
-            enable_gyroscopic_forces=True,
-        ),
-        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=True,
-            solver_position_iteration_count=8,
-            solver_velocity_iteration_count=0,
-            stabilization_threshold=0.001,
-        ),
-    ),
-    init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.0),
-        rot=(1.0, 0.0, 0.0, 0.0),
-        joint_pos={
-            "joint_x": 0.0, "joint_y": 0.0, "joint_theta": 0.0,
-            "left_arm_joint1": 0.0, "left_arm_joint2": 0.0,
-            "left_arm_joint3": 0.0, "left_arm_joint4": 0.0,
-            "left_arm_joint5": 0.0, "left_arm_joint6": 0.0,
-        },
-    ),
-    actuators={
-        "base_xy": ImplicitActuatorCfg(
-            joint_names_expr=["joint_x", "joint_y"],
-            effort_limit_sim=1000.0,
-            velocity_limit_sim=1.0,
-            stiffness=0.0, damping=300.0,
-        ),
-        "base_yaw": ImplicitActuatorCfg(
-            joint_names_expr=["joint_theta"],
-            effort_limit_sim=1000.0,
-            velocity_limit_sim=2.0,
-            stiffness=0.0, damping=50.0,
-        ),
-        "arm": ImplicitActuatorCfg(
-            joint_names_expr=[
-                "left_arm_joint1", "left_arm_joint2", "left_arm_joint3",
-                "left_arm_joint4", "left_arm_joint5", "left_arm_joint6",
-            ],
-            effort_limit_sim=200.0,
-            velocity_limit_sim=2.5,
-            stiffness=0.0, damping=25.0,
-        ),
-    },
-)
+# Later, when defining the ArticulationCfg:
+# spawn=sim_utils.UsdFileCfg(usd_path=str(assets.usd_path), ...)
 ```
 
 ## 2. RL Environment Scaffold
 
-- Observation, reward, and reset logic remain TODOs in `MobileMMTrackEE(DirectRLEnv)`.
-- Action mapping: base `vx`/`ω` plus 6 arm joint velocities; nonholonomic constraints handled via kinematics inside `_apply_action`.
-- Curriculum ideas and staged reward tweaks captured in `assets/raw/robot_spec.md`.
+### 2.1 Module Layout
+Create a task-specific package to keep code organized:
+```
+src/rl_platform/tasks/mobile_mm/
+    __init__.py
+    config.py           # dataclasses / OmegaConf bindings for tunables
+    trajectories.py     # reference generators and waypoint loaders
+    scene.py            # obstacle spawning, sensor setup
+    observations.py     # functions that assemble observation tensors/dicts
+    rewards.py          # reusable reward terms & penalty helpers
+    env.py              # DirectRLEnv subclass (MobileMMTrackEE)
+```
+Register the task ID (e.g., `MobileMMTrackEE-v0`) in the training registry (`src/task_spec.py` or equivalent) so SB3/RL-Games launchers can resolve it.
 
+### 2.2 Trajectory Library
+- Implement parametric references (line, circle, figure-eight) with controllable speed and amplitude.
+- Allow playback of recorded waypoints stored under `assets/processed/trajectories/` (preprocess data via WSL scripts if convenient).
+- Provide a `TrajectoryManager` that yields the current target pose plus optional lookahead samples for preview control.
+- Include curriculum knobs to vary trajectory length/speed as training progresses.
+
+### 2.3 Scene & Collision Instrumentation
+- Instantiate the mobile manipulator using `rl_platform.robots.mobile_mm.get_mobile_mm_assets()`.
+- Spawn static or randomized obstacles via `InteractiveSceneCfg` primitives; maintain per-env seeds for reproducibility.
+- Attach contact sensors (base, arm) and, if needed, distance/ray sensors for early collision warnings.
+- Track obstacle metadata (AABBs, safety radii) so rewards/terminations can reference minimum distance values.
+
+### 2.4 Observation Composition
+- In `_get_obs()`, include base pose/velocity, joint states, end-effector pose/velocity, and tracking error vectors.
+- Add lookahead reference deltas, contact flags, minimum obstacle distance, and action history when rate penalties are planned.
+- Return a dictionary/tensor compatible with the chosen backend (SB3 expects numpy arrays; RL-Games uses torch tensors).
+
+### 2.5 Reward & Penalty Design
+- Build reusable terms in `rewards.py`: position/orientation tracking, progress bonuses, action magnitude/rate penalties, collision penalties, stability terms.
+- Keep scale factors in `config.py` so they can be tuned via YAML/CLI without code edits.
+- In `_compute_reward()`, combine the scaled components and log diagnostics (e.g., collision counts) to `self.extras`.
+
+### 2.6 Reset, Randomization, Curriculum
+- `_reset_idx()` should reset the trajectory phase, randomize obstacle placements (if enabled), and jitter initial joint states.
+- Apply domain randomization to physics parameters (mass, friction, torque limits) using Isaac Lab RNG utilities.
+- Drive curriculum staging via config flags—start with sparse obstacles and short trajectories, then increase difficulty once reward thresholds are met.
+
+### 2.7 Integration Plan
+- Feed `assets.usd_path` from `get_mobile_mm_assets()` into the `ArticulationCfg` spawn block.
+- Update SB3/RL-Games training configs to reference the new task ID.
+- Document environment parameters and reward settings in a new `docs/tracking/phase1_task_design.md` once the scaffold is implemented.
 ## 3. Training Workflow
 
 ### ROS 2 Bridge Health Check
@@ -124,14 +113,17 @@ Monitor progress via TensorBoard (`logs/sb3` or `logs/rl_games`), and keep check
 ## 5. Next Stage Checklist
 
 1. **Assets**
-   - [ ] Re-export current URDF to USD under `assets_own/usd/`.
-   - [ ] Update inspection report in `assets/processed/` once USD is regenerated.
+   - [x] Stage `assets_own/usd/mobile_manipulator_PPR_base_corrected.usd` and supporting configuration (2025-10-13).
+   - [ ] Regenerate `assets/processed/mobile_arm_whole_body/inspection_report.json` after any mesh/URDF edits.
 2. **Code**
-   - [ ] Implement `_reset_idx`, `_get_obs`, `_desired_ee_pose` in `MobileMMTrackEE`.
-   - [ ] Add reward shaping & collision handling.
+   - [ ] Scaffold `src/rl_platform/tasks/mobile_mm/` (config, trajectories, scene, observations, rewards, env).
+   - [ ] Implement `_get_obs`, `_compute_reward`, `_reset_idx`, and obstacle randomization inside `MobileMMTrackEE`.
+   - [ ] Register `MobileMMTrackEE-v0` (or chosen ID) in the training registry and expose config knobs.
 3. **Testing**
-   - [ ] Run smoke training (SB3/RL-Games) with 128 envs for 200 iters.
-   - [ ] Confirm ROS bridge picks up Isaac Sim topics when `--/exts/ros2_bridge/useDomainID=55` is enabled.
-4. **Automation**
-   - [ ] Decide whether to finish WSL headless Isaac Sim install; if yes, run `scripts/install_isaacsim_headless_wsl.sh`.
-   - [ ] Wire CI or local linting using `scripts/wsl/check_phase0_prereqs.sh` and future `scripts/wsl/setup_ci_env.sh` (TBD).
+   - [ ] Run asset inspector + visualization pipeline to sanity-check the USD import.
+   - [ ] Execute a smoke RL run (e.g., RL-Games with 128 envs for 200 iterations) to validate reward stability.
+   - [ ] Script a collision-avoidance scenario to confirm contact sensors and distance penalties fire correctly.
+4. **Automation & Integration**
+   - [ ] Decide whether to finish the WSL headless Isaac Sim install (`scripts/install_isaacsim_headless_wsl.sh`).
+   - [ ] Extend ROS 2 bridge validation to the new task (ensure Isaac Sim publishes expected topics on domain 55).
+   - [ ] Add CI/local hooks (e.g., lint/preflight invoking `scripts/wsl/check_phase0_prereqs.sh`).

@@ -1,6 +1,8 @@
 # Source ROS 2 Humble (binary) installation on Windows
+# NOTE: Default uses the verified Python 3.8 installation (lessons_learnt_ros2OnWindows.md)
+#       Use -RosInstall 'I:\ros2humble\ros2-windows' for Python 3.10 version if preferred
 param(
-    [string]$RosInstall = 'I:\\ros2humble\\ros2-windows'
+    [string]$RosInstall = 'I:\ros2\ros2-windows'
 )
 
 if (-not (Test-Path $RosInstall)) {

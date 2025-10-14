@@ -69,10 +69,11 @@ source "$ACTIVATE"
 echo "[INFO] Upgrading pip"
 python -m pip install --upgrade pip
 
-CUDA_WHL_INDEX="https://download.pytorch.org/whl/cu121"
+# Use NVIDIA's recommended PyTorch version for Isaac Lab
+CUDA_WHL_INDEX="https://download.pytorch.org/whl/cu128"
 
-echo "[INFO] Installing PyTorch (CUDA 12.1 wheels)"
-python -m pip install --extra-index-url "$CUDA_WHL_INDEX" torch torchvision torchaudio
+echo "[INFO] Installing PyTorch 2.7.0 (CUDA 12.8 - NVIDIA recommended for Isaac Lab)"
+python -m pip install torch==2.7.0 torchvision==0.22.0 --index-url "$CUDA_WHL_INDEX"
 
 echo "[INFO] Installing auxiliary packages"
 python -m pip install gymnasium[all] numpy pandas jupyter

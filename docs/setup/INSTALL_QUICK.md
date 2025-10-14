@@ -6,8 +6,8 @@
 - **Python**: 3.11.10 (in .venv_rl311)
 - **GPU**: NVIDIA RTX 3090 (24 GB) + Quadro P2000
 - **Driver**: 580.97
-- **PyTorch**: 2.6.0+cu124 with CUDA
-- **Existing packages**: gymnasium, stable-baselines3, torch
+- **PyTorch**: Upgrading to 2.7.0+cu128 (NVIDIA recommended)
+- **Existing packages**: gymnasium, stable-baselines3
 
 ## Install Isaac Lab (Choose One)
 

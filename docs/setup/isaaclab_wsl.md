@@ -69,6 +69,12 @@ source .venv_rl311/bin/activate
 Isaac Lab can now be installed directly via pip (as of Isaac Sim 4.0+):
 
 ```bash
+# First, ensure you have the recommended PyTorch version (NVIDIA official)
+pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
+
+# Verify CUDA is available
+python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, GPU: {torch.cuda.get_device_name(0)}')"
+
 # Install Isaac Lab with Isaac Sim runtime
 pip install isaacsim-rl isaacsim-replicator isaacsim-extscache-physics isaacsim-extscache-kit-sdk isaacsim-extscache-kit isaacsim-app --extra-index-url https://pypi.nvidia.com
 
@@ -85,11 +91,11 @@ pip install isaaclab
 **Alternative (lighter install)**: If the full `isaacsim-*` packages are too heavy, try:
 ```bash
 # Minimal Isaac Lab install (may require additional dependencies)
-pip install torch==2.2.2+cu121 --index-url https://download.pytorch.org/whl/cu121
+pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
 pip install isaaclab
 ```
 
-**Note**: As of 2025, NVIDIA is transitioning to pip-based installs. Check the [official docs](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/pip_installation.html) for the latest package names.
+**Note**: As of 2025, NVIDIA recommends PyTorch 2.7.0 with CUDA 12.8. Check the [official docs](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/pip_installation.html) for the latest package names.
 
 ## Step 4: Install training dependencies
 

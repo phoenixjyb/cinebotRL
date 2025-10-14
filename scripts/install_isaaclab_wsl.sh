@@ -53,10 +53,28 @@ if python -c "import torch; assert torch.cuda.is_available()" 2>/dev/null; then
     TORCH_VERSION=$(python -c "import torch; print(torch.__version__)")
     GPU_NAME=$(python -c "import torch; print(torch.cuda.get_device_name(0))")
     echo "       ✓ PyTorch $TORCH_VERSION with CUDA ($GPU_NAME)"
+    
+    # Check if we need to upgrade to recommended version
+    RECOMMENDED_VERSION="2.7.0"
+    CURRENT_MAJOR_MINOR=$(echo "$TORCH_VERSION" | cut -d'.' -f1,2)
+    if [[ "$CURRENT_MAJOR_MINOR" != "$RECOMMENDED_VERSION" ]]; then
+        echo "[INFO] NVIDIA recommends PyTorch $RECOMMENDED_VERSION with CUDA 12.8"
+        read -p "       Upgrade PyTorch? (recommended) (Y/n): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+            echo "[INFO] Upgrading PyTorch to $RECOMMENDED_VERSION..."
+            pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
+        fi
+    fi
 else
-    echo "[ERROR] PyTorch with CUDA is not available"
-    echo "       Run setup_rl_venv.sh to install PyTorch first"
-    exit 1
+    echo "[INFO] Installing recommended PyTorch 2.7.0 with CUDA 12.8..."
+    pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
+    
+    # Verify installation
+    if ! python -c "import torch; assert torch.cuda.is_available()" 2>/dev/null; then
+        echo "[ERROR] PyTorch installation failed or CUDA not available"
+        exit 1
+    fi
 fi
 
 # Install Isaac Lab

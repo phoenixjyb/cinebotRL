@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import numpy as np
 import torch
+from pathlib import Path
 from typing import Literal
 
 
@@ -19,6 +21,7 @@ class TrajectoryManager:
         speed: float = 0.2,
         height: float = 1.0,
         dt: float = 0.02,
+        waypoint_file: str | None = None,
     ):
         """Initialize trajectory manager.
         
@@ -30,6 +33,7 @@ class TrajectoryManager:
             speed: Trajectory speed in m/s
             height: Height (z-coordinate) of trajectory plane
             dt: Time step in seconds
+            waypoint_file: Path to recorded waypoint JSON file (for 'recorded' type)
         """
         self.traj_type = traj_type
         self.num_envs = num_envs
@@ -45,6 +49,15 @@ class TrajectoryManager:
         # Center offset for each environment (randomization)
         self.center_x = torch.zeros(num_envs, device=device)
         self.center_y = torch.zeros(num_envs, device=device)
+        
+        # Recorded trajectory data
+        self.recorded_positions = None
+        self.recorded_orientations = None
+        self.current_waypoint_idx = torch.zeros(num_envs, dtype=torch.long, device=device)
+        
+        # Load recorded trajectory if specified
+        if traj_type == "recorded" and waypoint_file is not None:
+            self._load_recorded_trajectory(waypoint_file)
         
     def reset(self, env_ids: torch.Tensor) -> None:
         """Reset trajectory phase for specified environments.
@@ -77,6 +90,8 @@ class TrajectoryManager:
             return self._line_trajectory()
         elif self.traj_type == "figure_eight":
             return self._figure_eight_trajectory()
+        elif self.traj_type == "recorded":
+            return self._recorded_trajectory()
         else:
             raise NotImplementedError(f"Trajectory type {self.traj_type} not implemented")
     
@@ -179,3 +194,77 @@ class TrajectoryManager:
         orientation[:, 0] = 1.0
         
         return position, orientation
+    
+    def _recorded_trajectory(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Playback recorded trajectory from waypoints.
+        
+        Returns:
+            position: Target positions [num_envs, 3]
+            orientation: Target orientations [num_envs, 4]
+        """
+        if self.recorded_positions is None:
+            raise RuntimeError("No recorded trajectory loaded. Set waypoint_file in config.")
+        
+        # Get current waypoint for each environment
+        batch_indices = torch.arange(self.num_envs, device=self.device)
+        position = self.recorded_positions[batch_indices, self.current_waypoint_idx]
+        orientation = self.recorded_orientations[batch_indices, self.current_waypoint_idx]
+        
+        return position, orientation
+    
+    def _load_recorded_trajectory(self, waypoint_file: str) -> None:
+        """Load recorded trajectory from JSON file.
+        
+        Expected format:
+        {
+            "poses": [
+                {
+                    "position": [x, y, z],
+                    "orientation": [x, y, z, w]  # xyzw order, will convert to wxyz
+                },
+                ...
+            ]
+        }
+        
+        Args:
+            waypoint_file: Path to JSON file with recorded poses
+        """
+        file_path = Path(waypoint_file)
+        if not file_path.exists():
+            raise FileNotFoundError(f"Waypoint file not found: {waypoint_file}")
+        
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+        
+        poses = data.get("poses", [])
+        if not poses:
+            raise ValueError(f"No poses found in {waypoint_file}")
+        
+        # Extract positions and orientations
+        positions = []
+        orientations = []
+        
+        for pose in poses:
+            pos = pose["position"]
+            ori = pose["orientation"]
+            
+            positions.append(pos)
+            
+            # Convert from xyzw to wxyz
+            orientations.append([ori[3], ori[0], ori[1], ori[2]])
+        
+        # Convert to tensors [num_waypoints, 3/4]
+        positions_array = torch.tensor(positions, dtype=torch.float32, device=self.device)
+        orientations_array = torch.tensor(orientations, dtype=torch.float32, device=self.device)
+        
+        # Replicate for all environments [num_envs, num_waypoints, 3/4]
+        self.recorded_positions = positions_array.unsqueeze(0).expand(
+            self.num_envs, -1, -1
+        )
+        self.recorded_orientations = orientations_array.unsqueeze(0).expand(
+            self.num_envs, -1, -1
+        )
+        
+        print(f"[TrajectoryManager] Loaded {len(poses)} waypoints from {waypoint_file}")
+        print(f"[TrajectoryManager] Position range: {positions_array.min(dim=0)[0]} to {positions_array.max(dim=0)[0]}")
+

@@ -194,6 +194,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Reward component tracking for logging
         self.reward_components = {}
         
+        # End-effector body index (will be set in _setup_scene)
+        self._ee_body_idx = None
+        
         print(f"[MobileMMTrackEE] Environment initialized:")
         print(f"  - Num envs: {self.num_envs}")
         print(f"  - Observation dim: {self.cfg.num_observations}")
@@ -205,6 +208,16 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         """Setup the scene entities."""
         # Get robot articulation
         self.robot = self.scene["robot"]
+        
+        # Find end-effector body index by name
+        ee_link_name = "left_gripper_link"
+        if ee_link_name in self.robot.body_names:
+            self._ee_body_idx = self.robot.body_names.index(ee_link_name)
+            print(f"[MobileMMTrackEE] Found EE link '{ee_link_name}' at index {self._ee_body_idx}")
+        else:
+            # Fallback to last body
+            self._ee_body_idx = -1
+            print(f"[MobileMMTrackEE] WARNING: EE link '{ee_link_name}' not found, using last body")
         
         # Clone ground plane
         self.scene.clone_environments(copy_from_source=False)
@@ -249,12 +262,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         joint_pos = self.robot.data.joint_pos
         joint_vel = self.robot.data.joint_vel
         
-        # Get end-effector state (assuming last link is EE)
-        # This will need to be updated based on actual robot structure
-        ee_pos = self.robot.data.body_pos_w[:, -1, :]
-        ee_quat = self.robot.data.body_quat_w[:, -1, :]
-        ee_lin_vel = self.robot.data.body_lin_vel_w[:, -1, :]
-        ee_ang_vel = self.robot.data.body_ang_vel_w[:, -1, :]
+        # Get end-effector state
+        ee_pos = self.robot.data.body_pos_w[:, self._ee_body_idx, :]
+        ee_quat = self.robot.data.body_quat_w[:, self._ee_body_idx, :]
+        ee_lin_vel = self.robot.data.body_lin_vel_w[:, self._ee_body_idx, :]
+        ee_ang_vel = self.robot.data.body_ang_vel_w[:, self._ee_body_idx, :]
         
         # Get target from trajectory
         target_pos, target_quat = self.trajectory_manager.get_target_pose()
@@ -296,8 +308,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             Reward tensor [num_envs]
         """
         # Get current EE pose
-        ee_pos = self.robot.data.body_pos_w[:, -1, :]
-        ee_quat = self.robot.data.body_quat_w[:, -1, :]
+        ee_pos = self.robot.data.body_pos_w[:, self._ee_body_idx, :]
+        ee_quat = self.robot.data.body_quat_w[:, self._ee_body_idx, :]
         
         # Get target pose
         target_pos, target_quat = self.trajectory_manager.get_target_pose()
@@ -340,7 +352,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             time_out: Environments that reached max episode length [num_envs]
         """
         # Check for excessive tracking error
-        ee_pos = self.robot.data.body_pos_w[:, -1, :]
+        ee_pos = self.robot.data.body_pos_w[:, self._ee_body_idx, :]
         target_pos, _ = self.trajectory_manager.get_target_pose()
         tracking_error = torch.norm(target_pos - ee_pos, dim=-1)
         

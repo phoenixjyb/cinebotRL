@@ -397,7 +397,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Apply velocity targets to base joints
         self.robot.set_joint_velocity_target(
-            velocity=base_velocities,  # Fixed: parameter name is 'velocity' not 'velocities'
+            target=base_velocities,  # Correct parameter name is 'target'
             joint_ids=self._base_joint_ids
         )
     

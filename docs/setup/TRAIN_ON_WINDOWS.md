@@ -29,10 +29,10 @@ Location: I:\isaacsim\
 Version: 5.0.0 or newer
 ```
 
-### 2. Python Environment
+### 2. Isaac Lab Installation
 ```
 Location: I:\isaaclab\
-Python: 3.11
+Python: 3.11 (included)
 Isaac Lab: 2.2.0
 ```
 
@@ -41,6 +41,69 @@ Isaac Lab: 2.2.0
 Location: I:\wSpace\cinebotRL\
 (or C:\Users\yanbo\wSpace\cinebotRL\)
 ```
+
+---
+
+## Python Environment Setup
+
+You have **two options** for the Python environment:
+
+### Option A: Use Isaac Lab's Environment (Recommended) ✅
+
+Isaac Lab comes with a complete Python environment. **No separate venv needed!**
+
+```powershell
+cd I:\isaaclab
+.\isaaclab.bat
+
+# This automatically:
+# - Activates Isaac Lab's conda/venv environment
+# - Sets up all Isaac Sim paths
+# - Includes PyTorch, CUDA, and all dependencies
+```
+
+**Advantages**:
+- ✅ Pre-configured for Isaac Sim
+- ✅ All dependencies included
+- ✅ No version conflicts
+- ✅ Just works!
+
+**Then install your project**:
+```powershell
+cd I:\wSpace\cinebotRL
+
+# Install project in editable mode
+pip install -e .
+
+# Install Stable Baselines3
+pip install stable-baselines3[extra]
+```
+
+### Option B: Create Dedicated venv (Advanced)
+
+Only if you need full control over packages:
+
+```powershell
+# Create new venv
+cd I:\wSpace\cinebotRL
+python -m venv .venv_windows
+
+# Activate it
+.\.venv_windows\Scripts\activate
+
+# Install Isaac Sim packages
+pip install isaacsim==5.0.0.0
+pip install isaaclab==2.2.0
+
+# Install PyTorch with CUDA
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
+# Install your project
+pip install -e .
+pip install stable-baselines3[extra]
+```
+
+**Note**: This guide assumes **Option A** (using Isaac Lab's environment).
 
 ---
 
@@ -53,10 +116,24 @@ Location: I:\wSpace\cinebotRL\
 cd I:\isaaclab
 .\isaaclab.bat
 
-# This activates the conda/venv and sets up paths
+# This activates the environment and sets up paths
+# You should see something like: (isaac-lab) PS I:\isaaclab>
 ```
 
-### Step 2: Verify CUDA
+### Step 2: Install Your Project
+
+```powershell
+# Still in Isaac Lab environment
+cd I:\wSpace\cinebotRL
+
+# Install project in editable mode
+pip install -e .
+
+# Install Stable Baselines3
+pip install stable-baselines3[extra]
+```
+
+### Step 3: Verify CUDA
 
 ```powershell
 # In Isaac Lab environment
@@ -69,27 +146,72 @@ CUDA available: True
 Device: NVIDIA GeForce RTX 3090
 ```
 
-### Step 3: Install Additional Dependencies
-
-```powershell
-# In Isaac Lab environment
-cd I:\wSpace\cinebotRL
-
-# Install project in editable mode
-pip install -e .
-
-# Install Stable Baselines3
-pip install stable-baselines3[extra]
-```
-
 ### Step 4: Test Environment
 
 ```powershell
+# Still in Isaac Lab environment
+cd I:\wSpace\cinebotRL
+
 # Headless test (no GUI)
 python scripts\test_mobile_mm_env.py --num_envs 1 --steps 5 --headless
 
 # With GUI (slower but visual)
 python scripts\test_mobile_mm_env.py --num_envs 1 --steps 5
+```
+
+**Expected output**:
+```
+✓ Environment created
+✓ Robot loaded
+✓ EE link 'left_gripper_link' found
+✓ Step 0: reward=X.XXXX
+✓ Step 1: reward=X.XXXX
+...
+✓ Test completed successfully
+```
+
+---
+
+## Important Notes 📝
+
+### Environment Isolation
+
+Your WSL and Windows environments are **completely separate**:
+
+| Environment | Location | Python | Purpose |
+|-------------|----------|--------|---------|
+| **WSL** | `/mnt/c/Users/yanbo/wSpace/cinebotRL/.venv_rl311/` | 3.11 | WSL development |
+| **Windows** | `I:\isaaclab\` (built-in) | 3.11 | Windows training |
+
+**No conflicts!** You can switch between them freely.
+
+### When to Use Each
+
+**Use Isaac Lab's environment** (`.\isaaclab.bat`) when:
+- ✅ Training with Isaac Sim
+- ✅ Running environment tests
+- ✅ Recording demos
+- ✅ Debugging with GUI
+
+**Use separate venv** only if:
+- ⚠️ You need specific package versions
+- ⚠️ You want isolation from Isaac Lab
+- ⚠️ You're doing development without Isaac Sim
+
+### Activating the Environment
+
+**Every time** you start a new PowerShell session:
+
+```powershell
+# ALWAYS do this first!
+cd I:\isaaclab
+.\isaaclab.bat
+
+# Then navigate to your project
+cd I:\wSpace\cinebotRL
+
+# Now you can run training scripts
+python scripts\reinforcement_learning\sb3\train.py ...
 ```
 
 ---
@@ -300,21 +422,40 @@ model = PPO.load("checkpoints/my_model.zip")
 ## Quick Reference
 
 ```powershell
-# Activate environment
-cd I:\isaaclab && .\isaaclab.bat
+# === EVERY TIME YOU START ===
+# 1. Activate Isaac Lab environment
+cd I:\isaaclab
+.\isaaclab.bat
 
-# Quick test
+# 2. Navigate to project
 cd I:\wSpace\cinebotRL
-python scripts\test_mobile_mm_env.py --num_envs 1 --steps 2
 
-# Start training
+# 3. Quick test
+python scripts\test_mobile_mm_env.py --num_envs 1 --steps 2 --headless
+
+# 4. Start training
 python scripts\reinforcement_learning\sb3\train.py `
     --task MobileMMTrackEE-v0 `
     --num_envs 1024 `
     --headless
 
-# Monitor
+# 5. Monitor (in separate PowerShell)
+cd I:\isaaclab
+.\isaaclab.bat
+cd I:\wSpace\cinebotRL
 tensorboard --logdir logs\sb3
 ```
+
+---
+
+## Environment Setup Summary
+
+**Recommended setup** (Option A):
+1. ✅ Use Isaac Lab's built-in environment (`.\isaaclab.bat`)
+2. ✅ Install your project: `pip install -e .`
+3. ✅ Install SB3: `pip install stable-baselines3[extra]`
+4. ✅ Done! Ready to train.
+
+**No separate venv needed** - Isaac Lab's environment has everything! 🚀
 
 **Happy training!** 🚀

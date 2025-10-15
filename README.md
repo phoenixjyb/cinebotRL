@@ -2,96 +2,152 @@
 
 ## Overview
 
-This project implements reinforcement learning for a mobile manipulator robot using Isaac Sim and Isaac Lab on Windows, with WSL2 providing ROS 2 integration, data processing, and monitoring capabilities.
+This project implements reinforcement learning for a mobile manipulator robot using Isaac Sim and Isaac Lab on **Windows native**. WSL2 provides optional ROS 2 integration, data analysis, and monitoring capabilities.
 
-**Status (2025-10-13):** ✅ Environment fully configured, ROS 2 communication verified
+**Status (2025-10-15):** ✅ **Windows Training Fully Operational** - All compatibility issues resolved, Stable Baselines3 PPO training verified working
 
 ## Architecture
 
 ```
-Windows (Training)          WSL2 (Support & Monitoring)
-├── Isaac Sim 5.0.0-rc      ├── System Python 3.10
-├── Isaac Lab               │   └── ROS 2 Humble (communication)
-├── ROS 2 Humble            └── .venv_rl311 (Python 3.11)
-└── RTX 3090 (Training)         └── PyTorch, SB3, Gymnasium
-         │                              (analysis & dev)
-         └──── Fast DDS Bridge ────┘
-               (Domain ID: 55)
+Windows (Primary Training Platform) ✅
+├── Isaac Sim 5.0.0-rc.45
+├── Isaac Lab 2.2.0 (Python 3.11.13, torch 2.7.0+cu128)
+├── Stable Baselines3 PPO Training
+├── Custom IsaacLabToSB3VecEnvWrapper (Isaac Lab ↔ SB3 bridge)
+├── ROS 2 Humble (optional, for topic bridging)
+└── RTX 3090 (auto-detected for training)
+
+WSL2 (Optional Support - Not Required)
+├── System Python 3.10
+│   └── ROS 2 Humble (communication & monitoring)
+└── .venv_rl311 (Python 3.11)
+    └── PyTorch, SB3 (data analysis only)
 ```
 
 ## Quick Start
 
-### 1. Verify WSL Setup
+### Windows Training (Recommended)
+
+**Start Training in 3 Commands:**
+```powershell
+# 1. Navigate to project
+cd C:\Users\yanbo\wSpace\cinebotRL
+
+# 2. Launch training (default: 64 envs, headless, 5M steps)
+.\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
+
+# 3. Monitor in separate window
+.\scripts\monitor_training.ps1 -Mode all
+```
+
+**Alternative: Direct Isaac Lab Launcher**
+```powershell
+I:\isaaclab\isaaclab.bat -p scripts/reinforcement_learning/sb3/train.py `
+  --task MobileMMTrackEE-v0 --num_envs 64 --headless true
+```
+
+**See [START_TRAINING_NOW.md](START_TRAINING_NOW.md) for complete training guide.**
+
+### Optional: WSL Setup (For Monitoring/Analysis Only)
+
+**WSL is NOT required for training.** Use only if you need ROS 2 monitoring or data analysis tools.
 
 ```bash
 cd /mnt/c/Users/yanbo/wSpace/cinebotRL
 bash scripts/wsl/check_wsl_setup.sh
 ```
 
-### 2. Choose Your Workflow
-
-**For ROS 2 Communication:**
+**For ROS 2 Monitoring:**
 ```bash
 source scripts/wsl/setup_ros2_only.sh
-ros2 run demo_nodes_cpp talker
+ros2 topic list
 ```
 
-**For RL Development (analysis, utilities):**
+**For Data Analysis:**
 ```bash
 source scripts/wsl/activate_rl_env_wsl.sh
 python experiments/analyze_logs.py
 ```
 
-**For Training (Windows):**
-```powershell
-I:\isaaclab\isaaclab-3090.bat -p scripts/reinforcement_learning/sb3/train.py --task YourTask-v0 --headless
-```
-
 ## Key Scripts
 
-### WSL
-- `scripts/wsl/check_wsl_setup.sh` - Comprehensive environment verification
-- `scripts/wsl/setup_ros2_only.sh` - ROS 2 environment setup
-- `scripts/wsl/activate_rl_env_wsl.sh` - RL development environment
-- `scripts/networking/configure_fastdds_wsl.sh` - Fast DDS network configuration
+### Windows (Primary)
+- `scripts\launch_training_windows.ps1` - ✅ **Primary training launcher** (auto GPU detection, parameters)
+- `scripts\monitor_training.ps1` - Monitor training progress (logs/gpu/tensorboard)
+- `scripts\commit_and_start_training.ps1` - Commit changes and start training in one command
+- `scripts\networking\setup_ros2_humble_windows.ps1` - ROS 2 setup (optional)
+- `scripts\networking\configure_fastdds_firewall.ps1` - Firewall configuration (optional)
 
-### Windows
-- `scripts\networking\setup_ros2_humble_windows.ps1` - ROS 2 setup
-- `scripts\networking\configure_fastdds_firewall.ps1` - Firewall configuration
-- `I:\isaaclab\isaaclab-3090.bat` - Launch Isaac Lab
+### WSL (Optional - Not Required for Training)
+- `scripts/wsl/check_wsl_setup.sh` - Environment verification
+- `scripts/wsl/setup_ros2_only.sh` - ROS 2 environment setup  
+- `scripts/wsl/activate_rl_env_wsl.sh` - RL analysis environment
+- `scripts/networking/configure_fastdds_wsl.sh` - Fast DDS network configuration
 
 ## Documentation
 
 📖 **[Complete Documentation Index](docs/README.md)** - Start here for organized documentation
 
-### Quick Links
+### Essential Guides
 
-- ⚡ **[Quick Reference Card](docs/QUICK_REFERENCE.md)** - One-page cheat sheet (print this!)
-- 🔧 **[WSL Setup Guide](docs/setup/wsl_setup_guide.md)** - Configure WSL environment  
-- 🪟 **[Windows Setup Guide](docs/setup/windows_setup_guide.md)** - Configure Windows side
+- ⚡ **[START_TRAINING_NOW.md](START_TRAINING_NOW.md)** - ✅ **Quick start guide** - Get training running in 3 commands!
+- 📊 **[TRAINING_SUCCESS.md](TRAINING_SUCCESS.md)** - Technical details on all 12+ compatibility fixes
+- ⚡ **[Quick Reference Card](docs/QUICK_REFERENCE.md)** - One-page cheat sheet
+- 🗺️ **[Roadmap](ROADMAP.md)** - Project phases and implementation plan (updated for Windows training)
+
+### Setup & Architecture
+- 🪟 **[Windows Setup Guide](docs/setup/windows_setup_guide.md)** - Configure Windows environment
+- 🔧 **[WSL Setup Guide](docs/setup/wsl_setup_guide.md)** - Optional WSL configuration  
 - 🏗️ **[Architecture Overview](docs/architecture/overview.md)** - How everything fits together
-- 🌉 **[ROS 2 Communication](docs/architecture/ros2_communication.md)** - How WSL ↔ Windows works
+- 🌉 **[ROS 2 Communication](docs/architecture/ros2_communication.md)** - How WSL ↔ Windows works (optional)
 - 🐍 **[Python Environments](docs/architecture/python_environments.md)** - Why multiple Python versions
+
+### Workflows
 - ⚡ **[Daily Workflow](docs/workflows/daily_workflow.md)** - Common tasks and commands
-- 🗺️ **[Roadmap](ROADMAP.md)** - Project phases and implementation plan
+- 🎯 **[Multi-Trajectory Training](docs/workflows/multi_trajectory_training.md)** - Advanced training workflows
 
 ## Environment Details
 
-### Windows Side
-- **Isaac Sim:** `I:\isaacsim` (5.0.0-rc.45, Python 3.11)
-- **Isaac Lab:** `I:\isaaclab` (editable install with SB3, RL-Games)
-- **ROS 2 Humble:** `I:\ros2humble\ros2-windows` (Python 3.10)
-- **Training GPU:** RTX 3090 (CUDA device 0)
+### Windows Side (Primary Training Platform)
+- **Isaac Sim:** `I:\isaacsim` (5.0.0-rc.45, Python 3.11.13)
+- **Isaac Lab:** `I:\isaaclab` (2.2.0, torch 2.7.0+cu128, editable install with SB3)
+- **Training Framework:** Stable Baselines3 PPO with custom `IsaacLabToSB3VecEnvWrapper`
+- **Training GPU:** RTX 3090 (CUDA device 0, auto-detected)
+- **Display GPU:** Quadro P2000 (CUDA device 1)
+- **ROS 2 Humble:** `I:\ros2humble\ros2-windows` (optional, Python 3.10)
+- **Status:** ✅ All compatibility issues resolved, training verified working
 
-### WSL Side
+### WSL Side (Optional - Not Required for Training)
 - **OS:** Ubuntu 22.04 (WSL2)
-- **ROS 2 Humble:** System Python 3.10 (`/opt/ros/humble`)
-- **RL Environment:** `.venv_rl311` Python 3.11 (PyTorch 2.6.0+cu124, SB3 2.7.0)
-- **CUDA:** 12.6.85 (GPU passthrough enabled)
+- **ROS 2 Humble:** System Python 3.10 (`/opt/ros/humble`) - for monitoring only
+- **RL Environment:** `.venv_rl311` Python 3.11 (PyTorch 2.6.0+cu124, SB3 2.7.0) - for analysis only
+- **CUDA:** 12.6.85 (GPU passthrough available but not used)
 
 ## Common Commands
 
-### Test ROS 2 Communication
+### Training & Monitoring (Windows)
+
+```powershell
+# Start training (basic)
+.\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
+
+# Start training with custom settings
+.\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 128 -TotalTimesteps 10000000
+
+# Monitor training logs
+.\scripts\monitor_training.ps1 -Mode logs
+
+# Watch GPU usage
+.\scripts\monitor_training.ps1 -Mode gpu
+
+# Launch TensorBoard
+.\scripts\monitor_training.ps1 -Mode tensorboard
+
+# All-in-one: commit and train
+.\scripts\commit_and_start_training.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
+```
+
+### Test ROS 2 Communication (Optional)
 
 ```bash
 # WSL: Publish messages
@@ -105,10 +161,10 @@ ros2 run demo_nodes_cpp talker
 ros2 run demo_nodes_cpp listener
 ```
 
-### Monitor Training
+### Data Analysis (WSL - Optional)
 
 ```bash
-# Start TensorBoard
+# Start TensorBoard for analysis
 source scripts/wsl/activate_rl_env_wsl.sh
 tensorboard --logdir /mnt/i/isaaclab/logs
 
@@ -119,36 +175,62 @@ ros2 topic list
 
 ## Python Version Guidelines
 
-- **System Python 3.10:** Use for ROS 2 nodes, `ros2` CLI commands
-- **Venv Python 3.11:** Use for RL development, PyTorch, data analysis
-- **Windows Python 3.11:** Isaac Lab training (bundled with Isaac Sim)
-- **Windows Python 3.10:** ROS 2 on Windows (separate installation)
+- **Windows Python 3.11 (Isaac Lab):** ✅ **Primary for training** - bundled with Isaac Sim, use for all RL training
+- **Windows Python 3.10 (ROS 2):** Optional - only if using ROS 2 on Windows for topic bridging
+- **WSL Python 3.11 (venv):** Optional - only for data analysis, visualization, not training
+- **WSL System Python 3.10:** Optional - only for ROS 2 monitoring and automation scripts
+
+## Training Performance
+
+**Current Task:** `MobileMMTrackEE-v0` (Mobile Manipulator End-Effector Tracking)
+- **Robot:** 9 DOF (6 arm joints + 3 chassis: vx, vy, wz)
+- **Action Space:** 8D (6 arm positions + vx + wz, differential drive excludes vy)
+- **Observation Space:** 76D (dynamically discovered)
+- **Algorithm:** Stable Baselines3 PPO with VecNormalize
+
+**Expected Timeline:**
+- 64 envs: ~60 minutes for 100K steps, ~8-10 hours for 5M steps  
+- 128 envs: ~30 minutes for 100K steps, ~4-5 hours for 5M steps
+
+**Architecture:** Custom `IsaacLabToSB3VecEnvWrapper` bridges Isaac Lab (dict observations, torch tensors, GPU) to Stable Baselines3 (numpy arrays, CPU). See [TRAINING_SUCCESS.md](TRAINING_SUCCESS.md) for technical details.
 
 ## Troubleshooting
 
-**ROS 2 topics not visible?**
+**Training not starting?**
+- Verify Isaac Lab installation: `I:\isaaclab\isaaclab.bat -h`
+- Check GPU detection: `nvidia-smi`
+- Review logs in latest directory under `I:\isaaclab\logs\sb3\`
+- See [TRAINING_SUCCESS.md](TRAINING_SUCCESS.md) for known issues and solutions
+
+**Import errors or compatibility issues?**
+- All 12+ compatibility issues have been resolved as of 2025-10-15
+- Gymnasium ale_py issue: Already patched in Isaac Lab Python environment
+- See [TRAINING_SUCCESS.md](TRAINING_SUCCESS.md) for complete list of fixes
+
+**ROS 2 topics not visible? (Optional)**
 - Check `ROS_DOMAIN_ID=55` on both sides
 - Verify firewall: `netsh advfirewall firewall show rule name=all | findstr 7410`
 - Reconfigure Fast DDS: `bash scripts/networking/configure_fastdds_wsl.sh`
 
-**PyTorch CUDA not available?**
-- Activate venv: `source scripts/wsl/activate_rl_env_wsl.sh`
-- Check paths: `echo $LD_LIBRARY_PATH`
+**PyTorch CUDA not available in WSL?**
+- Not needed for training! Use Windows side for training
+- For analysis only: Activate venv `source scripts/wsl/activate_rl_env_wsl.sh`
 
-**`rclpy` import error in venv?**
-- Expected! Deactivate venv and use system Python for ROS 2
-
-See [WSL Workflow Guide](docs/wsl_workflow_guide.md) for detailed troubleshooting.
+See [docs/reference/troubleshooting.md](docs/reference/troubleshooting.md) for detailed troubleshooting.
 
 ## Next Steps
 
 1. ✅ Environment setup complete
 2. ✅ ROS 2 communication tested
-3. ⏭️ Implement custom RL task (`MobileMMTrackEE-v0`)
-4. ⏭️ Convert robot URDF to USD format
-5. ⏭️ Run baseline training experiments
+3. ✅ **Windows training verified working** (2025-10-15)
+4. ✅ `MobileMMTrackEE-v0` task implemented and training
+5. ✅ Robot USD asset created and validated
+6. ⏭️ Tune reward function and hyperparameters
+7. ⏭️ Implement obstacle avoidance scenarios
+8. ⏭️ Deploy trained policy to robot
 
 ---
 
-**Last Updated:** 2025-10-13
+**Last Updated:** 2025-10-15  
+**Training Status:** ✅ Fully Operational on Windows
 

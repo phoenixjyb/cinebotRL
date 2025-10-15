@@ -6,6 +6,7 @@ with its end-effector while avoiding obstacles and maintaining stability.
 
 from __future__ import annotations
 
+import sys
 import torch
 from dataclasses import dataclass, field
 from typing import Any
@@ -105,8 +106,9 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         )
         
         # Set physics simulation parameters
+        # Note: device will be auto-selected by AppLauncher
+        # No need to specify here - Isaac Lab will use the device from AppLauncher
         self.sim = SimulationCfg(
-            device="cuda:1",  # Use RTX 3090 explicitly
             dt=0.005,  # 200 Hz physics
             render_interval=self.decimation,
         )
@@ -320,6 +322,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             actions: Actions from policy [num_envs, num_actions]
         """
         # Ensure actions are 2D [num_envs, num_actions]
+        # Sometimes actions come in as 3D [1, 1, 8] - squeeze to [1, 8]
+        while actions.ndim > 2:
+            if actions.shape[0] == 1:
+                actions = actions.squeeze(0)
+            elif actions.shape[1] == 1:
+                actions = actions.squeeze(1)
+            else:
+                break
+        
         if actions.ndim == 1:
             actions = actions.unsqueeze(0)
         
@@ -334,8 +345,33 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             self.action_history[:, -1, :] = actions
         
         # Apply actions to robot
-        # For now, directly set joint position targets (will be refined)
-        self.robot.set_joint_position_target(actions)
+        # Action space is 8D: [6 arm joint positions, vx, wz]
+        # Robot has 9 DOF: [6 arm joints, 3 chassis: vx, vy, wz]
+        # Differential drive can't move sideways, so vy is always 0
+        
+        # Split actions: first 6 are arm joints, last 2 are base commands (vx, wz)
+        arm_actions = actions[:, :6]  # First 6: arm joint position targets
+        base_vx = actions[:, 6:7]     # vx: forward/backward velocity
+        base_wz = actions[:, 7:8]     # wz: angular velocity (rotation)
+        
+        # Apply arm joint position targets to the actuated arm joints only
+        # The robot has 9 total joints: 6 arm + 3 chassis (vx, vy, wz)
+        # We only control the 6 arm joints via position targets
+        if not hasattr(self, '_arm_joint_ids'):
+            # Find indices of arm joints (left_arm_joint1 through left_arm_joint6)
+            arm_joint_names = [f"left_arm_joint{i}" for i in range(1, 7)]
+            self._arm_joint_ids = []
+            for name in arm_joint_names:
+                if name in self.robot.joint_names:
+                    idx = self.robot.joint_names.index(name)
+                    self._arm_joint_ids.append(idx)
+            self._arm_joint_ids = torch.tensor(self._arm_joint_ids, device=self.device)
+        
+        # Set joint position targets for arm joints only
+        self.robot.set_joint_position_target(arm_actions, joint_ids=self._arm_joint_ids)
+        
+        # TODO: Apply base velocity commands (v_x, omega_z) to mobile base
+        # For now, base is passive - will be implemented later
     
     def _apply_action(self):
         """Apply actions to the simulation (called by parent)."""

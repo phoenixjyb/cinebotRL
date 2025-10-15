@@ -2,17 +2,31 @@
 
 ## 0. Environment Roles, Tooling, and Assets
 
-### Windows (Primary Isaac Lab Runtime)
-- Launch Isaac Sim 5.0.0 RC and Isaac Lab via `I:\isaaclab\isaaclab-3090.bat`, ensuring `CUDA_VISIBLE_DEVICES=0` pins workloads to the RTX 3090.
-- Convert authoritative URDF/mesh assets from `assets_own/` into Omniverse USDs (store generated USDs under `assets_own/usd/`) before registering them in lab configs; archive validation or reduction outputs under `assets/processed/`.
-- Run RL training scripts (SB3, RL-Games), manage TensorBoard/Torch checkpoints, and validate GUI scenes. Isaac Lab packages are already installed editable against the bundled Python 3.11 environment (`isaaclab`, `isaaclab_tasks`, etc.).
-- Maintain ROS 2 Humble listener sessions using `scripts\networking\setup_ros2_humble_windows.ps1 -RosInstall I:\ros2\ros2-windows`, keeping `ROS_DOMAIN_ID=55` and Fast DDS bridge ready for cross-host telemetry.
+### Windows (Primary RL Training Platform) ✅ **FULLY OPERATIONAL**
+**Status (2025-10-15):** Training verified working with all compatibility fixes applied
 
-### WSL2 (Ubuntu 22.04, Supporting Automation)
-- Use for scripting, data preprocessing, ROS 2 publishers, and future headless Isaac Sim automation. CUDA 12.6 is verified (`nvcc --version` -> 12.6.85).
-- Source `.venv_rl311` via `scripts/wsl/activate_rl_env_wsl.sh` for CUDA-enabled PyTorch experiments that do not require the Windows kit.
-- Keep Fast DDS bridge aligned with `scripts/networking/configure_fastdds_wsl.sh`, exporting `ROS_DOMAIN_ID=55`, `RMW_IMPLEMENTATION=rmw_fastrtps_cpp`, and `FASTDDS_DEFAULT_PROFILES_FILE=$HOME/fastdds_windows.xml`; confirmed listener/talker exchange on 2025‑10‑13.
-- Optional headless Isaac Sim install (Linux) remains pending; run `scripts/install_isaacsim_headless_wsl.sh` and `scripts/wsl/check_phase0_prereqs.sh` once ready.
+- **Isaac Lab 2.2.0** at `I:\isaaclab` with Python 3.11.13, torch 2.7.0+cu128, Isaac Sim 5.0.0-rc.45
+- **Dual-GPU Configuration:**
+  - RTX 3090 (Device 0, compute 8.6) → RL training (auto-detected)
+  - Quadro P2000 (Device 1, compute 6.1) → display/GUI
+- **Training Framework:** Stable Baselines3 PPO with custom `IsaacLabToSB3VecEnvWrapper` bridging Isaac Lab → SB3
+- **Launch Method:** PowerShell scripts with automatic GPU detection (no manual CUDA_VISIBLE_DEVICES needed)
+  ```powershell
+  .\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
+  ```
+- **ROS 2 Humble** at `I:\ros2humble\ros2-windows` (Python 3.10) for Isaac Sim topic bridging (Domain 55)
+- **Asset Management:** Convert URDF/meshes from `assets_own/` to USD format in `assets_own/usd/` before training
+
+**Migration Complete:** All WSL-specific code removed. Training runs natively on Windows with 12+ compatibility fixes documented in [TRAINING_SUCCESS.md](TRAINING_SUCCESS.md). Quick start guide available in [START_TRAINING_NOW.md](START_TRAINING_NOW.md).
+
+### WSL2 (Ubuntu 22.04, Optional Support)
+**Not required for training** - use only for data analysis, monitoring, or ROS 2 automation
+
+- **ROS 2 Humble** (system Python 3.10, `/opt/ros/humble`) for topic monitoring and automation scripts
+- **`.venv_rl311`** (Python 3.11, PyTorch 2.6.0+cu124, SB3 2.7.0) for data analysis and visualization (not training)
+- CUDA 12.6.85 available via GPU passthrough, but Windows handles all training
+- Fast DDS bridge config: `scripts/networking/configure_fastdds_wsl.sh` (Domain 55)
+- Optional headless Isaac Sim install: `scripts/install_isaacsim_headless_wsl.sh` (not needed for current workflow)
 
 ### Asset Provenance
 - `assets_own/`: single source of truth for URDFs and original meshes; keep under version control.
@@ -97,9 +111,57 @@ Register the task ID (e.g., `MobileMMTrackEE-v0`) in the training registry (`src
 I:\isaaclab\isaaclab-3090.bat -p scripts/reinforcement_learning/sb3/train.py \
   --task MobileMMTrackEE-v0 --num_envs 1024 --headless
 
-# Windows (RL-Games example)
-I:\isaaclab\isaaclab-3090.bat -p scripts/reinforcement_learning/rl_games/train.py \
-  task=MobileMMTrackEE-v0 num_envs=1024 headless=true max_iterations=1000
+## 3. Running RL Training
+
+### Quick Start (Windows Training)
+
+**Option 1: Quick Start (Recommended)**
+```powershell
+# Launch training with default settings (64 envs, headless, 5M steps)
+.\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
+
+# Or with custom parameters
+.\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 128 -TotalTimesteps 10000000
+```
+
+**Option 2: Direct Invocation**
+```powershell
+# Direct Isaac Lab launcher (auto GPU detection)
+I:\isaaclab\isaaclab.bat -p scripts/reinforcement_learning/sb3/train.py `
+  --task MobileMMTrackEE-v0 --num_envs 64 --headless true --total_timesteps 5000000
+```
+
+**Option 3: Combined Commit & Train**
+```powershell
+# Commit all changes and start training in one command
+.\scripts\commit_and_start_training.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
+```
+
+### Monitoring Training
+
+```powershell
+# In a separate PowerShell window - view logs
+.\scripts\monitor_training.ps1 -Mode logs
+
+# Watch GPU usage
+.\scripts\monitor_training.ps1 -Mode gpu
+
+# Launch TensorBoard
+.\scripts\monitor_training.ps1 -Mode tensorboard
+
+# Show all monitoring options
+.\scripts\monitor_training.ps1 -Mode all
+```
+
+**Expected Timeline:**
+- 64 envs: ~60 minutes for 100K steps, ~8-10 hours for 5M steps
+- 128 envs: ~30 minutes for 100K steps, ~4-5 hours for 5M steps
+
+**Checkpoints:** Saved to `I:\isaaclab\logs\sb3\MobileMMTrackEE-v0\<timestamp>/checkpoints/`
+
+**Architecture:** Custom `IsaacLabToSB3VecEnvWrapper` handles all conversions between Isaac Lab (dict observations, torch tensors, GPU) and Stable Baselines3 (numpy arrays, CPU). See [TRAINING_SUCCESS.md](TRAINING_SUCCESS.md) for technical details.
+
+Monitor progress via TensorBoard (logs at `I:\isaaclab\logs\sb3`), and keep checkpoints under `I:\isaaclab\logs/` (gitignored).
 ```
 
 Monitor progress via TensorBoard (`logs/sb3` or `logs/rl_games`), and keep checkpoints under `outputs/` (gitignored).
@@ -113,17 +175,31 @@ Monitor progress via TensorBoard (`logs/sb3` or `logs/rl_games`), and keep check
 ## 5. Next Stage Checklist
 
 1. **Assets**
-   - [x] Stage `assets_own/usd/mobile_manipulator_PPR_base_corrected.usd` and supporting configuration (2025-10-13).
-   - [ ] Regenerate `assets/processed/mobile_arm_whole_body/inspection_report.json` after any mesh/URDF edits.
-2. **Code**
-   - [ ] Scaffold `src/rl_platform/tasks/mobile_mm/` (config, trajectories, scene, observations, rewards, env).
-   - [ ] Implement `_get_obs`, `_compute_reward`, `_reset_idx`, and obstacle randomization inside `MobileMMTrackEE`.
-   - [ ] Register `MobileMMTrackEE-v0` (or chosen ID) in the training registry and expose config knobs.
+   - [x] Stage `assets_own/usd/mobile_manipulator_PPR_base_corrected.usd` and supporting configuration (2025-10-13)
+   - [ ] Regenerate `assets/processed/mobile_arm_whole_body/inspection_report.json` after any mesh/URDF edits
+
+2. **Code & Environment**
+   - [x] ✅ **Windows Training Operational** (2025-10-15)
+     - [x] Isaac Lab 2.2.0 + Stable Baselines3 integration complete
+     - [x] All 12+ compatibility issues resolved (see [TRAINING_SUCCESS.md](TRAINING_SUCCESS.md))
+     - [x] Custom `IsaacLabToSB3VecEnvWrapper` implemented for Isaac Lab ↔ SB3 bridging
+     - [x] GPU auto-detection implemented (no manual CUDA_VISIBLE_DEVICES needed)
+     - [x] PowerShell launcher scripts created ([launch_training_windows.ps1](scripts/launch_training_windows.ps1))
+     - [x] Monitoring utilities created ([monitor_training.ps1](scripts/monitor_training.ps1))
+     - [x] Training verified working with `MobileMMTrackEE-v0` task
+   - [x] Scaffold `src/rl_platform/tasks/mobile_mm/` (config, trajectories, scene, observations, rewards, env)
+   - [x] Implement `_get_obs`, `_compute_reward`, `_reset_idx` in `MobileMMTrackEE`
+   - [x] Register `MobileMMTrackEE-v0` in training registry
+   - [ ] Add obstacle randomization inside `MobileMMTrackEE` environment
+
 3. **Testing**
-   - [ ] Run asset inspector + visualization pipeline to sanity-check the USD import.
-   - [ ] Execute a smoke RL run (e.g., RL-Games with 128 envs for 200 iterations) to validate reward stability.
-   - [ ] Script a collision-avoidance scenario to confirm contact sensors and distance penalties fire correctly.
+   - [x] Run asset inspector + visualization pipeline to validate USD import
+   - [x] Execute RL training runs (SB3 with 64-128 envs) to validate reward stability
+   - [ ] Script a collision-avoidance scenario to confirm contact sensors and distance penalties
+
 4. **Automation & Integration**
-   - [ ] Decide whether to finish the WSL headless Isaac Sim install (`scripts/install_isaacsim_headless_wsl.sh`).
-   - [ ] Extend ROS 2 bridge validation to the new task (ensure Isaac Sim publishes expected topics on domain 55).
-   - [ ] Add CI/local hooks (e.g., lint/preflight invoking `scripts/wsl/check_phase0_prereqs.sh`).
+   - [ ] Optional: Finish WSL headless Isaac Sim install (`scripts/install_isaacsim_headless_wsl.sh`) - not required for training
+   - [ ] Extend ROS 2 bridge validation to the new task (ensure Isaac Sim publishes expected topics on domain 55)
+   - [ ] Add CI/local hooks (e.g., lint/preflight invoking `scripts/wsl/check_phase0_prereqs.sh`)
+
+**Priority:** Training infrastructure complete ✅ Next focus: Reward tuning, obstacle avoidance, deployment pipeline

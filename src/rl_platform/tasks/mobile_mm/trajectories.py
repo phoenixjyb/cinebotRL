@@ -14,7 +14,7 @@ class TrajectoryManager:
     
     def __init__(
         self,
-        traj_type: Literal["line", "circle", "figure_eight", "recorded"],
+        traj_type: Literal["line", "circle", "figure_eight", "recorded", "multi_recorded"],
         num_envs: int,
         device: str,
         amplitude: float = 0.5,
@@ -22,6 +22,7 @@ class TrajectoryManager:
         height: float = 1.0,
         dt: float = 0.02,
         waypoint_file: str | None = None,
+        trajectory_dir: str | None = None,
     ):
         """Initialize trajectory manager.
         
@@ -34,6 +35,7 @@ class TrajectoryManager:
             height: Height (z-coordinate) of trajectory plane
             dt: Time step in seconds
             waypoint_file: Path to recorded waypoint JSON file (for 'recorded' type)
+            trajectory_dir: Directory with multiple trajectories (for 'multi_recorded' type)
         """
         self.traj_type = traj_type
         self.num_envs = num_envs
@@ -50,22 +52,34 @@ class TrajectoryManager:
         self.center_x = torch.zeros(num_envs, device=device)
         self.center_y = torch.zeros(num_envs, device=device)
         
-        # Recorded trajectory data
+        # Recorded trajectory data (single trajectory mode)
         self.recorded_positions = None
         self.recorded_orientations = None
         self.current_waypoint_idx = torch.zeros(num_envs, dtype=torch.long, device=device)
         
-        # Load recorded trajectory if specified
+        # Multi-trajectory loader
+        self.multi_loader = None
+        
+        # Load trajectory based on type
         if traj_type == "recorded" and waypoint_file is not None:
             self._load_recorded_trajectory(waypoint_file)
+        elif traj_type == "multi_recorded" and trajectory_dir is not None:
+            self._init_multi_trajectory(trajectory_dir)
         
     def reset(self, env_ids: torch.Tensor) -> None:
         """Reset trajectory phase for specified environments.
+        
+        For multi_recorded mode, this also resamples new trajectories.
         
         Args:
             env_ids: Indices of environments to reset
         """
         self.phase[env_ids] = 0.0
+        self.current_waypoint_idx[env_ids] = 0
+        
+        # Resample trajectories in multi-trajectory mode
+        if self.traj_type == "multi_recorded":
+            self._resample_multi_trajectories(env_ids)
         
     def set_center(self, center_x: torch.Tensor, center_y: torch.Tensor) -> None:
         """Set trajectory center offsets.
@@ -90,7 +104,7 @@ class TrajectoryManager:
             return self._line_trajectory()
         elif self.traj_type == "figure_eight":
             return self._figure_eight_trajectory()
-        elif self.traj_type == "recorded":
+        elif self.traj_type in ["recorded", "multi_recorded"]:
             return self._recorded_trajectory()
         else:
             raise NotImplementedError(f"Trajectory type {self.traj_type} not implemented")
@@ -267,4 +281,47 @@ class TrajectoryManager:
         
         print(f"[TrajectoryManager] Loaded {len(poses)} waypoints from {waypoint_file}")
         print(f"[TrajectoryManager] Position range: {positions_array.min(dim=0)[0]} to {positions_array.max(dim=0)[0]}")
+    
+    def _init_multi_trajectory(self, trajectory_dir: str) -> None:
+        """Initialize multi-trajectory loader.
+        
+        Args:
+            trajectory_dir: Directory containing multiple trajectory JSON files
+        """
+        from .multi_trajectory import MultiTrajectoryLoader
+        
+        self.multi_loader = MultiTrajectoryLoader(
+            trajectory_dir=trajectory_dir,
+            pattern="**/*.json",
+            device=self.device,
+            max_trajectories=None,  # Load all
+        )
+        
+        # Sample initial trajectories for all environments
+        self._resample_multi_trajectories()
+    
+    def _resample_multi_trajectories(self, env_ids: torch.Tensor | None = None) -> None:
+        """Resample trajectories for specified environments.
+        
+        Args:
+            env_ids: Environment IDs to resample (None = all)
+        """
+        if self.multi_loader is None:
+            return
+        
+        if env_ids is None:
+            # Resample all environments
+            positions, orientations = self.multi_loader.sample_trajectories(self.num_envs)
+            self.recorded_positions = positions
+            self.recorded_orientations = orientations
+            self.current_waypoint_idx.zero_()
+        else:
+            # Resample only specified environments
+            num_resample = len(env_ids)
+            positions, orientations = self.multi_loader.sample_trajectories(num_resample)
+            
+            self.recorded_positions[env_ids] = positions
+            self.recorded_orientations[env_ids] = orientations
+            self.current_waypoint_idx[env_ids] = 0
+
 

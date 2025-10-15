@@ -12,7 +12,29 @@ import os
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
+# ============================================================================
+# CRITICAL: GPU Selection for WSL + Isaac Sim
+# ============================================================================
+# ISSUE: System has 2 GPUs:
+#   GPU 0: Quadro P2000 (CUDA capability 6.1 - NOT supported by PyTorch 2.7+)
+#   GPU 1: RTX 3090 (CUDA capability 8.6 - SUPPORTED)
+#
+# ISSUE 2: WSL2 CUDA Library Path
+#   Warp (Isaac Sim's GPU tensor library) needs /usr/lib/wsl/lib in LD_LIBRARY_PATH
+#   to find the CUDA driver stub in WSL2.
+#
+# SOLUTION:
+#   1. Add /usr/lib/wsl/lib to LD_LIBRARY_PATH via wrapper script (run_with_wsl_cuda.sh)
+#   2. Use PCI bus ordering for consistent device numbering
+#   3. Let PhysX auto-select GPU with compute capability >= 7.0 (will pick RTX 3090)
+#   4. DO NOT set CUDA_VISIBLE_DEVICES (Omniverse warns it causes issues)
+# ============================================================================
+
+# This configuration is now handled by the wrapper script run_with_wsl_cuda.sh
+# The script must set LD_LIBRARY_PATH before Python starts!
+
 # Accept EULA
+os.environ["ACCEPT_EULA"] = "YES"
 os.environ["OMNI_KIT_ACCEPT_EULA"] = "yes"
 
 def main():
@@ -32,15 +54,24 @@ def main():
     # Import Isaac Lab app launcher
     print("[1/8] Initializing Isaac Lab...")
     try:
-        from omni.isaac.lab.app import AppLauncher
+        from isaaclab.app import AppLauncher
         
-        # Create launcher args
-        app_launcher = AppLauncher(headless=args_cli.headless)
+        # Create launcher args with custom kit settings
+        # CRITICAL: device="cuda:1" selects RTX 3090 (device 1 in WSL2)
+        # Device 0 = Quadro P2000 (compute capability 6.1 - not supported)
+        # Device 1 = RTX 3090 (compute capability 8.6 - supported)
+        app_launcher = AppLauncher(
+            headless=args_cli.headless,
+            enable_cameras=False,  # No camera rendering needed
+            device="cuda:1",  # Use RTX 3090 (device 1)
+        )
         simulation_app = app_launcher.app
         
         print("    ✓ Isaac Lab initialized")
     except Exception as e:
         print(f"    ✗ Failed to initialize Isaac Lab: {e}")
+        import traceback
+        traceback.print_exc()
         return 1
     
     # Now import the rest (must be after app launcher)

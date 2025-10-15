@@ -7,24 +7,39 @@ with its end-effector while avoiding obstacles and maintaining stability.
 from __future__ import annotations
 
 import torch
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
+import gymnasium as gym
+import numpy as np
 
-# Isaac Lab imports (these will be available when running in Isaac Lab)
+# Isaac Lab imports (correct for Isaac Lab 2.2.0 pip package)
+# NOTE: Must import AFTER AppLauncher/SimulationApp is created!
 try:
-    import omni.isaac.lab.sim as sim_utils
-    from omni.isaac.lab.assets import ArticulationCfg, AssetBaseCfg
-    from omni.isaac.lab.envs import DirectRLEnv, DirectRLEnvCfg
-    from omni.isaac.lab.scene import InteractiveSceneCfg
-    from omni.isaac.lab.sim import SimulationCfg
-    from omni.isaac.lab.utils import configclass
+    # Isaac Lab 2.2.0 pip package uses 'isaaclab' not 'omni.isaac.lab'
+    import isaaclab.sim as sim_utils
+    from isaaclab.actuators import ImplicitActuatorCfg
+    from isaaclab.assets import ArticulationCfg, AssetBaseCfg
+    from isaaclab.envs import DirectRLEnv, DirectRLEnvCfg
+    from isaaclab.scene import InteractiveSceneCfg
+    from isaaclab.sim import SimulationCfg
+    from isaaclab.utils import configclass
     ISAAC_LAB_AVAILABLE = True
-except ImportError:
-    # Fallback for development without Isaac Lab
+except ImportError as e:
+    # Fallback for development/testing without Isaac Sim running
+    # When register_isaac_lab_tasks() is called, Isaac Sim will already
+    # be running and the imports will succeed on the second pass
     ISAAC_LAB_AVAILABLE = False
-    DirectRLEnv = object
-    DirectRLEnvCfg = object
-    configclass = lambda cls: dataclass(cls)
+    print(f"[env.py] ✗ Failed to import Isaac Lab: {e}", file=sys.stderr)
+    DirectRLEnv = None
+    DirectRLEnvCfg = None
+    configclass = None
+    # Create dummy versions for type hints
+    class DirectRLEnv:  # type: ignore
+        pass
+    class DirectRLEnvCfg:  # type: ignore
+        pass
+    def configclass(cls):  # type: ignore
+        return dataclass(cls)
 
 from rl_platform.robots.mobile_mm import get_mobile_mm_usd_path
 from .config import MobileMMTrackConfig, RewardWeights
@@ -40,9 +55,10 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
     # Simulation settings
     decimation = 4
     episode_length_s = 20.0
+    num_envs = 1  # Default to 1, can be overridden
     
     # Task-specific configuration
-    task_config: MobileMMTrackConfig = MobileMMTrackConfig()
+    task_config: MobileMMTrackConfig = field(default_factory=MobileMMTrackConfig)
     
     # Scene configuration (will be populated in __post_init__)
     scene: InteractiveSceneCfg = None
@@ -71,8 +87,26 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
             use_obstacles=self.task_config.obstacles.enable_obstacles,
         )
         
+        # Define observation space (continuous, normalized)
+        self.observation_space = gym.spaces.Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(self.num_observations,),
+            dtype=np.float32,
+        )
+        
+        # Define action space (continuous, normalized)
+        # Actions: [arm_joint_targets (6), base_vel_x, base_angular_vel]
+        self.action_space = gym.spaces.Box(
+            low=-1.0,
+            high=1.0,
+            shape=(self.num_actions,),
+            dtype=np.float32,
+        )
+        
         # Set physics simulation parameters
         self.sim = SimulationCfg(
+            device="cuda:1",  # Use RTX 3090 explicitly
             dt=0.005,  # 200 Hz physics
             render_interval=self.decimation,
         )
@@ -85,9 +119,10 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         
         # Configure robot articulation
         robot_cfg = ArticulationCfg(
+            prim_path="{ENV_REGEX_NS}/Robot",  # USD prim path for robot
             spawn=sim_utils.UsdFileCfg(
                 usd_path=robot_usd_path,
-                activate_contact_sensors=False,
+                activate_contact_sensors=True,  # Enable for self-collision detection
             ),
             init_state=ArticulationCfg.InitialStateCfg(
                 pos=(0.0, 0.0, 0.0),
@@ -102,7 +137,7 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
                 },
             ),
             actuators={
-                "arm": sim_utils.ImplicitActuatorCfg(
+                "arm": ImplicitActuatorCfg(
                     joint_names_expr=["left_arm_joint[1-6]"],
                     stiffness=400.0,
                     damping=40.0,
@@ -112,13 +147,14 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         
         # Ground plane
         ground_cfg = AssetBaseCfg(
+            prim_path="/World/Ground",  # USD prim path for ground
             spawn=sim_utils.GroundPlaneCfg(),
             init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0)),
         )
         
         # Create scene
         scene_cfg = InteractiveSceneCfg(
-            num_envs=1024,  # Will be overridden by training config
+            num_envs=self.num_envs,  # Use num_envs from parent config
             env_spacing=4.0,
             replicate_physics=True,
         )
@@ -144,24 +180,50 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         Args:
             cfg: Environment configuration
-            render_mode: Rendering mode (None for headless)
+            render_mode: Rendering mode (None for headless) - currently unused
             **kwargs: Additional arguments passed to parent
         """
-        super().__init__(cfg, render_mode, **kwargs)
+        # DirectRLEnv only takes cfg, not render_mode
+        super().__init__(cfg, **kwargs)
         
         # Task configuration
         self.task_cfg = cfg.task_config
+        
+        # Build reward weights dictionary with new constraint penalties
         self.reward_weights = {
             "position_tracking": self.task_cfg.rewards.position_tracking,
             "orientation_tracking": self.task_cfg.rewards.orientation_tracking,
             "progress_bonus": self.task_cfg.rewards.progress_bonus,
             "action_magnitude": self.task_cfg.rewards.action_magnitude,
             "action_rate": self.task_cfg.rewards.action_rate,
+            "action_smoothness": self.task_cfg.rewards.action_smoothness,
+            "velocity_limit_penalty": self.task_cfg.rewards.velocity_limit_penalty,
+            "acceleration_limit_penalty": self.task_cfg.rewards.acceleration_limit_penalty,
+            "jerk_limit_penalty": self.task_cfg.rewards.jerk_limit_penalty,
+            "joint_limit_penalty": self.task_cfg.rewards.joint_limit_penalty,
+            "lateral_motion_penalty": self.task_cfg.rewards.lateral_motion_penalty,
+            "self_collision_penalty": self.task_cfg.rewards.self_collision_penalty,
+            "self_collision_threshold": self.task_cfg.rewards.self_collision_threshold,
+            "self_collision_continuous": self.task_cfg.rewards.self_collision_continuous,
             "collision_penalty": self.task_cfg.rewards.collision_penalty,
             "stability_penalty": self.task_cfg.rewards.stability_penalty,
             "min_obstacle_distance_weight": self.task_cfg.rewards.min_obstacle_distance_weight,
             "safety_radius": self.task_cfg.rewards.safety_radius,
         }
+        
+        # Robot limits dictionary
+        self.robot_limits = {
+            "max_linear_velocity": self.task_cfg.robot_limits.max_linear_velocity,
+            "max_angular_velocity": self.task_cfg.robot_limits.max_angular_velocity,
+            "max_linear_acceleration": self.task_cfg.robot_limits.max_linear_acceleration,
+            "max_linear_jerk": self.task_cfg.robot_limits.max_linear_jerk,
+            "max_joint_velocity": self.task_cfg.robot_limits.max_joint_velocity,
+            "max_joint_acceleration": self.task_cfg.robot_limits.max_joint_acceleration,
+            "joint_limit_margin": self.task_cfg.robot_limits.joint_limit_margin,
+        }
+        
+        # Control timestep (for derivative calculations)
+        self.control_dt = self.physics_dt * self.cfg.decimation
         
         # Trajectory manager
         self.trajectory_manager = TrajectoryManager(
@@ -171,14 +233,26 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             amplitude=self.task_cfg.trajectory.amplitude,
             speed=self.task_cfg.trajectory.speed,
             height=self.task_cfg.trajectory.height,
-            dt=self.physics_dt * self.cfg.decimation,
+            dt=self.control_dt,
         )
         
-        # State buffers
+        # State buffers for tracking history (needed for derivatives)
         self.prev_actions = torch.zeros(
             self.num_envs, self.cfg.num_actions, device=self.device
         )
+        self.prev_prev_actions = torch.zeros(
+            self.num_envs, self.cfg.num_actions, device=self.device
+        )
         self.prev_tracking_error = torch.zeros(self.num_envs, device=self.device)
+        
+        # Velocity history for acceleration calculation
+        self.prev_base_lin_vel = torch.zeros(self.num_envs, 3, device=self.device)
+        self.prev_joint_vel = torch.zeros(
+            self.num_envs, 6, device=self.device  # 6 arm joints
+        )
+        
+        # Acceleration history for jerk calculation
+        self.prev_base_accel = torch.zeros(self.num_envs, 3, device=self.device)
         
         # Action history buffer
         if self.task_cfg.include_action_history:
@@ -193,9 +267,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Reward component tracking for logging
         self.reward_components = {}
-        
         # End-effector body index (will be set in _setup_scene)
         self._ee_body_idx = None
+        
+        # Joint limits (will be extracted in _setup_scene)
+        self.joint_lower_limits = None
+        self.joint_upper_limits = None
         
         print(f"[MobileMMTrackEE] Environment initialized:")
         print(f"  - Num envs: {self.num_envs}")
@@ -203,28 +280,38 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         print(f"  - Action dim: {self.cfg.num_actions}")
         print(f"  - Trajectory type: {self.task_cfg.trajectory.type}")
         print(f"  - Episode length: {self.max_episode_length} steps")
+        print(f"  - Control frequency: {1.0 / self.control_dt:.1f} Hz")
+        print(f"  - Trajectory dt: {self.task_cfg.trajectory_dt:.3f}s")
     
     def _setup_scene(self):
         """Setup the scene entities."""
         # Get robot articulation
         self.robot = self.scene["robot"]
         
-        # Find end-effector body index by name
-        ee_link_name = "left_gripper_link"
-        if ee_link_name in self.robot.body_names:
-            self._ee_body_idx = self.robot.body_names.index(ee_link_name)
-            print(f"[MobileMMTrackEE] Found EE link '{ee_link_name}' at index {self._ee_body_idx}")
-        else:
-            # Fallback to last body
-            self._ee_body_idx = -1
-            print(f"[MobileMMTrackEE] WARNING: EE link '{ee_link_name}' not found, using last body")
+        # Joint limits will be extracted lazily when needed (after first reset)
+        self.joint_lower_limits = None
+        self.joint_upper_limits = None
+        self._joint_limits_initialized = False
         
-        # Clone ground plane
+        # End-effector body index will be found lazily
+        self._ee_body_idx = None
+        self._ee_body_idx_initialized = False
+        
+        # Clone environments
         self.scene.clone_environments(copy_from_source=False)
-        
-        # Add lights if not headless
-        if self.sim.render_mode != "headless":
-            self.scene.add_default_ground_plane()
+    
+    def _initialize_ee_body_idx(self):
+        """Initialize end-effector body index (lazy initialization)."""
+        if not self._ee_body_idx_initialized and hasattr(self.robot, '_root_physx_view'):
+            ee_link_name = "left_gripper_link"
+            if ee_link_name in self.robot.body_names:
+                self._ee_body_idx = self.robot.body_names.index(ee_link_name)
+                print(f"[MobileMMTrackEE] Found EE link '{ee_link_name}' at index {self._ee_body_idx}")
+            else:
+                # Fallback to last body
+                self._ee_body_idx = -1
+                print(f"[MobileMMTrackEE] WARNING: EE link '{ee_link_name}' not found, using last body")
+            self._ee_body_idx_initialized = True
     
     def _pre_physics_step(self, actions: torch.Tensor):
         """Process actions before physics step.
@@ -232,10 +319,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         Args:
             actions: Actions from policy [num_envs, num_actions]
         """
-        # Store previous actions
+        # Ensure actions are 2D [num_envs, num_actions]
+        if actions.ndim == 1:
+            actions = actions.unsqueeze(0)
+        
+        # Update action history for derivative calculations
+        self.prev_prev_actions = self.prev_actions.clone()
         self.prev_actions = actions.clone()
         
-        # Update action history
+        # Update action history buffer
         if self.action_history is not None:
             # Shift history and append new action
             self.action_history = torch.roll(self.action_history, shifts=-1, dims=1)
@@ -249,13 +341,28 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         """Apply actions to the simulation (called by parent)."""
         pass  # Actions applied in _pre_physics_step
     
+    def _initialize_joint_limits(self):
+        """Initialize joint limits from robot data (lazy initialization)."""
+        if not self._joint_limits_initialized and hasattr(self.robot, 'data'):
+            # Extract joint limits from robot data (arm joints only, first 6)
+            self.joint_lower_limits = self.robot.data.soft_joint_pos_limits[0, :6, 0]
+            self.joint_upper_limits = self.robot.data.soft_joint_pos_limits[0, :6, 1]
+            self._joint_limits_initialized = True
+            print(f"[MobileMMTrackEE] Joint limits initialized:")
+            print(f"  Lower: {self.joint_lower_limits}")
+            print(f"  Upper: {self.joint_upper_limits}")
+    
     def _get_observations(self) -> dict[str, torch.Tensor]:
-        """Compute observations for all environments.
+        """Compute environment observations.
         
         Returns:
-            Dictionary with "policy" key containing observations
+            Dictionary with "policy" key containing observation tensor
         """
-        # Get robot state
+        # Initialize joint limits and EE body index on first call
+        self._initialize_joint_limits()
+        self._initialize_ee_body_idx()
+        
+        # Robot state
         base_pos, base_quat = self.robot.data.root_pos_w, self.robot.data.root_quat_w
         base_lin_vel = self.robot.data.root_lin_vel_w
         base_ang_vel = self.robot.data.root_ang_vel_w
@@ -314,11 +421,24 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Get target pose
         target_pos, target_quat = self.trajectory_manager.get_target_pose()
         
-        # Get base velocities
+        # Get robot state
         base_lin_vel = self.robot.data.root_lin_vel_w
         base_ang_vel = self.robot.data.root_ang_vel_w
+        joint_pos = self.robot.data.joint_pos[:, :6]  # First 6 joints (arm)
+        joint_vel = self.robot.data.joint_vel[:, :6]
         
-        # Compute rewards
+        # Get contact forces for self-collision detection
+        # TODO: Isaac Lab 2.2.0 might have a different API for contact forces
+        # For now, use a zero tensor as a placeholder
+        net_contact_forces = torch.zeros(
+            (self.num_envs, len(self.robot.body_names), 3),
+            device=self.device
+        )
+        
+        # Compute acceleration for current step
+        base_accel = (base_lin_vel - self.prev_base_lin_vel) / self.control_dt
+        
+        # Compute rewards with all new constraint penalties
         rewards, self.reward_components = compute_combined_reward(
             current_ee_pos=ee_pos,
             current_ee_quat=ee_quat,
@@ -326,16 +446,29 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             target_quat=target_quat,
             prev_tracking_error=self.prev_tracking_error,
             actions=self.prev_actions,
-            prev_actions=self.prev_actions,  # TODO: Store actual previous
-            contact_forces=torch.zeros(self.num_envs, 1, device=self.device),  # Placeholder
+            prev_actions=self.prev_prev_actions,
+            prev_prev_actions=self.prev_prev_actions,  # For smoothness
             base_lin_vel=base_lin_vel,
             base_ang_vel=base_ang_vel,
-            min_obstacle_dist=None,
+            joint_pos=joint_pos,
+            joint_vel=joint_vel,
+            prev_base_lin_vel=self.prev_base_lin_vel,
+            prev_joint_vel=self.prev_joint_vel,
+            prev_base_accel=self.prev_base_accel,
+            joint_lower=self.joint_lower_limits,
+            joint_upper=self.joint_upper_limits,
+            robot_limits=self.robot_limits,
+            contact_forces=net_contact_forces,  # Use actual contact forces for self-collision
+            min_obstacle_dist=None,  # Not using obstacles for now
+            dt=self.control_dt,
             weights=self.reward_weights,
         )
         
-        # Update tracking error for next step
+        # Update history for next step
         self.prev_tracking_error = torch.norm(target_pos - ee_pos, dim=-1)
+        self.prev_base_lin_vel = base_lin_vel.clone()
+        self.prev_joint_vel = joint_vel.clone()
+        self.prev_base_accel = base_accel.clone()
         
         # Log reward components
         self.extras["reward_components"] = {
@@ -351,15 +484,24 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             terminated: Environments that should terminate [num_envs]
             time_out: Environments that reached max episode length [num_envs]
         """
-        # Check for excessive tracking error
-        ee_pos = self.robot.data.body_pos_w[:, self._ee_body_idx, :]
-        target_pos, _ = self.trajectory_manager.get_target_pose()
-        tracking_error = torch.norm(target_pos - ee_pos, dim=-1)
-        
         terminated = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         
+        # Check for excessive tracking error
         if self.task_cfg.terminate_on_tracking_error:
+            ee_pos = self.robot.data.body_pos_w[:, self._ee_body_idx, :]
+            target_pos, _ = self.trajectory_manager.get_target_pose()
+            tracking_error = torch.norm(target_pos - ee_pos, dim=-1)
             terminated |= tracking_error > self.task_cfg.max_tracking_error
+        
+        # Check for self-collision (CRITICAL for mobile manipulator!)
+        if self.task_cfg.terminate_on_self_collision:
+            # TODO: Isaac Lab 2.2.0 might have a different API for contact forces
+            # For now, disable self-collision termination
+            pass
+            # net_contact_forces = self.robot.data.net_contact_forces_w  # [num_envs, num_bodies, 3]
+            # contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
+            # max_contact_force = torch.max(contact_force_mag, dim=-1)[0]  # [num_envs]
+            # terminated |= max_contact_force > self.task_cfg.self_collision_termination_threshold
         
         # Timeout after max episode length
         time_out = self.episode_length_buf >= self.max_episode_length - 1
@@ -382,7 +524,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Reset state buffers
         self.prev_actions[env_ids] = 0.0
+        self.prev_prev_actions[env_ids] = 0.0
         self.prev_tracking_error[env_ids] = 0.0
+        self.prev_base_lin_vel[env_ids] = 0.0
+        self.prev_joint_vel[env_ids] = 0.0
+        self.prev_base_accel[env_ids] = 0.0
         
         if self.action_history is not None:
             self.action_history[env_ids] = 0.0

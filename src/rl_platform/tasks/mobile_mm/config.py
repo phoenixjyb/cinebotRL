@@ -46,6 +46,25 @@ class ObstacleConfig:
 
 
 @dataclass
+class RobotLimits:
+    """Physical limits and constraints for the robot."""
+    
+    # Mobile base limits (differential drive - no lateral motion)
+    max_linear_velocity: float = 1.5  # m/s
+    max_angular_velocity: float = 2.0  # rad/s (yaw rate)
+    max_linear_acceleration: float = 5.0  # m/s^2
+    max_linear_jerk: float = 5.0  # m/s^3
+    
+    # Arm joint limits
+    max_joint_velocity: float = 2.0  # rad/s (motor speed)
+    max_joint_acceleration: float = 10.0  # rad/s^2
+    
+    # Joint position limits will be read from USD
+    enforce_joint_limits: bool = True
+    joint_limit_margin: float = 0.1  # radians (stay this far from limits)
+
+
+@dataclass
 class RewardWeights:
     """Reward term weights for the tracking task."""
     
@@ -54,13 +73,28 @@ class RewardWeights:
     orientation_tracking: float = 2.0
     progress_bonus: float = 1.0
     
-    # Penalties
+    # Motion quality penalties
     action_magnitude: float = 0.01
     action_rate: float = 0.01
-    collision_penalty: float = 10.0
+    action_smoothness: float = 0.05  # Jerk penalty
+    
+    # Constraint violation penalties
+    velocity_limit_penalty: float = 5.0
+    acceleration_limit_penalty: float = 5.0
+    jerk_limit_penalty: float = 3.0
+    joint_limit_penalty: float = 10.0
+    lateral_motion_penalty: float = 2.0  # No sideways motion for diff drive
+    
+    # Safety penalties
+    self_collision_penalty: float = 50.0  # CRITICAL: Robot hitting itself
+    collision_penalty: float = 10.0  # External collisions (not used for now)
     stability_penalty: float = 0.1
     
-    # Safety
+    # Self-collision detection settings
+    self_collision_threshold: float = 1.0  # Newtons (contact force threshold)
+    self_collision_continuous: bool = True  # Continuous vs binary penalty
+    
+    # Obstacle avoidance
     min_obstacle_distance_weight: float = 1.0
     safety_radius: float = 0.2  # meters
 
@@ -89,11 +123,15 @@ class MobileMMTrackConfig:
     trajectory: TrajectoryConfig = field(default_factory=TrajectoryConfig)
     obstacles: ObstacleConfig = field(default_factory=ObstacleConfig)
     rewards: RewardWeights = field(default_factory=RewardWeights)
+    robot_limits: RobotLimits = field(default_factory=RobotLimits)
     domain_rand: DomainRandomization = field(default_factory=DomainRandomization)
     
     # Episode settings
     episode_length_s: float = 20.0
-    decimation: int = 4  # Control frequency = sim_frequency / decimation
+    decimation: int = 20  # Control @ 10Hz (200Hz physics / 20 = 10Hz control)
+    
+    # Trajectory timing (must match recorded trajectory waypoint spacing)
+    trajectory_dt: float = 0.1  # seconds (100ms waypoint spacing)
     
     # Initial state randomization
     randomize_initial_joint_positions: bool = True
@@ -107,6 +145,8 @@ class MobileMMTrackConfig:
     action_history_length: int = 2
     
     # Termination conditions
-    terminate_on_collision: bool = True
+    terminate_on_self_collision: bool = True  # CRITICAL: End episode if robot hits itself
+    self_collision_termination_threshold: float = 10.0  # Newtons (higher than penalty threshold)
+    terminate_on_collision: bool = False  # External collisions (not used)
     terminate_on_tracking_error: bool = True
     max_tracking_error: float = 2.0  # meters

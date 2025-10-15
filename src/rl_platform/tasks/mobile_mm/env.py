@@ -334,7 +334,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         if actions.ndim == 1:
             actions = actions.unsqueeze(0)
         
-        # Update action history for derivative calculations
+        # Update action history for derivative calculations (jerk/smoothness)
+        # Store 3 timesteps: current, t-1, t-2
+        if not hasattr(self, '_actions_t_minus_2'):
+            self._actions_t_minus_2 = torch.zeros_like(actions)
+        
+        self._actions_t_minus_2 = self.prev_prev_actions.clone()
         self.prev_prev_actions = self.prev_actions.clone()
         self.prev_actions = actions.clone()
         
@@ -350,9 +355,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Differential drive can't move sideways, so vy is always 0
         
         # Split actions: first 6 are arm joints, last 2 are base commands (vx, wz)
-        arm_actions = actions[:, :6]  # First 6: arm joint position targets
-        base_vx = actions[:, 6:7]     # vx: forward/backward velocity
-        base_wz = actions[:, 7:8]     # wz: angular velocity (rotation)
+        arm_actions = actions[:, :6]  # First 6: arm joint position targets (in [-1, 1])
+        base_vx = actions[:, 6:7]     # vx: forward/backward velocity (in [-1, 1])
+        base_wz = actions[:, 7:8]     # wz: angular velocity/rotation (in [-1, 1])
+        
+        # Scale arm actions from [-1, 1] to actual joint limits with safety margins
+        arm_actions_scaled = self._scale_actions_to_joint_limits(arm_actions)
         
         # Apply arm joint position targets to the actuated arm joints only
         # The robot has 9 total joints: 6 arm + 3 chassis (vx, vy, wz)
@@ -367,15 +375,65 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     self._arm_joint_ids.append(idx)
             self._arm_joint_ids = torch.tensor(self._arm_joint_ids, device=self.device)
         
-        # Set joint position targets for arm joints only
-        self.robot.set_joint_position_target(arm_actions, joint_ids=self._arm_joint_ids)
+        # Set scaled joint position targets for arm joints only
+        self.robot.set_joint_position_target(arm_actions_scaled, joint_ids=self._arm_joint_ids)
         
-        # TODO: Apply base velocity commands (v_x, omega_z) to mobile base
-        # For now, base is passive - will be implemented later
+        # Apply base velocity commands for mobile base (differential drive)
+        # Initialize base joint indices on first call
+        if not hasattr(self, '_base_joint_ids'):
+            # Base joints: first 3 joints are typically base_link_x, base_link_y, base_link_z (or similar)
+            # For differential drive: we control vx (forward), and wz (rotation), vy is always 0
+            # Joint indices [0, 1, 2] correspond to [vx, vy, wz]
+            self._base_joint_ids = torch.tensor([0, 1, 2], device=self.device)
+            print(f"[MobileMMTrackEE] Base joint IDs initialized: {self._base_joint_ids.tolist()}")
+        
+        # Create base velocity command: [vx, 0, wz]
+        # vy = 0 because differential drive cannot move sideways
+        base_velocities = torch.cat([
+            base_vx,                      # Forward/backward velocity
+            torch.zeros_like(base_vx),    # vy = 0 (no sideways movement)
+            base_wz                        # Angular velocity (rotation)
+        ], dim=-1)
+        
+        # Apply velocity targets to base joints
+        self.robot.set_joint_velocity_target(
+            velocities=base_velocities,
+            joint_ids=self._base_joint_ids
+        )
     
     def _apply_action(self):
         """Apply actions to the simulation (called by parent)."""
         pass  # Actions applied in _pre_physics_step
+    
+    def _scale_actions_to_joint_limits(self, actions: torch.Tensor) -> torch.Tensor:
+        """
+        Scale normalized actions from [-1, 1] to actual joint limits with safety margins.
+        
+        Args:
+            actions: Normalized actions in [-1, 1], shape [num_envs, num_joints]
+            
+        Returns:
+            Scaled actions in physical joint limits, shape [num_envs, num_joints]
+        """
+        # Ensure joint limits are initialized
+        self._initialize_joint_limits()
+        
+        # Get joint limits (these are already for arm joints only)
+        lower = self.joint_lower_limits  # Shape: [6]
+        upper = self.joint_upper_limits  # Shape: [6]
+        
+        # Add safety margin (5% from each limit to avoid hard stops)
+        range_size = upper - lower
+        safety_margin = 0.05 * range_size
+        lower_safe = lower + safety_margin
+        upper_safe = upper - safety_margin
+        
+        # Scale from [-1, 1] to [lower_safe, upper_safe]
+        # Formula: scaled = (action + 1) * 0.5 * (upper - lower) + lower
+        actions_normalized = (actions + 1.0) * 0.5  # Convert [-1, 1] to [0, 1]
+        scaled_actions = actions_normalized * (upper_safe - lower_safe) + lower_safe
+        
+        return scaled_actions
     
     def _initialize_joint_limits(self):
         """Initialize joint limits from robot data (lazy initialization)."""
@@ -464,12 +522,23 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         joint_vel = self.robot.data.joint_vel[:, :6]
         
         # Get contact forces for self-collision detection
-        # TODO: Isaac Lab 2.2.0 might have a different API for contact forces
-        # For now, use a zero tensor as a placeholder
-        net_contact_forces = torch.zeros(
-            (self.num_envs, len(self.robot.body_names), 3),
-            device=self.device
-        )
+        # Isaac Lab 2.2.0 provides contact forces via PhysX view
+        try:
+            # Try to get net contact forces from PhysX view
+            net_contact_forces = self.robot.root_physx_view.get_net_contact_forces()
+        except AttributeError:
+            # Fallback: try body_net_contact_force_w from robot data
+            try:
+                net_contact_forces = self.robot.data.body_net_contact_force_w
+            except AttributeError:
+                # Last resort: use zeros but warn once
+                if not hasattr(self, '_contact_force_warning_shown'):
+                    print("[WARNING] Contact forces API not found - collision detection disabled!")
+                    self._contact_force_warning_shown = True
+                net_contact_forces = torch.zeros(
+                    (self.num_envs, len(self.robot.body_names), 3),
+                    device=self.device
+                )
         
         # Compute acceleration for current step
         base_accel = (base_lin_vel - self.prev_base_lin_vel) / self.control_dt
@@ -481,9 +550,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             target_pos=target_pos,
             target_quat=target_quat,
             prev_tracking_error=self.prev_tracking_error,
-            actions=self.prev_actions,
-            prev_actions=self.prev_prev_actions,
-            prev_prev_actions=self.prev_prev_actions,  # For smoothness
+            actions=self.prev_actions,  # Current actions (just applied)
+            prev_actions=self.prev_prev_actions,  # Actions from previous step
+            prev_prev_actions=self._actions_t_minus_2,  # Actions from 2 steps ago (for jerk calculation)
             base_lin_vel=base_lin_vel,
             base_ang_vel=base_ang_vel,
             joint_pos=joint_pos,
@@ -505,6 +574,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self.prev_base_lin_vel = base_lin_vel.clone()
         self.prev_joint_vel = joint_vel.clone()
         self.prev_base_accel = base_accel.clone()
+        
+        # Advance trajectory to next target
+        # This must happen after reward calculation so current target is used for this step
+        self.trajectory_manager.step()
         
         # Log reward components
         self.extras["reward_components"] = {
@@ -531,13 +604,21 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Check for self-collision (CRITICAL for mobile manipulator!)
         if self.task_cfg.terminate_on_self_collision:
-            # TODO: Isaac Lab 2.2.0 might have a different API for contact forces
-            # For now, disable self-collision termination
-            pass
-            # net_contact_forces = self.robot.data.net_contact_forces_w  # [num_envs, num_bodies, 3]
-            # contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
-            # max_contact_force = torch.max(contact_force_mag, dim=-1)[0]  # [num_envs]
-            # terminated |= max_contact_force > self.task_cfg.self_collision_termination_threshold
+            # Get contact forces - use same method as in _get_rewards()
+            try:
+                net_contact_forces = self.robot.root_physx_view.get_net_contact_forces()
+            except AttributeError:
+                try:
+                    net_contact_forces = self.robot.data.body_net_contact_force_w
+                except AttributeError:
+                    # If API not available, skip collision termination
+                    net_contact_forces = None
+            
+            if net_contact_forces is not None:
+                # Calculate maximum contact force magnitude per environment
+                contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
+                max_contact_force = torch.max(contact_force_mag, dim=-1)[0]  # [num_envs]
+                terminated |= max_contact_force > self.task_cfg.self_collision_termination_threshold
         
         # Timeout after max episode length
         time_out = self.episode_length_buf >= self.max_episode_length - 1

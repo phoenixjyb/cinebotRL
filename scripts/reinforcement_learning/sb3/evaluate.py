@@ -148,8 +148,18 @@ def main():
     # Create environment
     print(f"\n[4/5] Creating environment ({args.task})...")
     try:
-        env = gym.make(args.task, num_envs=args.num_envs, headless=args.headless)
+        # Import SB3 wrapper for Isaac Lab environments
+        from rl_platform.sb3.wrappers import IsaacLabVecEnvWrapper
+        
+        # Create base environment
+        base_env = gym.make(args.task, num_envs=args.num_envs, headless=args.headless)
+        
+        # Wrap for SB3 compatibility
+        env = IsaacLabVecEnvWrapper(base_env)
+        
         print(f"    ✓ Environment created with {args.num_envs} parallel instances")
+        print(f"    Observation space: {env.observation_space}")
+        print(f"    Action space: {env.action_space}")
     except Exception as e:
         print(f"    ✗ Failed to create environment: {e}")
         import traceback
@@ -160,7 +170,10 @@ def main():
     # Load trained model
     print(f"\n[5/5] Loading trained model...")
     try:
-        model = PPO.load(args.checkpoint, env=env, device=device)
+        # Load model without passing env (we'll set it after)
+        model = PPO.load(args.checkpoint, device=device)
+        # Now set the environment
+        model.set_env(env)
         print(f"    ✓ Model loaded successfully")
         print(f"    Policy network: {model.policy}")
     except Exception as e:

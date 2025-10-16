@@ -124,7 +124,102 @@ def main():
     # Now we can import Isaac Lab modules
     import torch
     import gymnasium as gym
+    from gymnasium import spaces
+    import numpy as np
     from stable_baselines3 import PPO
+    from stable_baselines3.common.vec_env import VecEnvWrapper
+    
+    # Create wrapper to convert Isaac Lab observations to SB3 format
+    class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):
+        """VecEnv wrapper to convert Isaac Lab's dict observations with torch tensors to numpy arrays for SB3."""
+        
+        def __init__(self, venv):
+            # Isaac Lab env is already a VecEnv
+            VecEnvWrapper.__init__(self, venv)
+            # We'll update observation space after first reset
+            self._obs_space_updated = False
+            
+            # FIX: Isaac Lab's action_space includes batch dimension [num_envs, action_dim]
+            # SB3 expects per-env action space [action_dim]
+            if hasattr(venv.action_space, 'shape') and len(venv.action_space.shape) > 1:
+                # Remove the num_envs dimension
+                action_dim = venv.action_space.shape[-1]  # Last dimension is action_dim
+                self.action_space = spaces.Box(
+                    low=venv.action_space.low.flatten()[0],  # All actions have same limits
+                    high=venv.action_space.high.flatten()[0],
+                    shape=(action_dim,),
+                    dtype=venv.action_space.dtype
+                )
+            
+        def reset(self):
+            obs = self.venv.reset()
+            
+            # Handle new Gymnasium API: reset() returns (obs, info)
+            if isinstance(obs, tuple):
+                obs, info = obs
+            
+            # Convert dict of torch tensors to numpy array
+            if isinstance(obs, dict):
+                obs_tensor = obs.get("policy", list(obs.values())[0])
+                if hasattr(obs_tensor, 'cpu'):
+                    obs = obs_tensor.cpu().numpy()
+                else:
+                    obs = np.array(obs_tensor)
+                
+                # Update observation space on first reset
+                if not self._obs_space_updated:
+                    # For the observation space, we want per-env shape without batch dim
+                    obs_shape = obs.shape[1:] if len(obs.shape) > 1 else obs.shape
+                    self.observation_space = spaces.Box(
+                        low=-np.inf,
+                        high=np.inf,
+                        shape=obs_shape,
+                        dtype=np.float32
+                    )
+                    self._obs_space_updated = True
+            return obs
+        
+        def step_async(self, actions):
+            # Convert numpy actions to torch tensors for Isaac Lab
+            if isinstance(actions, np.ndarray):
+                device = self.venv.unwrapped.device if hasattr(self.venv.unwrapped, 'device') else 'cuda:0'
+                actions = torch.from_numpy(actions).float().to(device)
+            self._actions = actions
+        
+        def step_wait(self):
+            # Call the synchronous step() method with stored actions
+            result = self.venv.step(self._actions)
+            
+            # Handle both old (4 values) and new (5 values) Gymnasium API
+            if len(result) == 5:
+                obs, rewards, terminated, truncated, infos = result
+                dones = terminated | truncated
+            else:
+                obs, rewards, dones, infos = result
+            
+            # Convert observations
+            if isinstance(obs, dict):
+                obs_tensor = obs.get("policy", list(obs.values())[0])
+                if hasattr(obs_tensor, 'cpu'):
+                    obs = obs_tensor.cpu().numpy()
+                else:
+                    obs = np.array(obs_tensor)
+            
+            # Convert rewards and dones to numpy
+            if hasattr(rewards, 'cpu'):
+                rewards = rewards.cpu().numpy()
+            if hasattr(dones, 'cpu'):
+                dones = dones.cpu().numpy()
+            
+            # Ensure infos is a list of dicts
+            if isinstance(infos, dict):
+                infos = [infos.copy() for _ in range(len(rewards))]
+            elif not isinstance(infos, list):
+                infos = [{} for _ in range(len(rewards))]
+            else:
+                infos = [info if isinstance(info, dict) else {} for info in infos]
+            
+            return obs, rewards, dones, infos
     
     # Register custom tasks
     print("\n[2/5] Registering custom tasks...")
@@ -148,14 +243,11 @@ def main():
     # Create environment
     print(f"\n[4/5] Creating environment ({args.task})...")
     try:
-        # Import SB3 wrapper for Isaac Lab environments
-        from rl_platform.sb3.wrappers import IsaacLabVecEnvWrapper
-        
         # Create base environment
         base_env = gym.make(args.task, num_envs=args.num_envs, headless=args.headless)
         
-        # Wrap for SB3 compatibility
-        env = IsaacLabVecEnvWrapper(base_env)
+        # Wrap for SB3 compatibility using our wrapper class
+        env = IsaacLabToSB3VecEnvWrapper(base_env)
         
         print(f"    ✓ Environment created with {args.num_envs} parallel instances")
         print(f"    Observation space: {env.observation_space}")

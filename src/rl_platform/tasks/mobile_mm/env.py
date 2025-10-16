@@ -338,6 +338,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         Args:
             actions: Actions from policy [num_envs, num_actions]
         """
+        # DEBUG: Print actual action shape on first call
+        if not hasattr(self, '_first_action_printed'):
+            print(f"[MobileMMTrackEE] DEBUG: First action shape = {actions.shape}")
+            print(f"[MobileMMTrackEE] DEBUG: self.num_envs = {self.num_envs}")
+            print(f"[MobileMMTrackEE] DEBUG: Expected shape = [{self.num_envs}, {self.cfg.num_actions}]")
+            self._first_action_printed = True
+        
         # Ensure actions are 2D [num_envs, num_actions]
         # Sometimes actions come in as 3D [1, 1, 8] - squeeze to [1, 8]
         while actions.ndim > 2:

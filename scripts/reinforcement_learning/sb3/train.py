@@ -79,13 +79,13 @@ def parse_args():
     parser.add_argument(
         "--n_steps",
         type=int,
-        default=2048,
+        default=4096,  # Increased from 2048 for better GPU utilization
         help="Number of steps per rollout",
     )
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=512,
+        default=1024,  # Increased from 512 for better GPU utilization
         help="Minibatch size for PPO updates",
     )
     parser.add_argument(
@@ -160,7 +160,8 @@ def main():
         if torch.cuda.is_available():
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
-            print("    ✓ TF32 enabled for Tensor Cores (8x matrix multiplication speedup)")
+            torch.backends.cudnn.benchmark = True  # Auto-tune kernels for your input sizes
+            print("    ✓ TF32 + cuDNN benchmark enabled (8x matmul speedup + auto-tuned kernels)")
         
         # Auto-detect best GPU
         best_device = 0
@@ -171,7 +172,19 @@ def main():
             if cap_val >= 7.0 and cap_val > best_compute:
                 best_compute = cap_val
                 best_device = i
-                print(f"    Selected GPU {i}: {torch.cuda.get_device_name(i)} (compute {cap[0]}.{cap[1]})")
+                gpu_name = torch.cuda.get_device_name(i)
+                gpu_mem_gb = torch.cuda.get_device_properties(i).total_memory / 1e9
+                print(f"    Selected GPU {i}: {gpu_name} (compute {cap[0]}.{cap[1]}, {gpu_mem_gb:.1f}GB)")
+                
+                # Warn if GPU is underutilized based on memory capacity
+                # Rough estimate: ~3MB per environment for mobile manipulator
+                recommended_envs = int((gpu_mem_gb - 4) / 0.003)  # Leave 4GB for overhead
+                if args.num_envs < recommended_envs * 0.3:  # Less than 30% capacity
+                    print(f"    ⚠️  GPU Memory Underutilized!")
+                    print(f"       Current: {args.num_envs} envs (~{args.num_envs * 3 / 1024:.1f}GB)")
+                    print(f"       Recommended: {recommended_envs // 2} envs (50% capacity)")
+                    print(f"       Maximum: ~{recommended_envs} envs (80% capacity)")
+                    print(f"       💡 Try: --num_envs {recommended_envs // 2}")
         
         # Create AppLauncher to initialize Isaac Sim
         app_launcher = AppLauncher(

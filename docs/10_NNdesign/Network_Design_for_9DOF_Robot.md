@@ -129,8 +129,8 @@ model = PPO(
     policy_kwargs=policy_kwargs,
     verbose=1,
     learning_rate=3e-4,
-    n_steps=4096,  # Experiment with larger steps for better GAE estimates
-    batch_size=1024,  # Experiment with larger batch sizes
+    n_steps=32,  # ⚠️ UPDATED: Was 4096 (too large for 2048 envs), now 32 for proper iterative learning
+    batch_size=512,  # ⚠️ UPDATED: Was 1024, now 512 to match smaller rollout buffer
     n_epochs=10,
     gamma=0.99,
     gae_lambda=0.95,
@@ -139,6 +139,9 @@ model = PPO(
     clip_range_vf=1.0,  # Clip value function updates for stability
     target_kl=0.01,  # Set KL divergence threshold for early stopping
 )
+
+# ⚠️ NOTE: This document proposes LSTM architecture, which is NOT recommended.
+# See Network_Architecture_SB3_Compatible.md for the implemented MLP design.
 ```
 
 ---

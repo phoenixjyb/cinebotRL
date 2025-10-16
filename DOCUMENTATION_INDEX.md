@@ -8,20 +8,20 @@
 
 ### I want to train my robot RIGHT NOW
 ```powershell
-# Phase 1: Conservative (2x speedup)
+# Phase 1: Conservative (2x speedup) - UPDATED for proper iterative learning
 cd I:\isaaclab
 .\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py `
   --task MobileMMTrackEE-v0 `
   --num_envs 2048 `
-  --batch_size 1024 `
-  --n_steps 4096 `
+  --batch_size 512 `
+  --n_steps 32 `
   --headless
 
 # Monitor GPU
 nvidia-smi -l 1
 ```
 
-**Expected**: 2x faster, 5-7GB GPU usage, 15-20 mins for 5M steps
+**Expected**: 2x faster, 5-7GB GPU usage, ~18 mins for 10M steps, 153 iterations (proper learning)
 
 📖 **Full guide**: [`docs_archive/04_gpu_optimization/RTX3090_REFERENCE_CARD.md`](docs_archive/04_gpu_optimization/RTX3090_REFERENCE_CARD.md)
 
@@ -146,10 +146,10 @@ cinebotRL/
 ## 📞 Quick Commands Reference
 
 ```powershell
-# Training (Phase 1 - Recommended start)
+# Training (Phase 1 - Recommended start) - UPDATED for proper iterative learning
 cd I:\isaaclab
 .\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py `
-  --task MobileMMTrackEE-v0 --num_envs 2048 --batch_size 1024 --n_steps 4096 --headless
+  --task MobileMMTrackEE-v0 --num_envs 2048 --batch_size 512 --n_steps 32 --headless
 
 # Monitor GPU
 nvidia-smi -l 1

@@ -270,17 +270,17 @@ With the enhanced network, you should see:
 ## Next Steps
 
 1. ✅ **Network updated** in `train.py` (already done!)
-2. **Run training**: 
+2. **Run training** (UPDATED for proper iterative learning): 
    ```bash
    I:\isaaclab\isaaclab.bat -p scripts/reinforcement_learning/sb3/train.py \
        --task MobileMMTrackEE-v0 \
        --num_envs 2048 \
-       --batch_size 1024 \
-       --n_steps 4096 \
+       --batch_size 512 \
+       --n_steps 32 \
        --total_timesteps 10000000 \
        --headless
    ```
-3. **Monitor TensorBoard**: Check if network is learning effectively
+3. **Monitor TensorBoard**: Check if network is learning effectively (153 iterations expected)
 4. **Evaluate**: Test tracking accuracy after 5-10M steps
 
 ---

@@ -180,11 +180,12 @@ net_arch=dict(
 Train for 5-10M steps and monitor:
 
 ```bash
+# UPDATED for proper iterative learning
 I:\isaaclab\isaaclab.bat -p scripts/reinforcement_learning/sb3/train.py \
     --task MobileMMTrackEE-v0 \
     --num_envs 2048 \
-    --batch_size 1024 \
-    --n_steps 4096 \
+    --batch_size 512 \
+    --n_steps 32 \
     --total_timesteps 10000000 \
     --headless
 ```

@@ -186,21 +186,23 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             render_mode: Rendering mode (None for headless) - currently unused
             **kwargs: Additional arguments (num_envs, etc.)
         """
-        # Create default config if none provided
-        if cfg is None:
-            cfg = MobileMMTrackEEEnvCfg()
+        # Extract num_envs BEFORE creating config (if provided)
+        num_envs_override = kwargs.pop('num_envs', None)
         
-        # CRITICAL: Override num_envs in config BEFORE calling super().__init__()
-        # DirectRLEnv will use cfg.num_envs to set the read-only self.num_envs property
-        if 'num_envs' in kwargs:
-            num_envs_override = kwargs.pop('num_envs')
-            print(f"[MobileMMTrackEE] DEBUG: Before override, cfg.num_envs = {cfg.num_envs}")
-            cfg.num_envs = num_envs_override
-            print(f"[MobileMMTrackEE] DEBUG: After override, cfg.num_envs = {cfg.num_envs}")
+        # Create config with correct num_envs if no config provided
+        if cfg is None:
+            if num_envs_override is not None:
+                # Create config with custom num_envs BEFORE __post_init__ runs
+                from dataclasses import replace
+                default_cfg = MobileMMTrackEEEnvCfg()
+                # Use replace to create new config with updated num_envs
+                # This will trigger __post_init__ with the correct value
+                cfg = replace(default_cfg, num_envs=num_envs_override)
+                print(f"[MobileMMTrackEE] Created config with num_envs={cfg.num_envs}")
+            else:
+                cfg = MobileMMTrackEEEnvCfg()
         
         # DirectRLEnv only takes cfg, not render_mode
-        # By this point, cfg.num_envs should be set correctly
-        print(f"[MobileMMTrackEE] DEBUG: Passing cfg with num_envs={cfg.num_envs} to DirectRLEnv")
         super().__init__(cfg, **kwargs)
         
         # Task configuration

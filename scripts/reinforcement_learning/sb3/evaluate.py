@@ -262,10 +262,8 @@ def main():
     # Load trained model
     print(f"\n[5/5] Loading trained model...")
     try:
-        # Load model without passing env (we'll set it after)
-        model = PPO.load(args.checkpoint, device=device)
-        # Now set the environment
-        model.set_env(env)
+        # Load model with the environment (allows different num_envs)
+        model = PPO.load(args.checkpoint, env=env, device=device)
         print(f"    ✓ Model loaded successfully")
         print(f"    Policy network: {model.policy}")
     except Exception as e:

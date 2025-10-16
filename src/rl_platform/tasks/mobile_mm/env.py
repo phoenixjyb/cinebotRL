@@ -24,6 +24,10 @@ try:
     from isaaclab.scene import InteractiveSceneCfg
     from isaaclab.sim import SimulationCfg
     from isaaclab.utils import configclass
+    # Debug visualization
+    from isaaclab.markers import VisualizationMarkers
+    from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, RED_ARROW_X_MARKER_CFG
+    import isaaclab.utils.math as math_utils
     ISAAC_LAB_AVAILABLE = True
 except ImportError as e:
     # Fallback for development/testing without Isaac Sim running
@@ -293,6 +297,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self.joint_lower_limits = None
         self.joint_upper_limits = None
         
+        # Visualization markers (initialized in _setup_scene)
+        self._target_markers = None
+        self._ee_markers = None
+        self._error_line_markers = None
+        self._visualization_enabled = False
+        
         print(f"[MobileMMTrackEE] Environment initialized:")
         print(f"  - Num envs: {self.num_envs}")
         print(f"  - Observation dim: {self.cfg.num_observations}")
@@ -318,6 +328,57 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Clone environments
         self.scene.clone_environments(copy_from_source=False)
+        
+        # Setup visualization markers (only in GUI mode)
+        self._setup_visualization_markers()
+    
+    def _setup_visualization_markers(self):
+        """Setup visual markers for trajectory visualization."""
+        try:
+            from isaaclab.markers import VisualizationMarkers
+            from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG
+            
+            # Create marker configs for targets (red spheres)
+            target_marker_cfg = BLUE_ARROW_X_MARKER_CFG.replace(prim_path="/Visuals/TargetMarkers")
+            target_marker_cfg.markers["sphere"].radius = 0.05  # 5cm radius
+            target_marker_cfg.markers["sphere"].visual_material.diffuse_color = (1.0, 0.0, 0.0)  # Red
+            
+            # Create marker configs for end-effector (green spheres)
+            ee_marker_cfg = GREEN_ARROW_X_MARKER_CFG.replace(prim_path="/Visuals/EEMarkers")
+            ee_marker_cfg.markers["sphere"].radius = 0.04  # 4cm radius
+            ee_marker_cfg.markers["sphere"].visual_material.diffuse_color = (0.0, 1.0, 0.0)  # Green
+            
+            # Initialize markers
+            self._target_markers = VisualizationMarkers(target_marker_cfg)
+            self._ee_markers = VisualizationMarkers(ee_marker_cfg)
+            
+            self._visualization_enabled = True
+            print("[MobileMMTrackEE] ✓ Trajectory visualization markers enabled")
+            
+        except Exception as e:
+            print(f"[MobileMMTrackEE] ℹ Visualization markers disabled (headless mode or error: {e})")
+            self._visualization_enabled = False
+    
+    def _update_visualization_markers(self, ee_pos: torch.Tensor, target_pos: torch.Tensor):
+        """Update visualization markers for trajectory tracking.
+        
+        Args:
+            ee_pos: End-effector positions [num_envs, 3]
+            target_pos: Target positions [num_envs, 3]
+        """
+        if not self._visualization_enabled or self._target_markers is None:
+            return
+        
+        try:
+            # Update target markers (red spheres at target positions)
+            self._target_markers.visualize(target_pos)
+            
+            # Update EE markers (green spheres at end-effector positions)
+            self._ee_markers.visualize(ee_pos)
+            
+        except Exception as e:
+            # Silently disable if visualization fails
+            self._visualization_enabled = False
     
     def _initialize_ee_body_idx(self):
         """Initialize end-effector body index (lazy initialization)."""
@@ -495,6 +556,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Get target from trajectory
         target_pos, target_quat = self.trajectory_manager.get_target_pose()
+        
+        # Update visualization markers (if enabled)
+        self._update_visualization_markers(ee_pos, target_pos)
         
         # Optional: Lookahead
         lookahead_pos = None

@@ -155,6 +155,13 @@ def main():
         from isaaclab.app import AppLauncher
         import torch
         
+        # Enable TF32 for Tensor Cores (RTX 30xx/40xx optimization)
+        # Provides ~8x speedup on matrix multiplications with minimal precision loss
+        if torch.cuda.is_available():
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+            print("    ✓ TF32 enabled for Tensor Cores (8x matrix multiplication speedup)")
+        
         # Auto-detect best GPU
         best_device = 0
         best_compute = 0.0

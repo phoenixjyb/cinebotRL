@@ -1,53 +1,11 @@
-# CinebotRL Documentation Index
+# 08 Project History
 
-**Welcome to the CinebotRL project documentation!** This index will guide you to the right document for your needs.
+Project evolution and documentation changes.
 
----
-
-## 🚀 Quick Start (Start Here!)
-
-**New to the project?** Read these in order:
-
-1. **[Project README](../README.md)** - Project overview and quick setup
-2. **[Quick Reference Card](QUICK_REFERENCE.md)** - One-page cheat sheet (⭐ print this!)
-3. **[WSL Setup Verification](setup/wsl_setup_guide.md)** - Verify your WSL environment is ready
-
----
-
-## 📚 Documentation Structure
-
-```
-docs/
-├── README.md (this file)              # Documentation index
-├── QUICK_REFERENCE.md                 # One-page reference card
-│
-├── setup/                             # Installation & Setup
-│   ├── wsl_setup_guide.md            # WSL environment setup & verification
-│   ├── windows_setup_guide.md        # Windows Isaac Sim/Lab setup
-│   ├── ros2_communication_setup.md   # ROS 2 networking configuration
-│   └── isaaclab_windows.md           # Legacy: Isaac Lab setup notes
-│
-├── architecture/                      # System Architecture
-│   ├── overview.md                   # High-level architecture
-│   ├── ros2_communication.md         # How ROS 2 works across systems
-│   └── python_environments.md        # Why multiple Python versions
-│
-├── workflows/                         # How-To Guides
-│   ├── daily_workflow.md             # Common daily tasks
-│   ├── training_workflow.md          # How to run RL training
-│   └── monitoring_workflow.md        # How to monitor training
-│
-├── reference/                         # Technical Reference
-│   ├── environment_variables.md      # All environment variables
-│   ├── scripts_reference.md          # What each script does
-│   └── troubleshooting.md            # Common issues & solutions
-│
-└── tracking/                          # Project History
-    ├── phase0_environment.md         # Environment setup log
-    ├── ee_frame_alignment.md         # Robot frame alignment notes
-    └── lessons_learned.md            # Lessons from development
-
-```
+## Project Overview
+- `PROJECT_OVERVIEW.md` - High-level project summary
+- `REORGANIZATION_SUMMARY.md` - Documentation reorganization history
+- `UPDATES_SUMMARY.md` - Project updates log
 
 ---
 

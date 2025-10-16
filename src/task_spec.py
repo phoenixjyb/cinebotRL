@@ -220,10 +220,11 @@ def register_isaac_lab_tasks():
         from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnv, MobileMMTrackEEEnvCfg
         
         # Register the tracking task
+        # NOTE: Don't pass cfg in kwargs - let gym.make() pass num_envs directly
         gym.register(
             id="MobileMMTrackEE-v0",
             entry_point="rl_platform.tasks.mobile_mm:MobileMMTrackEEEnv",
-            kwargs={"cfg": MobileMMTrackEEEnvCfg()},
+            # Remove hardcoded cfg to allow num_envs override
         )
         
         print("[task_spec] Registered Isaac Lab task: MobileMMTrackEE-v0")

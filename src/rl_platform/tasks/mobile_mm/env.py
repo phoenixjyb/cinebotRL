@@ -177,14 +177,23 @@ class MobileMMTrackEEEnv(DirectRLEnv):
     
     cfg: MobileMMTrackEEEnvCfg
     
-    def __init__(self, cfg: MobileMMTrackEEEnvCfg, render_mode: str | None = None, **kwargs):
+    def __init__(self, cfg: MobileMMTrackEEEnvCfg | None = None, render_mode: str | None = None, **kwargs):
         """Initialize the environment.
         
         Args:
-            cfg: Environment configuration
+            cfg: Environment configuration (optional, created if None)
             render_mode: Rendering mode (None for headless) - currently unused
-            **kwargs: Additional arguments passed to parent
+            **kwargs: Additional arguments (num_envs, etc.) passed to parent
         """
+        # Create default config if none provided
+        if cfg is None:
+            cfg = MobileMMTrackEEEnvCfg()
+        
+        # Override num_envs if provided in kwargs
+        if 'num_envs' in kwargs:
+            cfg.num_envs = kwargs.pop('num_envs')
+            print(f"[MobileMMTrackEE] Overriding num_envs to {cfg.num_envs}")
+        
         # DirectRLEnv only takes cfg, not render_mode
         super().__init__(cfg, **kwargs)
         

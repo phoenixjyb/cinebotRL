@@ -1,199 +1,68 @@
-# CinebotRL Documentation Index
+# CinebotRL Documentation
 
-**Welcome to the CinebotRL project documentation!** This index will guide you to the right document for your needs.
-
----
-
-## 🚀 Quick Start (Start Here!)
-
-**New to the project?** Read these in order:
-
-1. **[Project README](../README.md)** - Project overview and quick setup
-2. **[Quick Reference Card](QUICK_REFERENCE.md)** - One-page cheat sheet (⭐ print this!)
-3. **[WSL Setup Verification](setup/wsl_setup_guide.md)** - Verify your WSL environment is ready
+**Learning path for the CinebotRL reinforcement learning project.**
 
 ---
 
-## 📚 Documentation Structure
+## 🚀 Quick Start
 
-```
-docs/
-├── README.md (this file)              # Documentation index
-├── QUICK_REFERENCE.md                 # One-page reference card
-│
-├── setup/                             # Installation & Setup
-│   ├── wsl_setup_guide.md            # WSL environment setup & verification
-│   ├── windows_setup_guide.md        # Windows Isaac Sim/Lab setup
-│   ├── ros2_communication_setup.md   # ROS 2 networking configuration
-│   └── isaaclab_windows.md           # Legacy: Isaac Lab setup notes
-│
-├── architecture/                      # System Architecture
-│   ├── overview.md                   # High-level architecture
-│   ├── ros2_communication.md         # How ROS 2 works across systems
-│   └── python_environments.md        # Why multiple Python versions
-│
-├── workflows/                         # How-To Guides
-│   ├── daily_workflow.md             # Common daily tasks
-│   ├── training_workflow.md          # How to run RL training
-│   └── monitoring_workflow.md        # How to monitor training
-│
-├── reference/                         # Technical Reference
-│   ├── environment_variables.md      # All environment variables
-│   ├── scripts_reference.md          # What each script does
-│   └── troubleshooting.md            # Common issues & solutions
-│
-└── tracking/                          # Project History
-    ├── phase0_environment.md         # Environment setup log
-    ├── ee_frame_alignment.md         # Robot frame alignment notes
-    └── lessons_learned.md            # Lessons from development
-
-```
+**New to the project?** Start with [`QUICK_START.md`](QUICK_START.md) for essential commands.
 
 ---
 
-## 📖 By Topic
+## 📖 Learning Path
 
-### Getting Started
-- 🏁 **[Quick Reference Card](QUICK_REFERENCE.md)** - Most common commands
-- 🔧 **[WSL Setup Guide](setup/wsl_setup_guide.md)** - Configure WSL environment
-- 🪟 **[Windows Setup Guide](setup/windows_setup_guide.md)** - Configure Windows side
+Follow these folders in order:
 
-### Understanding the System
-- 🏗️ **[Architecture Overview](architecture/overview.md)** - How everything fits together
-- 🌉 **[ROS 2 Communication](architecture/ros2_communication.md)** - How WSL ↔ Windows works
-- 🐍 **[Python Environments Explained](architecture/python_environments.md)** - Why we have multiple Python versions
+### 1. Setup
+📁 [`01_setup/`](01_setup/)  
+Install Isaac Sim/Lab, configure Windows/WSL environments.
 
-### Daily Usage
-- ⚡ **[Daily Workflow](workflows/daily_workflow.md)** - Your everyday commands
-- 🎓 **[Training Workflow](workflows/training_workflow.md)** - How to train RL agents
-- 📊 **[Monitoring Workflow](workflows/monitoring_workflow.md)** - How to monitor training
+### 2. Architecture
+📁 [`02_architecture/`](02_architecture/)  
+Understand system design, ROS2 communication, training pipeline.
 
-### Reference
-- 📋 **[Environment Variables](reference/environment_variables.md)** - Complete variable reference
-- 📜 **[Scripts Reference](reference/scripts_reference.md)** - What each script does
-- 🐛 **[Troubleshooting Guide](reference/troubleshooting.md)** - Fix common issues
+### 3. Training
+📁 [`03_training/`](03_training/)  
+Train RL agents with multi-trajectory support.
 
----
+### 4. Optimization
+📁 [`04_optimization/`](04_optimization/)  
+**RTX 3090 GPU optimization** - Essential for performance tuning.
 
-## 🎯 By Use Case
+### 5. Bug Fixes
+📁 [`05_bug_fixes/`](05_bug_fixes/)  
+Resolved issues and their solutions.
 
-### "I want to verify my setup is working"
-→ Run: `bash scripts/wsl/check_wsl_setup.sh`  
-→ Read: [WSL Setup Guide](setup/wsl_setup_guide.md)
+### 6. Workflows
+📁 [`06_workflows/`](06_workflows/)  
+Daily development and visualization workflows.
 
-### "I want to test ROS 2 communication"
-→ Read: [ROS 2 Communication Setup](setup/ros2_communication_setup.md)  
-→ Test: [Quick Reference - Communication Test](QUICK_REFERENCE.md#communication-test)
+### 7. Reference
+📁 [`07_reference/`](07_reference/)  
+Technical references, reward functions, troubleshooting.
 
-### "I want to understand why we have different Python versions"
-→ Read: [Python Environments Explained](architecture/python_environments.md)
+### 8. Project History
+📁 [`08_project_history/`](08_project_history/)  
+Project evolution and documentation changes.
 
-### "I want to start training an RL agent"
-→ Read: [Training Workflow](workflows/training_workflow.md)  
-→ Reference: [Windows Setup Guide](setup/windows_setup_guide.md)
-
-### "I'm getting errors and need help"
-→ Read: [Troubleshooting Guide](reference/troubleshooting.md)  
-→ Check: [Environment Variables](reference/environment_variables.md)
-
-### "I want to know what a script does"
-→ Read: [Scripts Reference](reference/scripts_reference.md)
+### 9. Archive
+📁 [`09_archive/`](09_archive/)  
+Archived tracking documents and WSL troubleshooting.
 
 ---
 
-## 📂 Document Status
+## 🔍 Quick Navigation
 
-| Document | Status | Last Updated |
-|----------|--------|--------------|
-| Quick Reference | ✅ Complete | 2025-10-13 |
-| WSL Setup Guide | ✅ Complete | 2025-10-13 |
-| Windows Setup Guide | ✅ Complete | 2025-10-13 |
-| Architecture Overview | ✅ Complete | 2025-10-13 |
-| ROS 2 Communication | ✅ Complete | 2025-10-13 |
-| Python Environments | ✅ Complete | 2025-10-13 |
-| Daily Workflow | ✅ Complete | 2025-10-13 |
-| Troubleshooting | ✅ Complete | 2025-10-13 |
-| Training Workflow | ⏳ Pending | - |
-| Monitoring Workflow | ⏳ Pending | - |
-| Environment Variables | ⏳ Pending | - |
-| Scripts Reference | ⏳ Pending | - |
+- **Training**: [`03_training/multi_trajectory_training.md`](03_training/multi_trajectory_training.md)
+- **GPU Optimization**: [`04_optimization/RTX3090_REFERENCE_CARD.md`](04_optimization/RTX3090_REFERENCE_CARD.md)
+- **Troubleshooting**: [`07_reference/troubleshooting.md`](07_reference/troubleshooting.md)
+- **Daily Workflow**: [`06_workflows/daily_workflow.md`](06_workflows/daily_workflow.md)
 
 ---
 
-## 🗂️ Legacy Documents (Being Consolidated)
+## 📝 Documentation Updates
 
-These documents contain useful information but are being reorganized:
+This structure consolidates all documentation from the original `docs/` and `docs_archive/` folders into a unified, numbered learning path.
 
-- `lessons_learnt_ros2OnWindows.md` → Being merged into setup guides
-- `wsl_workflow_guide.md` → Split into setup + workflows
-- `wsl_windows_integration.md` → Reorganized into architecture docs
-- `ros2_python_versions_explained.md` → Moved to architecture
-- `ros2_bridge_explained.md` → Moved to architecture
-
----
-
-## 🔄 Document Migration Plan
-
-We're consolidating documentation to reduce scatter. Here's the plan:
-
-### Phase 1: Core Documents (✅ Complete)
-- [x] Quick Reference Card
-- [x] WSL Setup Guide (consolidated)
-- [x] Windows Setup Guide (consolidated)
-- [x] Architecture Overview
-- [x] ROS 2 Communication Explanation
-- [x] Python Environments Explanation
-
-### Phase 2: Workflow Documents (⏳ In Progress)
-- [ ] Daily Workflow Guide
-- [ ] Training Workflow Guide
-- [ ] Monitoring Workflow Guide
-
-### Phase 3: Reference Documents (⏳ Pending)
-- [ ] Environment Variables Reference
-- [ ] Scripts Reference
-- [ ] Troubleshooting Guide (consolidate all issues)
-
-### Phase 4: Cleanup (⏳ Pending)
-- [ ] Archive legacy documents
-- [ ] Update all cross-references
-- [ ] Verify no broken links
-
----
-
-## 💡 Documentation Principles
-
-1. **Single Source of Truth** - Each topic has ONE authoritative document
-2. **Clear Navigation** - Easy to find what you need
-3. **Progressive Disclosure** - Quick start → Details → Deep dive
-4. **Practical First** - Show how to do it, then explain why
-5. **Keep Updated** - Date stamps and status indicators
-
----
-
-## 🤝 Contributing to Documentation
-
-Found an issue? Want to improve something?
-
-1. Check if a document already exists in the structure above
-2. If reorganizing, update this index
-3. Add date stamps when making significant changes
-4. Use clear headers and examples
-5. Link to related documents
-
----
-
-## 📞 Quick Help
-
-**Can't find what you need?**
-
-1. Check **[Quick Reference Card](QUICK_REFERENCE.md)** first
-2. Use the **[By Use Case](#by-use-case)** section above
-3. Check **[Troubleshooting](reference/troubleshooting.md)** for errors
-
-**Still stuck?** Check the legacy documents or project history in `tracking/`.
-
----
-
-**Last Updated:** 2025-10-13  
-**Maintainer:** CinebotRL Team
+For project overview, see [`../README.md`](../README.md).

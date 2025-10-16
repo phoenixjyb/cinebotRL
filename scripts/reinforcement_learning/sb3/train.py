@@ -67,7 +67,7 @@ def parse_args():
     parser.add_argument(
         "--total_timesteps",
         type=int,
-        default=1_000_000,
+        default=10_000_000,
         help="Total number of timesteps to train",
     )
     parser.add_argument(
@@ -79,13 +79,13 @@ def parse_args():
     parser.add_argument(
         "--n_steps",
         type=int,
-        default=4096,  # Increased from 2048 for better GPU utilization
-        help="Number of steps per rollout",
+        default=32,  # 32 steps × 2048 envs = 65K timesteps/iteration (optimal for learning)
+        help="Number of steps per rollout (use 16-64 for large num_envs like 2048)",
     )
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=1024,  # Increased from 512 for better GPU utilization
+        default=512,  # Good balance for 65K rollout buffer
         help="Minibatch size for PPO updates",
     )
     parser.add_argument(
@@ -239,6 +239,19 @@ def main():
             VecEnvWrapper.__init__(self, venv)
             # We'll update observation space after first reset
             self._obs_space_updated = False
+            
+            # FIX: Isaac Lab's action_space includes batch dimension [num_envs, action_dim]
+            # SB3 expects per-env action space [action_dim]
+            if hasattr(venv.action_space, 'shape') and len(venv.action_space.shape) > 1:
+                # Remove the num_envs dimension
+                action_dim = venv.action_space.shape[-1]  # Last dimension is action_dim
+                self.action_space = spaces.Box(
+                    low=venv.action_space.low.flatten()[0],  # All actions have same limits
+                    high=venv.action_space.high.flatten()[0],
+                    shape=(action_dim,),
+                    dtype=venv.action_space.dtype
+                )
+                print(f"[IsaacLabToSB3VecEnvWrapper] Fixed action_space: {venv.action_space.shape} -> {self.action_space.shape}")
             
         def reset(self):
             obs = self.venv.reset()
@@ -434,9 +447,28 @@ def main():
             model = PPO.load(args.checkpoint, env=env, device=device)
         else:
             print("    Creating new PPO model...")
+            
+            # Enhanced network architecture for 9DOF robot with trajectory tracking
+            # Obs: 70 dims (base 13 + joints 12 + EE 13 + error 7 + lookahead 9 + action_hist 16)
+            # Actions: 8 dims (6 arm joints + 2 base velocities)
+            policy_kwargs = dict(
+                net_arch=dict(
+                    pi=[256, 256, 128],  # Actor: 3-layer network (70→256→256→128→8)
+                    vf=[256, 256, 128]   # Critic: 3-layer network (70→256→256→128→1)
+                ),
+                activation_fn=torch.nn.ReLU,
+                ortho_init=True,  # Orthogonal initialization (better for RL)
+            )
+            
+            print("    Network Architecture:")
+            print("      Actor (Policy):  [70] → [256] → [256] → [128] → [8]  (~118K params)")
+            print("      Critic (Value):  [70] → [256] → [256] → [128] → [1]  (~117K params)")
+            print("      Total: ~235K parameters (16× larger than default)")
+            
             model = PPO(
                 "MlpPolicy",
                 env,
+                policy_kwargs=policy_kwargs,  # Use enhanced architecture
                 learning_rate=args.learning_rate,
                 n_steps=args.n_steps,
                 batch_size=args.batch_size,

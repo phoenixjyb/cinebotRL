@@ -116,7 +116,6 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
     def _create_scene_config(self) -> InteractiveSceneCfg:
         """Create the scene configuration with robot and environment."""
         print(f"[MobileMMTrackEE] DEBUG: _create_scene_config called with self.num_envs = {self.num_envs}")
-        print(f"[MobileMMTrackEE] DEBUG: self.cfg.num_envs = {self.cfg.num_envs}")
         
         # Get robot USD path
         robot_usd_path = str(get_mobile_mm_usd_path())

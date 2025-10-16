@@ -111,7 +111,11 @@ def main():
     
     # Initialize Isaac Sim
     print("[1/5] Initializing Isaac Sim...")
-    from omni.isaac.lab.app import AppLauncher
+    try:
+        from isaaclab.app import AppLauncher
+    except ModuleNotFoundError:
+        print("    ✗ Could not import isaaclab.app. Make sure you're running with isaaclab.bat")
+        sys.exit(1)
     
     app_launcher = AppLauncher(headless=args.headless)
     simulation_app = app_launcher.app
@@ -125,7 +129,8 @@ def main():
     # Register custom tasks
     print("\n[2/5] Registering custom tasks...")
     try:
-        import task_spec  # Registers MobileMMTrackEE-v0
+        from task_spec import register_isaac_lab_tasks
+        register_isaac_lab_tasks()
         print(f"    ✓ Registered task: {args.task}")
     except Exception as e:
         print(f"    ✗ Failed to register tasks: {e}")

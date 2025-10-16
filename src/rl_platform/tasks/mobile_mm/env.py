@@ -190,20 +190,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         if cfg is None:
             cfg = MobileMMTrackEEEnvCfg()
         
-        # CRITICAL: Override num_envs BEFORE calling super().__init__()
-        # DirectRLEnv reads cfg.num_envs during initialization to create the scene
+        # CRITICAL: Override num_envs in config BEFORE calling super().__init__()
+        # DirectRLEnv will use cfg.num_envs to set the read-only self.num_envs property
         if 'num_envs' in kwargs:
             num_envs_override = kwargs.pop('num_envs')
             print(f"[MobileMMTrackEE] DEBUG: Before override, cfg.num_envs = {cfg.num_envs}")
             cfg.num_envs = num_envs_override
             print(f"[MobileMMTrackEE] DEBUG: After override, cfg.num_envs = {cfg.num_envs}")
-            print(f"[MobileMMTrackEE] DEBUG: cfg object id = {id(cfg)}")
-            
-            # HACK: Pre-set self.num_envs before parent reads it
-            # This is needed because DirectRLEnv calls _create_scene_config() 
-            # before setting self.num_envs from cfg
-            self.num_envs = num_envs_override
-            print(f"[MobileMMTrackEE] DEBUG: Pre-set self.num_envs = {self.num_envs}")
         
         # DirectRLEnv only takes cfg, not render_mode
         # By this point, cfg.num_envs should be set correctly

@@ -35,8 +35,8 @@ def compose_observation(
         base_quat: Base orientation [num_envs, 4]
         base_lin_vel: Base linear velocity [num_envs, 3]
         base_ang_vel: Base angular velocity [num_envs, 3]
-        joint_pos: Joint positions [num_envs, num_joints]
-        joint_vel: Joint velocities [num_envs, num_joints]
+        joint_pos: Joint positions [num_envs, 9] (all joints: [0-2: base PPR, 3-8: arm])
+        joint_vel: Joint velocities [num_envs, 9] (all joints: [0-2: base PPR, 3-8: arm])
         ee_pos: End-effector position [num_envs, 3]
         ee_quat: End-effector orientation [num_envs, 4]
         ee_lin_vel: End-effector linear velocity [num_envs, 3]
@@ -56,8 +56,12 @@ def compose_observation(
     # Base state (13 dims: pos + quat + lin_vel + ang_vel)
     components.extend([base_pos, base_quat, base_lin_vel, base_ang_vel])
     
-    # Joint state (2 * num_joints)
-    components.extend([joint_pos, joint_vel])
+    # Joint state (2 * num_joints) - extract only arm joints [3:9] from full joint array
+    # Robot has 9 DOF: [0-2: base PPR joints, 3-8: arm joints]
+    # We only include arm joints in observations (6 joints × 2 = 12 dims)
+    arm_joint_pos = joint_pos[:, 3:9]  # Only arm joints
+    arm_joint_vel = joint_vel[:, 3:9]  # Only arm joints
+    components.extend([arm_joint_pos, arm_joint_vel])
     
     # End-effector state (13 dims)
     components.extend([ee_pos, ee_quat, ee_lin_vel, ee_ang_vel])

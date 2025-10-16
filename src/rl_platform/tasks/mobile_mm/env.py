@@ -463,26 +463,37 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Set scaled joint position targets for arm joints only
         self.robot.set_joint_position_target(arm_actions_scaled, joint_ids=self._arm_joint_ids)
         
-        # Apply base velocity commands for mobile base (differential drive)
-        # Initialize base joint indices on first call
+        # Apply base position commands for mobile base (differential drive)
+        # Initialize base joint indices on first call (lookup by name for safety)
         if not hasattr(self, '_base_joint_ids'):
-            # Base joints: first 3 joints are typically base_link_x, base_link_y, base_link_z (or similar)
-            # For differential drive: we control vx (forward), and wz (rotation), vy is always 0
-            # Joint indices [0, 1, 2] correspond to [vx, vy, wz]
-            self._base_joint_ids = torch.tensor([0, 1, 2], device=self.device)
+            # Base joints: joint_x (prismatic X), joint_y (prismatic Y), joint_theta (revolute rotation)
+            base_joint_names = ["joint_x", "joint_y", "joint_theta"]
+            self._base_joint_ids = []
+            for name in base_joint_names:
+                if name in self.robot.joint_names:
+                    idx = self.robot.joint_names.index(name)
+                    self._base_joint_ids.append(idx)
+            self._base_joint_ids = torch.tensor(self._base_joint_ids, device=self.device)
             print(f"[MobileMMTrackEE] Base joint IDs initialized: {self._base_joint_ids.tolist()}")
+            print(f"[MobileMMTrackEE] Base joint names: {base_joint_names}")
         
-        # Create base velocity command: [vx, 0, wz]
-        # vy = 0 because differential drive cannot move sideways
-        base_velocities = torch.cat([
-            base_vx,                      # Forward/backward velocity
-            torch.zeros_like(base_vx),    # vy = 0 (no sideways movement)
-            base_wz                        # Angular velocity (rotation)
-        ], dim=-1)
+        # Get current base positions from physics (no drift accumulation)
+        current_base_pos = self.robot.data.joint_pos[:, self._base_joint_ids]  # [num_envs, 3]
+        theta = current_base_pos[:, 2]  # Current orientation (joint_theta)
         
-        # Apply velocity targets to base joints
-        self.robot.set_joint_velocity_target(
-            target=base_velocities,  # Correct parameter name is 'target'
+        # Integrate velocities to position deltas using differential drive kinematics
+        dt = self.cfg.sim.dt * self.cfg.decimation
+        dx = base_vx.squeeze(-1) * torch.cos(theta) * dt  # X displacement in global frame
+        dy = base_vx.squeeze(-1) * torch.sin(theta) * dt  # Y displacement in global frame
+        dtheta = base_wz.squeeze(-1) * dt  # Angular displacement
+        
+        # Compute new target positions
+        position_deltas = torch.stack([dx, dy, dtheta], dim=1)  # [num_envs, 3]
+        new_base_targets = current_base_pos + position_deltas
+        
+        # Apply position targets (PPR joints are position-controlled, NOT velocity-controlled)
+        self.robot.set_joint_position_target(
+            target=new_base_targets,
             joint_ids=self._base_joint_ids
         )
     

@@ -128,6 +128,15 @@ def parse_args():
         help="Path to checkpoint to resume from",
     )
     
+    # Device selection
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="auto",
+        choices=["auto", "cpu", "cuda"],
+        help="Device to use for training (default: auto - use GPU if available)",
+    )
+    
     return parser.parse_args()
 
 
@@ -386,7 +395,19 @@ def main():
     # Create or load model
     try:
         import torch
-        device = f"cuda:{best_device}" if torch.cuda.is_available() else "cpu"
+        
+        # Device selection based on command-line argument
+        if args.device == "cpu":
+            device = "cpu"
+            print("    ⚠️  CPU training forced via --device cpu")
+        elif args.device == "cuda":
+            if torch.cuda.is_available():
+                device = f"cuda:{best_device}"
+            else:
+                print("    ⚠️  CUDA requested but not available, falling back to CPU")
+                device = "cpu"
+        else:  # auto
+            device = f"cuda:{best_device}" if torch.cuda.is_available() else "cpu"
         
         if args.checkpoint:
             print(f"    Loading checkpoint: {args.checkpoint}")

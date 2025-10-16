@@ -198,6 +198,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             cfg.num_envs = num_envs_override
             print(f"[MobileMMTrackEE] DEBUG: After override, cfg.num_envs = {cfg.num_envs}")
             print(f"[MobileMMTrackEE] DEBUG: cfg object id = {id(cfg)}")
+            
+            # HACK: Pre-set self.num_envs before parent reads it
+            # This is needed because DirectRLEnv calls _create_scene_config() 
+            # before setting self.num_envs from cfg
+            self.num_envs = num_envs_override
+            print(f"[MobileMMTrackEE] DEBUG: Pre-set self.num_envs = {self.num_envs}")
         
         # DirectRLEnv only takes cfg, not render_mode
         # By this point, cfg.num_envs should be set correctly

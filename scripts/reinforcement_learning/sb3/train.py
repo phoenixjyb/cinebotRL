@@ -480,7 +480,7 @@ def main():
                 ent_coef=0.01,          # Exploration bonus (was 0.0)
                 vf_coef=0.5,
                 max_grad_norm=0.5,
-                target_kl=0.01,         # Early stopping if KL divergence too large
+                target_kl=None,         # No early stopping for initial training (was 0.01 - too strict!)
                 tensorboard_log=args.log_dir,
                 device=device,
                 verbose=1,

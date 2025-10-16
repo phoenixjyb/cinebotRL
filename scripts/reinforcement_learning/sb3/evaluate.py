@@ -136,8 +136,6 @@ def main():
         def __init__(self, venv):
             # Isaac Lab env is already a VecEnv
             VecEnvWrapper.__init__(self, venv)
-            # We'll update observation space after first reset
-            self._obs_space_updated = False
             
             # FIX: Isaac Lab's action_space includes batch dimension [num_envs, action_dim]
             # SB3 expects per-env action space [action_dim]
@@ -150,6 +148,33 @@ def main():
                     shape=(action_dim,),
                     dtype=venv.action_space.dtype
                 )
+            
+            # FIX: Set observation space correctly by doing a reset to get actual obs shape
+            # This is needed because PPO.load() checks spaces BEFORE first reset
+            dummy_obs = venv.reset()
+            if isinstance(dummy_obs, tuple):
+                dummy_obs, _ = dummy_obs
+            if isinstance(dummy_obs, dict):
+                obs_tensor = dummy_obs.get("policy", list(dummy_obs.values())[0])
+                if hasattr(obs_tensor, 'cpu'):
+                    dummy_obs = obs_tensor.cpu().numpy()
+                else:
+                    dummy_obs = np.array(obs_tensor)
+            
+            # dummy_obs shape is [num_envs, obs_dim], we want [obs_dim] for the space
+            if len(dummy_obs.shape) > 1:
+                obs_shape = (dummy_obs.shape[1],)
+            else:
+                obs_shape = dummy_obs.shape
+            
+            self.observation_space = spaces.Box(
+                low=-np.inf,
+                high=np.inf,
+                shape=obs_shape,
+                dtype=np.float32
+            )
+            
+            print(f"✓ Wrapper initialized: obs_space={self.observation_space.shape}, action_space={self.action_space.shape}")
             
         def reset(self):
             obs = self.venv.reset()
@@ -165,18 +190,7 @@ def main():
                     obs = obs_tensor.cpu().numpy()
                 else:
                     obs = np.array(obs_tensor)
-                
-                # Update observation space on first reset
-                if not self._obs_space_updated:
-                    # For the observation space, we want per-env shape without batch dim
-                    obs_shape = obs.shape[1:] if len(obs.shape) > 1 else obs.shape
-                    self.observation_space = spaces.Box(
-                        low=-np.inf,
-                        high=np.inf,
-                        shape=obs_shape,
-                        dtype=np.float32
-                    )
-                    self._obs_space_updated = True
+            
             return obs
         
         def step_async(self, actions):
@@ -245,6 +259,11 @@ def main():
     try:
         # Create base environment
         base_env = gym.make(args.task, num_envs=args.num_envs, headless=args.headless)
+        
+        # DISABLE termination conditions for evaluation (let episodes run full length)
+        base_env.unwrapped.task_cfg.terminate_on_tracking_error = False
+        base_env.unwrapped.task_cfg.terminate_on_self_collision = False
+        print(f"    ✓ Disabled termination conditions for full episode visualization")
         
         # Wrap for SB3 compatibility using our wrapper class
         env = IsaacLabToSB3VecEnvWrapper(base_env)

@@ -115,6 +115,8 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
     
     def _create_scene_config(self) -> InteractiveSceneCfg:
         """Create the scene configuration with robot and environment."""
+        print(f"[MobileMMTrackEE] DEBUG: _create_scene_config called with self.num_envs = {self.num_envs}")
+        print(f"[MobileMMTrackEE] DEBUG: self.cfg.num_envs = {self.cfg.num_envs}")
         
         # Get robot USD path
         robot_usd_path = str(get_mobile_mm_usd_path())
@@ -183,18 +185,24 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         Args:
             cfg: Environment configuration (optional, created if None)
             render_mode: Rendering mode (None for headless) - currently unused
-            **kwargs: Additional arguments (num_envs, etc.) passed to parent
+            **kwargs: Additional arguments (num_envs, etc.)
         """
         # Create default config if none provided
         if cfg is None:
             cfg = MobileMMTrackEEEnvCfg()
         
-        # Override num_envs if provided in kwargs
+        # CRITICAL: Override num_envs BEFORE calling super().__init__()
+        # DirectRLEnv reads cfg.num_envs during initialization to create the scene
         if 'num_envs' in kwargs:
-            cfg.num_envs = kwargs.pop('num_envs')
-            print(f"[MobileMMTrackEE] Overriding num_envs to {cfg.num_envs}")
+            num_envs_override = kwargs.pop('num_envs')
+            print(f"[MobileMMTrackEE] DEBUG: Before override, cfg.num_envs = {cfg.num_envs}")
+            cfg.num_envs = num_envs_override
+            print(f"[MobileMMTrackEE] DEBUG: After override, cfg.num_envs = {cfg.num_envs}")
+            print(f"[MobileMMTrackEE] DEBUG: cfg object id = {id(cfg)}")
         
         # DirectRLEnv only takes cfg, not render_mode
+        # By this point, cfg.num_envs should be set correctly
+        print(f"[MobileMMTrackEE] DEBUG: Passing cfg with num_envs={cfg.num_envs} to DirectRLEnv")
         super().__init__(cfg, **kwargs)
         
         # Task configuration

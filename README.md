@@ -46,7 +46,7 @@ I:\isaaclab\isaaclab.bat -p scripts/reinforcement_learning/sb3/train.py `
   --task MobileMMTrackEE-v0 --num_envs 64 --headless true
 ```
 
-**See [START_TRAINING_NOW.md](START_TRAINING_NOW.md) for complete training guide.**
+**📚 Documentation**: See [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) for complete guide navigation.
 
 ### Optional: WSL Setup (For Monitoring/Analysis Only)
 
@@ -200,12 +200,12 @@ ros2 topic list
 - Verify Isaac Lab installation: `I:\isaaclab\isaaclab.bat -h`
 - Check GPU detection: `nvidia-smi`
 - Review logs in latest directory under `I:\isaaclab\logs\sb3\`
-- See [TRAINING_SUCCESS.md](TRAINING_SUCCESS.md) for known issues and solutions
+- See [docs_archive/03_training_guides/TRAINING_SUCCESS.md](docs_archive/03_training_guides/TRAINING_SUCCESS.md) for known issues and solutions
 
 **Import errors or compatibility issues?**
 - All 12+ compatibility issues have been resolved as of 2025-10-15
 - Gymnasium ale_py issue: Already patched in Isaac Lab Python environment
-- See [TRAINING_SUCCESS.md](TRAINING_SUCCESS.md) for complete list of fixes
+- See [docs_archive/02_bug_fixes/ALL_FIXES_COMPLETE.md](docs_archive/02_bug_fixes/ALL_FIXES_COMPLETE.md) for complete list of fixes
 
 **ROS 2 topics not visible? (Optional)**
 - Check `ROS_DOMAIN_ID=55` on both sides
@@ -218,6 +218,17 @@ ros2 topic list
 
 See [docs/reference/troubleshooting.md](docs/reference/troubleshooting.md) for detailed troubleshooting.
 
+## Documentation
+
+📚 **Complete documentation index**: [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
+
+**Quick links**:
+- 🚀 [Quick Start Training](docs_archive/04_gpu_optimization/RTX3090_REFERENCE_CARD.md) - START HERE
+- 🐛 [Bug Fixes Summary](docs_archive/02_bug_fixes/ALL_FIXES_COMPLETE.md) - All resolved ✅
+- ⚡ [GPU Optimization](docs_archive/04_gpu_optimization/RTX3090_QUICK_START.md) - 6x speedup guide
+- 📖 [Training Guides](docs_archive/03_training_guides/) - Workflows and tuning
+- 🎯 [Project Overview](docs_archive/01_project_overview/) - Roadmap and status
+
 ## Next Steps
 
 1. ✅ Environment setup complete
@@ -225,12 +236,15 @@ See [docs/reference/troubleshooting.md](docs/reference/troubleshooting.md) for d
 3. ✅ **Windows training verified working** (2025-10-15)
 4. ✅ `MobileMMTrackEE-v0` task implemented and training
 5. ✅ Robot USD asset created and validated
-6. ⏭️ Tune reward function and hyperparameters
-7. ⏭️ Implement obstacle avoidance scenarios
-8. ⏭️ Deploy trained policy to robot
+6. ✅ **5 critical bugs fixed and verified**
+7. ✅ **GPU optimization implemented** (6-8x speedup potential)
+8. ⏭️ Scale to Phase 2 training (4096 envs)
+9. ⏭️ Evaluate trained policy performance
+10. ⏭️ Deploy to physical robot
 
 ---
 
-**Last Updated:** 2025-10-15  
-**Training Status:** ✅ Fully Operational on Windows
+**Last Updated:** 2025-10-16  
+**Training Status:** ✅ Fully Operational + Optimized  
+**GPU Utilization:** Scaling from 10% → 60-80% (6-8x faster)
 

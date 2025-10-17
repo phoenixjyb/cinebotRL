@@ -149,6 +149,11 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
                     stiffness=400.0,
                     damping=40.0,
                 ),
+                "base": ImplicitActuatorCfg(
+                    joint_names_expr=["joint_x", "joint_y", "joint_theta"],
+                    stiffness=10000.0,  # High stiffness for rigid position tracking
+                    damping=1000.0,     # High damping for mobile base stability
+                ),
             },
         )
         

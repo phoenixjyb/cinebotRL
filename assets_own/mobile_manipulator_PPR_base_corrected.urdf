@@ -229,21 +229,21 @@
         <child link="abstract_chassis_link"/>
         <origin rpy="0.00000000 0.00000000 0.00000000" xyz="0.00000000 0.00000000 0.00000000"/>
         <axis xyz="0.00000000 0.00000000 1.00000000"/>
-        <limit lower="-Inf" upper="Inf" effort="0" velocity="1.6"/>
+        <limit lower="-Inf" upper="Inf" effort="100.0" velocity="2.5"/>
     </joint>
     <joint name="joint_x" type="prismatic">
         <parent link="base"/>
         <child link="base_link_x"/>
         <origin rpy="0.00000000 0.00000000 0.00000000" xyz="0.00000000 0.00000000 0.00000000"/>
         <axis xyz="1.00000000 0.00000000 0.00000000"/>
-        <limit lower="-50.00000000" upper="50.00000000" effort="0" velocity="0"/>
+        <limit lower="-50.00000000" upper="50.00000000" effort="200.0" velocity="2.0"/>
     </joint>
     <joint name="joint_y" type="prismatic">
         <parent link="base_link_x"/>
         <child link="base_link_y"/>
         <origin rpy="0.00000000 0.00000000 0.00000000" xyz="0.00000000 0.00000000 0.00000000"/>
         <axis xyz="0.00000000 1.00000000 0.00000000"/>
-        <limit lower="-50.00000000" upper="50.00000000" effort="0" velocity="0"/>
+        <limit lower="-50.00000000" upper="50.00000000" effort="200.0" velocity="2.0"/>
     </joint>
   <joint name="left_arm_joint1" type="revolute">
     <origin xyz="-0.0011149 0.0446 0" rpy="0 0 0" />

@@ -79,8 +79,8 @@ def parse_args():
     parser.add_argument(
         "--n_steps",
         type=int,
-        default=32,  # 32 steps × 2048 envs = 65K timesteps/iteration (optimal for learning)
-        help="Number of steps per rollout (use 16-64 for large num_envs like 2048)",
+        default=128,  # 128 steps × 4096 envs = 524K timesteps/iteration (better GAE estimation)
+        help="Number of steps per rollout (128-512 recommended for stable GAE)",
     )
     parser.add_argument(
         "--batch_size",
@@ -687,12 +687,18 @@ def main():
                 ),
                 activation_fn=torch.nn.ReLU,
                 ortho_init=True,  # Orthogonal initialization (better for RL)
+                log_std_init=-1.0,  # Initial log(std) = -1.0 → std ≈ 0.37
+                log_std_bounds=(-3.0, 1.0),  # Bound std to [0.05, 2.72] range
             )
             
             print("    Network Architecture:")
             print("      Actor (Policy):  [70] → [256] → [256] → [128] → [8]  (~118K params)")
             print("      Critic (Value):  [70] → [256] → [256] → [128] → [1]  (~117K params)")
             print("      Total: ~235K parameters (16× larger than default)")
+            print("    Action Distribution:")
+            print("      Initial std:     ~0.37 (log_std_init=-1.0)")
+            print("      Std bounds:      [0.05, 2.72] (log_std ∈ [-3.0, 1.0])")
+            print("      Purpose:         Prevents std explosion/collapse")
             
             model = PPO(
                 "MlpPolicy",

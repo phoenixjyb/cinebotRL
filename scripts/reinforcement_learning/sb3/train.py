@@ -95,6 +95,63 @@ def parse_args():
         help="Number of epochs per PPO update",
     )
     
+    # PPO hyperparameters
+    parser.add_argument(
+        "--ent_coef",
+        type=float,
+        default=0.01,
+        help="Entropy coefficient for exploration (recommend 0.001 for tracking tasks)",
+    )
+    parser.add_argument(
+        "--target_kl",
+        type=float,
+        default=None,
+        help="Target KL divergence for early stopping (None = disabled)",
+    )
+    parser.add_argument(
+        "--clip_range",
+        type=float,
+        default=0.2,
+        help="PPO clipping range for policy updates",
+    )
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default=0.99,
+        help="Discount factor for future rewards",
+    )
+    parser.add_argument(
+        "--gae_lambda",
+        type=float,
+        default=0.95,
+        help="Lambda parameter for Generalized Advantage Estimation",
+    )
+    
+    # Entropy decay parameters (prevents late-stage policy divergence)
+    parser.add_argument(
+        "--enable_entropy_decay",
+        action="store_true",
+        help="Enable entropy coefficient decay to prevent policy divergence after convergence",
+    )
+    parser.add_argument(
+        "--final_ent_coef",
+        type=float,
+        default=0.0001,
+        help="Final entropy coefficient after decay (only used if --enable_entropy_decay)",
+    )
+    parser.add_argument(
+        "--decay_start_timestep",
+        type=int,
+        default=100_000_000,
+        help="Timestep to start entropy decay (default: 100M steps)",
+    )
+    parser.add_argument(
+        "--decay_duration_timesteps",
+        type=int,
+        default=100_000_000,
+        help="Duration of entropy decay in timesteps (default: 100M steps)",
+    )
+    
     # Logging and checkpointing
     parser.add_argument(
         "--log_dir",
@@ -222,13 +279,68 @@ def main():
         from gymnasium import spaces
         import numpy as np
         from stable_baselines3 import PPO
-        from stable_baselines3.common.callbacks import CheckpointCallback
+        from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
         from stable_baselines3.common.vec_env import VecNormalize, VecEnv, VecEnvWrapper
         print("    ✓ Dependencies imported")
     except ImportError as e:
         print(f"    ✗ Failed to import dependencies: {e}")
         simulation_app.close()
         return
+    
+    # Entropy decay callback to prevent policy divergence
+    class EntropyDecayCallback(BaseCallback):
+        """
+        Decays entropy coefficient during training to prevent late-stage divergence.
+        
+        Problem: Constant high ent_coef causes policy to maximize entropy instead of
+        tracking performance after convergence.
+        
+        Solution: Start with high ent_coef for exploration, decay to low value for convergence.
+        
+        Args:
+            initial_ent_coef: Starting entropy coefficient (default: 0.001 for exploration)
+            final_ent_coef: Ending entropy coefficient (default: 0.0001 for convergence)
+            decay_start_timestep: When to start decay (default: 100M steps)
+            decay_duration_timesteps: How long decay takes (default: 100M steps)
+        """
+        def __init__(
+            self, 
+            initial_ent_coef: float = 0.001,
+            final_ent_coef: float = 0.0001,
+            decay_start_timestep: int = 100_000_000,
+            decay_duration_timesteps: int = 100_000_000,
+            verbose: int = 0
+        ):
+            super().__init__(verbose)
+            self.initial_ent_coef = initial_ent_coef
+            self.final_ent_coef = final_ent_coef
+            self.decay_start = decay_start_timestep
+            self.decay_duration = decay_duration_timesteps
+            self.decay_end = decay_start_timestep + decay_duration_timesteps
+            
+        def _on_step(self) -> bool:
+            """Update entropy coefficient based on current timestep."""
+            current_timestep = self.num_timesteps
+            
+            if current_timestep < self.decay_start:
+                # Before decay: use initial value
+                new_ent_coef = self.initial_ent_coef
+            elif current_timestep >= self.decay_end:
+                # After decay: use final value
+                new_ent_coef = self.final_ent_coef
+            else:
+                # During decay: linear interpolation
+                progress = (current_timestep - self.decay_start) / self.decay_duration
+                new_ent_coef = self.initial_ent_coef * (1 - progress) + self.final_ent_coef * progress
+            
+            # Update model's entropy coefficient
+            self.model.ent_coef = new_ent_coef
+            
+            # Log every 10M steps
+            if self.verbose > 0 and current_timestep % 10_000_000 < 65536:  # Within one rollout
+                print(f"[EntropyDecay] Step {current_timestep/1e6:.1f}M: ent_coef = {new_ent_coef:.6f}")
+            
+            return True  # Continue training
     
     # Create wrapper to convert Isaac Lab observations to SB3 format
     class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):
@@ -422,6 +534,19 @@ def main():
     )
     callbacks.append(checkpoint_callback)
     
+    # Entropy decay callback (prevents policy divergence after convergence)
+    if args.enable_entropy_decay:
+        entropy_decay_callback = EntropyDecayCallback(
+            initial_ent_coef=args.ent_coef,
+            final_ent_coef=args.final_ent_coef,
+            decay_start_timestep=args.decay_start_timestep,
+            decay_duration_timesteps=args.decay_duration_timesteps,
+            verbose=1,
+        )
+        callbacks.append(entropy_decay_callback)
+        print(f"    ✓ Entropy decay enabled: {args.ent_coef} → {args.final_ent_coef}")
+        print(f"      Decay: {args.decay_start_timestep/1e6:.0f}M - {(args.decay_start_timestep + args.decay_duration_timesteps)/1e6:.0f}M steps")
+    
     if args.wandb:
         callbacks.append(wandb_callback)
     
@@ -473,14 +598,14 @@ def main():
                 n_steps=args.n_steps,
                 batch_size=args.batch_size,
                 n_epochs=args.n_epochs,
-                gamma=0.99,
-                gae_lambda=0.95,
-                clip_range=0.2,
+                gamma=args.gamma,
+                gae_lambda=args.gae_lambda,
+                clip_range=args.clip_range,
                 clip_range_vf=1.0,      # Clip value function updates for stability
-                ent_coef=0.01,          # Exploration bonus (was 0.0)
+                ent_coef=args.ent_coef,
                 vf_coef=0.5,
                 max_grad_norm=0.5,
-                target_kl=None,         # No early stopping for initial training (was 0.01 - too strict!)
+                target_kl=args.target_kl,
                 tensorboard_log=args.log_dir,
                 device=device,
                 verbose=1,
@@ -506,6 +631,14 @@ def main():
     print(f"Rollout steps:     {args.n_steps}")
     print(f"Batch size:        {args.batch_size}")
     print(f"PPO epochs:        {args.n_epochs}")
+    print(f"Entropy coef:      {args.ent_coef}")
+    if args.enable_entropy_decay:
+        print(f"  → Decay enabled: {args.ent_coef} → {args.final_ent_coef}")
+        print(f"  → Decay period:  {args.decay_start_timestep/1e6:.0f}M - {(args.decay_start_timestep + args.decay_duration_timesteps)/1e6:.0f}M steps")
+    print(f"Gamma:             {args.gamma}")
+    print(f"GAE lambda:        {args.gae_lambda}")
+    print(f"Clip range:        {args.clip_range}")
+    print(f"Target KL:         {args.target_kl if args.target_kl else 'None (disabled)'}")
     print(f"Save frequency:    {args.save_freq:,} steps")
     print(f"Log directory:     {args.log_dir}")
     print(f"Device:            {device}")

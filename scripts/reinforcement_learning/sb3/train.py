@@ -700,8 +700,7 @@ def main():
             print("      Total: ~235K parameters (16× larger than default)")
             print("    Action Distribution:")
             print("      Initial std:     ~0.37 (log_std_init=-1.0)")
-            print("      Std bounds:      [0.05, 2.72] (log_std ∈ [-3.0, 1.0])")
-            print("      Purpose:         Prevents std explosion/collapse")
+            print("      Std control:     Entropy decay + KL schedule")
             
             model = PPO(
                 "MlpPolicy",
@@ -719,7 +718,8 @@ def main():
                 vf_coef=0.5,
                 max_grad_norm=0.5,
                 target_kl=args.target_kl,
-                log_std_bounds=(-3.0, 1.0),  # Bound std to [0.05, 2.72] range
+                # Note: log_std_bounds not available in SB3 2.5.0
+                # Std control via: entropy decay + KL schedule + log_std_init=-1.0
                 tensorboard_log=args.log_dir,
                 device=device,
                 verbose=1,

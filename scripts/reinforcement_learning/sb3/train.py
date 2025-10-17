@@ -430,6 +430,10 @@ def main():
                     print(f"[KL Schedule] Step {current_timestep/1e6:.1f}M: target_kl = {new_target_kl:.3f} ({phase} phase)")
             
             return True  # Continue training
+        
+        def _on_step(self) -> bool:
+            """Called at every step. We update on rollout end instead."""
+            return True  # Continue training
     
     # Create wrapper to convert Isaac Lab observations to SB3 format
     class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):

@@ -692,7 +692,6 @@ def main():
                 activation_fn=torch.nn.ReLU,
                 ortho_init=True,  # Orthogonal initialization (better for RL)
                 log_std_init=-1.0,  # Initial log(std) = -1.0 → std ≈ 0.37
-                log_std_bounds=(-3.0, 1.0),  # Bound std to [0.05, 2.72] range
             )
             
             print("    Network Architecture:")
@@ -720,6 +719,7 @@ def main():
                 vf_coef=0.5,
                 max_grad_norm=0.5,
                 target_kl=args.target_kl,
+                log_std_bounds=(-3.0, 1.0),  # Bound std to [0.05, 2.72] range
                 tensorboard_log=args.log_dir,
                 device=device,
                 verbose=1,

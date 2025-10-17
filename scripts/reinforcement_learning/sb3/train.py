@@ -152,6 +152,31 @@ def parse_args():
         help="Duration of entropy decay in timesteps (default: 100M steps)",
     )
     
+    # KL divergence scheduling parameters (prevents instability and oscillations)
+    parser.add_argument(
+        "--enable_kl_schedule",
+        action="store_true",
+        help="Enable target_kl scheduling for stable policy updates across training phases",
+    )
+    parser.add_argument(
+        "--kl_warmup",
+        type=float,
+        default=0.07,
+        help="Target KL during warmup phase (0-10%% of training, default: 0.07)",
+    )
+    parser.add_argument(
+        "--kl_main",
+        type=float,
+        default=0.02,
+        help="Target KL during main phase (10-80%% of training, default: 0.02)",
+    )
+    parser.add_argument(
+        "--kl_finetune",
+        type=float,
+        default=0.01,
+        help="Target KL during fine-tune phase (80-100%% of training, default: 0.01)",
+    )
+    
     # Logging and checkpointing
     parser.add_argument(
         "--log_dir",
@@ -339,6 +364,70 @@ def main():
             # Log every 10M steps
             if self.verbose > 0 and current_timestep % 10_000_000 < 65536:  # Within one rollout
                 print(f"[EntropyDecay] Step {current_timestep/1e6:.1f}M: ent_coef = {new_ent_coef:.6f}")
+            
+            return True  # Continue training
+    
+    # KL divergence scheduling callback for stable training
+    class DynamicKLSchedule(BaseCallback):
+        """
+        Dynamically adjusts target_kl during training for stable policy updates.
+        
+        Problem: Constant target_kl doesn't adapt to training phase:
+        - Too tight early → prevents exploration, slow learning
+        - Too loose late → unstable updates, oscillations
+        
+        Solution: Three-phase schedule:
+        - Warmup (0-10%): Loose KL (0.05-0.10) for exploration
+        - Main (10-80%): Moderate KL (0.02) for steady learning
+        - Fine-tune (80-100%): Tight KL (0.01) for convergence
+        
+        Args:
+            total_timesteps: Total training timesteps for calculating phases
+            kl_warmup: Target KL during warmup phase (default: 0.07)
+            kl_main: Target KL during main phase (default: 0.02)
+            kl_finetune: Target KL during fine-tune phase (default: 0.01)
+            warmup_frac: Fraction of training for warmup (default: 0.1)
+            finetune_frac: Fraction of training for fine-tune (default: 0.8)
+        """
+        def __init__(
+            self,
+            total_timesteps: int,
+            kl_warmup: float = 0.07,
+            kl_main: float = 0.02,
+            kl_finetune: float = 0.01,
+            warmup_frac: float = 0.1,
+            finetune_frac: float = 0.8,
+            verbose: int = 0
+        ):
+            super().__init__(verbose)
+            self.warmup_steps = int(total_timesteps * warmup_frac)
+            self.finetune_steps = int(total_timesteps * finetune_frac)
+            self.kl_warmup = kl_warmup
+            self.kl_main = kl_main
+            self.kl_finetune = kl_finetune
+            
+        def _on_rollout_end(self) -> bool:
+            """Update target_kl at end of each rollout."""
+            current_timestep = self.num_timesteps
+            
+            if current_timestep < self.warmup_steps:
+                # Warmup phase: loose KL for exploration
+                new_target_kl = self.kl_warmup
+                phase = "warmup"
+            elif current_timestep < self.finetune_steps:
+                # Main phase: moderate KL for steady learning
+                new_target_kl = self.kl_main
+                phase = "main"
+            else:
+                # Fine-tune phase: tight KL for convergence
+                new_target_kl = self.kl_finetune
+                phase = "finetune"
+            
+            # Update model's target_kl
+            if self.model.target_kl != new_target_kl:
+                self.model.target_kl = new_target_kl
+                if self.verbose > 0:
+                    print(f"[KL Schedule] Step {current_timestep/1e6:.1f}M: target_kl = {new_target_kl:.3f} ({phase} phase)")
             
             return True  # Continue training
     
@@ -547,6 +636,21 @@ def main():
         print(f"    ✓ Entropy decay enabled: {args.ent_coef} → {args.final_ent_coef}")
         print(f"      Decay: {args.decay_start_timestep/1e6:.0f}M - {(args.decay_start_timestep + args.decay_duration_timesteps)/1e6:.0f}M steps")
     
+    # KL divergence schedule callback (prevents instability and oscillations)
+    if args.enable_kl_schedule:
+        kl_schedule_callback = DynamicKLSchedule(
+            total_timesteps=args.total_timesteps,
+            kl_warmup=args.kl_warmup,
+            kl_main=args.kl_main,
+            kl_finetune=args.kl_finetune,
+            warmup_frac=0.1,
+            finetune_frac=0.8,
+            verbose=1,
+        )
+        callbacks.append(kl_schedule_callback)
+        print(f"    ✓ KL schedule enabled: warmup={args.kl_warmup}, main={args.kl_main}, finetune={args.kl_finetune}")
+        print(f"      Phases: 0-{args.total_timesteps*0.1/1e6:.0f}M (warmup), {args.total_timesteps*0.1/1e6:.0f}M-{args.total_timesteps*0.8/1e6:.0f}M (main), {args.total_timesteps*0.8/1e6:.0f}M-{args.total_timesteps/1e6:.0f}M (finetune)")
+    
     if args.wandb:
         callbacks.append(wandb_callback)
     
@@ -639,6 +743,9 @@ def main():
     print(f"GAE lambda:        {args.gae_lambda}")
     print(f"Clip range:        {args.clip_range}")
     print(f"Target KL:         {args.target_kl if args.target_kl else 'None (disabled)'}")
+    if args.enable_kl_schedule:
+        print(f"  → KL schedule:   warmup={args.kl_warmup}, main={args.kl_main}, finetune={args.kl_finetune}")
+        print(f"  → Phase splits:  10% warmup, 70% main, 20% finetune")
     print(f"Save frequency:    {args.save_freq:,} steps")
     print(f"Log directory:     {args.log_dir}")
     print(f"Device:            {device}")

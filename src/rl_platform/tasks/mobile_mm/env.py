@@ -481,11 +481,16 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         current_base_pos = self.robot.data.joint_pos[:, self._base_joint_ids]  # [num_envs, 3]
         theta = current_base_pos[:, 2]  # Current orientation (joint_theta)
         
+        # Scale base actions from [-1, 1] to actual velocity limits
+        # CRITICAL FIX: Previously actions were used directly without scaling!
+        base_vx_scaled = base_vx * self.robot_limits["max_linear_velocity"]  # [-1.5, +1.5] m/s
+        base_wz_scaled = base_wz * self.robot_limits["max_angular_velocity"]  # [-2.0, +2.0] rad/s
+        
         # Integrate velocities to position deltas using differential drive kinematics
         dt = self.cfg.sim.dt * self.cfg.decimation
-        dx = base_vx.squeeze(-1) * torch.cos(theta) * dt  # X displacement in global frame
-        dy = base_vx.squeeze(-1) * torch.sin(theta) * dt  # Y displacement in global frame
-        dtheta = base_wz.squeeze(-1) * dt  # Angular displacement
+        dx = base_vx_scaled.squeeze(-1) * torch.cos(theta) * dt  # X displacement in global frame
+        dy = base_vx_scaled.squeeze(-1) * torch.sin(theta) * dt  # Y displacement in global frame
+        dtheta = base_wz_scaled.squeeze(-1) * dt  # Angular displacement
         
         # Compute new target positions
         position_deltas = torch.stack([dx, dy, dtheta], dim=1)  # [num_envs, 3]

@@ -167,9 +167,9 @@ class TrajectoryManager:
             # Increment waypoint index for all environments
             self.current_waypoint_idx += 1
             
-            # Wrap around at trajectory end (loop the trajectory)
-            max_idx = self.recorded_positions.shape[1] - 1  # [num_envs, max_length, 3]
-            self.current_waypoint_idx = torch.clamp(self.current_waypoint_idx, 0, max_idx)
+            # Wrap around at trajectory end (modulo for looping)
+            max_idx = self.recorded_positions.shape[1]  # [num_envs, max_length, 3]
+            self.current_waypoint_idx = torch.remainder(self.current_waypoint_idx, max_idx)
     
     def _circle_trajectory(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate circular trajectory.

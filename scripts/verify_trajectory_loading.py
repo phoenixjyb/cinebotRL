@@ -36,33 +36,25 @@ def main():
     # Create environment with trajectory loading
     print("[3/3] Creating environment with multi_recorded trajectories...")
     
-    # Use the same config approach as train.py
-    from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnvCfg, MobileMMTrackEEEnv
-    from rl_platform.tasks.mobile_mm.config import TrajectoryConfig
-    
-    # Create custom environment configuration
-    env_cfg = MobileMMTrackEEEnvCfg()
-    env_cfg.scene.num_envs = 4
-    
-    # Configure trajectory (same as train.py)
-    env_cfg.task_config.trajectory = TrajectoryConfig(
-        type="multi_recorded",
+    # Now kwargs work! The environment will honor them
+    env = gym.make(
+        "MobileMMTrackEE-v0",
+        num_envs=4,
+        trajectory_type="multi_recorded",
         trajectory_dir="trajectoryToLearn/world_json",
-        trajectory_pattern="**/*.json",
-        trajectory_filter_indices=None,  # Use all trajectories
-        max_trajectories=None,
+        use_all_trajectories=True,
     )
     
-    # Create environment directly with config
-    env = MobileMMTrackEEEnv(cfg=env_cfg)
+    # Unwrap to get the underlying environment
+    unwrapped_env = env.unwrapped
     
     print("\n" + "="*80)
     print("ENVIRONMENT CONFIGURATION")
     print("="*80)
     
     # Check trajectory manager
-    if hasattr(env, 'trajectory_manager'):
-        traj_mgr = env.trajectory_manager
+    if hasattr(unwrapped_env, 'trajectory_manager'):
+        traj_mgr = unwrapped_env.trajectory_manager
         print(f"✅ Trajectory manager found: {type(traj_mgr).__name__}")
         
         # Check what type it is
@@ -97,15 +89,15 @@ def main():
     print("\nSampling 100 timesteps from current trajectories:")
     print("-"*80)
     
-    initial_ee_pos = env.robot.data.body_pos_w[0, env._ee_body_idx, :].cpu().numpy()
+    initial_ee_pos = unwrapped_env.robot.data.body_pos_w[0, unwrapped_env._ee_body_idx, :].cpu().numpy()
     print(f"Initial EE position: {initial_ee_pos}")
     
     target_positions = []
     for step in range(100):
-        target_pos, _ = env.trajectory_manager.get_target_pose()
+        target_pos, _ = unwrapped_env.trajectory_manager.get_target_pose()
         target_positions.append(target_pos[0].cpu().numpy())
         # IMPORTANT: Step through the trajectory!
-        env.trajectory_manager.step()
+        unwrapped_env.trajectory_manager.step()
     
     import numpy as np
     target_positions = np.array(target_positions)
@@ -157,16 +149,16 @@ def main():
     print("CONCLUSION")
     print("="*80)
     
-    if not hasattr(env, 'trajectory_manager'):
+    if not hasattr(unwrapped_env, 'trajectory_manager'):
         print("❌ CRITICAL: No trajectory manager!")
-    elif env.trajectory_manager.traj_type not in ["recorded", "multi_recorded"]:
-        print(f"❌ Using simple trajectory ({env.trajectory_manager.traj_type}), NOT multi_recorded!")
+    elif unwrapped_env.trajectory_manager.traj_type not in ["recorded", "multi_recorded"]:
+        print(f"❌ Using simple trajectory ({unwrapped_env.trajectory_manager.traj_type}), NOT multi_recorded!")
         print("   -> Training did NOT see the 1,038 recorded trajectories")
-    elif env.trajectory_manager.multi_loader is None:
+    elif unwrapped_env.trajectory_manager.multi_loader is None:
         print("❌ Multi-loader not initialized!")
         print("   -> Trajectory type is multi_recorded but loader failed")
     else:
-        num_trajs = len(env.trajectory_manager.multi_loader.trajectories)
+        num_trajs = len(unwrapped_env.trajectory_manager.multi_loader.trajectories)
         if num_trajs == 1:
             print("⚠️  Only 1 trajectory loaded - should be 1,038!")
         elif num_trajs < 100:

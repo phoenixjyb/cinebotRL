@@ -195,23 +195,63 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         Args:
             cfg: Environment configuration (optional, created if None)
             render_mode: Rendering mode (None for headless) - currently unused
-            **kwargs: Additional arguments (num_envs, etc.)
+            **kwargs: Additional arguments:
+                - num_envs: Number of parallel environments
+                - trajectory_type: Type of trajectory ("line", "circle", "multi_recorded", etc.)
+                - trajectory_dir: Directory containing trajectory files
+                - use_all_trajectories: Use all trajectories (True) or filter (False)
+                - use_chassis_only: Use only chassis-requiring trajectories
+                - max_trajectories: Maximum number of trajectories to load
         """
-        # Extract num_envs BEFORE creating config (if provided)
+        # Extract kwargs BEFORE creating config
         num_envs_override = kwargs.pop('num_envs', None)
+        trajectory_type = kwargs.pop('trajectory_type', None)
+        trajectory_dir = kwargs.pop('trajectory_dir', None)
+        use_all_trajectories = kwargs.pop('use_all_trajectories', None)
+        use_chassis_only = kwargs.pop('use_chassis_only', None)
+        max_trajectories = kwargs.pop('max_trajectories', None)
         
-        # Create config with correct num_envs if no config provided
+        # Create config with correct settings if no config provided
         if cfg is None:
+            from dataclasses import replace
+            from .config import TrajectoryConfig
+            default_cfg = MobileMMTrackEEEnvCfg()
+            
+            # Apply num_envs override
             if num_envs_override is not None:
-                # Create config with custom num_envs BEFORE __post_init__ runs
-                from dataclasses import replace
-                default_cfg = MobileMMTrackEEEnvCfg()
-                # Use replace to create new config with updated num_envs
-                # This will trigger __post_init__ with the correct value
                 cfg = replace(default_cfg, num_envs=num_envs_override)
                 print(f"[MobileMMTrackEE] Created config with num_envs={cfg.num_envs}")
             else:
-                cfg = MobileMMTrackEEEnvCfg()
+                cfg = default_cfg
+            
+            # Apply trajectory configuration overrides if provided
+            if trajectory_type is not None:
+                # Prepare filter indices if needed
+                trajectory_filter_indices = None
+                if use_chassis_only and trajectory_type == "multi_recorded":
+                    import json
+                    from pathlib import Path
+                    analysis_file = Path("trajectoryToLearn/trajectory_analysis.json")
+                    if analysis_file.exists():
+                        with open(analysis_file, 'r') as f:
+                            analysis = json.load(f)
+                        trajectory_filter_indices = analysis.get('chassis_requiring_indices', [])
+                        print(f"[MobileMMTrackEE] Using {len(trajectory_filter_indices)} chassis-requiring trajectories")
+                
+                # Create new trajectory config
+                cfg.task_config.trajectory = TrajectoryConfig(
+                    type=trajectory_type,
+                    trajectory_dir=trajectory_dir or "trajectoryToLearn/world_json",
+                    trajectory_pattern="**/*.json",
+                    trajectory_filter_indices=trajectory_filter_indices,
+                    max_trajectories=max_trajectories,
+                )
+                print(f"[MobileMMTrackEE] Trajectory config updated: type={trajectory_type}")
+        else:
+            # Config provided - only apply num_envs if specified
+            if num_envs_override is not None:
+                from dataclasses import replace
+                cfg = replace(cfg, num_envs=num_envs_override)
         
         # DirectRLEnv only takes cfg, not render_mode
         super().__init__(cfg, **kwargs)
@@ -777,8 +817,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     net_contact_forces = None
             
             if net_contact_forces is not None:
-                # Calculate maximum contact force magnitude per environment
+                # Calculate contact force magnitude per environment
                 contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
+                
+                # CRITICAL: Exclude base link (index 0) to filter out ground contact
+                # Ground reaction forces should NOT terminate episodes!
+                if contact_force_mag.shape[1] > 1:
+                    contact_force_mag = contact_force_mag[:, 1:]  # Only check arm links
+                
                 max_contact_force = torch.max(contact_force_mag, dim=-1)[0]  # [num_envs]
                 terminated |= max_contact_force > self.task_cfg.self_collision_termination_threshold
         

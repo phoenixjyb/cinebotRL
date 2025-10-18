@@ -197,6 +197,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             render_mode: Rendering mode (None for headless) - currently unused
             **kwargs: Additional arguments that may override configuration.
         """
+        print(f"\n{'='*70}")
+        print(f"[MobileMMTrackEE] __init__ called:")
+        print(f"  cfg provided: {cfg is not None}")
+        if cfg is not None:
+            print(f"  cfg.task_config.trajectory.type: {cfg.task_config.trajectory.type}")
+            print(f"  cfg.task_config.trajectory.trajectory_dir: {cfg.task_config.trajectory.trajectory_dir}")
+        print(f"  kwargs: {list(kwargs.keys())}")
+        print(f"{'='*70}\n")
+        
         # Extract overrides before building config
         num_envs_override = kwargs.pop("num_envs", None)
         trajectory_type_override = kwargs.pop("trajectory_type", None)
@@ -748,14 +757,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"{'='*80}\n")
             self._contact_force_checked = True
         
-        # Compute acceleration for current step
-        base_accel = (base_lin_vel - self.prev_base_lin_vel) / self.control_dt
-        
         # CRITICAL FIX: Normalize velocities for reward calculation
         # Reward functions expect velocities in [0,1] range, but physics gives scaled values
         base_lin_vel_normalized = base_lin_vel / self.robot_limits["max_linear_velocity"]
         base_ang_vel_normalized = base_ang_vel / self.robot_limits["max_angular_velocity"]
         prev_base_lin_vel_normalized = self.prev_base_lin_vel / self.robot_limits["max_linear_velocity"]
+        
+        # Compute acceleration from normalized velocities (for consistent reward magnitude)
+        base_accel_normalized = (base_lin_vel_normalized - prev_base_lin_vel_normalized) / self.control_dt
         
         # Get base orientation for lateral penalty calculation
         base_quat = self.robot.data.root_quat_w
@@ -777,7 +786,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             joint_vel=joint_vel,
             prev_base_lin_vel=prev_base_lin_vel_normalized,  # Pass normalized velocities to rewards
             prev_joint_vel=self.prev_joint_vel,
-            prev_base_accel=self.prev_base_accel,
+            prev_base_accel=base_accel_normalized,  # Pass normalized acceleration (FIXED!)
             joint_lower=self.joint_lower_limits,
             joint_upper=self.joint_upper_limits,
             robot_limits=self.robot_limits,
@@ -787,11 +796,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             weights=self.reward_weights,
         )
         
-        # Update history for next step
+        # Update history for next step (store normalized acceleration!)
         self.prev_tracking_error = torch.norm(target_pos - ee_pos, dim=-1)
         self.prev_base_lin_vel = base_lin_vel.clone()
         self.prev_joint_vel = joint_vel.clone()
-        self.prev_base_accel = base_accel.clone()
+        self.prev_base_accel = base_accel_normalized.clone()  # Store normalized accel!
         
         # Advance trajectory to next target
         # This must happen after reward calculation so current target is used for this step

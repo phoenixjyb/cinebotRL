@@ -75,7 +75,7 @@ class RewardWeights:
     """Reward term weights for the tracking task."""
     
     # Tracking rewards
-    position_tracking: float = 10.0
+    position_tracking: float = 50.0  # INCREASED from 10.0 - need strong incentive for base movement
     orientation_tracking: float = 2.0
     progress_bonus: float = 1.0
     
@@ -87,7 +87,7 @@ class RewardWeights:
     # Constraint violation penalties
     velocity_limit_penalty: float = 5.0
     acceleration_limit_penalty: float = 5.0
-    jerk_limit_penalty: float = 3.0
+    jerk_limit_penalty: float = 0.1  # REDUCED from 3.0 - was killing base movement learning!
     joint_limit_penalty: float = 10.0
     lateral_motion_penalty: float = 2.0  # No sideways motion for diff drive
     

@@ -70,15 +70,22 @@ class TrajectoryManager:
         self.multi_loader = None
         
         # Load trajectory based on type
+        print(f"[TrajectoryManager] Initializing with type='{traj_type}'")
         if traj_type == "recorded" and waypoint_file is not None:
+            print(f"[TrajectoryManager] Loading single recorded trajectory from {waypoint_file}")
             self._load_recorded_trajectory(waypoint_file)
         elif traj_type == "multi_recorded" and trajectory_dir is not None:
+            print(f"[TrajectoryManager] Loading multi-recorded trajectories from {trajectory_dir}")
             self._init_multi_trajectory(
                 trajectory_dir, 
                 trajectory_pattern, 
                 trajectory_filter_indices,
                 max_trajectories
             )
+        elif traj_type == "multi_recorded":
+            print(f"[TrajectoryManager] ⚠️  WARNING: traj_type='multi_recorded' but trajectory_dir is None!")
+        else:
+            print(f"[TrajectoryManager] Using parametric trajectory type: {traj_type}")
         
     def reset(self, env_ids: torch.Tensor) -> None:
         """Reset trajectory phase for specified environments.

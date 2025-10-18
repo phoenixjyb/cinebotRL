@@ -387,12 +387,24 @@ def main():
     
     print(f"Running {args.num_episodes} episodes...")
     
+    global_step = 0
     while episode_count < args.num_episodes:
         # Get action from policy
         action, _states = model.predict(obs, deterministic=args.deterministic)
         
         # Step environment
         obs, rewards, dones, infos = env.step(action)
+        
+        # Debug: Print reward components every 100 steps (first episode only)
+        if episode_count == 0 and global_step % 100 == 0:
+            print(f"\n[DEBUG Step {global_step}] Total reward: {rewards[0]:.2f}")
+            if hasattr(env.unwrapped, 'reward_components') and env.unwrapped.reward_components:
+                for key, val in sorted(env.unwrapped.reward_components.items()):
+                    v = val[0].item() if hasattr(val, 'item') else val[0]
+                    sign = "+" if v >= 0 else ""
+                    print(f"  {key:35s}: {sign}{v:+10.4f}")
+        
+        global_step += 1
         
         # Track metrics
         current_episode_reward += rewards

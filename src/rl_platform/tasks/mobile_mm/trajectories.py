@@ -21,6 +21,7 @@ class TrajectoryManager:
         speed: float = 0.2,
         height: float = 1.0,
         dt: float = 0.02,
+        waypoint_dt: float | None = None,
         waypoint_file: str | None = None,
         trajectory_dir: str | None = None,
         trajectory_pattern: str = "**/*.json",
@@ -50,6 +51,7 @@ class TrajectoryManager:
         self.speed = speed
         self.height = height
         self.dt = dt
+        self.waypoint_dt = waypoint_dt if waypoint_dt is not None else dt
         
         # Phase tracking (one per environment)
         self.phase = torch.zeros(num_envs, device=device)
@@ -62,6 +64,7 @@ class TrajectoryManager:
         self.recorded_positions = None
         self.recorded_orientations = None
         self.current_waypoint_idx = torch.zeros(num_envs, dtype=torch.long, device=device)
+        self._recorded_time_accum = torch.zeros(num_envs, dtype=torch.float32, device=device)
         
         # Multi-trajectory loader
         self.multi_loader = None
@@ -87,6 +90,7 @@ class TrajectoryManager:
         """
         self.phase[env_ids] = 0.0
         self.current_waypoint_idx[env_ids] = 0
+        self._recorded_time_accum[env_ids] = 0.0
         
         # Resample trajectories in multi-trajectory mode
         if self.traj_type == "multi_recorded":
@@ -162,14 +166,19 @@ class TrajectoryManager:
         # Wrap phase to [0, 2π]
         self.phase = torch.remainder(self.phase, 2 * np.pi)
         
-        # For recorded/multi_recorded trajectories, advance waypoint index
+        # For recorded/multi_recorded trajectories, advance waypoint index with correct cadence
         if self.traj_type in ["recorded", "multi_recorded"] and self.recorded_positions is not None:
-            # Increment waypoint index for all environments
-            self.current_waypoint_idx += 1
-            
-            # Wrap around at trajectory end (modulo for looping)
-            max_idx = self.recorded_positions.shape[1]  # [num_envs, max_length, 3]
-            self.current_waypoint_idx = torch.remainder(self.current_waypoint_idx, max_idx)
+            self._recorded_time_accum += self.dt
+
+            steps_to_advance = torch.floor(self._recorded_time_accum / self.waypoint_dt).to(torch.long)
+
+            if torch.any(steps_to_advance > 0):
+                self.current_waypoint_idx += steps_to_advance
+                self._recorded_time_accum -= steps_to_advance.float() * self.waypoint_dt
+
+                max_length = self.recorded_positions.shape[1]
+                if max_length > 0:
+                    self.current_waypoint_idx = torch.remainder(self.current_waypoint_idx, max_length)
     
     def _circle_trajectory(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate circular trajectory.
@@ -345,6 +354,7 @@ class TrajectoryManager:
             self.recorded_positions = positions
             self.recorded_orientations = orientations
             self.current_waypoint_idx.zero_()
+            self._recorded_time_accum.zero_()
         else:
             # For partial resets, we need to handle variable trajectory lengths.
             # Since recorded_positions has a fixed shape, we need to resample ALL envs
@@ -369,7 +379,6 @@ class TrajectoryManager:
             self.recorded_positions = positions
             self.recorded_orientations = orientations
             self.current_waypoint_idx[env_ids] = 0
-
-
+            self._recorded_time_accum[env_ids] = 0.0
 
 

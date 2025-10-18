@@ -195,63 +195,53 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         Args:
             cfg: Environment configuration (optional, created if None)
             render_mode: Rendering mode (None for headless) - currently unused
-            **kwargs: Additional arguments:
-                - num_envs: Number of parallel environments
-                - trajectory_type: Type of trajectory ("line", "circle", "multi_recorded", etc.)
-                - trajectory_dir: Directory containing trajectory files
-                - use_all_trajectories: Use all trajectories (True) or filter (False)
-                - use_chassis_only: Use only chassis-requiring trajectories
-                - max_trajectories: Maximum number of trajectories to load
+            **kwargs: Additional arguments that may override configuration.
         """
-        # Extract kwargs BEFORE creating config
-        num_envs_override = kwargs.pop('num_envs', None)
-        trajectory_type = kwargs.pop('trajectory_type', None)
-        trajectory_dir = kwargs.pop('trajectory_dir', None)
-        use_all_trajectories = kwargs.pop('use_all_trajectories', None)
-        use_chassis_only = kwargs.pop('use_chassis_only', None)
-        max_trajectories = kwargs.pop('max_trajectories', None)
+        # Extract overrides before building config
+        num_envs_override = kwargs.pop("num_envs", None)
+        trajectory_type_override = kwargs.pop("trajectory_type", None)
+        trajectory_dir_override = kwargs.pop("trajectory_dir", None)
+        trajectory_pattern_override = kwargs.pop("trajectory_pattern", None)
+        trajectory_filter_override = kwargs.pop("trajectory_filter_indices", None)
+        max_trajectories_override = kwargs.pop("max_trajectories", None)
+        waypoint_file_override = kwargs.pop("waypoint_file", None)
+        use_all_trajectories = kwargs.pop("use_all_trajectories", None)
+        use_chassis_only = kwargs.pop("use_chassis_only", None)
         
-        # Create config with correct settings if no config provided
         if cfg is None:
             from dataclasses import replace
-            from .config import TrajectoryConfig
-            default_cfg = MobileMMTrackEEEnvCfg()
-            
-            # Apply num_envs override
+            cfg = MobileMMTrackEEEnvCfg()
             if num_envs_override is not None:
-                cfg = replace(default_cfg, num_envs=num_envs_override)
-                print(f"[MobileMMTrackEE] Created config with num_envs={cfg.num_envs}")
-            else:
-                cfg = default_cfg
-            
-            # Apply trajectory configuration overrides if provided
-            if trajectory_type is not None:
-                # Prepare filter indices if needed
-                trajectory_filter_indices = None
-                if use_chassis_only and trajectory_type == "multi_recorded":
-                    import json
-                    from pathlib import Path
-                    analysis_file = Path("trajectoryToLearn/trajectory_analysis.json")
-                    if analysis_file.exists():
-                        with open(analysis_file, 'r') as f:
-                            analysis = json.load(f)
-                        trajectory_filter_indices = analysis.get('chassis_requiring_indices', [])
-                        print(f"[MobileMMTrackEE] Using {len(trajectory_filter_indices)} chassis-requiring trajectories")
-                
-                # Create new trajectory config
-                cfg.task_config.trajectory = TrajectoryConfig(
-                    type=trajectory_type,
-                    trajectory_dir=trajectory_dir or "trajectoryToLearn/world_json",
-                    trajectory_pattern="**/*.json",
-                    trajectory_filter_indices=trajectory_filter_indices,
-                    max_trajectories=max_trajectories,
-                )
-                print(f"[MobileMMTrackEE] Trajectory config updated: type={trajectory_type}")
-        else:
-            # Config provided - only apply num_envs if specified
-            if num_envs_override is not None:
-                from dataclasses import replace
                 cfg = replace(cfg, num_envs=num_envs_override)
+                print(f"[MobileMMTrackEE] Created config with num_envs={cfg.num_envs}")
+        else:
+            if num_envs_override is not None:
+                cfg.num_envs = num_envs_override
+                print(f"[MobileMMTrackEE] Updated existing config to num_envs={cfg.num_envs}")
+        
+        if cfg.scene is not None and num_envs_override is not None:
+            cfg.scene.num_envs = num_envs_override
+        
+        # Apply trajectory overrides (works for provided or auto-created cfg)
+        traj_cfg = cfg.task_config.trajectory
+        
+        if trajectory_type_override is not None:
+            traj_cfg.type = trajectory_type_override
+        if trajectory_dir_override is not None:
+            traj_cfg.trajectory_dir = trajectory_dir_override
+        if trajectory_pattern_override is not None:
+            traj_cfg.trajectory_pattern = trajectory_pattern_override
+        if max_trajectories_override is not None:
+            traj_cfg.max_trajectories = max_trajectories_override
+        if waypoint_file_override is not None:
+            traj_cfg.waypoint_file = waypoint_file_override
+        
+        if trajectory_filter_override is not None:
+            traj_cfg.trajectory_filter_indices = trajectory_filter_override
+        elif use_chassis_only and traj_cfg.type == "multi_recorded":
+            traj_cfg.trajectory_filter_indices = self._load_chassis_required_indices(max_trajectories_override)
+        elif use_all_trajectories:
+            traj_cfg.trajectory_filter_indices = None
         
         # DirectRLEnv only takes cfg, not render_mode
         super().__init__(cfg, **kwargs)
@@ -304,6 +294,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             speed=self.task_cfg.trajectory.speed,
             height=self.task_cfg.trajectory.height,
             dt=self.control_dt,
+            waypoint_dt=self.task_cfg.trajectory_dt,
             waypoint_file=self.task_cfg.trajectory.waypoint_file,
             trajectory_dir=self.task_cfg.trajectory.trajectory_dir,
             trajectory_pattern=self.task_cfg.trajectory.trajectory_pattern,
@@ -363,6 +354,45 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         print(f"  - Episode length: {self.max_episode_length} steps")
         print(f"  - Control frequency: {1.0 / self.control_dt:.1f} Hz")
         print(f"  - Trajectory dt: {self.task_cfg.trajectory_dt:.3f}s")
+
+    @staticmethod
+    def _load_chassis_required_indices(limit: int | None = None) -> list[int] | None:
+        """Load chassis-required trajectory indices from known analysis files."""
+        try:
+            import json
+            import re
+            from pathlib import Path
+
+            indices: list[int] | None = None
+
+            txt_file = Path("chassis_required_indices.txt")
+            if txt_file.exists():
+                content = txt_file.read_text()
+                match = re.search(r"CHASSIS_REQUIRED_INDICES\s*=\s*\[(.*?)\]", content, re.DOTALL)
+                if match:
+                    cleaned = match.group(1).replace("\n", " ")
+                    parsed = [int(x.strip()) for x in cleaned.split(",") if x.strip()]
+                    if limit is not None:
+                        parsed = parsed[:limit]
+                    print(f"[MobileMMTrackEE] Loaded {len(parsed)} chassis-required indices from {txt_file}")
+                    return parsed
+
+            json_file = Path("trajectoryToLearn/trajectory_analysis.json")
+            if json_file.exists():
+                data = json.loads(json_file.read_text())
+                parsed = data.get("chassis_requiring_indices")
+                if isinstance(parsed, list):
+                    parsed_int = [int(x) for x in parsed]
+                    if limit is not None:
+                        parsed_int = parsed_int[:limit]
+                    print(f"[MobileMMTrackEE] Loaded {len(parsed_int)} chassis-required indices from {json_file}")
+                    return parsed_int
+
+        except Exception as exc:
+            print(f"[MobileMMTrackEE] WARNING: Unable to load chassis-required indices: {exc}")
+
+        print("[MobileMMTrackEE] WARNING: use_chassis_only requested but no chassis indices found. Using all trajectories.")
+        return None
     
     def _setup_scene(self):
         """Setup the scene entities."""

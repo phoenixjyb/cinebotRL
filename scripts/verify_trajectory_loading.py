@@ -56,26 +56,16 @@ def main():
     if hasattr(unwrapped_env, 'trajectory_manager'):
         traj_mgr = unwrapped_env.trajectory_manager
         print(f"✅ Trajectory manager found: {type(traj_mgr).__name__}")
+        print(f"   Trajectory type: {getattr(traj_mgr, 'traj_type', 'UNKNOWN')}")
         
-        # Check what type it is
-        if hasattr(traj_mgr, 'trajectory_type'):
-            print(f"   Trajectory type: {traj_mgr.trajectory_type}")
-        
-        # Check if multi-trajectory
-        if hasattr(traj_mgr, 'num_trajectories'):
-            print(f"   Number of trajectories loaded: {traj_mgr.num_trajectories}")
-        
-        if hasattr(traj_mgr, 'trajectories'):
-            print(f"   Trajectories list length: {len(traj_mgr.trajectories)}")
-        
-        if hasattr(traj_mgr, 'trajectory_dir'):
-            print(f"   Trajectory directory: {traj_mgr.trajectory_dir}")
-        
-        if hasattr(traj_mgr, 'use_all_trajectories'):
-            print(f"   Use all trajectories: {traj_mgr.use_all_trajectories}")
-            
-        if hasattr(traj_mgr, 'use_chassis_only'):
-            print(f"   Use chassis only: {traj_mgr.use_chassis_only}")
+        if traj_mgr.traj_type == "multi_recorded" and getattr(traj_mgr, 'multi_loader', None) is not None:
+            loader = traj_mgr.multi_loader
+            print(f"   Trajectory directory: {loader.trajectory_dir}")
+            print(f"   Loaded trajectories: {len(loader.trajectories)}")
+            categories = loader.get_categories()
+            print(f"   Categories sample: {categories[:5]}{'...' if len(categories) > 5 else ''}")
+        elif traj_mgr.traj_type == "recorded" and traj_mgr.recorded_positions is not None:
+            print(f"   Recorded waypoints: {traj_mgr.recorded_positions.shape[1]}")
     else:
         print("❌ No trajectory manager found!")
     
@@ -137,12 +127,12 @@ def main():
     
     for reset_idx in range(5):
         obs = env.reset()
-        target_pos, _ = env.trajectory_manager.get_target_pose()
+        target_pos, _ = unwrapped_env.trajectory_manager.get_target_pose()
         print(f"  Reset {reset_idx + 1}: Target = {target_pos[0].cpu().numpy()}")
         
         # If multi-trajectory, check which one was selected
-        if hasattr(env.trajectory_manager, 'current_trajectory_indices'):
-            idx = env.trajectory_manager.current_trajectory_indices[0].item()
+        if hasattr(unwrapped_env.trajectory_manager, 'current_trajectory_indices'):
+            idx = unwrapped_env.trajectory_manager.current_trajectory_indices[0].item()
             print(f"             Trajectory index = {idx}")
     
     print("\n" + "="*80)

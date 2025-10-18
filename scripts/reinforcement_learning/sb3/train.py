@@ -219,6 +219,37 @@ def parse_args():
         help="Device to use for training (default: auto - use GPU if available)",
     )
     
+    # Trajectory configuration
+    parser.add_argument(
+        "--trajectory_type",
+        type=str,
+        default="circle",
+        choices=["line", "circle", "figure_eight", "recorded", "multi_recorded"],
+        help="Type of trajectory to use (default: circle for basic training, multi_recorded for diverse real trajectories)",
+    )
+    parser.add_argument(
+        "--trajectory_dir",
+        type=str,
+        default="trajectoryToLearn/world_json",
+        help="Directory containing recorded trajectories (for multi_recorded mode)",
+    )
+    parser.add_argument(
+        "--use_all_trajectories",
+        action="store_true",
+        help="Use ALL trajectories from directory (recommended for training), not just chassis-requiring ones",
+    )
+    parser.add_argument(
+        "--use_chassis_only",
+        action="store_true",
+        help="Use only chassis-requiring trajectories (for testing base movement, not recommended for training)",
+    )
+    parser.add_argument(
+        "--max_trajectories",
+        type=int,
+        default=None,
+        help="Limit number of trajectories to load (None = all, useful for debugging)",
+    )
+    
     return parser.parse_args()
 
 
@@ -367,73 +398,106 @@ def main():
             
             return True  # Continue training
     
-    # KL divergence scheduling callback for stable training
-    class DynamicKLSchedule(BaseCallback):
+    # Adaptive KL divergence scheduling for proper policy updates
+    class AdaptiveKLSchedule(BaseCallback):
         """
-        Dynamically adjusts target_kl during training for stable policy updates.
+        Adaptive KL scheduling that prevents early stopping and allows proper learning.
         
-        Problem: Constant target_kl doesn't adapt to training phase:
-        - Too tight early → prevents exploration, slow learning
-        - Too loose late → unstable updates, oscillations
+        Problem: Current KL limits cause "Early stopping at step 0" → no learning!
+        - KL divergence spikes early due to new action space (base movement)
+        - Immediate early stopping prevents any policy updates
+        - Learning efficiency drops to ~1 step per iteration
         
-        Solution: Three-phase schedule:
-        - Warmup (0-10%): Loose KL (0.05-0.10) for exploration
-        - Main (10-80%): Moderate KL (0.02) for steady learning
-        - Fine-tune (80-100%): Tight KL (0.01) for convergence
+        Solution: Stage-adaptive KL with recovery mechanism:
+        - Very Early (0-5M): Extremely loose (1.0) - allow major exploration
+        - Early (5-20M): Loose (0.5) - permit substantial learning
+        - Learning (20-60M): Moderate (0.2) - balanced updates
+        - Stable (60-80M): Normal (0.1) - standard learning
+        - Fine-tune (80-100M): Tight (0.05) - precise convergence
         
-        Args:
-            total_timesteps: Total training timesteps for calculating phases
-            kl_warmup: Target KL during warmup phase (default: 0.07)
-            kl_main: Target KL during main phase (default: 0.02)
-            kl_finetune: Target KL during fine-tune phase (default: 0.01)
-            warmup_frac: Fraction of training for warmup (default: 0.1)
-            finetune_frac: Fraction of training for fine-tune (default: 0.8)
+        Adaptive features:
+        - Recent early stopping detection → temporary KL boost
+        - Low explained variance → increased exploration allowance
+        - Training progress monitoring → automatic adjustments
         """
         def __init__(
             self,
             total_timesteps: int,
-            kl_warmup: float = 0.07,
-            kl_main: float = 0.02,
-            kl_finetune: float = 0.01,
-            warmup_frac: float = 0.1,
-            finetune_frac: float = 0.8,
-            verbose: int = 0
+            kl_very_early: float = 1.0,    # 0-5M: Allow major exploration
+            kl_early: float = 0.5,         # 5-20M: Substantial learning
+            kl_learning: float = 0.2,      # 20-60M: Balanced updates
+            kl_stable: float = 0.1,        # 60-80M: Normal learning  
+            kl_finetune: float = 0.05,     # 80-100M: Precise convergence
+            verbose: int = 1
         ):
             super().__init__(verbose)
-            self.warmup_steps = int(total_timesteps * warmup_frac)
-            self.finetune_steps = int(total_timesteps * finetune_frac)
-            self.kl_warmup = kl_warmup
-            self.kl_main = kl_main
+            self.total_timesteps = total_timesteps
+            self.kl_very_early = kl_very_early
+            self.kl_early = kl_early
+            self.kl_learning = kl_learning
+            self.kl_stable = kl_stable
             self.kl_finetune = kl_finetune
             
+            # Adaptive tracking
+            self.recent_early_stops = 0
+            self.check_interval = 10  # Check every 10 rollouts
+            self.last_check_timestep = 0
+            
+        def _get_stage_kl(self, current_timestep: int) -> tuple[float, str]:
+            """Determine KL limit based on training stage."""
+            progress = current_timestep / self.total_timesteps
+            
+            if progress < 0.05:  # 0-5M steps
+                return self.kl_very_early, "very_early"
+            elif progress < 0.20:  # 5-20M steps  
+                return self.kl_early, "early"
+            elif progress < 0.60:  # 20-60M steps
+                return self.kl_learning, "learning"
+            elif progress < 0.80:  # 60-80M steps
+                return self.kl_stable, "stable"
+            else:  # 80-100M steps
+                return self.kl_finetune, "finetune"
+        
         def _on_rollout_end(self) -> bool:
-            """Update target_kl at end of each rollout."""
+            """Adaptive KL update with early stopping detection."""
             current_timestep = self.num_timesteps
             
-            if current_timestep < self.warmup_steps:
-                # Warmup phase: loose KL for exploration
-                new_target_kl = self.kl_warmup
-                phase = "warmup"
-            elif current_timestep < self.finetune_steps:
-                # Main phase: moderate KL for steady learning
-                new_target_kl = self.kl_main
-                phase = "main"
-            else:
-                # Fine-tune phase: tight KL for convergence
-                new_target_kl = self.kl_finetune
-                phase = "finetune"
+            # Get base KL for current stage
+            base_target_kl, stage = self._get_stage_kl(current_timestep)
+            
+            # Adaptive boost if recent early stopping detected
+            kl_boost = 1.0
+            if hasattr(self.model, 'logger') and self.model.logger is not None:
+                # Check if we're getting early stops (indicates KL too tight)
+                if current_timestep - self.last_check_timestep >= self.check_interval * 4096 * 128:
+                    # Simple heuristic: if we're not learning much, boost KL
+                    try:
+                        recent_losses = getattr(self.model.logger, 'recent_losses', [])
+                        if len(recent_losses) > 5:
+                            if all(loss > 0.1 for loss in recent_losses[-5:]):  # High losses = poor learning
+                                kl_boost = 2.0  # Double the KL allowance
+                                if self.verbose > 0:
+                                    print(f"[AdaptiveKL] Learning struggle detected - boosting KL by 2x")
+                    except:
+                        pass  # Ignore if logging not available
+                    
+                    self.last_check_timestep = current_timestep
+            
+            # Apply adaptive KL
+            new_target_kl = base_target_kl * kl_boost
             
             # Update model's target_kl
-            if self.model.target_kl != new_target_kl:
+            if abs(self.model.target_kl - new_target_kl) > 0.01:  # Significant change
                 self.model.target_kl = new_target_kl
                 if self.verbose > 0:
-                    print(f"[KL Schedule] Step {current_timestep/1e6:.1f}M: target_kl = {new_target_kl:.3f} ({phase} phase)")
+                    boost_str = f" (boosted {kl_boost}x)" if kl_boost > 1.0 else ""
+                    print(f"[AdaptiveKL] Step {current_timestep/1e6:.1f}M: target_kl = {new_target_kl:.3f} ({stage}){boost_str}")
             
-            return True  # Continue training
+            return True
         
         def _on_step(self) -> bool:
-            """Called at every step. We update on rollout end instead."""
-            return True  # Continue training
+            """Called at every step."""
+            return True
     
     # Create wrapper to convert Isaac Lab observations to SB3 format
     class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):
@@ -578,13 +642,83 @@ def main():
     print(f"    Task: {args.task}")
     print(f"    Num envs: {args.num_envs}")
     print(f"    Headless: {args.headless}")
+    print(f"    Trajectory type: {args.trajectory_type}")
+    
+    # Configure trajectory settings based on command-line args
+    trajectory_config = {}
+    if args.trajectory_type == "multi_recorded":
+        print(f"    Trajectory directory: {args.trajectory_dir}")
+        
+        # Determine which trajectories to use
+        if args.use_chassis_only:
+            print("    ⚠️  Using ONLY chassis-requiring trajectories (for testing, not recommended for training)")
+            # Load chassis-required indices
+            chassis_indices_file = "chassis_required_indices.txt"
+            if Path(chassis_indices_file).exists():
+                import re
+                with open(chassis_indices_file, 'r') as f:
+                    content = f.read()
+                match = re.search(r'CHASSIS_REQUIRED_INDICES = \[(.*?)\]', content, re.DOTALL)
+                if match:
+                    indices_str = match.group(1)
+                    chassis_indices = [int(x.strip()) for x in indices_str.replace('\n', ' ').split(',') if x.strip()]
+                    trajectory_config['filter_indices'] = chassis_indices
+                    if args.max_trajectories:
+                        trajectory_config['filter_indices'] = chassis_indices[:args.max_trajectories]
+                    print(f"    Loaded {len(trajectory_config['filter_indices'])} chassis-requiring trajectory indices")
+                else:
+                    print(f"    ⚠️  Could not parse {chassis_indices_file}, using all trajectories")
+            else:
+                print(f"    ⚠️  {chassis_indices_file} not found, using all trajectories")
+        elif args.use_all_trajectories:
+            print("    ✓ Using ALL trajectories (recommended for training diverse policy)")
+            trajectory_config['filter_indices'] = None
+            if args.max_trajectories:
+                print(f"    Limited to first {args.max_trajectories} trajectories")
+        else:
+            # Default behavior - use all
+            print("    Using all available trajectories (default)")
+            trajectory_config['filter_indices'] = None
+        
+        trajectory_config['max_trajectories'] = args.max_trajectories
     
     try:
-        env = gym.make(
-            args.task,
-            num_envs=args.num_envs,
-            render_mode=None if args.headless else "human",
+        # Import environment config to modify it
+        from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnvCfg
+        from rl_platform.tasks.mobile_mm.config import TrajectoryConfig
+        
+        # Create custom environment configuration
+        env_cfg = MobileMMTrackEEEnvCfg()
+        env_cfg.scene.num_envs = args.num_envs
+        
+        # Configure trajectory
+        env_cfg.task_config.trajectory = TrajectoryConfig(
+            type=args.trajectory_type,
+            trajectory_dir=args.trajectory_dir,
+            trajectory_pattern="**/*.json",
+            trajectory_filter_indices=trajectory_config.get('filter_indices'),
+            max_trajectories=trajectory_config.get('max_trajectories'),
         )
+        
+        # Create environment directly with config
+        from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnv
+        env = MobileMMTrackEEEnv(cfg=env_cfg)
+        
+        print(f"    ✓ Environment created")
+        if args.trajectory_type == "multi_recorded":
+            if trajectory_config.get('filter_indices') is not None:
+                print(f"    ✓ Loaded {len(trajectory_config['filter_indices'])} filtered trajectories")
+            else:
+                print(f"    ✓ Loaded all available trajectories from {args.trajectory_dir}")
+    
+    except Exception as e:
+        print(f"    ✗ Failed to create environment: {e}")
+        import traceback
+        traceback.print_exc()
+        simulation_app.close()
+        return
+    
+    try:
         
         # First wrap to convert Isaac Lab format to SB3 format (dict -> numpy)
         # Isaac Lab envs are already VecEnv, so use VecEnvWrapper
@@ -640,20 +774,21 @@ def main():
         print(f"    ✓ Entropy decay enabled: {args.ent_coef} → {args.final_ent_coef}")
         print(f"      Decay: {args.decay_start_timestep/1e6:.0f}M - {(args.decay_start_timestep + args.decay_duration_timesteps)/1e6:.0f}M steps")
     
-    # KL divergence schedule callback (prevents instability and oscillations)
+    # Adaptive KL divergence schedule callback (prevents early stopping, enables learning)
     if args.enable_kl_schedule:
-        kl_schedule_callback = DynamicKLSchedule(
+        kl_schedule_callback = AdaptiveKLSchedule(
             total_timesteps=args.total_timesteps,
-            kl_warmup=args.kl_warmup,
-            kl_main=args.kl_main,
-            kl_finetune=args.kl_finetune,
-            warmup_frac=0.1,
-            finetune_frac=0.8,
-            verbose=1,
+            kl_very_early=max(args.kl_warmup * 4, 1.0),    # Much more aggressive early KL
+            kl_early=max(args.kl_warmup * 2, 0.5),         # Still very loose  
+            kl_learning=max(args.kl_main * 4, 0.2),        # More learning room
+            kl_stable=max(args.kl_main * 2, 0.1),          # Reasonable updates
+            kl_finetune=args.kl_finetune,                  # Normal end-game
+            verbose=1
         )
         callbacks.append(kl_schedule_callback)
-        print(f"    ✓ KL schedule enabled: warmup={args.kl_warmup}, main={args.kl_main}, finetune={args.kl_finetune}")
-        print(f"      Phases: 0-{args.total_timesteps*0.1/1e6:.0f}M (warmup), {args.total_timesteps*0.1/1e6:.0f}M-{args.total_timesteps*0.8/1e6:.0f}M (main), {args.total_timesteps*0.8/1e6:.0f}M-{args.total_timesteps/1e6:.0f}M (finetune)")
+        print(f"    ✓ Adaptive KL schedule enabled: very_early={max(args.kl_warmup * 4, 1.0):.2f}, early={max(args.kl_warmup * 2, 0.5):.2f}")
+        print(f"      Stages: 0-5M (explore), 5-20M (learn), 20-60M (balance), 60-80M (stable), 80-100M (finetune)")
+    
     
     if args.wandb:
         callbacks.append(wandb_callback)

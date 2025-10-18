@@ -23,6 +23,9 @@ class TrajectoryManager:
         dt: float = 0.02,
         waypoint_file: str | None = None,
         trajectory_dir: str | None = None,
+        trajectory_pattern: str = "**/*.json",
+        trajectory_filter_indices: list[int] | None = None,
+        max_trajectories: int | None = None,
     ):
         """Initialize trajectory manager.
         
@@ -36,6 +39,9 @@ class TrajectoryManager:
             dt: Time step in seconds
             waypoint_file: Path to recorded waypoint JSON file (for 'recorded' type)
             trajectory_dir: Directory with multiple trajectories (for 'multi_recorded' type)
+            trajectory_pattern: Glob pattern for finding trajectories (default: "**/*.json")
+            trajectory_filter_indices: Filter to specific trajectory indices from analysis
+            max_trajectories: Maximum number of trajectories to load
         """
         self.traj_type = traj_type
         self.num_envs = num_envs
@@ -64,7 +70,12 @@ class TrajectoryManager:
         if traj_type == "recorded" and waypoint_file is not None:
             self._load_recorded_trajectory(waypoint_file)
         elif traj_type == "multi_recorded" and trajectory_dir is not None:
-            self._init_multi_trajectory(trajectory_dir)
+            self._init_multi_trajectory(
+                trajectory_dir, 
+                trajectory_pattern, 
+                trajectory_filter_indices,
+                max_trajectories
+            )
         
     def reset(self, env_ids: torch.Tensor) -> None:
         """Reset trajectory phase for specified environments.
@@ -282,19 +293,29 @@ class TrajectoryManager:
         print(f"[TrajectoryManager] Loaded {len(poses)} waypoints from {waypoint_file}")
         print(f"[TrajectoryManager] Position range: {positions_array.min(dim=0)[0]} to {positions_array.max(dim=0)[0]}")
     
-    def _init_multi_trajectory(self, trajectory_dir: str) -> None:
+    def _init_multi_trajectory(
+        self, 
+        trajectory_dir: str,
+        pattern: str = "**/*.json",
+        filter_indices: list[int] | None = None,
+        max_trajectories: int | None = None
+    ) -> None:
         """Initialize multi-trajectory loader.
         
         Args:
             trajectory_dir: Directory containing multiple trajectory JSON files
+            pattern: Glob pattern for finding trajectories
+            filter_indices: Filter to specific trajectory indices
+            max_trajectories: Maximum number of trajectories to load
         """
         from .multi_trajectory import MultiTrajectoryLoader
         
         self.multi_loader = MultiTrajectoryLoader(
             trajectory_dir=trajectory_dir,
-            pattern="**/*.json",
+            pattern=pattern,
             device=self.device,
-            max_trajectories=None,  # Load all
+            max_trajectories=max_trajectories,
+            filter_by_indices=filter_indices,
         )
         
         # Sample initial trajectories for all environments

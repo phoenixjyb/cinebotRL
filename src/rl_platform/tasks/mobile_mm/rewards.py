@@ -466,25 +466,31 @@ def compute_combined_reward(
     )
     
     # Robot constraint penalties
+    # Note: base_lin_vel and joint_vel are now normalized to [0,1] range
+    # So limits should be 1.0 for normalized velocity penalty
     vel_limit_penalty = velocity_limit_penalty(
         base_lin_vel, joint_vel,
-        robot_limits["max_linear_velocity"],
-        robot_limits["max_joint_velocity"],
+        1.0,  # Normalized velocity limit for base (was robot_limits["max_linear_velocity"])
+        robot_limits["max_joint_velocity"],  # Joint limits still in rad/s (not normalized)
         scale=weights["velocity_limit_penalty"],
     )
     
-    # Base acceleration
+    # Base acceleration (with normalized velocities)
     base_accel = (base_lin_vel - prev_base_lin_vel) / dt
+    # Normalize acceleration limit: max_accel_normalized = max_accel / max_velocity 
+    normalized_accel_limit = robot_limits["max_linear_acceleration"] / robot_limits["max_linear_velocity"]
     accel_limit_penalty = acceleration_limit_penalty(
-        base_lin_vel[:, 0:1], prev_base_lin_vel[:, 0:1],  # Forward velocity only
-        dt, robot_limits["max_linear_acceleration"],
+        base_lin_vel[:, 0:1], prev_base_lin_vel[:, 0:1],  # Forward velocity only (normalized)
+        dt, normalized_accel_limit,  # Use normalized acceleration limit
         scale=weights["acceleration_limit_penalty"],
     )
     
-    # Jerk (rate of acceleration change)
+    # Jerk (rate of acceleration change) - normalize limit
+    # max_jerk_normalized = max_jerk / max_velocity (since accel is already normalized by velocity)
+    normalized_jerk_limit = robot_limits["max_linear_jerk"] / robot_limits["max_linear_velocity"]
     jerk_penalty_val = jerk_penalty(
-        base_accel[:, 0:1], prev_base_accel[:, 0:1],  # Forward direction
-        dt, robot_limits["max_linear_jerk"],
+        base_accel[:, 0:1], prev_base_accel[:, 0:1],  # Forward direction (normalized)
+        dt, normalized_jerk_limit,  # Use normalized jerk limit
         scale=weights["jerk_limit_penalty"],
     )
     

@@ -35,10 +35,12 @@ cd I:\isaaclab
     --decay_start_timestep 50000000 `
     --decay_duration_timesteps 50000000 `
     --enable_kl_schedule `
-    --kl_warmup 0.07 `
-    --kl_main 0.02 `
-    --kl_finetune 0.01 `
-    --target_kl 0.07 `
+    --kl_warmup 0.25 `
+    --kl_main 0.15 `
+    --kl_finetune 0.07 `
+    --target_kl 1.0 `
+    --trajectory_type multi_recorded `
+    --use_all_trajectories `
     --headless
 ```
 

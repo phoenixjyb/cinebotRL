@@ -9,13 +9,21 @@ cd I:\isaaclab
     --task MobileMMTrackEE-v0 `
     --num_envs 4096 `
     --batch_size 1024 `
-    --n_steps 32 `
+    --n_steps 128 `
     --total_timesteps 100000000 `
+    --learning_rate 0.0003 `
     --ent_coef 0.001 `
     --enable_entropy_decay `
     --final_ent_coef 0.0001 `
     --decay_start_timestep 50000000 `
     --decay_duration_timesteps 50000000 `
+    --enable_kl_schedule `
+    --kl_warmup 0.25 `
+    --kl_main 0.15 `
+    --kl_finetune 0.07 `
+    --target_kl 1.0 `
+    --trajectory_type multi_recorded `
+    --use_all_trajectories `
     --headless
 ```
 

@@ -87,6 +87,37 @@ def parse_args():
         help="Device to run on",
     )
     
+    # Trajectory configuration (to test against recorded trajectories)
+    parser.add_argument(
+        "--trajectory_type",
+        type=str,
+        default="circle",
+        choices=["line", "circle", "figure_eight", "recorded", "multi_recorded"],
+        help="Type of trajectory to test against (use multi_recorded to test on your training trajectories)",
+    )
+    parser.add_argument(
+        "--trajectory_dir",
+        type=str,
+        default="trajectoryToLearn/world_json",
+        help="Directory containing recorded trajectories (for multi_recorded mode)",
+    )
+    parser.add_argument(
+        "--use_all_trajectories",
+        action="store_true",
+        help="Use ALL 1,038 trajectories from training dataset",
+    )
+    parser.add_argument(
+        "--use_chassis_only",
+        action="store_true",
+        help="Use only chassis-requiring trajectories (519 trajectories)",
+    )
+    parser.add_argument(
+        "--max_trajectories",
+        type=int,
+        default=None,
+        help="Limit number of trajectories to load (None = all)",
+    )
+    
     return parser.parse_args()
 
 
@@ -256,9 +287,26 @@ def main():
     
     # Create environment
     print(f"\n[4/5] Creating environment ({args.task})...")
+    print(f"    Trajectory type: {args.trajectory_type}")
+    if args.trajectory_type == "multi_recorded":
+        print(f"    Trajectory directory: {args.trajectory_dir}")
+        print(f"    Use all trajectories: {args.use_all_trajectories}")
+        print(f"    Use chassis only: {args.use_chassis_only}")
+        if args.max_trajectories:
+            print(f"    Max trajectories: {args.max_trajectories}")
     try:
-        # Create base environment
-        base_env = gym.make(args.task, num_envs=args.num_envs, headless=args.headless)
+        # Create base environment with trajectory configuration
+        base_env = gym.make(
+            args.task, 
+            num_envs=args.num_envs, 
+            headless=args.headless,
+            # Pass trajectory parameters
+            trajectory_type=args.trajectory_type,
+            trajectory_dir=args.trajectory_dir,
+            use_all_trajectories=args.use_all_trajectories,
+            use_chassis_only=args.use_chassis_only,
+            max_trajectories=args.max_trajectories,
+        )
         
         # DISABLE termination conditions for evaluation (let episodes run full length)
         base_env.unwrapped.task_cfg.terminate_on_tracking_error = False

@@ -11,7 +11,7 @@ class TrajectoryConfig:
     """Configuration for reference trajectory generation."""
     
     # Trajectory type
-    type: Literal["line", "circle", "figure_eight", "recorded"] = "circle"
+    type: Literal["line", "circle", "figure_eight", "recorded", "multi_recorded"] = "circle"
     
     # Parametric trajectory settings
     amplitude: float = 0.5  # meters
@@ -21,6 +21,12 @@ class TrajectoryConfig:
     # Recorded trajectory settings
     waypoint_file: str | None = None
     loop_trajectory: bool = True
+    
+    # Multi-recorded trajectory settings
+    trajectory_dir: str = "trajectoryToLearn/world_json"
+    trajectory_pattern: str = "**/*.json"
+    trajectory_filter_indices: list[int] | None = None  # Filter to specific indices
+    max_trajectories: int | None = None  # Limit number of trajectories
     
     # Curriculum settings
     enable_curriculum: bool = True

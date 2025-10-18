@@ -158,7 +158,6 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
                 ),
             },
         )
-        )
         
         # Ground plane
         ground_cfg = AssetBaseCfg(
@@ -265,6 +264,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             speed=self.task_cfg.trajectory.speed,
             height=self.task_cfg.trajectory.height,
             dt=self.control_dt,
+            waypoint_file=self.task_cfg.trajectory.waypoint_file,
+            trajectory_dir=self.task_cfg.trajectory.trajectory_dir,
+            trajectory_pattern=self.task_cfg.trajectory.trajectory_pattern,
+            trajectory_filter_indices=self.task_cfg.trajectory.trajectory_filter_indices,
+            max_trajectories=self.task_cfg.trajectory.max_trajectories,
         )
         
         # State buffers for tracking history (needed for derivatives)
@@ -436,9 +440,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self.prev_prev_actions = self.prev_actions.clone()
         self.prev_actions = actions.clone()
         
-        # Update action history buffer
+        # Update action history buffer  
         if self.action_history is not None:
-            # Shift history and append new action
+            # Store raw actions [-1,1] for policy consistency
+            # NOTE: Base actions will be scaled when applied to robot, but history keeps original policy outputs
             self.action_history = torch.roll(self.action_history, shifts=-1, dims=1)
             self.action_history[:, -1, :] = actions
         
@@ -592,12 +597,16 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 lookahead_dt=self.task_cfg.lookahead_dt,
             )
         
+        # Normalize base velocities for observations (to match policy's expected range [0,1])
+        base_lin_vel_obs = base_lin_vel / self.robot_limits["max_linear_velocity"]  # [0, 1.5] -> [0, 1]
+        base_ang_vel_obs = base_ang_vel / self.robot_limits["max_angular_velocity"]  # [0, 2.0] -> [0, 1]
+        
         # Compose full observation
         obs = compose_observation(
             base_pos=base_pos,
             base_quat=base_quat,
-            base_lin_vel=base_lin_vel,
-            base_ang_vel=base_ang_vel,
+            base_lin_vel=base_lin_vel_obs,  # Pass normalized velocities
+            base_ang_vel=base_ang_vel_obs,  # Pass normalized velocities
             joint_pos=joint_pos,
             joint_vel=joint_vel,
             ee_pos=ee_pos,
@@ -652,8 +661,31 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     device=self.device
                 )
         
+        # DIAGNOSTIC: Check contact force API on first call
+        if not hasattr(self, '_contact_force_checked'):
+            contact_force_mag = torch.norm(net_contact_forces, dim=-1)
+            max_force = contact_force_mag.max().item()
+            print(f"\n{'='*80}")
+            print(f"CONTACT FORCE API VERIFICATION")
+            print(f"{'='*80}")
+            print(f"Contact forces shape: {net_contact_forces.shape}")
+            print(f"Max contact force: {max_force:.4f} N")
+            if max_force < 0.001:
+                print(f"⚠️  WARNING: Contact forces are zero!")
+                print(f"   Self-collision detection may NOT be working!")
+            else:
+                print(f"✅ Contact forces detected - API is working!")
+            print(f"{'='*80}\n")
+            self._contact_force_checked = True
+        
         # Compute acceleration for current step
         base_accel = (base_lin_vel - self.prev_base_lin_vel) / self.control_dt
+        
+        # CRITICAL FIX: Normalize velocities for reward calculation
+        # Reward functions expect velocities in [0,1] range, but physics gives scaled values
+        base_lin_vel_normalized = base_lin_vel / self.robot_limits["max_linear_velocity"]
+        base_ang_vel_normalized = base_ang_vel / self.robot_limits["max_angular_velocity"]
+        prev_base_lin_vel_normalized = self.prev_base_lin_vel / self.robot_limits["max_linear_velocity"]
         
         # Compute rewards with all new constraint penalties
         rewards, self.reward_components = compute_combined_reward(
@@ -665,11 +697,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             actions=self.prev_actions,  # Current actions (just applied)
             prev_actions=self.prev_prev_actions,  # Actions from previous step
             prev_prev_actions=self._actions_t_minus_2,  # Actions from 2 steps ago (for jerk calculation)
-            base_lin_vel=base_lin_vel,
-            base_ang_vel=base_ang_vel,
+            base_lin_vel=base_lin_vel_normalized,  # Pass normalized velocities to rewards
+            base_ang_vel=base_ang_vel_normalized,  # Pass normalized velocities to rewards
             joint_pos=joint_pos,
             joint_vel=joint_vel,
-            prev_base_lin_vel=self.prev_base_lin_vel,
+            prev_base_lin_vel=prev_base_lin_vel_normalized,  # Pass normalized velocities to rewards
             prev_joint_vel=self.prev_joint_vel,
             prev_base_accel=self.prev_base_accel,
             joint_lower=self.joint_lower_limits,
@@ -694,6 +726,20 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Log reward components
         self.extras["reward_components"] = {
             k: v.mean().item() for k, v in self.reward_components.items()
+        }
+        
+        # DIAGNOSTIC: Track base movement metrics
+        self.extras["base_diagnostics"] = {
+            "base_vel_x_mean": base_lin_vel[:, 0].mean().item(),
+            "base_vel_x_std": base_lin_vel[:, 0].std().item(),
+            "base_vel_x_max": base_lin_vel[:, 0].abs().max().item(),
+            "base_vel_z_mean": base_ang_vel[:, 2].mean().item(),
+            "base_vel_z_std": base_ang_vel[:, 2].std().item(),
+            "base_vel_z_max": base_ang_vel[:, 2].abs().max().item(),
+            "base_action_x_mean": self.prev_actions[:, 6].mean().item(),
+            "base_action_x_std": self.prev_actions[:, 6].std().item(),
+            "base_action_z_mean": self.prev_actions[:, 7].mean().item(),
+            "base_action_z_std": self.prev_actions[:, 7].std().item(),
         }
         
         return rewards

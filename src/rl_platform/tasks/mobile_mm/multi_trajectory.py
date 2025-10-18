@@ -24,6 +24,8 @@ class MultiTrajectoryLoader:
         pattern: str = "**/*.json",
         device: str = "cuda",
         max_trajectories: int | None = None,
+        filter_by_indices: List[int] | None = None,
+        exclude_macosx: bool = True,
     ):
         """Initialize multi-trajectory loader.
         
@@ -32,6 +34,8 @@ class MultiTrajectoryLoader:
             pattern: Glob pattern to match trajectory files
             device: Torch device for tensors
             max_trajectories: Maximum number of trajectories to load (None = all)
+            filter_by_indices: Only load trajectories at these indices (from analysis results)
+            exclude_macosx: Filter out __MACOSX files (default True)
         """
         self.device = device
         self.trajectory_dir = Path(trajectory_dir)
@@ -39,13 +43,30 @@ class MultiTrajectoryLoader:
         # Find all trajectory files
         self.trajectory_files = sorted(self.trajectory_dir.glob(pattern))
         
+        # Filter out __MACOSX files
+        if exclude_macosx:
+            self.trajectory_files = [f for f in self.trajectory_files if '__MACOSX' not in str(f)]
+            print(f"[MultiTrajectoryLoader] Found {len(self.trajectory_files)} trajectory files (excluding __MACOSX)")
+        else:
+            print(f"[MultiTrajectoryLoader] Found {len(self.trajectory_files)} trajectory files")
+        
+        # Apply index filtering if specified
+        if filter_by_indices is not None:
+            if not filter_by_indices:
+                raise ValueError("filter_by_indices is empty")
+            if max(filter_by_indices) >= len(self.trajectory_files):
+                raise ValueError(f"Index {max(filter_by_indices)} exceeds available trajectories ({len(self.trajectory_files)})")
+            
+            self.trajectory_files = [self.trajectory_files[i] for i in filter_by_indices]
+            print(f"[MultiTrajectoryLoader] Filtered to {len(self.trajectory_files)} trajectories by indices")
+        
+        # Limit number of trajectories
         if max_trajectories is not None:
             self.trajectory_files = self.trajectory_files[:max_trajectories]
+            print(f"[MultiTrajectoryLoader] Limited to {len(self.trajectory_files)} trajectories")
         
         if not self.trajectory_files:
             raise ValueError(f"No trajectory files found in {trajectory_dir} with pattern {pattern}")
-        
-        print(f"[MultiTrajectoryLoader] Found {len(self.trajectory_files)} trajectory files")
         
         # Pre-load all trajectories
         self.trajectories: List[dict] = []

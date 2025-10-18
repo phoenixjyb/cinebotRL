@@ -294,23 +294,47 @@ def main():
         print(f"    Use chassis only: {args.use_chassis_only}")
         if args.max_trajectories:
             print(f"    Max trajectories: {args.max_trajectories}")
+    
     try:
-        # Create base environment with trajectory configuration
-        base_env = gym.make(
-            args.task, 
-            num_envs=args.num_envs, 
-            headless=args.headless,
-            # Pass trajectory parameters
-            trajectory_type=args.trajectory_type,
+        # Import environment config to modify it (same as train.py)
+        from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnvCfg, MobileMMTrackEEEnv
+        from rl_platform.tasks.mobile_mm.config import TrajectoryConfig
+        
+        # Create custom environment configuration
+        env_cfg = MobileMMTrackEEEnvCfg()
+        env_cfg.scene.num_envs = args.num_envs
+        
+        # Prepare trajectory filter (same logic as train.py)
+        trajectory_filter_indices = None
+        if args.trajectory_type == "multi_recorded":
+            if args.use_chassis_only:
+                # Load chassis-requiring trajectory indices
+                import json
+                from pathlib import Path
+                analysis_file = Path("trajectoryToLearn/trajectory_analysis.json")
+                if analysis_file.exists():
+                    with open(analysis_file, 'r') as f:
+                        analysis = json.load(f)
+                    trajectory_filter_indices = analysis.get('chassis_requiring_indices', [])
+                    print(f"    Using {len(trajectory_filter_indices)} chassis-requiring trajectories")
+                else:
+                    print(f"    WARNING: trajectory_analysis.json not found, using all trajectories")
+        
+        # Configure trajectory (same as train.py)
+        env_cfg.task_config.trajectory = TrajectoryConfig(
+            type=args.trajectory_type,
             trajectory_dir=args.trajectory_dir,
-            use_all_trajectories=args.use_all_trajectories,
-            use_chassis_only=args.use_chassis_only,
+            trajectory_pattern="**/*.json",
+            trajectory_filter_indices=trajectory_filter_indices,
             max_trajectories=args.max_trajectories,
         )
         
+        # Create environment directly with config (same as train.py)
+        base_env = MobileMMTrackEEEnv(cfg=env_cfg)
+        
         # DISABLE termination conditions for evaluation (let episodes run full length)
-        base_env.unwrapped.task_cfg.terminate_on_tracking_error = False
-        base_env.unwrapped.task_cfg.terminate_on_self_collision = False
+        base_env.task_cfg.terminate_on_tracking_error = False
+        base_env.task_cfg.terminate_on_self_collision = False
         print(f"    ✓ Disabled termination conditions for full episode visualization")
         
         # Wrap for SB3 compatibility using our wrapper class

@@ -134,11 +134,15 @@ def self_collision_penalty(
     threshold: float = 1.0,
     scale: float = 1.0,
     continuous: bool = True,
+    exclude_base: bool = True,
 ) -> torch.Tensor:
     """Penalty for self-collisions within the robot.
     
     Self-collision occurs when robot links contact each other, which is
     critical to prevent for mobile manipulators (arm hitting base, etc.).
+    
+    NOTE: Ground contact shows up in contact forces! We need to filter it out.
+    By default, we exclude the base link (index 0) which has ground contact.
     
     Args:
         net_contact_forces: Net contact force vectors [num_envs, num_bodies, 3]
@@ -146,12 +150,17 @@ def self_collision_penalty(
         scale: Penalty scale
         continuous: If True, penalty scales with force magnitude (softer).
                    If False, binary penalty (harsher).
+        exclude_base: If True, exclude base link (index 0) which has ground contact
         
     Returns:
         Penalty values [num_envs]
     """
     # Compute magnitude of net contact forces for each body
     contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
+    
+    # Exclude base link if requested (to filter out ground contact)
+    if exclude_base and contact_force_mag.shape[1] > 1:
+        contact_force_mag = contact_force_mag[:, 1:]  # Skip first body (base)
     
     if continuous:
         # Continuous penalty: scales with force magnitude
@@ -327,22 +336,40 @@ def joint_limit_penalty(
 
 def lateral_motion_penalty(
     base_lin_vel: torch.Tensor,
+    base_quat: torch.Tensor,
     scale: float = 1.0,
 ) -> torch.Tensor:
-    """Penalty for lateral (sideways) motion.
+    """Penalty for lateral (sideways) motion in robot frame.
     
     Differential drive robots cannot move sideways, so any y-velocity
-    indicates slipping or unrealistic motion.
+    in the ROBOT frame indicates slipping or unrealistic motion.
     
     Args:
-        base_lin_vel: Base linear velocity [num_envs, 3] (x, y, z)
+        base_lin_vel: Base linear velocity in WORLD frame [num_envs, 3] (x, y, z)
+        base_quat: Base orientation quaternion in WORLD frame [num_envs, 4] (w, x, y, z)
         scale: Penalty scale
         
     Returns:
         Penalty values [num_envs]
     """
-    # Penalize y-direction velocity (lateral)
-    lateral_vel = base_lin_vel[:, 1].abs()
+    # Convert world-frame velocity to robot frame
+    # Extract yaw from quaternion and rotate velocity
+    # quat is (w, x, y, z), we need yaw angle
+    
+    # For a quaternion (w, x, y, z), yaw (rotation around Z) is:
+    # yaw = atan2(2*(w*z + x*y), 1 - 2*(y^2 + z^2))
+    w, x, y, z = base_quat[:, 0], base_quat[:, 1], base_quat[:, 2], base_quat[:, 3]
+    yaw = torch.atan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2))
+    
+    # Rotate world velocity to robot frame (2D rotation around Z)
+    cos_yaw = torch.cos(yaw)
+    sin_yaw = torch.sin(yaw)
+    
+    vel_x_robot = cos_yaw * base_lin_vel[:, 0] + sin_yaw * base_lin_vel[:, 1]
+    vel_y_robot = -sin_yaw * base_lin_vel[:, 0] + cos_yaw * base_lin_vel[:, 1]
+    
+    # Penalize y-direction velocity in ROBOT frame (lateral)
+    lateral_vel = vel_y_robot.abs()
     return scale * lateral_vel ** 2
 
 
@@ -391,6 +418,7 @@ def compute_combined_reward(
     # Robot state
     base_lin_vel: torch.Tensor,
     base_ang_vel: torch.Tensor,
+    base_quat: torch.Tensor,  # Base orientation for lateral penalty
     joint_pos: torch.Tensor,
     joint_vel: torch.Tensor,
     
@@ -503,7 +531,7 @@ def compute_combined_reward(
     
     # Lateral motion (should be zero for differential drive)
     lateral_penalty = lateral_motion_penalty(
-        base_lin_vel, scale=weights["lateral_motion_penalty"]
+        base_lin_vel, base_quat, scale=weights["lateral_motion_penalty"]
     )
     
     # Safety penalties - SELF-COLLISION (critical for mobile manipulator!)

@@ -35,23 +35,34 @@ def main():
     
     # Create environment with trajectory loading
     print("[3/3] Creating environment with multi_recorded trajectories...")
-    env = gym.make(
-        "MobileMMTrackEE-v0",
-        num_envs=4,
-        headless=True,
-        trajectory_type="multi_recorded",
-        use_all_trajectories=True,
+    
+    # Use the same config approach as train.py
+    from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnvCfg, MobileMMTrackEEEnv
+    from rl_platform.tasks.mobile_mm.config import TrajectoryConfig
+    
+    # Create custom environment configuration
+    env_cfg = MobileMMTrackEEEnvCfg()
+    env_cfg.scene.num_envs = 4
+    
+    # Configure trajectory (same as train.py)
+    env_cfg.task_config.trajectory = TrajectoryConfig(
+        type="multi_recorded",
+        trajectory_dir="trajectoryToLearn/world_json",
+        trajectory_pattern="**/*.json",
+        trajectory_filter_indices=None,  # Use all trajectories
+        max_trajectories=None,
     )
     
-    unwrapped = env.unwrapped
+    # Create environment directly with config
+    env = MobileMMTrackEEEnv(cfg=env_cfg)
     
     print("\n" + "="*80)
     print("ENVIRONMENT CONFIGURATION")
     print("="*80)
     
     # Check trajectory manager
-    if hasattr(unwrapped, 'trajectory_manager'):
-        traj_mgr = unwrapped.trajectory_manager
+    if hasattr(env, 'trajectory_manager'):
+        traj_mgr = env.trajectory_manager
         print(f"✅ Trajectory manager found: {type(traj_mgr).__name__}")
         
         # Check what type it is
@@ -86,13 +97,15 @@ def main():
     print("\nSampling 100 timesteps from current trajectories:")
     print("-"*80)
     
-    initial_ee_pos = unwrapped.robot.data.body_pos_w[0, unwrapped._ee_body_idx, :].cpu().numpy()
+    initial_ee_pos = env.robot.data.body_pos_w[0, env._ee_body_idx, :].cpu().numpy()
     print(f"Initial EE position: {initial_ee_pos}")
     
     target_positions = []
     for step in range(100):
-        target_pos, _ = unwrapped.trajectory_manager.get_target_pose()
+        target_pos, _ = env.trajectory_manager.get_target_pose()
         target_positions.append(target_pos[0].cpu().numpy())
+        # IMPORTANT: Step through the trajectory!
+        env.trajectory_manager.step()
     
     import numpy as np
     target_positions = np.array(target_positions)
@@ -132,30 +145,36 @@ def main():
     
     for reset_idx in range(5):
         obs = env.reset()
-        target_pos, _ = unwrapped.trajectory_manager.get_target_pose()
+        target_pos, _ = env.trajectory_manager.get_target_pose()
         print(f"  Reset {reset_idx + 1}: Target = {target_pos[0].cpu().numpy()}")
         
         # If multi-trajectory, check which one was selected
-        if hasattr(unwrapped.trajectory_manager, 'current_trajectory_indices'):
-            idx = unwrapped.trajectory_manager.current_trajectory_indices[0].item()
+        if hasattr(env.trajectory_manager, 'current_trajectory_indices'):
+            idx = env.trajectory_manager.current_trajectory_indices[0].item()
             print(f"             Trajectory index = {idx}")
     
     print("\n" + "="*80)
     print("CONCLUSION")
     print("="*80)
     
-    if not hasattr(unwrapped, 'trajectory_manager'):
+    if not hasattr(env, 'trajectory_manager'):
         print("❌ CRITICAL: No trajectory manager!")
-    elif not hasattr(unwrapped.trajectory_manager, 'num_trajectories'):
-        print("❌ Using simple trajectory (circle/line), NOT multi_recorded!")
+    elif env.trajectory_manager.traj_type not in ["recorded", "multi_recorded"]:
+        print(f"❌ Using simple trajectory ({env.trajectory_manager.traj_type}), NOT multi_recorded!")
         print("   -> Training did NOT see the 1,038 recorded trajectories")
-    elif unwrapped.trajectory_manager.num_trajectories == 1:
-        print("⚠️  Only 1 trajectory loaded - should be 1,038!")
-    elif unwrapped.trajectory_manager.num_trajectories < 100:
-        print(f"⚠️  Only {unwrapped.trajectory_manager.num_trajectories} trajectories loaded")
+    elif env.trajectory_manager.multi_loader is None:
+        print("❌ Multi-loader not initialized!")
+        print("   -> Trajectory type is multi_recorded but loader failed")
     else:
-        print(f"✅ {unwrapped.trajectory_manager.num_trajectories} trajectories loaded")
-        print("   -> Multi-trajectory system appears to be working")
+        num_trajs = len(env.trajectory_manager.multi_loader.trajectories)
+        if num_trajs == 1:
+            print("⚠️  Only 1 trajectory loaded - should be 1,038!")
+        elif num_trajs < 100:
+            print(f"⚠️  Only {num_trajs} trajectories loaded")
+        else:
+            print(f"✅ {num_trajs} trajectories loaded and advancing!")
+            print(f"   -> Multi-trajectory system is WORKING")
+            print(f"   -> Training with {num_trajs} diverse trajectories")
     
     print("="*80)
     

@@ -687,6 +687,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         base_ang_vel_normalized = base_ang_vel / self.robot_limits["max_angular_velocity"]
         prev_base_lin_vel_normalized = self.prev_base_lin_vel / self.robot_limits["max_linear_velocity"]
         
+        # Get base orientation for lateral penalty calculation
+        base_quat = self.robot.data.root_quat_w
+        
         # Compute rewards with all new constraint penalties
         rewards, self.reward_components = compute_combined_reward(
             current_ee_pos=ee_pos,
@@ -699,6 +702,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             prev_prev_actions=self._actions_t_minus_2,  # Actions from 2 steps ago (for jerk calculation)
             base_lin_vel=base_lin_vel_normalized,  # Pass normalized velocities to rewards
             base_ang_vel=base_ang_vel_normalized,  # Pass normalized velocities to rewards
+            base_quat=base_quat,  # Base orientation for lateral penalty
             joint_pos=joint_pos,
             joint_vel=joint_vel,
             prev_base_lin_vel=prev_base_lin_vel_normalized,  # Pass normalized velocities to rewards

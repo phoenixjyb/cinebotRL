@@ -161,6 +161,15 @@ class TrajectoryManager:
         
         # Wrap phase to [0, 2π]
         self.phase = torch.remainder(self.phase, 2 * np.pi)
+        
+        # For recorded/multi_recorded trajectories, advance waypoint index
+        if self.traj_type in ["recorded", "multi_recorded"] and self.recorded_positions is not None:
+            # Increment waypoint index for all environments
+            self.current_waypoint_idx += 1
+            
+            # Wrap around at trajectory end (loop the trajectory)
+            max_idx = self.recorded_positions.shape[1] - 1  # [num_envs, max_length, 3]
+            self.current_waypoint_idx = torch.clamp(self.current_waypoint_idx, 0, max_idx)
     
     def _circle_trajectory(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate circular trajectory.
@@ -337,12 +346,30 @@ class TrajectoryManager:
             self.recorded_orientations = orientations
             self.current_waypoint_idx.zero_()
         else:
-            # Resample only specified environments
-            num_resample = len(env_ids)
-            positions, orientations = self.multi_loader.sample_trajectories(num_resample)
+            # For partial resets, we need to handle variable trajectory lengths.
+            # Since recorded_positions has a fixed shape, we need to resample ALL envs
+            # to get a consistent max_length, then only reset the indices for env_ids.
             
-            self.recorded_positions[env_ids] = positions
-            self.recorded_orientations[env_ids] = orientations
+            # Resample ALL environments to get new max_length
+            positions, orientations = self.multi_loader.sample_trajectories(self.num_envs)
+            
+            # Keep existing trajectories for non-reset envs by copying their data
+            if self.recorded_positions is not None:
+                # Find which envs to keep (not in env_ids)
+                all_env_ids = torch.arange(self.num_envs, device=self.device)
+                keep_mask = ~torch.isin(all_env_ids, env_ids)
+                keep_ids = all_env_ids[keep_mask]
+                
+                # If new max_length matches old, preserve non-reset trajectories
+                if positions.shape[1] == self.recorded_positions.shape[1]:
+                    positions[keep_ids] = self.recorded_positions[keep_ids]
+                    orientations[keep_ids] = self.recorded_orientations[keep_ids]
+                # Otherwise, just use all new trajectories (unavoidable due to shape change)
+            
+            self.recorded_positions = positions
+            self.recorded_orientations = orientations
             self.current_waypoint_idx[env_ids] = 0
+
+
 
 

@@ -288,6 +288,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "position_tracking": self.task_cfg.rewards.position_tracking,
             "orientation_tracking": self.task_cfg.rewards.orientation_tracking,
             "progress_bonus": self.task_cfg.rewards.progress_bonus,
+            "base_progress_reward": self.task_cfg.rewards.base_progress_reward,
+            "target_distance_penalty": self.task_cfg.rewards.target_distance_penalty,
             "action_magnitude": self.task_cfg.rewards.action_magnitude,
             "action_rate": self.task_cfg.rewards.action_rate,
             "action_smoothness": self.task_cfg.rewards.action_smoothness,
@@ -516,14 +518,18 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 
                 # Show if base should be moving
                 if base_to_target_2d[0].item() > 0.6:
-                    print(f"  ⚠️  Base SHOULD be moving! (target {base_to_target_2d[0].item() - 0.6:.3f}m beyond arm reach)")
+                    beyond_reach = base_to_target_2d[0].item() - 0.6
+                    print(f"  ⚠️  Base SHOULD be moving! (target {beyond_reach:.3f}m beyond arm reach)")
+                    print(f"  💸 Distance penalty: {10.0 * beyond_reach:.2f} points")
                     
                 # Show reward components
                 if hasattr(self, 'reward_components'):
                     base_mob = self.reward_components.get('base_mobilization', torch.zeros(1, device=self.device))
                     pos_track = self.reward_components.get('position_tracking', torch.zeros(1, device=self.device))
+                    dist_pen = self.reward_components.get('target_distance_penalty', torch.zeros(1, device=self.device))
                     print(f"  💰 base_mobilization reward: {base_mob[0].item():.4f}")
                     print(f"  💰 position_tracking reward: {pos_track[0].item():.4f}")
+                    print(f"  💸 target_distance_penalty: {dist_pen[0].item():.4f}")
             return
         
         try:

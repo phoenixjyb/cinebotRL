@@ -123,6 +123,44 @@ def base_mobilization_reward(
     return scale * progress * out_of_reach
 
 
+def target_distance_penalty(
+    base_pos: torch.Tensor,
+    target_pos: torch.Tensor,
+    arm_reach: float = 0.6,
+    scale: float = 10.0,
+) -> torch.Tensor:
+    """Penalty for target being beyond arm reach from base.
+    
+    Measures PLANAR distance (X-Y only) since base can only move horizontally.
+    Provides strong negative signal to force base mobilization when needed.
+    
+    This penalty creates a strong gradient for base movement by linearly penalizing
+    distance beyond arm reach. Unlike exponential position tracking reward (which
+    provides weak gradient when far), this penalty grows linearly with distance,
+    ensuring the policy is strongly motivated to reduce large errors.
+    
+    Example: Target 1.4m beyond 0.6m reach → penalty = 10.0 × 1.4 = 14 points
+             As base moves closer, penalty decreases linearly to zero at 0.6m
+    
+    Args:
+        base_pos: Current base position [num_envs, 3]
+        target_pos: Target position [num_envs, 3]
+        arm_reach: Maximum reach of arm from base (meters)
+        scale: Penalty scale factor (points per meter beyond reach)
+        
+    Returns:
+        Penalty values [num_envs] - higher when further beyond reach
+    """
+    # Planar distance only (base moves in X-Y plane)
+    target_xy = target_pos[:, :2]
+    base_xy = base_pos[:, :2]
+    
+    dist = torch.norm(target_xy - base_xy, dim=-1)
+    beyond_reach = torch.clamp(dist - arm_reach, min=0.0)
+    
+    return scale * beyond_reach  # Linear penalty
+
+
 def action_magnitude_penalty(
     actions: torch.Tensor,
     scale: float = 1.0,
@@ -546,6 +584,13 @@ def compute_combined_reward(
         scale=weights.get("base_progress_reward", 10.0)
     )
     
+    # Distance penalty - strong gradient for base mobilization
+    dist_penalty = target_distance_penalty(
+        base_pos, target_pos,
+        arm_reach=0.6,
+        scale=weights.get("target_distance_penalty", 10.0)
+    )
+    
     # Action penalties
     action_mag_penalty = action_magnitude_penalty(actions, scale=weights["action_magnitude"])
     action_rt_penalty = action_rate_penalty(actions, prev_actions, scale=weights["action_rate"])
@@ -623,6 +668,7 @@ def compute_combined_reward(
         + ori_reward
         + prog_bonus
         + base_mob_reward  # NEW: Reward base movement when target is far
+        - dist_penalty  # NEW: Strong penalty for being beyond arm reach
         - action_mag_penalty
         - action_rt_penalty
         - action_smooth_penalty
@@ -642,6 +688,7 @@ def compute_combined_reward(
         "orientation_tracking": ori_reward,
         "progress_bonus": prog_bonus,
         "base_mobilization": base_mob_reward,  # NEW: Log base movement reward
+        "target_distance_penalty": dist_penalty,  # NEW: Log distance penalty
         "action_magnitude_penalty": action_mag_penalty,
         "action_rate_penalty": action_rt_penalty,
         "action_smoothness_penalty": action_smooth_penalty,

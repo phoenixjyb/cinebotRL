@@ -80,6 +80,7 @@ class RewardWeights:
     orientation_tracking: float = 2.0
     progress_bonus: float = 1.0
     base_progress_reward: float = 50.0  # CRITICAL: Must be strong enough to overcome arm-only strategies!
+    target_distance_penalty: float = 10.0  # NEW: Linear penalty for distance beyond arm reach (points/meter)
     
     # Motion quality penalties
     action_magnitude: float = 0.01

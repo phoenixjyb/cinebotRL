@@ -217,6 +217,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         use_all_trajectories = kwargs.pop("use_all_trajectories", None)
         use_chassis_only = kwargs.pop("use_chassis_only", None)
         
+        print(f"[MobileMMTrackEE] DEBUG: Before config handling, num_envs_override={num_envs_override}")
+        
         if cfg is None:
             from dataclasses import replace
             cfg = MobileMMTrackEEEnvCfg()
@@ -252,8 +254,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         elif use_all_trajectories:
             traj_cfg.trajectory_filter_indices = None
         
+        print(f"[MobileMMTrackEE] DEBUG: About to call super().__init__() with cfg.num_envs={cfg.num_envs if cfg else 'None'}")
+        
         # DirectRLEnv only takes cfg, not render_mode
         super().__init__(cfg, **kwargs)
+        
+        print(f"[MobileMMTrackEE] DEBUG: After super().__init__(), self.num_envs={self.num_envs}")
         
         # ============================================================================
         # COORDINATE FRAME CONVENTIONS
@@ -353,8 +359,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Velocity history for acceleration calculation
         self.prev_base_lin_vel = torch.zeros(self.num_envs, 3, device=self.device)
+        print(f"[MobileMMTrackEE] DEBUG: Initializing velocity buffers with num_envs={self.num_envs}")
         self.current_commanded_vel = torch.zeros(self.num_envs, 3, device=self.device)  # Rate-limited commanded velocities for THIS step
         self.prev_commanded_vel = torch.zeros(self.num_envs, 3, device=self.device)
+        print(f"[MobileMMTrackEE] DEBUG: current_commanded_vel.shape = {self.current_commanded_vel.shape}")
         self.prev_commanded_accel = torch.zeros(self.num_envs, 3, device=self.device)
         self.prev_joint_vel = torch.zeros(
             self.num_envs, 6, device=self.device  # 6 arm joints

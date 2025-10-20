@@ -489,7 +489,18 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 
                 base_to_target_2d = torch.norm(target_pos[:, :2] - base_pos_world[:, :2], dim=-1)
                 
-                print(f"\n[TRACKING Step {self._vis_step_count}] Env 0:")
+                # Get trajectory interpolation info (if available)
+                traj_info = ""
+                if hasattr(self.trajectory_manager, 'current_waypoint_idx') and \
+                   hasattr(self.trajectory_manager, '_recorded_time_accum') and \
+                   hasattr(self.trajectory_manager, 'waypoint_dt'):
+                    current_wp = self.trajectory_manager.current_waypoint_idx[0].item()
+                    time_accum = self.trajectory_manager._recorded_time_accum[0].item()
+                    wp_dt = self.trajectory_manager.waypoint_dt
+                    alpha = min(time_accum / wp_dt, 1.0)
+                    traj_info = f"\n  🎬 Waypoint: {current_wp} → {current_wp + 1} (α={alpha:.2f}, {time_accum*1000:.0f}ms/{wp_dt*1000:.0f}ms)"
+                
+                print(f"\n[TRACKING Step {self._vis_step_count}] Env 0:{traj_info}")
                 print(f"  🎯 Target (WORLD):  [{target_pos[0, 0]:.3f}, {target_pos[0, 1]:.3f}, {target_pos[0, 2]:.3f}]")
                 print(f"  🟢 EE Pos (WORLD):  [{ee_pos[0, 0]:.3f}, {ee_pos[0, 1]:.3f}, {ee_pos[0, 2]:.3f}]")
                 print(f"  🚗 Base Pos (WORLD): [{base_pos_world[0, 0]:.3f}, {base_pos_world[0, 1]:.3f}, {base_pos_world[0, 2]:.3f}]")

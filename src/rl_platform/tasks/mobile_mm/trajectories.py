@@ -246,7 +246,10 @@ class TrajectoryManager:
         return position, orientation
     
     def _recorded_trajectory(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """Playback recorded trajectory from waypoints.
+        """Playback recorded trajectory from waypoints with smooth interpolation.
+        
+        Interpolates between waypoints to provide smooth target motion at control frequency,
+        eliminating step-wise jumps that confuse the policy.
         
         Returns:
             position: Target positions [num_envs, 3]
@@ -255,12 +258,79 @@ class TrajectoryManager:
         if self.recorded_positions is None:
             raise RuntimeError("No recorded trajectory loaded. Set waypoint_file in config.")
         
-        # Get current waypoint for each environment
         batch_indices = torch.arange(self.num_envs, device=self.device)
-        position = self.recorded_positions[batch_indices, self.current_waypoint_idx]
-        orientation = self.recorded_orientations[batch_indices, self.current_waypoint_idx]
+        max_length = self.recorded_positions.shape[1]
+        
+        # Get current and next waypoint indices
+        current_idx = self.current_waypoint_idx
+        next_idx = (current_idx + 1) % max_length
+        
+        # Interpolation factor (0.0 to 1.0 between waypoints)
+        # _recorded_time_accum accumulates control_dt (0.02s) until it reaches waypoint_dt (0.1s)
+        alpha = torch.clamp(self._recorded_time_accum / self.waypoint_dt, 0.0, 1.0)
+        
+        # Linear interpolation for positions
+        pos_current = self.recorded_positions[batch_indices, current_idx]
+        pos_next = self.recorded_positions[batch_indices, next_idx]
+        position = (1.0 - alpha.unsqueeze(-1)) * pos_current + alpha.unsqueeze(-1) * pos_next
+        
+        # Spherical linear interpolation (slerp) for orientations
+        quat_current = self.recorded_orientations[batch_indices, current_idx]
+        quat_next = self.recorded_orientations[batch_indices, next_idx]
+        orientation = self._slerp_quaternions(quat_current, quat_next, alpha)
         
         return position, orientation
+    
+    def _slerp_quaternions(
+        self, q1: torch.Tensor, q2: torch.Tensor, t: torch.Tensor
+    ) -> torch.Tensor:
+        """Spherical linear interpolation between quaternions.
+        
+        Args:
+            q1: Start quaternions [num_envs, 4] (wxyz)
+            q2: End quaternions [num_envs, 4] (wxyz)
+            t: Interpolation factors [num_envs] (0.0 to 1.0)
+            
+        Returns:
+            Interpolated quaternions [num_envs, 4]
+        """
+        # Compute dot product
+        dot = torch.sum(q1 * q2, dim=-1, keepdim=True)
+        
+        # If dot < 0, negate q2 to take shorter path
+        q2 = torch.where(dot < 0, -q2, q2)
+        dot = torch.abs(dot)
+        
+        # Threshold for linear interpolation (quaternions very close)
+        DOT_THRESHOLD = 0.9995
+        
+        # For quaternions very close together, use linear interpolation
+        use_linear = dot > DOT_THRESHOLD
+        
+        # Slerp calculation
+        theta = torch.acos(torch.clamp(dot, -1.0, 1.0))
+        sin_theta = torch.sin(theta)
+        
+        # Avoid division by zero
+        sin_theta = torch.where(sin_theta < 1e-6, torch.ones_like(sin_theta), sin_theta)
+        
+        t_expanded = t.unsqueeze(-1)
+        w1 = torch.sin((1.0 - t_expanded) * theta) / sin_theta
+        w2 = torch.sin(t_expanded * theta) / sin_theta
+        
+        result_slerp = w1 * q1 + w2 * q2
+        
+        # Linear interpolation fallback
+        result_linear = (1.0 - t_expanded) * q1 + t_expanded * q2
+        result_linear = result_linear / torch.norm(result_linear, dim=-1, keepdim=True)
+        
+        # Choose based on threshold
+        result = torch.where(use_linear, result_linear, result_slerp)
+        
+        # Normalize to ensure unit quaternion
+        result = result / torch.norm(result, dim=-1, keepdim=True)
+        
+        return result
     
     def _load_recorded_trajectory(self, waypoint_file: str) -> None:
         """Load recorded trajectory from JSON file.

@@ -35,16 +35,18 @@
     <link name="base_link_x">
         <inertial>
             <origin rpy="0.00000000 0.00000000 0.00000000" xyz="0.00000000 0.00000000 0.00000000"/>
-            <!-- Massless kinematic helper link (PPR chain intermediate) -->
-            <mass value="0.001"/>
+            <!-- Zero-mass kinematic helper (PhysX computes composite mass from parent/child) -->
+            <!-- Avoids numerical stiffness from tiny masses + high spring stiffness (10kN/m) -->
+            <mass value="0.0"/>
             <inertia ixx="0.0001" ixy="0.00000000" ixz="0.00000000" iyy="0.0001" iyz="0.00000000" izz="0.0001"/>
         </inertial>
     </link>
     <link name="base_link_y">
         <inertial>
             <origin rpy="0.00000000 0.00000000 0.00000000" xyz="0.00000000 0.00000000 0.00000000"/>
-            <!-- Massless kinematic helper link (PPR chain intermediate) -->
-            <mass value="0.001"/>
+            <!-- Zero-mass kinematic helper (PhysX computes composite mass from parent/child) -->
+            <!-- Avoids numerical stiffness from tiny masses + high spring stiffness (10kN/m) -->
+            <mass value="0.0"/>
             <inertia ixx="0.0001" ixy="0.00000000" ixz="0.00000000" iyy="0.0001" iyz="0.00000000" izz="0.0001"/>
         </inertial>
     </link>
@@ -235,7 +237,9 @@
         <child link="abstract_chassis_link"/>
         <origin rpy="0.00000000 0.00000000 0.00000000" xyz="0.00000000 0.00000000 0.00000000"/>
         <axis xyz="0.00000000 0.00000000 1.00000000"/>
-        <limit lower="-Inf" upper="Inf" effort="100.0" velocity="2.5"/>
+        <!-- Finite limits required: USD collapses -inf/+inf to zero-width (locked joint) -->
+        <!-- ±2π radians allows unlimited rotation in practice -->
+        <limit lower="-6.283185" upper="6.283185" effort="100.0" velocity="2.5"/>
     </joint>
     <joint name="joint_x" type="prismatic">
         <parent link="base"/>

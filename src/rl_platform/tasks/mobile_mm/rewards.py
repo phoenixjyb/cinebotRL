@@ -72,6 +72,57 @@ def progress_bonus(
     return torch.clamp(improvement, min=0.0)
 
 
+def base_mobilization_reward(
+    base_pos: torch.Tensor,
+    prev_base_pos: torch.Tensor,
+    target_pos: torch.Tensor,
+    arm_reach: float = 0.8,  # Maximum reach of arm from base (meters)
+    scale: float = 1.0,
+) -> torch.Tensor:
+    """Reward chassis movement that genuinely reduces target distance.
+    
+    The previous implementation compared sequential target distances that were
+    measured against the target at different timesteps. When the trajectory
+    moved closer on its own, the policy received positive reward even if the
+    chassis stayed still. Here we hold the target fixed at the CURRENT pose and
+    compare how far it would be if the base had not moved. This isolates the
+    contribution of chassis motion and only grants credit when the base actually
+    closes the gap to an out-of-reach target.
+    
+    Args:
+        base_pos: Current base position [num_envs, 3]
+        prev_base_pos: Previous base position [num_envs, 3]
+        target_pos: Current target position [num_envs, 3]
+        arm_reach: Maximum reach of arm from base center (meters)
+        scale: Reward scale factor
+        
+    Returns:
+        Reward values [num_envs] - positive when base motion reduces distance
+    """
+    # Clamp numerical noise so zero displacement does not look like movement.
+    eps = 1e-6
+    
+    target_xy = target_pos[:, :2]
+    base_xy = base_pos[:, :2]
+    prev_base_xy = prev_base_pos[:, :2]
+    
+    # Distance to the current target with and without the latest base motion.
+    dist_current = torch.norm(target_xy - base_xy, dim=-1)
+    dist_if_static = torch.norm(target_xy - prev_base_xy, dim=-1)
+    
+    # Positive when the chassis actually moved closer to the target.
+    progress = dist_if_static - dist_current
+    
+    # Only reward motion when the goal is outside the arm workspace.
+    out_of_reach = torch.sigmoid(((dist_current + dist_if_static) * 0.5 - arm_reach) * 5.0)
+    
+    # Suppress tiny numerical oscillations when the base did not really move.
+    moved = torch.norm(base_xy - prev_base_xy, dim=-1) > eps
+    progress = torch.where(moved, progress, torch.zeros_like(progress))
+    
+    return scale * progress * out_of_reach
+
+
 def action_magnitude_penalty(
     actions: torch.Tensor,
     scale: float = 1.0,
@@ -416,6 +467,7 @@ def compute_combined_reward(
     prev_prev_actions: torch.Tensor,
     
     # Robot state
+    base_pos: torch.Tensor,  # NEW: Base position for progress tracking
     base_lin_vel: torch.Tensor,
     base_ang_vel: torch.Tensor,
     base_quat: torch.Tensor,  # Base orientation for lateral penalty
@@ -423,6 +475,7 @@ def compute_combined_reward(
     joint_vel: torch.Tensor,
     
     # Previous state for derivatives
+    prev_base_pos: torch.Tensor,  # NEW: Previous base position
     prev_base_lin_vel: torch.Tensor,
     prev_joint_vel: torch.Tensor,
     prev_base_accel: torch.Tensor,
@@ -486,6 +539,13 @@ def compute_combined_reward(
         prev_tracking_error, current_error
     )
     
+    # Base mobilization reward - only move chassis when target is out of arm reach
+    base_mob_reward = base_mobilization_reward(
+        base_pos, prev_base_pos, target_pos,
+        arm_reach=0.6,  # Based on empirical observation: EE reaches ~0.6m from base
+        scale=weights.get("base_progress_reward", 10.0)
+    )
+    
     # Action penalties
     action_mag_penalty = action_magnitude_penalty(actions, scale=weights["action_magnitude"])
     action_rt_penalty = action_rate_penalty(actions, prev_actions, scale=weights["action_rate"])
@@ -494,31 +554,31 @@ def compute_combined_reward(
     )
     
     # Robot constraint penalties
-    # Note: base_lin_vel and joint_vel are now normalized to [0,1] range
-    # So limits should be 1.0 for normalized velocity penalty
+    # base_lin_vel is in physical units (m/s); limits come directly from robot specs.
     vel_limit_penalty = velocity_limit_penalty(
-        base_lin_vel, joint_vel,
-        1.0,  # Normalized velocity limit for base (was robot_limits["max_linear_velocity"])
-        robot_limits["max_joint_velocity"],  # Joint limits still in rad/s (not normalized)
+        base_lin_vel,
+        joint_vel,
+        robot_limits["max_linear_velocity"],
+        robot_limits["max_joint_velocity"],
         scale=weights["velocity_limit_penalty"],
     )
     
-    # Base acceleration (with normalized velocities)
+    # Base acceleration in physical units (m/s^2)
     base_accel = (base_lin_vel - prev_base_lin_vel) / dt
-    # Normalize acceleration limit: max_accel_normalized = max_accel / max_velocity 
-    normalized_accel_limit = robot_limits["max_linear_acceleration"] / robot_limits["max_linear_velocity"]
     accel_limit_penalty = acceleration_limit_penalty(
-        base_lin_vel[:, 0:1], prev_base_lin_vel[:, 0:1],  # Forward velocity only (normalized)
-        dt, normalized_accel_limit,  # Use normalized acceleration limit
+        base_lin_vel[:, 0:1],
+        prev_base_lin_vel[:, 0:1],
+        dt,
+        robot_limits["max_linear_acceleration"],
         scale=weights["acceleration_limit_penalty"],
     )
     
-    # Jerk (rate of acceleration change) - normalize limit
-    # max_jerk_normalized = max_jerk / max_velocity (since accel is already normalized by velocity)
-    normalized_jerk_limit = robot_limits["max_linear_jerk"] / robot_limits["max_linear_velocity"]
+    # Jerk (rate of change of acceleration) in physical units (m/s^3)
     jerk_penalty_val = jerk_penalty(
-        base_accel[:, 0:1], prev_base_accel[:, 0:1],  # Forward direction (normalized)
-        dt, normalized_jerk_limit,  # Use normalized jerk limit
+        base_accel[:, 0:1],
+        prev_base_accel[:, 0:1],
+        dt,
+        robot_limits["max_linear_jerk"],
         scale=weights["jerk_limit_penalty"],
     )
     
@@ -562,6 +622,7 @@ def compute_combined_reward(
         pos_reward
         + ori_reward
         + prog_bonus
+        + base_mob_reward  # NEW: Reward base movement when target is far
         - action_mag_penalty
         - action_rt_penalty
         - action_smooth_penalty
@@ -580,6 +641,7 @@ def compute_combined_reward(
         "position_tracking": pos_reward,
         "orientation_tracking": ori_reward,
         "progress_bonus": prog_bonus,
+        "base_mobilization": base_mob_reward,  # NEW: Log base movement reward
         "action_magnitude_penalty": action_mag_penalty,
         "action_rate_penalty": action_rt_penalty,
         "action_smoothness_penalty": action_smooth_penalty,

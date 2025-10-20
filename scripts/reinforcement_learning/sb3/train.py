@@ -691,10 +691,16 @@ def main():
         env_cfg = MobileMMTrackEEEnvCfg()
         env_cfg.scene.num_envs = args.num_envs
         
+        # Convert trajectory_dir to absolute path if it's relative
+        trajectory_dir = args.trajectory_dir
+        if not Path(trajectory_dir).is_absolute():
+            trajectory_dir = str(PROJECT_ROOT / trajectory_dir)
+            print(f"    Resolved relative path to: {trajectory_dir}")
+        
         # Configure trajectory
         env_cfg.task_config.trajectory = TrajectoryConfig(
             type=args.trajectory_type,
-            trajectory_dir=args.trajectory_dir,
+            trajectory_dir=trajectory_dir,
             trajectory_pattern="**/*.json",
             trajectory_filter_indices=trajectory_config.get('filter_indices'),
             max_trajectories=trajectory_config.get('max_trajectories'),

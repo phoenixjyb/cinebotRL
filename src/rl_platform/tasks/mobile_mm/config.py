@@ -59,6 +59,7 @@ class RobotLimits:
     max_linear_velocity: float = 1.5  # m/s
     max_angular_velocity: float = 2.0  # rad/s (yaw rate)
     max_linear_acceleration: float = 5.0  # m/s^2
+    max_angular_acceleration: float = 10.0  # rad/s^2 (yaw acceleration)
     max_linear_jerk: float = 5.0  # m/s^3
     
     # Arm joint limits
@@ -78,6 +79,7 @@ class RewardWeights:
     position_tracking: float = 50.0  # INCREASED from 10.0 - need strong incentive for base movement
     orientation_tracking: float = 2.0
     progress_bonus: float = 1.0
+    base_progress_reward: float = 50.0  # CRITICAL: Must be strong enough to overcome arm-only strategies!
     
     # Motion quality penalties
     action_magnitude: float = 0.01

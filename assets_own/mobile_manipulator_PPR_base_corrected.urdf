@@ -3,8 +3,10 @@
     <link name="abstract_chassis_link">
         <inertial>
           <origin xyz="0.00703065 -0.00001010 0.21569964" rpy="0 0 0" />
-          <mass value="50.96231322" />
-          <inertia ixx="3.27070589" ixy="0.00010827" ixz="-0.18468600" iyy="3.37047588" iyz="0.00035735" izz="2.72731093" />
+          <!-- Mass split: 51kg total platform = 20kg base (kinematic root) + 31kg chassis (upper structure) -->
+          <mass value="30.96231322" />
+          <!-- Inertia scaled proportionally (31/51 ≈ 0.608 of original) -->
+          <inertia ixx="1.989" ixy="0.000066" ixz="-0.112" iyy="2.049" iyz="0.000217" izz="1.658" />
         </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />

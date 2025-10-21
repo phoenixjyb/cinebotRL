@@ -151,8 +151,8 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
                 ),
                 "base": ImplicitActuatorCfg(
                     joint_names_expr=["joint_x", "joint_y", "joint_theta"],
-                    stiffness=10000.0,  # High stiffness for PPR position tracking
-                    damping=1000.0,     # High damping for stability
+                    stiffness=1000.0,   # k=1000 N/m → ω_n=31.6 rad/s (5Hz, controllable at 50Hz)
+                    damping=316.0,      # ζ=0.5 underdamped for 50Hz control (responsive, 3-step settling)
                     effort_limit=1000.0,  # Override URDF effort=0
                     velocity_limit=2.0,   # Override URDF velocity=0
                 ),

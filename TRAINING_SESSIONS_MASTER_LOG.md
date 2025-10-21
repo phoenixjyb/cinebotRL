@@ -3,16 +3,16 @@
 **Project:** CinebotRL - Mobile Manipulator End-Effector Tracking  
 **Repository:** phoenixjyb/cinebotRL  
 **Branch:** train-windows  
-**Last Updated:** October 21, 2025 19:30 +0800
+**Last Updated:** October 21, 2025 20:30 +0800
 
 ---
 
-## 🚀 **READY TO LAUNCH: Session 5**
+## 🚀 **READY TO LAUNCH: Session 5b**
 
-**Status:** All fixes committed, documentation complete, ready for training launch  
-**Session:** 5 - Base Mobilization Fix  
-**Commits:** 6 total (URDF fixes → observation space fix → logging infrastructure)  
-**Latest Commit:** `78216e1` - Training session logging infrastructure
+**Status:** Critical reward fixes applied after Session 5 catastrophic failure  
+**Session:** 5b - Unbounded Reward Fix  
+**Commits:** 7 total (Session 5 fixes + reward capping fixes)  
+**Latest Commit:** `00fdbf5` - Session 5b: Fix unbounded reward & add excessive movement penalty
 
 ### Quick Start
 ```powershell
@@ -25,16 +25,26 @@ cd I:\isaaclab
 I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py --task MobileMMTrackEE-v0 --num_envs 8192 --n_steps 64 --batch_size 512 --total_timesteps 100000000 --learning_rate 3e-4 --ent_coef 0.001 --enable_entropy_decay --final_ent_coef 1e-4 --decay_start_timestep 50000000 --decay_duration_timesteps 50000000 --enable_kl_schedule --kl_warmup 0.25 --kl_main 0.15 --kl_finetune 0.07 --target_kl 1.0 --trajectory_type multi_recorded --use_all_trajectories --headless
 ```
 
-### What's Fixed
-✅ Observation space enhanced (+4 dims for base-to-target info)  
-✅ Rewards rebalanced (base movement gives +15.7 points vs -5.1 for staying still!)  
-✅ Smart penalty (90% reduction when moving)  
-✅ All bugs from BASE_MOVEMENT_BUG_ANALYSIS.md addressed
+### What's Fixed (Session 5b)
+✅ **CRITICAL:** Capped base_mobilization progress to max 0.2m per step  
+✅ **NEW:** Added excessive_base_movement_penalty (10.0 × excess beyond 0.1m)  
+✅ **REBALANCED:** Increased target_distance_penalty from 3.0 to 5.0  
+✅ Session 5 observation space fix (still active)  
+✅ All unbounded reward exploits eliminated
 
-### Expected Outcome
-🎯 Base action std > 0.3 within 5 minutes  
-🎯 Mean tracking error < 0.3m after 100M steps  
-🎯 Policy learns to mobilize base when targets out of reach
+### Why Session 5b is Needed
+❌ Session 5 CATASTROPHIC FAILURE at 20M steps:
+- Unbounded reward → policy learned "move base as far as possible = infinite rewards"
+- 51.5%→63.5% environments broken (>2m error)
+- Base moving wildly: 5-10 meters!
+- Mean error DOUBLED: 0.877m → 2.242m
+- Training death spiral, had to abort
+
+### Expected Outcome (Session 5b)
+🎯 Base movements: 5-15cm per step (NOT 5-10 meters!)  
+🎯 base_mobilization_reward: -5 to +30 range (BOUNDED!)  
+🎯 Mean tracking error < 0.5m after 100M steps  
+🎯 <5% broken environments throughout training
 
 ---
 
@@ -49,7 +59,8 @@ This document maintains a chronological record of all training sessions, includi
 - [Session 3](#session-3) - [TBD]
 - [Session 4a](#session-4a) - [TBD]
 - [Session 4b](#session-4b-25m-steps-no-base-movement) - 25.7M steps, no base movement (stopped)
-- [Session 5](#session-5-base-mobilization-fix) - **CURRENT** - Critical observation space fix
+- [Session 5](#session-5-base-mobilization-fix) - Observation space fix, ran to 20M steps, CATASTROPHIC FAILURE
+- [Session 5b](#session-5b-unbounded-reward-fix) - **CURRENT** - Critical reward capping fixes
 
 ---
 
@@ -354,17 +365,202 @@ I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcemen
 
 ### Results
 
+**Status:** ❌ CATASTROPHIC FAILURE (Stopped at ~20M steps)
+
+**Training Progression:**
+- **10M steps (1 hour):** ✅ SUCCESS! Base actions ACTIVE
+  - Base movements: 0.006-0.112m (reasonable)
+  - base_mobilization_reward: -1.34 to +2.43
+  - Mean tracking error: 0.877m (62% better than Session 4b!)
+  - Broken envs: 0.3% (25 out of 8192)
+  - **Observation space fix WORKED!**
+
+- **20M steps (2 hours):** ❌ CATASTROPHIC FAILURE
+  - Base moving WILDLY: 5-10 meters!
+  - base_mobilization_reward: -21.31 to +10.26 (EXPLODED!)
+  - Mean tracking error: 2.242m (156% WORSE!)
+  - Broken envs: 51.5%→63.5% (4222→5205 out of 8192)
+  - Constant reset spam (100+ resets per tracking window)
+  - Wild arm motion: 8.67 rad/s (limit is 2.0 rad/s)
+  - **Training death spiral - ABORTED**
+
+**Root Cause Identified:**
+- **Unbounded base_mobilization_reward** causing reward hacking
+- Policy discovered: "move base as far as possible = huge rewards!"
+- If base moves 5m: reward = 150 × 5.0 = 750 points! (vs 50 max for position tracking)
+- Value function lags reality: explained_variance 0.927 while 63.5% broken!
+
+**Second Bug Discovered:**
+- Many environments spawning at identical trajectory start positions (e.g., [1.050, 0.080, 0.860])
+- Lack of initial condition diversity
+- Some envs (like 8093) consistently stuck in catastrophic failures
+
+**Resolution:** Session 5b implements 3 critical fixes (reward capping, excessive penalty, rebalancing)
+
+**Detailed Log:** [docs/tracking/SESSION_5_LAUNCH_LOG.md](docs/tracking/SESSION_5_LAUNCH_LOG.md)
+
+---
+
+## Session 5b: Unbounded Reward Fix
+
+**Status:** 🚀 READY TO LAUNCH  
+**Date:** October 21, 2025  
+**Objective:** Fix unbounded reward bug that caused Session 5 catastrophic failure
+
+### Git Commits
+
+#### Commit 7: Session 5b Reward Fixes
+```
+Commit: 00fdbf5
+Date: October 21, 2025 [Time TBD]
+Message: Session 5b: Fix unbounded reward & add excessive movement penalty
+```
+
+**CRITICAL FIXES (3 changes):**
+
+1. **Cap base_mobilization progress** (Priority 1 - CRITICAL):
+   - Added `torch.clamp(progress, min=0.0, max=0.2)` in `base_mobilization_reward()`
+   - Max reward = 150 × 0.2 = 30 points (reasonable vs 50 position tracking)
+   - Prevents: 5m movement → 750 point explosion
+   - Typical 7.5cm movement → 11.25 points
+
+2. **Add excessive_base_movement_penalty** (Priority 2 - IMPORTANT):
+   - New function: `excessive_base_movement_penalty()`
+   - Heavily penalizes movements >10cm per step
+   - Example: 1m movement → 10.0 × 0.9 = 9.0 point penalty
+   - Prevents policy from exploiting uncapped rewards
+
+3. **Increase target_distance_penalty** (Priority 3 - BALANCING):
+   - Increased from 3.0 to 5.0
+   - Compensates for capped mobilization reward
+   - Maintains pressure to move base when needed
+
+**Files Modified:**
+- `src/rl_platform/tasks/mobile_mm/rewards.py`:
+  * `base_mobilization_reward()`: Added progress capping (lines ~91-94)
+  * `excessive_base_movement_penalty()`: New function (lines ~175-200)
+  * `compute_combined_reward()`: Added excessive penalty to total
+  * `components` dict: Added excessive_base_movement_penalty logging
+
+- `src/rl_platform/tasks/mobile_mm/config.py`:
+  * `RewardWeights.target_distance_penalty`: 3.0 → 5.0
+  * `RewardWeights.excessive_base_movement_penalty`: 10.0 (NEW)
+
+**Documentation:**
+- `docs/tracking/SESSION_5B_FIX_SUMMARY.md`: Comprehensive fix documentation
+
+---
+
+### Training Configuration
+
+**Environment:**
+- Task: MobileMMTrackEE-v0
+- Trajectory Type: multi_recorded (all 23 trajectories)
+- Rendering: Headless
+- Observations: 43 dims (+4 from Session 5 fix)
+
+**Hyperparameters:**
+- Total Timesteps: 100,000,000
+- Number of Environments: 8192
+- n_steps: 64
+- Batch Size: 512
+- Learning Rate: 3e-4
+- Entropy Coefficient: 0.001 (decay to 1e-4)
+- Enable KL Schedule: Yes (warmup 0.25, main 0.15, finetune 0.07)
+- Target KL: 1.0
+
+**Key Changes from Session 5:**
+- ✅ base_mobilization progress CAPPED at 0.2m per step
+- ✅ excessive_base_movement_penalty ADDED (10.0 × excess beyond 0.1m)
+- ✅ target_distance_penalty INCREASED (3.0 → 5.0)
+- ✅ All other hyperparameters UNCHANGED (isolate reward fixes)
+
+### Launch Command
+
+**Full Command:**
+```powershell
+cd I:\isaaclab
+I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py --task MobileMMTrackEE-v0 --num_envs 8192 --n_steps 64 --batch_size 512 --total_timesteps 100000000 --learning_rate 3e-4 --ent_coef 0.001 --enable_entropy_decay --final_ent_coef 1e-4 --decay_start_timestep 50000000 --decay_duration_timesteps 50000000 --enable_kl_schedule --kl_warmup 0.25 --kl_main 0.15 --kl_finetune 0.07 --target_kl 1.0 --trajectory_type multi_recorded --use_all_trajectories --headless
+```
+
+**Command Used:** [TO BE FILLED AT LAUNCH]
+
+### Expected Performance
+
+**Reward Structure (Session 5b):**
+- Position tracking: 0 to +50 points (exponential decay)
+- Base mobilization: -5 to +30 points (CAPPED at 0.2m progress!)
+- Distance penalty: 0 to -10 points (out of reach penalty, increased scale)
+- Excessive movement: 0 to -X points (wild movements >10cm penalized)
+- Action penalties: -0.5 to -2 points (typical)
+
+**Success Criteria:**
+
+**CRITICAL First 5 Minutes (1M steps):**
+- [ ] Base movements: <0.15m (NOT >1m!)
+- [ ] base_mobilization_reward: -5 to +30 range (NOT -21 to +10!)
+- [ ] Excessive penalty: Near 0 (movements within bounds)
+- [ ] Broken envs: <1% (NOT 51.5%!)
+- **IF ANY FAIL → STOP IMMEDIATELY!**
+
+**Early (5M steps, 30 min):**
+- Mean tracking error < 1.0m (improving)
+- Base mobilization mean > 0.0 (net positive strategy)
+- Broken envs < 2%
+- No reset spam
+
+**Intermediate (10M steps, 1 hour):**
+- Mean tracking error < 0.7m
+- Base movements coordinated (5-15cm typical, rarely >20cm)
+- "Good" tracking category > 5%
+- Explained variance 0.80-0.85
+
+**Final (100M steps, ~9 hours):**
+- Mean tracking error < 0.25m (TARGET!)
+- Base actively mobilizes for >70% OOR targets
+- Total reward > 35 (consistently positive!)
+- Explained variance > 0.92
+- Policy respects 10cm movement limit naturally
+
+### Training Timeline
+
+- **Launch Time:** [TO BE FILLED]
+- **Estimated Duration:** ~9 hours (8192 envs)
+- **Checkpoint 1 (5 min, 1M steps):** [CRITICAL - ABORT IF FAILS]
+- **Checkpoint 2 (30 min, 5M steps):** [TO BE FILLED]
+- **Checkpoint 3 (1 hour, 10M steps):** [TO BE FILLED]
+- **Checkpoint 4 (3 hours, 30M steps):** [TO BE FILLED]
+- **Checkpoint 5 (6 hours, 60M steps):** [TO BE FILLED]
+- **Completion (9 hours, 100M steps):** [TO BE FILLED]
+
+### Results
+
 **Status:** Not Started
 
 **Final Metrics:** [TO BE FILLED]
 
 **Outcome:** [TO BE FILLED]
 
-**Detailed Log:** [docs/training_sessions/SESSION_5_LAUNCH_LOG.md](docs/training_sessions/SESSION_5_LAUNCH_LOG.md)
+**Detailed Log:** [docs/tracking/SESSION_5B_LAUNCH_LOG.md](docs/tracking/SESSION_5B_LAUNCH_LOG.md) (to be created at launch)
+
+**Comparison with Session 5:**
+- Session 5 @ 20M: 51.5% broken, mean error 2.242m, wild movements (5-10m)
+- Session 5b @ 20M: [TO BE FILLED]
 
 ---
 
-## Session 4b: 25.7M Steps - No Base Movement
+## Session 5: Base Mobilization Fix (FAILED)
+
+**Status:** ❌ CATASTROPHIC FAILURE (Aborted at ~20M steps)  
+**Date:** October 21, 2025  
+**Objective:** Fix critical observation space bug preventing base mobilization learning
+
+### Why This Session is Important
+Session 5 PROVED the observation space fix works (base actions became active at 10M steps!), but discovered a NEW critical bug: unbounded rewards causing policy to learn catastrophic behavior. Session 5b addresses this with reward capping.
+
+### Git Commits (Sessions 1-6 from Session 5)
+
+[Previous commit documentation remains unchanged...]
 
 **Status:** ⏸️ STOPPED (Issue Identified)  
 **Date:** [Date TBD]  
@@ -593,6 +789,6 @@ Message: [Commit message]
 
 ---
 
-**Last Updated:** October 21, 2025  
-**Current Session:** 5 (Base Mobilization Fix)  
-**Repository Status:** All changes committed, ready to launch
+**Last Updated:** October 21, 2025 20:30 +0800  
+**Current Session:** 5b (Unbounded Reward Fix)  
+**Repository Status:** All Session 5b fixes committed, ready to launch

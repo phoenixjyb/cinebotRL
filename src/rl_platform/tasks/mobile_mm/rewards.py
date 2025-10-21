@@ -126,6 +126,7 @@ def base_mobilization_reward(
 def target_distance_penalty(
     base_pos: torch.Tensor,
     target_pos: torch.Tensor,
+    prev_base_pos: torch.Tensor = None,
     arm_reach: float = 0.6,
     scale: float = 10.0,
 ) -> torch.Tensor:
@@ -134,6 +135,9 @@ def target_distance_penalty(
     Measures PLANAR distance (X-Y only) since base can only move horizontally.
     Provides strong negative signal to force base mobilization when needed.
     
+    SMART PENALTY: If base is actively moving toward target, penalty is reduced 90%
+    to encourage base movement learning without overly harsh penalties during motion.
+    
     This penalty creates a strong gradient for base movement by linearly penalizing
     distance beyond arm reach. Unlike exponential position tracking reward (which
     provides weak gradient when far), this penalty grows linearly with distance,
@@ -141,10 +145,12 @@ def target_distance_penalty(
     
     Example: Target 1.4m beyond 0.6m reach → penalty = 10.0 × 1.4 = 14 points
              As base moves closer, penalty decreases linearly to zero at 0.6m
+             If base is moving: penalty = 10.0 × 1.4 × 0.1 = 1.4 points (90% reduction!)
     
     Args:
         base_pos: Current base position [num_envs, 3]
         target_pos: Target position [num_envs, 3]
+        prev_base_pos: Previous base position [num_envs, 3] (optional, for smart penalty)
         arm_reach: Maximum reach of arm from base (meters)
         scale: Penalty scale factor (points per meter beyond reach)
         
@@ -158,7 +164,18 @@ def target_distance_penalty(
     dist = torch.norm(target_xy - base_xy, dim=-1)
     beyond_reach = torch.clamp(dist - arm_reach, min=0.0)
     
-    return scale * beyond_reach  # Linear penalty
+    penalty = scale * beyond_reach  # Linear penalty
+    
+    # SMART PENALTY: Reduce if base is actively moving (>1cm threshold to ignore noise)
+    if prev_base_pos is not None:
+        prev_base_xy = prev_base_pos[:, :2]
+        base_movement = torch.norm(base_xy - prev_base_xy, dim=-1)
+        is_moving = base_movement > 0.01  # 1cm threshold
+        
+        # Apply 90% penalty reduction when moving (keep 10% to maintain gradient)
+        penalty = torch.where(is_moving, penalty * 0.1, penalty)
+    
+    return penalty
 
 
 def action_magnitude_penalty(
@@ -587,6 +604,7 @@ def compute_combined_reward(
     # Distance penalty - strong gradient for base mobilization
     dist_penalty = target_distance_penalty(
         base_pos, target_pos,
+        prev_base_pos=prev_base_pos,  # NEW: Enable smart penalty (90% reduction when moving)
         arm_reach=0.6,
         scale=weights.get("target_distance_penalty", 10.0)
     )

@@ -71,6 +71,17 @@ def compose_observation(
     quat_error = quat_diff(ee_quat, target_quat)  # Relative quaternion
     components.extend([pos_error, quat_error])
     
+    # CRITICAL FIX: Base-to-target information (4 dims: dx, dy, distance, out_of_reach_flag)
+    # Policy needs explicit signal about when to move base!
+    base_to_target_xy = target_pos[:, :2] - base_pos[:, :2]  # [num_envs, 2]
+    base_to_target_dist = torch.norm(base_to_target_xy, dim=-1, keepdim=True)  # [num_envs, 1]
+    
+    # Explicit "out of reach" signal (binary flag) - arm reach is ~0.6m empirically
+    arm_reach = 0.6  # meters
+    out_of_reach = (base_to_target_dist > arm_reach).float()  # [num_envs, 1]
+    
+    components.extend([base_to_target_xy, base_to_target_dist, out_of_reach])
+    
     # Optional: Lookahead targets
     if lookahead_pos is not None:
         # Flatten lookahead: [num_envs, steps, 3] -> [num_envs, steps*3]
@@ -181,6 +192,9 @@ def get_observation_dimensions(
     
     # Tracking error: pos_error(3) + quat_error(4) = 7
     dim += 7
+    
+    # Base-to-target info: dx(1) + dy(1) + distance(1) + out_of_reach_flag(1) = 4
+    dim += 4
     
     # Optional: Lookahead
     if use_lookahead:

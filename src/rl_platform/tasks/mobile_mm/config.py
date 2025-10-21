@@ -79,18 +79,18 @@ class RewardWeights:
     position_tracking: float = 50.0  # INCREASED from 10.0 - need strong incentive for base movement
     orientation_tracking: float = 2.0
     progress_bonus: float = 1.0
-    base_progress_reward: float = 50.0  # CRITICAL: Must be strong enough to overcome arm-only strategies!
-    target_distance_penalty: float = 10.0  # NEW: Linear penalty for distance beyond arm reach (points/meter)
+    base_progress_reward: float = 150.0  # CRITICAL: 3x stronger! (was 50.0) - must overcome action penalties
+    target_distance_penalty: float = 3.0  # REDUCED from 10.0 - less harsh while base is moving
     
     # Motion quality penalties
-    action_magnitude: float = 0.01
+    action_magnitude: float = 0.005  # REDUCED from 0.01 - encourage base action exploration
     action_rate: float = 0.01
     action_smoothness: float = 0.05  # Jerk penalty
     
     # Constraint violation penalties
     velocity_limit_penalty: float = 5.0
     acceleration_limit_penalty: float = 5.0
-    jerk_limit_penalty: float = 0.1  # REDUCED from 3.0 - was killing base movement learning!
+    jerk_limit_penalty: float = 0.05  # REDUCED from 0.1 - was killing base movement learning!
     joint_limit_penalty: float = 10.0
     lateral_motion_penalty: float = 2.0  # No sideways motion for diff drive
     

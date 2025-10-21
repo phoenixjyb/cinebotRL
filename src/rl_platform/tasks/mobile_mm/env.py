@@ -58,7 +58,7 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
     """Configuration for the mobile manipulator tracking environment."""
     
     # Simulation settings
-    decimation = 4
+    decimation = 10  # 200Hz physics / 10 = 20Hz control (realistic for mobile manipulators)
     episode_length_s = 20.0
     num_envs = 1  # Default to 1, can be overridden
     

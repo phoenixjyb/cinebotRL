@@ -80,7 +80,8 @@ class RewardWeights:
     orientation_tracking: float = 2.0
     progress_bonus: float = 1.0
     base_progress_reward: float = 150.0  # CRITICAL: 3x stronger! (was 50.0) - must overcome action penalties
-    target_distance_penalty: float = 3.0  # REDUCED from 10.0 - less harsh while base is moving
+    target_distance_penalty: float = 5.0  # Session 5b: Increased from 3.0 - compensates for capped mobilization reward
+    excessive_base_movement_penalty: float = 10.0  # Session 5b: NEW - prevents wild base movements >10cm
     
     # Motion quality penalties
     action_magnitude: float = 0.005  # REDUCED from 0.01 - encourage base action exploration

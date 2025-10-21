@@ -113,6 +113,11 @@ def base_mobilization_reward(
     # Positive when the chassis actually moved closer to the target.
     progress = dist_if_static - dist_current
     
+    # CRITICAL FIX (Session 5b): Cap progress to prevent reward explosion!
+    # Max 20cm progress per step → max reward = 150 × 0.2 = 30 points
+    # (reasonable compared to position_tracking max = 50 points)
+    progress = torch.clamp(progress, min=0.0, max=0.2)
+    
     # Only reward motion when the goal is outside the arm workspace.
     out_of_reach = torch.sigmoid(((dist_current + dist_if_static) * 0.5 - arm_reach) * 5.0)
     
@@ -124,6 +129,80 @@ def base_mobilization_reward(
 
 
 def target_distance_penalty(
+    base_pos: torch.Tensor,
+    target_pos: torch.Tensor,
+    prev_base_pos: torch.Tensor = None,
+    arm_reach: float = 0.6,
+    scale: float = 1.0,
+    moving_discount: float = 0.9,
+) -> torch.Tensor:
+    """Penalty for distance between base and target.
+    
+    Heavily penalize when base is far from target AND not moving.
+    Reduce penalty by 90% when base is actively moving (detected via velocity).
+    
+    Args:
+        base_pos: Current base position [num_envs, 3]
+        target_pos: Target position [num_envs, 3]
+        prev_base_pos: Previous base position (for movement detection)
+        arm_reach: Arm reach threshold
+        scale: Base penalty scale
+        moving_discount: Discount factor when base is moving (0.9 = 90% reduction)
+        
+    Returns:
+        Distance penalty [num_envs]
+    """
+    # XY distance from base to target
+    dist = torch.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)
+    
+    # Smooth penalty that ramps up when target is out of reach
+    out_of_reach_penalty = torch.sigmoid((dist - arm_reach) * 5.0) * dist
+    
+    # If prev_base_pos provided, detect movement and reduce penalty
+    if prev_base_pos is not None:
+        base_movement = torch.norm(base_pos[:, :2] - prev_base_pos[:, :2], dim=-1)
+        is_moving = base_movement > 0.01  # 1cm threshold
+        penalty = torch.where(
+            is_moving,
+            out_of_reach_penalty * moving_discount,  # 90% reduction when moving
+            out_of_reach_penalty  # Full penalty when static
+        )
+    else:
+        penalty = out_of_reach_penalty
+    
+    return scale * penalty
+
+
+def excessive_base_movement_penalty(
+    base_pos: torch.Tensor,
+    prev_base_pos: torch.Tensor,
+    threshold: float = 0.1,
+    scale: float = 10.0,
+) -> torch.Tensor:
+    """Heavily penalize excessive base movements to prevent wild behavior.
+    
+    Movements beyond threshold (default 10cm) are heavily penalized.
+    This prevents the policy from exploiting unbounded rewards by moving wildly.
+    
+    Example: If base moves 1 meter in one step:
+        excess = 1.0 - 0.1 = 0.9 meters
+        penalty = 10.0 × 0.9 = 9.0 points
+    
+    Args:
+        base_pos: Current base position [num_envs, 3]
+        prev_base_pos: Previous base position [num_envs, 3]
+        threshold: Maximum reasonable movement per step (meters)
+        scale: Penalty scale factor
+        
+    Returns:
+        Penalty values [num_envs] - zero for movements ≤ threshold
+    """
+    movement = torch.norm(base_pos[:, :2] - prev_base_pos[:, :2], dim=-1)
+    excess = torch.clamp(movement - threshold, min=0.0)
+    return scale * excess
+
+
+def old_target_distance_penalty(
     base_pos: torch.Tensor,
     target_pos: torch.Tensor,
     prev_base_pos: torch.Tensor = None,
@@ -609,6 +688,13 @@ def compute_combined_reward(
         scale=weights.get("target_distance_penalty", 10.0)
     )
     
+    # Session 5b FIX: Excessive movement penalty (prevents wild base movements)
+    excessive_penalty = excessive_base_movement_penalty(
+        base_pos, prev_base_pos,
+        threshold=0.1,  # 10cm per step is maximum reasonable
+        scale=weights.get("excessive_base_movement_penalty", 10.0)
+    )
+    
     # Action penalties
     action_mag_penalty = action_magnitude_penalty(actions, scale=weights["action_magnitude"])
     action_rt_penalty = action_rate_penalty(actions, prev_actions, scale=weights["action_rate"])
@@ -685,8 +771,9 @@ def compute_combined_reward(
         pos_reward
         + ori_reward
         + prog_bonus
-        + base_mob_reward  # NEW: Reward base movement when target is far
+        + base_mob_reward  # NEW: Reward base movement when target is far (NOW CAPPED!)
         - dist_penalty  # NEW: Strong penalty for being beyond arm reach
+        - excessive_penalty  # Session 5b: Prevent wild base movements
         - action_mag_penalty
         - action_rt_penalty
         - action_smooth_penalty
@@ -705,8 +792,9 @@ def compute_combined_reward(
         "position_tracking": pos_reward,
         "orientation_tracking": ori_reward,
         "progress_bonus": prog_bonus,
-        "base_mobilization": base_mob_reward,  # NEW: Log base movement reward
+        "base_mobilization": base_mob_reward,  # NEW: Log base movement reward (NOW CAPPED!)
         "target_distance_penalty": dist_penalty,  # NEW: Log distance penalty
+        "excessive_base_movement_penalty": excessive_penalty,  # Session 5b: Log wild movement penalty
         "action_magnitude_penalty": action_mag_penalty,
         "action_rate_penalty": action_rt_penalty,
         "action_smoothness_penalty": action_smooth_penalty,

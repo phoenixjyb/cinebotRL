@@ -46,7 +46,10 @@ I:\isaaclab\isaaclab.bat -p scripts/reinforcement_learning/sb3/train.py `
   --task MobileMMTrackEE-v0 --num_envs 64 --headless true
 ```
 
-**📚 Documentation**: See [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) for complete guide navigation.
+**📚 Documentation**: 
+- **Quick Reference**: [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)
+- **Directory Structure**: [DIRECTORY_STRUCTURE.md](DIRECTORY_STRUCTURE.md) ⭐ NEW
+- **Documentation Index**: [docs/README.md](docs/README.md)
 
 ### Optional: WSL Setup (For Monitoring/Analysis Only)
 

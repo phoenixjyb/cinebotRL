@@ -2,7 +2,41 @@
 
 **Project:** CinebotRL - Mobile Manipulator End-Effector Tracking  
 **Repository:** phoenixjyb/cinebotRL  
-**Branch:** train-windows
+**Branch:** train-windows  
+**Last Updated:** October 21, 2025 19:30 +0800
+
+---
+
+## 🚀 **READY TO LAUNCH: Session 5**
+
+**Status:** All fixes committed, documentation complete, ready for training launch  
+**Session:** 5 - Base Mobilization Fix  
+**Commits:** 6 total (URDF fixes → observation space fix → logging infrastructure)  
+**Latest Commit:** `78216e1` - Training session logging infrastructure
+
+### Quick Start
+```powershell
+# Option A: 4096 Environments (~12 hours)
+cd I:\isaaclab
+I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py --task MobileMMTrackEE-v0 --num_envs 4096 --n_steps 64 --batch_size 256 --total_timesteps 100000000 --learning_rate 3e-4 --ent_coef 0.001 --enable_entropy_decay --final_ent_coef 1e-4 --decay_start_timestep 50000000 --decay_duration_timesteps 50000000 --enable_kl_schedule --kl_warmup 0.25 --kl_main 0.15 --kl_finetune 0.07 --target_kl 1.0 --trajectory_type multi_recorded --use_all_trajectories --headless
+
+# Option B: 8192 Environments (~9 hours, may be tight on VRAM)
+cd I:\isaaclab
+I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py --task MobileMMTrackEE-v0 --num_envs 8192 --n_steps 64 --batch_size 512 --total_timesteps 100000000 --learning_rate 3e-4 --ent_coef 0.001 --enable_entropy_decay --final_ent_coef 1e-4 --decay_start_timestep 50000000 --decay_duration_timesteps 50000000 --enable_kl_schedule --kl_warmup 0.25 --kl_main 0.15 --kl_finetune 0.07 --target_kl 1.0 --trajectory_type multi_recorded --use_all_trajectories --headless
+```
+
+### What's Fixed
+✅ Observation space enhanced (+4 dims for base-to-target info)  
+✅ Rewards rebalanced (base movement gives +15.7 points vs -5.1 for staying still!)  
+✅ Smart penalty (90% reduction when moving)  
+✅ All bugs from BASE_MOVEMENT_BUG_ANALYSIS.md addressed
+
+### Expected Outcome
+🎯 Base action std > 0.3 within 5 minutes  
+🎯 Mean tracking error < 0.3m after 100M steps  
+🎯 Policy learns to mobilize base when targets out of reach
+
+---
 
 This document maintains a chronological record of all training sessions, including git commits, configurations, commands, and outcomes.
 
@@ -122,6 +156,65 @@ Commit: 7ff0e8de8282bdd7457299cd999d3269f3169dc1
 Date: October 21, 2025 19:12:01 +0800
 Message: Fix CRITICAL observation space bug preventing base mobilization learning
 ```
+
+**ROOT CAUSE IDENTIFIED:**
+- 83.8% of trajectory waypoints OUT OF REACH (>0.6m from base)
+- Mean distance: 2.3m, Max distance: 4.0m (trajectory REQUIRES base movement!)
+- Policy had 0.958 explained variance but zero base movement after 25.7M steps
+- Policy learned "I will get low rewards" but couldn't learn "HOW to fix it"
+
+**CRITICAL FIXES:**
+
+**Fix #1: Observation Space Enhancement (+4 dims)**
+- `src/rl_platform/tasks/mobile_mm/observations.py`:
+  - Added `base_to_target_xy` [2 dims]: XY offset from base to target
+  - Added `base_to_target_dist` [1 dim]: Euclidean distance to target
+  - Added `out_of_reach_flag` [1 dim]: Binary signal when target >0.6m from base
+  - Total: 59 dims (was 55 dims with lookahead)
+
+**Fix #2: Reward Rebalancing**
+- `src/rl_platform/tasks/mobile_mm/config.py`:
+  - `base_progress_reward`: 50.0 → 150.0 (3x stronger!)
+  - `target_distance_penalty`: 10.0 → 3.0 (less harsh during movement)
+  - `action_magnitude`: 0.01 → 0.005 (encourage base action exploration)
+  - `jerk_limit_penalty`: 0.1 → 0.05 (reduce movement suppression)
+
+**Fix #3: Smart Distance Penalty**
+- `src/rl_platform/tasks/mobile_mm/rewards.py`:
+  - 90% penalty reduction when base is moving (>1cm threshold)
+  - Full penalty when stationary (maintains gradient)
+  - Encourages exploration: "Try moving base → penalty drops dramatically!"
+
+**Files Modified:**
+- `src/rl_platform/tasks/mobile_mm/observations.py`
+- `src/rl_platform/tasks/mobile_mm/config.py`
+- `src/rl_platform/tasks/mobile_mm/rewards.py`
+- `scripts/analyze_trajectory_reach.py` (NEW - trajectory analysis tool)
+- `docs/BASE_MOVEMENT_BUG_ANALYSIS.md` (NEW - 10-page investigation report)
+
+---
+
+#### Commit 6: Training Session Logging Infrastructure
+```
+Commit: 78216e1ec98b86b84cd2e8deb46cf0cc85e8aa43
+Date: October 21, 2025 19:30:00 +0800 (approx)
+Message: Add comprehensive training session logging infrastructure
+```
+
+**Changes:**
+- Created `TRAINING_SESSIONS_MASTER_LOG.md` (this file) - single source of truth
+- Created `docs/training_sessions/SESSION_5_LAUNCH_LOG.md` - detailed tracking template
+- Documented all 5 previous commits with full git hashes and timestamps
+- Both launch command options (4096 and 8192 envs)
+- Complete success criteria, monitoring plan, and failure indicators
+- Session comparison matrix and template for future sessions
+
+**Files Modified:**
+- `TRAINING_SESSIONS_MASTER_LOG.md` (NEW)
+- `docs/training_sessions/SESSION_5_LAUNCH_LOG.md` (NEW)
+- `docs/training_sessions/SESSION_5_BASE_FIX.md` (added in this commit)
+
+---
 
 **ROOT CAUSE IDENTIFIED:**
 - 83.8% of trajectory waypoints OUT OF REACH (>0.6m from base)

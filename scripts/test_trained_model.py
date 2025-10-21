@@ -134,7 +134,7 @@ def main():
                 current_episode_steps = 0
             
             # Small delay for visualization
-            time.sleep(0.02)  # 50 FPS for smooth visualization
+            time.sleep(0.05)  # 20 FPS (matches 20Hz control frequency)
             
     except KeyboardInterrupt:
         print("\n🛑 Testing stopped by user")

@@ -2,12 +2,12 @@
 
 This script:
 1. Creates environment with 4 envs
-2. Sends maximum base actions (1.0, 1.0) for 50 steps
+2. Sends maximum base actions (1.0, 1.0) for 20 steps
 3. Measures actual base displacement
 4. Verifies it matches expected scaled velocity
 
-Expected results (with fix):
-- Forward movement: ~1.5 m in 1 second (50 steps × 0.02s)
+Expected results (with fix @ 20Hz):
+- Forward movement: ~1.5 m in 1 second (20 steps × 0.05s)
 - Rotation: ~100° in 1 second (2.0 rad/s)
 
 Without fix (bug):

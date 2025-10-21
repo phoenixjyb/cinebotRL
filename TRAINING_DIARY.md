@@ -162,7 +162,7 @@ Actual shown: 15.3677 ✅ (within float precision)
 ### Robot Configuration:
 - **Base**: Differential drive (vx, wz), max speed 1.5 m/s linear, 2.0 rad/s angular
 - **Arm**: 6-DOF, empirical reach ~0.6m from base center (not 0.8m as in code comments)
-- **Control**: 50Hz (dt=0.02s), 8D action space [6 arm joints, vx, wz]
+- **Control**: 20Hz (dt=0.05s), 8D action space [6 arm joints, vx, wz]
 
 ### Trajectory Dataset:
 - **Total**: 1,038 trajectories across 14 motion categories

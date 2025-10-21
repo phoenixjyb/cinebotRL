@@ -205,6 +205,7 @@ def test_4_trajectory_manager():
             traj_type="multi_recorded",
             num_envs=num_envs,
             device=device,
+            dt=0.05,  # 20Hz control frequency (matches env.py decimation=10)
             trajectory_dir=traj_dir,
             trajectory_pattern="**/*.json",
             trajectory_filter_indices=None,  # Use all

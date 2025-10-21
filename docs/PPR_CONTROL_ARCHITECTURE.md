@@ -39,7 +39,7 @@ base_wz_scaled = base_wz * 2.5      # [-2.5, +2.5] rad/s
 theta = current_base_pos[:, 2]  # Current yaw angle
 
 # Integrate velocities → position deltas (differential drive kinematics)
-dt = 0.02  # 50Hz control frequency
+dt = 0.05  # 20Hz control frequency (decimation=10)
 dx = base_vx_scaled * torch.cos(theta) * dt       # World frame X
 dy = base_vx_scaled * torch.sin(theta) * dt       # World frame Y
 dtheta = base_wz_scaled * dt                      # Rotation
@@ -62,22 +62,22 @@ robot.set_joint_position_target(
 ```
 Policy: v_x = 1.0 m/s, ω_z = 0.5 rad/s
    ↓
-env.py integration (dt=0.02s):
-   dx = 1.0 * cos(theta) * 0.02 = 0.02m
-   dy = 1.0 * sin(theta) * 0.02 = ~0m (if theta≈0)
-   dtheta = 0.5 * 0.02 = 0.01 rad
+env.py integration (dt=0.05s @ 20Hz):
+   dx = 1.0 * cos(theta) * 0.05 = 0.05m
+   dy = 1.0 * sin(theta) * 0.05 = ~0m (if theta≈0)
+   dtheta = 0.5 * 0.05 = 0.025 rad
    ↓
 PPR position targets:
-   joint_x: current + 0.02 → NEW POSITION
+   joint_x: current + 0.05 → NEW POSITION
    joint_y: current + 0.0  → HOLD
-   joint_theta: current + 0.01 → NEW POSITION
+   joint_theta: current + 0.025 → NEW POSITION
    ↓
 PhysX PD controllers:
-   - joint_x: Apply spring force toward target (10kN/m stiffness)
+   - joint_x: Apply spring force toward target (1kN/m stiffness, ζ=0.5)
    - joint_y: Apply spring force toward target
    - joint_theta: Apply torque toward target
    ↓
-Result: Base moves forward 0.02m and rotates 0.01 rad in 20ms
+Result: Base moves forward 0.05m and rotates 0.025 rad in 50ms
 ```
 
 ## Why This Design?
@@ -173,9 +173,9 @@ torque = K_v * (target_vel - current_vel)
 | **env.py integration** | v_x, ω_z → dx, dy, dtheta | Differential drive kinematics |
 | **PhysX command** | `set_joint_position_target()` | ALL PPR joints |
 | **USD joint targets** | **Position** (all 3 PPR) | Must match `set_joint_position_target()` |
-| **Control frequency** | 50 Hz (dt=0.02s) | Velocity integration timestep |
-| **Spring stiffness** | 10,000 N/m | From env.py PD controller |
-| **Damping** | 1,000 N·s/m | From env.py PD controller |
+| **Control frequency** | 20 Hz (dt=0.05s) | Velocity integration timestep |
+| **Spring stiffness** | 1,000 N/m | From env.py PD controller (ω_n=31.6 rad/s) |
+| **Damping** | 316 N·s/m | From env.py PD controller (ζ=0.5 underdamped) |
 
 **Critical Fix**: Change `joint_theta` from "Velocity" → "Position" in Isaac Sim import dialog!
 

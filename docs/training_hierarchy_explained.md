@@ -24,7 +24,7 @@ This document explains the complete training hierarchy for the mobile manipulato
 ### **3. Episode Level** (Within Each Environment)
 - **One episode** = tracking one complete trajectory from start to finish
 - **Episode length** varies based on number of waypoints in the selected trajectory
-- Trajectory advances through waypoints at **50Hz** (dt=0.02s per step)
+- Trajectory advances through waypoints at **20Hz** (dt=0.05s per step)
 - Episode terminates when:
   - Trajectory completes (all waypoints tracked) ✅
   - OR collision detected 💥
@@ -69,7 +69,7 @@ A **step** is **one control cycle** through the entire RL loop:
 ```
 
 ### **Timing:**
-- **One step = 0.02 seconds of simulated time** (50 Hz control frequency)
+- **One step = 0.05 seconds of simulated time** (20 Hz control frequency)
 - Physical time: depends on GPU speed (typically 100-1000+ FPS with 4096 envs)
 
 ---
@@ -104,9 +104,9 @@ Then: Policy update using these 524k samples (split into mini-batches of 1024)
 ### **Math:**
 ```
 Trajectory: 300 waypoints × 0.1s spacing = 30 seconds
-Control frequency: 50Hz (0.02s per step)
-Steps needed: 30s ÷ 0.02s = 1500 steps
-Rollouts needed: 1500 ÷ 128 ≈ 12 rollouts
+Control frequency: 20Hz (0.05s per step)
+Steps needed: 30s ÷ 0.05s = 600 steps
+Rollouts needed: 600 ÷ 64 ≈ 10 rollouts
 ```
 
 ### **Timeline for One Environment:**
@@ -114,14 +114,14 @@ Rollouts needed: 1500 ÷ 128 ≈ 12 rollouts
 | Step | Simulated Time | Waypoint Index | What Happens |
 |------|----------------|----------------|--------------|
 | 1    | 0.00s         | 0              | Start tracking, observe, act |
-| 2    | 0.02s         | 0              | Move toward waypoint 0 |
-| 3    | 0.04s         | 1              | Advance to waypoint 1 |
+| 2    | 0.05s         | 1              | Move toward waypoint 1 |
+| 3    | 0.10s         | 2              | Advance to waypoint 2 |
 | ...  | ...           | ...            | Continue tracking |
-| 128  | 2.56s         | ~30            | At waypoint 30 (out of 300) |
+| 64   | 3.20s         | ~32            | At waypoint 32 (out of 300) |
 | ...  | ...           | ...            | Continue tracking |
-| 1500 | 30.00s        | 299            | Complete trajectory! |
+| 600  | 30.00s        | 299            | Complete trajectory! |
 
-**After step 128**: Policy update happens, then continue collecting next rollout.
+**After step 64**: Policy update happens, then continue collecting next rollout.
 
 ---
 
@@ -195,14 +195,14 @@ The rollout buffer stores **transitions**, not complete episodes:
 
 | Concept | Value | Meaning |
 |---------|-------|---------|
-| **One step** | 0.02s sim time | One control cycle (observe→act→simulate→reward) |
-| **n_steps** | 128 | Steps per rollout buffer |
-| **One rollout** | 2.56s sim time | 128 steps × 0.02s |
-| **Rollout samples** | 524,288 | 4096 envs × 128 steps |
-| **Policy updates** | Every 128 steps | After each rollout completes |
+| **One step** | 0.05s sim time | One control cycle (observe→act→simulate→reward) |
+| **n_steps** | 64 | Steps per rollout buffer |
+| **One rollout** | 3.20s sim time | 64 steps × 0.05s |
+| **Rollout samples** | 262,144 | 4096 envs × 64 steps |
+| **Policy updates** | Every 64 steps | After each rollout completes |
 | **Total training** | 100M steps | Across all 4096 environments |
-| **Total rollouts** | ~781,250 | 100M ÷ 128 |
-| **Updates per env** | ~190 | 781,250 ÷ 4096 |
+| **Total rollouts** | ~1,562,500 | 100M ÷ 64 |
+| **Updates per env** | ~381 | 1,562,500 ÷ 4096 |
 | **Training duration** | ~24,414 steps/env | 100M ÷ 4096 |
 
 ---
@@ -289,7 +289,7 @@ Rollout 5 (steps 513-640):
 3. ✅ **Rollout buffer spans episode boundaries** - PPO handles this correctly with `done` flags
 4. ✅ **Steps needed = (waypoints × spacing) ÷ dt** - your math is correct!
 5. ✅ **Training progress counts total steps**, not completed trajectories
-6. ✅ **One step = one control cycle** (0.02s), not one waypoint
+6. ✅ **One step = one control cycle** (0.05s @ 20Hz), not one waypoint
 7. ✅ **Tracking output shows current state**, not final waypoint
 
 The beauty of PPO: It learns from **all transitions** regardless of episode boundaries! 🚀

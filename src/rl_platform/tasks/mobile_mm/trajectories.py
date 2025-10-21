@@ -20,7 +20,7 @@ class TrajectoryManager:
         amplitude: float = 0.5,
         speed: float = 0.2,
         height: float = 1.0,
-        dt: float = 0.02,
+        dt: float = 0.05,  # 20Hz control frequency (changed from 0.02 @ 50Hz)
         waypoint_dt: float | None = None,
         waypoint_file: str | None = None,
         trajectory_dir: str | None = None,

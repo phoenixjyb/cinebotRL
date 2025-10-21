@@ -483,7 +483,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             target_pos: Target positions [num_envs, 3]
         """
         if not self._visualization_enabled or self._target_markers is None:
-            # Print console output every 50 steps for env 0
+            # Print console output every 50 steps with statistics and diverse env samples
             if not hasattr(self, '_vis_step_count'):
                 self._vis_step_count = 0
             self._vis_step_count += 1
@@ -499,45 +499,114 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 
                 base_to_target_2d = torch.norm(target_pos[:, :2] - base_pos_world[:, :2], dim=-1)
                 
-                # Get trajectory interpolation info (if available)
-                traj_info = ""
-                if hasattr(self.trajectory_manager, 'current_waypoint_idx') and \
-                   hasattr(self.trajectory_manager, '_recorded_time_accum') and \
-                   hasattr(self.trajectory_manager, 'waypoint_dt'):
-                    current_wp = self.trajectory_manager.current_waypoint_idx[0].item()
-                    time_accum = self.trajectory_manager._recorded_time_accum[0].item()
-                    wp_dt = self.trajectory_manager.waypoint_dt
-                    alpha = min(time_accum / wp_dt, 1.0)
-                    traj_info = f"\n  🎬 Waypoint: {current_wp} → {current_wp + 1} (α={alpha:.2f}, {time_accum*1000:.0f}ms/{wp_dt*1000:.0f}ms)"
+                # Calculate EE distance from base for all envs
+                ee_relative_all = ee_pos - base_pos_world
+                ee_dist_from_base = torch.norm(ee_relative_all[:, :2], dim=-1)
                 
-                print(f"\n[TRACKING Step {self._vis_step_count}] Env 0:{traj_info}")
-                print(f"  🎯 Target (WORLD):  [{target_pos[0, 0]:.3f}, {target_pos[0, 1]:.3f}, {target_pos[0, 2]:.3f}]")
-                print(f"  🟢 EE Pos (WORLD):  [{ee_pos[0, 0]:.3f}, {ee_pos[0, 1]:.3f}, {ee_pos[0, 2]:.3f}]")
-                print(f"  🚗 Base Pos (WORLD): [{base_pos_world[0, 0]:.3f}, {base_pos_world[0, 1]:.3f}, {base_pos_world[0, 2]:.3f}]")
-                print(f"  🔧 Base PPR offsets:   [{base_ppr[0, 0]:.3f}, {base_ppr[0, 1]:.3f}, {base_ppr[0, 2]:.3f}] (X, Y, theta)")
-                
-                # Calculate EE position relative to base (both in world frame)
-                ee_relative = ee_pos[0] - base_pos_world[0]
-                print(f"  📍 EE relative to base: [{ee_relative[0]:.3f}, {ee_relative[1]:.3f}, {ee_relative[2]:.3f}]")
-                print(f"  📍 EE distance from base: {torch.norm(ee_relative[:2]).item():.3f} m (should be < 0.65m for arm reach)")
-                
-                print(f"  📏 EE Error:     {tracking_error[0].item():.4f} m")
-                print(f"  📐 Base-Target:  {base_to_target_2d[0].item():.4f} m (arm reach: 0.6m)")
-                
-                # Show if base should be moving
-                if base_to_target_2d[0].item() > 0.6:
-                    beyond_reach = base_to_target_2d[0].item() - 0.6
-                    print(f"  ⚠️  Base SHOULD be moving! (target {beyond_reach:.3f}m beyond arm reach)")
-                    print(f"  💸 Distance penalty: {10.0 * beyond_reach:.2f} points")
-                    
-                # Show reward components
+                # Get reward components if available
+                base_mob = torch.zeros(self.num_envs, device=self.device)
+                pos_track = torch.zeros(self.num_envs, device=self.device)
+                dist_pen = torch.zeros(self.num_envs, device=self.device)
                 if hasattr(self, 'reward_components'):
-                    base_mob = self.reward_components.get('base_mobilization', torch.zeros(1, device=self.device))
-                    pos_track = self.reward_components.get('position_tracking', torch.zeros(1, device=self.device))
-                    dist_pen = self.reward_components.get('target_distance_penalty', torch.zeros(1, device=self.device))
-                    print(f"  💰 base_mobilization reward: {base_mob[0].item():.4f}")
-                    print(f"  💰 position_tracking reward: {pos_track[0].item():.4f}")
-                    print(f"  💸 target_distance_penalty: {dist_pen[0].item():.4f}")
+                    base_mob = self.reward_components.get('base_mobilization', base_mob)
+                    pos_track = self.reward_components.get('position_tracking', pos_track)
+                    dist_pen = self.reward_components.get('target_distance_penalty', dist_pen)
+                
+                # ========== OVERALL STATISTICS ==========
+                print(f"\n{'='*80}")
+                print(f"[TRACKING Step {self._vis_step_count}] OVERALL STATISTICS ({self.num_envs} envs)")
+                print(f"{'='*80}")
+                
+                # Count problematic environments
+                num_broken = (tracking_error > 2.0).sum().item()
+                num_excellent = (tracking_error < 0.1).sum().item()
+                num_good = ((tracking_error >= 0.1) & (tracking_error < 0.3)).sum().item()
+                
+                print(f"📊 Environment Health:")
+                print(f"   Excellent (<0.1m):  {num_excellent:4d} ({100*num_excellent/self.num_envs:.1f}%)")
+                print(f"   Good (0.1-0.3m):    {num_good:4d} ({100*num_good/self.num_envs:.1f}%)")
+                print(f"   Poor (0.3-2.0m):    {self.num_envs-num_excellent-num_good-num_broken:4d} ({100*(self.num_envs-num_excellent-num_good-num_broken)/self.num_envs:.1f}%)")
+                print(f"   Broken (>2.0m):     {num_broken:4d} ({100*num_broken/self.num_envs:.1f}%)")
+                
+                print(f"\n📏 EE Tracking Error (m):")
+                print(f"   min={tracking_error.min():.4f}  mean={tracking_error.mean():.4f}  max={tracking_error.max():.4f}  std={tracking_error.std():.4f}")
+                
+                print(f"📐 Base-Target Distance (m):")
+                print(f"   min={base_to_target_2d.min():.4f}  mean={base_to_target_2d.mean():.4f}  max={base_to_target_2d.max():.4f}  std={base_to_target_2d.std():.4f}")
+                
+                print(f"🤖 EE Distance from Base (m):")
+                print(f"   min={ee_dist_from_base.min():.4f}  mean={ee_dist_from_base.mean():.4f}  max={ee_dist_from_base.max():.4f}  std={ee_dist_from_base.std():.4f}")
+                
+                print(f"\n💰 Rewards:")
+                print(f"   base_mobilization:    min={base_mob.min():.4f}  mean={base_mob.mean():.4f}  max={base_mob.max():.4f}")
+                print(f"   position_tracking:    min={pos_track.min():.4f}  mean={pos_track.mean():.4f}  max={pos_track.max():.4f}")
+                print(f"   target_distance_pen:  min={dist_pen.min():.4f}  mean={dist_pen.mean():.4f}  max={dist_pen.max():.4f}")
+                
+                # ========== SAMPLE ENVIRONMENTS ==========
+                # Pick 3 random envs, 1 best, 1 worst
+                random_env_ids = torch.randperm(self.num_envs)[:3].tolist()
+                best_env_id = tracking_error.argmin().item()
+                worst_env_id = tracking_error.argmax().item()
+                
+                # Combine and remove duplicates while preserving order
+                display_env_ids = []
+                display_labels = []
+                
+                for env_id in random_env_ids:
+                    if env_id not in display_env_ids:
+                        display_env_ids.append(env_id)
+                        display_labels.append("RANDOM")
+                
+                if best_env_id not in display_env_ids:
+                    display_env_ids.append(best_env_id)
+                    display_labels.append("✅ BEST")
+                else:
+                    idx = display_env_ids.index(best_env_id)
+                    display_labels[idx] = "✅ BEST"
+                
+                if worst_env_id not in display_env_ids:
+                    display_env_ids.append(worst_env_id)
+                    display_labels.append("❌ WORST")
+                else:
+                    idx = display_env_ids.index(worst_env_id)
+                    display_labels[idx] = "❌ WORST"
+                
+                # Display each selected environment
+                for env_id, label in zip(display_env_ids, display_labels):
+                    # Get trajectory interpolation info (if available)
+                    traj_info = ""
+                    if hasattr(self.trajectory_manager, 'current_waypoint_idx') and \
+                       hasattr(self.trajectory_manager, '_recorded_time_accum') and \
+                       hasattr(self.trajectory_manager, 'waypoint_dt'):
+                        current_wp = self.trajectory_manager.current_waypoint_idx[env_id].item()
+                        time_accum = self.trajectory_manager._recorded_time_accum[env_id].item()
+                        wp_dt = self.trajectory_manager.waypoint_dt
+                        alpha = min(time_accum / wp_dt, 1.0)
+                        traj_info = f" | 🎬 WP {current_wp}→{current_wp + 1} (α={alpha:.2f})"
+                    
+                    print(f"\n{'-'*80}")
+                    print(f"Env {env_id:4d} [{label}]{traj_info}")
+                    print(f"{'-'*80}")
+                    print(f"  🎯 Target:       [{target_pos[env_id, 0]:7.3f}, {target_pos[env_id, 1]:7.3f}, {target_pos[env_id, 2]:7.3f}]")
+                    print(f"  🟢 EE Pos:       [{ee_pos[env_id, 0]:7.3f}, {ee_pos[env_id, 1]:7.3f}, {ee_pos[env_id, 2]:7.3f}]")
+                    print(f"  🚗 Base Pos:     [{base_pos_world[env_id, 0]:7.3f}, {base_pos_world[env_id, 1]:7.3f}, {base_pos_world[env_id, 2]:7.3f}]")
+                    print(f"  🔧 PPR offsets:  [{base_ppr[env_id, 0]:7.3f}, {base_ppr[env_id, 1]:7.3f}, {base_ppr[env_id, 2]:7.3f}] (X, Y, θ)")
+                    
+                    # Calculate EE position relative to base
+                    ee_relative = ee_pos[env_id] - base_pos_world[env_id]
+                    print(f"  📍 EE from base: [{ee_relative[0]:7.3f}, {ee_relative[1]:7.3f}, {ee_relative[2]:7.3f}] | dist={ee_dist_from_base[env_id]:.3f}m")
+                    
+                    print(f"  📏 EE Error:     {tracking_error[env_id].item():.4f} m")
+                    print(f"  📐 Base-Target:  {base_to_target_2d[env_id].item():.4f} m (arm reach: 0.6m)")
+                    
+                    # Show if base should be moving
+                    if base_to_target_2d[env_id].item() > 0.6:
+                        beyond_reach = base_to_target_2d[env_id].item() - 0.6
+                        print(f"  ⚠️  Base SHOULD move! (target {beyond_reach:.3f}m beyond reach → penalty {10.0 * beyond_reach:.2f} pts)")
+                    
+                    print(f"  💰 Rewards: base_mob={base_mob[env_id].item():7.4f} | pos_track={pos_track[env_id].item():7.4f} | dist_pen={dist_pen[env_id].item():7.4f}")
+                
+                print(f"{'='*80}\n")
             return
         
         try:

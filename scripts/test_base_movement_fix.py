@@ -100,7 +100,7 @@ def test_base_movement():
     print(f"    Δθ: {dtheta:+.4f} rad ({dtheta_deg:+.1f}°)")
     
     # Expected values (with fix)
-    dt = 0.005 * 4  # 5ms physics × 4 decimation = 20ms per step
+    dt = 0.005 * 10  # 5ms physics × 10 decimation = 50ms per step (20Hz control)
     expected_vx = 1.5  # max_linear_velocity
     expected_wz = 2.0  # max_angular_velocity
     expected_distance = expected_vx * dt * num_steps  # Should be ~1.5m

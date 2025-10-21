@@ -137,7 +137,7 @@ class MobileMMTrackConfig:
     
     # Episode settings
     episode_length_s: float = 20.0
-    decimation: int = 20  # Control @ 10Hz (200Hz physics / 20 = 10Hz control)
+    decimation: int = 10  # Control @ 20Hz (200Hz physics / 10 = 20Hz control)
     
     # Trajectory timing (must match recorded trajectory waypoint spacing)
     trajectory_dt: float = 0.1  # seconds (100ms waypoint spacing)

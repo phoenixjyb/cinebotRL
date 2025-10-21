@@ -266,7 +266,7 @@ class TrajectoryManager:
         next_idx = (current_idx + 1) % max_length
         
         # Interpolation factor (0.0 to 1.0 between waypoints)
-        # _recorded_time_accum accumulates control_dt (0.02s) until it reaches waypoint_dt (0.1s)
+        # _recorded_time_accum accumulates control_dt (0.05s @ 20Hz) until it reaches waypoint_dt (0.1s)
         alpha = torch.clamp(self._recorded_time_accum / self.waypoint_dt, 0.0, 1.0)
         
         # Linear interpolation for positions

@@ -96,7 +96,7 @@ def main():
     print("-" * 70)
     
     # Check for ContactSensor in scene (Isaac Lab 2.2.0 pattern)
-    if hasattr(base_env, 'scene') and "contact_sensor" in base_env.scene:
+    try:
         sensor = base_env.scene["contact_sensor"]
         print(f"  ✅ ContactSensor found in scene")
         print(f"  Type: {type(sensor)}")
@@ -105,7 +105,7 @@ def main():
             print(f"\n  ContactSensor data attributes:")
             print(f"    net_forces_w shape: {sensor.data.net_forces_w.shape}")
             print(f"    (Expected: [num_envs, num_bodies, 3] or [num_envs, 3])")
-    else:
+    except KeyError:
         print("  ❌ No ContactSensor found in scene")
     
     print("\n2. Robot Articulation:")

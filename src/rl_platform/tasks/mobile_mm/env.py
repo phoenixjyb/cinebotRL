@@ -970,11 +970,19 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Get contact forces from ContactSensor (Isaac Lab 2.2.0 pattern)
         # Following official example from ref_codes/contact_sensor.py
         contact_sensor = self.scene["contact_sensor"]
-        net_contact_forces = contact_sensor.data.net_forces_w  # Shape: [num_envs, 3]
+        net_contact_forces = contact_sensor.data.net_forces_w  # Shape: [num_envs, num_bodies, 3] or [num_envs, 3]
         
         # DIAGNOSTIC: Check contact force API and monitor continuously
-        contact_force_mag = torch.norm(net_contact_forces, dim=-1)
-        max_force = contact_force_mag.max().item()
+        # Handle both single-body and multi-body contact sensors
+        if len(net_contact_forces.shape) == 3:
+            # Multi-body: [num_envs, num_bodies, 3]
+            contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
+            contact_force_mag_per_env = contact_force_mag.max(dim=-1)[0]  # [num_envs] - max across bodies
+        else:
+            # Single body: [num_envs, 3]
+            contact_force_mag_per_env = torch.norm(net_contact_forces, dim=-1)  # [num_envs]
+        
+        max_force = contact_force_mag_per_env.max().item()
         
         if not hasattr(self, '_contact_force_checked'):
             print(f"\n{'='*80}")
@@ -1158,10 +1166,16 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         if self.task_cfg.terminate_on_self_collision:
             # Get contact forces from ContactSensor (same as _get_rewards)
             contact_sensor = self.scene["contact_sensor"]
-            net_contact_forces = contact_sensor.data.net_forces_w  # Shape: [num_envs, 3]
+            net_contact_forces = contact_sensor.data.net_forces_w  # Shape: [num_envs, num_bodies, 3] or [num_envs, 3]
             
             # Calculate contact force magnitude per environment
-            contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs]
+            # If multi-body (filtered contacts), shape is [num_envs, num_bodies, 3]
+            if len(net_contact_forces.shape) == 3:
+                contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
+                contact_force_mag = contact_force_mag.max(dim=-1)[0]  # [num_envs] - max across all bodies
+            else:
+                # Single body, shape is [num_envs, 3]
+                contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs]
             
             # Terminate if contact force exceeds threshold
             terminated |= contact_force_mag > self.task_cfg.self_collision_termination_threshold

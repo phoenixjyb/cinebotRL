@@ -53,6 +53,7 @@
    │
    ├─ 📂 07_reference/          (Reference Materials & Data)
    │   ├─ REWARD_SYSTEM_DESIGN.md      ← Complete reward function docs
+   │   ├─ MODEL_ARCHITECTURE.md        ← PPO network, obs/action spaces, hyperparameters
    │   ├─ ROBOT_HOME_POSITION.md
    │   ├─ TRAJECTORY_INFO.md
    │   ├─ CHASSIS_TRAJECTORY_REF.md

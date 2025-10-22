@@ -178,13 +178,15 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         scene_cfg.robot = robot_cfg
         scene_cfg.ground = ground_cfg
         
-        # Add contact sensor for chassis (to detect arm-chassis collisions)
+        # Add contact sensor for chassis (to detect when arm links collide with it)
         # Following official Isaac Lab pattern from contact_sensor.py example
+        # filter_prim_paths_expr limits to only report contacts with arm links
         scene_cfg.contact_sensor = ContactSensorCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/chassis",  # Monitor chassis body
+            prim_path="{ENV_REGEX_NS}/Robot/chassis",  # Monitor forces on chassis
             update_period=0.0,  # Update every sim step (5ms physics)
             history_length=1,   # Only need current forces
             debug_vis=False,    # Disable visualization for performance
+            filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/left_arm.*"],  # Only report arm-chassis contacts
         )
         
         return scene_cfg

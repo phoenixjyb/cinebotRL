@@ -54,7 +54,7 @@ def main():
     print(f"\nInitializing Isaac Sim with {args.num_envs} environments...")
     
     # Initialize Isaac Sim/Lab - MUST happen before importing Isaac Lab modules
-    from omni.isaac.lab.app import AppLauncher
+    from isaaclab.app import AppLauncher
     
     app_launcher = AppLauncher(
         headless=True,

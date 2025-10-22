@@ -1,5 +1,13 @@
 # Cinebot RL Environment
 
+> **🔴 CRITICAL FIXES APPLIED** (Current Session)  
+> ✅ **Jerk penalty fixed** (5.0 → 50.0 m/s³) - Root cause of frozen base resolved!  
+> ✅ **Shape mismatch fixed** (prev_joint_vel: 6 → 9 columns)  
+> ⚠️ **USD limits verification pending** - Check joint_theta not locked at [0,0]  
+> ⚠️ **Contact forces debug pending** - Find correct PhysX array  
+> 📋 **Next**: Run verification scripts → Launch Session 6  
+> 📖 **Details**: See [`docs/CRITICAL_FIXES_APPLIED.md`](docs/CRITICAL_FIXES_APPLIED.md)
+
 ## Overview
 
 This project implements **reinforcement learning** for a **mobile manipulator robot** (6-DOF arm + differential drive base) using **Isaac Sim** and **Isaac Lab** on **Windows native**. The system trains a PPO agent to perform precise end-effector trajectory tracking using 8,192 parallel environments.
@@ -11,6 +19,7 @@ This project implements **reinforcement learning** for a **mobile manipulator ro
 - ✅ **Session 5b Success** - Base mobility fixed, 100M steps completed (~18 hours)
 - ✅ **Comprehensive Documentation** - Reward system, model architecture, training guides
 - ✅ **8,192 Parallel Envs** - High-throughput training (~12M interactions/sec)
+- ✅ **Critical Fixes Applied** - Jerk penalty and shape mismatch resolved
 
 ## Architecture
 

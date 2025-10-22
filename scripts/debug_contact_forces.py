@@ -65,7 +65,6 @@ def main():
     
     # NOW we can import Isaac Lab and other modules
     import torch
-    from omni.isaac.lab_tasks.utils import parse_env_cfg
     import gymnasium as gym
     
     # Register tasks
@@ -74,10 +73,14 @@ def main():
     register_isaac_lab_tasks()
     print("✓ Task registered")
     
-    # Create environment
+    # Create environment directly
     print(f"\nCreating environment with {args.num_envs} parallel instances...")
-    env_cfg = parse_env_cfg(args.task, device="cuda:0", num_envs=args.num_envs)
-    env = gym.make(args.task, cfg=env_cfg)
+    from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnvCfg, MobileMMTrackEEEnv
+    
+    env_cfg = MobileMMTrackEEEnvCfg()
+    env_cfg.scene.num_envs = args.num_envs
+    
+    env = MobileMMTrackEEEnv(cfg=env_cfg)
     print("✓ Environment created")
     
     # Reset environment
@@ -86,7 +89,7 @@ def main():
     print("✓ Environment reset complete")
     
     # Get the unwrapped environment to access internal state
-    base_env = env.unwrapped
+    base_env = env
     
     # Print available contact-related attributes
     print("\n1. Available Contact Force Arrays:")

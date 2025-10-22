@@ -365,7 +365,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         print(f"[MobileMMTrackEE] DEBUG: current_commanded_vel.shape = {self.current_commanded_vel.shape}")
         self.prev_commanded_accel = torch.zeros(self.num_envs, 3, device=self.device)
         self.prev_joint_vel = torch.zeros(
-            self.num_envs, 6, device=self.device  # 6 arm joints
+            self.num_envs, 9, device=self.device  # 9 total joints (3 base PPR + 6 arm)
         )
         
         # Acceleration history for jerk calculation

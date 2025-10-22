@@ -9,26 +9,72 @@
 ⚡ QUICK HELP → QUICK_REFERENCE.md (One-Page Cheat Sheet)
    └─ Most common commands and workflows
 
-📁 DOCUMENT STRUCTURE
+📁 DOCUMENT STRUCTURE (Updated Oct 22, 2025)
    │
-   ├─ 📂 setup/              (Installation & Configuration)
-   │   ├─ wsl_setup_guide.md          ← Verify WSL environment
-   │   ├─ windows_setup_guide.md      ← Windows Isaac Sim/Lab
-   │   └─ ros2_communication_setup.md ← ROS 2 networking
+   ├─ 📂 01_setup/              (Installation & Quick Start)
+   │   ├─ QUICK_START.md (if exists)
+   │   ├─ QUICK_START_ENTROPY_TRAINING.md
+   │   └─ EVALUATION_SETUP.md
    │
-   ├─ 📂 architecture/       (Understanding the System)
-   │   ├─ overview.md                 ← High-level architecture  
-   │   ├─ ros2_communication.md       ← How ROS 2 bridge works
-   │   └─ python_environments.md      ← Why multiple Pythons
+   ├─ 📂 02_architecture/       (System Design & Architecture)
+   │   ├─ PPR_CONTROL_ARCHITECTURE.md  ← PPR joint control flow
+   │   └─ TRAINING_HIERARCHY.md        ← Training structure explained
    │
-   ├─ 📂 workflows/          (How-To Guides)
-   │   └─ daily_workflow.md           ← Common daily tasks
+   ├─ 📂 03_training/           (Training Guides & Commands)
+   │   ├─ TRAINING_READINESS_CHECKLIST.md
+   │   ├─ TRAINING_COMMAND_REFERENCE.md
+   │   ├─ COMMAND_QUICK_REF.md
+   │   ├─ RECORDED_TRAJECTORIES_GUIDE.md
+   │   └─ ENTROPY_AND_KL_EXPLAINED.md
    │
-   ├─ �� reference/          (Technical Details)
-   │   └─ troubleshooting.md          ← Fix common issues
+   ├─ 📂 04_optimization/       (Performance & Improvements)
+   │   ├─ POLICY_DIVERGENCE_200M.md
+   │   ├─ DISTANCE_PENALTY_IMPLEMENTATION.md
+   │   ├─ TRAJECTORY_TRACKING_IMPROVEMENTS.md
+   │   └─ IMPROVEMENT_CHECKLIST.md
    │
-   └─ 📂 tracking/           (Project History)
-       └─ phase0_environment.md       ← Setup log
+   ├─ 📂 05_bug_fixes/          (Bug Reports & Investigations)
+   │   ├─ BASE_MOVEMENT_BUG_ANALYSIS.md
+   │   ├─ BASE_MOVEMENT_COMPREHENSIVE.md
+   │   ├─ BASE_FIX_CHECKLIST.md
+   │   ├─ BUG_FROZEN_BASE.md
+   │   ├─ FROZEN_BASE_SUMMARY.md
+   │   ├─ CONTACT_FORCE_*.md (3 files)
+   │   ├─ SELF_COLLISION_STATUS.md
+   │   ├─ TRAJECTORY_INSIDE_BODY.md
+   │   ├─ urdf_physics_analysis.md
+   │   └─ URDF_PHYSICS_REMAINING.md
+   │
+   ├─ 📂 06_workflows/          (How-To Guides & Workflows)
+   │   ├─ EVALUATION_GUIDE.md
+   │   ├─ EVALUATION_QUICKSTART.md
+   │   ├─ TESTING_TRAJECTORIES.md
+   │   └─ VISUALIZATION_GUIDE.md
+   │
+   ├─ 📂 07_reference/          (Reference Materials & Data)
+   │   ├─ REWARD_SYSTEM_DESIGN.md      ← Complete reward function docs
+   │   ├─ ROBOT_HOME_POSITION.md
+   │   ├─ TRAJECTORY_INFO.md
+   │   ├─ CHASSIS_TRAJECTORY_REF.md
+   │   ├─ TRAJECTORY_ANALYSIS.md
+   │   ├─ TRAJECTORY_LOADING_INVESTIGATION.md
+   │   └─ TRAJECTORY_LOADING_VERIFIED.md
+   │
+   ├─ 📂 08_project_history/    (Milestones & Historical Analysis)
+   │   ├─ TESTS_PASSED_MILESTONE.md
+   │   ├─ DOCS_UPDATE_OCT17.md
+   │   ├─ PLAYBOOK_VS_REALITY_ANALYSIS.md
+   │   └─ INVESTIGATION_PLAN_OCT18.md
+   │
+   ├─ 📂 09_archive/            (Deprecated/Old Documents)
+   │
+   ├─ 📂 10_NNdesign/           (Neural Network Design)
+   │
+   ├─ 📂 tracking/              (Live Training Sessions)
+   │   └─ SESSION_5B_FIX_SUMMARY.md
+   │
+   └─ 📂 training_sessions/     (Training Session Logs)
+       └─ TRAINING_SESSIONS_MASTER_LOG.md
 
 🔍 FIND WHAT YOU NEED
 

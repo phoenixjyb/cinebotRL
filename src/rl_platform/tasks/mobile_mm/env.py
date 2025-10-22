@@ -182,7 +182,7 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         # Following official Isaac Lab pattern from contact_sensor.py example
         # filter_prim_paths_expr limits to only report contacts with arm links
         scene_cfg.contact_sensor = ContactSensorCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/chassis",  # Monitor forces on chassis
+            prim_path="{ENV_REGEX_NS}/Robot/abstract_chassis_link",  # Monitor forces on actual chassis body
             update_period=0.0,  # Update every sim step (5ms physics)
             history_length=1,   # Only need current forces
             debug_vis=False,    # Disable visualization for performance

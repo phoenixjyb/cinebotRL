@@ -18,16 +18,25 @@ Added proper `ContactSensorCfg` to the scene configuration following the officia
 from isaaclab.sensors import ContactSensorCfg
 ```
 
-### 2. Added ContactSensor to Scene (env.py lines 180-186)
+### 2. Added ContactSensor to Scene (env.py lines 180-189)
 ```python
-# Add contact sensor for chassis (to detect arm-chassis collisions)
+# Add contact sensor for chassis (to detect when arm links collide with it)
+# Following official Isaac Lab pattern from contact_sensor.py example
+# filter_prim_paths_expr limits to only report contacts with arm links
 scene_cfg.contact_sensor = ContactSensorCfg(
-    prim_path="{ENV_REGEX_NS}/Robot/chassis",  # Monitor chassis body
+    prim_path="{ENV_REGEX_NS}/Robot/chassis",  # Monitor forces on chassis
     update_period=0.0,  # Update every sim step (5ms physics)
     history_length=1,   # Only need current forces
     debug_vis=False,    # Disable visualization for performance
+    filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/left_arm.*"],  # Only report arm-chassis contacts
 )
 ```
+
+**What it monitors:**
+- Primary body: `chassis` (base platform)
+- Contact filter: Only arm links (`left_arm_base_link`, `left_arm_link1-6`)
+- Physics: Captures all arm-chassis self-collisions from chassis perspective
+- Regex pattern: `left_arm.*` matches all 7 arm links efficiently
 
 ### 3. Updated Contact Force Retrieval in `_get_rewards()` (env.py lines 969-971)
 **Before:**

@@ -22,6 +22,7 @@ try:
     from isaaclab.assets import ArticulationCfg, AssetBaseCfg
     from isaaclab.envs import DirectRLEnv, DirectRLEnvCfg
     from isaaclab.scene import InteractiveSceneCfg
+    from isaaclab.sensors import ContactSensorCfg
     from isaaclab.sim import SimulationCfg
     from isaaclab.utils import configclass
     # Debug visualization
@@ -176,6 +177,15 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         # Add assets to scene
         scene_cfg.robot = robot_cfg
         scene_cfg.ground = ground_cfg
+        
+        # Add contact sensor for chassis (to detect arm-chassis collisions)
+        # Following official Isaac Lab pattern from contact_sensor.py example
+        scene_cfg.contact_sensor = ContactSensorCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/chassis",  # Monitor chassis body
+            update_period=0.0,  # Update every sim step (5ms physics)
+            history_length=1,   # Only need current forces
+            debug_vis=False,    # Disable visualization for performance
+        )
         
         return scene_cfg
 
@@ -955,24 +965,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         joint_vel = self.robot.data.joint_vel  # All joint velocities (needed for monitoring)
         arm_joint_vel = joint_vel[:, 3:9]  # ARM joint velocities
         
-        # Get contact forces for self-collision detection
-        # Isaac Lab 2.2.0 provides contact forces via PhysX view
-        try:
-            # Try to get net contact forces from PhysX view
-            net_contact_forces = self.robot.root_physx_view.get_net_contact_forces()
-        except AttributeError:
-            # Fallback: try body_net_contact_force_w from robot data
-            try:
-                net_contact_forces = self.robot.data.body_net_contact_force_w
-            except AttributeError:
-                # Last resort: use zeros but warn once
-                if not hasattr(self, '_contact_force_warning_shown'):
-                    print("[WARNING] Contact forces API not found - collision detection disabled!")
-                    self._contact_force_warning_shown = True
-                net_contact_forces = torch.zeros(
-                    (self.num_envs, len(self.robot.body_names), 3),
-                    device=self.device
-                )
+        # Get contact forces from ContactSensor (Isaac Lab 2.2.0 pattern)
+        # Following official example from ref_codes/contact_sensor.py
+        contact_sensor = self.scene["contact_sensor"]
+        net_contact_forces = contact_sensor.data.net_forces_w  # Shape: [num_envs, 3]
         
         # DIAGNOSTIC: Check contact force API and monitor continuously
         contact_force_mag = torch.norm(net_contact_forces, dim=-1)
@@ -1158,27 +1154,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Check for self-collision (CRITICAL for mobile manipulator!)
         if self.task_cfg.terminate_on_self_collision:
-            # Get contact forces - use same method as in _get_rewards()
-            try:
-                net_contact_forces = self.robot.root_physx_view.get_net_contact_forces()
-            except AttributeError:
-                try:
-                    net_contact_forces = self.robot.data.body_net_contact_force_w
-                except AttributeError:
-                    # If API not available, skip collision termination
-                    net_contact_forces = None
+            # Get contact forces from ContactSensor (same as _get_rewards)
+            contact_sensor = self.scene["contact_sensor"]
+            net_contact_forces = contact_sensor.data.net_forces_w  # Shape: [num_envs, 3]
             
-            if net_contact_forces is not None:
-                # Calculate contact force magnitude per environment
-                contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
-                
-                # CRITICAL: Exclude base link (index 0) to filter out ground contact
-                # Ground reaction forces should NOT terminate episodes!
-                if contact_force_mag.shape[1] > 1:
-                    contact_force_mag = contact_force_mag[:, 1:]  # Only check arm links
-                
-                max_contact_force = torch.max(contact_force_mag, dim=-1)[0]  # [num_envs]
-                terminated |= max_contact_force > self.task_cfg.self_collision_termination_threshold
+            # Calculate contact force magnitude per environment
+            contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs]
+            
+            # Terminate if contact force exceeds threshold
+            terminated |= contact_force_mag > self.task_cfg.self_collision_termination_threshold
         
         # Timeout after max episode length
         time_out = self.episode_length_buf >= self.max_episode_length - 1

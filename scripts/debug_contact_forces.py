@@ -159,11 +159,15 @@ def main():
     print("\nRunning simulation for", args.steps, "steps...")
     print("Looking for non-zero contact forces...\n")
     
+    # Get correct action dimension (should be 8: 6 arm + 2 base)
+    action_dim = 8
+    print(f"Action dimension: {action_dim}")
+    
     max_forces_seen = {}
     
     for step in range(args.steps):
         # Random actions to potentially cause collisions
-        action = torch.randn(args.num_envs, env.action_space.shape[0], device="cuda:0") * 0.5
+        action = torch.randn(args.num_envs, action_dim, device="cuda:0") * 0.5
         
         obs, reward, terminated, truncated, info = env.step(action)
         

@@ -2,9 +2,15 @@
 
 ## Overview
 
-This project implements reinforcement learning for a mobile manipulator robot using Isaac Sim and Isaac Lab on **Windows native**. WSL2 provides optional ROS 2 integration, data analysis, and monitoring capabilities.
+This project implements **reinforcement learning** for a **mobile manipulator robot** (6-DOF arm + differential drive base) using **Isaac Sim** and **Isaac Lab** on **Windows native**. The system trains a PPO agent to perform precise end-effector trajectory tracking using 8,192 parallel environments.
 
-**Status (2025-10-15):** ✅ **Windows Training Fully Operational** - All compatibility issues resolved, Stable Baselines3 PPO training verified working
+**Current Status (2025-10-22):** ✅ **Session 5b Complete** - 100M+ steps trained, base mobility fixes validated, comprehensive documentation published
+
+**Key Achievements:**
+- ✅ **Windows Training Operational** - Isaac Lab + Stable-Baselines3 PPO verified
+- ✅ **Session 5b Success** - Base mobility fixed, 100M steps completed (~18 hours)
+- ✅ **Comprehensive Documentation** - Reward system, model architecture, training guides
+- ✅ **8,192 Parallel Envs** - High-throughput training (~12M interactions/sec)
 
 ## Architecture
 
@@ -47,9 +53,12 @@ I:\isaaclab\isaaclab.bat -p scripts/reinforcement_learning/sb3/train.py `
 ```
 
 **📚 Documentation**: 
-- **Quick Reference**: [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)
-- **Directory Structure**: [DIRECTORY_STRUCTURE.md](DIRECTORY_STRUCTURE.md) ⭐ NEW
-- **Documentation Index**: [docs/README.md](docs/README.md)
+- **⚡ Quick Start**: [START_TRAINING_NOW.md](START_TRAINING_NOW.md) - Get training running in 3 commands!
+- **📖 Complete Documentation**: [docs/README.md](docs/README.md) - Organized learning path
+- **🔧 Quick Reference**: [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) - One-page command cheat sheet
+- **📊 Reward System**: [docs/reference/REWARD_SYSTEM_DESIGN.md](docs/reference/REWARD_SYSTEM_DESIGN.md) - How rewards are designed
+- **🧠 Model Architecture**: [docs/reference/MODEL_ARCHITECTURE.md](docs/reference/MODEL_ARCHITECTURE.md) - PPO network, obs/action spaces, hyperparameters
+- **📈 Training Sessions**: [docs/training_sessions/TRAINING_SESSIONS_MASTER_LOG.md](docs/training_sessions/TRAINING_SESSIONS_MASTER_LOG.md) - All training runs documented
 
 ### Optional: WSL Setup (For Monitoring/Analysis Only)
 
@@ -89,25 +98,54 @@ python experiments/analyze_logs.py
 
 ## Documentation
 
-📖 **[Complete Documentation Index](docs/README.md)** - Start here for organized documentation
+📖 **[Complete Documentation Index](docs/README.md)** - Organized learning path with 9 categorized sections
 
-### Essential Guides
+### Essential Documents (Start Here!)
 
-- ⚡ **[START_TRAINING_NOW.md](START_TRAINING_NOW.md)** - ✅ **Quick start guide** - Get training running in 3 commands!
-- 📊 **[TRAINING_SUCCESS.md](TRAINING_SUCCESS.md)** - Technical details on all 12+ compatibility fixes
-- ⚡ **[Quick Reference Card](docs/QUICK_REFERENCE.md)** - One-page cheat sheet
-- 🗺️ **[Roadmap](ROADMAP.md)** - Project phases and implementation plan (updated for Windows training)
+**Getting Started:**
+- ⚡ **[START_TRAINING_NOW.md](START_TRAINING_NOW.md)** - Quick start guide (3 commands to train!)
+- 🔧 **[Quick Reference Card](docs/QUICK_REFERENCE.md)** - One-page command cheat sheet
+- 🗺️ **[ROADMAP.md](ROADMAP.md)** - Project phases and implementation plan
+
+**Core Documentation:**
+- 📊 **[Reward System Design](docs/reference/REWARD_SYSTEM_DESIGN.md)** - 9 reward components explained (800+ lines)
+- 🧠 **[Model Architecture](docs/reference/MODEL_ARCHITECTURE.md)** - PPO network, obs/action spaces, hyperparameters (1000+ lines)
+- 📈 **[Training Sessions Master Log](docs/training_sessions/TRAINING_SESSIONS_MASTER_LOG.md)** - All training runs documented
+- 🔧 **[Session 5b Fix Summary](docs/training_sessions/SESSION_5B_FIX_SUMMARY.md)** - Base mobility fixes explained
 
 ### Setup & Architecture
-- 🪟 **[Windows Setup Guide](docs/setup/windows_setup_guide.md)** - Configure Windows environment
-- 🔧 **[WSL Setup Guide](docs/setup/wsl_setup_guide.md)** - Optional WSL configuration  
-- 🏗️ **[Architecture Overview](docs/architecture/overview.md)** - How everything fits together
-- 🌉 **[ROS 2 Communication](docs/architecture/ros2_communication.md)** - How WSL ↔ Windows works (optional)
-- 🐍 **[Python Environments](docs/architecture/python_environments.md)** - Why multiple Python versions
 
-### Workflows
-- ⚡ **[Daily Workflow](docs/workflows/daily_workflow.md)** - Common tasks and commands
-- 🎯 **[Multi-Trajectory Training](docs/workflows/multi_trajectory_training.md)** - Advanced training workflows
+- 🪟 **[Windows Setup Guide](docs/01_setup/windows_setup_guide.md)** - Configure Windows environment
+- 🔧 **[WSL Setup Guide](docs/01_setup/wsl_setup_guide.md)** - Optional WSL configuration  
+- 🏗️ **[Architecture Overview](docs/02_architecture/overview.md)** - How everything fits together
+- 🚂 **[Training Architecture](docs/02_architecture/training_architecture.md)** - IsaacLab → SB3 pipeline
+- 🏗️ **[PPR Control Architecture](docs/02_architecture/PPR_CONTROL_ARCHITECTURE.md)** - Base mobility control flow
+
+### Training Guides
+
+- 📚 **[Multi-Trajectory Training](docs/03_training/multi_trajectory_training.md)** - Advanced training workflows
+- 📋 **[Training Command Reference](docs/03_training/TRAINING_COMMAND_REFERENCE.md)** - All CLI flags explained
+- 🎯 **[Training Readiness Checklist](docs/03_training/TRAINING_READINESS_CHECKLIST.md)** - Pre-flight checks
+- � **[Entropy & KL Explained](docs/03_training/ENTROPY_AND_KL_EXPLAINED.md)** - PPO hyperparameters demystified
+
+### Bug Fixes & Optimizations
+
+- 🐛 **[Base Movement Bug Analysis](docs/05_bug_fixes/BASE_MOVEMENT_BUG_ANALYSIS.md)** - "Lazy base" problem solved
+- 🚀 **[Policy Divergence at 200M](docs/04_optimization/POLICY_DIVERGENCE_200M.md)** - Long training stability
+- ⚡ **[Trajectory Tracking Improvements](docs/04_optimization/TRAJECTORY_TRACKING_IMPROVEMENTS.md)** - Performance tuning
+
+### Workflows & Visualization
+
+- ⚡ **[Daily Workflow](docs/06_workflows/daily_workflow.md)** - Common tasks and commands
+- 📊 **[Visualization Guide](docs/06_workflows/VISUALIZATION_GUIDE.md)** - TensorBoard, RViz, Isaac Sim
+- 🧪 **[Evaluation Guide](docs/06_workflows/EVALUATION_GUIDE.md)** - Test trained policies
+
+### Reference Materials
+
+- 🔧 **[Troubleshooting](docs/07_reference/troubleshooting.md)** - Common issues & solutions
+- 🏠 **[Robot Home Position](docs/07_reference/ROBOT_HOME_POSITION.md)** - Joint configurations
+- 📊 **[Reward Cheatsheet](docs/07_reference/reward_cheatsheet.md)** - Quick reward formula reference
+- 📝 **[Trajectory Info](docs/07_reference/TRAJECTORY_INFO.md)** - Training trajectory details
 
 ## Environment Details
 
@@ -183,19 +221,43 @@ ros2 topic list
 - **WSL Python 3.11 (venv):** Optional - only for data analysis, visualization, not training
 - **WSL System Python 3.10:** Optional - only for ROS 2 monitoring and automation scripts
 
-## Training Performance
+## Training Performance (Session 5b Baseline)
 
 **Current Task:** `MobileMMTrackEE-v0` (Mobile Manipulator End-Effector Tracking)
-- **Robot:** 9 DOF (6 arm joints + 3 chassis: vx, vy, wz)
-- **Action Space:** 8D (6 arm positions + vx + wz, differential drive excludes vy)
-- **Observation Space:** 76D (dynamically discovered)
-- **Algorithm:** Stable Baselines3 PPO with VecNormalize
 
-**Expected Timeline:**
-- 64 envs: ~60 minutes for 100K steps, ~8-10 hours for 5M steps  
-- 128 envs: ~30 minutes for 100K steps, ~4-5 hours for 5M steps
+**Robot Specifications:**
+- **DOF:** 9 total (6 arm joints + 3 base: PPR = prismatic X, prismatic Y, revolute Z)
+- **Action Space:** 8D continuous (6 arm joint positions + base v_x + base ω_z, differential drive)
+- **Observation Space:** 46D (base state + arm joints + EE state + tracking errors + base-to-target signals)
+- **Algorithm:** Stable Baselines3 PPO with enhanced 3-layer MLP ([256, 256, 128] → ~235K params)
 
-**Architecture:** Custom `IsaacLabToSB3VecEnvWrapper` bridges Isaac Lab (dict observations, torch tensors, GPU) to Stable Baselines3 (numpy arrays, CPU). See [TRAINING_SUCCESS.md](TRAINING_SUCCESS.md) for technical details.
+**Session 5b Results (100M+ Steps):**
+- **Training Time:** ~18 hours (RTX 3090, 8,192 parallel environments)
+- **Throughput:** ~1,500 steps/sec wall-clock (~12.3M env interactions/sec)
+- **Final Reward:** ~0.85 (normalized, see [Reward System Design](docs/reference/REWARD_SYSTEM_DESIGN.md))
+- **GPU Utilization:** ~75% (18GB/24GB memory)
+- **Base Mobility:** ✅ Fixed - base actively repositions when targets are out of reach
+
+**Key Fixes Applied in Session 5b:**
+- Capped `base_mobilization_reward` to prevent reward hacking
+- Added `excessive_base_movement_penalty` for large movements (>0.1m)
+- Increased `target_distance_penalty` from 3.0 → 5.0
+- Added 4D base-to-target observations (dx, dy, distance, out_of_reach flag)
+
+See [Session 5b Fix Summary](docs/training_sessions/SESSION_5B_FIX_SUMMARY.md) for complete details.
+
+**Scaling Recommendations:**
+
+| Num Envs | GPU Memory | Training Time (100M) | Recommended GPU |
+|----------|------------|----------------------|-----------------|
+| 512 | ~4GB | ~7 days | RTX 3060 (12GB) |
+| 2048 | ~8GB | ~2 days | RTX 3070 (8GB) |
+| 4096 | ~12GB | ~1 day | RTX 3080 (10GB) |
+| 8192 | ~18GB | ~18 hours | RTX 3090 (24GB) |
+| 16384 | ~32GB | ~10 hours | RTX A6000 (48GB) |
+
+**Architecture Details:**  
+Custom `IsaacLabToSB3VecEnvWrapper` bridges Isaac Lab (dict observations, torch tensors, GPU) to Stable Baselines3 (numpy arrays, CPU). See [Model Architecture](docs/reference/MODEL_ARCHITECTURE.md) for technical details.
 
 ## Troubleshooting
 
@@ -203,12 +265,24 @@ ros2 topic list
 - Verify Isaac Lab installation: `I:\isaaclab\isaaclab.bat -h`
 - Check GPU detection: `nvidia-smi`
 - Review logs in latest directory under `I:\isaaclab\logs\sb3\`
-- See [docs_archive/03_training_guides/TRAINING_SUCCESS.md](docs_archive/03_training_guides/TRAINING_SUCCESS.md) for known issues and solutions
+- See [Troubleshooting Guide](docs/07_reference/troubleshooting.md) for known issues and solutions
 
 **Import errors or compatibility issues?**
 - All 12+ compatibility issues have been resolved as of 2025-10-15
 - Gymnasium ale_py issue: Already patched in Isaac Lab Python environment
-- See [docs_archive/02_bug_fixes/ALL_FIXES_COMPLETE.md](docs_archive/02_bug_fixes/ALL_FIXES_COMPLETE.md) for complete list of fixes
+- See [TRAINING_SUCCESS.md](TRAINING_SUCCESS.md) for complete list of fixes
+
+**Base not moving during training?**
+- Verify URDF fixes are applied (PPR helper masses = 1.0kg, joint_theta limits = ±6.28 rad)
+- Check observation space includes `base_to_target` signals (4 dims)
+- Review reward components include `base_mobilization_reward`
+- See [Base Movement Bug Analysis](docs/05_bug_fixes/BASE_MOVEMENT_BUG_ANALYSIS.md) for details
+
+**Policy diverging after 50M+ steps?**
+- Enable entropy decay: `--enable_entropy_decay` (exponential decay, τ=10M)
+- Monitor KL divergence: should stay below 0.03
+- Check `excessive_base_movement_penalty` is enabled
+- See [Policy Divergence at 200M](docs/04_optimization/POLICY_DIVERGENCE_200M.md) for long training stability
 
 **ROS 2 topics not visible? (Optional)**
 - Check `ROS_DOMAIN_ID=55` on both sides
@@ -219,35 +293,48 @@ ros2 topic list
 - Not needed for training! Use Windows side for training
 - For analysis only: Activate venv `source scripts/wsl/activate_rl_env_wsl.sh`
 
-See [docs/reference/troubleshooting.md](docs/reference/troubleshooting.md) for detailed troubleshooting.
+**Complete troubleshooting guide:** [docs/07_reference/troubleshooting.md](docs/07_reference/troubleshooting.md)
 
-## Documentation
+## Quick Links
 
-📚 **Complete documentation index**: [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
+📚 **Complete documentation index**: [docs/README.md](docs/README.md)
 
-**Quick links**:
-- 🚀 [Quick Start Training](docs_archive/04_gpu_optimization/RTX3090_REFERENCE_CARD.md) - START HERE
-- 🐛 [Bug Fixes Summary](docs_archive/02_bug_fixes/ALL_FIXES_COMPLETE.md) - All resolved ✅
-- ⚡ [GPU Optimization](docs_archive/04_gpu_optimization/RTX3090_QUICK_START.md) - 6x speedup guide
-- 📖 [Training Guides](docs_archive/03_training_guides/) - Workflows and tuning
-- 🎯 [Project Overview](docs_archive/01_project_overview/) - Roadmap and status
+**Essential Documents:**
+- 🚀 [Quick Start Training](START_TRAINING_NOW.md) - Get training running in 3 commands
+- 📊 [Reward System Design](docs/reference/REWARD_SYSTEM_DESIGN.md) - How rewards guide learning (800+ lines)
+- 🧠 [Model Architecture](docs/reference/MODEL_ARCHITECTURE.md) - PPO network, obs/action spaces (1000+ lines)
+- 📈 [Training Sessions Log](docs/training_sessions/TRAINING_SESSIONS_MASTER_LOG.md) - All training runs documented
+- � [Session 5b Fix Summary](docs/training_sessions/SESSION_5B_FIX_SUMMARY.md) - Base mobility fixes explained
+- 🏗️ [PPR Control Architecture](docs/02_architecture/PPR_CONTROL_ARCHITECTURE.md) - Base control flow explained
+- � [Training Command Reference](docs/03_training/TRAINING_COMMAND_REFERENCE.md) - All CLI flags
+- 🔧 [Troubleshooting Guide](docs/07_reference/troubleshooting.md) - Common issues & solutions
 
 ## Next Steps
 
+**Current Phase (Phase 1.5 - Optimization & Documentation):**
 1. ✅ Environment setup complete
-2. ✅ ROS 2 communication tested
-3. ✅ **Windows training verified working** (2025-10-15)
+2. ✅ ROS 2 communication tested (optional)
+3. ✅ Windows training verified working
 4. ✅ `MobileMMTrackEE-v0` task implemented and training
 5. ✅ Robot USD asset created and validated
-6. ✅ **5 critical bugs fixed and verified**
-7. ✅ **GPU optimization implemented** (6-8x speedup potential)
-8. ⏭️ Scale to Phase 2 training (4096 envs)
-9. ⏭️ Evaluate trained policy performance
-10. ⏭️ Deploy to physical robot
+6. ✅ **5 critical URDF physics bugs fixed** (base mobility, joint limits, inertia)
+7. ✅ **Session 5b completed** (100M+ steps, base mobility validated)
+8. ✅ **Comprehensive documentation published** (Reward System, Model Architecture)
+9. ✅ **Documentation reorganized** (37 files into 8 categorized directories)
+
+**Next Phase (Phase 2 - Scaling & Deployment):**
+10. ⏭️ Analyze Session 5b metrics with TensorBoard
+11. ⏭️ Scale to 16,384 envs for faster convergence (requires RTX A6000 or 2× RTX 3090)
+12. ⏭️ Evaluate trained policy on diverse test trajectories
+13. ⏭️ Implement real-time policy inference pipeline
+14. ⏭️ Deploy to physical robot hardware
+
+**See [ROADMAP.md](ROADMAP.md) for complete project timeline.**
 
 ---
 
-**Last Updated:** 2025-10-16  
-**Training Status:** ✅ Fully Operational + Optimized  
-**GPU Utilization:** Scaling from 10% → 60-80% (6-8x faster)
+**Last Updated:** 2025-10-22  
+**Training Status:** ✅ Session 5b Complete (100M+ steps)  
+**Documentation:** ✅ Comprehensive (Reward System + Model Architecture)  
+**GPU Utilization:** 75% (18GB/24GB on RTX 3090)
 

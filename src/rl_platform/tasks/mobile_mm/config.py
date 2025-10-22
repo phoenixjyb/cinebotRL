@@ -60,7 +60,7 @@ class RobotLimits:
     max_angular_velocity: float = 2.0  # rad/s (yaw rate)
     max_linear_acceleration: float = 5.0  # m/s^2
     max_angular_acceleration: float = 10.0  # rad/s^2 (yaw acceleration)
-    max_linear_jerk: float = 5.0  # m/s^3
+    max_linear_jerk: float = 50.0  # m/s^3 (was 5.0 - too restrictive, caused ~900 point penalties)
     
     # Arm joint limits
     max_joint_velocity: float = 2.0  # rad/s (motor speed)

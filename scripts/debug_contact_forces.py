@@ -19,7 +19,7 @@ Expected Behavior:
     - Without contact feedback, policy has no incentive to reposition
 
 Usage:
-    python scripts/debug_contact_forces.py --task MobileMMTrackEE-v0 --num_envs 16
+    I:\isaaclab\isaaclab.bat -p scripts/debug_contact_forces.py --num_envs 16
 
 Expected Output:
     - Print all available contact arrays
@@ -33,9 +33,10 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add project root to path
+# Add project root to path BEFORE importing anything
 project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "src"))
 
 
 def main():
@@ -47,42 +48,42 @@ def main():
     parser.add_argument("--steps", type=int, default=100, help="Number of simulation steps")
     args = parser.parse_args()
     
-    # Initialize Isaac Sim/Lab
+    print("\n" + "="*70)
+    print("CONTACT FORCES DEBUG")
+    print("="*70)
+    print(f"\nInitializing Isaac Sim with {args.num_envs} environments...")
+    
+    # Initialize Isaac Sim/Lab - MUST happen before importing Isaac Lab modules
     from omni.isaac.lab.app import AppLauncher
     
-    launcher_args = argparse.Namespace(
+    app_launcher = AppLauncher(
         headless=True,
-        cpu=False,
-        num_envs=args.num_envs,
-        task=args.task,
         enable_cameras=False,
     )
-    
-    print("Initializing Isaac Lab...")
-    app_launcher = AppLauncher(launcher_args)
     simulation_app = app_launcher.app
+    print("✓ Isaac Sim initialized")
     
-    # Import after AppLauncher
+    # NOW we can import Isaac Lab and other modules
     import torch
     from omni.isaac.lab_tasks.utils import parse_env_cfg
     import gymnasium as gym
     
     # Register tasks
-    print(f"Loading task: {args.task}")
-    from src.task_spec import register_isaac_lab_tasks
+    print(f"\nRegistering task: {args.task}")
+    from task_spec import register_isaac_lab_tasks
     register_isaac_lab_tasks()
+    print("✓ Task registered")
     
     # Create environment
+    print(f"\nCreating environment with {args.num_envs} parallel instances...")
     env_cfg = parse_env_cfg(args.task, device="cuda:0", num_envs=args.num_envs)
     env = gym.make(args.task, cfg=env_cfg)
-    
-    print("\n" + "="*70)
-    print("CONTACT FORCES DEBUG")
-    print("="*70)
+    print("✓ Environment created")
     
     # Reset environment
     print("\nResetting environment...")
     obs, _ = env.reset()
+    print("✓ Environment reset complete")
     
     # Get the unwrapped environment to access internal state
     base_env = env.unwrapped

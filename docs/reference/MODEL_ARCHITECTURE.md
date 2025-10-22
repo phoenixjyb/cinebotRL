@@ -2,7 +2,7 @@
 
 **Version:** 1.0  
 **Last Updated:** 2025-01-08  
-**Related Documents:** [REWARD_SYSTEM_DESIGN.md](REWARD_SYSTEM_DESIGN.md), [TRAINING_SESSIONS_MASTER_LOG.md](../08_project_history/TRAINING_SESSIONS_MASTER_LOG.md)
+**Related Documents:** [REWARD_SYSTEM_DESIGN.md](REWARD_SYSTEM_DESIGN.md), [TRAINING_SESSIONS_MASTER_LOG.md](../training_sessions/TRAINING_SESSIONS_MASTER_LOG.md)
 
 ---
 
@@ -198,7 +198,7 @@ components.extend([base_to_target_xy, base_to_target_dist, out_of_reach])
 - **Before (Session 5a):** Policy relied only on `pos_error` → base rarely moved
 - **After (Session 5b):** Explicit `out_of_reach` flag → base actively repositions
 
-See [Session 5b Fix Summary](../08_project_history/SESSION_5B_FIX_SUMMARY.md) for details.
+See [Session 5b Fix Summary](../training_sessions/SESSION_5B_FIX_SUMMARY.md) for details.
 
 #### 2.3.3 Velocity Normalization
 

@@ -756,6 +756,9 @@ TIMEOUT_WEIGHT = 50.0
 ---
 
 **Related Documents**:
-- `docs/tracking/SESSION_5B_FIX_SUMMARY.md` - Session 5 failure details
-- `docs/reference/MODEL_ARCHITECTURE.md` - Model and training system design
-- `TRAINING_SESSIONS_MASTER_LOG.md` - Complete training history
+- [SESSION_5B_FIX_SUMMARY.md](../training_sessions/SESSION_5B_FIX_SUMMARY.md) - Session 5 failure & Session 5b fixes
+- [MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md) - Model and training system design
+- [TRAINING_SESSIONS_MASTER_LOG.md](../training_sessions/TRAINING_SESSIONS_MASTER_LOG.md) - Complete training history
+- [BASE_MOVEMENT_BUG_ANALYSIS.md](../05_bug_fixes/BASE_MOVEMENT_BUG_ANALYSIS.md) - Base mobility debugging
+- [PPR_CONTROL_ARCHITECTURE.md](../02_architecture/PPR_CONTROL_ARCHITECTURE.md) - Base control flow
+

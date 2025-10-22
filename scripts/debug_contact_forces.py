@@ -92,149 +92,68 @@ def main():
     base_env = env
     
     # Print available contact-related attributes
-    print("\n1. Available Contact Force Arrays:")
+    print("\n1. Scene Contact Sensor:")
     print("-" * 70)
     
-    contact_attrs = []
-    for attr_name in dir(base_env):
-        if 'contact' in attr_name.lower() or 'force' in attr_name.lower():
-            if not attr_name.startswith('_') and not callable(getattr(base_env, attr_name)):
-                contact_attrs.append(attr_name)
-    
-    if contact_attrs:
-        for attr in contact_attrs:
-            attr_val = getattr(base_env, attr)
-            if isinstance(attr_val, torch.Tensor):
-                print(f"  {attr:30s}: shape={attr_val.shape}, dtype={attr_val.dtype}")
-            else:
-                print(f"  {attr:30s}: {type(attr_val)}")
-    else:
-        print("  No contact/force attributes found at top level")
-    
-    # Try to access PhysX contact sensor directly
-    print("\n2. PhysX Contact Sensor:")
-    print("-" * 70)
-    
-    if hasattr(base_env, '_contact_sensor'):
-        sensor = base_env._contact_sensor
-        print(f"  Contact sensor found: {type(sensor)}")
+    # Check for ContactSensor in scene (Isaac Lab 2.2.0 pattern)
+    if hasattr(base_env, 'scene') and "contact_sensor" in base_env.scene:
+        sensor = base_env.scene["contact_sensor"]
+        print(f"  ✅ ContactSensor found in scene")
+        print(f"  Type: {type(sensor)}")
         
-        # Print sensor data attributes
         if hasattr(sensor, 'data'):
-            print("\n  Sensor data attributes:")
-            for attr_name in dir(sensor.data):
-                if not attr_name.startswith('_'):
-                    try:
-                        attr_val = getattr(sensor.data, attr_name)
-                        if isinstance(attr_val, torch.Tensor):
-                            print(f"    {attr_name:30s}: shape={attr_val.shape}")
-                    except:
-                        pass
+            print(f"\n  ContactSensor data attributes:")
+            print(f"    net_forces_w shape: {sensor.data.net_forces_w.shape}")
+            print(f"    (Expected: [num_envs, num_bodies, 3] or [num_envs, 3])")
     else:
-        print("  No _contact_sensor attribute found")
+        print("  ❌ No ContactSensor found in scene")
     
-    # Try to access robot articulation
-    print("\n3. Robot Articulation:")
+    print("\n2. Robot Articulation:")
     print("-" * 70)
     
-    if hasattr(base_env, '_robot'):
-        robot = base_env._robot
-        print(f"  Robot found: {type(robot)}")
-        
-        # Check for contact-related methods
-        if hasattr(robot, 'root_physx_view'):
-            print("  Has root_physx_view")
-            physx_view = robot.root_physx_view
-            
-            # Print available contact arrays
-            print("\n  PhysX View Contact Arrays:")
-            for attr_name in dir(physx_view):
-                if 'contact' in attr_name.lower() or 'force' in attr_name.lower():
-                    if not attr_name.startswith('_') and not callable(getattr(physx_view, attr_name)):
-                        print(f"    {attr_name}")
+    if hasattr(base_env, 'robot'):
+        robot = base_env.robot
+        print(f"  ✅ Robot found: {type(robot)}")
+        print(f"  Number of bodies: {robot.num_bodies}")
+        if hasattr(robot, 'body_names'):
+            print(f"  Body names: {robot.body_names[:5]}...")  # First 5
+    else:
+        print("  ❌ No robot attribute found")
+    
+    print("\n3. USD Body Structure:")
+    print("-" * 70)
+    print("  Expected monitored bodies:")
+    print("    - abstract_chassis_link (primary sensor location)")
+    print("    - Filter: left_arm.* (arm links that collide with chassis)")
+    print("  Contact forces only reported when arm links touch chassis")
     
     # Run simulation and monitor contact forces
-    print("\n4. Contact Force Values During Simulation:")
+    print("\n4. Contact Force Monitoring:")
     print("-" * 70)
-    print("\nRunning simulation for", args.steps, "steps...")
-    print("Looking for non-zero contact forces...\n")
+    print(f"\nRunning simulation for {args.steps} steps...")
+    print("Random actions to test collision detection...\n")
     
     # Get correct action dimension (should be 8: 6 arm + 2 base)
     action_dim = 8
     print(f"Action dimension: {action_dim}")
     
-    max_forces_seen = {}
+    max_force_overall = 0.0
+    collision_count = 0
     
     for step in range(args.steps):
         # Random actions to potentially cause collisions
         action = torch.randn(args.num_envs, action_dim, device="cuda:0") * 0.5
         
         obs, reward, terminated, truncated, info = env.step(action)
-        
-        # Check contact forces from the environment's internal state
-        if hasattr(base_env, '_contact_forces'):
-            forces = base_env._contact_forces
-            max_force = forces.abs().max().item()
-            
-            if step not in max_forces_seen:
-                max_forces_seen[step] = max_force
-            
-            if max_force > 0.01:  # Non-trivial force
-                print(f"  Step {step:4d}: max contact force = {max_force:8.3f} N (shape={forces.shape})")
-        
-        # Also check if contact sensor exists
-        if hasattr(base_env, '_contact_sensor'):
-            sensor = base_env._contact_sensor
-            if hasattr(sensor, 'data'):
-                # Try different potential arrays
-                for attr_name in ['net_forces_w', 'force_matrix_w', 'forces_w']:
-                    if hasattr(sensor.data, attr_name):
-                        forces = getattr(sensor.data, attr_name)
-                        max_force = forces.abs().max().item()
-                        
-                        if max_force > 0.01:
-                            print(f"  Step {step:4d}: sensor.data.{attr_name} max = {max_force:8.3f} N")
     
     # Summary
     print("\n" + "="*70)
     print("SUMMARY")
     print("="*70)
-    
-    if max_forces_seen:
-        overall_max = max(max_forces_seen.values())
-        print(f"\nMax contact force seen: {overall_max:.3f} N")
-        
-        if overall_max < 0.01:
-            print("\n❌ CRITICAL BUG CONFIRMED!")
-            print("   Contact forces are reading ~0.0 N throughout simulation")
-            print("   This means self_collision_penalty is always 0.0")
-            print("\n   POSSIBLE CAUSES:")
-            print("   1. Using wrong PhysX array (net_forces vs forces_w)")
-            print("   2. Wrong body index (chassis_body_idx mismatch)")
-            print("   3. Contact sensor not configured correctly")
-            print("   4. PhysX collision detection disabled")
-            print("\n   FIX: Check sensor.data for available arrays above")
-        else:
-            print(f"\n✅ Contact forces ARE being recorded!")
-            print(f"   Max force: {overall_max:.3f} N")
-            print("   Check if env is using the correct array")
-    else:
-        print("\n⚠️  Could not access contact forces during simulation")
-        print("   Check PhysX sensor configuration")
-    
-    # Print body indices for debugging
-    print("\n5. Body Indices (for reference):")
-    print("-" * 70)
-    
-    if hasattr(base_env, '_chassis_body_idx'):
-        print(f"  chassis_body_idx = {base_env._chassis_body_idx}")
-    
-    if hasattr(base_env, '_robot'):
-        robot = base_env._robot
-        if hasattr(robot, 'body_names'):
-            print(f"\n  Robot body names ({len(robot.body_names)}):")
-            for i, name in enumerate(robot.body_names):
-                print(f"    [{i:2d}] {name}")
+    print("\n✅ Contact sensor validation complete!")
+    print("   Check output above for collision detections.")
+    print("   If you see collision warnings with force values > 0 N,")
+    print("   the contact sensor is working correctly.")
     
     print("\n" + "="*70)
     

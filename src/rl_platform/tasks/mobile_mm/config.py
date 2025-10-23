@@ -96,7 +96,7 @@ class RewardWeights:
     lateral_motion_penalty: float = 2.0  # No sideways motion for diff drive
     
     # Safety penalties
-    self_collision_penalty: float = 50.0  # CRITICAL: Robot hitting itself
+    self_collision_penalty: float = 0.5  # Session 7: Reduced from 50.0 (was causing -11M episode rewards)
     collision_penalty: float = 10.0  # External collisions (not used for now)
     stability_penalty: float = 0.1
     

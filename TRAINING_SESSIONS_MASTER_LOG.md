@@ -3,16 +3,42 @@
 **Project:** CinebotRL - Mobile Manipulator End-Effector Tracking  
 **Repository:** phoenixjyb/cinebotRL  
 **Branch:** train-windows  
-**Last Updated:** October 21, 2025 20:30 +0800
+**Last Updated:** October 22, 2025 23:05 +0800
 
 ---
 
-## 🚀 **READY TO LAUNCH: Session 5b**
+## 🚀 **RUNNING: Session 6**
 
-**Status:** Critical reward fixes applied after Session 5 catastrophic failure  
-**Session:** 5b - Unbounded Reward Fix  
-**Commits:** 7 total (Session 5 fixes + reward capping fixes)  
-**Latest Commit:** `00fdbf5` - Session 5b: Fix unbounded reward & add excessive movement penalty
+**Status:** Critical frozen base fixes - jerk penalty + contact sensor  
+**Session:** 6 - Frozen Base Fix (3 CRITICAL fixes)  
+**Commits:** 10 total (jerk penalty + contact sensor + shape fix + validation)  
+**Latest Commit:** `c59c72b` - Fix KeyError in debug script scene access
+
+### Quick Start
+```powershell
+# 8192 Environments (~9 hours to 100M steps)
+cd I:\isaaclab
+I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py --task MobileMMTrackEE-v0 --num_envs 8192 --n_steps 64 --batch_size 512 --total_timesteps 100000000 --learning_rate 3e-4 --ent_coef 0.001 --enable_entropy_decay --final_ent_coef 1e-4 --decay_start_timestep 50000000 --decay_duration_timesteps 50000000 --enable_kl_schedule --kl_warmup 0.25 --kl_main 0.15 --kl_finetune 0.07 --target_kl 1.0 --trajectory_type multi_recorded --use_all_trajectories --headless
+```
+
+### What's Fixed (Session 6)
+✅ **CRITICAL FIX #1:** Jerk penalty 5.0 → 50.0 m/s³ (THE KEY FIX)  
+   - Old: -451 penalty + 150 bonus = -301 NET (base FROZEN)
+   - New: -125 penalty + 150 bonus = +25 NET (can move!)
+✅ **CRITICAL FIX #2:** ContactSensor added (952.51 N validated!)  
+   - Monitors arm-chassis collisions (self-collision detection)
+   - Filter: `abstract_chassis_link` with `left_arm.*` bodies
+✅ **CRITICAL FIX #3:** prev_joint_vel shape 6 → 9 columns  
+   - Fixed observation space mismatch
+✅ USD limits verified: ±360° (±6.28 rad) - base CAN rotate
+✅ Debug validation complete: Contact forces working
+
+### Why Session 6 is Needed
+❌ Session 5b: Base still FROZEN despite observation space fix!
+- Root cause: Jerk penalty (5 m/s³) too harsh
+- Normal 0→0.25 m/s movement = -301 NET penalty
+- Base learning disabled by catastrophic jerk penalties
+- No self-collision detection (contact forces reading 0.0 N)
 
 ### Quick Start
 ```powershell
@@ -723,6 +749,179 @@ Session 5 PROVED the observation space fix works (base actions became active at 
 
 ---
 
+## Session 6: Fix Frozen Base (3 Critical Fixes)
+
+**Status:** ⚠️ **MIXED RESULTS** - Base moves, but catastrophic self-collision  
+**Date:** 2025-10-22 to 2025-10-23  
+**Objective:** Fix frozen base by adjusting jerk penalty, adding ContactSensor, and fixing shape bug
+
+### Changes Applied
+
+**Critical Fixes:**
+1. **Jerk penalty: 5.0 → 50.0 m/s³** - Allow base movement without excessive penalties
+2. **Added ContactSensor** - Detect contact forces (validated at 952.51 N)
+3. **Fixed prev_joint_vel shape: 6 → 9 columns** - Match observation buffer
+
+### Training Configuration
+
+**Environment:**
+- Task: MobileMMTrackEE-v0
+- Trajectory Type: multi_recorded (all 1,038 trajectories)
+- Rendering: Headless
+- Number of Environments: 4096 (reduced from 8192)
+
+**Hyperparameters:**
+- Total Timesteps: 100,000,000
+- n_steps: 128 (increased from 64)
+- Batch Size: 1024 (increased from 512)
+- Learning Rate: 3e-4
+- Entropy Coefficient: 0.001 (decay to 1e-4)
+- KL Schedule: warmup 0.25, main 0.15, finetune 0.07
+
+### Launch Command
+
+```powershell
+I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py `
+    --task MobileMMTrackEE-v0 `
+    --num_envs 4096 `
+    --n_steps 128 `
+    --batch_size 1024 `
+    --total_timesteps 100000000 `
+    --learning_rate 3e-4 `
+    --ent_coef 0.001 `
+    --enable_entropy_decay `
+    --final_ent_coef 1e-4 `
+    --decay_start_timestep 50000000 `
+    --decay_duration_timesteps 50000000 `
+    --enable_kl_schedule `
+    --kl_warmup 0.25 `
+    --kl_main 0.15 `
+    --kl_finetune 0.07 `
+    --target_kl 1.0 `
+    --trajectory_type multi_recorded `
+    --use_all_trajectories `
+    --headless
+```
+
+**Started:** 2025-10-22 22:30  
+**Completed:** 2025-10-23 morning (~overnight run)
+
+### Results
+
+**Training Completion:**
+- ✅ Completed 100,073,472 steps (100M target)
+- Final checkpoint: `logs/sb3/mobilemmtrackee_v0/20251022_230622/final_model.zip`
+- No crashes, no NaN values
+- All 3 critical fixes deployed successfully
+
+**Evaluation Results (2025-10-23 09:17):**
+```
+Command: evaluate.py --checkpoint final_model.zip --num_envs 16 --num_episodes 5 --headless
+Episodes: 5 (16 parallel envs × 399 steps)
+Mean Reward: -11,715,724 ± 39,599
+Min Reward: -11,781,028
+Max Reward: -11,661,779
+Episode Length: 399 steps
+```
+
+### Critical Analysis
+
+✅ **SUCCESSES - The 3 Fixes WORKED:**
+
+1. **✅ Base IS Moving!**
+   - Base mobilization rewards: 0.02-0.20 (non-zero confirms movement)
+   - Base position changes: [1.135, 0.103] → [1.153, 0.136] → [1.163, 0.145]
+   - PPR offsets varying: -0.058 to -0.190 m (base adjusting)
+   - **Jerk penalty fix successful!**
+
+2. **✅ ContactSensor WORKING!**
+   - Detecting forces: 635.66 N at step 302
+   - Contact warnings: "Collision on body: base"
+   - Sensor properly integrated and reporting
+
+3. **✅ Shape Fix Successful!**
+   - No runtime errors
+   - Training completed full 100M steps
+   - Observation buffer stable (43 dims)
+
+🎯 **Tracking Performance (ignoring collision penalties):**
+- **Best:** 0.49m error (Env 13) - decent tracking!
+- **Typical:** 0.5-2.5m range
+- **Position tracking rewards:** Up to 39.26 points
+- **Base movements:** Coordinated 5-15cm adjustments
+
+❌ **CATASTROPHIC PROBLEM: Self-Collision Explosion**
+
+**The Issue:**
+```
+[DEBUG Step 300] Total reward: -30,308.07
+  self_collision_penalty: +30,264.8711  ← DOMINATES EVERYTHING
+  position_tracking: +0.5647
+  base_mobilization: +0.0770
+
+⚠️ [COLLISION DETECTED] Step 302
+   Max contact force: 635.66 N (threshold: 1.00 N)
+   Collision on body: base
+```
+
+**Impact:**
+- Self-collision penalty: ~30,000 per step
+- Over 399 steps: 30,000 × 399 = 11.97M negative reward
+- **This is 1000x larger than all other rewards combined!**
+- Learning signal completely destroyed
+
+**Root Causes Identified:**
+1. **Penalty magnitude excessive:** 30K per collision vs 50 max for position tracking
+2. **Constant base collisions:** Robot geometry causing perpetual self-collision
+3. **Possible sign error:** Penalty shown as "+30264" (should be negative?)
+4. **Collision filtering:** Base may be colliding with arms/legs inappropriately
+
+### Key Insights
+
+**What We Learned:**
+- ✅ Base CAN move when jerk penalty is reasonable (50.0 works)
+- ✅ ContactSensor works perfectly (detecting real forces)
+- ✅ Policy learned decent tracking (~0.5-2.5m) despite reward corruption
+- ❌ Self-collision penalty destroys learning (needs 100x reduction OR geometry fix)
+
+**Why Reward is Catastrophic:**
+- Position tracking best: +39.26 points
+- Base mobilization: +0.2 points
+- Self-collision: -30,000 points ← **Overwhelms everything!**
+- **Net:** Policy has no incentive to track well, only avoid collisions
+
+### Next Steps → Session 7
+
+**Fix Options (choose 1 or combine):**
+
+1. **Option A: Reduce Penalty Weight**
+   - `self_collision_penalty_weight: 1000.0 → 10.0` (100x reduction)
+   - Keep detecting collisions, make penalty proportional to other rewards
+
+2. **Option B: Fix Collision Geometry**
+   - Investigate robot URDF collision meshes
+   - Check if base is colliding with legs/arms inappropriately
+   - Add collision filtering (base should NOT collide with own parts)
+
+3. **Option C: Verify Penalty Math**
+   - Check if penalty is subtracting or adding
+   - Why is self_collision shown as "+30264" instead of "-30264"?
+   - Ensure reward = tracking + base_mob - penalties
+
+**Recommended Approach for Session 7:**
+```python
+# In config.py RewardWeights:
+self_collision_penalty: 1000.0 → 5.0  # Make it 200x smaller
+# Then test 1M steps to verify:
+# - Base still moves
+# - Reward becomes positive
+# - Tracking improves
+```
+
+**Detailed Analysis:** [To be created: `docs/SESSION_6_COLLISION_ANALYSIS.md`]
+
+---
+
 ## 📝 Template for New Session
 
 ```markdown
@@ -789,6 +988,14 @@ Message: [Commit message]
 
 ---
 
-**Last Updated:** October 21, 2025 20:30 +0800  
-**Current Session:** 5b (Unbounded Reward Fix)  
-**Repository Status:** All Session 5b fixes committed, ready to launch
+**Last Updated:** October 23, 2025 09:30 +0800  
+**Current Session:** 6 (EVALUATED - Self-collision issue found)  
+**Next Session:** 7 (Fix self-collision penalty)  
+**Repository Status:** Session 6 evaluated, Session 7 plan ready
+
+**Quick Action for Session 7:**
+```python
+# In src/rl_platform/tasks/mobile_mm/config.py:
+self_collision_penalty: float = 5.0  # Change from 1000.0
+# Then launch training with same config as Session 6
+```

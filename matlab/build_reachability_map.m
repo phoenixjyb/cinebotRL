@@ -1,0 +1,631 @@
+function build_reachability_map()
+% BUILD_REACHABILITY_MAP - Generate collision-aware reachability map for mobile manipulator
+% 
+% Purpose: Pre-compute reachable workspace to guide RL training by:
+%   1) Filtering impossible target poses early (avoid wasting exploration)
+%   2) Providing good IK seeds for faster convergence
+%   3) Quantifying manipulability to bias rewards toward dexterous poses
+%
+% Output: A .mat file with reachability map for fast online queries
+%
+% Usage:
+%   1) Run this script once (offline): build_reachability_map()
+%   2) In Python/RL: load map and query for each target pose
+%   3) Use reachability score to shape rewards or filter targets
+%
+% Tested with MATLAB R2023b + Robotics System Toolbox
+
+%% ========================================================================
+%  CONFIGURATION FOR YOUR ROBOT
+%  ========================================================================
+
+% URDF path (absolute)
+URDF_PATH = "C:\Users\yanbo\wSpace\cinebotRL\assets_own\mobile_manipulator_PPR_base_corrected.urdf";
+
+% End-effector link name (from your URDF)
+EE_LINK = "left_gripper_link";
+
+% Base link for the arm (first link in arm, excludes mobile base virtual joints)
+% From URDF: arm_mount_joint connects abstract_chassis_link -> left_arm_base_link
+% This computes ONLY the arm workspace, not including mobile base movement
+BASE_LINK = "left_arm_base_link";
+
+% URDF data format
+DATA_FORMAT = "row";  % or "column" depending on your URDF
+
+% Gravity vector
+GRAVITY = [0 0 -9.81];
+
+%% ========================================================================
+%  GRID PARAMETERS (in arm base frame, meters)
+%  ========================================================================
+% Grid is relative to left_arm_base_link (the shoulder mount point)
+% From your arm geometry: 0.75m reach from shoulder
+% Arm kinematic chain: left_arm_base_link -> left_arm_joint1 -> ... -> left_gripper_link
+
+% Grid bounds (relative to left_arm_base_link, the arm shoulder mount)
+% X: forward/back from shoulder
+% Y: left/right from shoulder  
+% Z: up/down from shoulder
+GRID_ORIGIN = [-0.6, -0.8, -0.4];   % min [x,y,z] - cover hemisphere around shoulder
+GRID_SIZE   = [ 1.2,  1.6,  1.0];   % size [dx,dy,dz] - symmetric workspace
+VOXEL       = [ 0.05, 0.05, 0.05];  % 5cm resolution (balance between detail & computation)
+
+%% ========================================================================
+%  ORIENTATION SAMPLING
+%  ========================================================================
+% Camera-like EE: mostly pointing down/forward
+% Use cone constraint to focus on practical orientations
+
+N_ORIENT        = 24;      % Number of orientation samples per voxel
+ORIENT_CONE_DEG = 90;      % 90° cone around -Z axis (camera looking down/forward)
+
+%% ========================================================================
+%  IK SOLVER PARAMETERS
+%  ========================================================================
+IK_ATTEMPTS     = 8;       % Random seed attempts per voxel/orientation
+IK_POS_TOL      = 3e-3;    % 3mm position tolerance
+IK_ORI_TOL      = deg2rad(5);  % 5° orientation tolerance
+
+%% ========================================================================
+%  COLLISION CHECKING
+%  ========================================================================
+DO_SELF_COLLISION = true;   % Essential! Avoid self-collision configs
+
+%% ========================================================================
+%  PARALLEL COMPUTING
+%  ========================================================================
+USE_PARFOR = true;  % Use parallel processing (faster with multiple cores)
+% NOTE: Set to false if you get parpool errors
+
+%% ========================================================================
+%  OUTPUT
+%  ========================================================================
+% Save path for the map (will include metadata)
+MAP_FILE = "reach_map_mobile_mm_arm_only.mat";
+
+%% ========================================================================
+%  PAYLOAD (metadata only)
+%  ========================================================================
+PAYLOAD_KG = 0.5;  % Typical camera payload
+
+%% ========================================================================
+%  BUILD THE MAP
+%  ========================================================================
+fprintf('╔════════════════════════════════════════════════════════╗\n');
+fprintf('║  MOBILE MANIPULATOR REACHABILITY MAP BUILDER           ║\n');
+fprintf('╚════════════════════════════════════════════════════════╝\n\n');
+
+build_and_save_map(URDF_PATH, EE_LINK, BASE_LINK, MAP_FILE, DATA_FORMAT, GRAVITY, ...
+    GRID_ORIGIN, GRID_SIZE, VOXEL, ...
+    N_ORIENT, ORIENT_CONE_DEG, ...
+    IK_ATTEMPTS, IK_POS_TOL, IK_ORI_TOL, ...
+    DO_SELF_COLLISION, USE_PARFOR, PAYLOAD_KG);
+
+fprintf('\n✓ Complete! Map saved to: %s\n', MAP_FILE);
+fprintf('  Grid: %.0f×%.0f×%.0f voxels (%.1f×%.1f×%.1f m³)\n', ...
+    GRID_SIZE./VOXEL, GRID_SIZE);
+fprintf('  Voxel size: %.0fmm\n', 1000*VOXEL(1));
+fprintf('  Orientations: %d per voxel\n', N_ORIENT);
+
+%% ========================================================================
+%  EXAMPLE QUERY
+%  ========================================================================
+fprintf('\n─────────────────────────────────────────────────────────\n');
+fprintf('EXAMPLE QUERY:\n');
+
+% Test target: 0.5m forward, 0.2m left, 0.9m height (base frame)
+pB = [0.5; 0.2; 0.9];
+RB = eul2rotm([0, deg2rad(45), 0], 'ZYX');  % Camera tilted 45° down
+TB = [RB, pB; 0 0 0 1];
+
+% Mobile base pose in world (for demo, assume base = world frame)
+basePose = struct('x', 0.0, 'y', 0.0, 'yaw', 0.0);
+
+res = reachable_sanity_check(MAP_FILE, TB, basePose);
+fprintf('Target: [%.2f, %.2f, %.2f]m (base frame)\n', pB);
+fprintf('Result: %s\n', res.ok);
+if res.ok
+    fprintf('  Reach score: %.2f (%.0f%% orientations reachable)\n', res.reach, 100*res.reach);
+    fprintf('  Manipulability: %.3f\n', res.manipMax);
+    if ~isempty(res.seedQ)
+        fprintf('  IK seed available: %d DOF\n', length(res.seedQ));
+    end
+else
+    fprintf('  Reason: %s\n', res.reason);
+end
+
+end % function build_reachability_map
+
+%% ========================================================================
+%% BUILD AND SAVE MAP
+%% ========================================================================
+function build_and_save_map(URDF_PATH, EE_LINK, BASE_LINK, MAP_FILE, DATA_FORMAT, GRAVITY, ...
+    GRID_ORIGIN, GRID_SIZE, VOXEL, ...
+    N_ORIENT, ORIENT_CONE_DEG, ...
+    IK_ATTEMPTS, IK_POS_TOL, IK_ORI_TOL, ...
+    DO_SELF_COLLISION, USE_PARFOR, PAYLOAD_KG)
+
+fprintf('Loading URDF: %s\n', URDF_PATH);
+robot = importrobot(URDF_PATH, DataFormat=DATA_FORMAT);
+robot.Gravity = GRAVITY;
+
+% Remove virtual mobile base joints (joint_x, joint_y, joint_theta)
+% These are the 3 planar joints that allow the chassis to move
+% We want to compute ONLY the arm workspace from the arm base
+fprintf('  Original DOF: %d\n', length(robot.homeConfiguration));
+
+% Create subtree starting from BASE_LINK (excludes mobile base)
+try
+    robot_arm = subtree(robot, BASE_LINK);
+    robot = robot_arm;
+    fprintf('  Extracted arm subtree from "%s"\n', BASE_LINK);
+    fprintf('  Arm-only DOF: %d (mobile base joints excluded)\n', length(robot.homeConfiguration));
+catch ME
+    warning('CinebotRL:SubtreeFailed', 'Could not extract subtree: %s\nUsing full robot (may include mobile base joints).', ME.message);
+end
+
+% Validate links
+allLinks = robot.BodyNames;
+fprintf('  Links found: %d\n', length(allLinks));
+if ~any(strcmp(allLinks, EE_LINK))
+    error('EE link "%s" not found in URDF. Available: %s', EE_LINK, strjoin(allLinks, ', '));
+end
+if ~any(strcmp(allLinks, BASE_LINK))
+    warning('Base link "%s" not found. Using robot base.', BASE_LINK);
+end
+
+% Get home configuration
+qHome = homeConfiguration(robot);
+ndof = numel(qHome);
+fprintf('  DOF: %d\n', ndof);
+
+% Display joint limits
+fprintf('  Joint limits:\n');
+for i = 1:min(7, length(robot.Bodies))  % Show first 7 (arm joints)
+    body = robot.Bodies{i};
+    if ~isempty(body.Joint) && ~strcmp(body.Joint.Type, 'fixed')
+        lim = body.Joint.PositionLimits;
+        fprintf('    %20s: [%+.2f, %+.2f] rad\n', body.Joint.Name, lim(1), lim(2));
+    end
+end
+
+% Sample orientation bins
+orientBins = sample_orientation_bins(N_ORIENT, ORIENT_CONE_DEG);
+fprintf('  Orientation bins: %d (%.0f° cone)\n', size(orientBins,3), ORIENT_CONE_DEG);
+
+% Build voxel grid
+nx = max(1, round(GRID_SIZE(1)/VOXEL(1)));
+ny = max(1, round(GRID_SIZE(2)/VOXEL(2)));
+nz = max(1, round(GRID_SIZE(3)/VOXEL(3)));
+[xg, yg, zg] = ndgrid( ...
+    GRID_ORIGIN(1) + (0:nx-1)*VOXEL(1) + VOXEL(1)/2, ...
+    GRID_ORIGIN(2) + (0:ny-1)*VOXEL(2) + VOXEL(2)/2, ...
+    GRID_ORIGIN(3) + (0:nz-1)*VOXEL(3) + VOXEL(3)/2);
+Nvox = numel(xg);
+fprintf('  Grid: %dx%dx%d = %d voxels @ %.0fmm resolution\n', nx, ny, nz, Nvox, 1000*VOXEL(1));
+fprintf('  Bounds: X[%.2f, %.2f], Y[%.2f, %.2f], Z[%.2f, %.2f] m\n', ...
+    min(xg(:)), max(xg(:)), min(yg(:)), max(yg(:)), min(zg(:)), max(zg(:)));
+
+% Prepare output arrays
+reachScore = zeros(nx,ny,nz,'single');      % [0,1] - fraction of orientations reachable
+manipMax   = zeros(nx,ny,nz,'single');      % maximum manipulability across orientations
+haveQex    = false(nx,ny,nz);               % has example IK solution
+qExample   = zeros(nx,ny,nz,ndof,'single'); % IK seed (if available)
+
+% Setup IK solver
+ik = inverseKinematics('RigidBodyTree', robot);
+ik.SolverParameters.AllowRandomRestarts = true;
+ik.SolverParameters.MaxIterations = 150;
+weights = [1 1 1 1 1 1];  % xyz + rpy (equal importance)
+
+% Self-collision pairs
+pairIdx = [];
+if DO_SELF_COLLISION
+    fprintf('  Building self-collision pairs... ');
+    allBodies = robot.BodyNames;
+    for i = 1:numel(allBodies)
+        for j = i+1:numel(allBodies)
+            if ~isParentChild(robot, allBodies{i}, allBodies{j})
+                pairIdx = [pairIdx; i, j]; %#ok<AGROW>
+            end
+        end
+    end
+    fprintf('%d pairs\n', size(pairIdx,1));
+end
+
+% Parallel or serial loop
+fprintf('\nComputing reachability map...\n');
+tic;
+if USE_PARFOR && exist('parpool', 'file')
+    % Check if pool exists
+    poolobj = gcp('nocreate');
+    if isempty(poolobj)
+        fprintf('  Starting parallel pool...\n');
+        parpool;
+    end
+    poolobj = gcp;
+    fprintf('  Using %d workers for parallel computation\n', poolobj.NumWorkers);
+    fprintf('  Total voxels: %d\n', Nvox);
+    fprintf('  Expected time: %.0f-%.0f minutes (with %d cores)\n\n', ...
+        Nvox*0.3/60/poolobj.NumWorkers, Nvox*0.5/60/poolobj.NumWorkers, poolobj.NumWorkers);
+    
+    % Simplified progress tracking for parallel mode
+    % Note: parfor doesn't support real-time progress easily, so we'll report milestones
+    fprintf('  Starting parallel computation...\n');
+    fprintf('  Note: Progress updates limited in parallel mode\n');
+    fprintf('  Check CPU usage in Task Manager to verify parallel execution\n\n');
+    
+    parfor k = 1:Nvox
+        [reachScore(k), manipMax(k), haveQex(k), qex_flat] = ...
+            eval_voxel(k, xg, yg, zg, robot, EE_LINK, ik, weights, ...
+                       orientBins, IK_ATTEMPTS, IK_POS_TOL, IK_ORI_TOL, ...
+                       pairIdx, ndof);
+        if ~isempty(qex_flat)
+            % Store IK solution - qex_flat is already a row vector [1 x ndof]
+            for d = 1:ndof
+                qExample(k + (d-1)*Nvox) = qex_flat(d);
+            end
+        end
+    end
+    
+    fprintf('  ✅ All voxels processed (parallel)!\n');
+else
+    % Serial with enhanced progress tracking
+    fprintf('  Progress tracking enabled (serial mode)\n');
+    fprintf('  Total voxels: %d\n', Nvox);
+    fprintf('  Expected time: %.0f-%.0f minutes\n\n', Nvox*0.3/60, Nvox*0.5/60);
+    
+    % Progress tracking variables
+    start_time = tic;
+    last_report_time = start_time;
+    report_interval = 30; % Report every 30 seconds
+    checkpoint_interval = max(1, floor(Nvox/20)); % Save every 5%
+    
+    for k = 1:Nvox
+        try
+            [reachScore(k), manipMax(k), haveQex(k), qex_flat] = ...
+                eval_voxel(k, xg, yg, zg, robot, EE_LINK, ik, weights, ...
+                           orientBins, IK_ATTEMPTS, IK_POS_TOL, IK_ORI_TOL, ...
+                           pairIdx, ndof);
+            if ~isempty(qex_flat)
+                % Store IK solution - qex_flat is already a row vector [1 x ndof]
+                for d = 1:ndof
+                    qExample(k + (d-1)*Nvox) = qex_flat(d);
+                end
+            end
+        catch err
+            fprintf('\n  ⚠️  Error at voxel %d: %s\n', k, err.message);
+            fprintf('      Continuing with next voxel...\n');
+            reachScore(k) = 0;
+            manipMax(k) = 0;
+            haveQex(k) = false;
+        end
+        
+        % Time-based progress reporting (every 30 seconds)
+        current_time = toc(start_time);
+        if (current_time - toc(last_report_time)) >= report_interval || k == 1
+            pct_done = 100 * k / Nvox;
+            elapsed_min = current_time / 60;
+            voxels_per_sec = k / current_time;
+            remaining_voxels = Nvox - k;
+            eta_min = remaining_voxels / voxels_per_sec / 60;
+            
+            fprintf('  [%5.1f%%] Voxel %5d/%5d | Elapsed: %5.1f min | ETA: %5.1f min | Speed: %.1f vox/s\n', ...
+                pct_done, k, Nvox, elapsed_min, eta_min, voxels_per_sec);
+            
+            last_report_time = tic;
+        end
+        
+        % Checkpoint progress (every 5%)
+        if mod(k, checkpoint_interval) == 0 && k > checkpoint_interval
+            pct = round(100 * k / Nvox);
+            fprintf('  ✓ Checkpoint: %d%% complete (%d/%d voxels)\n', pct, k, Nvox);
+        end
+    end
+    
+    fprintf('\n  ✅ All voxels processed!\n');
+end
+elapsed = toc;
+fprintf('  Elapsed: %.1f min (%.2f voxels/sec)\n', elapsed/60, Nvox/elapsed);
+
+% Statistics
+reachable = reachScore > 0;
+fprintf('\n─────────────────────────────────────────────────────────\n');
+fprintf('REACHABILITY STATISTICS:\n');
+fprintf('  Reachable voxels: %d / %d (%.1f%%)\n', sum(reachable(:)), Nvox, 100*sum(reachable(:))/Nvox);
+fprintf('  Mean reach score: %.3f (among reachable)\n', mean(reachScore(reachable)));
+fprintf('  Mean manipulability: %.3f\n', mean(manipMax(reachable)));
+fprintf('  IK seeds stored: %d\n', sum(haveQex(:)));
+
+% Pack map struct
+map = struct();
+map.meta.urdfPath      = string(URDF_PATH);
+map.meta.eeLink        = string(EE_LINK);
+map.meta.baseLink      = string(BASE_LINK);
+map.meta.dataFormat    = string(DATA_FORMAT);
+map.meta.gravity       = GRAVITY;
+map.meta.payload_kg    = PAYLOAD_KG;
+map.meta.timestamp     = char(datetime('now'));
+map.meta.ndof          = int32(ndof);
+map.grid.origin        = GRID_ORIGIN;
+map.grid.voxel         = VOXEL;
+map.grid.size          = GRID_SIZE;
+map.grid.shape         = int32([nx,ny,nz]);
+map.orient.n_bins      = int32(N_ORIENT);
+map.orient.cone_deg    = ORIENT_CONE_DEG;
+map.data.reachScore    = reachScore;    % [0,1] per voxel
+map.data.manipMax      = manipMax;      % max manipulability
+map.data.hasExampleQ   = haveQex;       % bool per voxel
+map.data.exampleQ      = qExample;      % ndof per voxel (may be large!)
+
+% Save
+fprintf('\nSaving map to: %s\n', MAP_FILE);
+save(MAP_FILE, 'map', '-v7.3');  % HDF5 format for large files
+d = dir(MAP_FILE);
+fprintf('  File size: %.1f MB\n', d.bytes/1e6);
+
+end % build_and_save_map
+
+%% ========================================================================
+%% EVALUATE SINGLE VOXEL
+%% ========================================================================
+function [score, manipVal, hasQex, qex_flat] = eval_voxel(k, xg, yg, zg, robot, eeName, ik, weights, ...
+    orientBins, IK_ATTEMPTS, IK_POS_TOL, IK_ORI_TOL, pairIdx, ndof)
+
+% Default outputs
+score    = single(0);
+manipVal = single(0);
+hasQex   = false;
+qex_flat = [];
+
+px = xg(k); py = yg(k); pz = zg(k);
+pTgt = [px; py; pz];
+
+nb = size(orientBins, 3);
+if nb == 0
+    % Fallback: position-only with default orientations
+    nb = 6;
+    orientBins = default_orientations(nb);
+end
+
+success = 0;
+bestManip = 0;
+qe = [];
+
+for b = 1:nb
+    Rb = orientBins(:,:,b);
+    T  = [Rb, pTgt; 0 0 0 1];
+    
+    ok_here = false;
+    best_here = 0;
+    q_here = [];
+    
+    for a = 1:IK_ATTEMPTS
+        % Random initial configuration
+        q0 = randomConfiguration(robot);
+        [q, solInfo] = ik(eeName, T, weights, q0);
+        
+        if strcmp(solInfo.Status, "success")
+            % Double-check tolerances
+            TW = getTransform(robot, q, eeName);
+            posErr = norm(TW(1:3,4) - pTgt);
+            Rerr = TW(1:3,1:3)' * Rb;
+            angErr = abs(rotm2axang(Rerr));  % [axis_x, axis_y, axis_z, angle]
+            angErr = angErr(4);
+            
+            if posErr <= IK_POS_TOL && angErr <= IK_ORI_TOL
+                % Self-collision check
+                if ~isempty(pairIdx)
+                    inColl = check_self_collision(robot, q);
+                    if inColl
+                        continue;
+                    end
+                end
+                
+                % Feasible!
+                ok_here = true;
+                
+                % Compute manipulability
+                try
+                    J = geometricJacobian(robot, q, eeName);
+                    % Translational manipulability (sqrt of Jacobian volume)
+                    m = sqrt(abs(det(J(1:3,:)*J(1:3,:)')));
+                catch
+                    m = 0;
+                end
+                
+                if m > best_here
+                    best_here = m;
+                    q_here = q;
+                end
+            end
+        end
+    end
+    
+    if ok_here
+        success = success + 1;
+        bestManip = max(bestManip, best_here);
+        if isempty(qe) && ~isempty(q_here)
+            qe = q_here;
+        end
+    end
+end
+
+score = single(success / nb);
+manipVal = single(bestManip);
+if ~isempty(qe)
+    hasQex = true;
+    qex_flat = single(qe);  % Return as flat vector for parfor
+end
+
+end % eval_voxel
+
+%% ========================================================================
+%% HELPER FUNCTIONS
+%% ========================================================================
+function tf = isParentChild(robot, a, b)
+% Check if two bodies are parent-child (adjacent in kinematic tree)
+tf = false;
+try
+    % MATLAB R2022a+ has isAncestor
+    tf = isAncestor(robot, a, b) || isAncestor(robot, b, a);
+catch
+    % Fallback for older versions: check immediate parent
+    bodyA = getBody(robot, a);
+    bodyB = getBody(robot, b);
+    if ~isempty(bodyA.Parent) && strcmp(bodyA.Parent.Name, b)
+        tf = true;
+    elseif ~isempty(bodyB.Parent) && strcmp(bodyB.Parent.Name, a)
+        tf = true;
+    end
+end
+end
+
+function inColl = check_self_collision(robot, q)
+% Check self-collision using MATLAB's built-in checkCollision
+try
+    % Skip parent-child pairs automatically
+    inColl = checkCollision(robot, q, 'SkippedSelfCollisions', 'parent');
+catch
+    % Fallback
+    inColl = checkCollision(robot, q);
+end
+end
+
+function B = sample_orientation_bins(n_bins, cone_deg)
+% Sample orientation matrices in a cone around -Z axis (camera/tool pointing down)
+if n_bins <= 0
+    B = zeros(3,3,0);
+    return;
+end
+
+if cone_deg >= 179.9
+    % Full SO(3) coverage: uniform-ish yaw-pitch grid
+    nyaw = max(4, round(sqrt(n_bins)*2));
+    npit = max(3, round(n_bins/nyaw));
+    ys = linspace(-pi, pi, nyaw+1); ys(end) = [];
+    ps = linspace(-pi/2, pi/2, npit);
+    mats = {};
+    for y = ys
+        for p = ps
+            R = eul2rotm([y, p, 0], 'ZYX');
+            mats{end+1} = R; %#ok<AGROW>
+        end
+    end
+else
+    % Cone around -Z (tool axis): sample yaw and tilt within cone
+    ncirc = max(1, round(sqrt(n_bins)));
+    nrad  = max(1, round(n_bins/ncirc));
+    
+    yaws = linspace(0, 2*pi, ncirc+1); yaws(end) = [];
+    tilts = linspace(0, deg2rad(cone_deg), nrad);
+    
+    mats = {};
+    for tilt = tilts
+        for yaw = yaws
+            % Start with -Z pointing down
+            R0 = [0  0 -1;   % X to the right
+                  1  0  0;   % Y forward
+                  0 -1  0];  % Z up (EE pointing down = -Z)
+            % Rotate around Y (tilt) then around Z (yaw)
+            Rtilt = axang2rotm([0 1 0 tilt]);
+            Ryaw  = axang2rotm([0 0 1 yaw]);
+            R = Ryaw * Rtilt * R0;
+            mats{end+1} = R; %#ok<AGROW>
+        end
+    end
+end
+B = cat(3, mats{:});
+end
+
+function B = default_orientations(n)
+% Fallback: cardinal directions for position-only checks
+dirs = [ ...
+     0  0 -1;   % down (camera looking down)
+     0  0  1;   % up
+     1  0  0;   % right
+    -1  0  0;   % left
+     0  1  0;   % forward
+     0 -1  0];  % back
+dirs = dirs(1:min(n, size(dirs,1)), :);
+mats = {};
+for i = 1:size(dirs,1)
+    z = dirs(i,:)'; z = z/norm(z);
+    x = [1;0;0];
+    if abs(dot(x,z)) > 0.9
+        x = [0;1;0];
+    end
+    y = cross(z, x); y = y/norm(y);
+    x = cross(y, z);
+    R = [x y z];
+    mats{end+1} = R; %#ok<AGROW>
+end
+B = cat(3, mats{:});
+end
+
+%% ========================================================================
+%% QUERY FUNCTION (for online use)
+%% ========================================================================
+function res = reachable_sanity_check(MAP_FILE, targetWorldT, basePose)
+% Fast reachability check using precomputed map
+% 
+% Inputs:
+%   MAP_FILE: path to .mat file with reachability map
+%   targetWorldT: 4x4 target pose in world frame
+%   basePose: struct('x', ,'y', ,'yaw',) - mobile base pose in world
+%
+% Outputs:
+%   res: struct with fields:
+%     .ok: true/false (is target reachable?)
+%     .reason: string (why not reachable)
+%     .reach: score [0,1] (fraction of orientations reachable)
+%     .manipMax: maximum manipulability at this voxel
+%     .seedQ: IK seed configuration (if available)
+
+S = load(MAP_FILE, 'map');
+map = S.map;
+
+% Transform target from world to base frame
+% Base pose: (x, y, yaw) in world
+Rbase = rotz(-rad2deg(basePose.yaw));  % MATLAB rotz uses degrees, inverse rotation
+pWorld = targetWorldT(1:3,4);
+pBase = Rbase * (pWorld - [basePose.x; basePose.y; 0]);
+
+% Find voxel index
+[idx, outside] = voxel_index(pBase, map.grid.origin, map.grid.voxel, map.grid.shape);
+if outside
+    res = struct('ok', false, 'reason', "outside grid", 'reach', 0, 'manipMax', 0, 'seedQ', []);
+    return;
+end
+
+score = map.data.reachScore(idx(1), idx(2), idx(3));
+if score <= 0
+    res = struct('ok', false, 'reason', "unreachable", 'reach', 0, 'manipMax', 0, 'seedQ', []);
+    return;
+end
+
+% Success!
+out = struct();
+out.ok       = true;
+out.reason   = "reachable";
+out.reach    = double(score);
+out.manipMax = double(map.data.manipMax(idx(1), idx(2), idx(3)));
+if map.data.hasExampleQ(idx(1), idx(2), idx(3))
+    out.seedQ = squeeze(map.data.exampleQ(idx(1), idx(2), idx(3), :))';
+else
+    out.seedQ = [];
+end
+res = out;
+
+end % reachable_sanity_check
+
+function [idx, outside] = voxel_index(p, origin, voxel, shape)
+% Map 3D point to voxel indices (1-based)
+rel = (p(:)' - origin) ./ voxel;
+ijk = floor(rel) + 1;
+outside = any(ijk < 1) || any(ijk > shape);
+ijk = max(ijk, [1 1 1]);
+ijk = min(ijk, double(shape));
+idx = ijk;
+end

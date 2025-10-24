@@ -1,0 +1,27 @@
+name: cinebotrl-linux
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - numpy>=1.20
+  - pybullet
+  - pip:
+    - stable-baselines3==2.0.0 
+    - gymnasium==0.28.1  # stable-baselines3 v2.0.0 currently requires gymnasium==0.28.1
+    - torch>=2.7.0  # NOTE: prefer installing torch via the official PyTorch channel/commands to match CUDA
+    - tensorboard
+    - wandb
+    - matplotlib
+    - pandas
+
+# Notes:
+# Notes:
+# - This environment.yml pins Python to 3.11 to match the Windows/Isaac Lab recommended runtime.
+# - stable-baselines3 v2.0.0 currently requires gymnasium==0.28.1; we pin that here to avoid pip's dependency
+#   resolution conflicts. If you upgrade SB3 later, revisit the gymnasium version.
+# - We intentionally list `torch` in pip section as a placeholder. For best results (CUDA-enabled PyTorch)
+#   install PyTorch using the official instructions for your CUDA driver (https://pytorch.org/get-started/locally/)
+#   e.g. `conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia` or the pip wheel provided by PyTorch.
+# - After creating the conda env, follow the steps in README (or below) to install the correct torch build for your GPU.

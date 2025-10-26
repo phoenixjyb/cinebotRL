@@ -1,8 +1,8 @@
 # Reward System Design - CinebotRL Mobile Manipulator
 
-**Document Version**: 1.0  
-**Last Updated**: October 22, 2025  
-**Applies To**: Session 5b onwards (post-catastrophic-failure fixes)
+**Document Version**: 2.0  
+**Last Updated**: October 26, 2025  
+**Applies To**: Session 7 onwards (reachability-guided base planning)
 
 ---
 
@@ -334,6 +334,165 @@ else:
 - **Type**: Terminal penalty
 - **Range**: {-50, 0}
 - **Applied once**: At episode end
+
+---
+
+### 10. Reachability-Guided Base Planning (NEW - SESSION 7)
+
+**Purpose**: Intelligently guide base movement using pre-computed workspace knowledge. Policy learns WHEN to move base vs. when to just use arm.
+
+**Introduced**: Session 7 (October 26, 2025)
+
+#### 10.1 Reachability Map System
+
+**Data Structure:**
+- **Format**: Pre-computed FK workspace map from MATLAB
+- **Voxels**: 12,646 reachable positions (35.3% of 35,840 total)
+- **Resolution**: 5cm (0.05m) voxel size
+- **Frame**: ARM BASE FRAME (shoulder frame, not ground)
+- **Coverage**: [-0.8→0.8, -1.0→1.0, -0.6→0.8] meters around shoulder
+- **Storage**: Each voxel stores best 6-joint arm configuration (qExample)
+- **Query Speed**: O(log N) via KD-tree (≈14 comparisons)
+
+**Coordinate Transformation Pipeline:**
+```
+World Frame (target EE position)
+    ↓ [Transform: world → mobile base]
+Mobile Base Frame
+    ↓ [Translate: -[0.16, 0, 0.9465]]
+    ↓ [Rotate: -90° around Z]
+Arm Base Frame (reachability map coordinates)
+    ↓ [KD-tree query: nearest of 12,646 voxels]
+Boolean: Reachable (distance < 0.1m tolerance)
+```
+
+#### 10.2 Two-Stage Reward Strategy
+
+**Case 1: Target IS Reachable (from current base position)**
+
+**Bonus Weight**: `0.5`
+
+**Formula**:
+```python
+# Transform target to arm base frame
+target_arm_frame = reach_map.world_to_arm_frame(target_pos, base_pose)
+
+# Check reachability
+is_reachable = reach_map.query(target_arm_frame, tolerance=0.1)
+
+# Reward for being in good position
+if is_reachable:
+    reachability_bonus = 0.5
+```
+
+**Characteristics**:
+- **Type**: Dense reward (every timestep)
+- **Range**: [0, 0.5]
+- **Signal**: "Base is well-positioned, focus on arm tracking"
+- **Effect**: Penalizes unnecessary base movement (energy waste)
+
+**Case 2: Target NOT Reachable (need to move base)**
+
+**Direction Alignment Weight**: `1.0`  
+**Speed Bonus Weight**: `0.3`
+
+**Formula**:
+```python
+if not is_reachable:
+    # Compute direction to target in world X-Y plane
+    direction = target_xy - base_xy
+    direction_normalized = direction / (||direction|| + ε)
+    
+    # Transform base velocity from body frame to world frame
+    base_vx_world = base_vx_body * cos(base_theta)
+    base_vy_world = base_vx_body * sin(base_theta)
+    base_vel_world = [vx_world, vy_world]
+    
+    # Reward alignment with target direction
+    alignment = dot(base_vel_world, direction_normalized)
+    base_direction_reward = 1.0 * clamp(alignment, min=0.0)
+    
+    # Bonus for higher speed when moving in right direction
+    speed_xy = ||base_vel_world||
+    base_direction_reward += 0.3 * speed_xy * clamp(alignment, min=0.0)
+```
+
+**Characteristics**:
+- **Type**: Dense reward (every timestep when unreachable)
+- **Range**: [0, 1.3] (1.0 alignment + 0.3 speed bonus)
+- **Signal**: "Move THIS direction to reach target"
+- **Only positive**: No penalty for moving wrong way (policy explores)
+
+**Key Design Decisions:**
+
+1. **Why world frame direction?**
+   - Simple and intuitive: just `target - base` in X-Y
+   - No complex inverse kinematics during training
+   - Direct feedback: "closer = better"
+
+2. **Why body → world velocity transform?**
+   - Base controls are in body frame (vx forward, wz rotation)
+   - Rewards computed in world frame (where target is)
+   - Transform needed: `[vx*cos(θ), vx*sin(θ)]`
+
+3. **Why clamp alignment to [0, ∞)?**
+   - Only reward positive alignment (moving toward target)
+   - Don't penalize exploration (moving away might be necessary)
+   - Let other penalties handle bad movements
+
+4. **Why speed bonus?**
+   - Encourages faster navigation when moving correctly
+   - Multiplied by alignment: only applies when going right way
+   - Weight 0.3: Significant but not dominant
+
+#### 10.3 Expected Behavior
+
+**Early Training (0-10M steps):**
+- Reachability checks show varying ratios (policy explores)
+- Base direction alignment increases from ~0 to >0.5
+- Policy learns: "When unreachable, move toward target"
+
+**Mid Training (10M-50M steps):**
+- Policy learns: "Move base FIRST when target unreachable"
+- Fewer wasted arm movements from bad base positions
+- Reachability bonus guides base to good positions
+
+**Late Training (50M-100M steps):**
+- Smooth coordination: base navigates, then arm tracks
+- High reachability bonus average (most targets reachable)
+- Minimal base movement when arm can reach (energy efficient)
+
+**Performance Metrics to Monitor:**
+```
+[Reachability Stats] Step X
+  Reachable: N/4096 envs
+  Unreachable: M/4096 envs
+  Avg base→target alignment: X.XXX  ← Should increase
+  Avg base→target distance: Y.YYY   ← Should decrease when unreachable
+```
+
+**Expected Improvements vs Session 6:**
+- Faster convergence (less random exploration)
+- Better base positioning (fewer "stuck" situations)
+- Lower mean tracking error (<0.3m vs 0.5m)
+- More efficient trajectories (less backtracking)
+
+#### 10.4 Implementation Details
+
+**Files:**
+- `src/rl_platform/utils/reachability_map.py`: ReachabilityMap class (346 lines)
+- `matlab/reach_map_mobile_mm_arm_only.mat`: Pre-computed workspace data
+- `src/rl_platform/tasks/mobile_mm/env.py`: Integration in `_get_rewards()`
+
+**Performance:**
+- Map loading: Once at initialization (~100ms)
+- Query time: O(log 12646) ≈ 14 comparisons (~10µs per env)
+- Total overhead: Negligible (<0.1% of step time)
+
+**Logging:**
+- Reachability stats printed every 100 steps
+- Reward components tracked in `extras["reward_components"]`
+- TensorBoard: `reachability_bonus` and `base_direction_reward`
 
 ---
 

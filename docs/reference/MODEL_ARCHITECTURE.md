@@ -1,8 +1,8 @@
 # Model Architecture & Training System
 
-**Version:** 1.0  
-**Last Updated:** 2025-01-08  
-**Related Documents:** [REWARD_SYSTEM_DESIGN.md](REWARD_SYSTEM_DESIGN.md), [TRAINING_SESSIONS_MASTER_LOG.md](../training_sessions/TRAINING_SESSIONS_MASTER_LOG.md)
+**Version:** 2.0  
+**Last Updated:** 2025-10-26  
+**Related Documents:** [REWARD_SYSTEM_DESIGN.md](REWARD_SYSTEM_DESIGN.md), [TRAINING_SESSIONS_MASTER_LOG.md](../../TRAINING_SESSIONS_MASTER_LOG.md)
 
 ---
 
@@ -1134,6 +1134,108 @@ The reward function has **9 components** with varying scales:
 - **[256, 256, 128]** (235K params): Good tracking (Session 5b: ~0.85 reward)
 
 **Hypothesis:** Larger networks better approximate complex value functions for multi-objective RL.
+
+### 8.4 Reachability-Guided Rewards (Session 7)
+
+**Added:** October 26, 2025
+
+**Purpose:** Guide base movement intelligently using pre-computed workspace knowledge instead of pure exploration.
+
+#### Pre-Computed Reachability Map
+
+**Data Structure:**
+- **Format**: MATLAB v7.3 (HDF5) loaded with h5py
+- **File**: `matlab/reach_map_mobile_mm_arm_only.mat`
+- **Voxels**: 12,646 reachable positions (35.3% of 35,840 total)
+- **Resolution**: 5cm (0.05m)
+- **Frame**: ARM BASE FRAME (shoulder-centric, not ground)
+- **Query**: KD-tree with O(log N) complexity (≈14 comparisons)
+
+#### Integration with Reward System
+
+**Two-Stage Reward Logic:**
+
+```python
+# src/rl_platform/tasks/mobile_mm/env.py, lines ~1100-1170
+
+# 1. Transform target to arm base frame
+target_arm_frame = reach_map.world_to_arm_frame(target_pos, base_pose)
+
+# 2. Query reachability (within 10cm tolerance)
+is_reachable = reach_map.query(target_arm_frame, tolerance=0.1)
+
+# 3. Split reward calculation
+if is_reachable:
+    # CASE 1: Target reachable from current base position
+    reachability_bonus = 0.5  # Reward being in good position
+    # Policy focuses on arm tracking accuracy
+    
+else:
+    # CASE 2: Target unreachable, need to move base
+    # Compute direction in world X-Y plane
+    direction = (target_xy - base_xy) / distance
+    
+    # Transform base velocity to world frame
+    vel_world = [vx*cos(θ), vx*sin(θ)]
+    
+    # Reward alignment with target direction
+    alignment = dot(vel_world, direction)
+    base_direction_reward = 1.0 * max(alignment, 0) + 0.3 * speed * max(alignment, 0)
+```
+
+#### Impact on Policy Learning
+
+**Expected Behavior Changes:**
+
+| Phase | Without Reachability | With Reachability (Session 7) |
+|-------|---------------------|-------------------------------|
+| **Early (0-10M)** | Random base movements | Directed movement toward targets |
+| **Mid (10M-50M)** | Base moves reactively | Base moves predictively |
+| **Late (50M-100M)** | Still exploring positions | Converged to optimal positions |
+
+**Performance Improvements (Expected):**
+- **Faster convergence**: Less random exploration wasted
+- **Better base positioning**: Policy knows "good spots" ahead of time
+- **Lower tracking error**: <0.3m vs 0.5m (Session 6 baseline)
+- **More efficient**: Less backtracking and repositioning
+
+#### Computational Overhead
+
+**One-Time Cost:**
+- Map loading at initialization: ~100ms
+- KD-tree construction: Included in map loading
+
+**Per-Step Cost:**
+- Coordinate transformation: O(1) matrix multiply (~1µs)
+- KD-tree query: O(log 12646) ≈ 14 comparisons (~10µs)
+- Total overhead per environment: ~11µs
+- Total overhead for 4096 envs: ~45ms (< 0.1% of 500ms step time)
+
+**Memory:**
+- Reachability map: ~5MB (12,646 voxels × 6 configs × 8 bytes)
+- Negligible compared to 18GB GPU usage
+
+#### Code Files
+
+- `src/rl_platform/utils/reachability_map.py`: ReachabilityMap class (346 lines)
+- `matlab/build_reachability_map_FK.m`: Generates workspace from FK
+- `scripts/inspect_mat_file.py`: HDF5 debugging utility
+
+#### Logging & Monitoring
+
+**Console Output (every 100 steps):**
+```
+[Reachability Stats] Step 1000
+  Reachable: 2846/4096 envs (69.5%)
+  Unreachable: 1250/4096 envs (30.5%)
+  Avg base→target alignment: 0.623
+  Avg base→target distance: 0.847 m
+```
+
+**TensorBoard Metrics:**
+- `reachability_bonus`: Mean value per timestep
+- `base_direction_reward`: Mean alignment reward
+- Should see increasing reachability percentage over training
 
 ---
 

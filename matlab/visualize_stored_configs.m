@@ -36,9 +36,13 @@ end
 
 %% Load robot
 fprintf('Loading robot...\n');
-urdf_file = 'mobile_manipulator_PPR_matlab.urdf';
+urdf_file = 'mobile_manipulator_PPR_theta_before_x.urdf';
 if ~exist(urdf_file, 'file')
-    urdf_file = '../assets_own/mobile_manipulator_PPR_matlab.urdf';
+    urdf_file = '../assets_own/mobile_manipulator_PPR_theta_before_x.urdf';
+end
+if ~exist(urdf_file, 'file')
+    % Fallback to old URDF
+    urdf_file = '../assets_own/mobile_manipulator_PPR_base_corrected.urdf';
 end
 robot = importrobot(urdf_file);
 robot.DataFormat = 'column';

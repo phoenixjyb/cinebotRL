@@ -29,11 +29,11 @@ end
 load(map_file, 'reachScore', 'manipMax', 'qExample', 'config', 'metadata');
 
 %% Load robot URDF
-% Use MATLAB-compatible URDF with relative mesh paths (not package://)
-urdf_matlab = strrep(config.urdf_path, 'base_corrected.urdf', 'matlab.urdf');
-if exist(urdf_matlab, 'file')
-    urdf_to_load = urdf_matlab;
-    fprintf('Loading robot URDF (MATLAB version): %s\n', urdf_matlab);
+% Prefer theta_before_x version (correct mobile base joint order)
+urdf_theta = strrep(config.urdf_path, 'base_corrected.urdf', 'theta_before_x.urdf');
+if exist(urdf_theta, 'file')
+    urdf_to_load = urdf_theta;
+    fprintf('Loading robot URDF (theta_before_x): %s\n', urdf_theta);
 else
     urdf_to_load = config.urdf_path;
     fprintf('Loading robot URDF: %s\n', config.urdf_path);

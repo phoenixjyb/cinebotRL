@@ -21,10 +21,10 @@ fprintf('=== Building Reachability Map (FK-based) ===\n\n');
 
 %% ===== CONFIGURATION =====
 
-% Robot URDF (use MATLAB-compatible version with relative mesh paths)
-URDF_PATH = fullfile('..', 'assets_own', 'mobile_manipulator_PPR_matlab.urdf');
+% Robot URDF (use theta_before_x version with correct mobile base joint order)
+URDF_PATH = fullfile('..', 'assets_own', 'mobile_manipulator_PPR_theta_before_x.urdf');
 if ~isfile(URDF_PATH)
-    % Fallback to original if MATLAB version doesn't exist
+    % Fallback to old version if new URDF doesn't exist
     URDF_PATH = fullfile('..', 'assets_own', 'mobile_manipulator_PPR_base_corrected.urdf');
     if ~isfile(URDF_PATH)
         error('URDF not found');

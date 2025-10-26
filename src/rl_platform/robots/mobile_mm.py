@@ -26,9 +26,10 @@ class MobileManipulatorAssets:
 def get_mobile_mm_assets() -> MobileManipulatorAssets:
     """Return paths to the mobile manipulator USD and supporting configuration."""
     usd_dir = assets_root() / "usd"
-    # Use theta_before_x version with correct mobile base joint order (theta→x→y)
+    # Use theta_x_y USD with correct joint order (theta→x→y) for reachability map
+    # Fixed: No invalid root_joint, proper physics chain
     return MobileManipulatorAssets(
-        usd_path=usd_dir / "mobile_manipulator_PPR_theta_before_x.usd",
+        usd_path=usd_dir / "mobile_manipulator_PPR_theta_x_y.usd",
         config_dir=usd_dir / "configuration",
     )
 

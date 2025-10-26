@@ -486,8 +486,9 @@ def main():
             # Apply adaptive KL
             new_target_kl = base_target_kl * kl_boost
             
-            # Update model's target_kl
-            if abs(self.model.target_kl - new_target_kl) > 0.01:  # Significant change
+            # Update model's target_kl (handle None case)
+            current_kl = self.model.target_kl if self.model.target_kl is not None else 0.0
+            if abs(current_kl - new_target_kl) > 0.01:  # Significant change
                 self.model.target_kl = new_target_kl
                 if self.verbose > 0:
                     boost_str = f" (boosted {kl_boost}x)" if kl_boost > 1.0 else ""

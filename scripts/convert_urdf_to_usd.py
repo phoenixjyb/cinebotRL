@@ -21,13 +21,13 @@ parser = argparse.ArgumentParser(description="Convert URDF to USD using Isaac Si
 parser.add_argument(
     "--urdf",
     type=str,
-    default="assets_own/mobile_manipulator_PPR_base_corrected.urdf",
+    default="assets_own/mobile_manipulator_PPR_theta_before_x.urdf",
     help="Path to input URDF file (relative to project root)",
 )
 parser.add_argument(
     "--usd",
     type=str,
-    default="assets_own/usd/mobile_manipulator_PPR_base_corrected.usd",
+    default="assets_own/usd/mobile_manipulator_PPR_theta_before_x.usd",
     help="Path to output USD file (relative to project root)",
 )
 parser.add_argument(

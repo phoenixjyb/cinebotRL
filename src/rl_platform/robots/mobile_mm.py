@@ -26,8 +26,9 @@ class MobileManipulatorAssets:
 def get_mobile_mm_assets() -> MobileManipulatorAssets:
     """Return paths to the mobile manipulator USD and supporting configuration."""
     usd_dir = assets_root() / "usd"
+    # Use theta_before_x version with correct mobile base joint order (theta→x→y)
     return MobileManipulatorAssets(
-        usd_path=usd_dir / "mobile_manipulator_PPR_base_corrected.usd",
+        usd_path=usd_dir / "mobile_manipulator_PPR_theta_before_x.usd",
         config_dir=usd_dir / "configuration",
     )
 

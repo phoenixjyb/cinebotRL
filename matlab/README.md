@@ -78,6 +78,7 @@ The `.mat` file contains:
 - **`manipMax`** (32×40×28): Best manipulability at each voxel
 - **`qExample`** (32×40×28×6): Best joint config (6 arm joints) per voxel
 - **`config`**: Grid parameters (origin, size, voxel_size, etc.)
+- **`metadata`**: Build info (date, samples, collision_mode, etc.)
 
 ## Extract Surface Mesh
 
@@ -120,7 +121,6 @@ mesh = trimesh.load("exports/reach_surface.ply")
 ```
 
 Tune the options to trade fidelity for mesh size. The defaults smooth the binary grid, remove voxel speckles smaller than 32 cells, and decimate the mesh to roughly 35% of the original faces.
-- **`metadata`**: Build info (date, samples, collision_mode, etc.)
 
 ## Key Features
 

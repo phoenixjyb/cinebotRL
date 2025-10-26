@@ -45,7 +45,7 @@ function surface = extract_reachability_surface(map_file, opts)
 
 arguments
     map_file (1,1) string
-    opts.output_mat (1,1) string = ""
+    opts.output_mat (1,1) string = "<auto>"
     opts.output_ply (1,1) string = ""
     opts.reach_threshold (1,1) double = 0.5
     opts.smooth_kernel (1,1) double {mustBeNonnegative} = 3
@@ -60,12 +60,11 @@ if ~isfile(map_file)
           'Map file not found: %s', map_file);
 end
 
-if opts.output_mat == ""
+save_mat = true;
+if opts.output_mat == "<auto>"
     opts.output_mat = map_file + "_surface.mat";
-end
-
-if opts.output_ply == ""
-    opts.output_ply = "";
+elseif opts.output_mat == ""
+    save_mat = false;
 end
 
 if opts.verbose
@@ -213,7 +212,7 @@ if opts.verbose
     fprintf('Boundary voxels (centres): %d\n', surface.stats.n_boundary_voxels);
 end
 
-if opts.output_mat ~= ""
+if save_mat
     ensure_parent_folder(opts.output_mat);
     save(opts.output_mat, 'surface', '-v7');
     if opts.verbose

@@ -1116,8 +1116,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             
             # === CASE 1: Target IS reachable from current base position ===
             if is_reachable.any():
-                # Bonus for being in a good base position
-                reachability_bonus[is_reachable] = 0.5
+                # Bonus for being in a good base position (Session 7b: 0.5 → 2.0)
+                reachability_bonus[is_reachable] = 2.0
                 
                 # Optional: Get best arm config as IK hint (future enhancement)
                 # arm_configs, _ = self.reach_map.get_best_configs(target_in_arm_frame[is_reachable])
@@ -1146,12 +1146,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 # Compute alignment: dot product of velocity with desired direction
                 alignment = (base_vel_xy_world * direction_normalized).sum(dim=-1)  # [M]
                 
-                # Reward moving in correct direction (only positive alignment)
-                base_direction_reward[~is_reachable] = 1.0 * torch.clamp(alignment, min=0.0)
+                # Reward moving in correct direction (Session 7b: 1.0 → 3.0)
+                base_direction_reward[~is_reachable] = 3.0 * torch.clamp(alignment, min=0.0)
                 
-                # Bonus for higher speed when moving in right direction
+                # Bonus for higher speed when moving in right direction (Session 7b: 0.3 → 1.0)
                 speed_xy = torch.norm(base_vel_xy_world, dim=-1)  # [M]
-                base_direction_reward[~is_reachable] += 0.3 * speed_xy * torch.clamp(alignment, min=0.0)
+                base_direction_reward[~is_reachable] += 1.0 * speed_xy * torch.clamp(alignment, min=0.0)
             
             # Log reachability statistics (every 100 steps to avoid spam)
             if not hasattr(self, '_reach_log_step'):

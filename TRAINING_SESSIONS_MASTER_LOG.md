@@ -3,11 +3,60 @@
 **Project:** CinebotRL - Mobile Manipulator End-Effector Tracking  
 **Repository:** phoenixjyb/cinebotRL  
 **Branch:** train-windows  
-**Last Updated:** October 22, 2025 23:05 +0800
+**Last Updated:** October 26, 2025 15:30 +0800
 
 ---
 
-## 🚀 **RUNNING: Session 6**
+## 🚀 **RUNNING: Session 7**
+
+**Status:** Reachability-guided base planning with FK workspace map  
+**Session:** 7 - Intelligent Base Navigation (reachability rewards)  
+**Commits:** 2 total (reachability loader + reward integration)  
+**Latest Commit:** `d0f44cc` - Add reachability-guided reward integration
+
+### Quick Start
+```powershell
+# Recommended: 64 environments for testing
+.\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
+
+# Full training: 4096 environments (~12 hours to 100M)
+cd I:\isaaclab
+I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py --task MobileMMTrackEE-v0 --num_envs 4096 --n_steps 128 --batch_size 1024 --total_timesteps 100000000 --learning_rate 3e-4 --ent_coef 0.001 --enable_entropy_decay --final_ent_coef 1e-4 --decay_start_timestep 50000000 --decay_duration_timesteps 50000000 --enable_kl_schedule --kl_warmup 0.25 --kl_main 0.15 --kl_finetune 0.07 --target_kl 1.0 --trajectory_type multi_recorded --use_all_trajectories --headless
+```
+
+### What's New (Session 7)
+✅ **NEW:** Reachability map (12,646 voxels, 5cm resolution, ARM base frame)  
+✅ **NEW:** Two-stage reward strategy based on workspace reachability  
+   - **Reachable:** +0.5 bonus for good base positioning
+   - **Unreachable:** Reward base movement toward target in X-Y plane
+✅ **NEW:** Directional alignment reward: `dot(base_vel_world, direction_to_target)`  
+✅ **NEW:** Speed bonus when moving in correct direction  
+✅ Fast KD-tree queries (O(log N) = O(log 12646) ≈ 14 comparisons)  
+✅ Coordinate transformation: World → Arm base frame  
+✅ All Session 6 fixes still active (jerk penalty, contact sensor, shape fix)
+
+### Why Session 7 is Needed
+🎯 **Smarter Base Navigation:**
+- Previous sessions: Base moved randomly or not at all
+- Session 7: Policy knows WHEN to move base vs. just use arm
+- Reachability map tells: "Can arm reach from here?"
+- If unreachable → guide base toward target efficiently
+
+🎯 **Accelerated Learning:**
+- Less wasted exploration on impossible poses
+- Direct guidance: "Move THIS direction to reach target"
+- Should converge faster than pure reward shaping
+
+### Expected Outcome (Session 7)
+🎯 Base learns to navigate to good positions BEFORE arm moves  
+🎯 Fewer "stuck" situations (target unreachable from current base)  
+🎯 More efficient trajectories (less backtracking)  
+🎯 Better coordination between base and arm movements  
+🎯 Mean tracking error < 0.3m after 100M steps (improvement over Session 6)
+
+---
+
+## Session 6 (Completed)
 
 **Status:** Critical frozen base fixes - jerk penalty + contact sensor  
 **Session:** 6 - Frozen Base Fix (3 CRITICAL fixes)  
@@ -86,11 +135,184 @@ This document maintains a chronological record of all training sessions, includi
 - [Session 4a](#session-4a) - [TBD]
 - [Session 4b](#session-4b-25m-steps-no-base-movement) - 25.7M steps, no base movement (stopped)
 - [Session 5](#session-5-base-mobilization-fix) - Observation space fix, ran to 20M steps, CATASTROPHIC FAILURE
-- [Session 5b](#session-5b-unbounded-reward-fix) - **CURRENT** - Critical reward capping fixes
+- [Session 5b](#session-5b-unbounded-reward-fix) - Reward capping fixes
+- [Session 6](#session-6-fix-frozen-base-3-critical-fixes) - **COMPLETED** - Jerk penalty + contact sensor (mixed results)
+- [Session 7](#session-7-reachability-guided-base-planning) - **CURRENT** - Intelligent base navigation with FK workspace map
 
 ---
 
-## Session 5: Base Mobilization Fix
+## Session 7: Reachability-Guided Base Planning
+
+**Status:** 🚀 READY TO LAUNCH  
+**Date:** October 26, 2025  
+**Objective:** Guide base movement intelligently using pre-computed reachability workspace
+
+### Git Commits
+
+**Core Implementation:**
+1. `37d23d5` - Add reachability map loader with HDF5 support
+   - Load MATLAB v7.3 (.mat) files with h5py
+   - Fast KD-tree queries for reachability checks (O(log 12646))
+   - Return best arm joint configs for reachable positions
+   - Compute distance to workspace boundary
+   - World-to-arm frame coordinate transformation
+   - Tested and verified with 12,646 reachable voxels
+
+2. `d0f44cc` - Add reachability-guided reward integration
+   - Integrated reachability map queries into `_get_rewards()`
+   - Two-stage reward strategy: reachable vs unreachable
+   - Transform body velocity to world frame
+   - Compute alignment: `dot(vel_world, direction_to_target)`
+   - Reward positive alignment + speed bonus
+   - Log reachability stats every 100 steps
+   - Track reward components in extras
+
+**Additional Files:**
+- `src/rl_platform/utils/reachability_map.py` - ReachabilityMap class (346 lines)
+- `scripts/inspect_mat_file.py` - HDF5 inspection utility
+- `matlab/reach_map_mobile_mm_arm_only.mat` - Pre-computed workspace (12,646 voxels)
+
+### Changes Applied
+
+**NEW: Reachability Map System**
+- **Data:** 12,646 reachable voxels from 35,840 total (35.3% coverage)
+- **Resolution:** 5cm voxel size
+- **Frame:** ARM BASE FRAME (shoulder frame, not ground)
+- **Coverage:** [-0.8→0.8, -1.0→1.0, -0.6→0.8] meters around shoulder
+- **Storage:** Each voxel stores best 6-joint arm configuration (qExample)
+
+**NEW: Two-Stage Reward Strategy**
+
+**Case 1: Target IS Reachable (from current base position)**
+```python
+# Bonus for being in a good base position
+reachability_bonus = 0.5
+
+# Policy focuses on arm tracking accuracy
+# No need to move base, save energy
+```
+
+**Case 2: Target NOT Reachable (need to move base)**
+```python
+# Compute direction to target in world X-Y plane
+direction = target_xy - base_xy
+direction_normalized = direction / (distance + 1e-6)
+
+# Transform base velocity from body frame to world frame
+base_vx_world = base_vx_body * cos(base_theta)
+base_vy_world = base_vx_body * sin(base_theta)
+
+# Reward alignment with desired direction
+alignment = dot([vx_world, vy_world], direction_normalized)
+base_direction_reward = 1.0 * clamp(alignment, min=0.0)
+
+# Speed bonus: move faster in right direction
+speed_bonus = 0.3 * speed * clamp(alignment, min=0.0)
+```
+
+**How Reachability Check Works:**
+1. Get target EE position in world frame
+2. Transform to arm base frame: `world_to_arm_frame(target, base_pose)`
+3. KD-tree query: Find nearest of 12,646 reachable voxels
+4. Check distance: `is_reachable = (distance < 0.1m)`
+5. Split rewards based on boolean mask
+
+### Training Configuration
+
+**Environment:**
+- Task: MobileMMTrackEE-v0
+- Trajectory Type: multi_recorded (all 1,038 trajectories)
+- Rendering: Headless
+- Number of Environments: 4096 (recommended), or 64 for testing
+- Robot: theta_before_x USD (joint order: theta, x, y, arm1-6)
+
+**Hyperparameters:**
+- Total Timesteps: 100,000,000
+- n_steps: 128
+- Batch Size: 1024
+- Learning Rate: 3e-4
+- Entropy Coefficient: 0.001 (decay to 1e-4)
+- KL Schedule: warmup 0.25, main 0.15, finetune 0.07
+
+**All Session 6 Fixes Still Active:**
+- ✅ Jerk penalty: 50.0 m/s³ (allows base movement)
+- ✅ ContactSensor: Monitors self-collisions
+- ✅ Shape fix: prev_joint_vel 9 columns
+
+### Launch Command
+
+```powershell
+# Testing (64 envs, ~5 min per 100K steps)
+.\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
+
+# Full training (4096 envs, ~12 hours to 100M)
+cd I:\isaaclab
+I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py `
+    --task MobileMMTrackEE-v0 `
+    --num_envs 4096 `
+    --n_steps 128 `
+    --batch_size 1024 `
+    --total_timesteps 100000000 `
+    --learning_rate 3e-4 `
+    --ent_coef 0.001 `
+    --enable_entropy_decay `
+    --final_ent_coef 1e-4 `
+    --decay_start_timestep 50000000 `
+    --decay_duration_timesteps 50000000 `
+    --enable_kl_schedule `
+    --kl_warmup 0.25 `
+    --kl_main 0.15 `
+    --kl_finetune 0.07 `
+    --target_kl 1.0 `
+    --trajectory_type multi_recorded `
+    --use_all_trajectories `
+    --headless
+```
+
+### Expected Results
+
+**Early Phase (0-10M steps):**
+- Reachability stats should show varying reachable/unreachable ratios
+- Base direction alignment should increase from ~0 to >0.5
+- Base should start moving toward targets when unreachable
+
+**Mid Phase (10M-50M steps):**
+- Policy learns: "Move base FIRST when target unreachable"
+- Fewer wasted arm movements when base is in wrong position
+- Mean tracking error should drop faster than Session 6
+
+**Late Phase (50M-100M steps):**
+- Smooth coordination: base navigates, then arm tracks
+- Reachability bonus guides base to good positions
+- Expected final error: <0.3m (vs 0.5m in Session 6)
+
+**Key Metrics to Monitor:**
+- `reachability_bonus`: Average value (higher = more good positions)
+- `base_direction_reward`: Average alignment (should increase over time)
+- Reachability stats: % reachable vs unreachable per step
+- Base→target distance when unreachable (should decrease)
+
+### Validation Before Launch
+
+✅ **Environment Test Passed:**
+```bash
+Test: 4 envs × 10 steps
+Result: Successful
+Reachability: Detected 4/4 envs with unreachable targets
+Alignment: 0.000 (no base movement with zero actions)
+Distance: 0.500m average
+Reward: 21.62 → 24.25 (increasing over steps)
+```
+
+✅ **Code Commits Clean:**
+- 2 commits: loader + integration
+- 13 files changed, 453 insertions
+- USD files organized correctly
+- All tests passing
+
+---
+
+## Session 6: Fix Frozen Base (COMPLETED)
 
 **Status:** 🚀 READY TO LAUNCH  
 **Date:** October 21, 2025  

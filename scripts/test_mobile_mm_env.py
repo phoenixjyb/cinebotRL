@@ -292,8 +292,14 @@ def main():
     # Execute steps
     print(f"[7/8] Testing environment stepping ({args_cli.steps} steps)...")
     try:
+        # Get action dimension - handle both wrapped and unwrapped cases
+        if hasattr(env.action_space, 'shape'):
+            action_dim = env.action_space.shape[-1] if len(env.action_space.shape) > 1 else env.action_space.shape[0]
+        else:
+            action_dim = 8  # Fallback: 6 arm + 2 base
+        
         for i in range(args_cli.steps):
-            actions = torch.zeros((args_cli.num_envs, env.action_space.shape[0]), device=env.unwrapped.device)
+            actions = torch.zeros((args_cli.num_envs, action_dim), device=env.unwrapped.device)
             obs, reward, terminated, truncated, info = env.step(actions)
             
             if i == 0:

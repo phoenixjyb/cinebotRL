@@ -55,29 +55,47 @@ COLLISION_PAIRS = {
     % Format: {'link1', 'link2'}
     % NOTE: Link names from URDF (left_arm_link1 NOT left_arm_link_1!)
     
-    % Arm links hitting chassis
+    % IMPORTANT: ARM vs CHASSIS - Prevents reachability points from going
+    %            INSIDE the chassis mesh (physically impossible!)
+    %            Checking ALL arm links (base + link1-6 + gripper)
+    {'left_arm_base_link', 'abstract_chassis_link'},
     {'left_arm_link1', 'abstract_chassis_link'},
     {'left_arm_link2', 'abstract_chassis_link'},
     {'left_arm_link3', 'abstract_chassis_link'},
+    {'left_arm_link4', 'abstract_chassis_link'},
+    {'left_arm_link5', 'abstract_chassis_link'},
+    {'left_arm_link6', 'abstract_chassis_link'},
+    {'left_gripper_link', 'abstract_chassis_link'},
     
-    % Arm self-collisions (non-adjacent links only)
+    % ARM SELF-COLLISIONS (non-adjacent links)
     % Adjacent links (e.g., link1-link2) always touch - skip them!
+    
+    % Link1 vs others (skip link2 - adjacent)
     {'left_arm_link1', 'left_arm_link3'},
     {'left_arm_link1', 'left_arm_link4'},
     {'left_arm_link1', 'left_arm_link5'},
     {'left_arm_link1', 'left_arm_link6'},
+    
+    % Link2 vs others (skip link1/link3 - adjacent)
     {'left_arm_link2', 'left_arm_link4'},
     {'left_arm_link2', 'left_arm_link5'},
     {'left_arm_link2', 'left_arm_link6'},
+    
+    % Link3 vs others (skip link2/link4 - adjacent)
     {'left_arm_link3', 'left_arm_link5'},
     {'left_arm_link3', 'left_arm_link6'},
+    
+    % Link4 vs others (skip link3/link5 - adjacent)
     {'left_arm_link4', 'left_arm_link6'},
     
-    % Gripper collisions (end effector = left_gripper_link)
-    {'left_gripper_link', 'abstract_chassis_link'},
+    % Link5 vs link6 are adjacent - skip
+    
+    % Gripper self-collisions
     {'left_gripper_link', 'left_arm_link1'},
     {'left_gripper_link', 'left_arm_link2'},
-    {'left_gripper_link', 'left_arm_link3'}
+    {'left_gripper_link', 'left_arm_link3'},
+    {'left_gripper_link', 'left_arm_link4'}
+    % Note: link5 and link6 are adjacent to gripper - skip
 };
 
 % Output
@@ -123,6 +141,17 @@ arm_joint_config_indices = find(arm_joint_config_mask);
 if isempty(arm_joint_config_indices)
     error('No arm joints found in robot configuration. Check joint naming in URDF.');
 end
+
+% Debug: Print joint mapping
+fprintf('  Configuration vector mapping:\n');
+for i = 1:num_joints
+    fprintf('    cfg(%d) = %-25s', i, joint_names{i});
+    if arm_joint_config_mask(i)
+        fprintf(' <-- ARM JOINT');
+    end
+    fprintf('\n');
+end
+fprintf('  Arm joint indices in config vector: [%s]\n', num2str(arm_joint_config_indices'));
 
 % Extract joint limits for arm joints
 joint_limits_lower = joint_limits_lower_all(arm_joint_config_indices)';
@@ -227,8 +256,12 @@ fprintf('\nAggregating results into voxel grid...\n');
 tic;
 
 n_valid = sum(valid_mask);
+n_rejected = sum(~valid_mask);
 fprintf('  Valid samples (no collision, in bounds): %d / %d (%.1f%%)\n', ...
         n_valid, N_SAMPLES, 100*n_valid/N_SAMPLES);
+fprintf('  Rejected samples: %d (%.1f%%)\n', ...
+        n_rejected, 100*n_rejected/N_SAMPLES);
+fprintf('    (Rejected = collision OR outside grid bounds)\n');
 
 % DEBUG: Check why samples are being rejected
 if n_valid == 0
@@ -314,10 +347,14 @@ metadata.build_date = datetime('now');
 metadata.n_samples = N_SAMPLES;
 metadata.n_valid_samples = n_valid;
 metadata.n_reachable_voxels = n_reachable;
+metadata.n_rejected_collision = sum(~valid_mask);  % Track collision rejections
+metadata.collision_rejection_rate = 100 * sum(~valid_mask) / N_SAMPLES;
 metadata.check_collisions = CHECK_COLLISIONS;
+metadata.collision_mode = 'adjacent';  % Document which mode was used
 metadata.use_parfor = USE_PARFOR;
 
 fprintf('\nSaving map to: %s\n', MAP_FILE);
+% qExample stores the best config for each reachable voxel (enables verification)
 save(MAP_FILE, 'reachScore', 'manipMax', 'qExample', 'config', 'metadata', '-v7.3');
 
 info = dir(MAP_FILE);
@@ -406,38 +443,33 @@ q = q(:)';
 end
 
 
-function in_collision = check_self_collision(robot, q_full, collision_pairs)
+function in_collision = check_self_collision(robot, q_full, ~)
 % Check if configuration has self-collision
 %
-% Uses distance threshold for sphere-based collision detection
+% Uses MATLAB's checkCollision with 'adjacent' mode
+% This successfully detects both:
+% 1. Arm self-collisions (non-adjacent links)
+% 2. Chassis-arm collisions (verified by test_chassis_collision.m)
 
 in_collision = false;
-COLLISION_THRESHOLD = 0.05;  % 5cm safety margin
 
-for i = 1:length(collision_pairs)
-    link1_name = collision_pairs{i}{1};
-    link2_name = collision_pairs{i}{2};
+try
+    % Use 'adjacent' mode - skips only bodies at adjacent array indices
+    % This catches chassis-arm collisions and arm self-collisions
+    [isColliding, ~] = checkCollision(robot, q_full, ...
+        'Exhaustive', 'on', ...
+        'SkippedSelfCollisions', 'adjacent');
     
-    try
-        % Get transforms for both links
-        T1 = getTransform(robot, q_full, link1_name);
-        T2 = getTransform(robot, q_full, link2_name);
-        
-        % Extract positions
-        p1 = T1(1:3, 4);
-        p2 = T2(1:3, 4);
-        
-        % Check distance
-        dist = norm(p1 - p2);
-        
-        if dist < COLLISION_THRESHOLD
-            in_collision = true;
-            return;
-        end
-    catch
-        % If transform fails, assume no collision
-        continue;
+    if isColliding
+        in_collision = true;
+        return;
     end
+    
+catch ME
+    % If check fails entirely, be conservative
+    warning('robotics:checkCollision', ...
+        'Collision check failed: %s', ME.message);
+    in_collision = true;
 end
 
 end

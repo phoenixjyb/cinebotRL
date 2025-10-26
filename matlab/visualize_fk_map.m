@@ -85,24 +85,26 @@ fig.Position = [100 100 1200 800];
 %% Plot 1: Reachability voxel cloud with robot
 subplot(1, 2, 1);
 plot_reach_cloud(reachScore, config, ARM_OFFSET, robot, qExample);
-title('Reachable Workspace (in World Frame)');
+title('Reachable Workspace (World Frame)');
 
 %% Plot 2: Manipulability heatmap with robot
 subplot(1, 2, 2);
 plot_manip_cloud(reachScore, manipMax, config, ARM_OFFSET, robot, qExample);
-title('Manipulability Index (in World Frame)');
+title('Manipulability Index (World Frame)');
 
 fprintf('\n✓ Visualization complete!\n');
 fprintf('  - Left: Binary reachability (red = reachable)\n');
 fprintf('  - Right: Manipulability (blue=low, red=high)\n');
 fprintf('  - Robot shown at home configuration\n');
-fprintf('  - Frame: World frame (mobile base at ground, arm at %.2fm height)\n\n', ARM_OFFSET(3));
+fprintf('  - Frame: World frame (chassis at ground, cloud centered at arm shoulder)\n\n');
 
 end
 
 
 function plot_reach_cloud(reachScore, config, arm_offset, robot, qExample)
-% Plot binary reachability as 3D point cloud in WORLD FRAME
+% Plot reachability cloud in ARM BASE FRAME with robot in WORLD FRAME
+% Cloud: relative to arm shoulder (0,0,0 = shoulder)
+% Robot: shows full mobile base + arm (chassis at ground)
 
 % Get grid parameters
 nx = config.grid_dims(1);
@@ -114,49 +116,69 @@ voxel = config.voxel_size;
 % Find reachable voxels
 [ix, iy, iz] = ind2sub([nx, ny, nz], find(reachScore > 0));
 
-% Convert to ARM BASE coordinates
+% Convert voxel indices to ARM BASE FRAME coordinates
+% This is the workspace relative to the shoulder
 x_arm = origin(1) + (ix - 0.5) * voxel;
 y_arm = origin(2) + (iy - 0.5) * voxel;
 z_arm = origin(3) + (iz - 0.5) * voxel;
 
-% Transform to WORLD FRAME (mobile base frame)
-x = x_arm + arm_offset(1);
-y = y_arm + arm_offset(2);
-z = z_arm + arm_offset(3);
-
-% Show robot at home configuration FIRST (if available)
+% Show robot in WORLD FRAME (chassis at ground)
 if ~isempty(robot)
     q_home = homeConfiguration(robot);
-    % Render robot with meshes first, then add scatter on top
     show(robot, q_home, 'Visuals', 'on', 'Collisions', 'off', 'Frames', 'off');
     hold on;
-    fprintf('  Robot mesh rendered\n');
+    fprintf('  Robot mesh rendered in world frame\n');
 end
 
-% Plot reachability cloud on top of robot
-scatter3(x, y, z, 10, 'r', 'filled', 'MarkerFaceAlpha', 0.3);
+% Transform point cloud from ARM BASE to WORLD FRAME for visualization
+% Arm base transform from URDF: xyz="0.16 0 0.9465" rpy="0 0 -1.5708"
+% Translation
+ARM_TRANSLATION = [0.16; 0; 0.9465];
+% Rotation: -90° around Z-axis
+% Rz(-90°) = [0  1  0]
+%            [-1 0  0]
+%            [0  0  1]
+ARM_ROTATION = [0, 1, 0; 
+                -1, 0, 0; 
+                0, 0, 1];
 
-% Mark mobile base (ground, origin of world frame)
+% Transform each point: p_world = R * p_arm + t
+points_arm = [x_arm(:), y_arm(:), z_arm(:)]';  % 3xN matrix
+points_world = ARM_ROTATION * points_arm + ARM_TRANSLATION;
+x_world = points_world(1, :)';
+y_world = points_world(2, :)';
+z_world = points_world(3, :)';
+
+% Plot reachability cloud in world frame to match robot
+scatter3(x_world, y_world, z_world, 10, 'r', 'filled', 'MarkerFaceAlpha', 0.3);
+
+% Mark mobile base (chassis at ground, world origin)
 scatter3(0, 0, 0, 150, 'k', 'filled', 'p', 'MarkerEdgeColor', 'w', 'LineWidth', 2);
 text(0, 0, -0.1, 'Mobile Base', 'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
 
-% Mark arm base (shoulder, where arm is mounted)
-scatter3(arm_offset(1), arm_offset(2), arm_offset(3), 100, 'b', 'filled', ...
+% Mark arm base (shoulder in world frame)
+arm_base_world = ARM_TRANSLATION;  % Just the translation part for marker
+scatter3(arm_base_world(1), arm_base_world(2), arm_base_world(3), 100, 'b', 'filled', ...
          'MarkerEdgeColor', 'w', 'LineWidth', 2);
-text(arm_offset(1), arm_offset(2), arm_offset(3)+0.1, 'Arm Base', ...
+text(arm_base_world(1), arm_base_world(2), arm_base_world(3)+0.1, 'Arm Base', ...
      'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
 
-% Grid box (in world frame)
-corners = [
-    origin(1) + arm_offset(1), origin(2) + arm_offset(2), origin(3) + arm_offset(3);
-    origin(1) + nx*voxel + arm_offset(1), origin(2) + arm_offset(2), origin(3) + arm_offset(3);
-    origin(1) + nx*voxel + arm_offset(1), origin(2) + ny*voxel + arm_offset(2), origin(3) + arm_offset(3);
-    origin(1) + arm_offset(1), origin(2) + ny*voxel + arm_offset(2), origin(3) + arm_offset(3);
-    origin(1) + arm_offset(1), origin(2) + arm_offset(2), origin(3) + nz*voxel + arm_offset(3);
-    origin(1) + nx*voxel + arm_offset(1), origin(2) + arm_offset(2), origin(3) + nz*voxel + arm_offset(3);
-    origin(1) + nx*voxel + arm_offset(1), origin(2) + ny*voxel + arm_offset(2), origin(3) + nz*voxel + arm_offset(3);
-    origin(1) + arm_offset(1), origin(2) + ny*voxel + arm_offset(2), origin(3) + nz*voxel + arm_offset(3);
-];
+% Grid box in WORLD FRAME
+% Define 8 corners in arm base frame then transform to world
+corners_arm = [
+    origin(1), origin(2), origin(3);
+    origin(1) + nx*voxel, origin(2), origin(3);
+    origin(1) + nx*voxel, origin(2) + ny*voxel, origin(3);
+    origin(1), origin(2) + ny*voxel, origin(3);
+    origin(1), origin(2), origin(3) + nz*voxel;
+    origin(1) + nx*voxel, origin(2), origin(3) + nz*voxel;
+    origin(1) + nx*voxel, origin(2) + ny*voxel, origin(3) + nz*voxel;
+    origin(1), origin(2) + ny*voxel, origin(3) + nz*voxel;
+]';  % 3x8 matrix
+
+% Transform to world frame
+corners_world = ARM_ROTATION * corners_arm + ARM_TRANSLATION;
+corners = corners_world';  % 8x3 matrix
 plot_box(corners);
 
 hold off;
@@ -170,8 +192,8 @@ view(45, 30);
 end
 
 
-function plot_manip_cloud(reachScore, manipMax, config, arm_offset, robot, qExample)
-% Plot manipulability as colored 3D point cloud in WORLD FRAME
+function plot_manip_cloud(reachScore, manipMax, config, arm_offset, robot, ~)
+% Plot manipulability cloud in ARM BASE FRAME with robot in WORLD FRAME
 
 % Get grid parameters
 nx = config.grid_dims(1);
@@ -187,53 +209,64 @@ reachable_idx = find(reachScore > 0);
 % Get manipulability values
 manip_vals = manipMax(reachable_idx);
 
-% Convert to ARM BASE coordinates
+% Convert to ARM BASE FRAME coordinates
 x_arm = origin(1) + (ix - 0.5) * voxel;
 y_arm = origin(2) + (iy - 0.5) * voxel;
 z_arm = origin(3) + (iz - 0.5) * voxel;
 
-% Transform to WORLD FRAME (mobile base frame)
-x = x_arm + arm_offset(1);
-y = y_arm + arm_offset(2);
-z = z_arm + arm_offset(3);
-
-% Show robot at home configuration FIRST (if available)
+% Show robot in WORLD FRAME (chassis at ground)
 if ~isempty(robot)
     q_home = homeConfiguration(robot);
-    % Render robot kinematic structure (meshes may not load due to package:// paths)
-    % Show with frames to visualize the robot structure
     show(robot, q_home, 'Visuals', 'on', 'Collisions', 'off', 'Frames', 'on');
     hold on;
 end
 
-% Plot manipulability cloud on top of robot
-scatter3(x, y, z, 10, manip_vals, 'filled', 'MarkerFaceAlpha', 0.5);
+% Transform point cloud to WORLD FRAME for visualization
+% Arm base transform from URDF: xyz="0.16 0 0.9465" rpy="0 0 -1.5708"
+ARM_TRANSLATION = [0.16; 0; 0.9465];
+ARM_ROTATION = [0, 1, 0; -1, 0, 0; 0, 0, 1];
+
+% Transform: p_world = R * p_arm + t
+points_arm = [x_arm(:), y_arm(:), z_arm(:)]';
+points_world = ARM_ROTATION * points_arm + ARM_TRANSLATION;
+x_world = points_world(1, :)';
+y_world = points_world(2, :)';
+z_world = points_world(3, :)';
+
+% Plot manipulability cloud in world frame
+scatter3(x_world, y_world, z_world, 10, manip_vals, 'filled', 'MarkerFaceAlpha', 0.5);
 
 colormap('jet');
 cb = colorbar;
 cb.Label.String = 'Manipulability Index';
 
-% Mark mobile base (ground)
+% Mark mobile base (chassis at ground)
 scatter3(0, 0, 0, 150, 'k', 'filled', 'p', 'MarkerEdgeColor', 'w', 'LineWidth', 2);
 text(0, 0, -0.1, 'Mobile Base', 'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
 
-% Mark arm base (shoulder)
-scatter3(arm_offset(1), arm_offset(2), arm_offset(3), 100, 'b', 'filled', ...
+% Mark arm base (shoulder in world frame)
+arm_base_world = ARM_TRANSLATION;
+scatter3(arm_base_world(1), arm_base_world(2), arm_base_world(3), 100, 'b', 'filled', ...
          'MarkerEdgeColor', 'w', 'LineWidth', 2);
-text(arm_offset(1), arm_offset(2), arm_offset(3)+0.1, 'Arm Base', ...
+text(arm_base_world(1), arm_base_world(2), arm_base_world(3)+0.1, 'Arm Base', ...
      'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
 
-% Grid box (in world frame)
-corners = [
-    origin(1) + arm_offset(1), origin(2) + arm_offset(2), origin(3) + arm_offset(3);
-    origin(1) + nx*voxel + arm_offset(1), origin(2) + arm_offset(2), origin(3) + arm_offset(3);
-    origin(1) + nx*voxel + arm_offset(1), origin(2) + ny*voxel + arm_offset(2), origin(3) + arm_offset(3);
-    origin(1) + arm_offset(1), origin(2) + ny*voxel + arm_offset(2), origin(3) + arm_offset(3);
-    origin(1) + arm_offset(1), origin(2) + arm_offset(2), origin(3) + nz*voxel + arm_offset(3);
-    origin(1) + nx*voxel + arm_offset(1), origin(2) + arm_offset(2), origin(3) + nz*voxel + arm_offset(3);
-    origin(1) + nx*voxel + arm_offset(1), origin(2) + ny*voxel + arm_offset(2), origin(3) + nz*voxel + arm_offset(3);
-    origin(1) + arm_offset(1), origin(2) + ny*voxel + arm_offset(2), origin(3) + nz*voxel + arm_offset(3);
-];
+% Grid box in WORLD FRAME
+% Define 8 corners in arm base frame then transform to world
+corners_arm = [
+    origin(1), origin(2), origin(3);
+    origin(1) + nx*voxel, origin(2), origin(3);
+    origin(1) + nx*voxel, origin(2) + ny*voxel, origin(3);
+    origin(1), origin(2) + ny*voxel, origin(3);
+    origin(1), origin(2), origin(3) + nz*voxel;
+    origin(1) + nx*voxel, origin(2), origin(3) + nz*voxel;
+    origin(1) + nx*voxel, origin(2) + ny*voxel, origin(3) + nz*voxel;
+    origin(1), origin(2) + ny*voxel, origin(3) + nz*voxel;
+]';  % 3x8 matrix
+
+% Transform to world frame
+corners_world = ARM_ROTATION * corners_arm + ARM_TRANSLATION;
+corners = corners_world';  % 8x3 matrix
 plot_box(corners);
 
 hold off;

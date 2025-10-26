@@ -16,12 +16,11 @@
 
 ### Quick Start
 ```powershell
-# Recommended: 64 environments for testing
-.\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
+# Quick test: 64 environments (~5 min to verify reachability works)
+I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py --task MobileMMTrackEE-v0 --num_envs 64 --n_steps 128 --batch_size 64 --total_timesteps 1000000 --learning_rate 3e-4 --ent_coef 0.001 --trajectory_type multi_recorded --use_all_trajectories --headless
 
 # Full training: 4096 environments (~12 hours to 100M)
-cd I:\isaaclab
-I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py --task MobileMMTrackEE-v0 --num_envs 4096 --n_steps 128 --batch_size 1024 --total_timesteps 100000000 --learning_rate 3e-4 --ent_coef 0.001 --enable_entropy_decay --final_ent_coef 1e-4 --decay_start_timestep 50000000 --decay_duration_timesteps 50000000 --enable_kl_schedule --kl_warmup 0.25 --kl_main 0.15 --kl_finetune 0.07 --target_kl 1.0 --trajectory_type multi_recorded --use_all_trajectories --headless
+I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py --task MobileMMTrackEE-v0 --num_envs 4096 --n_steps 128 --batch_size 1024 --n_epochs 10 --total_timesteps 100000000 --learning_rate 3e-4 --ent_coef 0.001 --enable_entropy_decay --final_ent_coef 1e-4 --decay_start_timestep 50000000 --decay_duration_timesteps 50000000 --enable_kl_schedule --kl_warmup 0.25 --kl_main 0.15 --kl_finetune 0.07 --target_kl 1.0 --clip_range 0.2 --gamma 0.99 --gae_lambda 0.95 --trajectory_type multi_recorded --use_all_trajectories --save_freq 100000 --headless
 ```
 
 ### What's New (Session 7)
@@ -241,17 +240,29 @@ speed_bonus = 0.3 * speed * clamp(alignment, min=0.0)
 
 ### Launch Command
 
+**Quick Test (64 envs, ~5 min to verify reachability system works):**
 ```powershell
-# Testing (64 envs, ~5 min per 100K steps)
-.\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
+I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py `
+    --task MobileMMTrackEE-v0 `
+    --num_envs 64 `
+    --n_steps 128 `
+    --batch_size 64 `
+    --total_timesteps 1000000 `
+    --learning_rate 3e-4 `
+    --ent_coef 0.001 `
+    --trajectory_type multi_recorded `
+    --use_all_trajectories `
+    --headless
+```
 
-# Full training (4096 envs, ~12 hours to 100M)
-cd I:\isaaclab
+**Full Training (4096 envs, ~12 hours to 100M):**
+```powershell
 I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py `
     --task MobileMMTrackEE-v0 `
     --num_envs 4096 `
     --n_steps 128 `
     --batch_size 1024 `
+    --n_epochs 10 `
     --total_timesteps 100000000 `
     --learning_rate 3e-4 `
     --ent_coef 0.001 `
@@ -264,10 +275,25 @@ I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcemen
     --kl_main 0.15 `
     --kl_finetune 0.07 `
     --target_kl 1.0 `
+    --clip_range 0.2 `
+    --gamma 0.99 `
+    --gae_lambda 0.95 `
     --trajectory_type multi_recorded `
     --use_all_trajectories `
+    --save_freq 100000 `
     --headless
 ```
+
+**Parameters Explained:**
+- `--n_steps 128`: Rollout length (128 × 4096 = 524K timesteps/iteration)
+- `--batch_size 1024`: Minibatch size for updates
+- `--n_epochs 10`: PPO update epochs per rollout
+- `--ent_coef 0.001`: Initial entropy (decay to 0.0001 after 50M steps)
+- `--enable_kl_schedule`: Three-phase KL schedule for stability
+  - Warmup (0-10M): 0.25 (exploration)
+  - Main (10M-80M): 0.15 (balanced)
+  - Finetune (80M-100M): 0.07 (refinement)
+- `--save_freq 100000`: Checkpoint every 100K steps (every ~2.4M timesteps)
 
 ### Expected Results
 

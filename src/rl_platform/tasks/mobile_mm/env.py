@@ -357,6 +357,18 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             max_trajectories=self.task_cfg.trajectory.max_trajectories,
         )
         
+        # Load reachability map for intelligent base planning
+        print("[MobileMMTrackEE] Loading reachability map...")
+        try:
+            from rl_platform.utils.reachability_map import ReachabilityMap
+            reach_map_path = "matlab/reach_map_mobile_mm_arm_only.mat"
+            self.reach_map = ReachabilityMap(reach_map_path, device=self.device)
+            print(f"[MobileMMTrackEE] ✓ Reachability map loaded with {len(self.reach_map.reachable_positions)} points")
+        except Exception as e:
+            print(f"[MobileMMTrackEE] ⚠ Failed to load reachability map: {e}")
+            print(f"[MobileMMTrackEE] ⚠ Continuing without reachability guidance")
+            self.reach_map = None
+        
         # State buffers for tracking history (needed for derivatives)
         self.prev_actions = torch.zeros(
             self.num_envs, self.cfg.num_actions, device=self.device
@@ -1082,6 +1094,81 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Get base orientation for lateral penalty calculation
         base_quat = self.robot.data.root_quat_w
         
+        # ============================================================================
+        # REACHABILITY-GUIDED BASE PLANNING
+        # ============================================================================
+        # Check if target EE position is reachable from current base position
+        # If not reachable → encourage base movement toward target
+        reachability_bonus = torch.zeros(self.num_envs, device=self.device)
+        base_direction_reward = torch.zeros(self.num_envs, device=self.device)
+        
+        if self.reach_map is not None:
+            # Transform target EE position from world frame to arm base frame
+            base_pose = self.robot.data.joint_pos[:, self._base_joint_ids]  # [N, 3]: [x, y, theta]
+            target_in_arm_frame = self.reach_map.world_to_arm_frame(target_pos, base_pose)
+            
+            # Check reachability
+            is_reachable = self.reach_map.query(target_in_arm_frame, tolerance=0.1)  # 10cm tolerance
+            
+            # Count reachable/unreachable for logging
+            n_reachable = is_reachable.sum().item()
+            n_unreachable = (~is_reachable).sum().item()
+            
+            # === CASE 1: Target IS reachable from current base position ===
+            if is_reachable.any():
+                # Bonus for being in a good base position
+                reachability_bonus[is_reachable] = 0.5
+                
+                # Optional: Get best arm config as IK hint (future enhancement)
+                # arm_configs, _ = self.reach_map.get_best_configs(target_in_arm_frame[is_reachable])
+            
+            # === CASE 2: Target is NOT reachable from current base position ===
+            if (~is_reachable).any():
+                # Compute direction to target in world X-Y plane
+                target_xy = target_pos[~is_reachable, :2]  # [M, 2]: world X, Y
+                base_xy = base_pose[~is_reachable, :2]     # [M, 2]: world X, Y
+                
+                # Direction vector from base to target
+                direction_to_target = target_xy - base_xy  # [M, 2]
+                distance_to_target_xy = torch.norm(direction_to_target, dim=-1, keepdim=True)  # [M, 1]
+                direction_normalized = direction_to_target / (distance_to_target_xy + 1e-6)  # [M, 2]
+                
+                # Transform base velocity from body frame to world frame
+                # Base velocity in body frame: [vx_body, 0, wz] (differential drive can't strafe)
+                base_theta = base_pose[~is_reachable, 2]  # [M]
+                base_vx_body = commanded_linear[~is_reachable, 0]  # [M]
+                
+                # World frame velocity (rotation matrix applied to body velocity)
+                base_vx_world = base_vx_body * torch.cos(base_theta)  # X component in world
+                base_vy_world = base_vx_body * torch.sin(base_theta)  # Y component in world
+                base_vel_xy_world = torch.stack([base_vx_world, base_vy_world], dim=-1)  # [M, 2]
+                
+                # Compute alignment: dot product of velocity with desired direction
+                alignment = (base_vel_xy_world * direction_normalized).sum(dim=-1)  # [M]
+                
+                # Reward moving in correct direction (only positive alignment)
+                base_direction_reward[~is_reachable] = 1.0 * torch.clamp(alignment, min=0.0)
+                
+                # Bonus for higher speed when moving in right direction
+                speed_xy = torch.norm(base_vel_xy_world, dim=-1)  # [M]
+                base_direction_reward[~is_reachable] += 0.3 * speed_xy * torch.clamp(alignment, min=0.0)
+            
+            # Log reachability statistics (every 100 steps to avoid spam)
+            if not hasattr(self, '_reach_log_step'):
+                self._reach_log_step = 0
+            
+            if self._reach_log_step % 100 == 0:
+                print(f"\n[Reachability Stats] Step {self._reach_log_step}")
+                print(f"  Reachable: {n_reachable}/{self.num_envs} envs")
+                print(f"  Unreachable: {n_unreachable}/{self.num_envs} envs")
+                if n_unreachable > 0:
+                    avg_alignment = alignment.mean().item() if n_unreachable > 0 else 0.0
+                    avg_distance = distance_to_target_xy.mean().item() if n_unreachable > 0 else 0.0
+                    print(f"  Avg base→target alignment: {avg_alignment:.3f}")
+                    print(f"  Avg base→target distance: {avg_distance:.3f} m")
+            
+            self._reach_log_step += 1
+        
         # Compute rewards with all new constraint penalties
         # Use COMMANDED velocities for penalty calculation to avoid penalizing simulation artifacts
         rewards, self.reward_components = compute_combined_reward(
@@ -1143,6 +1230,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "base_action_z_mean": self.prev_actions[:, 7].mean().item(),
             "base_action_z_std": self.prev_actions[:, 7].std().item(),
         }
+        
+        # === ADD REACHABILITY-GUIDED REWARDS ===
+        rewards += reachability_bonus + base_direction_reward
+        
+        # Log reachability reward components
+        if self.reach_map is not None:
+            self.extras["reward_components"]["reachability_bonus"] = reachability_bonus.mean().item()
+            self.extras["reward_components"]["base_direction_reward"] = base_direction_reward.mean().item()
         
         return rewards
     

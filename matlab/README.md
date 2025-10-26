@@ -78,6 +78,48 @@ The `.mat` file contains:
 - **`manipMax`** (32×40×28): Best manipulability at each voxel
 - **`qExample`** (32×40×28×6): Best joint config (6 arm joints) per voxel
 - **`config`**: Grid parameters (origin, size, voxel_size, etc.)
+
+## Extract Surface Mesh
+
+`tools/extract_reachability_surface.m` converts the dense voxel grid into a lightweight surface representation that is easier to visualise and consume from Python.
+
+```matlab
+cd matlab
+addpath tools
+surface = extract_reachability_surface('reach_map_mobile_mm_arm_only.mat', ...
+    'output_mat', 'exports/reach_surface.mat', ...
+    'output_ply', 'exports/reach_surface.ply', ...
+    'smooth_kernel', 3, ...      % set 0 to skip smoothing
+    'reduce_fraction', 0.4, ...  % 0<r<=1, 1 keeps full mesh
+    'min_cluster', 16);          % drop tiny voxel islands
+```
+
+Outputs:
+
+- `.mat` file with a `surface` struct containing `vertices`, `faces`, `normals`, per-voxel boundary points, and metadata.
+- Optional ASCII `.ply` mesh for immediate use in Python (`trimesh`, `open3d`, `pyvista`, Blender, etc.).
+
+Minimal Python loader for the `.mat` surface (requires `scipy`):
+
+```python
+import scipy.io
+import numpy as np
+
+data = scipy.io.loadmat("exports/reach_surface.mat", squeeze_me=True)
+surface = data["surface"]
+vertices = np.asarray(surface["vertices"])
+faces = np.asarray(surface["faces"], dtype=np.int32) - 1  # MATLAB -> 0-based
+normals = np.asarray(surface["normals"])
+```
+
+If `scipy` is unavailable, load the `.ply` output instead:
+
+```python
+import trimesh
+mesh = trimesh.load("exports/reach_surface.ply")
+```
+
+Tune the options to trade fidelity for mesh size. The defaults smooth the binary grid, remove voxel speckles smaller than 32 cells, and decimate the mesh to roughly 35% of the original faces.
 - **`metadata`**: Build info (date, samples, collision_mode, etc.)
 
 ## Key Features

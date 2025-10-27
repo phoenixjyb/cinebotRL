@@ -212,7 +212,7 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
             update_period=0.0,
             history_length=1,
             debug_vis=False,
-            filter_prim_paths_expr=["{ENV_REGEX_NS}/GroundPlane"],  # Only report arm-ground contacts
+            filter_prim_paths_expr=["/World/Ground"],  # Only report arm-ground contacts (actual prim path)
         )
         
         return scene_cfg
@@ -944,8 +944,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             chassis_force_mag = torch.norm(chassis_forces, dim=-1)  # [num_envs]
         
         # Get forces from arm sensor (arm-ground collisions)
+        # Check both possible key formats: direct key or via sensors dict
+        arm_sensor = None
         if "arm_contact_sensor" in self.scene.sensors:
-            arm_sensor = self.scene["arm_contact_sensor"]
+            arm_sensor = self.scene.sensors["arm_contact_sensor"]
+        elif hasattr(self.scene, "arm_contact_sensor"):
+            arm_sensor = self.scene.arm_contact_sensor
+        
+        if arm_sensor is not None:
             arm_forces = arm_sensor.data.net_forces_w
             
             # Calculate arm contact magnitudes
@@ -957,7 +963,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             # Combined: max of arm-chassis OR arm-ground
             contact_force_per_env = torch.maximum(chassis_force_mag, arm_force_mag)
         else:
-            # Fallback: only chassis sensor available
+            # Fallback: only chassis sensor available (should not happen with new config)
             contact_force_per_env = chassis_force_mag
         
         return contact_force_per_env

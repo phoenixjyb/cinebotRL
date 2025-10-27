@@ -865,8 +865,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # so we manually keep the base at ground level (Z=0)
         current_root_pos = self.robot.data.root_pos_w.clone()
         current_root_pos[:, 2] = 0.0  # Keep chassis at ground level
-        # write_root_pose_to_sim handles full batch when given per-env poses
-        self.robot.write_root_pose_to_sim(current_root_pos, self.robot.data.root_quat_w)
+        # Concatenate [pos(3), quat(4)] into single tensor for write_root_pose_to_sim
+        root_pose = torch.cat([current_root_pos, self.robot.data.root_quat_w], dim=-1)  # [N, 7]
+        self.robot.write_root_pose_to_sim(root_pose)
         
         # DEBUG: Print base velocity on first few steps
         if not hasattr(self, '_base_debug_count'):

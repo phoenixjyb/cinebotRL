@@ -865,7 +865,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # so we manually keep the base at ground level (Z=0)
         current_root_pos = self.robot.data.root_pos_w.clone()
         current_root_pos[:, 2] = 0.0  # Lock Z position at ground level
-        self.robot.write_root_pose_to_sim(current_root_pos, self.robot.data.root_quat_w)
+        env_ids = list(range(self.num_envs))  # Need explicit int list for indexing
+        self.robot.write_root_pose_to_sim(current_root_pos, self.robot.data.root_quat_w, env_ids=env_ids)
         
         # DEBUG: Print base velocity on first few steps
         if not hasattr(self, '_base_debug_count'):

@@ -195,12 +195,24 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         # Add contact sensor for chassis (to detect when arm links collide with it)
         # Following official Isaac Lab pattern from contact_sensor.py example
         # filter_prim_paths_expr limits to only report contacts with arm links
+        # Contact sensors: Monitor both chassis and arm for comprehensive collision detection
+        # 1. Chassis sensor: Detects arm-base collisions (filters out ground support)
+        # 2. Arm sensor: Detects arm-ground collisions
         scene_cfg.contact_sensor = ContactSensorCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/abstract_chassis_link",  # Monitor forces on actual chassis body
+            prim_path="{ENV_REGEX_NS}/Robot/abstract_chassis_link",  # Monitor chassis
             update_period=0.0,  # Update every sim step (5ms physics)
             history_length=1,   # Only need current forces
             debug_vis=False,    # Disable visualization for performance
             filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/left_arm.*"],  # Only report arm-chassis contacts
+        )
+        
+        # Add arm contact sensor to detect arm-ground collisions
+        scene_cfg.arm_contact_sensor = ContactSensorCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/left_arm.*",  # Monitor all arm links
+            update_period=0.0,
+            history_length=1,
+            debug_vis=False,
+            filter_prim_paths_expr=["{ENV_REGEX_NS}/GroundPlane"],  # Only report arm-ground contacts
         )
         
         return scene_cfg
@@ -911,74 +923,42 @@ class MobileMMTrackEEEnv(DirectRLEnv):
     def _get_filtered_contact_forces(self) -> torch.Tensor:
         """Get contact forces filtered to exclude normal base-ground contact.
         
-        The contact sensor is attached to abstract_chassis_link, so it reports:
-        - Chassis ↔ Ground (normal support - EXCLUDE this)
-        - Chassis ↔ Arm links (potential collision - KEEP this)
+        We use two sensors:
+        1. Chassis sensor: Reports arm-chassis collisions (sensor on base, filtered to arm contacts)
+        2. Arm sensor: Reports arm-ground collisions (sensor on arm, filtered to ground contacts)
         
-        We filter by checking the "other body" in contact pairs:
-        - If other body is ground → EXCLUDE (normal base support)
-        - If other body is arm link → KEEP (arm hitting base)
-        - If other body is ground AND sensor on arm → KEEP (arm hitting floor)
+        This excludes:
+        - Chassis ↔ Ground (normal 2-3kN support load - not reported by either sensor)
         
         Returns:
             Tensor of shape [num_envs] with maximum filtered contact force per env
         """
-        contact_sensor = self.scene["contact_sensor"]
-        net_contact_forces = contact_sensor.data.net_forces_w  # [num_envs, num_bodies, 3] or [num_envs, 3]
+        # Get forces from chassis sensor (arm-chassis collisions)
+        chassis_sensor = self.scene["contact_sensor"]
+        chassis_forces = chassis_sensor.data.net_forces_w  # [num_envs, num_bodies, 3] or [num_envs, 3]
         
-        # Calculate force magnitudes
-        if len(net_contact_forces.shape) == 3:
-            # Multi-body: [num_envs, num_bodies, 3]
-            contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
-            
-            # Check if we have body names to filter intelligently
-            body_names = contact_sensor.data.body_names if hasattr(contact_sensor.data, 'body_names') else []
-            
-            # NEW: Check "other body" names (what the sensor body is touching)
-            # This is key for catching arm-ground collisions when sensor is on chassis
-            other_body_names = []
-            if hasattr(contact_sensor.data, 'contact_pair_names'):
-                # Extract "other body" from contact pair names
-                # Format is typically "body1:body2"
-                for pair in contact_sensor.data.contact_pair_names:
-                    if ':' in pair:
-                        parts = pair.split(':')
-                        other_body_names.append(parts[1] if len(parts) > 1 else "")
-            
-            if body_names or other_body_names:
-                # Create mask: True to KEEP, False to EXCLUDE
-                mask = torch.ones(contact_force_mag.shape[1], dtype=torch.bool, device=self.device)
-                
-                for idx in range(len(mask)):
-                    sensor_body = body_names[idx] if idx < len(body_names) else ""
-                    other_body = other_body_names[idx] if idx < len(other_body_names) else ""
-                    
-                    # EXCLUDE: Chassis ↔ Ground (normal base support load)
-                    is_chassis_sensor = 'chassis' in sensor_body.lower() or 'base' in sensor_body.lower()
-                    is_ground_contact = 'ground' in other_body.lower() or 'plane' in other_body.lower()
-                    
-                    if is_chassis_sensor and is_ground_contact:
-                        mask[idx] = False  # Exclude base-ground support
-                    
-                    # KEEP everything else:
-                    # - Arm ↔ Base (collision)
-                    # - Arm ↔ Ground (arm hitting floor - if sensor were on arm)
-                    # - Any other unexpected contacts
-                
-                # Apply mask: zero out excluded forces
-                filtered_forces = torch.where(
-                    mask.unsqueeze(0).expand_as(contact_force_mag),
-                    contact_force_mag,
-                    torch.zeros_like(contact_force_mag)
-                )
-                # Max across all bodies per env
-                contact_force_per_env = filtered_forces.max(dim=-1)[0]  # [num_envs]
-            else:
-                # No body names available, use all forces (fallback)
-                contact_force_per_env = contact_force_mag.max(dim=-1)[0]
+        # Calculate chassis contact magnitudes
+        if len(chassis_forces.shape) == 3:
+            chassis_force_mag = torch.norm(chassis_forces, dim=-1).max(dim=-1)[0]  # [num_envs]
         else:
-            # Single body: [num_envs, 3]
-            contact_force_per_env = torch.norm(net_contact_forces, dim=-1)
+            chassis_force_mag = torch.norm(chassis_forces, dim=-1)  # [num_envs]
+        
+        # Get forces from arm sensor (arm-ground collisions)
+        if "arm_contact_sensor" in self.scene.sensors:
+            arm_sensor = self.scene["arm_contact_sensor"]
+            arm_forces = arm_sensor.data.net_forces_w
+            
+            # Calculate arm contact magnitudes
+            if len(arm_forces.shape) == 3:
+                arm_force_mag = torch.norm(arm_forces, dim=-1).max(dim=-1)[0]  # [num_envs]
+            else:
+                arm_force_mag = torch.norm(arm_forces, dim=-1)  # [num_envs]
+            
+            # Combined: max of arm-chassis OR arm-ground
+            contact_force_per_env = torch.maximum(chassis_force_mag, arm_force_mag)
+        else:
+            # Fallback: only chassis sensor available
+            contact_force_per_env = chassis_force_mag
         
         return contact_force_per_env
     

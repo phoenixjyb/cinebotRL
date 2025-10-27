@@ -61,10 +61,17 @@ def main():
         headless=args_cli.headless,
     )
     
-    # Disable collision termination for test
+    # CRITICAL: Disable ALL terminations for this test
+    # We're only testing base movement, not task performance
+    print("\n⚠️  Disabling terminations for base movement test...")
     env.unwrapped.task_cfg.terminate_on_self_collision = False
-    # Also set threshold very high as backup
+    env.unwrapped.task_cfg.terminate_on_tracking_error = False
     env.unwrapped.task_cfg.self_collision_termination_threshold = 999999.0
+    env.unwrapped.task_cfg.max_tracking_error = 999999.0
+    
+    # Also zero out collision penalty to avoid confusing logs
+    if hasattr(env.unwrapped, 'reward_cfg'):
+        env.unwrapped.reward_cfg.self_collision_penalty = 0.0
     
     print("\n" + "="*80)
     print("Base Movement Validation Test")
@@ -73,7 +80,8 @@ def main():
     print(f"Num envs: {args_cli.num_envs}")
     print(f"Test duration: 10 seconds")
     print(f"Command: 0.5 m/s forward (normalized: {0.5/1.5:.3f})")
-    print(f"⚠️  Collision terminations DISABLED for test")
+    print(f"⚠️  ALL terminations DISABLED for test")
+    print(f"⚠️  Collision penalty ZEROED for test")
     print("="*80 + "\n")
     
     # Reset environment

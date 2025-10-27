@@ -863,10 +863,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # CRITICAL: Clamp Z position to prevent sinking through ground
         # Direct velocity control doesn't handle gravity/contact resolution,
         # so we manually keep the base at ground level (Z=0)
+        # Combine position and quaternion into root_pose [pos_xyz, quat_wxyz]
         current_root_pos = self.robot.data.root_pos_w.clone()
         current_root_pos[:, 2] = 0.0  # Lock Z position at ground level
-        env_ids = list(range(self.num_envs))  # Need explicit int list for indexing
-        self.robot.write_root_pose_to_sim(current_root_pos, self.robot.data.root_quat_w, env_ids=env_ids)
+        root_pose = torch.cat([current_root_pos, self.robot.data.root_quat_w], dim=-1)  # [N, 7]
+        env_ids = list(range(self.num_envs))
+        self.robot.write_root_pose_to_sim(root_pose, env_ids=env_ids)
         
         # DEBUG: Print base velocity on first few steps
         if not hasattr(self, '_base_debug_count'):

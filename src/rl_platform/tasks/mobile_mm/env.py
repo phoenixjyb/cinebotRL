@@ -1266,7 +1266,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             joint_lower=self.joint_lower_limits,  # ARM limits [6]
             joint_upper=self.joint_upper_limits,  # ARM limits [6]
             robot_limits=self.robot_limits,
-            contact_forces=contact_force_mag_per_env.unsqueeze(-1),  # Use filtered contact forces [num_envs, 1]
+            contact_forces=contact_force_mag_per_env[:, None, None],  # Shape [num_envs, 1, 1] to match expected [num_envs, num_bodies, 3]
             min_obstacle_dist=None,  # Not using obstacles for now
             dt=self.control_dt,
             weights=self.reward_weights,

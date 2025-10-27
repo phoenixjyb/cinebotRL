@@ -1,173 +1,212 @@
-"""Quick test to verify base movement after action scaling fix.
+#!/usr/bin/env python3
+"""Quick validation test for base movement control fix.
 
-This script:
-1. Creates environment with 4 envs
-2. Sends maximum base actions (1.0, 1.0) for 20 steps
-3. Measures actual base displacement
-4. Verifies it matches expected scaled velocity
+Tests that the base actually moves when commanded after fixing the dual control bug.
 
-Expected results (with fix @ 20Hz):
-- Forward movement: ~1.5 m in 1 second (20 steps × 0.05s)
-- Rotation: ~100° in 1 second (2.0 rad/s)
+Expected behavior after fix:
+- Base displacement: ~5.0m for 10 seconds at 0.5 m/s
+- Root velocity: ~0.5 m/s during motion
+- PPR joints: Stay near zero (< 0.01m drift)
 
-Without fix (bug):
-- Forward movement: ~1.0 m in 1 second
-- Rotation: ~57° in 1 second (1.0 rad/s)
+Run:
+    I:\\isaaclab\\isaaclab.bat -p scripts/test_base_movement_fix.py --headless
 """
 
-import torch
 import sys
-import os
+from pathlib import Path
 
-# Add project root to path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+# Add project root to Python path
+SCRIPT_DIR = Path(__file__).resolve().parent  # scripts/
+PROJECT_ROOT = SCRIPT_DIR.parent  # project root
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-def test_base_movement():
-    """Test that base actions are properly scaled."""
+import torch
+import argparse
+from isaaclab.app import AppLauncher
+
+# Parse CLI arguments
+parser = argparse.ArgumentParser(description="Quick base movement validation test")
+parser.add_argument("--num_envs", type=int, default=4, help="Number of environments")
+parser.add_argument("--device", type=str, default="cuda:0", help="Device to run on")
+parser.add_argument("--headless", action="store_true", help="Run headless")
+args_cli = parser.parse_args()
+
+# Initialize app
+app_launcher = AppLauncher(args_cli)
+simulation_app = app_launcher.app
+
+# Now import Isaac Lab modules and custom task
+from task_spec import register_isaac_lab_tasks
+import gymnasium as gym
+
+# Register tasks
+register_isaac_lab_tasks()
+
+
+def quat_to_yaw(quat: torch.Tensor) -> torch.Tensor:
+    """Extract yaw angle from quaternion (same as env.py)."""
+    w, x, y, z = quat[..., 0], quat[..., 1], quat[..., 2], quat[..., 3]
+    return torch.atan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2))
+
+
+def main():
+    """Run base movement validation test."""
     
-    print("=" * 70)
-    print("BASE MOVEMENT VERIFICATION TEST")
-    print("=" * 70)
-    print("\nThis test verifies the critical bug fix for base action scaling.")
-    print("Testing with maximum base actions (1.0, 1.0) for 1 second (50 steps)\n")
+    # Create environment with disabled termination for testing
+    env = gym.make(
+        "MobileMMTrackEE-v0",
+        num_envs=args_cli.num_envs,
+        device=args_cli.device,
+        headless=args_cli.headless,
+    )
     
-    # Import after path setup
-    from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnv, MobileMMTrackEEEnvCfg
+    # Disable collision termination for test (base-ground contact is normal!)
+    env.unwrapped.cfg.terminations = {}  # Disable all terminations
     
-    # Create minimal config
-    cfg = MobileMMTrackEEEnvCfg()
-    cfg.num_envs = 4
-    cfg.scene.num_envs = 4
+    print("\n" + "="*80)
+    print("Base Movement Validation Test")
+    print("="*80)
+    print(f"Device: {args_cli.device}")
+    print(f"Num envs: {args_cli.num_envs}")
+    print(f"Test duration: 10 seconds")
+    print(f"Command: 0.5 m/s forward (normalized: {0.5/1.5:.3f})")
+    print(f"⚠️  Terminations disabled for test")
+    print("="*80 + "\n")
     
-    print(f"[1/4] Creating environment with {cfg.num_envs} envs...")
-    env = MobileMMTrackEEEnv(cfg)
+    # Reset environment
+    obs_dict, _ = env.reset()
+    obs = obs_dict["policy"]  # Extract policy observation tensor
     
-    print(f"[2/4] Resetting environment...")
-    obs, _ = env.reset()
+    # Record initial state (USE ROOT STATE, NOT JOINT STATE!)
+    robot = env.unwrapped.scene["robot"]
+    initial_root_pos = robot.data.root_pos_w.clone()
+    initial_root_quat = robot.data.root_quat_w.clone()
+    initial_joint_pos = robot.data.joint_pos[:, 0:3].clone()  # PPR joints for monitoring
     
-    # Get initial base positions
-    initial_pos = env.robot.data.joint_pos[:, env._base_joint_ids].clone()
-    initial_x = initial_pos[:, 0]
-    initial_y = initial_pos[:, 1]
-    initial_theta = initial_pos[:, 2]
+    print("Initial state:")
+    print(f"  Root position (world): {initial_root_pos[0, :3]}")
+    print(f"  Root orientation (yaw): {quat_to_yaw(initial_root_quat[0:1]).item():.3f} rad")
+    print(f"  PPR joint positions: {initial_joint_pos[0]}")
+    print()
     
-    print(f"\nInitial positions (env 0):")
-    print(f"  X: {initial_x[0].item():.4f} m")
-    print(f"  Y: {initial_y[0].item():.4f} m")
-    print(f"  Theta: {initial_theta[0].item():.4f} rad ({torch.rad2deg(initial_theta[0]).item():.1f}°)")
+    # Run for 10 seconds with constant forward command
+    dt = env.unwrapped.cfg.sim.dt * env.unwrapped.cfg.decimation  # ~0.1s per step
+    num_steps = int(10.0 / dt)
     
-    print(f"\n[3/4] Sending maximum base actions for 50 steps (1.0 second)...")
-    print("  Actions: [0,0,0,0,0,0, 1.0, 1.0]  (arm zeros, base max)")
+    # Action space: [arm_joints (0-5), base_vx (6), base_wz (7)]
+    # Base actions in indices 6 and 7, normalized to [-1, 1]
+    # Scaled by max_linear_velocity (1.5 m/s) and max_angular_velocity (1.0 rad/s)
+    # To get 0.5 m/s forward: 0.5 / 1.5 = 0.333 normalized
+    actions = torch.zeros(args_cli.num_envs, 8, device=args_cli.device)
+    actions[:, 6] = 0.5 / 1.5  # Index 6: Normalized forward velocity → 0.5 m/s
+    actions[:, 7] = 0.0         # Index 7: No rotation
+    # Arm joints (0-5) stay at current positions (zeros are fine)
     
-    # Send maximum base actions for 50 steps
-    num_steps = 50
+    print(f"Running {num_steps} steps at {dt:.3f}s per step...")
+    print(f"  Action indices: arm=[0-5], base_vx=[6], base_wz=[7]")
+    print(f"  Commanding: base_vx={actions[0, 6].item():.3f} (normalized) → 0.5 m/s\n")
+    
     for step in range(num_steps):
-        # Actions: [6 arm joints, vx, wz]
-        # Set arm to zeros, base to maximum forward + rotation
-        action = torch.zeros(cfg.num_envs, 8, device=env.device)
-        action[:, 6] = 1.0  # Maximum forward velocity
-        action[:, 7] = 1.0  # Maximum rotation
+        obs_dict, reward, terminated, truncated, info = env.step(actions)
+        obs = obs_dict["policy"]  # Extract policy observation
         
-        obs, reward, terminated, truncated, info = env.step(action)
-        
-        if step % 10 == 0:
-            current_pos = env.robot.data.joint_pos[:, env._base_joint_ids]
-            dx = (current_pos[0, 0] - initial_x[0]).item()
-            dy = (current_pos[0, 1] - initial_y[0]).item()
-            dtheta = (current_pos[0, 2] - initial_theta[0]).item()
-            print(f"  Step {step:2d}: Δx={dx:+.3f}m, Δy={dy:+.3f}m, Δθ={torch.rad2deg(torch.tensor(dtheta)).item():+.1f}°")
+        # Print progress every 2 seconds
+        if (step + 1) % int(2.0 / dt) == 0:
+            current_root_pos = robot.data.root_pos_w
+            displacement = current_root_pos - initial_root_pos
+            current_vel = robot.data.root_lin_vel_w
+            print(f"  Step {step+1}/{num_steps}: displacement = {displacement[0, :2]}, velocity = {current_vel[0, :2]}")
     
-    # Get final base positions
-    final_pos = env.robot.data.joint_pos[:, env._base_joint_ids]
-    final_x = final_pos[:, 0]
-    final_y = final_pos[:, 1]
-    final_theta = final_pos[:, 2]
+    # Record final state
+    final_root_pos = robot.data.root_pos_w.clone()
+    final_root_quat = robot.data.root_quat_w.clone()
+    final_joint_pos = robot.data.joint_pos[:, 0:3].clone()
+    final_vel = robot.data.root_lin_vel_w.clone()
     
-    # Compute displacements
-    dx = (final_x - initial_x)[0].item()
-    dy = (final_y - initial_y)[0].item()
-    dtheta = (final_theta - initial_theta)[0].item()
-    dtheta_deg = torch.rad2deg(torch.tensor(dtheta)).item()
+    # Calculate metrics (USE ROOT STATE!)
+    displacement = final_root_pos - initial_root_pos
+    mean_displacement_x = displacement[:, 0].mean().item()
+    mean_displacement_y = displacement[:, 1].mean().item()
+    mean_displacement_z = displacement[:, 2].mean().item()
+    mean_velocity_x = final_vel[:, 0].mean().item()
+    mean_velocity_y = final_vel[:, 1].mean().item()
     
-    print(f"\n[4/4] Results Analysis (env 0):")
-    print(f"  Final X: {final_x[0].item():.4f} m")
-    print(f"  Final Y: {final_y[0].item():.4f} m")
-    print(f"  Final Theta: {final_theta[0].item():.4f} rad ({torch.rad2deg(final_theta[0]).item():.1f}°)")
-    print(f"\n  Total displacement:")
-    print(f"    ΔX: {dx:+.4f} m")
-    print(f"    ΔY: {dy:+.4f} m")
-    print(f"    Δθ: {dtheta:+.4f} rad ({dtheta_deg:+.1f}°)")
+    # PPR joint drift
+    joint_drift = (final_joint_pos - initial_joint_pos).abs()
+    max_joint_drift = joint_drift.max().item()
     
-    # Expected values (with fix)
-    dt = 0.005 * 10  # 5ms physics × 10 decimation = 50ms per step (20Hz control)
-    expected_vx = 1.5  # max_linear_velocity
-    expected_wz = 2.0  # max_angular_velocity
-    expected_distance = expected_vx * dt * num_steps  # Should be ~1.5m
-    expected_rotation = expected_wz * dt * num_steps  # Should be ~2.0 rad (~115°)
-    expected_rotation_deg = torch.rad2deg(torch.tensor(expected_rotation)).item()
+    print("\n" + "="*80)
+    print("RESULTS")
+    print("="*80)
+    print(f"Base displacement (from root_pos_w):")
+    print(f"  X: {mean_displacement_x:.3f} m")
+    print(f"  Y: {mean_displacement_y:.3f} m")
+    print(f"  Z: {mean_displacement_z:.3f} m")
+    print(f"Final velocity (from root_lin_vel_w):")
+    print(f"  X: {mean_velocity_x:.3f} m/s")
+    print(f"  Y: {mean_velocity_y:.3f} m/s")
+    print(f"Max PPR joint drift: {max_joint_drift:.5f} m")
+    print("="*80 + "\n")
     
-    print(f"\n  Expected (with fix):")
-    print(f"    Forward: {expected_distance:.4f} m  (1.5 m/s × 1.0s)")
-    print(f"    Rotation: {expected_rotation:.4f} rad ({expected_rotation_deg:.1f}°)  (2.0 rad/s × 1.0s)")
+    # Validation checks
+    print("VALIDATION:")
+    checks = []
     
-    # Without fix expected
-    buggy_distance = 1.0 * dt * num_steps  # Would be ~1.0m
-    buggy_rotation = 1.0 * dt * num_steps  # Would be ~1.0 rad (~57°)
-    buggy_rotation_deg = torch.rad2deg(torch.tensor(buggy_rotation)).item()
+    # Check 1: Forward displacement should be ~5.0m (0.5 m/s * 10s)
+    expected_displacement = 5.0
+    tolerance = 0.5
+    check1 = abs(mean_displacement_x - expected_displacement) < tolerance
+    checks.append(check1)
+    print(f"  1. Forward displacement: {mean_displacement_x:.3f}m (expected {expected_displacement}±{tolerance}m) - {'✅ PASS' if check1 else '❌ FAIL'}")
     
-    print(f"\n  Expected (WITHOUT fix - bug):")
-    print(f"    Forward: {buggy_distance:.4f} m  (1.0 m/s × 1.0s)")
-    print(f"    Rotation: {buggy_rotation:.4f} rad ({buggy_rotation_deg:.1f}°)  (1.0 rad/s × 1.0s)")
+    # Check 2: Velocity should be ~0.5 m/s
+    expected_vel = 0.5
+    vel_tolerance = 0.1
+    check2 = abs(mean_velocity_x - expected_vel) < vel_tolerance
+    checks.append(check2)
+    print(f"  2. Forward velocity: {mean_velocity_x:.3f}m/s (expected {expected_vel}±{vel_tolerance}m/s) - {'✅ PASS' if check2 else '❌ FAIL'}")
     
-    # Compute actual distance (Pythagorean)
-    actual_distance = (dx**2 + dy**2)**0.5
+    # Check 3: PPR joints should stay near zero (< 1cm drift)
+    max_drift_threshold = 0.01
+    check3 = max_joint_drift < max_drift_threshold
+    checks.append(check3)
+    print(f"  3. PPR joint drift: {max_joint_drift:.5f}m (threshold {max_drift_threshold}m) - {'✅ PASS' if check3 else '❌ FAIL'}")
     
-    print(f"\n  Measured:")
-    print(f"    Distance: {actual_distance:.4f} m")
-    print(f"    Rotation: {abs(dtheta):.4f} rad ({abs(dtheta_deg):.1f}°)")
+    # Check 4: Lateral drift should be small
+    lateral_threshold = 0.5
+    check4 = abs(mean_displacement_y) < lateral_threshold
+    checks.append(check4)
+    print(f"  4. Lateral drift: {abs(mean_displacement_y):.3f}m (threshold {lateral_threshold}m) - {'✅ PASS' if check4 else '❌ FAIL'}")
     
-    # Verdict
-    print(f"\n{'=' * 70}")
-    print("VERDICT:")
-    print("=" * 70)
+    # Check 5: Vertical drift should be minimal
+    vertical_threshold = 0.1
+    check5 = abs(mean_displacement_z) < vertical_threshold
+    checks.append(check5)
+    print(f"  5. Vertical drift: {abs(mean_displacement_z):.3f}m (threshold {vertical_threshold}m) - {'✅ PASS' if check5 else '❌ FAIL'}")
     
-    distance_error = abs(actual_distance - expected_distance)
-    rotation_error = abs(abs(dtheta) - expected_rotation)
-    
-    if distance_error < 0.1 and rotation_error < 0.2:
-        print("✅ BASE MOVEMENT CORRECT - Bug is FIXED!")
-        print(f"   Distance within 10cm of expected: {distance_error*100:.1f}cm error")
-        print(f"   Rotation within 11° of expected: {torch.rad2deg(torch.tensor(rotation_error)).item():.1f}° error")
-        print("\n   Base actions are properly scaled to velocity limits.")
-        print("   Policy can now learn to use base for tracking!")
-        return True
-    
-    elif abs(actual_distance - buggy_distance) < 0.1:
-        print("❌ BASE MOVEMENT WEAK - Bug still present!")
-        print(f"   Distance matches buggy behavior: ~{actual_distance:.2f}m (expected {buggy_distance:.2f}m)")
-        print(f"   Should be: ~{expected_distance:.2f}m (1.5× faster)")
-        print("\n   Base actions NOT scaled - still using raw [-1,1] values!")
-        print("   Policy will learn to ignore base (too slow to help).")
-        return False
-    
+    # Overall result
+    all_passed = all(checks)
+    print("\n" + "="*80)
+    if all_passed:
+        print("✅ ALL CHECKS PASSED - Base movement fix is working correctly!")
     else:
-        print("⚠️  UNEXPECTED BEHAVIOR")
-        print(f"   Distance: {actual_distance:.2f}m (expected {expected_distance:.2f}m, bug would give {buggy_distance:.2f}m)")
-        print(f"   Rotation: {abs(dtheta_deg):.1f}° (expected {expected_rotation_deg:.1f}°, bug would give {buggy_rotation_deg:.1f}°)")
-        print("\n   Values don't match either scenario - investigate further!")
-        return None
+        print("❌ SOME CHECKS FAILED - Base movement fix may have issues!")
+    print("="*80 + "\n")
     
-    print("=" * 70)
+    env.close()
+    return 0 if all_passed else 1
 
 
 if __name__ == "__main__":
     try:
-        result = test_base_movement()
-        sys.exit(0 if result else 1)
+        exit_code = main()
     except Exception as e:
-        print(f"\n❌ TEST FAILED WITH ERROR:")
-        print(f"   {type(e).__name__}: {e}")
+        print(f"\n❌ Test failed with exception: {e}")
         import traceback
         traceback.print_exc()
-        sys.exit(2)
+        exit_code = 1
+    finally:
+        simulation_app.close()
+    
+    exit(exit_code)

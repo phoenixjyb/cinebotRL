@@ -100,8 +100,8 @@ class RewardWeights:
     collision_penalty: float = 10.0  # External collisions (not used for now)
     stability_penalty: float = 0.1
     
-    # Self-collision detection settings
-    self_collision_threshold: float = 1.0  # Newtons (contact force threshold)
+    # Self-collision detection settings (filtered to exclude base-ground contact)
+    self_collision_threshold: float = 50.0  # Newtons - arm impact threshold (was 1.0, too sensitive for base-ground load)
     self_collision_continuous: bool = True  # Continuous vs binary penalty
     
     # Obstacle avoidance

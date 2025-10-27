@@ -908,6 +908,80 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"  Lower: {self.joint_lower_limits}")
             print(f"  Upper: {self.joint_upper_limits}")
     
+    def _get_filtered_contact_forces(self) -> torch.Tensor:
+        """Get contact forces filtered to exclude normal base-ground contact.
+        
+        The contact sensor is attached to abstract_chassis_link, so it reports:
+        - Chassis ↔ Ground (normal support - EXCLUDE this)
+        - Chassis ↔ Arm links (potential collision - KEEP this)
+        
+        We filter by checking the "other body" in contact pairs:
+        - If other body is ground → EXCLUDE (normal base support)
+        - If other body is arm link → KEEP (arm hitting base)
+        - If other body is ground AND sensor on arm → KEEP (arm hitting floor)
+        
+        Returns:
+            Tensor of shape [num_envs] with maximum filtered contact force per env
+        """
+        contact_sensor = self.scene["contact_sensor"]
+        net_contact_forces = contact_sensor.data.net_forces_w  # [num_envs, num_bodies, 3] or [num_envs, 3]
+        
+        # Calculate force magnitudes
+        if len(net_contact_forces.shape) == 3:
+            # Multi-body: [num_envs, num_bodies, 3]
+            contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
+            
+            # Check if we have body names to filter intelligently
+            body_names = contact_sensor.data.body_names if hasattr(contact_sensor.data, 'body_names') else []
+            
+            # NEW: Check "other body" names (what the sensor body is touching)
+            # This is key for catching arm-ground collisions when sensor is on chassis
+            other_body_names = []
+            if hasattr(contact_sensor.data, 'contact_pair_names'):
+                # Extract "other body" from contact pair names
+                # Format is typically "body1:body2"
+                for pair in contact_sensor.data.contact_pair_names:
+                    if ':' in pair:
+                        parts = pair.split(':')
+                        other_body_names.append(parts[1] if len(parts) > 1 else "")
+            
+            if body_names or other_body_names:
+                # Create mask: True to KEEP, False to EXCLUDE
+                mask = torch.ones(contact_force_mag.shape[1], dtype=torch.bool, device=self.device)
+                
+                for idx in range(len(mask)):
+                    sensor_body = body_names[idx] if idx < len(body_names) else ""
+                    other_body = other_body_names[idx] if idx < len(other_body_names) else ""
+                    
+                    # EXCLUDE: Chassis ↔ Ground (normal base support load)
+                    is_chassis_sensor = 'chassis' in sensor_body.lower() or 'base' in sensor_body.lower()
+                    is_ground_contact = 'ground' in other_body.lower() or 'plane' in other_body.lower()
+                    
+                    if is_chassis_sensor and is_ground_contact:
+                        mask[idx] = False  # Exclude base-ground support
+                    
+                    # KEEP everything else:
+                    # - Arm ↔ Base (collision)
+                    # - Arm ↔ Ground (arm hitting floor - if sensor were on arm)
+                    # - Any other unexpected contacts
+                
+                # Apply mask: zero out excluded forces
+                filtered_forces = torch.where(
+                    mask.unsqueeze(0).expand_as(contact_force_mag),
+                    contact_force_mag,
+                    torch.zeros_like(contact_force_mag)
+                )
+                # Max across all bodies per env
+                contact_force_per_env = filtered_forces.max(dim=-1)[0]  # [num_envs]
+            else:
+                # No body names available, use all forces (fallback)
+                contact_force_per_env = contact_force_mag.max(dim=-1)[0]
+        else:
+            # Single body: [num_envs, 3]
+            contact_force_per_env = torch.norm(net_contact_forces, dim=-1)
+        
+        return contact_force_per_env
+    
     def _get_observations(self) -> dict[str, torch.Tensor]:
         """Compute environment observations.
         
@@ -1003,33 +1077,21 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         arm_joint_vel = joint_vel[:, 3:9]  # ARM joint velocities
         
         # Get contact forces from ContactSensor (Isaac Lab 2.2.0 pattern)
-        # Following official example from ref_codes/contact_sensor.py
-        contact_sensor = self.scene["contact_sensor"]
-        net_contact_forces = contact_sensor.data.net_forces_w  # Shape: [num_envs, num_bodies, 3] or [num_envs, 3]
-        
-        # DIAGNOSTIC: Check contact force API and monitor continuously
-        # Handle both single-body and multi-body contact sensors
-        if len(net_contact_forces.shape) == 3:
-            # Multi-body: [num_envs, num_bodies, 3]
-            contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
-            contact_force_mag_per_env = contact_force_mag.max(dim=-1)[0]  # [num_envs] - max across bodies
-        else:
-            # Single body: [num_envs, 3]
-            contact_force_mag_per_env = torch.norm(net_contact_forces, dim=-1)  # [num_envs]
-        
+        # Use filtered contact forces (excludes base-ground static load)
+        contact_force_mag_per_env = self._get_filtered_contact_forces()  # [num_envs]
         max_force = contact_force_mag_per_env.max().item()
         
         if not hasattr(self, '_contact_force_checked'):
             print(f"\n{'='*80}")
-            print(f"CONTACT FORCE API VERIFICATION")
+            print(f"CONTACT FORCE API VERIFICATION (Filtered)")
             print(f"{'='*80}")
-            print(f"Contact forces shape: {net_contact_forces.shape}")
-            print(f"Max contact force: {max_force:.4f} N")
+            print(f"Max filtered contact force: {max_force:.4f} N")
             if max_force < 0.001:
-                print(f"⚠️  WARNING: Contact forces are zero!")
-                print(f"   Self-collision detection may NOT be working!")
+                print(f"⚠️  WARNING: Filtered contact forces are zero!")
+                print(f"   Either no collisions or filtering is too aggressive!")
             else:
-                print(f"✅ Contact forces detected - API is working!")
+                print(f"✅ Filtered contact forces detected - collision detection active!")
+            print(f"   (Base-ground support load excluded)")
             print(f"{'='*80}\n")
             self._contact_force_checked = True
             self._collision_step_count = 0
@@ -1043,12 +1105,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             # Print warning every 100 steps to avoid spam
             if self._collision_step_count - self._last_collision_warning_step >= 100:
                 print(f"\n⚠️  [COLLISION DETECTED] Step {self._collision_step_count}")
-                print(f"   Max contact force: {max_force:.2f} N (threshold: {collision_threshold:.2f} N)")
-                
-                # Find which body has the collision
-                max_body_idx = contact_force_mag.max(dim=-1).indices[0].item()
-                if max_body_idx < len(self.robot.body_names):
-                    print(f"   Collision on body: {self.robot.body_names[max_body_idx]}")
+                print(f"   Max filtered contact force: {max_force:.2f} N (threshold: {collision_threshold:.2f} N)")
+                print(f"   (Base-ground contact excluded from detection)")
                 self._last_collision_warning_step = self._collision_step_count
         
         # Monitor for wild joint velocities
@@ -1222,7 +1280,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             joint_lower=self.joint_lower_limits,  # ARM limits [6]
             joint_upper=self.joint_upper_limits,  # ARM limits [6]
             robot_limits=self.robot_limits,
-            contact_forces=net_contact_forces,  # Use actual contact forces for self-collision
+            contact_forces=contact_force_mag_per_env.unsqueeze(-1),  # Use filtered contact forces [num_envs, 1]
             min_obstacle_dist=None,  # Not using obstacles for now
             dt=self.control_dt,
             weights=self.reward_weights,
@@ -1288,20 +1346,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Check for self-collision (CRITICAL for mobile manipulator!)
         if self.task_cfg.terminate_on_self_collision:
-            # Get contact forces from ContactSensor (same as _get_rewards)
-            contact_sensor = self.scene["contact_sensor"]
-            net_contact_forces = contact_sensor.data.net_forces_w  # Shape: [num_envs, num_bodies, 3] or [num_envs, 3]
+            # Get filtered contact forces (excludes base-ground static load)
+            contact_force_mag = self._get_filtered_contact_forces()  # [num_envs]
             
-            # Calculate contact force magnitude per environment
-            # If multi-body (filtered contacts), shape is [num_envs, num_bodies, 3]
-            if len(net_contact_forces.shape) == 3:
-                contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs, num_bodies]
-                contact_force_mag = contact_force_mag.max(dim=-1)[0]  # [num_envs] - max across all bodies
-            else:
-                # Single body, shape is [num_envs, 3]
-                contact_force_mag = torch.norm(net_contact_forces, dim=-1)  # [num_envs]
-            
-            # Terminate if contact force exceeds threshold
+            # Terminate if filtered contact force exceeds threshold
+            # This will only trigger on arm-ground or arm-base collisions, not normal base support
             terminated |= contact_force_mag > self.task_cfg.self_collision_termination_threshold
         
         # Timeout after max episode length

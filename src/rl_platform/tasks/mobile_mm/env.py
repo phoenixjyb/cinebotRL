@@ -54,6 +54,20 @@ from .observations import compose_observation, get_observation_dimensions
 from .rewards import compute_combined_reward
 
 
+def quat_to_yaw(quat: torch.Tensor) -> torch.Tensor:
+    """Extract yaw angle (rotation around Z-axis) from quaternion.
+    
+    Args:
+        quat: Quaternion in (w, x, y, z) format, shape [..., 4]
+        
+    Returns:
+        Yaw angles in radians, shape [...]
+    """
+    w, x, y, z = quat[..., 0], quat[..., 1], quat[..., 2], quat[..., 3]
+    yaw = torch.atan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2))
+    return yaw
+
+
 @configclass
 class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
     """Configuration for the mobile manipulator tracking environment."""
@@ -274,8 +288,22 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         print(f"[MobileMMTrackEE] DEBUG: After super().__init__(), self.num_envs={self.num_envs}")
         
         # ============================================================================
-        # COORDINATE FRAME CONVENTIONS
+        # COORDINATE FRAME CONVENTIONS (FIXED: Session 7c)
         # ============================================================================
+        # BASE CONTROL FIX (2024-10-27): Resolved dual control mechanism bug
+        # 
+        # PREVIOUS BUG:
+        # - Both write_root_state_to_sim() AND set_joint_position_target() controlled base
+        # - PPR joints accumulated world-frame displacements (joint_y reached -6.3m!)
+        # - root_pos_w stayed frozen (Y=0.08m), creating 6.38m discrepancies
+        # - This caused all sessions (6, 7, 7b) to have ~0.002m base displacement
+        #
+        # CURRENT FIX:
+        # - Base controlled ONLY via write_root_link_velocity_to_sim() (direct velocity)
+        # - PPR joints set to ZERO (they are kinematic offsets, not world positions)
+        # - Orientation unified: all transforms use root_quat_w (via quat_to_yaw helper)
+        # - Reachability uses root_pos_w/root_quat_w (not joint_pos)
+        #
         # This environment uses TWO coordinate systems:
         #
         # 1. WORLD FRAME (Isaac "_w" buffers) - GROUND TRUTH for learning & rewards
@@ -518,7 +546,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 # Get base position (using root_pos_w - actual world position)
                 base_pos_world = self.robot.data.root_pos_w
                 
-                # Also show PPR joints for comparison (these are relative offsets)
+                # Show PPR joints (FIXED: should stay near zero now)
                 base_ppr = self.robot.data.joint_pos[:, 0:3]  # [joint_x, joint_y, joint_theta]
                 
                 base_to_target_2d = torch.norm(target_pos[:, :2] - base_pos_world[:, :2], dim=-1)
@@ -768,36 +796,21 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Set scaled joint position targets for arm joints only
         self.robot.set_joint_position_target(arm_actions_scaled, joint_ids=self._arm_joint_ids)
         
-        # Apply base position commands for mobile base (differential drive)
-        # Initialize base joint indices on first call (lookup by name for safety)
-        if not hasattr(self, '_base_joint_ids'):
-            # Base joints: joint_x (prismatic X), joint_y (prismatic Y), joint_theta (revolute rotation)
-            base_joint_names = ["joint_x", "joint_y", "joint_theta"]
-            self._base_joint_ids = []
-            for name in base_joint_names:
-                if name in self.robot.joint_names:
-                    idx = self.robot.joint_names.index(name)
-                    self._base_joint_ids.append(idx)
-            self._base_joint_ids = torch.tensor(self._base_joint_ids, device=self.device)
-            print(f"[MobileMMTrackEE] Base joint IDs initialized: {self._base_joint_ids.tolist()}")
-            print(f"[MobileMMTrackEE] Base joint names: {base_joint_names}")
-        
-        # Get current base positions from physics (no drift accumulation)
-        current_base_pos = self.robot.data.joint_pos[:, self._base_joint_ids]  # [num_envs, 3]
-        theta = current_base_pos[:, 2]  # Current orientation (joint_theta)
+        # Apply base velocity commands via direct root control (FIXED: no more joint accumulation)
+        # Get current base orientation from root state (unified source of truth)
+        base_quat = self.robot.data.root_quat_w
+        theta = quat_to_yaw(base_quat)  # Extract yaw for body-to-world transform
         
         # Scale base actions from [-1, 1] to actual velocity limits
-        # CRITICAL FIX: Previously actions were used directly without scaling!
         base_vx_desired = base_vx * self.robot_limits["max_linear_velocity"]  # [-1.5, +1.5] m/s
         base_wz_desired = base_wz * self.robot_limits["max_angular_velocity"]  # [-2.0, +2.0] rad/s
         
         # Rate limit velocities to respect acceleration constraints
-        # This ensures commanded velocities are physically realizable
         dt = self.cfg.sim.dt * self.cfg.decimation
         max_linear_accel = self.robot_limits["max_linear_acceleration"]
         max_angular_accel = self.robot_limits["max_angular_acceleration"]
-        max_vel_delta_linear = max_linear_accel * dt  # Max velocity change per step (e.g., 0.1 m/s)
-        max_vel_delta_angular = max_angular_accel * dt  # Max angular velocity change per step
+        max_vel_delta_linear = max_linear_accel * dt  # Max velocity change per step
+        max_vel_delta_angular = max_angular_accel * dt
         
         # Get previous commanded velocities (body frame) for rate limiting
         prev_vx = self.prev_commanded_vel[:, 0:1]
@@ -817,31 +830,35 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self.current_commanded_vel[:, 0:1] = base_vx_scaled  # Linear velocity (x)
         self.current_commanded_vel[:, 2:3] = base_wz_scaled  # Angular velocity (yaw)
         
-        # Integrate rate-limited velocities to position deltas using differential drive kinematics
-        dx = base_vx_scaled.squeeze(-1) * torch.cos(theta) * dt  # X displacement in global frame
-        dy = base_vx_scaled.squeeze(-1) * torch.sin(theta) * dt  # Y displacement in global frame
-        dtheta = base_wz_scaled.squeeze(-1) * dt  # Angular displacement
+        # Transform body-frame velocities to world frame
+        cos_theta = torch.cos(theta)
+        sin_theta = torch.sin(theta)
+        vel_world_x = base_vx_scaled.squeeze(-1) * cos_theta  # World X velocity
+        vel_world_y = base_vx_scaled.squeeze(-1) * sin_theta  # World Y velocity
         
-        # Compute new target positions
-        position_deltas = torch.stack([dx, dy, dtheta], dim=1)  # [num_envs, 3]
-        new_base_targets = current_base_pos + position_deltas
+        # Set root velocity directly (no joint integration!)
+        root_vel_w = torch.zeros(self.num_envs, 6, device=self.device)
+        root_vel_w[:, 0] = vel_world_x  # Linear velocity X (world)
+        root_vel_w[:, 1] = vel_world_y  # Linear velocity Y (world)
+        root_vel_w[:, 2] = 0.0  # Linear velocity Z (always 0 for ground robot)
+        root_vel_w[:, 3] = 0.0  # Angular velocity X (roll, always 0)
+        root_vel_w[:, 4] = 0.0  # Angular velocity Y (pitch, always 0)
+        root_vel_w[:, 5] = base_wz_scaled.squeeze(-1)  # Angular velocity Z (yaw)
         
-        # Apply position targets (PPR joints are position-controlled, NOT velocity-controlled)
-        self.robot.set_joint_position_target(
-            target=new_base_targets,
-            joint_ids=self._base_joint_ids
-        )
+        # Apply velocity command to root
+        self.robot.write_root_link_velocity_to_sim(root_vel_w)
         
-        # DEBUG: Print base movement on first few steps
+        # DEBUG: Print base velocity on first few steps
         if not hasattr(self, '_base_debug_count'):
             self._base_debug_count = 0
         if self._base_debug_count < 5:
+            root_pos = self.robot.data.root_pos_w[0]
             print(f"\n[BASE DEBUG Step {self._base_debug_count}]")
             print(f"  base_vx action: {base_vx[0].item():.4f} -> scaled: {base_vx_scaled[0].item():.4f} m/s")
             print(f"  base_wz action: {base_wz[0].item():.4f} -> scaled: {base_wz_scaled[0].item():.4f} rad/s")
-            print(f"  position_delta: [{dx[0].item():.4f}, {dy[0].item():.4f}, {dtheta[0].item():.4f}]")
-            print(f"  current_pos: {current_base_pos[0].cpu().numpy()}")
-            print(f"  new_target: {new_base_targets[0].cpu().numpy()}")
+            print(f"  root_vel_w (world): [{vel_world_x[0].item():.4f}, {vel_world_y[0].item():.4f}, {base_wz_scaled[0].item():.4f}]")
+            print(f"  root_pos_w: [{root_pos[0].item():.4f}, {root_pos[1].item():.4f}, {root_pos[2].item():.4f}]")
+            print(f"  yaw (from quat): {theta[0].item():.4f} rad")
             self._base_debug_count += 1
     
     def _apply_action(self):
@@ -902,8 +919,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self._initialize_ee_body_idx()
         self._verify_joint_mapping()  # Verify joint mapping on first call
         
-        # Robot state - use root_pos_w for base position (this is the actual world position maintained by PhysX)
-        # PPR joints are used for COMMANDING movement, but root_pos_w reflects the actual simulated position
+        # Robot state - FIXED: Use root_pos_w for base (unified source of truth)
+        # Base position controlled directly via root velocity commands (no joint accumulation)
         joint_pos = self.robot.data.joint_pos
         joint_vel = self.robot.data.joint_vel
         
@@ -1109,8 +1126,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         base_direction_reward = torch.zeros(self.num_envs, device=self.device)
         
         if self.reach_map is not None:
+            # FIXED: Use root state (world pose) instead of joint offsets
+            # Extract base world pose from root state
+            base_world_x = base_pos[:, 0]  # Already have base_pos from root_pos_w
+            base_world_y = base_pos[:, 1]
+            base_world_yaw = quat_to_yaw(base_quat)  # Extract yaw from root quaternion
+            base_pose = torch.stack([base_world_x, base_world_y, base_world_yaw], dim=1)  # [N, 3]
+            
             # Transform target EE position from world frame to arm base frame
-            base_pose = self.robot.data.joint_pos[:, self._base_joint_ids]  # [N, 3]: [x, y, theta]
             target_in_arm_frame = self.reach_map.world_to_arm_frame(target_pos, base_pose)
             
             # Check reachability
@@ -1318,7 +1341,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Apply the new root state
         self.robot.write_root_state_to_sim(new_root_state, env_ids=env_ids)
         
-        # Also reset base joint positions (PPR joints) to match
+        # FIXED: Set PPR joints to ZERO (they are offsets, not world positions!)
         # Initialize base joint indices if needed
         if not hasattr(self, '_base_joint_ids'):
             base_joint_names = ["joint_x", "joint_y", "joint_theta"]
@@ -1329,19 +1352,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     self._base_joint_ids.append(idx)
             self._base_joint_ids = torch.tensor(self._base_joint_ids, device=self.device)
         
-        # Set base joint positions to trajectory start (x, y, theta=0)
+        # Set base joints to zero offset (root_pos_w controls world position directly)
         base_joint_pos = torch.zeros(len(env_ids), 3, device=self.device)
-        base_joint_pos[:, 0] = first_target_pos[env_ids, 0]  # joint_x
-        base_joint_pos[:, 1] = first_target_pos[env_ids, 1]  # joint_y  
-        base_joint_pos[:, 2] = 0.0  # joint_theta (facing forward)
-        
         self.robot.set_joint_position_target(
             base_joint_pos, 
             joint_ids=self._base_joint_ids,
             env_ids=env_ids
         )
         
-        print(f"[RESET] Env {env_ids[0].item() if len(env_ids) > 0 else 'N/A'}: Base moved to trajectory start [{first_target_pos[env_ids[0], 0]:.3f}, {first_target_pos[env_ids[0], 1]:.3f}, {first_target_pos[env_ids[0], 2]:.3f}]")
+        print(f"[RESET] Env {env_ids[0].item() if len(env_ids) > 0 else 'N/A'}: Base at trajectory start [{first_target_pos[env_ids[0], 0]:.3f}, {first_target_pos[env_ids[0], 1]:.3f}, {first_target_pos[env_ids[0], 2]:.3f}], PPR joints zeroed")
         
         # NEW: Store episode start base position for movement tracking
         if not hasattr(self, '_episode_start_base_pos'):

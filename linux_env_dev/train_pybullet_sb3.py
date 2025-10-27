@@ -1,14 +1,23 @@
+import datetime
 import os
 import argparse
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 from pybullet_envs.mobile_mm import MobileMMBulletEnv
+from pybullet_envs.target_generator import FixedTarget, RandomTarget, RandomTargetForEpisode, CurriculumTarget
 
 # parse custom network architectures
 def parse_layers(s: str):
     if s is None or s.strip() == "":
         return []
     return [int(x) for x in s.split(",") if x.strip()]
+
+def calcaulate_time_stamp():
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("Asia/Shanghai")
+    ts = datetime.now(tz).strftime("%Y%m%d_%H%M%S")
+    return ts
 
 def get_policy_kwargs(pi_layers_str, vf_layers_str):
     pi_layers = parse_layers(pi_layers_str)
@@ -38,7 +47,6 @@ def main():
     parser.add_argument("--timesteps", type=int, default=1_000_000)
     parser.add_argument("--render", action="store_true", help="Use GUI")
     parser.add_argument("--save_dir", type=str, default="linux_env_dev/models")
-    parser.add_argument("--run_name", type=str, default=None, help="Optional run name to include in logs/model filenames")
     # PPO / env config
     parser.add_argument("--n_envs", type=int, default=1, help="Number of parallel envs (vec env)")
     parser.add_argument("--n_steps", type=int, default=2048, help="PPO n_steps (per env)")
@@ -52,61 +60,100 @@ def main():
                         help="Save a checkpoint every N timesteps (0 to disable)")
     parser.add_argument("--load_model", type=str, default=None,
                         help="Path to a saved model to load and continue training")
+    parser.add_argument("--eval_freq", type=int, default=10000,
+                        help="Run evaluation every N timesteps (0 to disable)")
+    parser.add_argument("--eval_episodes", type=int, default=5,
+                        help="Number of eval episodes per evaluation run")
+    parser.add_argument("--learning_rate", type=float, default=1e-4,
+                        help="Initial learning rate for the optimizer (overrides SB3 default if set)")
     args = parser.parse_args()
 
     os.makedirs(args.save_dir, exist_ok=True)
-    env_fn = lambda: MobileMMBulletEnv(render=args.render)
+    env_fn = lambda: MobileMMBulletEnv(render=args.render,
+                                       target_generator=RandomTargetForEpisode(
+                                           low=(4.0, -2.0, 0.2),
+                                           high=(10.0, 2.0, 0.2)
+                                       ))
     if args.n_envs > 1:
         from stable_baselines3.common.vec_env import SubprocVecEnv
         vec_env = SubprocVecEnv([env_fn for _ in range(args.n_envs)])
     else:
         vec_env = DummyVecEnv([env_fn])
 
-    # create timestamped log/model folder to avoid overwriting previous runs
-    from datetime import datetime
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_suffix = f"_{args.run_name}" if args.run_name else ""
-    log_dir = os.path.join(args.save_dir, f"tensorboard_logs{run_suffix}_{ts}")
+    ts = calcaulate_time_stamp()
+    # import pdb; pdb.set_trace()
+    log_dir = os.path.join(args.save_dir, f"logs_{ts}/tensorboard_logs")
     os.makedirs(log_dir, exist_ok=True)
 
 
     policy_kwargs = get_policy_kwargs(args.pi_layers, args.vf_layers)
 
     # load existing model if requested, else create a new one
+    model_kwargs = dict(
+        policy="MlpPolicy",
+        env=vec_env,
+        n_steps=args.n_steps,
+        batch_size=args.batch_size,
+        n_epochs=args.n_epochs,
+        policy_kwargs=policy_kwargs,
+        ent_coef=0.0,
+        verbose=1,
+        tensorboard_log=log_dir,
+    )
+    # optionally set learning rate
+    if args.learning_rate is not None:
+        model_kwargs['learning_rate'] = float(args.learning_rate)
+
     if args.load_model:
         print(f"Loading model from: {args.load_model}")
         model = PPO.load(args.load_model, env=vec_env, device='auto')
-        # overwrite policy_kwargs if user provided new arch? keep existing loaded arch
+        # if user requested a different learning rate, override optimizer param groups
+        if args.learning_rate is not None:
+            try:
+                for pg in model.policy.optimizer.param_groups:
+                    pg['lr'] = float(args.learning_rate)
+                print(f"Overrode loaded model optimizer lr -> {args.learning_rate}")
+            except Exception:
+                print("Warning: failed to override optimizer lr on loaded model")
     else:
-        model = PPO(
-            "MlpPolicy", vec_env,
-            n_steps=args.n_steps,
-            batch_size=args.batch_size,
-            n_epochs=args.n_epochs,
-            policy_kwargs=policy_kwargs,
-            ent_coef=0.0,
-            verbose=1,
-            tensorboard_log=log_dir,
-        )
+        model = PPO(**model_kwargs)
 
     # 打印模型信息
     policy = model.policy
     calc_param_num(policy) 
 
-
+    # print initial optimizer lr for visibility
+    try:
+        optim = model.policy.optimizer
+        lrs = [pg.get('lr', None) for pg in optim.param_groups]
+        print(f"Initial optimizer learning rates: {lrs}")
+    except Exception:
+        pass
 
     # prepare callbacks for periodic checkpointing
     callbacks = []
     if args.save_interval and args.save_interval > 0:
         from stable_baselines3.common.callbacks import CheckpointCallback
-        ckpt_dir = os.path.join(args.save_dir, f"checkpoints{run_suffix}_{ts}")
+        ckpt_dir = os.path.join(args.save_dir, f"logs_{ts}/checkpoints")
         os.makedirs(ckpt_dir, exist_ok=True)
         ckpt_cb = CheckpointCallback(save_freq=args.save_interval, save_path=ckpt_dir,
-                                     name_prefix=f"ppo_mobile_mm{run_suffix}")
+                                     name_prefix=f"ppo_mobile_mm")
         callbacks.append(ckpt_cb)
+    # evaluation callback (periodic eval runs, logs mean_reward to tensorboard and saves best model)
+    if args.eval_freq and args.eval_freq > 0:
+        from stable_baselines3.common.callbacks import EvalCallback
+        # create a deterministic eval env with a fixed target (midpoint of train RandomTargetForEpisode)
+        eval_target = ((4.0 + 10.0) / 2.0, (-2.0 + 2.0) / 2.0, 0.2)
+        eval_env = DummyVecEnv([lambda: MobileMMBulletEnv(render=False, target_generator=FixedTarget(eval_target))])
+        best_model_dir = os.path.join(args.save_dir, f"logs_{ts}/best_model")
+        os.makedirs(best_model_dir, exist_ok=True)
+        eval_cb = EvalCallback(eval_env, best_model_save_path=best_model_dir, log_path=log_dir,
+                               eval_freq=args.eval_freq, n_eval_episodes=args.eval_episodes,
+                               deterministic=True, render=False)
+        callbacks.append(eval_cb)
 
     model.learn(total_timesteps=args.timesteps, callback=callbacks or None)
-    model_filename = f"ppo_mobile_mm{run_suffix}_{ts}"
+    model_filename = f"logs_{ts}/ppo_mobile_mm_final"
     model.save(os.path.join(args.save_dir, model_filename))
 
 

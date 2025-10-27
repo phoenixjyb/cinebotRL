@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 from pybullet_envs.mobile_mm import MobileMMBulletEnv
+from pybullet_envs.target_generator import FixedTarget, RandomTarget, RandomTargetForEpisode, CurriculumTarget
 
-
-def test_trained_model(model_path, num_episodes=1, render=False):
+def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False):
     """
     测试训练好的模型并生成可视化结果
     
@@ -27,7 +27,10 @@ def test_trained_model(model_path, num_episodes=1, render=False):
     model = PPO.load(model_path)
     
     # 创建测试环境（render 参数可控）
-    env_fn = lambda: MobileMMBulletEnv(render=render, max_steps=1000)
+    env_fn = lambda: MobileMMBulletEnv(render=render, max_steps=max_steps,target_generator=RandomTargetForEpisode(
+                                           low=(4.0, -2.0, 0.2),
+                                           high=(6.0, 2.0, 0.2)
+                                       ))
     vec_env = DummyVecEnv([env_fn])
     
     # 存储测试结果
@@ -47,6 +50,10 @@ def test_trained_model(model_path, num_episodes=1, render=False):
         # collect end-effector and base positions for trajectory overlay
         episode_ee_positions = []
         episode_base_positions = []
+        # collect per-step velocities (world frame and chassis frame)
+        episode_world_vels = []  # list of (vx_world, vy_world)
+        episode_chassis_vels = []  # list of (vx_chassis, vy_chassis)
+
         def _get_ee_pos_from_env(e):
             return e._get_ee_pos()
 
@@ -120,17 +127,54 @@ def test_trained_model(model_path, num_episodes=1, render=False):
             except Exception:
                 pass
 
+            # collect velocities: prefer explicit attributes if present, else try to call _get_base_pos()
+            try:
+                # ensure env has updated base/link velocity stored
+                try:
+                    # calling _get_base_pos() will update internal velocity attributes in many env implementations
+                    env._get_base_pos()
+                except Exception:
+                    pass
+
+                v_world = None
+                v_chassis = None
+                # possible attribute names used in the environment
+                if hasattr(env, '_abstract_chassis_lin_vel_world'):
+                    v_world = getattr(env, '_abstract_chassis_lin_vel_world')
+                elif hasattr(env, '_abstract_chassis_lin_vel'):
+                    v_world = getattr(env, '_abstract_chassis_lin_vel')
+
+                if hasattr(env, '_abstract_chassis_lin_vel_chassis'):
+                    v_chassis = getattr(env, '_abstract_chassis_lin_vel_chassis')
+                elif hasattr(env, '_abstract_chassis_lin_vel'):
+                    # fallback: treat same as world if chassis not available
+                    v_chassis = getattr(env, '_abstract_chassis_lin_vel')
+
+                if v_world is not None:
+                    episode_world_vels.append((float(v_world[0]), float(v_world[1])))
+                else:
+                    episode_world_vels.append((np.nan, np.nan))
+
+                if v_chassis is not None:
+                    episode_chassis_vels.append((float(v_chassis[0]), float(v_chassis[1])))
+                else:
+                    episode_chassis_vels.append((np.nan, np.nan))
+            except Exception:
+                # on any failure, append NaNs to keep lengths consistent
+                episode_world_vels.append((np.nan, np.nan))
+                episode_chassis_vels.append((np.nan, np.nan))
+
             terminated = done_flag
             
-            # 每50步保存一张图片
-            if step_count % 50 == 0:
-                img_path = os.path.join(save_dir, f"episode_{episode+1}_step_{step_count}.png")
-                try:
-                    # pass collected EE trajectory for overlay
-                    env.save_robot_image(img_path, width=800, height=600, traj=episode_ee_positions, draw_origin=True)
-                    print(f"Saved image: {img_path}")
-                except Exception as e:
-                    print(f"Failed to save image: {e}")
+            # # 每50步保存一张图片
+            # if step_count % 50 == 0:
+            #     img_path = os.path.join(save_dir, f"episode_{episode+1}_step_{step_count}.png")
+            #     try:
+            #         # pass collected EE trajectory for overlay
+            #         env.save_robot_image(img_path, width=800, height=600, traj=episode_ee_positions, draw_origin=True)
+            #         print(f"Saved image: {img_path}")
+            #     except Exception as e:
+            #         print(f"Failed to save image: {e}")
         
             # 检查是否成功到达目标
             final_distance = episode_distances[-1] if episode_distances else float('nan')
@@ -156,17 +200,32 @@ def test_trained_model(model_path, num_episodes=1, render=False):
         except Exception as e:
             print(f"Failed to save final image: {e}")
 
-        # accumulate base and ee positions for cross-episode plotting
+        # accumulate base and ee positions for cross-episode plotting (still keep for summary if needed)
         if 'all_base_positions' not in locals():
             all_base_positions = []
         if 'all_ee_positions' not in locals():
             all_ee_positions = []
         # store collected trajectories and target per episode (trim possible trailing incomplete entries)
-        all_base_positions.append(episode_base_positions[:-2])
-        all_ee_positions.append(episode_ee_positions[:-2])
+        episode_base_trimmed = episode_base_positions[:-2]
+        episode_ee_trimmed = episode_ee_positions[:-2]
+        all_base_positions.append(episode_base_trimmed)
+        all_ee_positions.append(episode_ee_trimmed)
         if 'all_targets' not in locals():
             all_targets = []
         all_targets.append(target)
+
+        # Generate per-episode 3D trajectory plot immediately for this episode
+        try:
+            # pass single-episode lists wrapped in lists to match function signature
+            generate_3d_trajectory_plot([episode_base_trimmed], [episode_ee_trimmed], [target], save_dir, episode=episode+1)
+        except Exception as e:
+            print(f'Failed to generate per-episode 3D trajectory plot for episode {episode+1}: {e}')
+
+        # Generate per-episode velocity plot (world-frame vs chassis-frame)
+        try:
+            generate_velocity_plot(episode_world_vels, episode_chassis_vels, save_dir, episode=episode+1)
+        except Exception as e:
+            print(f'Failed to generate per-episode velocity plot for episode {episode+1}: {e}')
     
     vec_env.close()
     
@@ -176,13 +235,13 @@ def test_trained_model(model_path, num_episodes=1, render=False):
     # 生成测试报告
     generate_test_report(all_distances, all_rewards, success_count, num_episodes, save_dir)
     # 生成3D轨迹图（底座与末端执行器）
-    try:
-        if 'all_base_positions' in locals() and 'all_ee_positions' in locals():
-            generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_targets, save_dir)
-        else:
-            print('No trajectory data collected to plot 3D trajectories.')
-    except Exception as e:
-        print(f'Failed to generate 3D trajectory plot: {e}')
+    # try:
+    #     if 'all_base_positions' in locals() and 'all_ee_positions' in locals():
+    #         generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_targets, save_dir, episode)
+    #     else:
+    #         print('No trajectory data collected to plot 3D trajectories.')
+    # except Exception as e:
+    #     print(f'Failed to generate 3D trajectory plot: {e}')
     
     return all_distances, all_rewards, success_count
 
@@ -274,7 +333,7 @@ def generate_test_report(all_distances, all_rewards, success_count, num_episodes
     print(f"Saved test report: {report_path}")
 
 
-def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_targets, save_dir):
+def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_targets, save_dir, episode=1):
     """生成3D轨迹图：机器人底座和末端执行器位置的变化（不渲染机器人）"""
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
@@ -308,7 +367,7 @@ def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_target
                 if target_arr.ndim == 1 and target_arr.size >= 3:
                     # single target point
                     tx, ty, tz = target_arr[:3]
-                    ax.scatter([tx], [ty], [tz], color='magenta', marker='X', s=140, edgecolors='k', label=f'Target Ep{i+1}')
+                    ax.scatter([tx], [ty], [tz], color='magenta', marker='X', s=140, edgecolors='k', label=f'Target p{i+1}({tx:.1f},{ty:.1f},{tz:.1f})')
                 elif target_arr.ndim == 2 and target_arr.shape[1] >= 3:
                     # sequence of target points (plot as dashed magenta line + markers)
                     ax.plot(target_arr[:, 0], target_arr[:, 1], target_arr[:, 2], linestyle=':', color='magenta', linewidth=1.0)
@@ -330,24 +389,82 @@ def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_target
     ax.set_ylabel('Y (m)')
     ax.set_zlabel('Z (m)')
     ax.set_title('3D Trajectories: Base (solid) and End-Effector (dashed)')
-    ax.legend(loc='upper left', bbox_to_anchor=(1.05, 1))
+    # place legend inside the axes in the upper-left to avoid external overlap
+    ax.legend(loc='upper left')
     ax.set_aspect('equal')
     plt.tight_layout()
 
-    out_path = os.path.join(save_dir, 'trajectories_3d.png')
+    out_path = os.path.join(save_dir, f'trajectories_3d_episode_{episode}.png')
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Saved 3D trajectory plot: {out_path}")
 
 
+def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1):
+    """Generate a 2-panel plot (side-by-side) comparing world-frame and chassis-frame
+    longitudinal (vx) and lateral (vy) linear velocities over time for one episode.
+
+    Args:
+        world_vels: list of (vx_world, vy_world) per step
+        chassis_vels: list of (vx_chassis, vy_chassis) per step
+        save_dir: directory to save the PNG
+        episode: episode number (used for filename)
+    """
+    # convert to arrays (N,2)
+    w = np.array(world_vels, dtype=np.float32) if len(world_vels) > 0 else np.zeros((0, 2), dtype=np.float32)
+    c = np.array(chassis_vels, dtype=np.float32) if len(chassis_vels) > 0 else np.zeros((0, 2), dtype=np.float32)
+
+    steps_w = np.arange(w.shape[0]) if w.shape[0] > 0 else np.arange(0)
+    steps_c = np.arange(c.shape[0]) if c.shape[0] > 0 else np.arange(0)
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 4), sharey=True)
+
+    # World-frame velocities
+    ax = axes[0]
+    if w.shape[0] > 0:
+        ax.plot(steps_w, w[:, 0], label='vx_world (forward)', color='C0')
+        ax.plot(steps_w, w[:, 1], label='vy_world (lateral)', color='C1')
+    else:
+        ax.plot([], [], label='no data')
+    ax.set_xlabel('Step')
+    ax.set_ylabel('Linear velocity (m/s)')
+    ax.set_title('World-frame linear velocities')
+    ax.grid(True)
+    ax.legend()
+
+    # Chassis-frame velocities
+    ax2 = axes[1]
+    if c.shape[0] > 0:
+        ax2.plot(steps_c, c[:, 0], label='vx_chassis (forward)', color='C0')
+        ax2.plot(steps_c, c[:, 1], label='vy_chassis (lateral)', color='C1')
+    else:
+        ax2.plot([], [], label='no data')
+    ax2.set_xlabel('Step')
+    ax2.set_title('Chassis-frame linear velocities')
+    ax2.grid(True)
+    ax2.legend()
+
+    plt.suptitle(f'Episode {episode}: Linear velocities (world vs chassis)')
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+    out_path = os.path.join(save_dir, f'episode_{episode}_velocities.png')
+    plt.savefig(out_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Saved velocity plot: {out_path}")
+
+
 if __name__ == "__main__":
     # 模型路径 - 根据实际保存位置调整
-    model_path = "linux_env_dev/models/checkpoints_20251024_073650/ppo_mobile_mm_1000000_steps.zip"
+    # model_path = "linux_env_dev/models/checkpoints_20251024_073650/ppo_mobile_mm_1000000_steps.zip"
+    # model_path = "linux_env_dev/models/checkpoints_20251024_154939/ppo_mobile_mm_600000_steps.zip"
+    # model_path = "linux_env_dev/models/checkpoints_20251024_164654/ppo_mobile_mm_200000_steps.zip"
+    # model_path = "linux_env_dev/models/logs_20251027_015159/checkpoints/ppo_mobile_mm_1000000_steps.zip"
+    model_path = "linux_env_dev/models/logs_20251029_005404/checkpoints/ppo_mobile_mm_800000_steps.zip"
     render = False
     
     if os.path.exists(model_path):
         print("Starting model testing...")
-        distances, rewards, success_count = test_trained_model(model_path, render=render)
+        distances, rewards, success_count = test_trained_model(model_path, num_episodes=5, render=render, max_steps=500)
         print(f"\nTesting completed! Success rate: {success_count}/3 ({success_count/3*100:.1f}%)")
     else:
         print(f"Model file not found: {model_path}")

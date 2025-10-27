@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from typing import Optional
 import gymnasium as gym
 from gymnasium import spaces
 import pybullet as p
@@ -9,6 +10,8 @@ try:
 except Exception:
     Image = None
 
+from .reward_helpers import compute_reward
+from .target_generator import TargetGenerator, FixedTarget, RandomTarget, RandomTargetForEpisode, CurriculumTarget
 
 class MobileMMBulletEnv(gym.Env):
     """Minimal PyBullet-based mobile manipulator tracking env.
@@ -20,12 +23,14 @@ class MobileMMBulletEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
-    def __init__(self, urdf_path=None, frame_skip=10, max_steps=1000, render=False,
+    def __init__(self, urdf_path=None, frame_skip=10, max_steps=500, render=False,
                  save_image_on_reset=False, save_image_path=None, image_width=800, image_height=600,
-                 reward_distance_weight: float = 0.5, reward_yaw_weight: float = 0.5):
+                 reward_distance_weight: float = 1.0, reward_yaw_weight: float = 1.0,
+                 target_generator: Optional[TargetGenerator] = None):
         self.project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         # self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "mobile_manipulator_PPR_base_corrected.urdf")
-        self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "mobile_manipulator_PPR_theta_before_x.urdf")
+        # self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "mobile_manipulator_PPR_theta_before_x.urdf")
+        self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "mobile_manipulator_little_xy_link.urdf")
         self.frame_skip = frame_skip
         self.max_steps = max_steps
         self.render = render
@@ -76,15 +81,24 @@ class MobileMMBulletEnv(gym.Env):
                 else:
                     self._action_max_delta.append(0.1)
 
-        # action space uses normalized controls in [-1, 1] per-dimension; we'll scale inside step()
-        self.action_space = spaces.Box(low=-1, high=1, shape=(n_j,), dtype=np.float32)
-        obs_dim = n_j * 2 + 3 + 3 + 3  # joint pos, joint vel, ee_pos(3) + target_pos(3)
+        # 目前仅控制底盘的2自由度——x平移和theta旋转
+        self.action_space = spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float32) # 
+        obs_dim = n_j * 2 + 3 + 3 + 3 + 1  # joint pos, joint vel, ee_pos(3) + target_pos(3) + target_yaw(1)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
 
-        # simple fixed target for initial tests
         # ee初始位置是[0.4, 0.0, 0.9]
         # base_pos初始位置是[0.0, 0.0, 0.2]
-        self._target = np.array([10.0, 1.0, 0.2], dtype=np.float32)
+        default_target = np.array([10.0, 1.0, 0.2], dtype=np.float32)
+        if target_generator is None:
+            self._target_generator = FixedTarget(tuple(default_target.tolist()))
+        else:
+            self._target_generator = target_generator
+        # initialise current target via generator
+        try:
+            self._target = self._target_generator.reset()
+        except Exception:
+            # fallback to default target if generator fails
+            self._target = default_target
 
         # reward shaping weights
         self.reward_distance_weight = float(reward_distance_weight)
@@ -104,11 +118,11 @@ class MobileMMBulletEnv(gym.Env):
         is_y_prismatic_found = False
         for i in range(p.getNumJoints(robot)):
             info = p.getJointInfo(robot, i)
-            if info[1] == b'joint_y':
-                # skip y prismatic joint to fix lateral movement
-                print("[MobileMMBulletEnv] Skipping y prismatic joint to fix lateral movement.")
-                is_y_prismatic_found = True
-                continue
+            # if info[1] == b'joint_y':
+            #     # skip y prismatic joint to fix lateral movement
+            #     print("[MobileMMBulletEnv] Skipping y prismatic joint to fix lateral movement.")
+            #     is_y_prismatic_found = True
+            #     continue
             # import pdb; pdb.set_trace()
             jtype = info[2]
             if jtype != p.JOINT_FIXED:
@@ -120,9 +134,9 @@ class MobileMMBulletEnv(gym.Env):
                 self.joint_upper.append(info[9])
         
         # 去掉y方向移动的自由度
-        if not is_y_prismatic_found:
-            print("[MobileMMBulletEnv] Warning: 'joint_y' prismatic joint not found; lateral movement may be possible.")
-            raise RuntimeError("Expected 'joint_y' prismatic joint not found in URDF.")
+        # if not is_y_prismatic_found:
+        #     print("[MobileMMBulletEnv] Warning: 'joint_y' prismatic joint not found; lateral movement may be possible.")
+        #     raise RuntimeError("Expected 'joint_y' prismatic joint not found in URDF.")
         
         # clean up
         p.removeBody(robot)
@@ -131,6 +145,7 @@ class MobileMMBulletEnv(gym.Env):
     def reset(self, seed=None, options=None):
         if seed is not None:
             np.random.seed(seed)
+        self._target = self._target_generator.reset()
         self.step_count = 0
         p.resetSimulation()
         p.setGravity(0, 0, -9.81)
@@ -150,7 +165,6 @@ class MobileMMBulletEnv(gym.Env):
             except Exception as e:
                 print(f"[MobileMMBulletEnv] Warning: failed to save robot image: {e}")
 
-        base_pos, base_orn = p.getBasePositionAndOrientation(self.robot)
         print(f"Robot initial position: ")
         for jid in self.joint_ids:
             info = p.getJointInfo(self.robot, jid)
@@ -355,27 +369,91 @@ class MobileMMBulletEnv(gym.Env):
                 return i
         return None
     
+    def _get_base_pos_chassis_base(self):
+        base_pos, base_orn = p.getBasePositionAndOrientation(self.robot)
+        euler = p.getEulerFromQuaternion(base_orn)
+        abs_pos = np.array(base_pos, dtype=np.float32)
+        self._abstract_chassis_pos = abs_pos
+        self._abstract_chassis_yaw = float(euler[2])
+
+        base_lin, base_ang = p.getBaseVelocity(self.robot)
+        base_lin = np.array(base_lin, dtype=np.float32)
+        base_ang = np.array(base_ang, dtype=np.float32)
+
+        # project world linear velocity into chassis (yaw) frame
+        yaw = float(euler[2])
+        cy = np.cos(yaw); sy = np.sin(yaw)
+        vx_w, vy_w = float(base_lin[0]), float(base_lin[1])
+        vx_r = cy * vx_w + sy * vy_w
+        vy_r = -sy * vx_w + cy * vy_w
+
+        self._abstract_chassis_lin_vel_world = base_lin
+        self._abstract_chassis_lin_vel = np.array([vx_r, vy_r, base_lin[2]], dtype=np.float32)
+        self._abstract_chassis_ang_vel = base_ang
+
+        print(f"[DEBUG base] chassis_lin_vel_world={base_lin}, chassis_ang_vel={base_ang}, vx_r={vx_r:.4f}, vy_r={vy_r:.4f}")
+
+        return abs_pos
+
+    def _get_linear_vel_chassis_frame(self, yaw, lin_vel_world_frame):
+        yaw = float(yaw)
+        cy = np.cos(yaw)
+        sy = np.sin(yaw)
+        
+        vx_w, vy_w = float(lin_vel_world_frame[0]), float(lin_vel_world_frame[1])
+        vx_r = cy * vx_w + sy * vy_w
+        vy_r = -sy * vx_w + cy * vy_w
+        return vx_r, vy_r
+
     def _get_base_pos(self):
-        # attempt to locate the abstract chassis link by name and record its world position
         abstract_idx = self._link_index_by_name(self.robot, 'abstract_chassis_link')
         st_abs = p.getLinkState(self.robot, abstract_idx, computeForwardKinematics=True, computeLinkVelocity=True)
         abs_pos = np.array(st_abs[0], dtype=np.float32)
         euler = p.getEulerFromQuaternion(st_abs[1])   # (roll, pitch, yaw)
         self._abstract_chassis_pos = abs_pos
-        # store chassis yaw for reward computations (roll, pitch, yaw)
         self._abstract_chassis_yaw = float(euler[2])
-        self._abstract_chassis_lin_vel = st_abs[6]
-        self._abstract_chassis_ang_vel = st_abs[7]
+        theta = np.arctan2(abs_pos[1], abs_pos[0])
+        
+        # link_vel_from_getLinkState (world frame)
+        link_lin_vel_world_frame = np.array(st_abs[6], dtype=np.float32)
+        link_ang_vel_world_frame = np.array(st_abs[7], dtype=np.float32)
+        
+        # store base translational/angular velocities
+        self._abstract_chassis_ang_vel = link_ang_vel_world_frame
 
+        # compute robot/chassis-frame velocity by rotating world velocity
+        # into the chassis yaw frame (so vx_r is forward, vy_r is lateral)
+        vx_r, vy_r = self._get_linear_vel_chassis_frame(euler[2], link_lin_vel_world_frame)
 
-        # print(f" Abstract chassis position: ({abs_pos[0]:.1f}, {abs_pos[1]:.5f}, {abs_pos[2]:.1f}), "
-        #       f"orientation: {euler[2]:.5f}")
+        # store both world-frame and chassis-frame velocities
+        self._abstract_chassis_lin_vel_world = link_lin_vel_world_frame
+        self._abstract_chassis_lin_vel_chassis = np.array([vx_r, vy_r, link_lin_vel_world_frame[2]], dtype=np.float32)
+
+        # For debugging, optionally print comparison (enable by setting env._debug_velocity = True)
+        base_pos, _ = p.getBasePositionAndOrientation(self.robot)
+        base_pos = np.array(base_pos, dtype=np.float32)
+        r = abs_pos - base_pos
+        rot_contrib = np.cross(link_ang_vel_world_frame, r)
+        print(f"cur pos = ({abs_pos[0]:.2f}, {abs_pos[1]:.2f}),  yaw = {euler[2]:.3f}, theta={theta:.3f}, "
+              f"chassis_lin_vel_world=({link_lin_vel_world_frame[0]:.3f}, {link_lin_vel_world_frame[1]:.3f}), "
+              f"chassis_ang_vel={link_ang_vel_world_frame[2]:.3f}, "
+              f"vx_r={vx_r:.3f}, vy_r={vy_r:.3f}")
+            #   f"rot_contrib={rot_contrib}")
 
         return abs_pos
 
     def _wrap_angle(self, a: float) -> float:
         """Wrap angle to [-pi, pi]."""
         return (a + np.pi) % (2 * np.pi) - np.pi
+
+    def _get_desired_yaw(self, base_pos, target_pos):
+        vec = target_pos[:2] - base_pos[:2]
+        dist = float(np.linalg.norm(vec))
+
+        desired_yaw = float(np.arctan2(vec[1], vec[0])) \
+            if dist > 1e-2 else float(self._abstract_chassis_yaw)
+        self._abstract_chassis_desired_yaw = desired_yaw
+        return desired_yaw
 
     def _get_obs(self):
         q = [] # 关节位置
@@ -388,8 +466,9 @@ class MobileMMBulletEnv(gym.Env):
         qdot = np.array(qdot, dtype=np.float32)
         ee_pos = self._get_ee_pos()
         base_pos = self._get_base_pos()
-        obs = np.concatenate([q, qdot, base_pos, ee_pos, self._target]).astype(np.float32)
-        # import pdb; pdb.set_trace()
+        desired_yaw = np.array([self._get_desired_yaw(base_pos, self._target)])
+
+        obs = np.concatenate([q, qdot, base_pos, ee_pos, self._target, desired_yaw]).astype(np.float32)
         return obs
 
     def _get_target_position(self):
@@ -407,78 +486,137 @@ class MobileMMBulletEnv(gym.Env):
 
     def step(self, action):
         self.step_count += 1
+        # if self.step_count > 200:
+        #     import pdb; pdb.set_trace()
         action = np.array(action, dtype=np.float32).flatten()
-        n = len(self.joint_ids)
+        self._get_base_pos()
 
-        for i, jid in enumerate(self.joint_ids):
-            cur = p.getJointState(self.robot, jid)[0]
-            info = p.getJointInfo(self.robot, jid)
-            effort_limit = info[10]
-            joint_name = info[1].decode()
+        last_yaw = self._abstract_chassis_yaw
+        last_pos = self._abstract_chassis_pos
+        
+        action_ds = action[0] * 0.1
+        action_dtheta = action[1] * 0.01
+        
+        action_dx = action_ds * np.cos(last_yaw)
+        action_dy = action_ds * np.sin(last_yaw)
+        
+        target_x = last_pos[0] + action_dx
+        target_y = last_pos[1] + action_dy
+        target_theta = self._wrap_angle(last_yaw + action_dtheta)
+        if target_theta > np.pi / 3:
+            target_theta = np.pi / 3
+        elif target_theta < -np.pi / 3:
+            target_theta = -np.pi / 3
+        
+        jidx = self._joint_index_by_name(self.robot, 'joint_x')
+        jidy = self._joint_index_by_name(self.robot, 'joint_y')
+        jidth = self._joint_index_by_name(self.robot, 'joint_theta')
+        
+        p.setJointMotorControlArray(self.robot,
+                                    jointIndices=[jidx, jidy],
+                                    controlMode=p.POSITION_CONTROL,
+                                    targetPositions=[target_x, target_y],
+                                    forces=[100, 100])
+        
+        p.setJointMotorControl2(self.robot, jidth, p.POSITION_CONTROL,
+                                targetPosition=target_theta,
+                                force=50)
+        
+        print(f"Action step {self.step_count}: action: ds={action_ds:.3f}"
+              f"(dx={action_dx:.3f}, dy={action_dy:.3f}), dtheta={action_dtheta:.3f})")
+        # import pdb; pdb.set_trace()
+        # for i, jid in enumerate(self.joint_ids):
+        #     cur = p.getJointState(self.robot, jid)[0]
+        #     info = p.getJointInfo(self.robot, jid)
+        #     effort_limit = info[10]
+        #     joint_name = info[1].decode()
 
-            joint_type = self.joint_types[i]
-            # ignore left_arm joints for now
-            if 'left_arm' in joint_name:
-                target = cur
-            else:
-                # incoming action is normalized in [-1,1]; scale by per-joint delta
-                max_delta = float(self._action_max_delta[i])
-                scaled_delta = float(np.clip(action[i], -1.0, 1.0)) * max_delta
+        #     joint_type = self.joint_types[i]
+        #     # ignore left_arm joints for now
+        #     if 'left_arm' in joint_name:
+        #         target = cur
+        #     else:
+        #         # incoming action is normalized in [-1,1]; scale by per-joint delta
+        #         max_delta = float(self._action_max_delta[i])
+        #         scaled_delta = float(np.clip(action[i], -1.0, 1.0)) * max_delta
 
-                if joint_type == p.JOINT_PRISMATIC:
-                    target = cur + scaled_delta
-                else:
-                    # revolute: apply delta and wrap
-                    target = cur + scaled_delta
-                    target = float(self._wrap_angle(target))
-                    if target > np.pi / 3:
-                        target = np.pi / 3
-                    elif target < -np.pi / 3:
-                        target = -np.pi / 3
+        #         if joint_type == p.JOINT_PRISMATIC:
+        #             target = cur + scaled_delta
+        #         else:
+        #             # revolute: apply delta and wrap
+        #             target = cur + scaled_delta
+        #             target = float(self._wrap_angle(target))
+        #             if target > np.pi / 3:
+        #                 target = np.pi / 3
+        #             elif target < -np.pi / 3:
+        #                 target = -np.pi / 3
 
-                # # clamp to joint limits if available
-                # lower = self.joint_lower[i]
-                # upper = self.joint_upper[i]
-                # try:
-                #     if np.isfinite(lower) and np.isfinite(upper):
-                #         target = float(np.clip(target, float(lower), float(upper)))
-                # except Exception:
-                #     pass
-
-                print(f"Action for joint {joint_name}: current={cur:.3f}, raw_action={action[i]:.3f}, target={target:.3f}, effort_limit={effort_limit:.1f}")
-                p.setJointMotorControl2(self.robot, jid, p.POSITION_CONTROL, targetPosition=target, force=min(100, effort_limit / 2))
+        #         print(f"Action for joint {joint_name}: current={cur:.3f}, raw_action={action[i]:.3f}, target={target:.3f}, effort_limit={effort_limit:.1f}")
+        #         p.setJointMotorControl2(self.robot, jid, p.POSITION_CONTROL, targetPosition=target, force=min(100, effort_limit / 3))
+        
         # step simulation
         for _ in range(self.frame_skip):
             p.stepSimulation()
 
+        # get observation and base position
         obs = self._get_obs()
-        ee = obs[-6:-3]
-        base_pos = obs[-9:-6]
-        # distance term (Euclidean in 3D)
-        dist = float(np.linalg.norm(base_pos[:2] - self._target[:2]))
 
-        vec_to_target = np.array(self._target[:2], dtype=float) - np.array(base_pos[:2], dtype=float)
-        desired_yaw = float(np.arctan2(vec_to_target[1], vec_to_target[0]))
-        current_yaw = float(getattr(self, '_abstract_chassis_yaw', 0.0))
-        current_pos = getattr(self, '_abstract_chassis_pos', (0.0, 0.0, 0.0))
-        current_lin_vel = getattr(self, '_abstract_chassis_lin_vel', (0.0, 0.0, 0.0))
-        current_ang_vel = getattr(self, '_abstract_chassis_ang_vel', (0.0, 0.0, 0.0))
-        # import pdb; pdb.set_trace()
-        yaw_error = float(self._wrap_angle(desired_yaw - current_yaw))
+        base_pos = getattr(self, '_abstract_chassis_pos', np.array([0.0, 0.0, 0.0], dtype=float))
+        base_yaw = float(getattr(self, '_abstract_chassis_yaw', 0.0))
+        base_lin_vel_chassis_frame = getattr(self, '_abstract_chassis_lin_vel_chassis', np.array([0.0, 0.0, 0.0], dtype=float))
+        base_ang_vel = getattr(self, '_abstract_chassis_ang_vel', np.array([0.0, 0.0, 0.0], dtype=float))
+        
+        base_lin_vel_norm = np.linalg.norm(base_lin_vel_chassis_frame)
+        base_ang_vel_norm = np.linalg.norm(base_ang_vel)
 
-        # combine into a scalar reward: negative weighted sum (smaller is better)
-        reward_dist_term = self.reward_distance_weight * dist
-        # penalize orientation error (use absolute yaw error)
-        reward_yaw_term = self.reward_yaw_weight * abs(yaw_error)
-        reward = -float(reward_dist_term + reward_yaw_term)
-        # reward = -float(abs(current_yaw) ** 2)
-        # print(f"reward = {reward:.4f} yaw_term={current_yaw:.4f})")
+        real_yaw = np.arctan2(base_lin_vel_chassis_frame[1], base_lin_vel_chassis_frame[0] + 1e-3)
+        # print(f"State after action: base_lin_vel = ({base_lin_vel_chassis_frame[0]:.1f}, {base_lin_vel_chassis_frame[1]:.1f}), "
+        #       f"base_yaw_ang_vel = {base_ang_vel[2]:.1f}, "
+        #       f"real_yaw = {real_yaw:.3f}, base_yaw = {base_yaw:.3f}")
+        print(f"actual movement: act dx = {base_pos[0] - last_pos[0]:.3f}, dy = {base_pos[1] - last_pos[1]:.3f}, dtheta = {self._wrap_angle(base_yaw - last_yaw):.3f}")
+        
+        reward, info = compute_reward(base_pos, self._target, base_yaw, real_yaw,
+                                    wrap_angle_fn=self._wrap_angle,
+                                    base_lin_vel=base_lin_vel_norm,
+                                    base_ang_vel=base_ang_vel_norm,
+                                    dist_weight=self.reward_distance_weight,
+                                    yaw_weight=self.reward_yaw_weight)
 
-        terminated = bool(dist < 0.05 or self.step_count >= self.max_steps)
-        truncated = False
-        info = {"distance": float(dist), "yaw_error": float(yaw_error)}
-        print(f"Step {self.step_count}: Distance: {dist:.4f}, YawErr: {yaw_error:.4f},"
-              f" Target: {self._target}, base_pos = ({base_pos[0]:.1f}, {base_pos[1]:.1f}, {base_pos[2]:.1f})")
+
+        # terminated: 成功或者失败的自然终止
+        reached_goal = bool(info.get("distance", 9999.0) < 0.05) and bool(base_lin_vel_norm < 0.1) and bool(base_ang_vel_norm < 0.1)
+
+        target_len = np.linalg.norm(self._target[:2])
+        base_len = np.linalg.norm(base_pos[:2])
+
+        # detect out-of-bounds / catastrophic failure conditions (treat as terminal failure)
+        out_of_bounds = bool(base_len > target_len * 1.5) or bool(base_pos[0] < -2.0) or bool(abs(base_pos[1]) > 2.0 * abs(self._target[1]))
+        out_of_bounds = False # 不使用，自行探索
+
+        # terminated is True for natural success OR terminal failure (out_of_bounds)
+        terminated = reached_goal or out_of_bounds
+
+        # truncated: episode ended because of time/step limit only
+        truncated = bool(self.step_count >= self.max_steps)
+
+        # penalize terminal failures so agent learns to avoid them
+        if out_of_bounds:
+            reward += -1e9
+            info['failure_reason'] = 'out_of_bounds'
+            info['out_of_bounds'] = True
+            info['is_success'] = False
+
+        # annotate info for downstream wrappers / loggers
+        if truncated:
+            info['TimeLimit.truncated'] = True
+        if reached_goal and not out_of_bounds:
+            info['is_success'] = True
+
+        print(f"Step {self.step_count}: Distance: {info.get('distance', 0.0):.1f}m, YawErr: {info.get('yaw_error', 0.0):.1f}rad,"
+              f" Target: ({self._target[0]:.1f}, {self._target[1]:.1f}, {self._target[2]:.1f})m, {self._abstract_chassis_desired_yaw:.2f}rad, "
+              f"base_pos = ({base_pos[0]:.1f}, {base_pos[1]:.1f}, {base_pos[2]:.1f}), "
+              f"Reward: {reward:.2f} \n")
+
         return obs, reward, terminated, truncated, info
 
     def render(self, mode="human"):

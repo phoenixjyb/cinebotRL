@@ -31,15 +31,15 @@
     <link name="base_link_x">
         <inertial>
             <origin rpy="0.00000000 0.00000000 0.00000000" xyz="0.00000000 0.00000000 0.00000000"/>
-            <mass value="1.00000000"/>
-            <inertia ixx="1.00000000" ixy="0.00000000" ixz="0.00000000" iyy="1.00000000" iyz="0.00000000" izz="1.00000000"/>
+            <mass value="0.0100000000"/>
+            <inertia ixx="0.0010000000" ixy="0.00000000" ixz="0.00000000" iyy="0.0100000000" iyz="0.00000000" izz="0.0100000000"/>
         </inertial>
     </link>
     <link name="base_link_y">
         <inertial>
             <origin rpy="0.00000000 0.00000000 0.00000000" xyz="0.00000000 0.00000000 0.00000000"/>
-            <mass value="1.00000000"/>
-            <inertia ixx="1.00000000" ixy="0.00000000" ixz="0.00000000" iyy="1.00000000" iyz="0.00000000" izz="1.00000000"/>
+            <mass value="0.0100000000"/>
+            <inertia ixx="0.0010000000" ixy="0.00000000" ixz="0.00000000" iyy="0.0100000000" iyz="0.00000000" izz="0.0100000000"/>
         </inertial>
     </link>
     <link name="left_arm_base_link">
@@ -225,24 +225,22 @@
         <axis xyz="1 0 0"/>
     </joint>
     <joint name="joint_theta" type="revolute">
-        <parent link="base"/>
-        <child link="base_link_x"/>
+        <parent link="base_link_y"/>
+        <child link="abstract_chassis_link"/>
         <origin rpy="0.00000000 0.00000000 0.00000000" xyz="0.00000000 0.00000000 0.00000000"/>
         <axis xyz="0.00000000 0.00000000 1.00000000"/>
-        <limit lower="-3.14159265" upper="3.14159265" effort="100.0" velocity="2.5"/>
+        <limit lower="-Inf" upper="Inf" effort="100.0" velocity="2.5"/>
     </joint>
     <joint name="joint_x" type="prismatic">
-        <!-- reparented so chain flows from chassis -> base_link_y -> base_link_x -> base -->
-        <parent link="base_link_x"/>
-        <child link="base_link_y"/>
+        <parent link="base"/>
+        <child link="base_link_x"/>
         <origin rpy="0.00000000 0.00000000 0.00000000" xyz="0.00000000 0.00000000 0.00000000"/>
         <axis xyz="1.00000000 0.00000000 0.00000000"/>
         <limit lower="-50.00000000" upper="50.00000000" effort="200.0" velocity="2.0"/>
     </joint>
     <joint name="joint_y" type="prismatic">
-        <!-- reparented so abstract_chassis_link is the upstream root -->
-        <parent link="base_link_y"/>
-        <child link="abstract_chassis_link"/>
+        <parent link="base_link_x"/>
+        <child link="base_link_y"/>
         <origin rpy="0.00000000 0.00000000 0.00000000" xyz="0.00000000 0.00000000 0.00000000"/>
         <axis xyz="0.00000000 1.00000000 0.00000000"/>
         <limit lower="-50.00000000" upper="50.00000000" effort="200.0" velocity="2.0"/>

@@ -558,6 +558,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 print(f"📐 Base-Target Distance (m):")
                 print(f"   min={base_to_target_2d.min():.4f}  mean={base_to_target_2d.mean():.4f}  max={base_to_target_2d.max():.4f}  std={base_to_target_2d.std():.4f}")
                 
+                # NEW: Track actual base movement since episode start
+                base_displacement = torch.norm(base_pos_world[:, :2] - self._episode_start_base_pos[:, :2], dim=-1)
+                print(f"🚗 Base Movement from Start (m):")
+                print(f"   min={base_displacement.min():.4f}  mean={base_displacement.mean():.4f}  max={base_displacement.max():.4f}  std={base_displacement.std():.4f}")
+                
                 print(f"🤖 EE Distance from Base (m):")
                 print(f"   min={ee_dist_from_base.min():.4f}  mean={ee_dist_from_base.mean():.4f}  max={ee_dist_from_base.max():.4f}  std={ee_dist_from_base.std():.4f}")
                 
@@ -622,6 +627,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     
                     print(f"  📏 EE Error:     {tracking_error[env_id].item():.4f} m")
                     print(f"  📐 Base-Target:  {base_to_target_2d[env_id].item():.4f} m (arm reach: 0.6m)")
+                    print(f"  🚗 Base Moved:   {base_displacement[env_id].item():.4f} m (from episode start)")
                     
                     # Show if base should be moving
                     if base_to_target_2d[env_id].item() > 0.6:
@@ -1116,8 +1122,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             
             # === CASE 1: Target IS reachable from current base position ===
             if is_reachable.any():
-                # Bonus for being in a good base position (Session 7b: 0.5 → 2.0)
-                reachability_bonus[is_reachable] = 2.0
+                # Bonus for being in a good base position (Session 7c: Reduced to 1.0 from 2.0 - was too dominant)
+                reachability_bonus[is_reachable] = 1.0
                 
                 # Optional: Get best arm config as IK hint (future enhancement)
                 # arm_configs, _ = self.reach_map.get_best_configs(target_in_arm_frame[is_reachable])
@@ -1146,12 +1152,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 # Compute alignment: dot product of velocity with desired direction
                 alignment = (base_vel_xy_world * direction_normalized).sum(dim=-1)  # [M]
                 
-                # Reward moving in correct direction (Session 7b: 1.0 → 3.0)
-                base_direction_reward[~is_reachable] = 3.0 * torch.clamp(alignment, min=0.0)
+                # Reward moving in correct direction (Session 7c: Reduced to 1.5 from 3.0)
+                base_direction_reward[~is_reachable] = 1.5 * torch.clamp(alignment, min=0.0)
                 
-                # Bonus for higher speed when moving in right direction (Session 7b: 0.3 → 1.0)
+                # Bonus for higher speed when moving in right direction (Session 7c: Reduced to 0.5 from 1.0)
                 speed_xy = torch.norm(base_vel_xy_world, dim=-1)  # [M]
-                base_direction_reward[~is_reachable] += 1.0 * speed_xy * torch.clamp(alignment, min=0.0)
+                base_direction_reward[~is_reachable] += 0.5 * speed_xy * torch.clamp(alignment, min=0.0)
             
             # Log reachability statistics (every 100 steps to avoid spam)
             if not hasattr(self, '_reach_log_step'):
@@ -1336,6 +1342,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         )
         
         print(f"[RESET] Env {env_ids[0].item() if len(env_ids) > 0 else 'N/A'}: Base moved to trajectory start [{first_target_pos[env_ids[0], 0]:.3f}, {first_target_pos[env_ids[0], 1]:.3f}, {first_target_pos[env_ids[0], 2]:.3f}]")
+        
+        # NEW: Store episode start base position for movement tracking
+        if not hasattr(self, '_episode_start_base_pos'):
+            self._episode_start_base_pos = torch.zeros(self.num_envs, 3, device=self.device)
+        self._episode_start_base_pos[env_ids] = new_root_state[:, 0:3]
         
         # Reset state buffers - use root_pos_w (actual world position)
         self.prev_base_pos[env_ids] = new_root_state[:, 0:3]

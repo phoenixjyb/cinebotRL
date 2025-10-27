@@ -76,7 +76,7 @@ class RewardWeights:
     """Reward term weights for the tracking task."""
     
     # Tracking rewards
-    position_tracking: float = 50.0  # INCREASED from 10.0 - need strong incentive for base movement
+    position_tracking: float = 100.0  # Session 7c: INCREASED 50→100 (2x) - make primary task dominant
     orientation_tracking: float = 2.0
     progress_bonus: float = 1.0
     base_progress_reward: float = 150.0  # CRITICAL: 3x stronger! (was 50.0) - must overcome action penalties

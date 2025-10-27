@@ -45,8 +45,8 @@ def convert_urdf_to_usd():
     
     # Get paths
     project_root = Path(__file__).parent.parent
-    urdf_path = (project_root / "assets_own" / "mobile_manipulator_PPR_theta_before_x.urdf").resolve()
-    usd_path = (project_root / "assets_own" / "usd" / "mobile_manipulator_PPR_theta_before_x.usd").resolve()
+    urdf_path = (project_root / "assets_own" / "mobile_manipulator_PPR_theta_x_y.urdf").resolve()
+    usd_path = (project_root / "assets_own" / "usd" / "mobile_manipulator_PPR_theta_x_y.usd").resolve()
     
     if not urdf_path.exists():
         print(f"❌ URDF not found: {urdf_path}")

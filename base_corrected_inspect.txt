@@ -1,0 +1,116 @@
+[INFO] Using python from: I:\isaaclab\\_isaac_sim\python.bat
+
+======================================================================
+Inspecting USD: assets_own\usd\mobile_manipulator_PPR_base_corrected.usd
+======================================================================
+
+🔍 PRIM HIERARCHY
+----------------------------------------------------------------------
+📦 Robot (Xform)
+  📦 base (Xform)
+    📦 visuals (Xform)
+    📦 collisions (Xform)
+  📦 base_link_x (Xform)
+    📦 visuals (Xform)
+    📦 collisions (Xform)
+     joints (Scope)
+    🔗 joint_x (PhysicsPrismaticJoint)
+    🔗 joint_y (PhysicsPrismaticJoint)
+    🔗 joint_theta (PhysicsRevoluteJoint)
+    🔗 left_arm_joint1 (PhysicsRevoluteJoint)
+    🔗 left_arm_joint2 (PhysicsRevoluteJoint)
+    🔗 left_arm_joint3 (PhysicsRevoluteJoint)
+    🔗 left_arm_joint4 (PhysicsRevoluteJoint)
+    🔗 left_arm_joint5 (PhysicsRevoluteJoint)
+    🔗 left_arm_joint6 (PhysicsRevoluteJoint)
+  📦 base_link_y (Xform)
+    📦 visuals (Xform)
+    📦 collisions (Xform)
+  📦 abstract_chassis_link (Xform)
+    📦 left_arm_base_link (Xform)
+    📦 visuals (Xform)
+    📦 collisions (Xform)
+  📦 left_arm_link1 (Xform)
+    📦 visuals (Xform)
+    📦 collisions (Xform)
+  📦 left_arm_link2 (Xform)
+    📦 visuals (Xform)
+    📦 collisions (Xform)
+  📦 left_arm_link3 (Xform)
+    📦 visuals (Xform)
+    📦 collisions (Xform)
+  📦 left_arm_link4 (Xform)
+    📦 visuals (Xform)
+    📦 collisions (Xform)
+  📦 left_arm_link5 (Xform)
+    📦 visuals (Xform)
+    📦 collisions (Xform)
+  📦 left_arm_link6 (Xform)
+    📦 left_gripper_link (Xform)
+    📦 visuals (Xform)
+    📦 collisions (Xform)
+     Looks (Scope)
+       DefaultMaterial (Material)
+         DefaultMaterial (Shader)
+       material_CAD1EE (Material)
+         Shader (Shader)
+       material_100100100 (Material)
+         Shader (Shader)
+       material_D2D2100 (Material)
+         Shader (Shader)
+
+======================================================================
+🔗 JOINTS FOUND
+----------------------------------------------------------------------
+Joint: /Robot/joints/joint_x
+  ├─ Body 0: /Robot/base
+  └─ Body 1: /Robot/base_link_x
+Joint: /Robot/joints/joint_y
+  ├─ Body 0: /Robot/base_link_x
+  └─ Body 1: /Robot/base_link_y
+Joint: /Robot/joints/joint_theta
+  ├─ Body 0: /Robot/base_link_y
+  └─ Body 1: /Robot/abstract_chassis_link
+Joint: /Robot/joints/left_arm_joint1
+  ├─ Body 0: /Robot/abstract_chassis_link
+  └─ Body 1: /Robot/left_arm_link1
+Joint: /Robot/joints/left_arm_joint2
+  ├─ Body 0: /Robot/left_arm_link1
+  └─ Body 1: /Robot/left_arm_link2
+Joint: /Robot/joints/left_arm_joint3
+  ├─ Body 0: /Robot/left_arm_link2
+  └─ Body 1: /Robot/left_arm_link3
+Joint: /Robot/joints/left_arm_joint4
+  ├─ Body 0: /Robot/left_arm_link3
+  └─ Body 1: /Robot/left_arm_link4
+Joint: /Robot/joints/left_arm_joint5
+  ├─ Body 0: /Robot/left_arm_link4
+  └─ Body 1: /Robot/left_arm_link5
+Joint: /Robot/joints/left_arm_joint6
+  ├─ Body 0: /Robot/left_arm_link5
+  └─ Body 1: /Robot/left_arm_link6
+
+======================================================================
+🎯 LIKELY END-EFFECTOR LINKS
+----------------------------------------------------------------------
+✓ /Robot/left_arm_link6/left_gripper_link
+  Type: Xform
+✓ /Robot/Looks/material_CAD1EE
+  Type: Material
+✓ /Robot/Looks/material_CAD1EE/Shader
+  Type: Shader
+
+======================================================================
+📊 SUMMARY
+----------------------------------------------------------------------
+Total prims: 52
+Total joints: 9
+EE candidates: 3
+
+💡 RECOMMENDATION:
+   For env.py, update the end-effector body index or name.
+   Currently using: robot.data.body_pos_w[:, -1, :]  # Last body
+   Should use specific link name from above
+
+======================================================================
+

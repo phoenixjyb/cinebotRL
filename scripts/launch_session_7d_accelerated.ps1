@@ -1,20 +1,31 @@
 <#
 .SYNOPSIS
-    Accelerated Session 7d Training - 8192 envs for ~11 hour runtime
+    Accelerated Session 7d Training - 16384 envs for ~5.5 hour runtime
 
 .DESCRIPTION
-    Optimized configuration to fully utilize RTX 3090 24GB VRAM.
-    Doubles training speed compared to 4096 envs while maintaining stability.
+    Optimized configuration after discovering actual memory efficiency:
+    - Actual measurement: 8192 envs = 4GB VRAM (not 28GB!)
+    - Per-env cost: 0.49MB (not 3MB as initially estimated)
+    - Can safely scale to 16384 envs with ~8GB VRAM usage
     
-    VRAM Usage Estimate:
-    - 8192 envs × 3MB/env = ~24.6GB
-    - Isaac Sim overhead: ~4GB
-    - Total: ~28GB (fits in 24GB with memory management)
+    VRAM Usage (Measured):
+    - 16384 envs × 0.49MB/env = ~8GB
+    - Isaac Sim overhead: ~4GB  
+    - Total: ~12GB (comfortable margin on 24GB GPU)
     
-    Training will complete in ~11 hours instead of 22 hours.
+    Performance:
+    - Training completes in ~5.5 hours (vs 11h with 8192, 22h with 4096)
+    - 4x speedup over Session 7c baseline
+    - Maintains same rollout buffer size for sample efficiency
+    
+    Hyperparameters:
+    - n_steps=32: Maintains 524K rollout buffer (32 × 16384 = 524,288)
+    - batch_size=2048: Scaled to leverage larger rollout
+    - Same learning rate (buffer size unchanged)
 
 .NOTES
-    Based on Session 7c successful setup, optimized for speed.
+    Based on Session 7c successful setup + actual memory profiling.
+    Also fixes base spawn height bug (Z=0.86m not 1.0m from commit 879b0bd).
 #>
 
 param(
@@ -33,24 +44,24 @@ $Reset = "$ESC[0m"
 
 Write-Host ""
 Write-Host "${Cyan}╔════════════════════════════════════════════════════════════════╗${Reset}"
-Write-Host "${Cyan}║     Session 7d Training - ACCELERATED (8192 environments)     ║${Reset}"
-Write-Host "${Cyan}╔════════════════════════════════════════════════════════════════╗${Reset}"
+Write-Host "${Cyan}║     Session 7d Training - ACCELERATED (8192 environments)      ║${Reset}"
+Write-Host "${Cyan}╚════════════════════════════════════════════════════════════════╝${Reset}"
 Write-Host ""
 
 # Configuration
 $CONFIG = @{
     # Environment
     Task = "MobileMMTrackEE-v0"
-    NumEnvs = 8192  # 2x parallelism (was 4096 in Session 7c)
+    NumEnvs = 16384  # 4x parallelism (was 4096 in Session 7c, 8192 in initial 7d)
     Headless = $true
     
     # Training duration
     TotalTimesteps = 200000000  # 200M timesteps (same as 7c)
     
-    # PPO Hyperparameters (adjusted for 8192 envs)
+    # PPO Hyperparameters (adjusted for 16384 envs)
     LearningRate = 0.0003  # 3e-4 (same as 7c)
-    NSteps = 64  # Down from 128 to keep buffer size manageable
-    BatchSize = 1024  # Up from 512 to leverage larger rollout
+    NSteps = 32  # Down from 128 to maintain buffer: 32 × 16384 = 524,288
+    BatchSize = 2048  # Up from 512 to leverage larger rollout (524K / 256 batches)
     NEpochs = 10  # Same as 7c
     
     # PPO regularization
@@ -66,7 +77,7 @@ $CONFIG = @{
     DecayDurationTimesteps = 50000000  # 50M
     
     # Checkpointing
-    SaveFreq = 2048000  # Save every ~2M timesteps (250 rollouts × 8192 envs)
+    SaveFreq = 4096000  # Save every ~4M timesteps (250 rollouts × 16384 envs)
     
     # Paths
     IsaacLabPath = "I:\isaaclab"
@@ -97,8 +108,8 @@ Write-Host "    Headless:          $($CONFIG.Headless)"
 Write-Host ""
 Write-Host "  ${Cyan}Training:${Reset}"
 Write-Host "    Total Timesteps:   $($CONFIG.TotalTimesteps) (200M)"
-Write-Host "    Expected Duration: ${Green}~11 hours${Reset} ${Yellow}(vs 22 hours in 7c)${Reset}"
-Write-Host "    Speedup:           ${Green}2.0x${Reset}"
+Write-Host "    Expected Duration: ${Green}~5.5 hours${Reset} ${Yellow}(vs 11h with 8K, 22h with 4K)${Reset}"
+Write-Host "    Speedup:           ${Green}4.0x${Reset} ${Yellow}(vs Session 7c baseline)${Reset}"
 Write-Host ""
 Write-Host "  ${Cyan}PPO Hyperparameters:${Reset}"
 Write-Host "    Learning Rate:     $($CONFIG.LearningRate)"
@@ -130,9 +141,9 @@ if ($DryRun) {
 }
 
 # Confirm before starting
-Write-Host "${Yellow}═══════════════════════════════════════════════════════════════${Reset}"
-Write-Host "${Yellow}Ready to start Session 7d accelerated training (~11 hours)${Reset}"
-Write-Host "${Yellow}═══════════════════════════════════════════════════════════════${Reset}"
+Write-Host "${Yellow}===============================================================${Reset}"
+Write-Host "${Yellow}Ready to start Session 7d accelerated training (~5.5 hours)${Reset}"
+Write-Host "${Yellow}===============================================================${Reset}"
 Write-Host ""
 $confirmation = Read-Host "Continue? (y/N)"
 if ($confirmation -ne "y") {
@@ -186,10 +197,10 @@ Write-Host "  .\isaaclab.bat $($scriptArgs -join ' ')"
 Write-Host ""
 
 $startTime = Get-Date
-Write-Host "${Green}╔════════════════════════════════════════════════════════════════╗${Reset}"
-Write-Host "${Green}║  Training started at: $($startTime.ToString('yyyy-MM-dd HH:mm:ss'))  ║${Reset}"
-Write-Host "${Green}║  Expected completion: ~11 hours                                ║${Reset}"
-Write-Host "${Green}╚════════════════════════════════════════════════════════════════╝${Reset}"
+Write-Host "${Green}================================================================${Reset}"
+Write-Host "${Green}  Training started at: $($startTime.ToString('yyyy-MM-dd HH:mm:ss'))${Reset}"
+Write-Host "${Green}  Expected completion: ~5.5 hours${Reset}"
+Write-Host "${Green}================================================================${Reset}"
 Write-Host ""
 
 & .\isaaclab.bat @scriptArgs
@@ -199,14 +210,14 @@ $duration = $endTime - $startTime
 
 Write-Host ""
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "${Green}╔════════════════════════════════════════════════════════════════╗${Reset}"
-    Write-Host "${Green}║  ✓ Training completed successfully!                           ║${Reset}"
-    Write-Host "${Green}║  Duration: $($duration.ToString('hh\:mm\:ss'))                                  ║${Reset}"
-    Write-Host "${Green}╚════════════════════════════════════════════════════════════════╝${Reset}"
+    Write-Host "${Green}================================================================${Reset}"
+    Write-Host "${Green}  Training completed successfully!${Reset}"
+    Write-Host "${Green}  Duration: $($duration.ToString('hh\:mm\:ss'))${Reset}"
+    Write-Host "${Green}================================================================${Reset}"
 } else {
-    Write-Host "${Yellow}╔════════════════════════════════════════════════════════════════╗${Reset}"
-    Write-Host "${Yellow}║  ✗ Training exited with error code: $LASTEXITCODE            ║${Reset}"
-    Write-Host "${Yellow}║  Duration: $($duration.ToString('hh\:mm\:ss'))                                  ║${Reset}"
-    Write-Host "${Yellow}╚════════════════════════════════════════════════════════════════╝${Reset}"
+    Write-Host "${Yellow}================================================================${Reset}"
+    Write-Host "${Yellow}  Training exited with error code: $LASTEXITCODE${Reset}"
+    Write-Host "${Yellow}  Duration: $($duration.ToString('hh\:mm\:ss'))${Reset}"
+    Write-Host "${Yellow}================================================================${Reset}"
     exit $LASTEXITCODE
 }

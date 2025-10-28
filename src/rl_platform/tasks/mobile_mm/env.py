@@ -1665,8 +1665,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         super()._reset_idx(env_ids)
         
-        # Reset trajectory phase
+        # Reset trajectory phase BEFORE getting first waypoint
         self.trajectory_manager.reset(env_ids)
+        
+        # DEBUG: Verify trajectory was reset correctly
+        if len(env_ids) > 0:
+            test_wp_idx = self.trajectory_manager.current_waypoint_idx[env_ids[0]].item()
+            test_time = self.trajectory_manager._recorded_time_accum[env_ids[0]].item()
+            print(f"[DEBUG] After reset - Env {env_ids[0].item()}: waypoint_idx={test_wp_idx}, time_accum={test_time:.4f}")
 
         # Clear waypoint visualization state for the reset environments
         if hasattr(self, "_visited_waypoint_masks"):
@@ -1678,9 +1684,20 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         if self._visualization_enabled:
             self._create_markers_if_needed()
         
-        # CRITICAL FIX: Reset robot base position to match trajectory starting point
-        # This ensures the robot starts near the trajectory, making it physically possible to track
+        # CRITICAL: Get first waypoint AFTER trajectory reset
+        # This ensures we're positioning base relative to trajectory start, not mid-trajectory
         first_target_pos, _ = self.trajectory_manager.get_target_pose()
+        
+        # DEBUG: Print what we got from get_target_pose AND what's in recorded_positions
+        if len(env_ids) > 0 and self.trajectory_manager.recorded_positions is not None:
+            env_idx = env_ids[0].item()
+            from_get_target = first_target_pos[env_idx].cpu().numpy()
+            from_recorded = self.trajectory_manager.recorded_positions[env_idx, 0].cpu().numpy()
+            print(f"[DEBUG] Env {env_idx}:")
+            print(f"  get_target_pose():    [{from_get_target[0]:.3f}, {from_get_target[1]:.3f}, {from_get_target[2]:.3f}]")
+            print(f"  recorded_positions:   [{from_recorded[0]:.3f}, {from_recorded[1]:.3f}, {from_recorded[2]:.3f}]")
+            print(f"  waypoint_idx:         {self.trajectory_manager.current_waypoint_idx[env_idx].item()}")
+            print(f"  time_accum:           {self.trajectory_manager._recorded_time_accum[env_idx].item():.4f}")
         
         # Set base position with offset from target, accounting for arm kinematics
         # FK analysis (all joints at zero): EE is at [0.1415, 0.2405, 0.9465] in base frame

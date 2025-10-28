@@ -415,6 +415,13 @@ class TrajectoryManager:
         
         # Sample initial trajectories for all environments
         self._resample_multi_trajectories()
+        
+        # Debug: Print first waypoint of first few environments
+        if self.recorded_positions is not None:
+            print(f"[TrajectoryManager] First waypoints after initialization:")
+            for i in range(min(3, self.num_envs)):
+                first_wp = self.recorded_positions[i, 0].cpu().numpy()
+                print(f"  Env {i}: [{first_wp[0]:.3f}, {first_wp[1]:.3f}, {first_wp[2]:.3f}]")
     
     def _resample_multi_trajectories(self, env_ids: torch.Tensor | None = None) -> None:
         """Resample trajectories for specified environments.
@@ -422,7 +429,10 @@ class TrajectoryManager:
         Args:
             env_ids: Environment IDs to resample (None = all)
         """
+        print(f"[DEBUG _resample_multi_trajectories] Called with env_ids={'ALL' if env_ids is None else f'{len(env_ids)} envs (first: {env_ids[0].item() if len(env_ids) > 0 else None})'}")
+        
         if self.multi_loader is None:
+            print(f"[DEBUG _resample_multi_trajectories] multi_loader is None! Exiting.")
             return
         
         if env_ids is None:
@@ -457,5 +467,13 @@ class TrajectoryManager:
             self.recorded_orientations = orientations
             self.current_waypoint_idx[env_ids] = 0
             self._recorded_time_accum[env_ids] = 0.0
+            
+            # Debug: Print first waypoint for reset environments
+            if len(env_ids) > 0:
+                first_env = env_ids[0].item()
+                first_wp = self.recorded_positions[first_env, 0].cpu().numpy()
+                print(f"[TrajectoryManager] Resampled Env {first_env}: First waypoint [{first_wp[0]:.3f}, {first_wp[1]:.3f}, {first_wp[2]:.3f}]")
+
+
 
 

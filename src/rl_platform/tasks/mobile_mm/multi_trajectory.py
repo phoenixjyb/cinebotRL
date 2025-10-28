@@ -143,6 +143,15 @@ class MultiTrajectoryLoader:
         # Sample one trajectory per environment
         sampled = [self.sample_trajectory() for _ in range(num_envs)]
         
+        # DEBUG: Check if we're getting diverse trajectories
+        unique_files = set(t["file"] for t in sampled)
+        unique_first_pos = set(tuple(t["positions"][0].cpu().tolist()) for t in sampled)
+        print(f"[MultiTrajectoryLoader] Sampled {num_envs} trajectories:")
+        print(f"  Unique trajectory files: {len(unique_files)}/{num_envs}")
+        print(f"  Unique first positions: {len(unique_first_pos)}/{num_envs}")
+        if len(unique_first_pos) <= 5:
+            print(f"  First positions: {list(unique_first_pos)}")
+        
         # Find max length
         max_length = max(t["length"] for t in sampled)
         

@@ -528,25 +528,314 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Clone environments
         self.scene.clone_environments(copy_from_source=False)
+
+        # Trajectory visualization bookkeeping
+        self._visited_waypoint_masks = [None for _ in range(self.num_envs)]
+        self._last_waypoint_idx = torch.full(
+            (self.num_envs,), -1, dtype=torch.long, device=self.device
+        )
+        self._marker_creation_attempts = 0
+        self._debug_vis_requested = False
+        self._debug_vis_active = False
         
         # Setup visualization markers (only in GUI mode)
         self._setup_visualization_markers()
     
     def _setup_visualization_markers(self):
-        """Setup visual markers for trajectory visualization."""
-        # For now, disable visual markers and use console output
-        # TODO: Fix marker visualization in Isaac Lab 0.46.2
-        self._visualization_enabled = False
-        print("[MobileMMTrackEE] ℹ Visual markers disabled - using console output for trajectory tracking")
+        """Setup visual markers for trajectory visualization.
+        
+        Note: Markers are created lazily on first use after simulation starts,
+        not during scene setup. This ensures USD stage is ready.
+        """
+        # Mark that we want visualization (actual creation happens later)
+        self._visualization_enabled = True
+        self._markers_created = False
+        self._current_target_markers = None
+        self._future_target_markers = None
+        self._past_target_markers = None
+        self._ee_markers = None
+        print("[MobileMMTrackEE] ℹ Visual markers deferred (will create after first reset)")
+    
+    def _create_markers_if_needed(self):
+        """Create markers on first use (lazy initialization)."""
+        if self._markers_created or not self._visualization_enabled:
+            return
+        
+        try:
+            # Import Isaac Lab marker utilities
+            from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
+            import isaaclab.sim as sim_utils
+            
+            # Red spheres for current target waypoint
+            current_target_cfg = VisualizationMarkersCfg(
+                prim_path="/World/Visuals/current_target_markers",
+                markers={
+                    "sphere": sim_utils.SphereCfg(
+                        radius=0.06,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0)),
+                    )
+                },
+            )
+            
+            # Green spheres for future waypoints
+            future_target_cfg = VisualizationMarkersCfg(
+                prim_path="/World/Visuals/future_target_markers",
+                markers={
+                    "sphere": sim_utils.SphereCfg(
+                        radius=0.04,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
+                    )
+                },
+            )
+            
+            # Blue spheres for past waypoints
+            past_target_cfg = VisualizationMarkersCfg(
+                prim_path="/World/Visuals/past_target_markers",
+                markers={
+                    "sphere": sim_utils.SphereCfg(
+                        radius=0.03,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)),
+                    )
+                },
+            )
+            
+            # Yellow spheres for end-effector positions
+            ee_marker_cfg = VisualizationMarkersCfg(
+                prim_path="/World/Visuals/ee_markers",
+                markers={
+                    "sphere": sim_utils.SphereCfg(
+                        radius=0.05,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 0.0)),
+                    )
+                },
+            )
+            
+            # Initialize markers
+            print("[MobileMMTrackEE] Creating current target markers...")
+            self._current_target_markers = VisualizationMarkers(current_target_cfg)
+            print(f"  ✓ Current: {self._current_target_markers is not None}")
+            
+            print("[MobileMMTrackEE] Creating future target markers...")
+            self._future_target_markers = VisualizationMarkers(future_target_cfg)
+            print(f"  ✓ Future: {self._future_target_markers is not None}")
+            
+            print("[MobileMMTrackEE] Creating past target markers...")
+            self._past_target_markers = VisualizationMarkers(past_target_cfg)
+            print(f"  ✓ Past: {self._past_target_markers is not None}")
+            
+            print("[MobileMMTrackEE] Creating EE markers...")
+            self._ee_markers = VisualizationMarkers(ee_marker_cfg)
+            print(f"  ✓ EE: {self._ee_markers is not None}")
+            
+            # Change dome light to white background for better marker visibility
+            try:
+                from pxr import Usd, UsdGeom, UsdLux
+                stage = self.scene.stage
+                # Set dome light to white with high intensity
+                dome_light_path = "/World/defaultLight"
+                dome_light = UsdLux.DomeLight.Get(stage, dome_light_path)
+                if dome_light:
+                    dome_light.GetIntensityAttr().Set(10000.0)
+                    dome_light.GetColorAttr().Set((1.0, 1.0, 1.0))
+                    print("[MobileMMTrackEE] ✓ Changed background to white for better visibility")
+            except Exception as light_err:
+                print(f"[MobileMMTrackEE] ⚠ Could not change background color: {light_err}")
+            
+            print("[MobileMMTrackEE] ✓ Visual markers enabled")
+            print("  - Red (large) = Current target waypoint")
+            print("  - Green (medium) = Future waypoints")
+            print("  - Blue (small) = Past waypoints")
+            print("  - Yellow (medium) = End-effector position")
+            self._markers_created = True
+            self._marker_creation_attempts = 0
+        except Exception as e:
+            self._marker_creation_attempts += 1
+            self._current_target_markers = None
+            self._future_target_markers = None
+            self._past_target_markers = None
+            self._ee_markers = None
+            if self._marker_creation_attempts <= 3:
+                print(f"[MobileMMTrackEE] ℹ Visual marker creation deferred (attempt {self._marker_creation_attempts}): {str(e)}")
+            return
+    
+    def _set_debug_vis_impl(self, debug_vis: bool):
+        """Implementation of debug visualization control.
+        
+        Called by DirectRLEnv when set_debug_vis() is called.
+        Controls visibility of trajectory markers.
+        
+        Args:
+            debug_vis: Whether to enable debug visualization
+        """
+        # If enabling visualization, create markers first (lazy initialization)
+        if debug_vis:
+            self._create_markers_if_needed()
+        
+        # Check if ALL markers were successfully created
+        self._debug_vis_requested = debug_vis
+
+        if (not hasattr(self, "_current_target_markers") or self._current_target_markers is None or
+            not hasattr(self, "_future_target_markers") or self._future_target_markers is None or
+            not hasattr(self, "_past_target_markers") or self._past_target_markers is None or
+            not hasattr(self, "_ee_markers") or self._ee_markers is None):
+            if debug_vis:
+                print("[MobileMMTrackEE] ⚠ Cannot enable debug vis: one or more markers not initialized")
+            return
+        
+        if debug_vis:
+            # Enable marker visibility
+            self._current_target_markers.set_visibility(True)
+            self._future_target_markers.set_visibility(True)
+            self._past_target_markers.set_visibility(True)
+            self._ee_markers.set_visibility(True)
+            print("[MobileMMTrackEE] ✓ Marker visibility enabled")
+            self._debug_vis_active = True
+        else:
+            # Disable marker visibility
+            self._current_target_markers.set_visibility(False)
+            self._future_target_markers.set_visibility(False)
+            self._past_target_markers.set_visibility(False)
+            self._ee_markers.set_visibility(False)
+            print("[MobileMMTrackEE] ℹ Marker visibility disabled")
+            self._debug_vis_active = False
+    
+    def _debug_vis_callback(self, event):
+        """Debug visualization callback - called automatically by DirectRLEnv on render events.
+        
+        This is where we update marker positions. DirectRLEnv calls this automatically
+        during render updates if debug_vis is enabled.
+        
+        Args:
+            event: Event object (unused, required by callback signature)
+        """
+        if not self._visualization_enabled:
+            return
+        
+        # Create markers on first call (lazy initialization after simulation starts)
+        self._create_markers_if_needed()
+        
+        # Skip if marker creation failed
+        if self._current_target_markers is None:
+            return
+        
+        # Get current EE and target positions
+        ee_pos = self.robot.data.body_pos_w[:, self._ee_body_idx, :]
+        target_pos, _ = self.trajectory_manager.get_target_pose()
+        
+        # Call the marker update method
+        self._update_visualization_markers(ee_pos, target_pos)
     
     def _update_visualization_markers(self, ee_pos: torch.Tensor, target_pos: torch.Tensor):
         """Update visualization markers for trajectory tracking.
+        
+        Shows all trajectory waypoints with different colors:
+        - Red (large): Current target waypoint
+        - Green (medium): Future waypoints
+        - Blue (small): Past waypoints
+        - Yellow (medium): Current end-effector position
         
         Args:
             ee_pos: End-effector positions [num_envs, 3]
             target_pos: Target positions [num_envs, 3]
         """
-        if not self._visualization_enabled or self._target_markers is None:
+        if self._visualization_enabled and self._current_target_markers is not None:
+            # Only visualize for the first environment to avoid clutter in the viewport
+            env_id = 0
+
+            if (hasattr(self.trajectory_manager, "recorded_positions")
+                    and self.trajectory_manager.recorded_positions is not None):
+                all_waypoints = self.trajectory_manager.recorded_positions[env_id]  # [num_waypoints, 3]
+                num_waypoints = all_waypoints.shape[0]
+
+                empty_positions = all_waypoints.new_empty((0, 3))
+
+                if num_waypoints == 0:
+                    self._current_target_markers.visualize(empty_positions)
+                    self._future_target_markers.visualize(empty_positions)
+                    self._past_target_markers.visualize(empty_positions)
+                    ee_single = ee_pos[env_id:env_id + 1]
+                    if ee_single.shape[0] == 0:
+                        self._ee_markers.visualize(empty_positions)
+                    else:
+                        self._ee_markers.visualize(ee_single)
+                    return
+
+                # Ensure bookkeeping containers exist
+                if not hasattr(self, "_visited_waypoint_masks"):
+                    self._visited_waypoint_masks = [None for _ in range(self.num_envs)]
+                if not hasattr(self, "_last_waypoint_idx"):
+                    self._last_waypoint_idx = torch.full(
+                        (self.num_envs,), -1, dtype=torch.long, device=self.device
+                    )
+
+                current_idx_int = int(self.trajectory_manager.current_waypoint_idx[env_id].item())
+                mask = self._visited_waypoint_masks[env_id]
+
+                if mask is None or mask.numel() != num_waypoints:
+                    mask = torch.zeros(num_waypoints, dtype=torch.bool, device=all_waypoints.device)
+                    self._visited_waypoint_masks[env_id] = mask
+                    last_idx_int = -1
+                else:
+                    last_idx_int = int(self._last_waypoint_idx[env_id].item())
+
+                if last_idx_int == -1 or current_idx_int < last_idx_int:
+                    mask.zero_()
+                    last_idx_int = current_idx_int
+
+                if last_idx_int <= current_idx_int:
+                    mask[last_idx_int:current_idx_int + 1] = True
+                else:
+                    mask[last_idx_int:] = True
+                    mask[:current_idx_int + 1] = True
+
+                self._last_waypoint_idx[env_id] = current_idx_int
+
+                current_goal_idx = (current_idx_int + 1) % num_waypoints
+
+                past_mask = mask.clone()
+                past_mask[current_goal_idx] = False
+
+                future_mask = torch.ones(num_waypoints, dtype=torch.bool, device=all_waypoints.device)
+                future_mask[past_mask] = False
+                future_mask[current_goal_idx] = False
+
+                past_waypoints = all_waypoints[past_mask]
+                future_waypoints = all_waypoints[future_mask]
+                current_goal_pos = all_waypoints[current_goal_idx:current_goal_idx + 1]
+
+                if current_goal_pos.shape[0] == 0:
+                    self._current_target_markers.visualize(empty_positions)
+                else:
+                    self._current_target_markers.visualize(current_goal_pos)
+
+                if future_waypoints.shape[0] == 0:
+                    self._future_target_markers.visualize(empty_positions)
+                else:
+                    self._future_target_markers.visualize(future_waypoints)
+
+                if past_waypoints.shape[0] == 0:
+                    self._past_target_markers.visualize(empty_positions)
+                else:
+                    self._past_target_markers.visualize(past_waypoints)
+
+                ee_single = ee_pos[env_id:env_id + 1]
+                if ee_single.shape[0] == 0:
+                    self._ee_markers.visualize(empty_positions)
+                else:
+                    self._ee_markers.visualize(ee_single)
+
+            else:
+                empty_positions = torch.empty((0, 3), device=self.device, dtype=torch.float32)
+                self._current_target_markers.visualize(empty_positions)
+                self._future_target_markers.visualize(empty_positions)
+                self._past_target_markers.visualize(empty_positions)
+                ee_single = ee_pos[0:1]
+                if ee_single.shape[0] == 0:
+                    self._ee_markers.visualize(empty_positions)
+                else:
+                    self._ee_markers.visualize(ee_single)
+
+        else:
             # Print console output every 50 steps with statistics and diverse env samples
             if not hasattr(self, '_vis_step_count'):
                 self._vis_step_count = 0
@@ -1010,8 +1299,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Get target from trajectory
         target_pos, target_quat = self.trajectory_manager.get_target_pose()
         
-        # Update visualization markers (if enabled)
-        self._update_visualization_markers(ee_pos, target_pos)
+        if self._visualization_enabled:
+            prev_markers_created = self._markers_created
+            self._create_markers_if_needed()
+            if self._debug_vis_requested and self._markers_created and not self._debug_vis_active:
+                # Markers just became available; enable visibility to honor prior request
+                self._set_debug_vis_impl(True)
+            if self._current_target_markers is not None:
+                self._update_visualization_markers(ee_pos, target_pos)
         
         # Optional: Lookahead
         lookahead_pos = None
@@ -1366,6 +1661,16 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Reset trajectory phase
         self.trajectory_manager.reset(env_ids)
+
+        # Clear waypoint visualization state for the reset environments
+        if hasattr(self, "_visited_waypoint_masks"):
+            for env_id in env_ids.cpu().tolist():
+                self._visited_waypoint_masks[env_id] = None
+        if hasattr(self, "_last_waypoint_idx"):
+            self._last_waypoint_idx[env_ids] = -1
+
+        if self._visualization_enabled:
+            self._create_markers_if_needed()
         
         # CRITICAL FIX: Reset robot base position to match trajectory starting point
         # This ensures the robot starts near the trajectory, making it physically possible to track

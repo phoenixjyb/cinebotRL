@@ -79,14 +79,15 @@ class RewardWeights:
     position_tracking: float = 100.0  # Session 7c: INCREASED 50→100 (2x) - make primary task dominant
     orientation_tracking: float = 2.0
     progress_bonus: float = 1.0
-    base_progress_reward: float = 150.0  # CRITICAL: 3x stronger! (was 50.0) - must overcome action penalties
-    target_distance_penalty: float = 5.0  # Session 5b: Increased from 3.0 - compensates for capped mobilization reward
+    base_progress_reward: float = 250.0  # Session 7d: INCREASED 150→250 (67% boost) - stronger incentive for strategic movement
+    base_target_alignment: float = 10.0  # Session 7d: NEW - reward moving toward target (goal-directed navigation)
+    target_distance_penalty: float = 3.0  # Session 7d: REDUCED 5→3 (40% gentler) - less punishment, more exploration
     excessive_base_movement_penalty: float = 10.0  # Session 5b: NEW - prevents wild base movements >10cm
     
     # Motion quality penalties
     action_magnitude: float = 0.005  # REDUCED from 0.01 - encourage base action exploration
     action_rate: float = 0.01
-    action_smoothness: float = 0.05  # Jerk penalty
+    action_smoothness: float = 0.15  # Session 7d: INCREASED 0.05→0.15 (3x) - reduce jiggling/oscillation
     
     # Constraint violation penalties
     velocity_limit_penalty: float = 5.0

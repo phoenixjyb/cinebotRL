@@ -7,51 +7,182 @@
 
 ---
 
-## 🚀 **RUNNING: Session 7**
+## 🚀 **NEXT: Session 7d (Planned)**
 
-**Status:** Reachability-guided base planning with FK workspace map  
-**Session:** 7 - Intelligent Base Navigation (reachability rewards)  
-**Commits:** 2 total (reachability loader + reward integration)  
-**Latest Commit:** `d0f44cc` - Add reachability-guided reward integration
+**Status:** Reward tuning for strategic base movement  
+**Goal:** Fix non-goal-directed base navigation from Session 7c  
+**Duration:** ~11 hours (200M timesteps)  
+**Changes:** 3 reward weight adjustments + 1 new reward component
 
-### Quick Start
+### Quick Start (Session 7d)
 ```powershell
-# Quick test: 64 environments (~5 min to verify reachability works)
-I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py --task MobileMMTrackEE-v0 --num_envs 64 --n_steps 128 --batch_size 64 --total_timesteps 1000000 --learning_rate 3e-4 --ent_coef 0.001 --trajectory_type multi_recorded --use_all_trajectories --headless
+# After implementing reward changes:
+.\scripts\launch_training_windows.ps1 `
+  -Task MobileMMTrackEE-v0 `
+  -NumEnvs 4096 `
+  -Headless `
+  -TotalTimesteps 200000000
+```
 
-# Full training: 4096 environments (~12 hours to 100M)
+### Session 7d Changes
+⬆️ **Increase base_progress_reward:** 150 → 250 (67% boost)  
+⬇️ **Reduce target_distance_penalty:** 5 → 3 (40% gentler)  
+⭐ **Add base_target_alignment reward:** New component (10.0 weight)  
+📊 **Expected:** Reachability 6% → 50%+, Mean error 1.01m → <0.50m
+
+**See:** `docs/SESSION_7D_REWARD_TUNING_PROPOSAL.md` for detailed analysis
+
+---
+
+## ✅ **COMPLETED: Session 7c**
+
+**Status:** Base movement enabled with Z-clamp fix  
+**Duration:** Oct 27 18:02 → Oct 28 06:32 (~11.5 hours)  
+**Timesteps:** 100,073,472 (100M)  
+**Evaluation:** Oct 28 09:23 (100 episodes, 16 parallel envs)
+
+### Session 7c Results Summary
+
+**Major Achievements:**
+- ✅ **Base MOVES!** 0.1-1.8m per episode (90x improvement vs Session 6)
+- ✅ **Reward fixed:** +12,330 (vs -11.7M in Session 6)
+- ✅ **Best tracking:** 0.15m (vs 0.49m in Session 6)
+- ✅ **Training stable:** 100M steps, no crashes
+
+**Critical Issues:**
+- ⚠️ **Not goal-directed:** 93% targets unreachable (6% reachability)
+- ⚠️ **Mean error high:** 1.01m (target: <0.30m)
+- ⚠️ **Low mobilization:** 0.0-2.3 pts reward (too weak)
+- ⚠️ **High variance:** CV=0.77 (inconsistent performance)
+
+**Detailed Results:**
+```
+Episodes: 100 completed
+Mean reward: 12,330 ± 9,483
+Min/Max: -34,196 to +26,999
+Episode length: 399 steps (all completed)
+
+Environment Health Distribution:
+  Excellent (<0.1m):     0%
+  Good (0.1-0.3m):      19%
+  Poor (0.3-2.0m):      75%
+  Broken (>2.0m):        6%
+
+Base Movement Examples:
+  Env 2: 1.78m moved
+  Env 4: 1.61m moved
+  Env 5: 1.57m moved
+  Mean: 0.78m
+
+Base Velocity Commands:
+  base_vx: -0.47 m/s (vs 0.002 in Session 6)
+  base_wz: 1.08 rad/s (vs 0.01 in Session 6)
+```
+
+### Session 7c vs Session 6 Comparison
+
+| Metric | Session 6 | Session 7c | Change |
+|--------|-----------|------------|--------|
+| Mean Reward | -11,715,724 | +12,330 | +11.7M ✅ |
+| Base Movement | 0.02-0.20m | 0.1-1.8m | 90x ✅ |
+| Best Error | 0.49m | 0.15m | 70% better ✅ |
+| Mean Error | ~1.5m | 1.01m | 33% better ⚠️ |
+| Reachability | N/A | 6% | Need 50%+ ❌ |
+| Broken Envs | 50% | 6% | 88% fewer ✅ |
+
+**See:** `docs/SESSION_7C_VS_SESSION_6_COMPARISON.md` for full analysis
+
+### What Worked (Session 7c)
+
+1. **Z-Clamp Fix (env.py lines 680-689):**
+   - Prevents base "jumping"
+   - Keeps Z ~0.0 stable
+   - Allows smooth X, Y, theta movement
+   - **This was the breakthrough!** 🎉
+
+2. **Collision Penalty Reduction (1000→5):**
+   - Restored learning signal
+   - Episode rewards positive
+   - Balanced reward distribution
+
+3. **Reachability Integration:**
+   - Loaded 12,646 reachable voxels
+   - Provides workspace guidance
+   - Penalizes unreachable targets
+
+### What Needs Improvement (Session 7c → 7d)
+
+1. **Base Mobilization Reward Too Low:**
+   - Current: 0.0-2.3 pts (2% of total reward)
+   - Issue: Not enough incentive for strategic movement
+   - Solution: Increase from 150 → 250 (67% boost)
+
+2. **No Directional Guidance:**
+   - Base moves but not toward targets
+   - 93% targets remain unreachable
+   - Solution: Add alignment reward (10.0 weight)
+
+3. **Distance Penalty Too Harsh:**
+   - Current: 13+ pts penalty for far targets
+   - Discourages exploration
+   - Solution: Reduce from 5.0 → 3.0 (40% gentler)
+
+### Training Configuration (Session 7c)
+```
+Environment: 4096 parallel instances
+Episode length: 20s (400 steps @ 20Hz)
+Trajectories: 1,038 recorded (all categories)
+Network: 235K params (Actor: 118K, Critic: 117K)
+Algorithm: PPO with adaptive KL
+Checkpoints: 1,018 saved (every 100K steps)
+Log dir: H:\wSpace\cinebotRL\logs\sb3\mobilemmtrackee_v0\20251027_180246
+Final model: 5.84 MB
+```
+
+### Files Created (Session 7c Analysis)
+- `docs/SESSION_7C_VS_SESSION_6_COMPARISON.md` - Detailed comparison
+- `docs/SESSION_7D_REWARD_TUNING_PROPOSAL.md` - Fix proposal
+- `docs/SESSION_7C_VISUALIZATION_GUIDE.md` - GUI observation guide
+- `scripts/summarize_training.py` - Training summary tool
+
+### Next Steps
+1. ✅ Evaluation complete (100 episodes analyzed)
+2. ✅ Comparison with Session 6 documented
+3. ⏳ Optional: Visualize behavior (GUI, 10-15 min)
+4. ⏳ Implement Session 7d reward changes (5 min)
+5. ⏳ Launch Session 7d training (200M steps, ~11 hours)
+
+---
+
+## Session 7c Details
+
+**Status:** Reachability-guided base planning with Z-clamp fix  
+**Session:** 7c - Base Movement Enabled (Z-clamp applied)  
+**Commits:** 3 total (reachability + Z-clamp + validation)
+
+### Quick Start (Session 7c - COMPLETED)
+```powershell
+# Full training: 4096 environments (100M steps)
 I:\isaaclab\isaaclab.bat -p C:\Users\yanbo\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py --task MobileMMTrackEE-v0 --num_envs 4096 --n_steps 128 --batch_size 1024 --n_epochs 10 --total_timesteps 100000000 --learning_rate 3e-4 --ent_coef 0.001 --enable_entropy_decay --final_ent_coef 1e-4 --decay_start_timestep 50000000 --decay_duration_timesteps 50000000 --enable_kl_schedule --kl_warmup 0.25 --kl_main 0.15 --kl_finetune 0.07 --target_kl 1.0 --clip_range 0.2 --gamma 0.99 --gae_lambda 0.95 --trajectory_type multi_recorded --use_all_trajectories --save_freq 100000 --headless
 ```
 
-### What's New (Session 7)
+### What's New (Session 7c)
 ✅ **NEW:** Reachability map (12,646 voxels, 5cm resolution, ARM base frame)  
-✅ **NEW:** Two-stage reward strategy based on workspace reachability  
-   - **Reachable:** +0.5 bonus for good base positioning
-   - **Unreachable:** Reward base movement toward target in X-Y plane
-✅ **NEW:** Directional alignment reward: `dot(base_vel_world, direction_to_target)`  
-✅ **NEW:** Speed bonus when moving in correct direction  
-✅ Fast KD-tree queries (O(log N) = O(log 12646) ≈ 14 comparisons)  
+✅ **NEW:** Z-clamp fix (lines 680-689) - prevents base jumping  
+✅ **NEW:** Base movement actually working (0.1-1.8m)  
 ✅ Coordinate transformation: World → Arm base frame  
 ✅ All Session 6 fixes still active (jerk penalty, contact sensor, shape fix)
 
-### Why Session 7 is Needed
-🎯 **Smarter Base Navigation:**
-- Previous sessions: Base moved randomly or not at all
-- Session 7: Policy knows WHEN to move base vs. just use arm
-- Reachability map tells: "Can arm reach from here?"
-- If unreachable → guide base toward target efficiently
+### Why Session 7c Was Needed
+🎯 **Fix Base Z-axis Instability:**
+- Session 7a/7b: Base Z drifted/jumped (not physical)
+- Z-clamp: Locks base Z ~0.0 while allowing X, Y, theta
+- Result: Stable base movement on ground plane
 
-🎯 **Accelerated Learning:**
-- Less wasted exploration on impossible poses
-- Direct guidance: "Move THIS direction to reach target"
-- Should converge faster than pure reward shaping
-
-### Expected Outcome (Session 7)
-🎯 Base learns to navigate to good positions BEFORE arm moves  
-🎯 Fewer "stuck" situations (target unreachable from current base)  
-🎯 More efficient trajectories (less backtracking)  
-🎯 Better coordination between base and arm movements  
-🎯 Mean tracking error < 0.3m after 100M steps (improvement over Session 6)
+🎯 **Validate Reachability Integration:**
+- Reachability map loaded successfully
+- KD-tree queries working
+- Workspace-aware rewards active
 
 ---
 

@@ -251,6 +251,12 @@ def main():
         print("    ✓ Environment created")
         print(f"    - Observation space: {env.observation_space.shape}")
         print(f"    - Action space: {env.action_space.shape}")
+        
+        # Enable debug visualization to show trajectory markers
+        if not args_cli.headless and hasattr(env.unwrapped, 'set_debug_vis'):
+            env.unwrapped.set_debug_vis(True)
+            print("    ✓ Debug visualization enabled (trajectory markers will be visible)")
+        
     except Exception as e:
         print(f"    ✗ Failed to create environment: {e}")
         import traceback

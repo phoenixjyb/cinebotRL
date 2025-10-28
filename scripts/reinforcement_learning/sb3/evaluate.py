@@ -337,6 +337,11 @@ def main():
         base_env.task_cfg.terminate_on_self_collision = False
         print(f"    ✓ Disabled termination conditions for full episode visualization")
         
+        # Enable debug visualization to show trajectory markers (only in GUI mode)
+        if not args.headless and hasattr(base_env, 'set_debug_vis'):
+            base_env.set_debug_vis(True)
+            print(f"    ✓ Debug visualization enabled (trajectory markers will be visible)")
+        
         # Wrap for SB3 compatibility using our wrapper class
         env = IsaacLabToSB3VecEnvWrapper(base_env)
         

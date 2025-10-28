@@ -1684,12 +1684,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Set base position to match trajectory XY, with correct base height
         # NOTE: first_target_pos Z is END-EFFECTOR height (1.0m from trajectories)
-        # Base root link is at 0.86m when wheels touch ground (from USD/URDF geometry)
-        # This was verified in Session 5B logs: [1.050, 0.080, 0.860]
+        # Mobile base sits at Z=0 (ground level) - see line 1162 where Z is clamped to 0.0
+        # Arm mount at 0.9465m above base can then reach EE targets at ~1.0m
         new_root_state = self.robot.data.default_root_state[env_ids].clone()
         new_root_state[:, 0] = first_target_pos[env_ids, 0]  # X position from trajectory
         new_root_state[:, 1] = first_target_pos[env_ids, 1]  # Y position from trajectory  
-        new_root_state[:, 2] = 0.86  # Base link height (NOT trajectory EE target Z=1.0!)
+        new_root_state[:, 2] = 0.0  # Ground level (NOT EE target Z, NOT 0.86m!)
         # Keep orientation from default (facing forward)
         
         # Reset velocities to zero
@@ -1718,7 +1718,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             env_ids=env_ids
         )
         
-        print(f"[RESET] Env {env_ids[0].item() if len(env_ids) > 0 else 'N/A'}: Base at trajectory start [{first_target_pos[env_ids[0], 0]:.3f}, {first_target_pos[env_ids[0], 1]:.3f}, {first_target_pos[env_ids[0], 2]:.3f}], PPR joints zeroed")
+        # Print ACTUAL base position (ground level Z=0) and target EE position for clarity
+        print(f"[RESET] Env {env_ids[0].item() if len(env_ids) > 0 else 'N/A'}: Base at [{new_root_state[0, 0]:.3f}, {new_root_state[0, 1]:.3f}, {new_root_state[0, 2]:.3f}] (ground), EE target at Z={first_target_pos[env_ids[0], 2]:.3f}")
         
         # NEW: Store episode start base position for movement tracking
         if not hasattr(self, '_episode_start_base_pos'):

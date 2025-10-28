@@ -1682,11 +1682,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # This ensures the robot starts near the trajectory, making it physically possible to track
         first_target_pos, _ = self.trajectory_manager.get_target_pose()
         
-        # Set base position to match trajectory XY, keep current Z (floor level)
+        # Set base position to match trajectory XY, with correct base height
+        # NOTE: first_target_pos Z is END-EFFECTOR height (1.0m from trajectories)
+        # Base root link is at 0.86m when wheels touch ground (from USD/URDF geometry)
+        # This was verified in Session 5B logs: [1.050, 0.080, 0.860]
         new_root_state = self.robot.data.default_root_state[env_ids].clone()
-        new_root_state[:, 0] = first_target_pos[env_ids, 0]  # X position
-        new_root_state[:, 1] = first_target_pos[env_ids, 1]  # Y position
-        # Keep Z position from default (floor level)
+        new_root_state[:, 0] = first_target_pos[env_ids, 0]  # X position from trajectory
+        new_root_state[:, 1] = first_target_pos[env_ids, 1]  # Y position from trajectory  
+        new_root_state[:, 2] = 0.86  # Base link height (NOT trajectory EE target Z=1.0!)
         # Keep orientation from default (facing forward)
         
         # Reset velocities to zero

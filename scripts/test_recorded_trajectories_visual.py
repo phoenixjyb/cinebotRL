@@ -23,7 +23,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 
-def load_chassis_indices(file_path: str = "chassis_required_indices.txt", max_indices: int | None = None):
+def load_chassis_indices(file_path: str = "data/trajectory_filters/chassis_required_indices.txt", max_indices: int | None = None):
     """Load chassis-required indices from generated file."""
     import re
     
@@ -210,7 +210,7 @@ def main():
     parser.add_argument(
         "--chassis_indices_file",
         type=str,
-        default="chassis_required_indices.txt",
+        default="data/trajectory_filters/chassis_required_indices.txt",
         help="File containing chassis-required trajectory indices"
     )
     parser.add_argument(

@@ -5,11 +5,17 @@ Tests the lazy initialization pattern.
 """
 
 import argparse
+import sys
+from pathlib import Path
+
+# Add workspace root to Python path so we can import rl_platform
+workspace_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(workspace_root / "src"))
+
 from isaaclab.app import AppLauncher
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Test trajectory visualization markers")
-parser.add_argument("--headless", action="store_true", help="Run in headless mode")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -21,9 +27,11 @@ print("✓ Isaac Sim initialized")
 
 # Now import after Isaac Sim is initialized
 import gymnasium as gym
-from src.task_spec import register_isaac_lab_tasks
+import torch
 
 # Register custom tasks
+print("Registering custom tasks...")
+from src.task_spec import register_isaac_lab_tasks
 register_isaac_lab_tasks()
 print("✓ Registered custom tasks")
 
@@ -32,7 +40,6 @@ print("\nCreating environment...")
 env = gym.make(
     "MobileMMTrackEE-v0",
     num_envs=1,
-    render_mode="rgb_array" if args_cli.headless else None,
 )
 
 # Enable debug visualization
@@ -49,7 +56,11 @@ print("✓ Environment reset complete")
 # Run a few steps
 print("\nRunning 10 steps to test marker updates...")
 for i in range(10):
-    action = env.action_space.sample()
+    # Sample action (numpy array)
+    action_np = env.action_space.sample()
+    # Convert to torch tensor
+    action = torch.from_numpy(action_np).unsqueeze(0).to(device='cuda:0')
+    
     obs, reward, terminated, truncated, info = env.step(action)
     print(f"  Step {i+1}: reward={reward[0]:.2f}")
 

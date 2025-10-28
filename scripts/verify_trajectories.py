@@ -100,7 +100,7 @@ def main():
     
     # Check chassis indices file
     print(f"\n[4/5] Checking chassis indices file...")
-    chassis_file = project_root / "chassis_required_indices.txt"
+    chassis_file = project_root / "data/trajectory_filters/chassis_required_indices.txt"
     
     if chassis_file.exists():
         import re
@@ -118,7 +118,7 @@ def main():
         else:
             print(f"  ⚠️  File exists but couldn't parse indices")
     else:
-        print(f"  ℹ️  chassis_required_indices.txt not found (run analyze_trajectories.py)")
+        print(f"  ℹ️  data/trajectory_filters/chassis_required_indices.txt not found (run analyze_trajectories.py)")
     
     # Summary
     print(f"\n[5/5] Summary")

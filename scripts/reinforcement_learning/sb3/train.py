@@ -654,7 +654,7 @@ def main():
         if args.use_chassis_only:
             print("    ⚠️  Using ONLY chassis-requiring trajectories (for testing, not recommended for training)")
             # Load chassis-required indices
-            chassis_indices_file = "chassis_required_indices.txt"
+            chassis_indices_file = "data/trajectory_filters/chassis_required_indices.txt"
             if Path(chassis_indices_file).exists():
                 import re
                 with open(chassis_indices_file, 'r') as f:

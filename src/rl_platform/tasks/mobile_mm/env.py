@@ -480,7 +480,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
             indices: list[int] | None = None
 
-            txt_file = Path("chassis_required_indices.txt")
+            txt_file = Path("data/trajectory_filters/chassis_required_indices.txt")
             if txt_file.exists():
                 content = txt_file.read_text()
                 match = re.search(r"CHASSIS_REQUIRED_INDICES\s*=\s*\[(.*?)\]", content, re.DOTALL)
@@ -566,6 +566,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
             import isaaclab.sim as sim_utils
             
+            print(f"[MobileMMTrackEE] Attempting marker creation (num_envs={self.num_envs})...")
+            
             # Red spheres for current target waypoint
             current_target_cfg = VisualizationMarkersCfg(
                 prim_path="/World/Visuals/current_target_markers",
@@ -649,13 +651,17 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             self._markers_created = True
             self._marker_creation_attempts = 0
         except Exception as e:
+            import traceback
             self._marker_creation_attempts += 1
             self._current_target_markers = None
             self._future_target_markers = None
             self._past_target_markers = None
             self._ee_markers = None
             if self._marker_creation_attempts <= 3:
-                print(f"[MobileMMTrackEE] ℹ Visual marker creation deferred (attempt {self._marker_creation_attempts}): {str(e)}")
+                print(f"[MobileMMTrackEE] ⚠ Visual marker creation failed (attempt {self._marker_creation_attempts}):")
+                print(f"  Error: {str(e)}")
+                print("  Traceback:")
+                traceback.print_exc()
             return
     
     def _set_debug_vis_impl(self, debug_vis: bool):

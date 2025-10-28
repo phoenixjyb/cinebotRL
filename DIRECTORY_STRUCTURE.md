@@ -1,6 +1,6 @@
 # CinebotRL Directory Structure
 
-**Last Updated:** October 21, 2025  
+**Last Updated:** October 28, 2025 (Session 7d)  
 **Purpose:** Quick reference for finding files in this repository
 
 ---
@@ -11,7 +11,8 @@
 cinebotRL/
 ├── README.md                           # Main project documentation (START HERE)
 ├── pyproject.toml                      # Python project configuration
-├── reporting.py                        # Logging/reporting utilities
+├── TRAINING_SESSIONS_MASTER_LOG.md     # Training session history
+├── DIRECTORY_STRUCTURE.md              # This file
 │
 ├── .github/                            # GitHub-specific files
 │   └── copilot-instructions.md         # AI coding agent context
@@ -28,65 +29,67 @@ cinebotRL/
 │   └── asset_inspector/                # Asset validation tools
 │
 ├── scripts/                            # Executable scripts
-│   ├── launch_training_windows.ps1     # Main training launcher (USE THIS)
+│   ├── launch_session_7d_accelerated.ps1  # Session 7d launcher (CURRENT)
+│   ├── launch_training_windows.ps1     # Generic training launcher
+│   ├── cleanup_workspace.ps1           # Workspace organization script
 │   ├── reinforcement_learning/sb3/     # SB3 training scripts
 │   │   └── train.py                    # Core training script
+│   ├── analysis/                       # Analysis scripts (ORGANIZED)
+│   │   ├── analyze_session5b.py
+│   │   └── reporting.py
 │   ├── networking/                     # ROS2/FastDDS configuration
 │   └── wsl/                            # WSL-specific scripts
 │
+├── data/                               # Data files (NEW)
+│   └── trajectory_filters/             # Trajectory selection configs
+│       ├── chassis_required_indices.txt
+│       └── chassis_required_trajectories.txt
+│
 ├── docs/                               # Documentation (ORGANIZED)
 │   ├── README.md                       # Documentation index
-│   ├── QUICK_REFERENCE.md              # Quick command reference
-│   ├── TRAJECTORY_TRACKING_IMPROVEMENTS.md  # Architecture analysis (NEW)
-│   ├── IMPROVEMENT_CHECKLIST.md        # Action items checklist (NEW)
 │   │
-│   ├── setup/                          # Installation guides
-│   │   ├── INSTALL_QUICK.md
-│   │   ├── TRAIN_ON_WINDOWS.md
-│   │   ├── windows_setup_guide.md
-│   │   └── wsl_setup_guide.md
+│   ├── training_sessions/              # Training session history (ORGANIZED BY SESSION)
+│   │   ├── TRAINING_DIARY.md           # Complete training log
+│   │   ├── session_6/                  # Session 6 documentation
+│   │   │   └── SESSION_6_EVALUATION_SUMMARY.md
+│   │   ├── session_7c/                 # Session 7c documentation
+│   │   │   ├── SESSION_7C_VISUALIZATION_GUIDE.md
+│   │   │   └── SESSION_7C_VS_SESSION_6_COMPARISON.md
+│   │   └── session_7d/                 # Session 7d documentation (CURRENT)
+│   │       ├── SESSION_7D_QUICK_START.md          # How to launch (START HERE)
+│   │       ├── SESSION_7D_ACCELERATED.md          # Technical details
+│   │       ├── SESSION_7D_REWARD_TUNING_PROPOSAL.md
+│   │       └── SESSION_7C_VS_7D_CHANGES.md        # What changed
 │   │
-│   ├── workflows/                      # How-to guides
-│   │   ├── daily_workflow.md
-│   │   ├── multi_trajectory_training.md
-│   │   └── visualization_options.md
+│   ├── tracking/                       # Tracking system & debug files
+│   │   ├── ee_frame_alignment.md
+│   │   ├── base_movement_validation.md
+│   │   ├── base_corrected_inspect.txt
+│   │   └── theta_before_x_inspect.txt
 │   │
 │   ├── reference/                      # Technical references
 │   │   ├── reward_cheatsheet.md
 │   │   ├── reward_system.md
-│   │   ├── robot_constraints_updated.md
-│   │   └── troubleshooting.md
+│   │   └── robot_constraints_updated.md
 │   │
-│   ├── architecture/                   # System architecture
-│   │   ├── overview.md
-│   │   ├── python_environments.md
-│   │   ├── ros2_communication.md
-│   │   └── training_architecture.md
+│   ├── 01_setup/                       # Installation guides (numbered for order)
+│   ├── 02_architecture/                # System architecture
+│   ├── 03_training/                    # Training guides
+│   ├── 04_optimization/                # Optimization strategies
+│   ├── 06_workflows/                   # How-to guides
+│   ├── 07_reference/                   # Additional references
 │   │
-│   ├── tracking/                       # Tracking system details
-│   │   ├── ee_frame_alignment.md
-│   │   ├── mobile_arm_asset_validation.md
-│   │   └── phase0_environment.md
-│   │
-│   ├── troubleshooting/                # Problem-solving guides
-│   │   ├── wsl2_cuda_fix_summary.md
-│   │   └── wsl2_cuda_isaac_sim.md
-│   │
-│   ├── urdf_fixes/                     # URDF/USD fixes (ORGANIZED)
-│   │   ├── URDF_FIXES_APPLIED.md       # Summary of all physics fixes
-│   │   ├── PPR_MASS_FIX_SUMMARY.md     # PPR joint mass fixes
-│   │   ├── PPR_STIFFNESS_TUNING.md     # Spring-damper tuning
-│   │   ├── USD_REGENERATION_GUIDE.md   # How to regenerate USD
-│   │   ├── USD_REGENERATION_CHECKLIST_V2.md
-│   │   ├── ISAAC_SIM_GUI_GUIDE.md      # Isaac Sim import guide
-│   │   └── ISAAC_SIM_IMPORT_CHECKLIST.md
-│   │
-│   ├── training_sessions/              # Training history (ORGANIZED)
-│   │   ├── TRAINING_DIARY.md           # Complete training log
-│   │   ├── TRAINING_SESSION_2_STATUS.md
-│   │   ├── SESSION_4_LAUNCH_READY.md
-│   │   ├── 20HZ_CONTROL_ANALYSIS.md    # Control frequency analysis
-│   │   ├── 20HZ_HOLDOVER_FIXES.md      # 50Hz→20Hz fixes
+│   └── 09_archive/                     # Historical/internal docs
+│       ├── old_analysis/               # Old analysis docs
+│       │   ├── COORDINATE_TRANSFORM_ANSWER.md
+│       │   ├── REACHABILITY_BUILD_RUNNING.md
+│       │   ├── REACHABILITY_MAP_SUMMARY.md
+│       │   └── REACHABILITY_QUICK_REF.md
+│       └── temp_docs/                  # Internal temp files
+│           ├── _CODE_REVIEW_VALIDATION.md
+│           ├── _COMPLETION_SUMMARY.md
+│           ├── _FIX_IMPLEMENTATION_PLAN.md
+│           └── _NAVIGATION_GUIDE.txt
 │   │   ├── CODE_AUDIT_20HZ.md          # Code consistency audit
 │   │   └── CONTROL_FREQUENCY_ANALYSIS.md
 │   │

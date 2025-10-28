@@ -317,10 +317,10 @@ def test_6_chassis_indices():
     print("TEST 6: Chassis-Requiring Trajectories")
     print("="*80)
     
-    chassis_file = project_root / "chassis_required_indices.txt"
+    chassis_file = project_root / "data/trajectory_filters/chassis_required_indices.txt"
     
     if not chassis_file.exists():
-        print(f"⚠️  SKIP: chassis_required_indices.txt not found")
+        print(f"⚠️  SKIP: data/trajectory_filters/chassis_required_indices.txt not found")
         print(f"   (This is OK - run analyze_trajectories.py to generate it)")
         return True
     

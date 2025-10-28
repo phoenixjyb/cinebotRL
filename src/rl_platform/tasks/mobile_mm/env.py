@@ -1682,14 +1682,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # This ensures the robot starts near the trajectory, making it physically possible to track
         first_target_pos, _ = self.trajectory_manager.get_target_pose()
         
-        # Set base position to match trajectory XY, with correct base height
-        # NOTE: first_target_pos Z is END-EFFECTOR height (1.0m from trajectories)
-        # Mobile base sits at Z=0 (ground level) - see line 1162 where Z is clamped to 0.0
-        # Arm mount at 0.9465m above base can then reach EE targets at ~1.0m
+        # Set base position with offset from target, accounting for arm kinematics
+        # FK analysis (all joints at zero): EE is at [0.1415, 0.2405, 0.9465] in base frame
+        # We offset base 44cm behind and 24cm left of target XY to allow 30cm forward reach
+        # This gives natural reaching posture instead of forcing arm backwards
         new_root_state = self.robot.data.default_root_state[env_ids].clone()
-        new_root_state[:, 0] = first_target_pos[env_ids, 0]  # X position from trajectory
-        new_root_state[:, 1] = first_target_pos[env_ids, 1]  # Y position from trajectory  
-        new_root_state[:, 2] = 0.0  # Ground level (NOT EE target Z, NOT 0.86m!)
+        new_root_state[:, 0] = first_target_pos[env_ids, 0] - 0.4415  # X: 30cm forward reach room
+        new_root_state[:, 1] = first_target_pos[env_ids, 1] - 0.2405  # Y: compensate for lateral offset
+        new_root_state[:, 2] = 0.0  # Ground level (matches runtime clamping line 1162)
         # Keep orientation from default (facing forward)
         
         # Reset velocities to zero
@@ -1718,8 +1718,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             env_ids=env_ids
         )
         
-        # Print ACTUAL base position (ground level Z=0) and target EE position for clarity
-        print(f"[RESET] Env {env_ids[0].item() if len(env_ids) > 0 else 'N/A'}: Base at [{new_root_state[0, 0]:.3f}, {new_root_state[0, 1]:.3f}, {new_root_state[0, 2]:.3f}] (ground), EE target at Z={first_target_pos[env_ids[0], 2]:.3f}")
+        # Print actual base position and target for debugging
+        print(f"[RESET] Env {env_ids[0].item() if len(env_ids) > 0 else 'N/A'}: Base=[{new_root_state[0, 0]:.3f}, {new_root_state[0, 1]:.3f}, {new_root_state[0, 2]:.3f}], Target=[{first_target_pos[env_ids[0], 0]:.3f}, {first_target_pos[env_ids[0], 1]:.3f}, {first_target_pos[env_ids[0], 2]:.3f}], Reach=0.30m forward")
         
         # NEW: Store episode start base position for movement tracking
         if not hasattr(self, '_episode_start_base_pos'):

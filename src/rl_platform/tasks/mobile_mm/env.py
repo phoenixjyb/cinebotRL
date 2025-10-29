@@ -418,6 +418,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         )
         self.prev_tracking_error = torch.zeros(self.num_envs, device=self.device)
         
+        # Tracking error buffers for evaluation/logging
+        self.ee_pos_error_buf = torch.zeros(self.num_envs, 3, device=self.device)  # [x, y, z] position error
+        self.ee_ori_error_buf = torch.zeros(self.num_envs, device=self.device)  # Angular error (radians)
+        
         # Position history for base progress tracking
         self.prev_base_pos = torch.zeros(self.num_envs, 3, device=self.device)
         
@@ -1584,6 +1588,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Update history for next step - store COMMANDED velocities for consistent penalty calculation
         self.prev_tracking_error = torch.norm(target_pos - ee_pos, dim=-1)
+        
+        # Store tracking errors for evaluation/logging
+        self.ee_pos_error_buf = target_pos - ee_pos  # [num_envs, 3] - vector error (x, y, z)
+        
+        # Compute orientation error (same as orientation_tracking_reward)
+        dot_product = torch.sum(ee_quat * target_quat, dim=-1).abs()
+        dot_product = torch.clamp(dot_product, 0.0, 1.0)
+        self.ee_ori_error_buf = 2 * torch.acos(dot_product)  # [num_envs] - angular error in radians
+        
         self.prev_base_pos = base_pos.clone()  # NEW: Store base position for next step
         self.prev_base_lin_vel = base_lin_vel.clone()
         self.prev_joint_vel = joint_vel.clone()

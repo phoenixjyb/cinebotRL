@@ -77,15 +77,16 @@ class RewardWeights:
     progress_bonus: float = 5.0            # INCREASED 1.0→5.0 (5× boost)
                                            # Reward steady progress along trajectory
     
-    base_progress_reward: float = 300.0    # INCREASED 250→300 (20% boost)
-                                           # Strong incentive for strategic movement
+    base_progress_reward: float = 400.0    # INCREASED 250→400 (60% boost) 🔥
+                                           # This scales the existing base_mobilization_reward() function
+                                           # Strong incentive for strategic base movement toward targets
     
     base_target_alignment: float = 30.0    # INCREASED 10→30 (3× boost)
                                            # Reward moving toward target (goal-directed)
     
-    base_mobilization_reward: float = 20.0 # 🔥 NEW! Reward ANY base movement
-                                           # Overcome learned immobility from Session 7d
-                                           # Reward when |base_vel| > 0.05 m/s
+    # NOTE: No new "base_mobilization_reward" config field needed!
+    # The existing base_mobilization_reward() function (rewards.py line 75)
+    # is already scaled by base_progress_reward above.
     
     target_distance_penalty: float = 1.0   # REDUCED 3.0→1.0 (67% reduction)
                                            # Less punishment for being far = more exploration

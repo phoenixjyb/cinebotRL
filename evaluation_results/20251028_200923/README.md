@@ -61,15 +61,17 @@
 
 ## 🔧 Recommendations
 
-**Priority 1: Retrain with Fixed Reward Weights**
+**Priority 1: Retrain with Fixed Reward Weights** ✅ **IMPLEMENTED (Session 8)**
 ```python
-orientation_tracking_weight: 50.0  # Was: ~1.0 (increase 50×)
-velocity_limit_penalty_weight: 5.0  # Was: 15-20 (reduce 3×)
-jerk_penalty_weight: 2.0  # Was: 10-15 (reduce 5-7×)
-base_mobilization_weight: 10.0  # Was: 1.0 (increase 10×)
+# See: src/rl_platform/tasks/mobile_mm/config.py
+orientation_tracking: 75.0          # Was: 2.0 (37.5× increase) ✅ DONE
+velocity_limit_penalty: 1.5         # Was: 5.0 (70% reduction) ✅ DONE
+jerk_limit_penalty: 0.01            # Was: 0.05 (80% reduction) ✅ DONE
+base_progress_reward: 400.0         # Was: 250.0 (60% increase) ✅ DONE
+position_tracking: 150.0            # Was: 100.0 (50% increase) ✅ DONE
 ```
 
-**Priority 2: Curriculum Learning**
+**Priority 2: Curriculum Learning** ⏸️ **PLANNED**
 - Stage 1: Static targets (50M steps)
 - Stage 2: Slow-moving (50M steps)
 - Stage 3: Full cinematic (100M steps)

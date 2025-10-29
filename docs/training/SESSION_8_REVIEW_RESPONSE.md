@@ -54,8 +54,12 @@
 ### ✅ Finding 4: Weight Documentation Inconsistency
 **Issue**: evaluation README showed 50.0, guide showed 75.0 for orientation_tracking
 
-**Resolution**: ✅
+**Resolution**: ✅ **FULLY FIXED**
 - Standardized on **75.0** across all docs
+- Updated evaluation_results/20251028_200923/README.md
+- Updated SESSION_8_CONFIG_GUIDE.md
+- Regenerated SESSION_8_COMPARISON.md with correct values
+- All docs now consistently show implemented values from config.py
 - This is 50% of position_tracking weight (150.0)
 - Aligns with film production needs (orientation nearly as important as position)
 

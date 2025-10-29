@@ -25,6 +25,9 @@ This document summarizes the Session 8 reward weight adjustments implemented in 
 - ✅ Corrected action_smoothness explanation (was showing increase instead of decrease)
 - ✅ Added clarification that `base_mobilization_reward()` already exists
 - ✅ Explained how `base_progress_reward` config weight scales the existing function
+- ✅ Updated evaluation README to show implemented Session 8 weights
+- ✅ Regenerated SESSION_8_COMPARISON.md with correct values
+- ✅ Updated SESSION_8_CONFIG_GUIDE.md to remove incorrect "NEW" field reference
 
 ### 3. **Created Validation Tool** (`validate_session8_weights.py`)
 - ✅ Computes projected reward balance using Session 7d evaluation data

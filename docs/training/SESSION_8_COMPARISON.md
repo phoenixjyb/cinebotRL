@@ -1,5 +1,10 @@
-# Session 8 Reward Configuration
-# Side-by-side comparison: Session 7d vs Session 8
+# Session 8 Reward Configuration - CORRECTED
+**Last Updated**: October 29, 2025 (Post-review corrections)  
+**Status**: ✅ **IMPLEMENTED** in config.py
+
+Side-by-side comparison: Session 7d vs Session 8 (ACTUAL values in code)
+
+---
 
 ## Quick Summary
 **Session 7d Problems:**
@@ -8,94 +13,57 @@
 - Penalties overwhelm rewards (ratio 0.7:1)
 - Base immobility: Robot learned to stand still
 
-**Session 8 Solutions:**
-- Boost orientation tracking 37.5× (2.0 → 75.0)
-- Reduce velocity penalty 70% (5.0 → 1.5)
-- Add base mobilization reward (+20.0 for movement)
-- Target reward/penalty ratio: 16:1 (rewards dominate!)
+**Session 8 Solutions (IMPLEMENTED):**
+- Boost orientation tracking 37.5× (2.0 → 75.0) ✅
+- Reduce velocity penalty 70% (5.0 → 1.5) ✅
+- Reduce jerk penalty 80% (0.05 → 0.01) ✅
+- Boost base mobilization 60% (250 → 400) ✅
+- Target reward/penalty ratio: 3.73:1 (rewards dominate!)
 
 ---
 
-## Updated RewardWeights Class
+## Updated RewardWeights Class (ACTUAL CODE)
 
 ```python
 from dataclasses import dataclass
 
 @dataclass
 class RewardWeights:
-    """Reward term weights for Session 8 (CORRECTED)."""
+    """Reward term weights for Session 8 (AS IMPLEMENTED)."""
     
     # ========================================
     # TRACKING REWARDS - Make these DOMINANT
     # ========================================
-    position_tracking: float = 150.0       # Session 7d: 100.0 → +50%
-                                           # Reason: Make position even more valuable
-    
-    orientation_tracking: float = 75.0     # Session 7d: 2.0 → +37.5×! 🔥
-                                           # Reason: Was 2% of position, now 50%
-                                           # 140.7° error in Session 7d = CRITICAL FIX
-    
-    progress_bonus: float = 5.0            # Session 7d: 1.0 → +5×
-                                           # Reason: Reward steady forward progress
-    
-    base_progress_reward: float = 300.0    # Session 7d: 250.0 → +20%
-                                           # Reason: Strong incentive for movement
-    
-    base_target_alignment: float = 30.0    # Session 7d: 10.0 → +3×
-                                           # Reason: Goal-directed navigation
-    
-    base_mobilization_reward: float = 20.0 # Session 7d: N/A → NEW! 🔥
-                                           # Reason: Overcome learned immobility
-                                           # Reward ANY base movement > 0.05 m/s
-    
-    target_distance_penalty: float = 1.0   # Session 7d: 3.0 → -67%
-                                           # Reason: Less punishment = more exploration
-    
-    excessive_base_movement_penalty: float = 5.0  # Session 7d: 10.0 → -50%
-                                                   # Reason: Allow more exploration
+    position_tracking: float = 150.0       # Session 7d: 100.0 (+50%)
+    orientation_tracking: float = 75.0     # Session 7d: 2.0 (+37.5×!) 🔥
+    progress_bonus: float = 5.0            # Session 7d: 1.0 (+5×)
+    base_progress_reward: float = 400.0    # Session 7d: 250.0 (+60%) 🔥
+                                           # Scales base_mobilization_reward()
+    base_target_alignment: float = 30.0    # Session 7d: 10.0 (+3×)
+    target_distance_penalty: float = 1.0   # Session 7d: 3.0 (-67%)
+    excessive_base_movement_penalty: float = 5.0  # Session 7d: 10.0 (-50%)
     
     # ========================================
     # MOTION QUALITY PENALTIES - Reduce these
     # ========================================
-    action_magnitude: float = 0.002        # Session 7d: 0.005 → -60%
-                                           # Reason: Don't penalize large actions
-    
-    action_rate: float = 0.005             # Session 7d: 0.01 → -50%
-                                           # Reason: Allow faster action changes
-    
-    action_smoothness: float = 0.5         # Session 7d: 0.15 → +3.3×
-                                           # Reason: Still reduce jitter but not harsh
+    action_magnitude: float = 0.002        # Session 7d: 0.005 (-60%)
+    action_rate: float = 0.005             # Session 7d: 0.01 (-50%)
+    action_smoothness: float = 0.05        # Session 7d: 0.15 (-67%) 🔥
     
     # ========================================
     # CONSTRAINT VIOLATIONS - Much gentler
     # ========================================
-    velocity_limit_penalty: float = 1.5    # Session 7d: 5.0 → -70%! 🔥
-                                           # Reason: Was causing -15.5/step
-                                           # Still penalize but much gentler
-    
-    acceleration_limit_penalty: float = 1.5  # Session 7d: 5.0 → -70%
-                                             # Reason: Match velocity penalty
-    
-    jerk_limit_penalty: float = 0.3        # Session 7d: 0.05 → +6×
-                                           # Reason: Was causing -14.0/step
-                                           # New ratio: vel=1.5, jerk=0.3 (5:1)
-    
-    joint_limit_penalty: float = 5.0       # Session 7d: 10.0 → -50%
-                                           # Reason: Softer enforcement
-    
-    lateral_motion_penalty: float = 1.0    # Session 7d: 2.0 → -50%
-                                           # Reason: Less harsh on lateral drift
+    velocity_limit_penalty: float = 1.5    # Session 7d: 5.0 (-70%!) 🔥
+    acceleration_limit_penalty: float = 1.5  # Session 7d: 5.0 (-70%)
+    jerk_limit_penalty: float = 0.01       # Session 7d: 0.05 (-80%!) 🔥
+    joint_limit_penalty: float = 5.0       # Session 7d: 10.0 (-50%)
+    lateral_motion_penalty: float = 1.0    # Session 7d: 2.0 (-50%)
     
     # ========================================
     # SAFETY PENALTIES - Keep reasonable
     # ========================================
-    self_collision_penalty: float = 1.0    # Session 7d: 0.5 → +2×
-                                           # Reason: Slightly more important
-    
-    collision_penalty: float = 10.0        # Session 7d: 10.0 → KEEP
-    
-    stability_penalty: float = 0.2         # Session 7d: 0.1 → +2×
-                                           # Reason: Slightly more important
+    self_collision_penalty: float = 1.0    # Session 7d: 0.5 (+2×)
+    stability_penalty: float = 0.2         # Session 7d: 0.1 (+2×)
     
     # Self-collision detection settings
     self_collision_threshold: float = 50.0  # KEEP (Newtons)
@@ -108,32 +76,34 @@ class RewardWeights:
 
 ---
 
-## Comparison Table
+## Comparison Table (CORRECTED VALUES)
 
-| Reward/Penalty | Session 7d | Session 8 | Change | Reason |
-|----------------|-----------|-----------|--------|--------|
+| Reward/Penalty | Session 7d | Session 8 (ACTUAL) | Change | Reason |
+|----------------|-----------|-------------------|--------|--------|
 | **TRACKING REWARDS** |||||
 | position_tracking | 100.0 | **150.0** | +50% ↑ | Make primary task even more valuable |
 | orientation_tracking | 2.0 | **75.0** | +37.5× ↑ 🔥 | Was 2% of position, now 50% |
 | progress_bonus | 1.0 | **5.0** | +5× ↑ | Reward steady progress |
-| base_progress_reward | 250.0 | **300.0** | +20% ↑ | Stronger movement incentive |
+| base_progress_reward | 250.0 | **400.0** | +60% ↑ 🔥 | Scales base_mobilization_reward() |
 | base_target_alignment | 10.0 | **30.0** | +3× ↑ | Goal-directed navigation |
-| base_mobilization_reward | N/A | **20.0** | NEW 🔥 | Overcome immobility |
 | target_distance_penalty | 3.0 | **1.0** | -67% ↓ | Less punishment, more exploration |
 | excessive_base_movement | 10.0 | **5.0** | -50% ↓ | Allow more exploration |
 | **MOTION PENALTIES** |||||
 | action_magnitude | 0.005 | **0.002** | -60% ↓ | Don't penalize large actions |
 | action_rate | 0.01 | **0.005** | -50% ↓ | Allow faster changes |
-| action_smoothness | 0.15 | **0.5** | +3.3× ↑ | Still reduce jitter |
+| action_smoothness | 0.15 | **0.05** | -67% ↓ 🔥 | Was -1.72/step, now ~-0.57 |
 | **CONSTRAINT VIOLATIONS** |||||
 | velocity_limit_penalty | 5.0 | **1.5** | -70% ↓ 🔥 | Was -15.5/step! |
 | acceleration_limit_penalty | 5.0 | **1.5** | -70% ↓ | Match velocity |
-| jerk_limit_penalty | 0.05 | **0.3** | +6× ↑ | Better ratio with velocity |
+| jerk_limit_penalty | 0.05 | **0.01** | -80% ↓ 🔥 | Was -14.0/step! |
 | joint_limit_penalty | 10.0 | **5.0** | -50% ↓ | Softer enforcement |
 | lateral_motion_penalty | 2.0 | **1.0** | -50% ↓ | Less harsh |
 | **SAFETY** |||||
 | self_collision_penalty | 0.5 | **1.0** | +2× ↑ | Slightly more important |
 | stability_penalty | 0.1 | **0.2** | +2× ↑ | Slightly more important |
+
+**NOTE**: No new "base_mobilization_reward" config field exists. The existing  
+`base_mobilization_reward()` function in rewards.py is scaled by `base_progress_reward`.
 
 ---
 
@@ -208,6 +178,7 @@ Ratio: 224:5 = 44:1 (rewards DOMINATE!)
 
 Before full training, run this quick test:
 
+
 ```powershell
 # 10M step test with 32 envs (~30 minutes)
 .\scripts\launch_training_windows.ps1 `
@@ -222,12 +193,14 @@ Before full training, run this quick test:
 - Episode reward should be **positive** (> 0)
 - position_tracking should be **+100 to +150**
 - orientation_tracking should be **+50 to +75** (not +0.19!)
-- velocity_limit_penalty should be **-2.0 or less** (not -15.5!)
+- velocity_limit_penalty should be **-5 or less** (not -15.5!)
+- jerk_penalty should be **-3 or less** (not -14.0!)
 
 If these check out → Proceed with full 200M training!
 
 ---
 
 **File**: `docs/training/SESSION_8_COMPARISON.md`  
-**Date**: October 29, 2025  
-**Status**: Ready for implementation
+**Date**: October 29, 2025 (Corrected post-review)  
+**Status**: ✅ **IMPLEMENTED** - Matches actual config.py
+

@@ -347,7 +347,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "orientation_tracking": self.task_cfg.rewards.orientation_tracking,
             "progress_bonus": self.task_cfg.rewards.progress_bonus,
             "base_progress_reward": self.task_cfg.rewards.base_progress_reward,
+            "base_target_alignment": self.task_cfg.rewards.base_target_alignment,  # BUGFIX: Was missing!
             "target_distance_penalty": self.task_cfg.rewards.target_distance_penalty,
+            "excessive_base_movement_penalty": self.task_cfg.rewards.excessive_base_movement_penalty,  # BUGFIX: Was missing!
             "action_magnitude": self.task_cfg.rewards.action_magnitude,
             "action_rate": self.task_cfg.rewards.action_rate,
             "action_smoothness": self.task_cfg.rewards.action_smoothness,
@@ -363,6 +365,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "stability_penalty": self.task_cfg.rewards.stability_penalty,
             "min_obstacle_distance_weight": self.task_cfg.rewards.min_obstacle_distance_weight,
             "safety_radius": self.task_cfg.rewards.safety_radius,
+            # Session 8b: Reachability-aware base coordination
+            "reachability_maintenance_reward": self.task_cfg.rewards.reachability_maintenance_reward,
+            "base_overshoot_penalty": self.task_cfg.rewards.base_overshoot_penalty,
         }
         
         # Robot limits dictionary

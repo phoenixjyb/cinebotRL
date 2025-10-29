@@ -621,9 +621,11 @@ def velocity_limit_penalty(
     Returns:
         Penalty values [num_envs]
     """
-    # Base forward velocity (x-direction for differential drive)
-    base_vel_x = base_lin_vel[:, 0].abs()
-    base_vel_violation = torch.clamp(base_vel_x - max_linear_vel, min=0.0) ** 2
+    # BUGFIX: Use planar speed magnitude (‖v_xy‖) instead of just X component
+    # This ensures limits are consistent regardless of chassis heading
+    base_vel_xy = base_lin_vel[:, :2]  # [num_envs, 2] - planar velocity
+    base_speed = torch.norm(base_vel_xy, dim=-1)  # [num_envs] - magnitude
+    base_vel_violation = torch.clamp(base_speed - max_linear_vel, min=0.0) ** 2
     
     # Joint velocities
     joint_vel_violation = torch.sum(
@@ -940,18 +942,20 @@ def compute_combined_reward(
     
     # Base acceleration in physical units (m/s^2)
     base_accel = (base_lin_vel - prev_base_lin_vel) / dt
+    # BUGFIX: Pass full planar velocity (xy) for magnitude-based penalty
     accel_limit_penalty = acceleration_limit_penalty(
-        base_lin_vel[:, 0:1],
-        prev_base_lin_vel[:, 0:1],
+        base_lin_vel[:, :2],  # Planar velocity [num_envs, 2]
+        prev_base_lin_vel[:, :2],  # Previous planar velocity [num_envs, 2]
         dt,
         robot_limits["max_linear_acceleration"],
         scale=weights["acceleration_limit_penalty"],
     )
     
     # Jerk (rate of change of acceleration) in physical units (m/s^3)
+    # BUGFIX: Pass full planar acceleration (xy) for magnitude-based penalty
     jerk_penalty_val = jerk_penalty(
-        base_accel[:, 0:1],
-        prev_base_accel[:, 0:1],
+        base_accel[:, :2],  # Planar acceleration [num_envs, 2]
+        prev_base_accel[:, :2],  # Previous planar acceleration [num_envs, 2]
         dt,
         robot_limits["max_linear_jerk"],
         scale=weights["jerk_limit_penalty"],

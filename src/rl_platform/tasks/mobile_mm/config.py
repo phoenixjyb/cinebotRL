@@ -75,18 +75,28 @@ class RobotLimits:
 class RewardWeights:
     """Reward term weights for the tracking task.
     
-    Session 8 Configuration (Based on Session 7d evaluation):
+    Session 8b Configuration (Based on Session 8 validation failure):
+    
+    Session 8 changes:
     - Dramatically boost orientation tracking (2.0 → 75.0, 37.5× increase)
     - Significantly reduce velocity penalty (5.0 → 1.5, 70% reduction)
     - Reduce jerk penalty (0.05 → 0.01, 80% reduction) to stop crushing movement
     - Boost base mobilization incentives (250.0 → 400.0)
-    - Target reward/penalty ratio: 44:1 (rewards dominate)
     
-    Expected Results:
-    - Position error: 3.64m → < 0.2m
-    - Orientation error: 140.7° → < 10°
-    - Episode reward: -5,120 → POSITIVE
-    - Base velocity: < 0.01 m/s → > 0.2 m/s
+    Session 8b additions (NEW - Fix reachability crisis):
+    - Add reachability maintenance reward (50.0) to keep targets reachable
+    - Add base overshoot penalty (20.0) to prevent moving past waypoints
+    - Increase excessive movement penalty (5.0 → 15.0) to constrain drift
+    
+    Session 8 validation failure at 400K steps:
+    - Reachability: 32/32 → 0/32 envs (complete collapse!)
+    - Distance: 0.5m → 1.2m (double arm reach, catastrophic!)
+    - Root cause: Base drifts freely without reachability awareness
+    
+    Expected Session 8b Results:
+    - Maintain 80%+ reachability throughout training
+    - Base-target distance: 0.3-0.6m (optimal arm workspace)
+    - Episode reward: POSITIVE with stable base positioning
     """
     
     # ========================================
@@ -98,7 +108,13 @@ class RewardWeights:
     base_progress_reward: float = 400.0  # Session 8: INCREASED 250→400 (60% boost) - scales base_mobilization_reward()
     base_target_alignment: float = 30.0  # Session 8: INCREASED 10→30 (3× boost)
     target_distance_penalty: float = 1.0  # Session 8: REDUCED 3.0→1.0 (67% reduction) - allow exploration
-    excessive_base_movement_penalty: float = 5.0  # Session 8: REDUCED 10→5 (50% reduction)
+    
+    # ========================================
+    # BASE COORDINATION (NEW - Session 8b)
+    # ========================================
+    reachability_maintenance_reward: float = 50.0  # Session 8b: NEW - reward keeping targets reachable
+    base_overshoot_penalty: float = 20.0  # Session 8b: NEW - penalize moving past waypoints
+    excessive_base_movement_penalty: float = 15.0  # Session 8b: INCREASED 5→15 (3× boost) - was too weak
     
     # ========================================
     # MOTION QUALITY PENALTIES (Reduce these)

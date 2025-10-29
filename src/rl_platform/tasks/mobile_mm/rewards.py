@@ -240,6 +240,138 @@ def target_distance_penalty(
     return scale * penalty
 
 
+def reachability_maintenance_reward(
+    target_pos: torch.Tensor,
+    base_pos: torch.Tensor,
+    arm_optimal_reach: float = 0.4,
+    arm_max_reach: float = 0.6,
+    scale: float = 50.0,
+) -> torch.Tensor:
+    """Reward maintaining targets within optimal arm workspace.
+    
+    Session 8b: Added to fix reachability crisis where base drifts too far.
+    
+    Validation showed catastrophic failure:
+    - Step 0: 32/32 reachable
+    - Step 12800: 0/32 reachable (100% failure!)
+    - Distance grew from 0.5m → 1.2m (double arm reach)
+    
+    This reward provides strong incentive to keep targets reachable:
+    - Within optimal reach (0.3-0.4m): Full reward (+1.0)
+    - Between optimal and max (0.4-0.6m): Reduced reward (+0.5)
+    - Beyond max reach (>0.6m): Penalty (-2.0)
+    
+    Args:
+        target_pos: Current target [num_envs, 3]
+        base_pos: Current base [num_envs, 3]
+        arm_optimal_reach: Optimal working distance (0.3-0.4m)
+        arm_max_reach: Maximum arm reach (0.6m)
+        scale: Reward weight
+        
+    Returns:
+        Reward [num_envs] - positive when reachable, negative when beyond reach
+    """
+    base_xy = base_pos[:, :2]
+    target_xy = target_pos[:, :2]
+    dist = torch.norm(target_xy - base_xy, dim=-1)
+    
+    # Three zones:
+    # 1. Optimal zone (< 0.4m): Full reward
+    # 2. Acceptable zone (0.4-0.6m): Partial reward
+    # 3. Unreachable zone (> 0.6m): Penalty
+    
+    optimal_mask = dist <= arm_optimal_reach
+    acceptable_mask = (dist > arm_optimal_reach) & (dist <= arm_max_reach)
+    unreachable_mask = dist > arm_max_reach
+    
+    reward = torch.where(
+        optimal_mask,
+        torch.ones_like(dist),  # +1.0 in optimal zone
+        torch.where(
+            acceptable_mask,
+            torch.ones_like(dist) * 0.5,  # +0.5 in acceptable zone
+            -2.0 * (dist - arm_max_reach),  # Penalty grows with distance
+        )
+    )
+    
+    return scale * reward
+
+
+def base_overshoot_penalty(
+    base_pos: torch.Tensor,
+    target_pos: torch.Tensor,
+    base_vel: torch.Tensor,
+    base_quat: torch.Tensor,
+    arm_optimal_reach: float = 0.4,
+    scale: float = 20.0,
+) -> torch.Tensor:
+    """Penalize base moving past target waypoints (overshooting).
+    
+    Session 8b: Added to prevent base from "rushing ahead" of trajectory.
+    
+    Detection method: Check if base velocity points away from target.
+    If base is moving away from target, it's either:
+    1. Overshooting the current waypoint, or
+    2. Moving in wrong direction
+    
+    Both cases should be penalized to maintain coordinated tracking.
+    
+    Args:
+        base_pos: Current base [num_envs, 3]
+        target_pos: Current target [num_envs, 3]
+        base_vel: Base velocity in body frame [num_envs, 3]
+        base_quat: Base orientation [num_envs, 4]
+        arm_optimal_reach: Optimal distance (don't get closer than this)
+        scale: Penalty weight
+        
+    Returns:
+        Penalty [num_envs] - increases when moving past target
+    """
+    base_xy = base_pos[:, :2]
+    target_xy = target_pos[:, :2]
+    
+    # Convert base velocity from body frame to world frame
+    w, x, y, z = base_quat[:, 0], base_quat[:, 1], base_quat[:, 2], base_quat[:, 3]
+    yaw = torch.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y**2 + z**2))
+    
+    vx_body = base_vel[:, 0]
+    vx_world = vx_body * torch.cos(yaw)
+    vy_world = vx_body * torch.sin(yaw)
+    vel_world = torch.stack([vx_world, vy_world], dim=-1)
+    
+    # Direction from base to target
+    base_to_target = target_xy - base_xy
+    base_to_target_norm = torch.norm(base_to_target, dim=-1, keepdim=True)
+    base_to_target_unit = base_to_target / (base_to_target_norm.squeeze(-1, keepdim=True) + 1e-6)
+    
+    # Velocity alignment: positive = moving toward, negative = moving away
+    vel_norm = torch.norm(vel_world, dim=-1, keepdim=True)
+    vel_alignment = torch.sum(vel_world * base_to_target_unit, dim=-1) / (vel_norm.squeeze() + 1e-6)
+    
+    # Current distance to target
+    dist = base_to_target_norm.squeeze()
+    
+    # Penalize moving away when:
+    # 1. Already within optimal reach AND moving away (overshooting)
+    # 2. Any distance AND moving strongly away (wrong direction)
+    
+    within_reach = dist < arm_optimal_reach
+    moving_away = vel_alignment < -0.2  # Threshold: significantly away
+    
+    # Strong penalty for overshooting (within reach but moving away)
+    overshoot_penalty = torch.where(
+        within_reach & moving_away,
+        -vel_alignment * 2.0,  # Penalty proportional to how fast moving away
+        torch.zeros_like(vel_alignment)
+    )
+    
+    # Mild penalty for wrong direction (any distance)
+    wrong_dir_penalty = torch.clamp(-vel_alignment, min=0.0) * 0.5
+    
+    total_penalty = overshoot_penalty + wrong_dir_penalty
+    return scale * total_penalty
+
+
 def excessive_base_movement_penalty(
     base_pos: torch.Tensor,
     prev_base_pos: torch.Tensor,
@@ -762,11 +894,31 @@ def compute_combined_reward(
         scale=weights.get("target_distance_penalty", 10.0)
     )
     
+    # ========================================
+    # Session 8b: BASE COORDINATION REWARDS
+    # ========================================
+    
+    # Reachability maintenance: Keep targets within arm workspace
+    reach_maint_reward = reachability_maintenance_reward(
+        target_pos, base_pos,
+        arm_optimal_reach=0.4,
+        arm_max_reach=0.6,
+        scale=weights.get("reachability_maintenance_reward", 50.0)
+    )
+    
+    # Overshoot penalty: Prevent base from moving past waypoints
+    overshoot_penalty = base_overshoot_penalty(
+        base_pos, target_pos, base_lin_vel, base_quat,
+        arm_optimal_reach=0.4,
+        scale=weights.get("base_overshoot_penalty", 20.0)
+    )
+    
     # Session 5b FIX: Excessive movement penalty (prevents wild base movements)
+    # Session 8b: Increased from 5.0 to 15.0 to constrain base drift
     excessive_penalty = excessive_base_movement_penalty(
         base_pos, prev_base_pos,
         threshold=0.1,  # 10cm per step is maximum reasonable
-        scale=weights.get("excessive_base_movement_penalty", 10.0)
+        scale=weights.get("excessive_base_movement_penalty", 15.0)
     )
     
     # Action penalties
@@ -847,8 +999,10 @@ def compute_combined_reward(
         + prog_bonus
         + base_mob_reward  # NEW: Reward base movement when target is far (NOW CAPPED!)
         + base_alignment_reward  # Session 7d: Reward moving toward target
+        + reach_maint_reward  # Session 8b: Reward keeping targets reachable
         - dist_penalty  # NEW: Strong penalty for being beyond arm reach
-        - excessive_penalty  # Session 5b: Prevent wild base movements
+        - overshoot_penalty  # Session 8b: Penalize moving past waypoints
+        - excessive_penalty  # Session 8b: Prevent wild base movements (increased 5→15)
         - action_mag_penalty
         - action_rt_penalty
         - action_smooth_penalty
@@ -869,8 +1023,10 @@ def compute_combined_reward(
         "progress_bonus": prog_bonus,
         "base_mobilization": base_mob_reward,  # NEW: Log base movement reward (NOW CAPPED!)
         "base_target_alignment": base_alignment_reward,  # Session 7d: Log alignment reward
+        "reachability_maintenance_reward": reach_maint_reward,  # Session 8b: Log reachability reward
         "target_distance_penalty": dist_penalty,  # NEW: Log distance penalty
-        "excessive_base_movement_penalty": excessive_penalty,  # Session 5b: Log wild movement penalty
+        "base_overshoot_penalty": overshoot_penalty,  # Session 8b: Log overshoot penalty
+        "excessive_base_movement_penalty": excessive_penalty,  # Session 8b: Log movement constraint
         "action_magnitude_penalty": action_mag_penalty,
         "action_rate_penalty": action_rt_penalty,
         "action_smoothness_penalty": action_smooth_penalty,

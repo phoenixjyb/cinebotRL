@@ -117,6 +117,12 @@ def parse_args():
         default=None,
         help="Limit number of trajectories to load (None = all)",
     )
+    parser.add_argument(
+        "--env_spacing",
+        type=float,
+        default=15.0,
+        help="Spacing between parallel environments in meters (default: 15.0 for visualization)",
+    )
     
     return parser.parse_args()
 
@@ -303,6 +309,8 @@ def main():
         # Create custom environment configuration
         env_cfg = MobileMMTrackEEEnvCfg()
         env_cfg.scene.num_envs = args.num_envs
+        env_cfg.scene.env_spacing = args.env_spacing  # Set custom spacing for visualization
+        print(f"    Environment spacing: {args.env_spacing}m")
         
         # Prepare trajectory filter (same logic as train.py)
         trajectory_filter_indices = None

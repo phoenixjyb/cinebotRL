@@ -55,6 +55,10 @@ $CONFIG = @{
     NumEnvs = 16384  # 4x parallelism (was 4096 in Session 7c, 8192 in initial 7d)
     Headless = $true
     
+    # Trajectory settings
+    TrajectoryType = "multi_recorded"  # Use 1038 real recorded trajectories
+    TrajectoryDir = "trajectoryToLearn/world_json"
+    
     # Training duration
     TotalTimesteps = 200000000  # 200M timesteps (same as 7c)
     
@@ -169,6 +173,10 @@ $scriptArgs = @(
     "--num_envs", $CONFIG.NumEnvs,
     "--headless",
     "--total_timesteps", $CONFIG.TotalTimesteps,
+    
+    # Trajectory settings
+    "--trajectory_type", $CONFIG.TrajectoryType,
+    "--trajectory_dir", $CONFIG.TrajectoryDir,
     
     # PPO hyperparameters
     "--learning_rate", $CONFIG.LearningRate,

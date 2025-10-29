@@ -73,33 +73,55 @@ class RobotLimits:
 
 @dataclass
 class RewardWeights:
-    """Reward term weights for the tracking task."""
+    """Reward term weights for the tracking task.
     
-    # Tracking rewards
-    position_tracking: float = 100.0  # Session 7c: INCREASED 50→100 (2x) - make primary task dominant
-    orientation_tracking: float = 2.0
-    progress_bonus: float = 1.0
-    base_progress_reward: float = 250.0  # Session 7d: INCREASED 150→250 (67% boost) - stronger incentive for strategic movement
-    base_target_alignment: float = 10.0  # Session 7d: NEW - reward moving toward target (goal-directed navigation)
-    target_distance_penalty: float = 3.0  # Session 7d: REDUCED 5→3 (40% gentler) - less punishment, more exploration
-    excessive_base_movement_penalty: float = 10.0  # Session 5b: NEW - prevents wild base movements >10cm
+    Session 8 Configuration (Based on Session 7d evaluation):
+    - Dramatically boost orientation tracking (2.0 → 75.0, 37.5× increase)
+    - Significantly reduce velocity penalty (5.0 → 1.5, 70% reduction)
+    - Reduce jerk penalty (0.05 → 0.01, 80% reduction) to stop crushing movement
+    - Boost base mobilization incentives (250.0 → 400.0)
+    - Target reward/penalty ratio: 44:1 (rewards dominate)
     
-    # Motion quality penalties
-    action_magnitude: float = 0.005  # REDUCED from 0.01 - encourage base action exploration
-    action_rate: float = 0.01
-    action_smoothness: float = 0.15  # Session 7d: INCREASED 0.05→0.15 (3x) - reduce jiggling/oscillation
+    Expected Results:
+    - Position error: 3.64m → < 0.2m
+    - Orientation error: 140.7° → < 10°
+    - Episode reward: -5,120 → POSITIVE
+    - Base velocity: < 0.01 m/s → > 0.2 m/s
+    """
     
-    # Constraint violation penalties
-    velocity_limit_penalty: float = 5.0
-    acceleration_limit_penalty: float = 5.0
-    jerk_limit_penalty: float = 0.05  # REDUCED from 0.1 - was killing base movement learning!
-    joint_limit_penalty: float = 10.0
-    lateral_motion_penalty: float = 2.0  # No sideways motion for diff drive
+    # ========================================
+    # TRACKING REWARDS (Make these DOMINANT)
+    # ========================================
+    position_tracking: float = 150.0  # Session 8: INCREASED 100→150 (50% boost)
+    orientation_tracking: float = 75.0  # Session 8: INCREASED 2.0→75.0 (37.5× boost!) - NOW 50% OF POSITION
+    progress_bonus: float = 5.0  # Session 8: INCREASED 1.0→5.0 (5× boost)
+    base_progress_reward: float = 400.0  # Session 8: INCREASED 250→400 (60% boost) - scales base_mobilization_reward()
+    base_target_alignment: float = 30.0  # Session 8: INCREASED 10→30 (3× boost)
+    target_distance_penalty: float = 1.0  # Session 8: REDUCED 3.0→1.0 (67% reduction) - allow exploration
+    excessive_base_movement_penalty: float = 5.0  # Session 8: REDUCED 10→5 (50% reduction)
     
-    # Safety penalties
-    self_collision_penalty: float = 0.5  # Session 7: Reduced from 50.0 (was causing -11M episode rewards)
+    # ========================================
+    # MOTION QUALITY PENALTIES (Reduce these)
+    # ========================================
+    action_magnitude: float = 0.002  # Session 8: REDUCED 0.005→0.002 (60% reduction)
+    action_rate: float = 0.005  # Session 8: REDUCED 0.01→0.005 (50% reduction)
+    action_smoothness: float = 0.05  # Session 8: REDUCED 0.15→0.05 (67% reduction) - was -1.72/step
+    
+    # ========================================
+    # CONSTRAINT VIOLATIONS (Much gentler)
+    # ========================================
+    velocity_limit_penalty: float = 1.5  # Session 8: REDUCED 5.0→1.5 (70% reduction!) - was -15.5/step
+    acceleration_limit_penalty: float = 1.5  # Session 8: REDUCED 5.0→1.5 (70% reduction)
+    jerk_limit_penalty: float = 0.01  # Session 8: REDUCED 0.05→0.01 (80% reduction!) - was -14.0/step
+    joint_limit_penalty: float = 5.0  # Session 8: REDUCED 10.0→5.0 (50% reduction)
+    lateral_motion_penalty: float = 1.0  # Session 8: REDUCED 2.0→1.0 (50% reduction)
+    
+    # ========================================
+    # SAFETY PENALTIES (Keep reasonable)
+    # ========================================
+    self_collision_penalty: float = 1.0  # Session 8: INCREASED 0.5→1.0 (2× boost)
     collision_penalty: float = 10.0  # External collisions (not used for now)
-    stability_penalty: float = 0.1
+    stability_penalty: float = 0.2  # Session 8: INCREASED 0.1→0.2 (2× boost)
     
     # Self-collision detection settings (filtered to exclude base-ground contact)
     self_collision_threshold: float = 50.0  # Newtons - arm impact threshold (was 1.0, too sensitive for base-ground load)

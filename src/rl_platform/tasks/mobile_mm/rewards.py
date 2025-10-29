@@ -304,11 +304,14 @@ def base_overshoot_penalty(
     
     Both cases should be penalized to maintain coordinated tracking.
     
+    BUGFIX: Now expects WORLD-frame velocity (changed from body-frame).
+    Consistent with all other reward functions.
+    
     Args:
         base_pos: Current base [num_envs, 3]
         target_pos: Current target [num_envs, 3]
-        base_vel: Base velocity in body frame [num_envs, 3]
-        base_quat: Base orientation [num_envs, 4]
+        base_vel: Base velocity in WORLD frame [num_envs, 3] (changed from body frame!)
+        base_quat: Base orientation [num_envs, 4] (kept for consistency, but not used)
         arm_optimal_reach: Optimal distance (don't get closer than this)
         scale: Penalty weight
         
@@ -318,14 +321,8 @@ def base_overshoot_penalty(
     base_xy = base_pos[:, :2]
     target_xy = target_pos[:, :2]
     
-    # Convert base velocity from body frame to world frame
-    w, x, y, z = base_quat[:, 0], base_quat[:, 1], base_quat[:, 2], base_quat[:, 3]
-    yaw = torch.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y**2 + z**2))
-    
-    vx_body = base_vel[:, 0]
-    vx_world = vx_body * torch.cos(yaw)
-    vy_world = vx_body * torch.sin(yaw)
-    vel_world = torch.stack([vx_world, vy_world], dim=-1)
+    # BUGFIX: Velocity is already in world frame, no conversion needed!
+    vel_world = base_vel[:, :2]  # Just extract XY components
     
     # Direction from base to target
     base_to_target = target_xy - base_xy

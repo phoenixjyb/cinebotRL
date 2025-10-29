@@ -1561,8 +1561,38 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             
             self._reach_log_step += 1
         
+        # BUGFIX: Convert commanded velocities from body frame to world frame
+        # Most reward functions expect world-frame velocities (lateral_motion_penalty, 
+        # velocity_limit_penalty, etc.) but commanded_vel is in body frame.
+        # Only base_target_alignment_reward expects body frame, so we'll handle that specially.
+        
+        # Extract yaw from quaternion for rotation
+        w, x, y, z = base_quat[:, 0], base_quat[:, 1], base_quat[:, 2], base_quat[:, 3]
+        yaw = torch.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y**2 + z**2))
+        
+        # Current commanded velocity: body → world
+        vx_body = commanded_linear[:, 0]
+        commanded_linear_world = torch.zeros_like(commanded_linear)
+        commanded_linear_world[:, 0] = vx_body * torch.cos(yaw)  # X component in world
+        commanded_linear_world[:, 1] = vx_body * torch.sin(yaw)  # Y component in world
+        commanded_linear_world[:, 2] = commanded_linear[:, 2]     # Z unchanged (usually 0)
+        
+        # Previous commanded velocity: body → world
+        vx_body_prev = prev_commanded_linear[:, 0]
+        prev_commanded_linear_world = torch.zeros_like(prev_commanded_linear)
+        prev_commanded_linear_world[:, 0] = vx_body_prev * torch.cos(yaw)
+        prev_commanded_linear_world[:, 1] = vx_body_prev * torch.sin(yaw)
+        prev_commanded_linear_world[:, 2] = prev_commanded_linear[:, 2]
+        
+        # Previous commanded acceleration: body → world
+        ax_body = prev_commanded_linear_accel[:, 0]
+        prev_commanded_linear_accel_world = torch.zeros_like(prev_commanded_linear_accel)
+        prev_commanded_linear_accel_world[:, 0] = ax_body * torch.cos(yaw)
+        prev_commanded_linear_accel_world[:, 1] = ax_body * torch.sin(yaw)
+        prev_commanded_linear_accel_world[:, 2] = prev_commanded_linear_accel[:, 2]
+        
         # Compute rewards with all new constraint penalties
-        # Use COMMANDED velocities for penalty calculation to avoid penalizing simulation artifacts
+        # Use COMMANDED velocities (now in world frame) for penalty calculation to avoid penalizing simulation artifacts
         rewards, self.reward_components = compute_combined_reward(
             current_ee_pos=ee_pos,
             current_ee_quat=ee_quat,
@@ -1573,15 +1603,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             prev_actions=self.prev_prev_actions,  # Actions from previous step
             prev_prev_actions=self._actions_t_minus_2,  # Actions from 2 steps ago (for jerk calculation)
             base_pos=base_pos,  # NEW: Current base position for progress tracking
-            base_lin_vel=commanded_linear,
+            base_lin_vel=commanded_linear_world,  # BUGFIX: Now in world frame
             base_ang_vel=commanded_ang,
             base_quat=base_quat,  # Base orientation for lateral penalty
             joint_pos=arm_joint_pos,  # ARM joints only [6]
             joint_vel=arm_joint_vel,  # ARM joint velocities only [6]
             prev_base_pos=self.prev_base_pos,  # NEW: Previous base position
-            prev_base_lin_vel=prev_commanded_linear,
+            prev_base_lin_vel=prev_commanded_linear_world,  # BUGFIX: Now in world frame
             prev_joint_vel=self.prev_joint_vel[:, 3:9],  # ARM joint velocities only [6]
-            prev_base_accel=prev_commanded_linear_accel,
+            prev_base_accel=prev_commanded_linear_accel_world,  # BUGFIX: Now in world frame
             joint_lower=self.joint_lower_limits,  # ARM limits [6]
             joint_upper=self.joint_upper_limits,  # ARM limits [6]
             robot_limits=self.robot_limits,

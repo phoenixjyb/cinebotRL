@@ -141,13 +141,12 @@ def base_target_alignment_reward(
     Encourages moving in the correct direction, even if not reducing
     distance much yet. Helps policy learn goal-directed navigation.
     
-    CRITICAL: Converts body-frame velocity to world-frame before computing
-    alignment. Differential drive has zero lateral velocity in body frame,
-    so we must rotate [vx_body, 0, 0] by base yaw to get world-frame motion.
+    BUGFIX: Now expects WORLD-frame velocity (changed from body-frame).
+    All velocity inputs to compute_combined_reward are now world-frame for consistency.
     
     Args:
         base_pos: Current base position [num_envs, 3]
-        base_vel: Base velocity in BODY frame [num_envs, 3] - [vx_body, 0, wz]
+        base_vel: Base velocity in WORLD frame [num_envs, 3] (changed from body frame!)
         base_quat: Base orientation quaternion [num_envs, 4]
         target_pos: Target position [num_envs, 3]
         arm_reach: Arm workspace radius
@@ -167,19 +166,8 @@ def base_target_alignment_reward(
     base_to_target_norm = torch.norm(base_to_target, dim=-1, keepdim=True)
     base_to_target_unit = base_to_target / (base_to_target_norm + 1e-6)
     
-    # Convert base velocity from body frame to world frame
-    # Body frame: [vx_body, 0, vz_body] (diff drive can't strafe)
-    # Extract yaw from quaternion (simple z-rotation extraction)
-    # For quaternion [w, x, y, z], yaw ≈ atan2(2*(w*z + x*y), 1 - 2*(y^2 + z^2))
-    w, x, y, z = base_quat[:, 0], base_quat[:, 1], base_quat[:, 2], base_quat[:, 3]
-    yaw = torch.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y**2 + z**2))
-    
-    vx_body = base_vel[:, 0]  # Forward velocity in body frame
-    
-    # Rotate body velocity to world frame
-    vx_world = vx_body * torch.cos(yaw)
-    vy_world = vx_body * torch.sin(yaw)
-    base_vel_world = torch.stack([vx_world, vy_world], dim=-1)  # [num_envs, 2]
+    # BUGFIX: Velocity is already in world frame, no conversion needed!
+    base_vel_world = base_vel[:, :2]  # Just extract XY components [num_envs, 2]
     
     # Compute speed and direction in world frame
     base_speed = torch.norm(base_vel_world, dim=-1, keepdim=True)

@@ -342,14 +342,14 @@ def base_overshoot_penalty(
     # Direction from base to target
     base_to_target = target_xy - base_xy
     base_to_target_norm = torch.norm(base_to_target, dim=-1, keepdim=True)
-    base_to_target_unit = base_to_target / (base_to_target_norm.squeeze(-1, keepdim=True) + 1e-6)
+    base_to_target_unit = base_to_target / (base_to_target_norm + 1e-6)
     
     # Velocity alignment: positive = moving toward, negative = moving away
     vel_norm = torch.norm(vel_world, dim=-1, keepdim=True)
-    vel_alignment = torch.sum(vel_world * base_to_target_unit, dim=-1) / (vel_norm.squeeze() + 1e-6)
+    vel_alignment = torch.sum(vel_world * base_to_target_unit, dim=-1) / (vel_norm.squeeze(-1) + 1e-6)
     
     # Current distance to target
-    dist = base_to_target_norm.squeeze()
+    dist = base_to_target_norm.squeeze(-1)
     
     # Penalize moving away when:
     # 1. Already within optimal reach AND moving away (overshooting)

@@ -156,7 +156,7 @@ switch ($Phase) {
             "--kl_warmup", "0.15",
             "--kl_main", "0.1",
             "--kl_finetune", "0.05",
-            "--target_kl", "0.5",
+            "--target_kl", "0.03",  # FIX (8c-v2): Tightened from 0.5 (was 30× actual KL of 0.015)
             "--save_freq", "2000000"
         )
         if ($Checkpoint) {

@@ -217,9 +217,10 @@ def target_distance_penalty(
     if prev_base_pos is not None:
         base_movement = torch.norm(base_pos[:, :2] - prev_base_pos[:, :2], dim=-1)
         is_moving = base_movement > 0.01  # 1cm threshold
+        # FIX (8c-v2): Use (1 - moving_discount) so 0.9 gives 90% reduction as documented
         penalty = torch.where(
             is_moving,
-            out_of_reach_penalty * moving_discount,  # 90% reduction when moving
+            out_of_reach_penalty * (1.0 - moving_discount),  # 90% reduction when moving
             out_of_reach_penalty  # Full penalty when static
         )
     else:

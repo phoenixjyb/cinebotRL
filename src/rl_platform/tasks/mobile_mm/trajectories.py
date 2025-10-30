@@ -455,30 +455,41 @@ class TrajectoryManager:
             self.current_waypoint_idx.zero_()
             self._recorded_time_accum.zero_()
         else:
-            # For partial resets, we need to handle variable trajectory lengths.
-            # Since recorded_positions has a fixed shape, we need to resample ALL envs
-            # to get a consistent max_length, then only reset the indices for env_ids.
+            # FIX (8c-v2): For partial resets, only resample the envs that need new trajectories
+            # This fixes the performance issue and prevents non-reset envs from getting new trajectories
             
-            # Resample ALL environments to get new max_length
-            positions, orientations = self.multi_loader.sample_trajectories(self.num_envs)
+            num_to_resample = len(env_ids)
+            print(f"[TrajectoryManager] Partial reset: resampling {num_to_resample} envs (was resampling all {self.num_envs})")
             
-            # Keep existing trajectories for non-reset envs by copying their data
-            if self.recorded_positions is not None:
-                # Find which envs to keep (not in env_ids)
-                all_env_ids = torch.arange(self.num_envs, device=self.device)
-                keep_mask = ~torch.isin(all_env_ids, env_ids)
-                keep_ids = all_env_ids[keep_mask]
+            # Sample only the trajectories needed for reset envs
+            positions, orientations = self.multi_loader.sample_trajectories(num_to_resample)
+            
+            # Get current max_length from existing trajectories
+            current_max_length = self.recorded_positions.shape[1] if self.recorded_positions is not None else positions.shape[1]
+            new_max_length = positions.shape[1]
+            
+            # Handle shape mismatch if new trajectories have different length
+            if new_max_length != current_max_length:
+                # Need to resize buffers - resample ALL envs (rare case)
+                print(f"[TrajectoryManager] Max length changed {current_max_length} -> {new_max_length}, resampling all envs")
+                positions, orientations = self.multi_loader.sample_trajectories(self.num_envs)
+                self.recorded_positions = positions
+                self.recorded_orientations = orientations
+                self.current_waypoint_idx[env_ids] = 0
+                self._recorded_time_accum[env_ids] = 0.0
+            else:
+                # Shape matches - insert new trajectories only at reset env indices
+                if self.recorded_positions is None:
+                    # First call, initialize buffers
+                    self.recorded_positions = positions
+                    self.recorded_orientations = orientations
+                else:
+                    # Insert sampled trajectories into the correct positions
+                    self.recorded_positions[env_ids] = positions
+                    self.recorded_orientations[env_ids] = orientations
                 
-                # If new max_length matches old, preserve non-reset trajectories
-                if positions.shape[1] == self.recorded_positions.shape[1]:
-                    positions[keep_ids] = self.recorded_positions[keep_ids]
-                    orientations[keep_ids] = self.recorded_orientations[keep_ids]
-                # Otherwise, just use all new trajectories (unavoidable due to shape change)
-            
-            self.recorded_positions = positions
-            self.recorded_orientations = orientations
-            self.current_waypoint_idx[env_ids] = 0
-            self._recorded_time_accum[env_ids] = 0.0
+                self.current_waypoint_idx[env_ids] = 0
+                self._recorded_time_accum[env_ids] = 0.0
             
             # Debug: Print first waypoint for reset environments
             if len(env_ids) > 0:

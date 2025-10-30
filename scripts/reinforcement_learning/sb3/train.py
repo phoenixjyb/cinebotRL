@@ -396,7 +396,10 @@ def main():
                 new_ent_coef = self.initial_ent_coef * (1 - progress) + self.final_ent_coef * progress
             
             # Update model's entropy coefficient
-            self.model.ent_coef = new_ent_coef
+            # FIX (8c-v2): Update the schedule function that SB3 actually uses during training
+            from stable_baselines3.common.utils import constant_fn
+            self.model.ent_coef_schedule = constant_fn(new_ent_coef)
+            self.model.ent_coef = new_ent_coef  # Also update attribute for logging
             
             # Log every 10M steps
             if self.verbose > 0 and current_timestep % 10_000_000 < 65536:  # Within one rollout
@@ -933,6 +936,18 @@ def main():
         
         if args.checkpoint:
             print(f"    Loading checkpoint: {args.checkpoint}")
+            
+            # FIX (8c-v2): Load VecNormalize stats before loading policy
+            vecnorm_path = args.checkpoint.replace('.zip', '_vecnormalize.pkl')
+            if os.path.exists(vecnorm_path):
+                print(f"    Loading VecNormalize stats from: {vecnorm_path}")
+                from stable_baselines3.common.vec_env import VecNormalize
+                env = VecNormalize.load(vecnorm_path, env)
+                print("    ✓ VecNormalize stats loaded successfully")
+            else:
+                print(f"    ⚠️  VecNormalize stats not found at: {vecnorm_path}")
+                print("    ⚠️  Continuing without normalization stats (may affect curriculum learning)")
+            
             model = PPO.load(args.checkpoint, env=env, device=device)
         else:
             print("    Creating new PPO model...")

@@ -546,7 +546,7 @@ def main():
                         print(f"[Training Monitor] Iteration {self.iteration_count} @ {self.num_timesteps/1e6:.1f}M steps")
                         print("="*60)
                         
-                        # Reward components (show mean across all envs)
+                        # Reward components (show mean across all envs + log to TensorBoard)
                         print("\n[Reward Components] Mean per episode:")
                         important_rewards = [
                             'position_tracking', 'orientation_tracking', 'progress_bonus',
@@ -560,6 +560,8 @@ def main():
                                 if hasattr(values, 'mean'):
                                     mean_val = values.mean().item()
                                     print(f"  {key:35s}: {mean_val:8.3f}")
+                                    # Log to TensorBoard for monitoring
+                                    self.logger.record(f"reward_components/{key}", mean_val)
                     
                     # Position and orientation errors
                     if hasattr(isaac_env, '_ee_position') and hasattr(isaac_env, '_target_positions'):
@@ -568,6 +570,32 @@ def main():
                         print(f"\n[Tracking Errors]")
                         print(f"  Position error (m):  mean={pos_error.mean().item():.4f}, std={pos_error.std().item():.4f}")
                         print(f"                       min={pos_error.min().item():.4f}, max={pos_error.max().item():.4f}")
+                    
+                    # CRITICAL: Base-target distance (for quadratic reachability penalty validation)
+                    if hasattr(isaac_env, '_robot') and hasattr(isaac_env, '_target_positions'):
+                        base_pos = isaac_env._robot.data.root_pos_w
+                        target_pos = isaac_env._target_positions
+                        base_target_dist = torch.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)
+                        
+                        # Calculate zone percentages (optimal: <0.4m, acceptable: 0.4-0.6m, unreachable: >0.6m)
+                        optimal_pct = (base_target_dist <= 0.4).float().mean().item() * 100
+                        acceptable_pct = ((base_target_dist > 0.4) & (base_target_dist <= 0.6)).float().mean().item() * 100
+                        unreachable_pct = (base_target_dist > 0.6).float().mean().item() * 100
+                        
+                        print(f"\n[Base-Target Distance] ⚠️ CRITICAL for quadratic penalty")
+                        print(f"  Distance (m):        mean={base_target_dist.mean().item():.4f}, std={base_target_dist.std().item():.4f}")
+                        print(f"                       min={base_target_dist.min().item():.4f}, max={base_target_dist.max().item():.4f}")
+                        print(f"  Zone distribution:   Optimal (<0.4m): {optimal_pct:.1f}%")
+                        print(f"                       Acceptable (0.4-0.6m): {acceptable_pct:.1f}%")
+                        print(f"                       Unreachable (>0.6m): {unreachable_pct:.1f}% ⚠️")
+                        
+                        # Log to TensorBoard
+                        self.logger.record("monitoring/base_target_dist_mean", base_target_dist.mean().item())
+                        self.logger.record("monitoring/base_target_dist_std", base_target_dist.std().item())
+                        self.logger.record("monitoring/base_target_dist_max", base_target_dist.max().item())
+                        self.logger.record("monitoring/optimal_zone_pct", optimal_pct)
+                        self.logger.record("monitoring/acceptable_zone_pct", acceptable_pct)
+                        self.logger.record("monitoring/unreachable_zone_pct", unreachable_pct)
                     
                     # Base movement statistics
                     if hasattr(isaac_env, '_robot') and hasattr(isaac_env._robot.data, 'root_lin_vel_w'):

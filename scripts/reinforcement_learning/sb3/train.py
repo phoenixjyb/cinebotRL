@@ -115,6 +115,12 @@ def parse_args():
         help="PPO clipping range for policy updates",
     )
     parser.add_argument(
+        "--clip_range_vf",
+        type=float,
+        default=None,
+        help="Value function clipping range (None = no clipping, 0.3 recommended for Session 8c to stabilize critic)",
+    )
+    parser.add_argument(
         "--gamma",
         type=float,
         default=0.99,
@@ -500,6 +506,107 @@ def main():
             """Called at every step."""
             return True
     
+    # Training monitoring callback for detailed metrics
+    class TrainingMonitorCallback(BaseCallback):
+        """
+        Logs detailed training metrics including reward components, errors, and base movement.
+        Provides real-time visibility into training progress beyond standard PPO metrics.
+        """
+        def __init__(self, log_freq: int = 5, verbose: int = 1):
+            super().__init__(verbose)
+            self.log_freq = log_freq  # Log every N iterations
+            self.iteration_count = 0
+            
+        def _on_rollout_end(self) -> bool:
+            """Log detailed metrics at end of each rollout."""
+            self.iteration_count += 1
+            
+            # Only log every log_freq iterations
+            if self.iteration_count % self.log_freq != 0:
+                return True
+            
+            try:
+                # Access the underlying Isaac Lab environment
+                env = self.training_env
+                while hasattr(env, 'venv'):
+                    env = env.venv
+                
+                # Get environment statistics if available
+                if hasattr(env, 'unwrapped'):
+                    isaac_env = env.unwrapped
+                    
+                    # Collect reward component statistics
+                    if hasattr(isaac_env, 'episode_sums') and 'rewards' in isaac_env.episode_sums:
+                        rewards_dict = isaac_env.episode_sums['rewards']
+                        
+                        print("\n" + "="*60)
+                        print(f"[Training Monitor] Iteration {self.iteration_count} @ {self.num_timesteps/1e6:.1f}M steps")
+                        print("="*60)
+                        
+                        # Reward components (show mean across all envs)
+                        print("\n[Reward Components] Mean per episode:")
+                        important_rewards = [
+                            'position_tracking', 'orientation_tracking', 'progress_bonus',
+                            'base_target_alignment', 'reachability_maintenance_reward',
+                            'base_overshoot_penalty', 'excessive_base_movement_penalty',
+                            'velocity_limit_penalty', 'jerk_limit_penalty'
+                        ]
+                        for key in important_rewards:
+                            if key in rewards_dict:
+                                values = rewards_dict[key]
+                                if hasattr(values, 'mean'):
+                                    mean_val = values.mean().item()
+                                    print(f"  {key:35s}: {mean_val:8.3f}")
+                    
+                    # Position and orientation errors
+                    if hasattr(isaac_env, '_ee_position') and hasattr(isaac_env, '_target_positions'):
+                        import torch
+                        pos_error = torch.norm(isaac_env._ee_position - isaac_env._target_positions, dim=-1)
+                        print(f"\n[Tracking Errors]")
+                        print(f"  Position error (m):  mean={pos_error.mean().item():.4f}, std={pos_error.std().item():.4f}")
+                        print(f"                       min={pos_error.min().item():.4f}, max={pos_error.max().item():.4f}")
+                    
+                    # Base movement statistics
+                    if hasattr(isaac_env, '_robot') and hasattr(isaac_env._robot.data, 'root_lin_vel_w'):
+                        base_vel = isaac_env._robot.data.root_lin_vel_w
+                        base_speed = torch.norm(base_vel[:, :2], dim=-1)  # Planar speed
+                        print(f"\n[Base Movement]")
+                        print(f"  Linear speed (m/s): mean={base_speed.mean().item():.4f}, std={base_speed.std().item():.4f}")
+                        print(f"                      min={base_speed.min().item():.4f}, max={base_speed.max().item():.4f}")
+                        
+                        # Angular velocity
+                        if hasattr(isaac_env._robot.data, 'root_ang_vel_w'):
+                            base_ang_vel = isaac_env._robot.data.root_ang_vel_w[:, 2]  # Yaw rate
+                            print(f"  Yaw rate (rad/s):   mean={base_ang_vel.mean().item():.4f}, std={base_ang_vel.std().item():.4f}")
+                    
+                    # Reachability statistics (if available from recent logs)
+                    if hasattr(isaac_env, '_last_reachability_stats'):
+                        stats = isaac_env._last_reachability_stats
+                        reachable = stats.get('reachable', 0)
+                        total = stats.get('total', 1)
+                        percentage = (reachable / total * 100) if total > 0 else 0
+                        distance = stats.get('avg_distance', 0)
+                        alignment = stats.get('avg_alignment', 0)
+                        print(f"\n[Reachability] (from latest stats)")
+                        print(f"  Reachable envs: {reachable}/{total} ({percentage:.1f}%)")
+                        print(f"  Avg distance:   {distance:.3f} m")
+                        print(f"  Avg alignment:  {alignment:.3f}")
+                    
+                    print("="*60 + "\n")
+                    
+            except Exception as e:
+                # Silently skip if environment doesn't expose these metrics
+                if self.verbose > 1:
+                    print(f"[TrainingMonitor] Could not access detailed metrics: {e}")
+            
+            return True
+        
+        def _on_step(self) -> bool:
+            """Called at every step. Required by BaseCallback."""
+            return True
+            
+            return True
+    
     # Create wrapper to convert Isaac Lab observations to SB3 format
     class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):
         """VecEnv wrapper to convert Isaac Lab's dict observations with torch tensors to numpy arrays for SB3."""
@@ -796,6 +903,13 @@ def main():
         print(f"    ✓ Adaptive KL schedule enabled: very_early={max(args.kl_warmup * 4, 1.0):.2f}, early={max(args.kl_warmup * 2, 0.5):.2f}")
         print(f"      Stages: 0-5M (explore), 5-20M (learn), 20-60M (balance), 60-80M (stable), 80-100M (finetune)")
     
+    # Training monitor callback (detailed metrics logging)
+    monitor_callback = TrainingMonitorCallback(
+        log_freq=5,  # Log every 5 iterations
+        verbose=1
+    )
+    callbacks.append(monitor_callback)
+    print(f"    ✓ Training monitor enabled: logging detailed metrics every 5 iterations")
     
     if args.wandb:
         callbacks.append(wandb_callback)
@@ -855,7 +969,8 @@ def main():
                 gamma=args.gamma,
                 gae_lambda=args.gae_lambda,
                 clip_range=args.clip_range,
-                clip_range_vf=1.0,      # Clip value function updates for stability
+                clip_range_vf=args.clip_range_vf if args.clip_range_vf is not None else None,  # Session 8c: 0.3 to stabilize critic
+                normalize_advantage=True,  # Session 8c: Normalize advantages for stable gradient signals
                 ent_coef=args.ent_coef,
                 vf_coef=0.5,
                 max_grad_norm=0.5,

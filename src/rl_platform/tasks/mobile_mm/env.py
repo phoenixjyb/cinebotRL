@@ -1549,13 +1549,22 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             if not hasattr(self, '_reach_log_step'):
                 self._reach_log_step = 0
             
+            # Store stats for training monitor callback
+            avg_alignment = alignment.mean().item() if n_unreachable > 0 else 0.0
+            avg_distance = distance_to_target_xy.mean().item() if n_unreachable > 0 else 0.0
+            self._last_reachability_stats = {
+                'reachable': n_reachable,
+                'unreachable': n_unreachable,
+                'total': self.num_envs,
+                'avg_alignment': avg_alignment,
+                'avg_distance': avg_distance
+            }
+            
             if self._reach_log_step % 100 == 0:
                 print(f"\n[Reachability Stats] Step {self._reach_log_step}")
                 print(f"  Reachable: {n_reachable}/{self.num_envs} envs")
                 print(f"  Unreachable: {n_unreachable}/{self.num_envs} envs")
                 if n_unreachable > 0:
-                    avg_alignment = alignment.mean().item() if n_unreachable > 0 else 0.0
-                    avg_distance = distance_to_target_xy.mean().item() if n_unreachable > 0 else 0.0
                     print(f"  Avg base→target alignment: {avg_alignment:.3f}")
                     print(f"  Avg base→target distance: {avg_distance:.3f} m")
             
@@ -1738,14 +1747,16 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # DEBUG: Print what we got from get_target_pose AND what's in recorded_positions
         if len(env_ids) > 0 and self.trajectory_manager.recorded_positions is not None:
-            env_idx = env_ids[0].item()
-            from_get_target = first_target_pos[env_idx].cpu().numpy()
-            from_recorded = self.trajectory_manager.recorded_positions[env_idx, 0].cpu().numpy()
-            print(f"[DEBUG] Env {env_idx}:")
-            print(f"  get_target_pose():    [{from_get_target[0]:.3f}, {from_get_target[1]:.3f}, {from_get_target[2]:.3f}]")
-            print(f"  recorded_positions:   [{from_recorded[0]:.3f}, {from_recorded[1]:.3f}, {from_recorded[2]:.3f}]")
-            print(f"  waypoint_idx:         {self.trajectory_manager.current_waypoint_idx[env_idx].item()}")
-            print(f"  time_accum:           {self.trajectory_manager._recorded_time_accum[env_idx].item():.4f}")
+            # Safety check: ensure env_ids is not empty and contains valid indices
+            if env_ids.numel() > 0:
+                env_idx = env_ids[0].item()
+                from_get_target = first_target_pos[env_idx].cpu().numpy()
+                from_recorded = self.trajectory_manager.recorded_positions[env_idx, 0].cpu().numpy()
+                print(f"[DEBUG] Env {env_idx}:")
+                print(f"  get_target_pose():    [{from_get_target[0]:.3f}, {from_get_target[1]:.3f}, {from_get_target[2]:.3f}]")
+                print(f"  recorded_positions:   [{from_recorded[0]:.3f}, {from_recorded[1]:.3f}, {from_recorded[2]:.3f}]")
+                print(f"  waypoint_idx:         {self.trajectory_manager.current_waypoint_idx[env_idx].item()}")
+                print(f"  time_accum:           {self.trajectory_manager._recorded_time_accum[env_idx].item():.4f}")
         
         # Set base position with offset from target, accounting for arm kinematics
         # FK analysis (all joints at zero): EE is at [0.1415, 0.2405, 0.9465] in base frame

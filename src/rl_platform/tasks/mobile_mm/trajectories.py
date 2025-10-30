@@ -265,6 +265,10 @@ class TrajectoryManager:
         current_idx = self.current_waypoint_idx
         next_idx = (current_idx + 1) % max_length
         
+        # Safety: Clamp indices to valid range
+        current_idx = torch.clamp(current_idx, 0, max_length - 1)
+        next_idx = torch.clamp(next_idx, 0, max_length - 1)
+        
         # Interpolation factor (0.0 to 1.0 between waypoints)
         # _recorded_time_accum accumulates control_dt (0.05s @ 20Hz) until it reaches waypoint_dt (0.1s)
         alpha = torch.clamp(self._recorded_time_accum / self.waypoint_dt, 0.0, 1.0)
@@ -294,6 +298,14 @@ class TrajectoryManager:
         Returns:
             Interpolated quaternions [num_envs, 4]
         """
+        # Safety: Ensure inputs are valid
+        if q1.numel() == 0 or q2.numel() == 0 or t.numel() == 0:
+            print(f"[WARNING _slerp_quaternions] Empty tensor input: q1={q1.shape}, q2={q2.shape}, t={t.shape}")
+            return q1 if q1.numel() > 0 else torch.zeros((0, 4), device=self.device)
+        
+        # Safety: Clamp t to valid range
+        t = torch.clamp(t, 0.0, 1.0)
+        
         # Compute dot product
         dot = torch.sum(q1 * q2, dim=-1, keepdim=True)
         

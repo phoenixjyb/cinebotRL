@@ -938,11 +938,20 @@ def main():
             print(f"    Loading checkpoint: {args.checkpoint}")
             
             # FIX (8c-v2): Load VecNormalize stats before loading policy
-            vecnorm_path = args.checkpoint.replace('.zip', '_vecnormalize.pkl')
-            if os.path.exists(vecnorm_path):
-                print(f"    Loading VecNormalize stats from: {vecnorm_path}")
+            # CheckpointCallback saves as: ppo_mobile_mm_<steps>_steps.zip
+            # and VecNormalize as: ppo_mobile_mm_vecnormalize_<steps>_steps.pkl
+            from pathlib import Path
+            checkpoint_path = Path(args.checkpoint)
+            checkpoint_name = checkpoint_path.stem  # e.g., "ppo_mobile_mm_20000000_steps"
+            
+            # Replace "ppo_mobile_mm" with "ppo_mobile_mm_vecnormalize"
+            vecnorm_name = checkpoint_name.replace("ppo_mobile_mm", "ppo_mobile_mm_vecnormalize", 1)
+            vecnorm_path = checkpoint_path.parent / f"{vecnorm_name}.pkl"
+            
+            if vecnorm_path.exists():
+                print(f"    Loading VecNormalize stats from: {vecnorm_path.name}")
                 from stable_baselines3.common.vec_env import VecNormalize
-                env = VecNormalize.load(vecnorm_path, env)
+                env = VecNormalize.load(str(vecnorm_path), env)
                 print("    ✓ VecNormalize stats loaded successfully")
             else:
                 print(f"    ⚠️  VecNormalize stats not found at: {vecnorm_path}")

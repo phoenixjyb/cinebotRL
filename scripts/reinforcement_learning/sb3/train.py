@@ -940,7 +940,6 @@ def main():
             # FIX (8c-v2): Load VecNormalize stats before loading policy
             # CheckpointCallback saves as: ppo_mobile_mm_<steps>_steps.zip
             # and VecNormalize as: ppo_mobile_mm_vecnormalize_<steps>_steps.pkl
-            from pathlib import Path
             checkpoint_path = Path(args.checkpoint)
             checkpoint_name = checkpoint_path.stem  # e.g., "ppo_mobile_mm_20000000_steps"
             

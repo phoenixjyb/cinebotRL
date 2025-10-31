@@ -1,0 +1,50 @@
+I've completed a comprehensive evaluation of the current codebase against the verified review recommendations. The verdict is concerning:
+
+🚨 Critical Finding: 0/6 Bugs Fixed
+Bug Status Breakdown:
+🔴 Quadratic Penalty Saturation - ❌ NOT FIXED
+
+Code still uses penalty = weight × (distance²)
+Both old (40×) and new (80×) quadratic penalties are ACTIVE
+Combined penalty: ~-960 per step at 3.3m (still 32× stronger than base reward)
+🟡 Linear Position Incentive - ⚠️ PARTIALLY IMPLEMENTED
+
+Function distance_tracking_penalty() exists ✅
+Integrated into reward computation ✅
+Weight value unknown (need config verification) ❓
+🔴 Weak Base Rewards - ❌ NOT FIXED
+
+Base mobilization: 150 (unchanged from 8c-v2)
+Progress cap: 0.2m (still limits to +30 max)
+Ratio: Still 1:32 (penalty:reward) 😱
+🟡 Workspace Distance Smoothing - ⚠️ IMPLEMENTED BUT STILL QUADRATIC
+
+New reachability_distance_components() function exists ✅
+But penalty is STILL quadratic: 80 × distance² ❌
+Review recommended LINEAR penalty!
+🔴 Monitoring Analysis - ❌ NOT DONE
+
+TensorBoard events not parsed
+Explained variance trajectory not verified
+monitoring/unreachable_fraction not checked
+⚠️ Curriculum Testing - CORRECTLY DEFERRED
+
+Review said "test penalty fixes FIRST"
+So deferring this is correct ✅
+📊 Current vs Required Configuration:
+Parameter	Session 8c-v2	Current Code	Required (8d)
+Reachability penalty form	Quadratic	Quadratic	Linear
+Reachability scale	100×	40× (old) + 80× (new)	50× linear
+Base mobilization	150	150	500-1000
+Progress cap	0.2m	0.2m	Remove or 1.0m
+Base alignment	10	30	100+
+🎯 Required Changes Before Session 8d:
+
+# 1. Fix penalty form (rewards.py:909)- reach_distance_penalty = 80.0 * (penalty_distance ** 2)  # ❌+ reach_distance_penalty = 50.0 * penalty_distance         # ✅# 2. Disable legacy penalty (config.py)- reachability_maintenance_reward: float = 40.0  # ❌+ reachability_maintenance_reward: float = 0.0   # ✅# 3. Strengthen base rewards (config.py)- base_progress_reward: float = 150.0            # ❌+ base_progress_reward: float = 500.0            # ✅- mobilization_progress_cap: float = 0.2         # ❌+ mobilization_progress_cap: float = None        # ✅ (or 1.0)
+📄 Documents Created:
+BUG_FIX_STATUS.md - Complete evaluation showing:
+Detailed status of each bug
+Code evidence with line numbers
+Required changes for Session 8d
+Expected impact analysis
+Bottom Line: The codebase has made SOME progress (new smooth distance functions exist), but the fundamental quadratic penalty bug remains unfixed, and base rewards are still too weak. Session 8d will likely have the same failure mode as 8c-v2 unless these changes are made! 🚨

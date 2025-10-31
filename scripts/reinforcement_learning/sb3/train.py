@@ -79,7 +79,7 @@ def parse_args():
     parser.add_argument(
         "--n_steps",
         type=int,
-        default=128,  # 128 steps × 4096 envs = 524K timesteps/iteration (better GAE estimation)
+        default=128,  # 128 steps x 4096 envs = 524K timesteps/iteration (better GAE estimation)
         help="Number of steps per rollout (128-512 recommended for stable GAE)",
     )
     parser.add_argument(
@@ -280,7 +280,7 @@ def main():
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
             torch.backends.cudnn.benchmark = True  # Auto-tune kernels for your input sizes
-            print("    ✓ TF32 + cuDNN benchmark enabled (8x matmul speedup + auto-tuned kernels)")
+            print("    [OK] TF32 + cuDNN benchmark enabled (8x matmul speedup + auto-tuned kernels)")
         
         # Auto-detect best GPU
         best_device = 0
@@ -299,11 +299,11 @@ def main():
                 # Rough estimate: ~3MB per environment for mobile manipulator
                 recommended_envs = int((gpu_mem_gb - 4) / 0.003)  # Leave 4GB for overhead
                 if args.num_envs < recommended_envs * 0.3:  # Less than 30% capacity
-                    print(f"    ⚠️  GPU Memory Underutilized!")
+                    print(f"    [WARN]  GPU Memory Underutilized!")
                     print(f"       Current: {args.num_envs} envs (~{args.num_envs * 3 / 1024:.1f}GB)")
                     print(f"       Recommended: {recommended_envs // 2} envs (50% capacity)")
                     print(f"       Maximum: ~{recommended_envs} envs (80% capacity)")
-                    print(f"       💡 Try: --num_envs {recommended_envs // 2}")
+                    print(f"       Hint: try --num_envs {recommended_envs // 2}")
         
         # Create AppLauncher to initialize Isaac Sim
         app_launcher = AppLauncher(
@@ -312,10 +312,10 @@ def main():
             device=f"cuda:{best_device}",
         )
         simulation_app = app_launcher.app
-        print("    ✓ Isaac Sim initialized")
+        print("    [OK] Isaac Sim initialized")
         
     except Exception as e:
-        print(f"    ✗ Failed to initialize Isaac Sim: {e}")
+        print(f"    [FAIL] Failed to initialize Isaac Sim: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -326,9 +326,9 @@ def main():
     try:
         from task_spec import register_isaac_lab_tasks
         register_isaac_lab_tasks()
-        print(f"    ✓ Registered task: {args.task}")
+        print(f"    [OK] Registered task: {args.task}")
     except Exception as e:
-        print(f"    ✗ Failed to register tasks: {e}")
+        print(f"    [FAIL] Failed to register tasks: {e}")
         import traceback
         traceback.print_exc()
         simulation_app.close()
@@ -343,9 +343,9 @@ def main():
         from stable_baselines3 import PPO
         from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
         from stable_baselines3.common.vec_env import VecNormalize, VecEnv, VecEnvWrapper
-        print("    ✓ Dependencies imported")
+        print("    [OK] Dependencies imported")
     except ImportError as e:
-        print(f"    ✗ Failed to import dependencies: {e}")
+        print(f"    [FAIL] Failed to import dependencies: {e}")
         simulation_app.close()
         return
     
@@ -412,7 +412,7 @@ def main():
         """
         Adaptive KL scheduling that prevents early stopping and allows proper learning.
         
-        Problem: Current KL limits cause "Early stopping at step 0" → no learning!
+        Problem: Current KL limits cause "Early stopping at step 0" -> no learning!
         - KL divergence spikes early due to new action space (base movement)
         - Immediate early stopping prevents any policy updates
         - Learning efficiency drops to ~1 step per iteration
@@ -425,9 +425,9 @@ def main():
         - Fine-tune (80-100M): Tight (0.05) - precise convergence
         
         Adaptive features:
-        - Recent early stopping detection → temporary KL boost
-        - Low explained variance → increased exploration allowance
-        - Training progress monitoring → automatic adjustments
+        - Recent early stopping detection -> temporary KL boost
+        - Low explained variance -> increased exploration allowance
+        - Training progress monitoring -> automatic adjustments
         """
         def __init__(
             self,
@@ -549,10 +549,17 @@ def main():
                         # Reward components (show mean across all envs + log to TensorBoard)
                         print("\n[Reward Components] Mean per episode:")
                         important_rewards = [
-                            'position_tracking', 'orientation_tracking', 'progress_bonus',
-                            'base_target_alignment', 'reachability_maintenance_reward',
-                            'base_overshoot_penalty', 'excessive_base_movement_penalty',
-                            'velocity_limit_penalty', 'jerk_limit_penalty'
+                            'position_tracking',
+                            'orientation_tracking',
+                            'progress_bonus',
+                            'base_target_alignment',
+                            'reachability_bonus',
+                            'reachability_distance_penalty',
+                            'position_distance_penalty',
+                            'base_overshoot_penalty',
+                            'excessive_base_movement_penalty',
+                            'velocity_limit_penalty',
+                            'jerk_limit_penalty',
                         ]
                         for key in important_rewards:
                             if key in rewards_dict:
@@ -571,31 +578,52 @@ def main():
                         print(f"  Position error (m):  mean={pos_error.mean().item():.4f}, std={pos_error.std().item():.4f}")
                         print(f"                       min={pos_error.min().item():.4f}, max={pos_error.max().item():.4f}")
                     
-                    # CRITICAL: Base-target distance (for quadratic reachability penalty validation)
+                    # CRITICAL: Base-target and workspace distance diagnostics
                     if hasattr(isaac_env, '_robot') and hasattr(isaac_env, '_target_positions'):
                         base_pos = isaac_env._robot.data.root_pos_w
                         target_pos = isaac_env._target_positions
                         base_target_dist = torch.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)
-                        
-                        # Calculate zone percentages (optimal: <0.4m, acceptable: 0.4-0.6m, unreachable: >0.6m)
-                        optimal_pct = (base_target_dist <= 0.4).float().mean().item() * 100
-                        acceptable_pct = ((base_target_dist > 0.4) & (base_target_dist <= 0.6)).float().mean().item() * 100
-                        unreachable_pct = (base_target_dist > 0.6).float().mean().item() * 100
-                        
-                        print(f"\n[Base-Target Distance] ⚠️ CRITICAL for quadratic penalty")
+
+                        optimal_margin = 0.4
+                        hard_margin = isaac_env.reward_weights.get("reachability_hard_margin", 0.6)
+                        acceptable_pct = (
+                            (base_target_dist > optimal_margin) & (base_target_dist <= hard_margin)
+                        ).float().mean().item() * 100
+                        optimal_pct = (base_target_dist <= optimal_margin).float().mean().item() * 100
+                        unreachable_pct = (base_target_dist > hard_margin).float().mean().item() * 100
+
+                        print(f"\n[Base-Target Distance] critical for reachability shaping")
                         print(f"  Distance (m):        mean={base_target_dist.mean().item():.4f}, std={base_target_dist.std().item():.4f}")
                         print(f"                       min={base_target_dist.min().item():.4f}, max={base_target_dist.max().item():.4f}")
-                        print(f"  Zone distribution:   Optimal (<0.4m): {optimal_pct:.1f}%")
-                        print(f"                       Acceptable (0.4-0.6m): {acceptable_pct:.1f}%")
-                        print(f"                       Unreachable (>0.6m): {unreachable_pct:.1f}% ⚠️")
-                        
-                        # Log to TensorBoard
+                        print(f"  Zone distribution:   Optimal (<{optimal_margin:.2f}m): {optimal_pct:.1f}%")
+                        print(f"                       Acceptable ({optimal_margin:.2f}-{hard_margin:.2f}m): {acceptable_pct:.1f}%")
+                        print(f"                       Unreachable (>{hard_margin:.2f}m): {unreachable_pct:.1f}%  <-- keep below 15%")
+
                         self.logger.record("monitoring/base_target_dist_mean", base_target_dist.mean().item())
                         self.logger.record("monitoring/base_target_dist_std", base_target_dist.std().item())
                         self.logger.record("monitoring/base_target_dist_max", base_target_dist.max().item())
                         self.logger.record("monitoring/optimal_zone_pct", optimal_pct)
                         self.logger.record("monitoring/acceptable_zone_pct", acceptable_pct)
                         self.logger.record("monitoring/unreachable_zone_pct", unreachable_pct)
+
+                    if hasattr(isaac_env, '_workspace_distance_buf'):
+                        workspace_dist = isaac_env._workspace_distance_buf
+                        hard_margin = isaac_env.reward_weights.get("reachability_hard_margin", 0.6)
+                        soft_margin = isaac_env.reward_weights.get("reachability_soft_margin", 0.2)
+                        beyond_soft_pct = (workspace_dist > soft_margin).float().mean().item() * 100
+                        beyond_hard_pct = (workspace_dist > hard_margin).float().mean().item() * 100
+
+                        print(f"\n[Workspace Distance]")
+                        print(f"  Distance to workspace (m): mean={workspace_dist.mean().item():.4f}, std={workspace_dist.std().item():.4f}")
+                        print(f"                              max={workspace_dist.max().item():.4f}")
+                        print(f"  Soft margin ({soft_margin:.2f}m) exceedances: {beyond_soft_pct:.1f}%")
+                        print(f"  Hard margin ({hard_margin:.2f}m) exceedances: {beyond_hard_pct:.1f}%")
+
+                        self.logger.record("monitoring/workspace_distance_mean", workspace_dist.mean().item())
+                        self.logger.record("monitoring/workspace_distance_std", workspace_dist.std().item())
+                        self.logger.record("monitoring/workspace_distance_max", workspace_dist.max().item())
+                        self.logger.record("monitoring/workspace_soft_exceed_pct", beyond_soft_pct)
+                        self.logger.record("monitoring/workspace_hard_exceed_pct", beyond_hard_pct)
                     
                     # Base movement statistics
                     if hasattr(isaac_env, '_robot') and hasattr(isaac_env._robot.data, 'root_lin_vel_w'):
@@ -742,7 +770,7 @@ def main():
             
             return obs, rewards, dones, infos
     
-    print("    ✓ Isaac Lab to SB3 VecEnv wrapper created")
+    print("    [OK] Isaac Lab to SB3 VecEnv wrapper created")
     
     # Step 4: Setup logging and W&B
     print("\n[4/6] Setting up logging...")
@@ -771,9 +799,9 @@ def main():
                 model_save_path=args.log_dir,
                 verbose=2,
             )
-            print("    ✓ W&B logging enabled")
+            print("    [OK] W&B logging enabled")
         except ImportError:
-            print("    ⚠️  wandb not available, skipping W&B logging")
+            print("    [WARN]  wandb not available, skipping W&B logging")
             args.wandb = False
     
     # Step 5: Create environment
@@ -790,7 +818,7 @@ def main():
         
         # Determine which trajectories to use
         if args.use_chassis_only:
-            print("    ⚠️  Using ONLY chassis-requiring trajectories (for testing, not recommended for training)")
+            print("    [WARN]  Using ONLY chassis-requiring trajectories (for testing, not recommended for training)")
             # Load chassis-required indices
             chassis_indices_file = "data/trajectory_filters/chassis_required_indices.txt"
             if Path(chassis_indices_file).exists():
@@ -806,11 +834,11 @@ def main():
                         trajectory_config['filter_indices'] = chassis_indices[:args.max_trajectories]
                     print(f"    Loaded {len(trajectory_config['filter_indices'])} chassis-requiring trajectory indices")
                 else:
-                    print(f"    ⚠️  Could not parse {chassis_indices_file}, using all trajectories")
+                    print(f"    [WARN]  Could not parse {chassis_indices_file}, using all trajectories")
             else:
-                print(f"    ⚠️  {chassis_indices_file} not found, using all trajectories")
+                print(f"    [WARN]  {chassis_indices_file} not found, using all trajectories")
         elif args.use_all_trajectories:
-            print("    ✓ Using ALL trajectories (recommended for training diverse policy)")
+            print("    [OK] Using ALL trajectories (recommended for training diverse policy)")
             trajectory_config['filter_indices'] = None
             if args.max_trajectories:
                 print(f"    Limited to first {args.max_trajectories} trajectories")
@@ -849,15 +877,15 @@ def main():
         from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnv
         env = MobileMMTrackEEEnv(cfg=env_cfg)
         
-        print(f"    ✓ Environment created")
+        print(f"    [OK] Environment created")
         if args.trajectory_type == "multi_recorded":
             if trajectory_config.get('filter_indices') is not None:
-                print(f"    ✓ Loaded {len(trajectory_config['filter_indices'])} filtered trajectories")
+                print(f"    [OK] Loaded {len(trajectory_config['filter_indices'])} filtered trajectories")
             else:
-                print(f"    ✓ Loaded all available trajectories from {args.trajectory_dir}")
+                print(f"    [OK] Loaded all available trajectories from {args.trajectory_dir}")
     
     except Exception as e:
-        print(f"    ✗ Failed to create environment: {e}")
+        print(f"    [FAIL] Failed to create environment: {e}")
         import traceback
         traceback.print_exc()
         simulation_app.close()
@@ -882,9 +910,9 @@ def main():
             clip_obs=10.0,
             clip_reward=10.0,
         )
-        print("    ✓ Environment created and wrapped")
+        print("    [OK] Environment created and wrapped")
     except Exception as e:
-        print(f"    ✗ Failed to create environment: {e}")
+        print(f"    [FAIL] Failed to create environment: {e}")
         import traceback
         traceback.print_exc()
         simulation_app.close()
@@ -916,7 +944,7 @@ def main():
             verbose=1,
         )
         callbacks.append(entropy_decay_callback)
-        print(f"    ✓ Entropy decay enabled: {args.ent_coef} → {args.final_ent_coef}")
+        print(f"    [OK] Entropy decay enabled: {args.ent_coef} -> {args.final_ent_coef}")
         print(f"      Decay: {args.decay_start_timestep/1e6:.0f}M - {(args.decay_start_timestep + args.decay_duration_timesteps)/1e6:.0f}M steps")
     
     # Adaptive KL divergence schedule callback (prevents early stopping, enables learning)
@@ -931,7 +959,7 @@ def main():
             verbose=1
         )
         callbacks.append(kl_schedule_callback)
-        print(f"    ✓ Adaptive KL schedule enabled: very_early={max(args.kl_warmup * 4, 1.0):.2f}, early={max(args.kl_warmup * 2, 0.5):.2f}")
+        print(f"    [OK] Adaptive KL schedule enabled: very_early={max(args.kl_warmup * 4, 1.0):.2f}, early={max(args.kl_warmup * 2, 0.5):.2f}")
         print(f"      Stages: 0-5M (explore), 5-20M (learn), 20-60M (balance), 60-80M (stable), 80-100M (finetune)")
     
     # Training monitor callback (detailed metrics logging)
@@ -940,7 +968,7 @@ def main():
         verbose=1
     )
     callbacks.append(monitor_callback)
-    print(f"    ✓ Training monitor enabled: logging detailed metrics every 5 iterations")
+    print(f"    [OK] Training monitor enabled: logging detailed metrics every 5 iterations")
     
     if args.wandb:
         callbacks.append(wandb_callback)
@@ -952,12 +980,12 @@ def main():
         # Device selection based on command-line argument
         if args.device == "cpu":
             device = "cpu"
-            print("    ⚠️  CPU training forced via --device cpu")
+            print("    [WARN]  CPU training forced via --device cpu")
         elif args.device == "cuda":
             if torch.cuda.is_available():
                 device = f"cuda:{best_device}"
             else:
-                print("    ⚠️  CUDA requested but not available, falling back to CPU")
+                print("    [WARN]  CUDA requested but not available, falling back to CPU")
                 device = "cpu"
         else:  # auto
             device = f"cuda:{best_device}" if torch.cuda.is_available() else "cpu"
@@ -979,10 +1007,10 @@ def main():
                 print(f"    Loading VecNormalize stats from: {vecnorm_path.name}")
                 from stable_baselines3.common.vec_env import VecNormalize
                 env = VecNormalize.load(str(vecnorm_path), env)
-                print("    ✓ VecNormalize stats loaded successfully")
+                print("    [OK] VecNormalize stats loaded successfully")
             else:
-                print(f"    ⚠️  VecNormalize stats not found at: {vecnorm_path}")
-                print("    ⚠️  Continuing without normalization stats (may affect curriculum learning)")
+                print(f"    [WARN]  VecNormalize stats not found at: {vecnorm_path}")
+                print("    [WARN]  Continuing without normalization stats (may affect curriculum learning)")
             
             model = PPO.load(args.checkpoint, env=env, device=device)
         else:
@@ -993,18 +1021,18 @@ def main():
             # Actions: 8 dims (6 arm joints + 2 base velocities)
             policy_kwargs = dict(
                 net_arch=dict(
-                    pi=[256, 256, 128],  # Actor: 3-layer network (70→256→256→128→8)
-                    vf=[256, 256, 128]   # Critic: 3-layer network (70→256→256→128→1)
+                    pi=[256, 256, 128],  # Actor: 3-layer network (70->256->256->128->8)
+                    vf=[256, 256, 128]   # Critic: 3-layer network (70->256->256->128->1)
                 ),
                 activation_fn=torch.nn.ReLU,
                 ortho_init=True,  # Orthogonal initialization (better for RL)
-                log_std_init=-1.0,  # Initial log(std) = -1.0 → std ≈ 0.37
+                log_std_init=-1.0,  # Initial log(std) = -1.0 -> std ~ 0.37
             )
             
             print("    Network Architecture:")
-            print("      Actor (Policy):  [70] → [256] → [256] → [128] → [8]  (~118K params)")
-            print("      Critic (Value):  [70] → [256] → [256] → [128] → [1]  (~117K params)")
-            print("      Total: ~235K parameters (16× larger than default)")
+            print("      Actor (Policy):  [70] -> [256] -> [256] -> [128] -> [8]  (~118K params)")
+            print("      Critic (Value):  [70] -> [256] -> [256] -> [128] -> [1]  (~117K params)")
+            print("      Total: ~235K parameters (16x larger than default)")
             print("    Action Distribution:")
             print("      Initial std:     ~0.37 (log_std_init=-1.0)")
             print("      Std control:     Entropy decay + KL schedule")
@@ -1032,10 +1060,10 @@ def main():
                 device=device,
                 verbose=1,
             )
-            print(f"    ✓ PPO model created on {device}")
+            print(f"    [OK] PPO model created on {device}")
             
     except Exception as e:
-        print(f"    ✗ Failed to create model: {e}")
+        print(f"    [FAIL] Failed to create model: {e}")
         import traceback
         traceback.print_exc()
         env.close()
@@ -1055,15 +1083,15 @@ def main():
     print(f"PPO epochs:        {args.n_epochs}")
     print(f"Entropy coef:      {args.ent_coef}")
     if args.enable_entropy_decay:
-        print(f"  → Decay enabled: {args.ent_coef} → {args.final_ent_coef}")
-        print(f"  → Decay period:  {args.decay_start_timestep/1e6:.0f}M - {(args.decay_start_timestep + args.decay_duration_timesteps)/1e6:.0f}M steps")
+        print(f"  -> Decay enabled: {args.ent_coef} -> {args.final_ent_coef}")
+        print(f"  -> Decay period:  {args.decay_start_timestep/1e6:.0f}M - {(args.decay_start_timestep + args.decay_duration_timesteps)/1e6:.0f}M steps")
     print(f"Gamma:             {args.gamma}")
     print(f"GAE lambda:        {args.gae_lambda}")
     print(f"Clip range:        {args.clip_range}")
     print(f"Target KL:         {args.target_kl if args.target_kl else 'None (disabled)'}")
     if args.enable_kl_schedule:
-        print(f"  → KL schedule:   warmup={args.kl_warmup}, main={args.kl_main}, finetune={args.kl_finetune}")
-        print(f"  → Phase splits:  10% warmup, 70% main, 20% finetune")
+        print(f"  -> KL schedule:   warmup={args.kl_warmup}, main={args.kl_main}, finetune={args.kl_finetune}")
+        print(f"  -> Phase splits:  10% warmup, 70% main, 20% finetune")
     print(f"Save frequency:    {args.save_freq:,} steps")
     print(f"Log directory:     {args.log_dir}")
     print(f"Device:            {device}")
@@ -1085,13 +1113,13 @@ def main():
         env.save(os.path.join(args.log_dir, "vec_normalize.pkl"))
         
         print(f"\n{'='*70}")
-        print("✓ Training complete!")
+        print("[OK] Training complete!")
         print(f"{'='*70}")
         print(f"Final model saved to: {final_model_path}")
         print(f"Logs saved to: {args.log_dir}")
         
     except KeyboardInterrupt:
-        print("\n\n⚠️  Training interrupted by user")
+        print("\n\n[WARN]  Training interrupted by user")
         
         # Save interrupt checkpoint
         interrupt_path = os.path.join(args.log_dir, "interrupt_checkpoint")
@@ -1101,7 +1129,7 @@ def main():
         print(f"Interrupt checkpoint saved to: {interrupt_path}")
     
     except Exception as e:
-        print(f"\n✗ Training failed: {e}")
+        print(f"\n[FAIL] Training failed: {e}")
         import traceback
         traceback.print_exc()
     
@@ -1116,3 +1144,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

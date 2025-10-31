@@ -1,4 +1,4 @@
-"""Monitor Session 8c-v2 training progress in real-time.
+"""Monitor Session 8c training progress in real-time.
 
 Reads progress.csv and generates health metrics without interrupting training.
 
@@ -69,6 +69,11 @@ def analyze_training_health(progress_csv: Path) -> dict:
         'ev_trend': None,
         'fps_trend': None,
     }
+
+    if 'monitoring/unreachable_zone_pct' in df.columns:
+        health['base_unreachable_pct'] = float(latest['monitoring/unreachable_zone_pct'])
+    if 'monitoring/workspace_hard_exceed_pct' in df.columns:
+        health['workspace_hard_exceed_pct'] = float(latest['monitoring/workspace_hard_exceed_pct'])
     
     # Calculate trends if enough data
     if len(df) >= 5:
@@ -86,25 +91,25 @@ def print_health_report(health: dict):
     """Print formatted health report."""
     
     print("\n" + "="*80)
-    print(f"  SESSION 8C-V2 TRAINING PROGRESS - {health['timestamp']}")
+    print(f"  SESSION 8C TRAINING PROGRESS - {health['timestamp']}")
     print("="*80)
     
     # Progress
-    print(f"\n📊 PROGRESS:")
+    print("\nPROGRESS")
     print(f"  Iteration:  {health['iteration']}/{health['total_iterations']} ({health['progress_pct']:.1f}%)")
     print(f"  Timesteps:  {health['timesteps']:,} / {health['timesteps_target']:,}")
     print(f"  FPS:        {health['fps']:.0f} ({health.get('fps_trend', 'N/A')})")
     
     # Time estimates
-    print(f"\n⏱️  TIME:")
+    print("\nTIMING")
     print(f"  Elapsed:    {health['elapsed_hours']:.2f} hours")
     print(f"  Remaining:  {health['remaining_hours']:.2f} hours (est.)")
     print(f"  Total:      {health['estimated_total_hours']:.2f} hours (est.)")
     
     # Training health
-    print(f"\n🏥 TRAINING HEALTH:")
-    ev_icon = "✅" if health['ev_status'] == 'GOOD' else "⚠️" if health['ev_status'] == 'WARNING' else "🔴"
-    kl_icon = "✅" if health['kl_status'] == 'GOOD' else "⚠️"
+    print("\nTRAINING HEALTH:")
+    ev_icon = "[OK ]" if health['ev_status'] == 'GOOD' else "[WARN]" if health['ev_status'] == 'WARNING' else "[CRIT]"
+    kl_icon = "[OK ]" if health['kl_status'] == 'GOOD' else "[WARN]"
     
     print(f"  {ev_icon} Explained Variance: {health['explained_variance']:.3f} [{health['ev_status']}]")
     if health['ev_trend']:
@@ -117,34 +122,38 @@ def print_health_report(health: dict):
     print(f"  Value Loss:         {health['value_loss']:.3f}")
     
     # Recommendations
-    print(f"\n💡 RECOMMENDATIONS:")
+    print("\nRECOMMENDATIONS:")
     
     if health['ev_status'] == 'CRITICAL':
-        print("  🔴 CRITICAL: EV below 0.65! Consider switching to curriculum training.")
+        print("  EV below 0.65. Consider switching to curriculum training.")
     elif health['ev_status'] == 'WARNING':
-        print("  ⚠️  WARNING: EV between 0.65-0.75. Monitor closely.")
+        print("  EV between 0.65 and 0.75. Monitor closely.")
     else:
-        print("  ✅ EV healthy (>0.75). Continue training.")
+        print("  EV healthy (>0.75). Continue training.")
     
     if health['approx_kl'] > 0.03:
-        print("  ⚠️  WARNING: KL above target. Policy taking large steps.")
+        print("  KL above target. Policy taking large steps.")
+    if 'base_unreachable_pct' in health:
+        print(f"  Base unreachable zone: {health['base_unreachable_pct']:.1f}% of samples")
+    if 'workspace_hard_exceed_pct' in health:
+        print(f"  Workspace hard-margin exceedances: {health['workspace_hard_exceed_pct']:.1f}%")
     
     if health['iteration'] >= 10 and health['iteration'] % 10 == 0:
         checkpoint_path = f"checkpoints/ppo_mobile_mm_{health['timesteps']}_steps.zip"
-        print(f"\n  📌 Checkpoint available for evaluation:")
-        print(f"     {checkpoint_path}")
-        print(f"     Run: python scripts/reinforcement_learning/sb3/evaluate_quantitative.py \\")
-        print(f"          --checkpoint <path> --num_episodes 10 --headless")
+        print("\nCHECKPOINT AVAILABLE:")
+        print(f"  Path: {checkpoint_path}")
+        print("  Run:  python scripts/reinforcement_learning/sb3/evaluate_quantitative.py \\ ")
+        print("        --checkpoint <path> --num_episodes 10 --headless")
     
     if health['iteration'] == 58:
-        print("\n  ⚡ MILESTONE: Entropy decay should start at 120M steps (iteration 58)!")
-        print("     Watch for [EntropyDecay] messages in training logs.")
+        print("\nENTROPY DECAY MILESTONE: 120M steps reached (iteration 58).")
+        print("  Watch for [EntropyDecay] messages in training logs.")
     
     print("\n" + "="*80 + "\n")
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Monitor Session 8c-v2 training progress')
+    parser = argparse.ArgumentParser(description='Monitor Session 8c training progress')
     parser.add_argument('--log_dir', type=str, required=True,
                        help='Path to training log directory containing progress.csv')
     parser.add_argument('--watch', action='store_true',
@@ -156,19 +165,19 @@ def main():
     progress_csv = log_dir / 'progress.csv'
     
     if not progress_csv.exists():
-        print(f"❌ ERROR: progress.csv not found at {progress_csv}")
+        print(f"ERROR: progress.csv not found at {progress_csv}")
         return
     
     if args.watch:
         import time
-        print("🔄 Watching training progress (Ctrl+C to stop)...")
+        print("Watching training progress (Ctrl+C to stop)...")
         try:
             while True:
                 health = analyze_training_health(progress_csv)
                 print_health_report(health)
                 time.sleep(30)
         except KeyboardInterrupt:
-            print("\n✋ Stopped watching.")
+            print("\nStopped watching progress monitor.")
     else:
         health = analyze_training_health(progress_csv)
         print_health_report(health)

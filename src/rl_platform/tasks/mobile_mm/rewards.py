@@ -72,15 +72,59 @@ def progress_bonus(
     return torch.clamp(improvement, min=0.0)
 
 
+
+def distance_tracking_penalty(
+    error_distance: torch.Tensor,
+    linear_threshold: float = 0.25,
+) -> torch.Tensor:
+    """Fallback penalty that grows linearly once distance exceeds a threshold.
+
+    Keeps gradients informative when the main exponential tracking reward saturates.
+
+    Args:
+        error_distance: Distance between EE and target [num_envs]
+        linear_threshold: Distance below which penalty is zero
+
+    Returns:
+        Penalty magnitude [num_envs] (non-negative)
+    """
+    return torch.clamp(error_distance - linear_threshold, min=0.0)
+
+
+
+def reachability_distance_components(
+    workspace_distance: torch.Tensor,
+    soft_margin: float,
+    hard_margin: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Compute smooth reachability bonus and penalty components.
+
+    Args:
+        workspace_distance: Distance to nearest reachable voxel [num_envs]
+        soft_margin: Distance (m) where bonus starts tapering
+        hard_margin: Distance (m) where quadratic penalty takes over
+
+    Returns:
+        bonus_factor: Values in [0, 1] rewarding being inside the soft region
+        penalty_distance: Excess distance beyond the hard margin (>= 0)
+    """
+    # Avoid division by zero when soft margin is extremely small.
+    safe_soft = max(soft_margin, 1e-6)
+    bonus_factor = torch.clamp(1.0 - workspace_distance / safe_soft, min=0.0, max=1.0)
+
+    penalty_distance = torch.clamp(workspace_distance - hard_margin, min=0.0)
+    return bonus_factor, penalty_distance
+
 def base_mobilization_reward(
     base_pos: torch.Tensor,
     prev_base_pos: torch.Tensor,
     target_pos: torch.Tensor,
     arm_reach: float = 0.8,  # Maximum reach of arm from base (meters)
     scale: float = 1.0,
+    progress_cap: float = 0.2,
 ) -> torch.Tensor:
     """Reward chassis movement that genuinely reduces target distance.
-    
+
     The previous implementation compared sequential target distances that were
     measured against the target at different timesteps. When the trajectory
     moved closer on its own, the policy received positive reward even if the
@@ -88,43 +132,36 @@ def base_mobilization_reward(
     compare how far it would be if the base had not moved. This isolates the
     contribution of chassis motion and only grants credit when the base actually
     closes the gap to an out-of-reach target.
-    
+
     Args:
         base_pos: Current base position [num_envs, 3]
         prev_base_pos: Previous base position [num_envs, 3]
         target_pos: Current target position [num_envs, 3]
         arm_reach: Maximum reach of arm from base center (meters)
         scale: Reward scale factor
-        
+        progress_cap: Maximum distance improvement credited per step (meters)
+
     Returns:
         Reward values [num_envs] - positive when base motion reduces distance
     """
-    # Clamp numerical noise so zero displacement does not look like movement.
-    eps = 1e-6
-    
+    eps = 1e-6  # Clamp numerical noise so zero displacement does not look like movement.
+
     target_xy = target_pos[:, :2]
     base_xy = base_pos[:, :2]
     prev_base_xy = prev_base_pos[:, :2]
-    
-    # Distance to the current target with and without the latest base motion.
+
     dist_current = torch.norm(target_xy - base_xy, dim=-1)
     dist_if_static = torch.norm(target_xy - prev_base_xy, dim=-1)
-    
-    # Positive when the chassis actually moved closer to the target.
-    progress = dist_if_static - dist_current
-    
-    # CRITICAL FIX (Session 5b): Cap progress to prevent reward explosion!
-    # Max 20cm progress per step → max reward = 150 × 0.2 = 30 points
-    # (reasonable compared to position_tracking max = 50 points)
-    progress = torch.clamp(progress, min=0.0, max=0.2)
-    
-    # Only reward motion when the goal is outside the arm workspace.
+
+    progress = torch.clamp(dist_if_static - dist_current, min=0.0)
+    if progress_cap > 0.0:
+        progress = torch.clamp(progress, max=progress_cap)
+
     out_of_reach = torch.sigmoid(((dist_current + dist_if_static) * 0.5 - arm_reach) * 5.0)
-    
-    # Suppress tiny numerical oscillations when the base did not really move.
+
     moved = torch.norm(base_xy - prev_base_xy, dim=-1) > eps
     progress = torch.where(moved, progress, torch.zeros_like(progress))
-    
+
     return scale * progress * out_of_reach
 
 
@@ -236,38 +273,11 @@ def reachability_maintenance_reward(
     arm_max_reach: float = 0.6,
     scale: float = 50.0,
 ) -> torch.Tensor:
-    """Reward maintaining targets within optimal arm workspace.
-    
-    Session 8b: Added to fix reachability crisis where base drifts too far.
-    Session 8c: Sharpened penalty curve (linear → quadratic) to prevent runaway distances.
-    
-    Session 8b evaluation showed policy accepted -135.21 penalty per step:
-    - Mean base-target distance: ~1.95m (way beyond 0.6m arm reach)
-    - Linear penalty too forgiving: policy traded tracking for reachability
-    - Solution: Quadratic penalty + increased weight (50→100)
-    
-    This reward provides strong incentive to keep targets reachable:
-    - Within optimal reach (0.3-0.4m): Full reward (+1.0)
-    - Between optimal and max (0.4-0.6m): Reduced reward (+0.5)
-    - Beyond max reach (>0.6m): QUADRATIC penalty (-2.0 × (dist-0.6)²)
-    
-    Penalty comparison (at scale=100):
-      Distance | Linear (8b) | Quadratic (8c)
-      0.8m     | -40         | -80
-      1.0m     | -80         | -320
-      1.5m     | -180        | -1,620
-      2.0m     | -280        | -3,920
-    
-    Args:
-        target_pos: Current target [num_envs, 3]
-        base_pos: Current base [num_envs, 3]
-        arm_optimal_reach: Optimal working distance (0.3-0.4m)
-        arm_max_reach: Maximum arm reach (0.6m)
-        scale: Reward weight (Session 8c: 100.0)
-        
-    Returns:
-        Reward [num_envs] - positive when reachable, SHARPLY negative when beyond reach
-    """
+    """Legacy quadratic reachability shaping from early Session 8c.
+
+New runs rely on reachability_distance_components for soft/hard margin behaviour.
+This function is kept for backward compatibility with historical evaluations.
+"""
     base_xy = base_pos[:, :2]
     target_xy = target_pos[:, :2]
     dist = torch.norm(target_xy - base_xy, dim=-1)
@@ -383,7 +393,7 @@ def excessive_base_movement_penalty(
     
     Example: If base moves 1 meter in one step:
         excess = 1.0 - 0.1 = 0.9 meters
-        penalty = 10.0 × 0.9 = 9.0 points
+        penalty = 10.0 x 0.9 = 9.0 points
     
     Args:
         base_pos: Current base position [num_envs, 3]
@@ -392,7 +402,7 @@ def excessive_base_movement_penalty(
         scale: Penalty scale factor
         
     Returns:
-        Penalty values [num_envs] - zero for movements ≤ threshold
+        Penalty values [num_envs] - zero for movements <= threshold
     """
     movement = torch.norm(base_pos[:, :2] - prev_base_pos[:, :2], dim=-1)
     excess = torch.clamp(movement - threshold, min=0.0)
@@ -419,9 +429,9 @@ def old_target_distance_penalty(
     provides weak gradient when far), this penalty grows linearly with distance,
     ensuring the policy is strongly motivated to reduce large errors.
     
-    Example: Target 1.4m beyond 0.6m reach → penalty = 10.0 × 1.4 = 14 points
+    Example: Target 1.4m beyond 0.6m reach -> penalty = 10.0 x 1.4 = 14 points
              As base moves closer, penalty decreases linearly to zero at 0.6m
-             If base is moving: penalty = 10.0 × 1.4 × 0.1 = 1.4 points (90% reduction!)
+             If base is moving: penalty = 10.0 x 1.4 x 0.1 = 1.4 points (90% reduction!)
     
     Args:
         base_pos: Current base position [num_envs, 3]
@@ -619,7 +629,7 @@ def velocity_limit_penalty(
     Returns:
         Penalty values [num_envs]
     """
-    # BUGFIX: Use planar speed magnitude (‖v_xy‖) instead of just X component
+    # BUGFIX: Use planar speed magnitude (||v_xy||) instead of just X component
     # This ensures limits are consistent regardless of chassis heading
     base_vel_xy = base_lin_vel[:, :2]  # [num_envs, 2] - planar velocity
     base_speed = torch.norm(base_vel_xy, dim=-1)  # [num_envs] - magnitude
@@ -804,6 +814,8 @@ def compute_combined_reward(
     base_lin_vel: torch.Tensor,
     base_ang_vel: torch.Tensor,
     base_quat: torch.Tensor,  # Base orientation for lateral penalty
+    base_target_distance: torch.Tensor,  # Pre-computed base->target planar distance
+    workspace_distance: torch.Tensor | None,  # Distance to workstation boundary (None if reach map disabled)
     joint_pos: torch.Tensor,
     joint_vel: torch.Tensor,
     
@@ -839,10 +851,7 @@ def compute_combined_reward(
         actions: Current actions [num_envs, action_dim]
         prev_actions: Previous actions [num_envs, action_dim]
         prev_prev_actions: Actions from 2 steps ago [num_envs, action_dim]
-        base_lin_vel: Base linear velocity [num_envs, 3]
-        base_ang_vel: Base angular velocity [num_envs, 3]
-        joint_pos: Joint positions [num_envs, num_joints]
-        joint_vel: Joint velocities [num_envs, num_joints]
+        base_lin_vel: Base linear velocity [num_envs, 3]\n        base_ang_vel: Base angular velocity [num_envs, 3]\n        base_target_distance: Planar distance between base and target [num_envs]\n        workspace_distance: Distance to reachable workspace boundary [num_envs] (None if unavailable)\n        joint_pos: Joint positions [num_envs, num_joints]\n        joint_vel: Joint velocities [num_envs, num_joints]
         prev_base_lin_vel: Previous base velocity [num_envs, 3]
         prev_joint_vel: Previous joint velocities [num_envs, num_joints]
         prev_base_accel: Previous base acceleration [num_envs, 3]
@@ -871,12 +880,18 @@ def compute_combined_reward(
     prog_bonus = weights["progress_bonus"] * progress_bonus(
         prev_tracking_error, current_error
     )
+    distance_penalty_linear = weights.get("position_distance_penalty", 0.0) * distance_tracking_penalty(
+        current_error
+    )
     
     # Base mobilization reward - only move chassis when target is out of arm reach
     base_mob_reward = base_mobilization_reward(
-        base_pos, prev_base_pos, target_pos,
+        base_pos,
+        prev_base_pos,
+        target_pos,
         arm_reach=0.6,  # Based on empirical observation: EE reaches ~0.6m from base
-        scale=weights.get("base_progress_reward", 10.0)
+        scale=weights.get("base_progress_reward", 10.0),
+        progress_cap=weights.get("mobilization_progress_cap", 0.2),
     )
     
     # Session 7d: Base-target alignment reward - encourage moving toward unreachable targets
@@ -894,31 +909,35 @@ def compute_combined_reward(
         scale=weights.get("target_distance_penalty", 10.0)
     )
     
-    # ========================================
-    # Session 8b: BASE COORDINATION REWARDS
-    # ========================================
-    
-    # Reachability maintenance: Keep targets within arm workspace
-    reach_maint_reward = reachability_maintenance_reward(
-        target_pos, base_pos,
-        arm_optimal_reach=0.4,
-        arm_max_reach=0.6,
-        scale=weights.get("reachability_maintenance_reward", 50.0)
+    # Smooth reachability shaping
+    reachability_distance = (
+        workspace_distance if workspace_distance is not None else torch.zeros_like(base_target_distance)
     )
-    
+    soft_margin = weights.get("reachability_soft_margin", 0.2)
+    hard_margin = weights.get("reachability_hard_margin", 0.6)
+    reach_bonus_factor, reach_penalty_distance = reachability_distance_components(
+        reachability_distance,
+        soft_margin,
+        hard_margin,
+    )
+    reach_bonus = weights.get("reachability_maintenance_reward", 0.0) * reach_bonus_factor
+    reach_distance_penalty = weights.get("reachability_distance_weight", 0.0) * (reach_penalty_distance ** 2)
+
     # Overshoot penalty: Prevent base from moving past waypoints
     overshoot_penalty = base_overshoot_penalty(
-        base_pos, target_pos, base_lin_vel, base_quat,
+        base_pos,
+        target_pos,
+        base_lin_vel,
+        base_quat,
         arm_optimal_reach=0.4,
-        scale=weights.get("base_overshoot_penalty", 20.0)
+        scale=weights.get("base_overshoot_penalty", 20.0),
     )
-    
-    # Session 5b FIX: Excessive movement penalty (prevents wild base movements)
-    # Session 8b: Increased from 5.0 to 15.0 to constrain base drift
+
     excessive_penalty = excessive_base_movement_penalty(
-        base_pos, prev_base_pos,
+        base_pos,
+        prev_base_pos,
         threshold=0.1,  # 10cm per step is maximum reasonable
-        scale=weights.get("excessive_base_movement_penalty", 15.0)
+        scale=weights.get("excessive_base_movement_penalty", 15.0),
     )
     
     # Action penalties
@@ -999,12 +1018,15 @@ def compute_combined_reward(
         pos_reward
         + ori_reward
         + prog_bonus
-        + base_mob_reward  # NEW: Reward base movement when target is far (NOW CAPPED!)
-        + base_alignment_reward  # Session 7d: Reward moving toward target
-        + reach_maint_reward  # Session 8b: Reward keeping targets reachable
-        - dist_penalty  # NEW: Strong penalty for being beyond arm reach
-        - overshoot_penalty  # Session 8b: Penalize moving past waypoints
-        - excessive_penalty  # Session 8b: Prevent wild base movements (increased 5→15)
+        + base_mob_reward  # Reward base movement when target is far (configurable cap)
+        + base_alignment_reward  # Reward moving toward unreachable targets
+        + reach_bonus  # Smooth bonus inside comfortable workspace
+        + obst_reward
+        - reach_distance_penalty  # Smooth penalty outside workspace
+        - dist_penalty  # Legacy base-target distance penalty
+        - distance_penalty_linear  # Linear fallback penalty keeps gradients informative
+        - overshoot_penalty
+        - excessive_penalty
         - action_mag_penalty
         - action_rt_penalty
         - action_smooth_penalty
@@ -1013,9 +1035,8 @@ def compute_combined_reward(
         - jerk_penalty_val
         - joint_limit_penalty_val
         - lateral_penalty
-        - self_coll_penalty  # CRITICAL: Self-collision penalty
+        - self_coll_penalty
         - stab_penalty
-        + obst_reward
     )
     
     # Store components for logging
@@ -1023,12 +1044,14 @@ def compute_combined_reward(
         "position_tracking": pos_reward,
         "orientation_tracking": ori_reward,
         "progress_bonus": prog_bonus,
-        "base_mobilization": base_mob_reward,  # NEW: Log base movement reward (NOW CAPPED!)
-        "base_target_alignment": base_alignment_reward,  # Session 7d: Log alignment reward
-        "reachability_maintenance_reward": reach_maint_reward,  # Session 8b: Log reachability reward
-        "target_distance_penalty": dist_penalty,  # NEW: Log distance penalty
-        "base_overshoot_penalty": overshoot_penalty,  # Session 8b: Log overshoot penalty
-        "excessive_base_movement_penalty": excessive_penalty,  # Session 8b: Log movement constraint
+        "base_mobilization": base_mob_reward,
+        "base_target_alignment": base_alignment_reward,
+        "reachability_bonus": reach_bonus,
+        "reachability_distance_penalty": reach_distance_penalty,
+        "target_distance_penalty": dist_penalty,
+        "position_distance_penalty": distance_penalty_linear,
+        "base_overshoot_penalty": overshoot_penalty,
+        "excessive_base_movement_penalty": excessive_penalty,
         "action_magnitude_penalty": action_mag_penalty,
         "action_rate_penalty": action_rt_penalty,
         "action_smoothness_penalty": action_smooth_penalty,
@@ -1043,3 +1066,9 @@ def compute_combined_reward(
     }
     
     return total_reward, components
+
+
+
+
+
+

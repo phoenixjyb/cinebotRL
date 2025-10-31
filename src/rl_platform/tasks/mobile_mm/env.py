@@ -367,7 +367,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "safety_radius": self.task_cfg.rewards.safety_radius,
             # Session 8b: Reachability-aware base coordination
             "reachability_maintenance_reward": self.task_cfg.rewards.reachability_maintenance_reward,
+            "reachability_distance_weight": self.task_cfg.rewards.reachability_distance_weight,
+            "reachability_soft_margin": self.task_cfg.rewards.reachability_soft_margin,
+            "reachability_hard_margin": self.task_cfg.rewards.reachability_hard_margin,
             "base_overshoot_penalty": self.task_cfg.rewards.base_overshoot_penalty,
+            "mobilization_progress_cap": self.task_cfg.rewards.mobilization_progress_cap,
+            "position_distance_penalty": self.task_cfg.rewards.position_distance_penalty,
         }
         
         # Robot limits dictionary
@@ -1304,7 +1309,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Use root velocities (these are in world frame and correct)
         base_lin_vel = self.robot.data.root_lin_vel_w
         base_ang_vel = self.robot.data.root_ang_vel_w
-        
+
         # Get end-effector state
         ee_pos = self.robot.data.body_pos_w[:, self._ee_body_idx, :]
         ee_quat = self.robot.data.body_quat_w[:, self._ee_body_idx, :]
@@ -1313,6 +1318,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Get target from trajectory
         target_pos, target_quat = self.trajectory_manager.get_target_pose()
+        base_target_distance = torch.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)
         
         if self._visualization_enabled:
             prev_markers_created = self._markers_created
@@ -1375,6 +1381,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         base_quat = self.robot.data.root_quat_w
         base_lin_vel = self.robot.data.root_lin_vel_w
         base_ang_vel = self.robot.data.root_ang_vel_w
+        base_target_distance = torch.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)
         
         joint_pos = self.robot.data.joint_pos
         arm_joint_pos = joint_pos[:, 3:9]  # ARM joints only
@@ -1501,6 +1508,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             
             # Check reachability
             is_reachable = self.reach_map.query(target_in_arm_frame, tolerance=0.1)  # 10cm tolerance
+            workspace_distance = self.reach_map.distance_to_workspace(target_in_arm_frame)
             
             # Count reachable/unreachable for logging
             n_reachable = is_reachable.sum().item()
@@ -1569,6 +1577,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     print(f"  Avg base→target distance: {avg_distance:.3f} m")
             
             self._reach_log_step += 1
+        else:
+            workspace_distance = None
         
         # BUGFIX: Convert commanded velocities from body frame to world frame
         # Most reward functions expect world-frame velocities (lateral_motion_penalty, 
@@ -1615,6 +1625,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             base_lin_vel=commanded_linear_world,  # BUGFIX: Now in world frame
             base_ang_vel=commanded_ang,
             base_quat=base_quat,  # Base orientation for lateral penalty
+            base_target_distance=base_target_distance,
+            workspace_distance=workspace_distance,
             joint_pos=arm_joint_pos,  # ARM joints only [6]
             joint_vel=arm_joint_vel,  # ARM joint velocities only [6]
             prev_base_pos=self.prev_base_pos,  # NEW: Previous base position
@@ -1629,6 +1641,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             dt=self.control_dt,
             weights=self.reward_weights,
         )
+
+        if workspace_distance is None:
+            workspace_distance_log = torch.zeros_like(base_target_distance)
+        else:
+            workspace_distance_log = workspace_distance
+        self._workspace_distance_buf = workspace_distance_log.clone()
+        self._base_target_distance_buf = base_target_distance.clone()
         
         # Update history for next step - store COMMANDED velocities for consistent penalty calculation
         self.prev_tracking_error = torch.norm(target_pos - ee_pos, dim=-1)

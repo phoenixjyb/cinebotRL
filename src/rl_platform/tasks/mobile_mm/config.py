@@ -60,7 +60,7 @@ class RobotLimits:
     max_angular_velocity: float = 2.0  # rad/s (yaw rate)
     max_linear_acceleration: float = 5.0  # m/s^2
     max_angular_acceleration: float = 10.0  # rad/s^2 (yaw acceleration)
-    max_linear_jerk: float = 100.0  # m/s^3 (Session 7b: 50→100, allow agile base reactions for reachability-guided movement)
+    max_linear_jerk: float = 100.0  # m/s^3; high limit keeps chassis agile when closing reach gaps
     
     # Arm joint limits
     max_joint_velocity: float = 2.0  # rad/s (motor speed)
@@ -74,71 +74,58 @@ class RobotLimits:
 @dataclass
 class RewardWeights:
     """Reward term weights for the tracking task.
-    
-    Session 8c Configuration (Based on Session 8b evaluation):
-    
-    Session 8b results (200M timesteps):
-    - ✅ Fixed reachability collapse (66.7% maintained vs Session 8's 0%)
-    - ✅ Restored base mobility (0.34 m/s vs Session 7d's frozen 0.01 m/s)
-    - ✅ Improved orientation tracking (47.8° vs Session 7d's 140.7°)
-    - ❌ Poor tracking accuracy (238 cm mean position error)
-    - ❌ Reachability reward hugely negative (-135.21) - base too far!
-    - ❌ High reward variance (±154,940) - bimodal performance
-    
-    Session 8c changes:
-    - Sharpen reachability penalty (linear → quadratic in rewards.py)
-    - Increase reachability weight (50.0 → 100.0, 2× boost) to match tracking priority
-    - Boost tracking weights further (position 150→200, orientation 75→100)
-    - Reduce jerk penalty (0.01 → 0.005) to allow agile motion
-    - Increase base_progress_reward (400→450) to encourage early movement
-    
-    Expected Session 8c Results:
-    - Reachability reward: -135 → +50 (finally positive!)
-    - Position error: 238 → 100-150 cm (within 1-1.5m, acceptable)
-    - Orientation error: 48 → 30° (better but still not target)
-    - Reward variance: ±155k → ±50k (more consistent)
-    - Base stays within 0.3-0.6m of targets (optimal workspace)
-    """
+
+Session 8c-v2 introduced distance-aware reachability shaping:
+- Soft/hard workspace margins (0.20 m / 0.60 m) separate gentle bonuses from steep penalties.
+- Base mobilisation rewards capture chassis-only progress with a configurable cap.
+- Legacy distance penalties remain with light weights so gradients persist when the robot falls far behind.
+
+The groups below mirror the structure used in rewards.compute_combined_reward().
+"""
     
     # ========================================
     # TRACKING REWARDS (Make these DOMINANT)
     # ========================================
-    position_tracking: float = 200.0  # Session 8c: INCREASED 150→200 (33% boost)
-    orientation_tracking: float = 100.0  # Session 8c: INCREASED 75→100 (33% boost)
-    progress_bonus: float = 5.0  # Session 8: INCREASED 1.0→5.0 (5× boost)
-    base_progress_reward: float = 450.0  # Session 8c: INCREASED 400→450 (12.5% boost) - encourage early movement
-    base_target_alignment: float = 30.0  # Session 8: INCREASED 10→30 (3× boost)
-    target_distance_penalty: float = 1.0  # Session 8: REDUCED 3.0→1.0 (67% reduction) - allow exploration
+    position_tracking: float = 200.0  # Dominant weight for EE position accuracy
+    orientation_tracking: float = 100.0  # Secondary weight for EE orientation accuracy
+    progress_bonus: float = 5.0  # Reward incremental error reductions between steps
+    base_progress_reward: float = 450.0  # Credits chassis motion when it closes the base-target gap
+    base_target_alignment: float = 30.0  # Rewards velocity that points toward an unreachable target
+    target_distance_penalty: float = 1.0  # Legacy penalty; discounted 90% while the base is moving
     
     # ========================================
-    # BASE COORDINATION (Session 8b/8c)
+    # BASE COORDINATION (Session 8c-v3)
     # ========================================
-    reachability_maintenance_reward: float = 100.0  # Session 8c: INCREASED 50→100 (2× boost) + QUADRATIC penalty
-    base_overshoot_penalty: float = 20.0  # Session 8b: NEW - penalize moving past waypoints
-    excessive_base_movement_penalty: float = 10.0  # Session 8c: REDUCED 15→10 (33% reduction) - let base explore more
+    reachability_maintenance_reward: float = 40.0  # Bonus when the target remains inside the soft margin
+    reachability_distance_weight: float = 80.0  # Penalty weight for exceeding the hard workspace margin
+    reachability_soft_margin: float = 0.2  # Soft margin radius (m) for positive shaping
+    reachability_hard_margin: float = 0.6  # Hard cutoff radius (m) that triggers quadratic penalties
+    base_overshoot_penalty: float = 20.0  # Penalises chassis that rush past the target
+    excessive_base_movement_penalty: float = 10.0  # Discourages back-and-forth oscillations
+    mobilization_progress_cap: float = 0.35  # Maximum distance progress credited per step (meters)
     
     # ========================================
     # MOTION QUALITY PENALTIES (Reduce these)
     # ========================================
-    action_magnitude: float = 0.002  # Session 8: REDUCED 0.005→0.002 (60% reduction)
-    action_rate: float = 0.005  # Session 8: REDUCED 0.01→0.005 (50% reduction)
-    action_smoothness: float = 0.05  # Session 8: REDUCED 0.15→0.05 (67% reduction) - was -1.72/step
+    action_magnitude: float = 0.002  # Penalises high torque commands
+    action_rate: float = 0.005  # Penalises rapid action changes
+    action_smoothness: float = 0.05  # Penalises jerk-like behaviour in the control sequence
     
     # ========================================
     # CONSTRAINT VIOLATIONS (Much gentler)
     # ========================================
-    velocity_limit_penalty: float = 1.0  # Session 8c: REDUCED 1.5→1.0 (33% reduction) - let base move faster
-    acceleration_limit_penalty: float = 1.5  # Session 8: REDUCED 5.0→1.5 (70% reduction)
-    jerk_limit_penalty: float = 0.005  # Session 8c: REDUCED 0.01→0.005 (50% reduction) - allow agile motion
-    joint_limit_penalty: float = 5.0  # Session 8: REDUCED 10.0→5.0 (50% reduction)
-    lateral_motion_penalty: float = 1.0  # Session 8: REDUCED 2.0→1.0 (50% reduction)
+    velocity_limit_penalty: float = 1.0  # Activates when base or joints exceed nominal velocity limits
+    acceleration_limit_penalty: float = 1.5  # Penalises linear acceleration spikes
+    jerk_limit_penalty: float = 0.005  # Soft penalty on large changes in acceleration
+    joint_limit_penalty: float = 5.0  # Keeps joints away from hard stops
+    lateral_motion_penalty: float = 1.0  # Penalises sideways slipping beyond differential-drive kinematics
     
     # ========================================
     # SAFETY PENALTIES (Keep reasonable)
     # ========================================
-    self_collision_penalty: float = 1.0  # Session 8: INCREASED 0.5→1.0 (2× boost)
+    self_collision_penalty: float = 1.0  # Penalises link-on-link impact excluding the base-ground contact
     collision_penalty: float = 10.0  # External collisions (not used for now)
-    stability_penalty: float = 0.2  # Session 8: INCREASED 0.1→0.2 (2× boost)
+    stability_penalty: float = 0.2  # Keeps linear/angular velocity within stable ranges
     
     # Self-collision detection settings (filtered to exclude base-ground contact)
     self_collision_threshold: float = 50.0  # Newtons - arm impact threshold (was 1.0, too sensitive for base-ground load)
@@ -147,6 +134,11 @@ class RewardWeights:
     # Obstacle avoidance
     min_obstacle_distance_weight: float = 1.0
     safety_radius: float = 0.2  # meters
+
+    # ========================================
+    # AUXILIARY TRACKING SHAPING
+    # ========================================
+    position_distance_penalty: float = 40.0  # Linear fallback penalty so gradients remain informative when far
 
 
 @dataclass
@@ -200,3 +192,5 @@ class MobileMMTrackConfig:
     terminate_on_collision: bool = False  # External collisions (not used)
     terminate_on_tracking_error: bool = True
     max_tracking_error: float = 2.0  # meters
+
+

@@ -512,7 +512,8 @@ def main():
         # If input is evaluation_results/20251028_200923/eval_summary_xxx.json
         # Output will be evaluation_plots/20251028_200923/
         model_folder = summary_file.parent.name
-        if args.input is not None and model_folder != args.input.parent.name:  # Has model subfolder
+        input_path = Path(args.input) if args.input is not None else None
+        if input_path is not None and model_folder != input_path.parent.name:  # Has model subfolder
             output_dir = Path(args.output_dir) / model_folder
         else:
             output_dir = Path(args.output_dir)

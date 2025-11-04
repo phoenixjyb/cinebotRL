@@ -33,6 +33,11 @@ def print_positions(env, label):
                 "lin_vel:", lin_str, "ang_vel:", ang_str)
     print("\n")
 
+def print_all_joints_state(jids,):
+    for jidx in jids:
+        st = p.getJointState(env.robot, jidx)
+        print(f"  joint {jidx}: pos={st[0]:.4f}, vel={st[1]:.4f}")
+
 # helper to move joints and step
 def move_and_step(jidx, pos, steps=100, positionGain=1.0, velocityGain=0.1, max_force=1000):
     # read current joint position
@@ -89,30 +94,32 @@ if __name__ == '__main__':
     idx_x = env._joint_index_by_name(env.robot, 'joint_x')
     idx_y = env._joint_index_by_name(env.robot, 'joint_y')
     idx_theta = env._joint_index_by_name(env.robot, 'joint_theta')
+    idx_arm1 = env._joint_index_by_name(env.robot, 'left_arm_joint1')
+    idx_arm2 = env._joint_index_by_name(env.robot, 'left_arm_joint2')
+    idx_arm3 = env._joint_index_by_name(env.robot, 'left_arm_joint3')
+    idx_arm4 = env._joint_index_by_name(env.robot, 'left_arm_joint4')
+    idx_arm5 = env._joint_index_by_name(env.robot, 'left_arm_joint5')
+    idx_arm6 = env._joint_index_by_name(env.robot, 'left_arm_joint6')
+    
     print('Joint indices: idx_x=', idx_x, 'idx_y=', idx_y, 'idx_theta=', idx_theta)
-
-
-
-    # reset x
-    # p.resetJointState(env.robot, idx_x, targetValue=0.0)
-    # for _ in range(50): p.stepSimulation()
-
-    # Case B: theta = 0.5 rad, move x by +0.1
-    # if idx_theta is not None:
-    #     p.resetJointState(env.robot, idx_theta, targetValue=0.0)
-    # p.resetJointState(env.robot, idx_x, targetValue=0.0)
+    print('Arm joint indices:', idx_arm1, idx_arm2, idx_arm3, idx_arm4, idx_arm5, idx_arm6)
     
-    print_positions(env, 'initial')
-    move_and_step_array([idx_x, idx_y], [-0.1, -0.1], steps=200)
-    print_positions(env, 'x y ->1')
-    move_and_step_array([idx_x, idx_y], [0.1, 0.1], steps=200)
-    print_positions(env, 'x y ->-1')
+    # print_positions(env, 'initial')
+    # move_and_step_array([idx_x, idx_y], [-0.1, -0.1], steps=200)
+    # print_positions(env, 'x y ->1')
+    # move_and_step_array([idx_x, idx_y], [0.1, 0.1], steps=200)
+    # print_positions(env, 'x y ->-1')
     
     
-    # move_and_step(idx_x, 10)
-    # print_positions(env, 'x->10')
-    # move_and_step(idx_y, 1)
-    # print_positions(env, 'y->1')
+    # env.save_robot_image('linux_env_dev/initial_0.0.png')
+    # move_and_step(idx_arm1, 1.0)
+    # print_positions(env, 'arm1->1.0')
+    # env.save_robot_image('linux_env_dev/arm1_1.0.png')
+    print_all_joints_state([idx_arm1, idx_arm2, idx_arm3, idx_arm4, idx_arm5, idx_arm6])
+    move_and_step(idx_arm2, 1.0)
+    print_positions(env, 'arm2->1.0')
+    env.save_robot_image('linux_env_dev/arm2_1.0.png')
+    print_all_joints_state([idx_arm1, idx_arm2, idx_arm3, idx_arm4, idx_arm5, idx_arm6])
     # move_and_step(idx_theta, 1.0)
     # print_positions(env, 'theta=1.0')
     # move_and_step(idx_x, -10)

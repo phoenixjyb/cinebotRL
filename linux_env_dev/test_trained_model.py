@@ -3,12 +3,15 @@ import argparse
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 from pybullet_envs.mobile_mm import MobileMMBulletEnv
 from pybullet_envs.target_generator import FixedTarget, RandomTarget, RandomTargetForEpisode, CurriculumTarget
+from pybullet_envs.transformer_extractor import TransformerFeaturesExtractor
 
-def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False):
+def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False,
+                       low=(4.0, -2.0, 0.5), high=(6.0, 2.0, 1.5)):
     """
     测试训练好的模型并生成可视化结果
     
@@ -22,14 +25,21 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
     save_dir = Path(model_path).parent
     os.makedirs(save_dir, exist_ok=True)
     
-    # 加载模型
+    # 加载模型（注意：有可能模型使用了自定义的特征提取器/策略，
+    # 确保相关模块可被导入。显式选择 device 以保证模型在 CUDA 上运行）
     print(f"Loading model from: {model_path}")
-    model = PPO.load(model_path)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"Using device for inference: {device}")
+    model = PPO.load(model_path, device=device)
+    
+    policy = model.policy
+    print(policy)
     
     # 创建测试环境（render 参数可控）
-    env_fn = lambda: MobileMMBulletEnv(render=render, max_steps=max_steps,target_generator=RandomTargetForEpisode(
-                                           low=(4.0, -2.0, 0.2),
-                                           high=(6.0, 2.0, 0.2)
+    env_fn = lambda: MobileMMBulletEnv(render=render, max_steps=max_steps,
+                                       target_generator=RandomTargetForEpisode(
+                                           low=low,
+                                           high=high
                                        ))
     vec_env = DummyVecEnv([env_fn])
     
@@ -53,6 +63,10 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
         # collect per-step velocities (world frame and chassis frame)
         episode_world_vels = []  # list of (vx_world, vy_world)
         episode_chassis_vels = []  # list of (vx_chassis, vy_chassis)
+        # collect per-step arm joint angles (6 joints expected)
+        episode_joint_angles = []  # list of length-6 tuples
+        # collect per-step end-effector heights (z)
+        episode_ee_heights = []
 
         def _get_ee_pos_from_env(e):
             return e._get_ee_pos()
@@ -105,7 +119,7 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
             # 记录数据 (vectorized env returns arrays/lists)
             # import pdb; pdb.set_trace()
             try:
-                dist_val = infos[0].get('distance', None)
+                dist_val = infos[0].get('ee_distance', None)
             except Exception:
                 dist_val = None
             episode_distances.append(dist_val)
@@ -118,6 +132,11 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
                 cur_ee = _get_ee_pos_from_env(env)
                 if cur_ee is not None:
                     episode_ee_positions.append(tuple(float(x) for x in cur_ee[:3]))
+                    # record ee height
+                    try:
+                        episode_ee_heights.append(float(cur_ee[2]) )
+                    except Exception:
+                        episode_ee_heights.append(np.nan)
             except Exception:
                 pass
             try:
@@ -164,6 +183,28 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
                 episode_world_vels.append((np.nan, np.nan))
                 episode_chassis_vels.append((np.nan, np.nan))
 
+            # collect arm joint angles if the env exposes _get_arm_state()
+            try:
+                arm_state = None
+                if hasattr(env, '_get_arm_state'):
+                    arm_state = env._get_arm_state()
+                elif hasattr(env, 'unwrapped') and hasattr(env.unwrapped, '_get_arm_state'):
+                    arm_state = env.unwrapped._get_arm_state()
+                elif hasattr(env, 'env') and hasattr(env.env, '_get_arm_state'):
+                    arm_state = env.env._get_arm_state()
+
+                if arm_state is None:
+                    episode_joint_angles.append((np.nan,)*6)
+                else:
+                    arr = np.array(arm_state).ravel()
+                    if arr.size < 6:
+                        tmp = np.full(6, np.nan, dtype=float)
+                        tmp[:arr.size] = arr
+                        arr = tmp
+                    episode_joint_angles.append(tuple(float(x) for x in arr[:6]))
+            except Exception:
+                episode_joint_angles.append((np.nan,)*6)
+
             terminated = done_flag
             
             # # 每50步保存一张图片
@@ -193,12 +234,12 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
         all_rewards.append(episode_rewards)
         
         # 保存该episode的轨迹图片（包含已经收集的EE轨迹），并传入target以在图中显示
-        final_img_path = os.path.join(save_dir, f"episode_{episode+1}_final.png")
-        try:
-            env.save_robot_image(final_img_path, width=800, height=600, traj=episode_ee_positions, draw_origin=True, target=target)
-            print(f"Saved final image: {final_img_path}")
-        except Exception as e:
-            print(f"Failed to save final image: {e}")
+        # final_img_path = os.path.join(save_dir, f"episode_{episode+1}_final.png")
+        # try:
+        #     env.save_robot_image(final_img_path, width=800, height=600, traj=episode_ee_positions, draw_origin=True, target=target)
+        #     print(f"Saved final image: {final_img_path}")
+        # except Exception as e:
+        #     print(f"Failed to save final image: {e}")
 
         # accumulate base and ee positions for cross-episode plotting (still keep for summary if needed)
         if 'all_base_positions' not in locals():
@@ -223,7 +264,7 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
 
         # Generate per-episode velocity plot (world-frame vs chassis-frame)
         try:
-            generate_velocity_plot(episode_world_vels, episode_chassis_vels, save_dir, episode=episode+1)
+            generate_velocity_plot(episode_world_vels, episode_chassis_vels, save_dir, episode=episode+1, joint_angles=episode_joint_angles, ee_heights=episode_ee_heights)
         except Exception as e:
             print(f'Failed to generate per-episode velocity plot for episode {episode+1}: {e}')
     
@@ -400,7 +441,7 @@ def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_target
     print(f"Saved 3D trajectory plot: {out_path}")
 
 
-def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1):
+def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1, joint_angles=None, ee_heights=None):
     """Generate a 2-panel plot (side-by-side) comparing world-frame and chassis-frame
     longitudinal (vx) and lateral (vy) linear velocities over time for one episode.
 
@@ -417,10 +458,13 @@ def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1):
     steps_w = np.arange(w.shape[0]) if w.shape[0] > 0 else np.arange(0)
     steps_c = np.arange(c.shape[0]) if c.shape[0] > 0 else np.arange(0)
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 4), sharey=True)
+    # create a figure with 3 rows: two side-by-side velocity plots on top row
+    # and a full-width joint-angles plot on the bottom row
+    fig = plt.figure(figsize=(14, 8))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1, 0.8])
 
+    ax = fig.add_subplot(gs[0, 0])
     # World-frame velocities
-    ax = axes[0]
     if w.shape[0] > 0:
         ax.plot(steps_w, w[:, 0], label='vx_world (forward)', color='C0')
         ax.plot(steps_w, w[:, 1], label='vy_world (lateral)', color='C1')
@@ -432,8 +476,8 @@ def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1):
     ax.grid(True)
     ax.legend()
 
+    ax2 = fig.add_subplot(gs[0, 1], sharey=ax)
     # Chassis-frame velocities
-    ax2 = axes[1]
     if c.shape[0] > 0:
         ax2.plot(steps_c, c[:, 0], label='vx_chassis (forward)', color='C0')
         ax2.plot(steps_c, c[:, 1], label='vy_chassis (lateral)', color='C1')
@@ -444,7 +488,37 @@ def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1):
     ax2.grid(True)
     ax2.legend()
 
-    plt.suptitle(f'Episode {episode}: Linear velocities (world vs chassis)')
+    # Lower row: left = joint angles, right = ee height
+    ax_joint = fig.add_subplot(gs[1, 0])
+    if joint_angles is None or len(joint_angles) == 0:
+        ax_joint.text(0.5, 0.5, 'No joint angle data', ha='center', va='center')
+    else:
+        ja = np.array(joint_angles, dtype=float)[:-2]
+        steps_j = np.arange(ja.shape[0])
+        # plot up to 6 joints
+        colors = [f'C{i}' for i in range(6)]
+        for i in range(min(6, ja.shape[1])):
+            ax_joint.plot(steps_j, np.rad2deg(ja[:, i]), label=f'joint{i+1} (deg)', color=colors[i], linestyle='-')
+        ax_joint.set_xlabel('Step')
+        ax_joint.set_ylabel('Joint angle (deg)')
+        ax_joint.set_title('Arm joint angles')
+        ax_joint.grid(True)
+        ax_joint.legend(ncol=3, fontsize='small')
+
+    ax_ee = fig.add_subplot(gs[1, 1])
+    if ee_heights is None or len(ee_heights) == 0:
+        ax_ee.text(0.5, 0.5, 'No EE height data', ha='center', va='center')
+    else:
+        eh = np.array(ee_heights, dtype=float)[:-2]
+        steps_e = np.arange(eh.shape[0])
+        ax_ee.plot(steps_e, eh, label='EE height (m)', color='C2')
+        ax_ee.set_xlabel('Step')
+        ax_ee.set_ylabel('Height (m)')
+        ax_ee.set_title('End-Effector Height')
+        ax_ee.grid(True)
+        ax_ee.legend()
+
+    plt.suptitle(f'Episode {episode}: Velocities and Joint Angles')
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     out_path = os.path.join(save_dir, f'episode_{episode}_velocities.png')
@@ -455,17 +529,33 @@ def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1):
 
 if __name__ == "__main__":
     # 模型路径 - 根据实际保存位置调整
-    # model_path = "linux_env_dev/models/checkpoints_20251024_073650/ppo_mobile_mm_1000000_steps.zip"
-    # model_path = "linux_env_dev/models/checkpoints_20251024_154939/ppo_mobile_mm_600000_steps.zip"
-    # model_path = "linux_env_dev/models/checkpoints_20251024_164654/ppo_mobile_mm_200000_steps.zip"
-    # model_path = "linux_env_dev/models/logs_20251027_015159/checkpoints/ppo_mobile_mm_1000000_steps.zip"
-    model_path = "linux_env_dev/models/logs_20251029_005404/checkpoints/ppo_mobile_mm_800000_steps.zip"
+    # 去掉角度误差
+    model_path = "linux_env_dev/models/logs_20251031_112452/ppo_mobile_mm_final.zip"
+    # 带高程误差惩罚
+    model_path = "linux_env_dev/models/logs_20251031_113615/ppo_mobile_mm_final.zip"
+    # 增大关节力矩
+    model_path = "linux_env_dev/models/logs_20251103_175011/ppo_mobile_mm_final.zip"
+    # 增加terminate的机械臂静止条件
+    model_path = "linux_env_dev/models/logs_20251104_110708/ppo_mobile_mm_final.zip"
+    # 优化学习率
+    model_path = "linux_env_dev/models/logs_20251104_121650/ppo_mobile_mm_final.zip"
+    # delta = 0.05
+    model_path = "linux_env_dev/models/logs_20251105_000224/ppo_mobile_mm_final.zip"
+    # Transformer特征提取器
+    model_path = "linux_env_dev/models/logs_20251105_110047/ppo_mobile_mm_final.zip"
     render = False
     
     if os.path.exists(model_path):
         print("Starting model testing...")
-        distances, rewards, success_count = test_trained_model(model_path, num_episodes=5, render=render, max_steps=500)
-        print(f"\nTesting completed! Success rate: {success_count}/3 ({success_count/3*100:.1f}%)")
+        # target_x, target_y, target_z = 5.5, -0.5, 0.7
+        target_x, target_y, target_z = 4.7, -1.7, 0.7
+        num_episode = 1
+        distances, rewards, success_count = test_trained_model(model_path, num_episodes=num_episode, render=render, max_steps=500,
+                                                                # low=(4.0, -2.0, 0.5),
+                                                                # high=(10.0, 2.0, 1.5))
+                                                                low=(target_x, target_y, target_z),
+                                                                high=(target_x, target_y, target_z))
+        print(f"\nTesting completed! Success rate: {success_count}/{num_episode} ({success_count/num_episode*100:.1f}%)")
     else:
         print(f"Model file not found: {model_path}")
         print("Please train the model first or check the model path.")

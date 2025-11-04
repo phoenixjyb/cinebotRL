@@ -5,6 +5,8 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 from pybullet_envs.mobile_mm import MobileMMBulletEnv
 from pybullet_envs.target_generator import FixedTarget, RandomTarget, RandomTargetForEpisode, CurriculumTarget
+import torch
+from pybullet_envs.transformer_extractor import TransformerFeaturesExtractor
 
 # parse custom network architectures
 def parse_layers(s: str):
@@ -44,8 +46,19 @@ def calc_param_num(policy):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--timesteps", type=int, default=1_000_000)
+    parser.add_argument("--timesteps", type=int, default=5_000_000)
     parser.add_argument("--render", action="store_true", help="Use GUI")
+    parser.add_argument("--policy", type=str, default="MlpPolicy",
+                        choices=["MlpPolicy", "LargeMlp", "Transformer"],
+                        help="Policy architecture to use. Transformer = Transformer-based feature extractor")
+    # transformer-specific options
+    parser.add_argument("--tf_seq_len", type=int, default=8, help="Transformer token sequence length")
+    parser.add_argument("--tf_embed_dim", type=int, default=256, help="Transformer embedding dimension")
+    parser.add_argument("--tf_layers", type=int, default=3, help="Number of Transformer encoder layers")
+    parser.add_argument("--tf_heads", type=int, default=8, help="Number of attention heads")
+    parser.add_argument("--tf_dropout", type=float, default=0.1, help="Transformer dropout")
+    parser.add_argument("--warmup_frac", type=float, default=0.05,
+                        help="Fraction of total training for linear warmup (0-1)")
     parser.add_argument("--save_dir", type=str, default="linux_env_dev/models")
     # PPO / env config
     parser.add_argument("--n_envs", type=int, default=1, help="Number of parallel envs (vec env)")
@@ -68,11 +81,43 @@ def main():
                         help="Initial learning rate for the optimizer (overrides SB3 default if set)")
     args = parser.parse_args()
 
+    # build a warmup + linear decay learning rate schedule (callable accepted by SB3)
+    try:
+        initial_lr = float(args.learning_rate) if args.learning_rate is not None else 1e-4
+    except Exception:
+        initial_lr = 1e-4
+    try:
+        warmup_frac = float(args.warmup_frac)
+        if warmup_frac < 0.0:
+            warmup_frac = 0.0
+        if warmup_frac >= 1.0:
+            warmup_frac = min(0.99, warmup_frac)
+    except Exception:
+        warmup_frac = 0.05
+
+    def lr_schedule(progress_remaining: float) -> float:
+        """Progress-based LR schedule for SB3.
+
+        progress_remaining: 1.0 -> 0.0 over the full training run.
+        We compute progress = 1 - progress_remaining (0 -> 1).
+        Warmup: linear from 0 -> initial_lr over `warmup_frac` of training.
+        Decay: linear from initial_lr -> 0 over remaining fraction.
+        Returns current learning rate (float).
+        """
+        progress = 1.0 - float(progress_remaining)
+        # warmup phase
+        if warmup_frac > 0.0 and progress < warmup_frac:
+            return float(initial_lr * (progress / max(1e-12, warmup_frac)))
+        # linear decay after warmup
+        denom = max(1e-12, 1.0 - warmup_frac)
+        t = (progress - warmup_frac) / denom
+        return float(max(1e-7, initial_lr * (1.0 - t)))
+
     os.makedirs(args.save_dir, exist_ok=True)
     env_fn = lambda: MobileMMBulletEnv(render=args.render,
                                        target_generator=RandomTargetForEpisode(
-                                           low=(4.0, -2.0, 0.2),
-                                           high=(10.0, 2.0, 0.2)
+                                           low=(4.0, -2.0, 0.5),
+                                           high=(10.0, 2.0, 1.5)
                                        ))
     if args.n_envs > 1:
         from stable_baselines3.common.vec_env import SubprocVecEnv
@@ -81,32 +126,68 @@ def main():
         vec_env = DummyVecEnv([env_fn])
 
     ts = calcaulate_time_stamp()
-    # import pdb; pdb.set_trace()
     log_dir = os.path.join(args.save_dir, f"logs_{ts}/tensorboard_logs")
     os.makedirs(log_dir, exist_ok=True)
 
 
     policy_kwargs = get_policy_kwargs(args.pi_layers, args.vf_layers)
 
+    # select device explicitly: prefer CUDA when available
+    try:
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        if device != 'cuda':
+            print(f"CUDA not available, using device='{device}'")
+        else:
+            print("Using CUDA device for training")
+    except Exception:
+        device = 'cpu'
+        print("Warning: failed to query CUDA availability; falling back to 'cpu'")
+
+    # If Transformer policy requested, wire custom features extractor
+    if args.policy == "Transformer":
+        # override policy_kwargs to use our features extractor
+        policy_kwargs = dict(
+            features_extractor_class=TransformerFeaturesExtractor,
+            features_extractor_kwargs={
+                'seq_len': int(args.tf_seq_len),
+                'embed_dim': int(args.tf_embed_dim),
+                'n_heads': int(args.tf_heads),
+                'n_layers': int(args.tf_layers),
+                'dropout': float(args.tf_dropout),
+            }
+        )
+        print(f"Using Transformer feature extractor: seq_len={args.tf_seq_len}, embed_dim={args.tf_embed_dim}, layers={args.tf_layers}, heads={args.tf_heads}")
+
+
+    # Decide actual SB3 policy class name to use. For a custom features extractor
+    # we still pass a standard policy name (e.g. MlpPolicy) and provide
+    # features_extractor_class via policy_kwargs.
+    policy_name = args.policy
+    if args.policy == "Transformer":
+        # SB3 does not know a policy called 'Transformer' — use MlpPolicy but
+        # provide our Transformer features extractor via policy_kwargs.
+        policy_name = "MlpPolicy"
+        print("Mapping requested 'Transformer' to SB3 policy 'MlpPolicy' with TransformerFeaturesExtractor")
+
     # load existing model if requested, else create a new one
     model_kwargs = dict(
-        policy="MlpPolicy",
+        policy=policy_name,
         env=vec_env,
         n_steps=args.n_steps,
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,
         policy_kwargs=policy_kwargs,
         ent_coef=0.0,
+        device=device,
         verbose=1,
         tensorboard_log=log_dir,
     )
-    # optionally set learning rate
-    if args.learning_rate is not None:
-        model_kwargs['learning_rate'] = float(args.learning_rate)
+    # use warmup + linear decay schedule for learning rate (callable accepted by SB3)
+    model_kwargs['learning_rate'] = lr_schedule
 
     if args.load_model:
         print(f"Loading model from: {args.load_model}")
-        model = PPO.load(args.load_model, env=vec_env, device='auto')
+        model = PPO.load(args.load_model, env=vec_env, device=device)
         # if user requested a different learning rate, override optimizer param groups
         if args.learning_rate is not None:
             try:
@@ -121,6 +202,7 @@ def main():
     # 打印模型信息
     policy = model.policy
     calc_param_num(policy) 
+    print(policy)
 
     # print initial optimizer lr for visibility
     try:
@@ -152,6 +234,7 @@ def main():
                                deterministic=True, render=False)
         callbacks.append(eval_cb)
 
+    # import pdb;     pdb.set_trace()
     model.learn(total_timesteps=args.timesteps, callback=callbacks or None)
     model_filename = f"logs_{ts}/ppo_mobile_mm_final"
     model.save(os.path.join(args.save_dir, model_filename))

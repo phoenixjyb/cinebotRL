@@ -82,6 +82,35 @@ def compose_observation(
     
     components.extend([base_to_target_xy, base_to_target_dist, out_of_reach])
     
+    # NEW (Session 8f): Heading cue - base→target yaw error as sin/cos
+    # This tells policy "you're facing 45° left of target" immediately
+    # Removes "which way to turn?" ambiguity
+    # Reference: mobile_mm_training_playbook.md §3
+    w, x, y, z = base_quat[:, 0], base_quat[:, 1], base_quat[:, 2], base_quat[:, 3]
+    yaw = torch.atan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2))
+    bearing = torch.atan2(base_to_target_xy[:, 1], base_to_target_xy[:, 0])
+    yaw_err = torch.remainder(bearing - yaw + torch.pi, 2 * torch.pi) - torch.pi
+    heading_cue = torch.stack([torch.sin(yaw_err), torch.cos(yaw_err)], dim=-1)  # [num_envs, 2]
+    components.append(heading_cue)
+    
+    # NEW (Session 8g): Workspace comfort observations
+    # Explicit feedback: "am I in optimal reach zone?" for policy awareness
+    # Aligns observations with reward structure (0.6m optimal, 0.7m hard margin)
+    optimal_distance = 0.6  # FK workspace median (from reach_surface.mat analysis)
+    comfort_width = 0.15  # ±15cm comfort band
+    
+    # Comfort signal: 1.0 when in optimal zone, fades to 0.0 outside
+    workspace_comfort = torch.clamp(
+        1.0 - torch.abs(base_to_target_dist - optimal_distance) / comfort_width,
+        0.0, 1.0
+    )  # [num_envs, 1]
+    
+    # Normalized distance to optimal (signed): negative=too close, positive=too far
+    dist_to_optimal_normalized = (base_to_target_dist - optimal_distance) / comfort_width
+    dist_to_optimal_normalized = torch.clamp(dist_to_optimal_normalized, -2.0, 2.0)  # [num_envs, 1]
+    
+    components.extend([workspace_comfort, dist_to_optimal_normalized])
+    
     # Optional: Lookahead targets
     if lookahead_pos is not None:
         # Flatten lookahead: [num_envs, steps, 3] -> [num_envs, steps*3]
@@ -193,8 +222,10 @@ def get_observation_dimensions(
     # Tracking error: pos_error(3) + quat_error(4) = 7
     dim += 7
     
-    # Base-to-target info: dx(1) + dy(1) + distance(1) + out_of_reach_flag(1) = 4
-    dim += 4
+    # Base-to-target info: dx(1) + dy(1) + distance(1) + out_of_reach_flag(1) + heading_cue(2) + workspace_comfort(2) = 8
+    # Session 8f: Added heading_cue (sin/cos of yaw error) = +2 dims
+    # Session 8g: Added workspace_comfort (comfort + dist_to_optimal) = +2 dims
+    dim += 8
     
     # Optional: Lookahead
     if use_lookahead:

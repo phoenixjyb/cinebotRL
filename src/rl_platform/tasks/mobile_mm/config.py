@@ -75,10 +75,18 @@ class RobotLimits:
 class RewardWeights:
     """Reward term weights for the tracking task.
 
-Session 8c-v2 introduced distance-aware reachability shaping:
-- Soft/hard workspace margins (0.20 m / 0.60 m) separate gentle bonuses from steep penalties.
-- Base mobilisation rewards capture chassis-only progress with a configurable cap.
-- Legacy distance penalties remain with light weights so gradients persist when the robot falls far behind.
+Session 8f implements distance-gated penalty system + playbook fixes:
+- CRITICAL: Distance-gated penalties (far=mobilization, near=precision) 
+- Two-zone linear reachability (0.35-0.5-0.6m with plateau, simpler than 8e's bell curve)
+- Control conflict fix (atomic root state write)
+- Heading cue in observations (+2 dims: sin/cos of base→target yaw error)
+- Reference: mobile_mm_training_playbook.md §1-3
+
+Session 8e attempted bell-shaped comfort zone but failed:
+- Reachability bonus collapsed from 7.06 → 0.79 (89% drop!)
+- Workspace distance drifted from 0.52m @ 50M to 0.58m @ 73M
+- Narrow bell peak too brittle for dynamic tracking
+- Root cause: Penalties fought mobilization at all distances
 
 The groups below mirror the structure used in rewards.compute_combined_reward().
 """
@@ -87,22 +95,51 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     # TRACKING REWARDS (Make these DOMINANT)
     # ========================================
     position_tracking: float = 200.0  # Dominant weight for EE position accuracy
-    orientation_tracking: float = 100.0  # Secondary weight for EE orientation accuracy
+    orientation_tracking: float = 200.0  # Emphasize EE orientation accuracy alongside reachability
     progress_bonus: float = 5.0  # Reward incremental error reductions between steps
     base_progress_reward: float = 450.0  # Credits chassis motion when it closes the base-target gap
-    base_target_alignment: float = 30.0  # Rewards velocity that points toward an unreachable target
+    base_target_alignment: float = 50.0  # Stronger reward for goal-directed chassis motion
     target_distance_penalty: float = 1.0  # Legacy penalty; discounted 90% while the base is moving
     
     # ========================================
-    # BASE COORDINATION (Session 8c-v3)
+    # BASE COORDINATION (Session 8g - Expanded Workspace)
     # ========================================
-    reachability_maintenance_reward: float = 40.0  # Bonus when the target remains inside the soft margin
-    reachability_distance_weight: float = 80.0  # Penalty weight for exceeding the hard workspace margin
-    reachability_soft_margin: float = 0.2  # Soft margin radius (m) for positive shaping
-    reachability_hard_margin: float = 0.6  # Hard cutoff radius (m) that triggers quadratic penalties
-    base_overshoot_penalty: float = 20.0  # Penalises chassis that rush past the target
+    reachability_maintenance_reward: float = 40.0  # Bonus when in optimal working zone (KEEP at 40!)
+    reachability_distance_weight: float = 30.0  # Penalty weight for exceeding hard margin (REDUCED from 60)
+    reachability_soft_margin: float = 0.2  # Width of bell curve around optimal distance (±0.2m)
+    reachability_hard_margin: float = 0.7  # Hard cutoff radius (m) - EXPANDED from 0.6m to match FK workspace
+    reachability_optimal_distance: float = 0.6  # Peak of bell curve - FK median (was 0.5m)
+    inner_margin_penalty: float = 15.0  # Penalty for base getting too close (<0.35m)
+    inner_margin_min_distance: float = 0.35  # Minimum comfortable working distance
+    base_overshoot_penalty: float = 30.0  # Penalises chassis that rush past the target
     excessive_base_movement_penalty: float = 10.0  # Discourages back-and-forth oscillations
     mobilization_progress_cap: float = 0.35  # Maximum distance progress credited per step (meters)
+    
+    # ========================================
+    # CURRICULUM LEARNING (Session 8h - Balanced Weights + Gradual Transition)
+    # ========================================
+    use_curriculum: bool = True  # Enable two-stage curriculum
+    curriculum_stage_1_steps: int = 45_000_000  # Stage 1: 0-45M steps (transition starts earlier)
+    curriculum_transition_steps: int = 10_000_000  # 10M gradual ramp (45M-55M)
+    
+    # Stage 1: Balanced ratio from start (40% of final, maintains 1:3 ratio)
+    # Session 8g FAILED with (5.0, 15.0) - orientation under-trained despite 1:3 ratio
+    # Session 8h FIX: (4.0, 12.0) - both reduced proportionally, orientation gets adequate signal
+    curriculum_stage_1_position_weight: float = 4.0  # 40% of 10.0 (was 5.0 = 50%)
+    curriculum_stage_1_orientation_weight: float = 12.0  # 40% of 30.0 (was 15.0 = 50%)
+    
+    # Stage 2: Full precision tracking (all trajectories, full weights)
+    curriculum_stage_2_position_weight: float = 10.0  # Restore full weight
+    curriculum_stage_2_orientation_weight: float = 30.0  # Restore full weight
+    # Optional boost if orientation still struggles @ 20M: increase to 40.0 for 4:1 ratio
+    
+    # ========================================
+    # STABILITY MONITORING (Session 8h - Auto-pause on Instability)
+    # ========================================
+    enable_auto_pause: bool = True  # Pause training on instability (8g collapsed @ 100M)
+    kl_threshold: float = 0.1  # Pause if KL divergence exceeds this
+    variance_threshold: float = -0.3  # Pause if explained variance drops below this (allow negative in early training)
+    checkpoint_frequency_steps: int = 2_000_000  # Save every 2M steps (finer granularity than 8g)
     
     # ========================================
     # MOTION QUALITY PENALTIES (Reduce these)
@@ -138,7 +175,7 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     # ========================================
     # AUXILIARY TRACKING SHAPING
     # ========================================
-    position_distance_penalty: float = 40.0  # Linear fallback penalty so gradients remain informative when far
+    position_distance_penalty: float = 80.0  # Linear fallback penalty so gradients remain informative when far
 
 
 @dataclass

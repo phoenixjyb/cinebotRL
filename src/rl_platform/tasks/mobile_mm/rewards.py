@@ -96,24 +96,93 @@ def reachability_distance_components(
     workspace_distance: torch.Tensor,
     soft_margin: float,
     hard_margin: float,
+    optimal_distance: float = 0.5,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Compute smooth reachability bonus and penalty components.
+    """Compute smooth reachability bonus and penalty components with two-zone linear profile.
+    
+    Session 8f: Simplified from bell-shaped to two-zone linear "gravitational well"
+    - Zone 1 (0.35-0.5m): Linear increase to full bonus → approach zone
+    - Zone 2 (0.5-0.6m): Full bonus plateau → optimal comfort zone
+    - Zone 3 (0.6-0.9m): Linear decay to zero → acceptable but suboptimal
+    - Zone 4 (>0.9m): Quadratic penalty → too far!
+    
+    This is easier to learn than bell-shaped curve and creates clear "gravitational well"
+    at optimal distance without brittleness of narrow peak.
+    Reference: Analysis of Session 8e failure (reachability_bonus collapsed to 0.79)
 
     Args:
         workspace_distance: Distance to nearest reachable voxel [num_envs]
-        soft_margin: Distance (m) where bonus starts tapering
+        soft_margin: Width of optimal plateau (m) - unused now, kept for API compatibility
         hard_margin: Distance (m) where quadratic penalty takes over
+        optimal_distance: Center of optimal zone (m) - ideal arm working distance
 
     Returns:
-        bonus_factor: Values in [0, 1] rewarding being inside the soft region
+        bonus_factor: Values in [0, 1], plateau at optimal_distance ± 0.05m
         penalty_distance: Excess distance beyond the hard margin (>= 0)
     """
-    # Avoid division by zero when soft margin is extremely small.
-    safe_soft = max(soft_margin, 1e-6)
-    bonus_factor = torch.clamp(1.0 - workspace_distance / safe_soft, min=0.0, max=1.0)
-
+    # Two-zone linear bonus with plateau
+    inner_margin = 0.35  # Minimum comfortable distance (matches inner_margin_penalty)
+    plateau_half_width = 0.05  # ±5cm plateau around optimal
+    decay_start = optimal_distance + plateau_half_width  # 0.55m
+    decay_end = hard_margin  # 0.9m
+    
+    # Zone 1: Approach zone (0.35 → 0.45m) - linear increase
+    approach_bonus = torch.clamp(
+        (workspace_distance - inner_margin) / (optimal_distance - plateau_half_width - inner_margin),
+        min=0.0, max=1.0
+    )
+    
+    # Zone 2: Optimal plateau (0.45 → 0.55m) - full bonus
+    in_plateau = (workspace_distance >= optimal_distance - plateau_half_width) & \
+                 (workspace_distance <= decay_start)
+    
+    # Zone 3: Decay zone (0.55 → 0.9m) - linear decrease
+    decay_bonus = torch.clamp(
+        (hard_margin - workspace_distance) / (hard_margin - decay_start),
+        min=0.0, max=1.0
+    )
+    
+    # Combine: use approach if below plateau, plateau if in range, decay if above
+    bonus_factor = torch.where(
+        workspace_distance < optimal_distance - plateau_half_width,
+        approach_bonus,
+        torch.where(in_plateau, torch.ones_like(workspace_distance), decay_bonus)
+    )
+    
+    # Zone 4: Penalty kicks in beyond hard margin
     penalty_distance = torch.clamp(workspace_distance - hard_margin, min=0.0)
     return bonus_factor, penalty_distance
+
+
+def inner_margin_penalty(
+    base_target_distance: torch.Tensor,
+    optimal_min_distance: float = 0.35,
+    scale: float = 15.0,
+) -> torch.Tensor:
+    """Penalty for base getting too close to target (cramping the arm).
+    
+    Session 8e: Prevents base from collapsing onto target, which reduces
+    orientation tracking capability and causes arm singularities.
+    
+    Penalty ramps up linearly as base gets closer than optimal_min_distance.
+    
+    Example:
+        optimal_min = 0.35m, scale = 15
+        distance = 0.25m → excess = 0.10m → penalty = 15 * 0.10 = 1.5
+        distance = 0.15m → excess = 0.20m → penalty = 15 * 0.20 = 3.0
+        distance = 0.40m → excess = 0.0   → penalty = 0.0 (no penalty)
+    
+    Args:
+        base_target_distance: XY distance from base to target [num_envs]
+        optimal_min_distance: Minimum comfortable working distance (meters)
+        scale: Penalty weight
+        
+    Returns:
+        Penalty values [num_envs] - positive when too close
+    """
+    # How much closer than optimal minimum?
+    excess_proximity = torch.clamp(optimal_min_distance - base_target_distance, min=0.0)
+    return scale * excess_proximity
 
 def base_mobilization_reward(
     base_pos: torch.Tensor,
@@ -909,19 +978,39 @@ def compute_combined_reward(
         scale=weights.get("target_distance_penalty", 10.0)
     )
     
-    # Smooth reachability shaping
+    # Smooth reachability shaping with bell-shaped bonus (Session 8e)
     reachability_distance = (
         workspace_distance if workspace_distance is not None else torch.zeros_like(base_target_distance)
     )
+    
+    # NEW (Session 8f): Distance-gated penalty system
+    # Far targets (>0.55m): penalties OFF, mobilization ON → "GO GET IT!"
+    # Near targets (<0.55m): penalties ON, precision mode → "BE PRECISE!"
+    # This prevents penalties from fighting mobilization when base needs to move
+    # Reference: mobile_mm_training_playbook.md §2
+    gate_threshold = 0.55  # Switch point between mobilization and precision modes
+    gate_steepness = 10.0  # Sigmoid slope
+    stability_gate = torch.sigmoid((gate_threshold - base_target_distance) * gate_steepness)
+    # stability_gate ≈ 0.0 when far (>0.55m), ≈ 1.0 when near (<0.55m)
+    
     soft_margin = weights.get("reachability_soft_margin", 0.2)
     hard_margin = weights.get("reachability_hard_margin", 0.6)
+    optimal_distance = weights.get("reachability_optimal_distance", 0.5)  # NEW: Peak of bell curve
     reach_bonus_factor, reach_penalty_distance = reachability_distance_components(
         reachability_distance,
         soft_margin,
         hard_margin,
+        optimal_distance,  # NEW: Bell curve peaks at this distance
     )
     reach_bonus = weights.get("reachability_maintenance_reward", 0.0) * reach_bonus_factor
     reach_distance_penalty = weights.get("reachability_distance_weight", 0.0) * (reach_penalty_distance ** 2)
+    
+    # Inner margin penalty: Prevent base from getting too close (Session 8e)
+    inner_penalty = inner_margin_penalty(
+        base_target_distance,
+        optimal_min_distance=weights.get("inner_margin_min_distance", 0.35),
+        scale=weights.get("inner_margin_penalty", 15.0),
+    )
 
     # Overshoot penalty: Prevent base from moving past waypoints
     overshoot_penalty = base_overshoot_penalty(
@@ -949,7 +1038,8 @@ def compute_combined_reward(
     
     # Robot constraint penalties
     # base_lin_vel is in physical units (m/s); limits come directly from robot specs.
-    vel_limit_penalty = velocity_limit_penalty(
+    # Session 8f: Gate by distance (OFF when far, ON when near)
+    vel_limit_penalty = stability_gate * velocity_limit_penalty(
         base_lin_vel,
         joint_vel,
         robot_limits["max_linear_velocity"],
@@ -960,7 +1050,8 @@ def compute_combined_reward(
     # Base acceleration in physical units (m/s^2)
     base_accel = (base_lin_vel - prev_base_lin_vel) / dt
     # BUGFIX: Pass full planar velocity (xy) for magnitude-based penalty
-    accel_limit_penalty = acceleration_limit_penalty(
+    # Session 8f: Gate by distance (OFF when far, ON when near)
+    accel_limit_penalty = stability_gate * acceleration_limit_penalty(
         base_lin_vel[:, :2],  # Planar velocity [num_envs, 2]
         prev_base_lin_vel[:, :2],  # Previous planar velocity [num_envs, 2]
         dt,
@@ -970,7 +1061,8 @@ def compute_combined_reward(
     
     # Jerk (rate of change of acceleration) in physical units (m/s^3)
     # BUGFIX: Pass full planar acceleration (xy) for magnitude-based penalty
-    jerk_penalty_val = jerk_penalty(
+    # Session 8f: Gate by distance (OFF when far, ON when near)
+    jerk_penalty_val = stability_gate * jerk_penalty(
         base_accel[:, :2],  # Planar acceleration [num_envs, 2]
         prev_base_accel[:, :2],  # Previous planar acceleration [num_envs, 2]
         dt,
@@ -1001,7 +1093,8 @@ def compute_combined_reward(
     # External collisions (not used for now, kept for compatibility)
     # coll_penalty = collision_penalty(contact_forces, scale=weights["collision_penalty"])
     
-    stab_penalty = stability_penalty(base_lin_vel, base_ang_vel, scale=weights["stability_penalty"])
+    # Session 8f: Gate stability penalty by distance (OFF when far, ON when near)
+    stab_penalty = stability_gate * stability_penalty(base_lin_vel, base_ang_vel, scale=weights["stability_penalty"])
     
     # Obstacle distance (if enabled)
     if min_obstacle_dist is not None:
@@ -1020,9 +1113,10 @@ def compute_combined_reward(
         + prog_bonus
         + base_mob_reward  # Reward base movement when target is far (configurable cap)
         + base_alignment_reward  # Reward moving toward unreachable targets
-        + reach_bonus  # Smooth bonus inside comfortable workspace
+        + reach_bonus  # Smooth bonus inside comfortable workspace (bell-shaped)
         + obst_reward
         - reach_distance_penalty  # Smooth penalty outside workspace
+        - inner_penalty  # NEW (Session 8e): Penalty for getting too close (<0.35m)
         - dist_penalty  # Legacy base-target distance penalty
         - distance_penalty_linear  # Linear fallback penalty keeps gradients informative
         - overshoot_penalty
@@ -1048,6 +1142,7 @@ def compute_combined_reward(
         "base_target_alignment": base_alignment_reward,
         "reachability_bonus": reach_bonus,
         "reachability_distance_penalty": reach_distance_penalty,
+        "inner_margin_penalty": inner_penalty,  # NEW (Session 8e)
         "target_distance_penalty": dist_penalty,
         "position_distance_penalty": distance_penalty_linear,
         "base_overshoot_penalty": overshoot_penalty,

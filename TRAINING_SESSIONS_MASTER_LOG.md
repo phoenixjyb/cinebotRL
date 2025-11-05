@@ -3,34 +3,304 @@
 **Project:** CinebotRL - Mobile Manipulator End-Effector Tracking  
 **Repository:** phoenixjyb/cinebotRL  
 **Branch:** train-windows  
-**Last Updated:** October 26, 2025 15:30 +0800
+**Last Updated:** November 1, 2025 17:00 +0800
 
 ---
 
-## 🚀 **NEXT: Session 7d (Planned)**
+## 🎉 **LATEST: Session 8f - BEST RESULTS!**
 
-**Status:** Reward tuning for strategic base movement  
-**Goal:** Fix non-goal-directed base navigation from Session 7c  
-**Duration:** ~11 hours (200M timesteps)  
-**Changes:** 3 reward weight adjustments + 1 new reward component
+**Status:** ✅ **COMPLETE - BEST PERFORMING SESSION**  
+**Goal:** Apply playbook fixes (atomic state write, distance gating, heading cue)  
+**Duration:** Oct 31 13:35 → Nov 1 01:44 (~12.2 hours)  
+**Timesteps:** 100,663,296 (100M)  
+**Evaluation:** Nov 1 15:15 (200 episodes, 64 parallel envs)
 
-### Quick Start (Session 7d)
+### Session 8f Results Summary
+
+**🏆 Performance Records:**
+- ✅ **Best position accuracy:** 307.8cm mean, 298.7cm median
+- ✅ **Best orientation:** 46.5° mean, 40.7° median  
+- ✅ **Highest reward:** -126k (vs -177k in 8d, -259k in 8e)
+- ✅ **Mobilization working:** 0.32 (vs 0.15 in 8e)
+- ⚠️ **Reachability bonus:** 0.64 (still low, but tracking works!)
+
+**Implemented Fixes (from playbook):**
+1. ✅ Atomic root state write (13-element tensor)
+2. ✅ Distance-gated penalties (>0.55m: OFF, <0.55m: ON)
+3. ✅ Heading cue observations (+2 dims: sin/cos yaw error)
+4. ✅ Two-zone linear reachability (0.35-0.55m plateau)
+
+**Remaining Issue:**
+- ⚠️ Workspace distance still drifts (0.42m → 0.60m over training)
+
+**See:** `docs/training_sessions/SESSION_8F_EVALUATION.md` for full analysis
+
+### Quick Start (Session 8g - Next)
 ```powershell
-# After implementing reward changes:
-.\scripts\launch_training_windows.ps1 `
-  -Task MobileMMTrackEE-v0 `
-  -NumEnvs 4096 `
-  -Headless `
-  -TotalTimesteps 200000000
+# Stronger reachability gravity or workspace distance reward
+.\scripts\launch_session_8g.ps1  # TBD: implement recommendations
 ```
 
-### Session 7d Changes
-⬆️ **Increase base_progress_reward:** 150 → 250 (67% boost)  
-⬇️ **Reduce target_distance_penalty:** 5 → 3 (40% gentler)  
-⭐ **Add base_target_alignment reward:** New component (10.0 weight)  
-📊 **Expected:** Reachability 6% → 50%+, Mean error 1.01m → <0.50m
+---
 
-**See:** `docs/SESSION_7D_REWARD_TUNING_PROPOSAL.md` for detailed analysis
+## 🚀 **NEXT: Session 8g (Planned)**
+
+**Goal:** Fix persistent workspace distance drift  
+**Options:**
+1. Increase reachability_maintenance_reward (40 → 80)
+2. Add explicit workspace_distance_reward component
+3. Progressive reachability weight schedule (40 → 100)
+4. Success-based curriculum learning
+
+---
+
+## 📊 **Session 8f - Detailed Results**
+
+**Date:** October 31 - November 1, 2025  
+**Duration:** Oct 31 13:35 → Nov 1 01:44 (~12.2 hours)  
+**Timesteps:** 100,663,296 (100M)  
+**Environments:** 16,384 parallel (RTX 3090, Isaac Lab 2.2.0)  
+**Evaluation:** Nov 1 15:15 (200 episodes, 64 parallel envs, deterministic)
+
+### Session 8f Results - THE BEST SO FAR! 🏆
+
+**Performance Metrics:**
+```
+Position Error:    307.8cm mean, 298.7cm median  ⭐ BEST
+Orientation Error: 46.5° mean, 40.7° median     ⭐ BEST
+Mean Reward:       -126,482                      ⭐ BEST
+Episode Length:    Mean 399.2 steps
+
+Environment Health Distribution:
+  Excellent (<100cm):      8.0%
+  Good (100-250cm):       33.5%
+  Acceptable (250-400cm): 41.0%
+  Poor (400-600cm):       14.0%
+  Critical (>600cm):       3.5%
+```
+
+**Reward Component Breakdown:**
+```
+position_tracking:               21.83 ± 46.90
+orientation_tracking:           144.72 ± 24.27
+reachability_bonus:               0.64 ± 2.18   ⚠️ Low but OK
+reachability_distance_penalty:  231.77 ± 217.31  (Much better than 8e!)
+inner_margin_penalty:             0.13 ± 0.43
+base_mobilization:                0.32 ± 0.52   ✅ Working!
+base_target_alignment:            0.36 ± 0.33   ✅ Much improved!
+```
+
+### Session 8f vs 8d vs 8e Comparison
+
+| Metric | Session 8d | Session 8e | Session 8f | vs 8d | vs 8e |
+|--------|------------|------------|------------|-------|-------|
+| **Position (cm)** | 311.0 | 349.4 | **307.8** | -1.0% ✅ | -11.9% ✅ |
+| **Orientation (°)** | 47.4 | 48.5 | **46.5** | -1.9% ✅ | -4.1% ✅ |
+| **Reward** | -177k | -259k | **-126k** | +28.8% ✅ | +51.4% ✅ |
+| **Reachability Bonus** | 7.06 | 0.79 | 0.64 | -91% ❌ | -19% ⚠️ |
+| **Distance Penalty** | 360 | 529 | **232** | -35.6% ✅ | -56.2% ✅ |
+| **Mobilization** | N/A | 0.15 | **0.32** | N/A | +113% ✅ |
+| **Alignment** | N/A | 0.056 | **0.36** | N/A | +543% ✅ |
+
+### What Worked (Session 8f Implementation)
+
+**1. ✅ Atomic Root State Write** (`env.py` lines ~1160-1185)
+- **Problem:** Sequential velocity→pose writes were conflicting
+- **Fix:** Single `write_root_state_to_sim()` with 13-element tensor
+- **Impact:** Base responds more smoothly, no control fighting
+
+**2. ✅ Distance-Gated Penalties** (`rewards.py` lines ~960-975)
+- **Problem:** Stability penalties fought mobilization even when far
+- **Fix:** `sigmoid((0.55 - distance) * 10.0)` gates penalties OFF when >0.55m
+- **Impact:** Mobilization +113%, alignment +543% vs Session 8e
+
+**3. ✅ Heading Cue Observations** (`observations.py` lines ~78-90)
+- **Problem:** Policy didn't know "which way to turn"
+- **Fix:** Added sin/cos(base→target yaw error) = +2 obs dims
+- **Impact:** Orientation median improved 13.8% (47.2° → 40.7°)
+
+**4. ⚠️ Two-Zone Linear Reachability** (`rewards.py` lines ~95-145)
+- **Problem:** Bell-shaped (8e) was too brittle, collapsed
+- **Fix:** Linear zones: approach (0.35-0.45m), plateau (0.45-0.55m), decay (0.55-0.9m)
+- **Impact:** Better than 8e, but reachability bonus still low (0.64)
+
+### What Still Needs Fixing
+
+**Workspace Distance Drift:**
+```
+Training Progress:
+  10M: 0.416m  ⚠️  Too close
+  20M: 0.450m  ✅  Good!
+  30M: 0.481m  ✅  Good!
+  40M: 0.489m  ✅  Good!
+  50M: 0.556m  ⚠️  Starting to drift
+  60M: 0.554m  ⚠️  Drifting
+  70M: 0.625m  🚨  Too far!
+  80M: 0.568m  ⚠️  Fluctuating
+  90M: 0.600m  ⚠️  Still too far
+```
+
+**Analysis:**
+- Distance gating helped early (20-40M stable)
+- But drift occurred after 50M
+- Policy learned: "Stay farther = avoid penalties"
+- Two-zone linear wasn't strong enough
+
+**Reachability Bonus Still Low:**
+- Target: >5.0 (like Session 8d's 7.06)
+- Actual: 0.64 (10% of target)
+- Root cause: Workspace distance at 0.60m during eval
+- Two-zone gives ~zero bonus beyond 0.55m
+
+### Training Configuration (Session 8f)
+
+**Architecture:**
+```python
+task: MobileMMTrackEE-v0
+num_envs: 16384
+device: cuda:0 (NVIDIA GeForce RTX 3090)
+isaac_lab: 2.2.0
+observation_dims: 76 total
+  - Base: 51 dims (13 root + 12 joints + 13 EE + 7 error + 6 base-to-target)
+  - Optional: 9 lookahead + 16 action history
+action_dims: 12 (arm: 9, base: 3)
+```
+
+**PPO Hyperparameters:**
+```python
+learning_rate: 3e-4
+n_steps: 16 (per env)
+batch_size: 32768 (2048 minibatches)
+n_epochs: 4
+gamma: 0.99
+gae_lambda: 0.95
+clip_range: 0.2
+ent_coef: entropy decay schedule
+vf_coef: 0.5
+max_grad_norm: 1.0
+
+# Advanced features
+adaptive_kl_enabled: True
+kl_schedule_enabled: True
+target_kl: 0.01
+tf32_enabled: True
+cudnn_benchmark: True
+```
+
+**Reward Weights (Session 8f):**
+```python
+position_tracking: 50.0
+orientation_tracking: 30.0
+reachability_maintenance: 40.0  ⚠️ Should increase for 8g
+reachability_distance_penalty: 10.0
+position_distance_penalty: 5.0
+inner_margin_penalty: 100.0
+base_mobilization: 0.5
+base_overshoot_penalty: 5.0
+base_target_alignment: 2.0
+
+# Distance-gated (active only <0.55m):
+stability_penalty: 1.0
+velocity_limit_penalty: 0.1
+acceleration_limit_penalty: 0.1
+jerk_penalty: 0.1
+```
+
+**Observation Features (Session 8f):**
+- ✅ Base state (13 dims): pos, quat, lin_vel, ang_vel
+- ✅ Joint states (12 dims): positions + velocities
+- ✅ End-effector (13 dims): pos, quat, lin_vel, ang_vel
+- ✅ Tracking error (7 dims): position + orientation
+- ✅ **NEW:** Base-to-target (6 dims): distance, heading sin/cos, relative pos
+- ✅ Lookahead (9 dims): future target trajectory
+- ✅ Action history (16 dims): smoothness signal
+
+### Playbook Compliance Checklist
+
+From `mobile_mm_training_playbook.md`:
+
+- ✅ **Atomic Root State Write:** Implemented (env.py)
+- ✅ **Distance-Gated Penalties:** Implemented (rewards.py)
+- ✅ **Heading Cue Observations:** Implemented (observations.py)
+- ✅ **Two-Zone Linear Reachability:** Implemented (rewards.py)
+- ⚠️ **Reachability Weight:** 40 (playbook suggests higher)
+- ⚠️ **Workspace Distance Control:** Still drifts (need 8g fix)
+
+### Files Generated (Session 8f)
+
+**Training Artifacts:**
+- `logs/sb3/mobilemmtrackee_v0/20251101_013539/final_model.zip` (policy checkpoint)
+- `logs/sb3/mobilemmtrackee_v0/20251101_013539/events.out.tfevents.*` (TensorBoard)
+
+**Evaluation Results:**
+- `evaluation_plots/session_8f_100M/20251101_013539/eval_summary_20251101_151551.json`
+- `evaluation_plots/session_8f_100M/20251101_013539/episodes_20251101_151551.csv`
+- `evaluation_plots/session_8f_100M/20251101_013539/steps_20251101_151551.csv`
+- `evaluation_plots/session_8f_100M/20251101_013539/arrays_20251101_151551.npz`
+
+**Documentation:**
+- `docs/training_sessions/SESSION_8F_IMPLEMENTATION.md` (setup guide)
+- `docs/training_sessions/SESSION_8F_EVALUATION.md` (this analysis)
+- `scripts/launch_session_8f.ps1` (launcher)
+- `scripts/check_workspace_8f.py` (monitoring tool)
+
+### Recommendations for Session 8g
+
+**Based on Session 8f analysis, try ONE of these:**
+
+**Option 1: Stronger Reachability Gravity** (Recommended)
+```python
+reachability_maintenance_reward: 40 → 80  # Double the pull
+optimal_plateau_width: ±0.05m → ±0.10m   # Wider safety margin
+```
+
+**Option 2: Explicit Workspace Distance Reward**
+```python
+# New component in rewards.py
+workspace_distance_reward = lambda d: {
+    +50 if 0.45 ≤ d ≤ 0.55,  # Large bonus in optimal zone
+    +25 if 0.40 ≤ d < 0.45 or 0.55 < d ≤ 0.60,  # Approach bonus
+    -100 * (d - 0.5)**2 otherwise  # Quadratic penalty
+}
+```
+
+**Option 3: Progressive Weight Schedule**
+```python
+# Increase reachability importance over time
+0-20M:   reachability_weight = 40
+20M-50M: reachability_weight = 60
+50M-100M: reachability_weight = 100
+```
+
+**Option 4: Success-Based Curriculum**
+```python
+# Only enforce strict workspace after tracking is good
+if position_error < 250cm AND orientation_error < 35°:
+    enforce_strict_workspace_distance()
+else:
+    relax_workspace_requirements()
+```
+
+### Session 8f Verdict
+
+**Overall Grade: A-** (Best session so far!)
+
+**Strengths:**
+- ✅ Best tracking accuracy (position & orientation)
+- ✅ Highest reward (+51% vs 8e, +29% vs 8d)
+- ✅ Mobilization working (base moves purposefully)
+- ✅ All playbook fixes validated
+- ✅ Stable training (no crashes, no collapse)
+
+**Weaknesses:**
+- ⚠️ Workspace distance still drifts after 50M
+- ⚠️ Reachability bonus remains low (0.64 vs target 5.0+)
+- ⚠️ Policy learns to stay farther to minimize risk
+
+**Recommendation:**
+- **Use Session 8f as baseline** for future work
+- **Launch Session 8g** with Option 1 (stronger reachability gravity)
+- Consider progressive weight schedule if Option 1 insufficient
 
 ---
 

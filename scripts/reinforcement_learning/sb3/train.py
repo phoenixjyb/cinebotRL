@@ -73,7 +73,7 @@ def parse_args():
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=3e-4,
+        default=2e-4,  # Session 8h: Lower for stability (8g used 3e-4)
         help="Learning rate for PPO",
     )
     parser.add_argument(
@@ -148,14 +148,14 @@ def parse_args():
     parser.add_argument(
         "--decay_start_timestep",
         type=int,
-        default=100_000_000,
-        help="Timestep to start entropy decay (default: 100M steps)",
+        default=150_000_000,
+        help="Timestep to start entropy decay (default: 150M steps)",
     )
     parser.add_argument(
         "--decay_duration_timesteps",
         type=int,
-        default=100_000_000,
-        help="Duration of entropy decay in timesteps (default: 100M steps)",
+        default=150_000_000,
+        help="Duration of entropy decay in timesteps (default: 150M steps for slower decay)",
     )
     
     # KL divergence scheduling parameters (prevents instability and oscillations)
@@ -248,6 +248,13 @@ def parse_args():
         "--use_chassis_only",
         action="store_true",
         help="Use only chassis-requiring trajectories (for testing base movement, not recommended for training)",
+    )
+    parser.add_argument(
+        "--trajectory_stage",
+        type=str,
+        default=None,
+        choices=["stage0_easy", "stage1_recovery", "stage2_moderate", "stage3_full"],
+        help="Session 8h: Use staged trajectory curriculum (stage0=easy, stage1=recovery, stage2=moderate, stage3=full)",
     )
     parser.add_argument(
         "--max_trajectories",
@@ -663,8 +670,131 @@ def main():
         def _on_step(self) -> bool:
             """Called at every step. Required by BaseCallback."""
             return True
+    
+    # Session 8h: Auto-pause callback for training instability detection
+    class AutoPauseCallback(BaseCallback):
+        """
+        Monitors training stability and automatically pauses if instability detected.
+        
+        Session 8g failed catastrophically due to no auto-pause mechanism.
+        Session 8h implements proactive monitoring to prevent collapse.
+        
+        Monitors:
+        - KL divergence: Triggers if exceeds threshold (default 0.1)
+        - Explained variance: Triggers if drops below threshold (default 0.0)
+        
+        When triggered:
+        - Saves emergency checkpoint
+        - Prints rollback guidance
+        - Stops training immediately
+        """
+        def __init__(
+            self, 
+            enable: bool = True,
+            kl_threshold: float = 0.1,
+            variance_threshold: float = 0.0,
+            warmup_steps: int = 500_000,  # Skip monitoring in first 500K steps (early instability is normal)
+            checkpoint_dir: str = None,
+            verbose: int = 1
+        ):
+            super().__init__(verbose)
+            self.enable = enable
+            self.kl_threshold = kl_threshold
+            self.variance_threshold = variance_threshold
+            self.warmup_steps = warmup_steps
+            self.checkpoint_dir = checkpoint_dir
+            self.triggered = False
+            
+            if self.enable:
+                print(f"[AutoPause] Monitoring enabled:")
+                print(f"  KL threshold: {kl_threshold}")
+                print(f"  Variance threshold: {variance_threshold}")
+                print(f"  Warmup period: {warmup_steps:,} steps (monitoring starts after)")
+        
+        def _on_rollout_end(self) -> bool:
+            """Check stability metrics after each rollout."""
+            if not self.enable or self.triggered:
+                return True
+            
+            # Skip monitoring during warmup period
+            if self.num_timesteps < self.warmup_steps:
+                return True
+            
+            try:
+                # Get metrics from PPO logger
+                if hasattr(self.logger, 'name_to_value'):
+                    current_kl = self.logger.name_to_value.get('train/approx_kl', 0.0)
+                    current_variance = self.logger.name_to_value.get('train/explained_variance', 1.0)
+                    
+                    # Check KL divergence
+                    if current_kl > self.kl_threshold:
+                        self._trigger_pause(
+                            reason=f"KL divergence exceeded threshold: {current_kl:.4f} > {self.kl_threshold}",
+                            current_kl=current_kl,
+                            current_variance=current_variance
+                        )
+                        return False
+                    
+                    # Check explained variance
+                    if current_variance < self.variance_threshold:
+                        self._trigger_pause(
+                            reason=f"Explained variance dropped below threshold: {current_variance:.4f} < {self.variance_threshold}",
+                            current_kl=current_kl,
+                            current_variance=current_variance
+                        )
+                        return False
+                
+            except Exception as e:
+                if self.verbose > 1:
+                    print(f"[AutoPause] Error checking metrics: {e}")
             
             return True
+        
+        def _trigger_pause(self, reason: str, current_kl: float, current_variance: float):
+            """Trigger auto-pause and save emergency checkpoint."""
+            self.triggered = True
+            
+            print("\n" + "!"*80)
+            print("!!! AUTO-PAUSE TRIGGERED !!!")
+            print("!"*80)
+            print(f"\nReason: {reason}")
+            print(f"\nCurrent Metrics:")
+            print(f"  KL divergence: {current_kl:.4f} (threshold: {self.kl_threshold})")
+            print(f"  Explained variance: {current_variance:.4f} (threshold: {self.variance_threshold})")
+            print(f"  Timesteps: {self.num_timesteps:,} ({self.num_timesteps/1e6:.1f}M)")
+            
+            # Save emergency checkpoint
+            if self.checkpoint_dir:
+                import os
+                emergency_path = os.path.join(
+                    self.checkpoint_dir, 
+                    f"emergency_pause_{self.num_timesteps}_steps"
+                )
+                self.model.save(emergency_path)
+                print(f"\n✅ Emergency checkpoint saved: {emergency_path}.zip")
+            
+            print("\n" + "="*80)
+            print("ROLLBACK GUIDANCE")
+            print("="*80)
+            print("\n1. Identify last stable checkpoint (before instability):")
+            print("   - Check logs for when metrics started degrading")
+            print("   - Look for checkpoints saved every 2M steps")
+            print("\n2. Resume from stable checkpoint:")
+            print("   python train.py --checkpoint <stable_checkpoint.zip> --total_timesteps <remaining>")
+            print("\n3. Consider adjustments:")
+            print("   - Reduce learning rate: --learning_rate 2e-4 (was 3e-4)")
+            print("   - Extend transition period: curriculum_transition_steps=20M (was 10M)")
+            print("   - Increase orientation weight: curriculum_stage_2_orientation_weight=40.0 (was 30.0)")
+            print("\n4. Session 8g lesson:")
+            print("   - Variance dropped to -0.241 @ 36M but no auto-pause → collapsed @ 100M")
+            print("   - Session 8h has auto-pause to prevent repeating this mistake")
+            print("\n" + "!"*80)
+            print("TRAINING PAUSED - Review metrics and rollback to stable checkpoint")
+            print("!"*80 + "\n")
+        
+        def _on_step(self) -> bool:
+            """Called at every step."""
+            return not self.triggered  # Stop if triggered
     
     # Create wrapper to convert Isaac Lab observations to SB3 format
     class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):
@@ -816,9 +946,35 @@ def main():
     if args.trajectory_type == "multi_recorded":
         print(f"    Trajectory directory: {args.trajectory_dir}")
         
-        # Determine which trajectories to use
+        # Session 8h: Trajectory curriculum stages
+        if args.trajectory_stage:
+            print(f"    [Session 8h] Using trajectory curriculum: {args.trajectory_stage}")
+            stage_dir = PROJECT_ROOT / "trajectoryToLearn" / args.trajectory_stage
+            if stage_dir.exists():
+                # Check if stage has trajectories
+                stage_files = list(stage_dir.glob("*.json"))
+                if stage_files:
+                    # Use trajectories from stage directory
+                    trajectory_config['stage_dir'] = str(stage_dir)
+                    trajectory_config['filter_indices'] = None
+                    print(f"    [OK] Loaded {len(stage_files)} trajectories from {args.trajectory_stage}")
+                    print(f"      Stage directory: {stage_dir}")
+                else:
+                    # Stage exists but empty - fall back to chassis-only as proxy
+                    print(f"    [WARN] {args.trajectory_stage} exists but contains no trajectories")
+                    print(f"    [INFO] Falling back to chassis-only as stage0 proxy")
+                    args.use_chassis_only = True  # Enable fallback
+            else:
+                print(f"    [WARN] Stage directory {stage_dir} does not exist")
+                print(f"    [INFO] Falling back to chassis-only as stage0 proxy")
+                args.use_chassis_only = True  # Enable fallback
+        
+        # Determine which trajectories to use (original logic + stage fallback)
         if args.use_chassis_only:
-            print("    [WARN]  Using ONLY chassis-requiring trajectories (for testing, not recommended for training)")
+            if args.trajectory_stage:
+                print("    Using chassis-only trajectories as {args.trajectory_stage} proxy")
+            else:
+                print("    [WARN]  Using ONLY chassis-requiring trajectories (for testing, not recommended for training)")
             # Load chassis-required indices
             chassis_indices_file = "data/trajectory_filters/chassis_required_indices.txt"
             if Path(chassis_indices_file).exists():
@@ -844,7 +1000,8 @@ def main():
                 print(f"    Limited to first {args.max_trajectories} trajectories")
         else:
             # Default behavior - use all
-            print("    Using all available trajectories (default)")
+            if not args.trajectory_stage:  # Don't print if stage already handled
+                print("    Using all available trajectories (default)")
             trajectory_config['filter_indices'] = None
         
         trajectory_config['max_trajectories'] = args.max_trajectories
@@ -859,10 +1016,15 @@ def main():
         env_cfg.scene.num_envs = args.num_envs
         
         # Convert trajectory_dir to absolute path if it's relative
-        trajectory_dir = args.trajectory_dir
-        if not Path(trajectory_dir).is_absolute():
-            trajectory_dir = str(PROJECT_ROOT / trajectory_dir)
-            print(f"    Resolved relative path to: {trajectory_dir}")
+        # Session 8h: Use stage_dir if trajectory curriculum is active
+        if 'stage_dir' in trajectory_config:
+            trajectory_dir = trajectory_config['stage_dir']
+            print(f"    [Session 8h] Using stage directory: {trajectory_dir}")
+        else:
+            trajectory_dir = args.trajectory_dir
+            if not Path(trajectory_dir).is_absolute():
+                trajectory_dir = str(PROJECT_ROOT / trajectory_dir)
+                print(f"    Resolved relative path to: {trajectory_dir}")
         
         # Configure trajectory
         env_cfg.task_config.trajectory = TrajectoryConfig(
@@ -969,6 +1131,41 @@ def main():
     )
     callbacks.append(monitor_callback)
     print(f"    [OK] Training monitor enabled: logging detailed metrics every 5 iterations")
+    
+    # Session 8h: Auto-pause callback for instability detection
+    # Read auto-pause settings from environment config
+    try:
+        # Access the unwrapped Isaac Lab environment to get config
+        unwrapped_env = env
+        while hasattr(unwrapped_env, 'venv'):
+            unwrapped_env = unwrapped_env.venv
+        if hasattr(unwrapped_env, 'unwrapped'):
+            isaac_env = unwrapped_env.unwrapped
+            if hasattr(isaac_env, 'task_cfg') and hasattr(isaac_env.task_cfg, 'rewards'):
+                cfg = isaac_env.task_cfg.rewards
+                enable_auto_pause = getattr(cfg, 'enable_auto_pause', False)
+                kl_threshold = getattr(cfg, 'kl_threshold', 0.1)
+                variance_threshold = getattr(cfg, 'variance_threshold', 0.0)
+                
+                if enable_auto_pause:
+                    auto_pause_callback = AutoPauseCallback(
+                        enable=True,
+                        kl_threshold=kl_threshold,
+                        variance_threshold=variance_threshold,
+                        warmup_steps=500_000,  # Skip monitoring in first 500K steps
+                        checkpoint_dir=os.path.join(args.log_dir, "checkpoints"),
+                        verbose=1
+                    )
+                    callbacks.append(auto_pause_callback)
+                    print(f"    [OK] Auto-pause enabled: KL>{kl_threshold}, variance<{variance_threshold}")
+                    print(f"      Warmup: 500K steps (monitoring starts after)")
+                    print(f"      Session 8g lesson: No auto-pause → collapse @ 100M")
+                    print(f"      Session 8h fix: Proactive monitoring prevents catastrophic failure")
+                else:
+                    print(f"    [INFO] Auto-pause disabled in config")
+    except Exception as e:
+        print(f"    [WARN] Could not read auto-pause config from environment: {e}")
+        print(f"    [INFO] Auto-pause callback not registered")
     
     if args.wandb:
         callbacks.append(wandb_callback)

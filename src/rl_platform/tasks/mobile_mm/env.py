@@ -375,6 +375,27 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "position_distance_penalty": self.task_cfg.rewards.position_distance_penalty,
         }
         
+        # Session 8h: Curriculum learning - track stage and original weights
+        self.use_curriculum = self.task_cfg.rewards.use_curriculum
+        self.curriculum_stage_1_steps = self.task_cfg.rewards.curriculum_stage_1_steps
+        self.current_training_step = 0  # Will be updated during training
+        self.curriculum_stage = 1 if self.use_curriculum else 2  # Start in stage 1 if enabled
+        
+        # Store original weights for curriculum switching
+        self.base_position_weight = self.reward_weights["position_tracking"]
+        self.base_orientation_weight = self.reward_weights["orientation_tracking"]
+        
+        # Apply Stage 1 weights if curriculum enabled
+        if self.use_curriculum:
+            self.reward_weights["position_tracking"] = self.task_cfg.rewards.curriculum_stage_1_position_weight
+            self.reward_weights["orientation_tracking"] = self.task_cfg.rewards.curriculum_stage_1_orientation_weight
+            print(f"[Session 8h] Curriculum Stage 1 Active: "
+                  f"position_weight={self.reward_weights['position_tracking']}, "
+                  f"orientation_weight={self.reward_weights['orientation_tracking']} (1:3 ratio maintained)")
+            print(f"[Session 8h] Gradual transition: 45M-55M linear ramp → ({self.task_cfg.rewards.curriculum_stage_2_position_weight}, "
+                  f"{self.task_cfg.rewards.curriculum_stage_2_orientation_weight})")
+
+        
         # Robot limits dictionary
         self.robot_limits = {
             "max_linear_velocity": self.task_cfg.robot_limits.max_linear_velocity,
@@ -1157,26 +1178,33 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         vel_world_x = base_vx_scaled.squeeze(-1) * cos_theta  # World X velocity
         vel_world_y = base_vx_scaled.squeeze(-1) * sin_theta  # World Y velocity
         
-        # Set root velocity directly (no joint integration!)
-        root_vel_w = torch.zeros(self.num_envs, 6, device=self.device)
-        root_vel_w[:, 0] = vel_world_x  # Linear velocity X (world)
-        root_vel_w[:, 1] = vel_world_y  # Linear velocity Y (world)
-        root_vel_w[:, 2] = 0.0  # Linear velocity Z (always 0 for ground robot)
-        root_vel_w[:, 3] = 0.0  # Angular velocity X (roll, always 0)
-        root_vel_w[:, 4] = 0.0  # Angular velocity Y (pitch, always 0)
-        root_vel_w[:, 5] = base_wz_scaled.squeeze(-1)  # Angular velocity Z (yaw)
+        # CRITICAL FIX (Session 8f): Write root state atomically to prevent control conflict
+        # Previously: write_root_link_velocity_to_sim() then write_root_pose_to_sim()
+        # Problem: Pose write could fight/wipe velocity write, making base "numb"
+        # Solution: Single atomic write of pose + velocities together
+        # Reference: mobile_mm_training_playbook.md §1
         
-        # Apply velocity command to root
-        self.robot.write_root_link_velocity_to_sim(root_vel_w)
+        root_state = torch.zeros(self.num_envs, 13, device=self.device)
         
-        # CRITICAL: Clamp Z position to prevent sinking through ground
-        # Direct velocity control doesn't handle gravity/contact resolution,
-        # so we manually keep the base at ground level (Z=0)
-        current_root_pos = self.robot.data.root_pos_w.clone()
-        current_root_pos[:, 2] = 0.0  # Keep chassis at ground level
-        # Concatenate [pos(3), quat(4)] into single tensor for write_root_pose_to_sim
-        root_pose = torch.cat([current_root_pos, self.robot.data.root_quat_w], dim=-1)  # [N, 7]
-        self.robot.write_root_pose_to_sim(root_pose)
+        # Position [0:3] - with Z clamped to ground
+        root_state[:, 0:3] = self.robot.data.root_pos_w
+        root_state[:, 2] = 0.0  # Keep chassis at ground level
+        
+        # Orientation [3:7] - preserve current quaternion
+        root_state[:, 3:7] = self.robot.data.root_quat_w
+        
+        # Linear velocity [7:10]
+        root_state[:, 7] = vel_world_x  # X velocity (world frame)
+        root_state[:, 8] = vel_world_y  # Y velocity (world frame)
+        root_state[:, 9] = 0.0  # Z velocity (always 0 for ground robot)
+        
+        # Angular velocity [10:13]
+        root_state[:, 10] = 0.0  # Roll rate (always 0)
+        root_state[:, 11] = 0.0  # Pitch rate (always 0)
+        root_state[:, 12] = base_wz_scaled.squeeze(-1)  # Yaw rate
+        
+        # Single atomic write - no control conflict!
+        self.robot.write_root_state_to_sim(root_state)
         
         # DEBUG: Print base velocity on first few steps
         if not hasattr(self, '_base_debug_count'):
@@ -1191,8 +1219,72 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"  yaw (from quat): {theta[0].item():.4f} rad")
             self._base_debug_count += 1
     
+    def _update_curriculum_stage(self):
+        """Update curriculum stage with gradual weight interpolation (Session 8h).
+        
+        Session 8g failed with instant transition @ 50M (value function shock).
+        Session 8h uses 10M linear ramp (45M-55M) to prevent instability.
+        """
+        if not self.use_curriculum:
+            return
+        
+        # Estimate current training step from episode count
+        # This is approximate, will be more accurate with explicit step tracking
+        self.current_training_step = self.episode_length_buf.max().item() * len(self.episode_length_buf)
+        
+        stage_1_end = self.curriculum_stage_1_steps  # 45M
+        transition_end = stage_1_end + self.task_cfg.rewards.curriculum_transition_steps  # 55M
+        
+        if self.current_training_step < stage_1_end:
+            # Stage 1: Keep reduced weights (4.0, 12.0)
+            return
+        
+        elif self.current_training_step < transition_end:
+            # Transition: Linear interpolation 45M-55M
+            if self.curriculum_stage == 1:
+                print(f"\n{'='*80}")
+                print(f"[Session 8h] Starting Gradual Curriculum Transition @ {self.current_training_step:,} steps")
+                print(f"  45M-55M: Linear interpolation (4.0, 12.0) → (10.0, 30.0)")
+                print(f"  Session 8g lesson: Instant switch @ 50M caused collapse")
+                print(f"{'='*80}\n")
+                self.curriculum_stage = 1.5  # Mark as transitioning
+            
+            # Calculate interpolation progress [0.0, 1.0]
+            progress = (self.current_training_step - stage_1_end) / self.task_cfg.rewards.curriculum_transition_steps
+            progress = min(1.0, max(0.0, progress))  # Clamp to [0, 1]
+            
+            # Linear interpolation
+            stage_1_pos = self.task_cfg.rewards.curriculum_stage_1_position_weight  # 4.0
+            stage_1_ori = self.task_cfg.rewards.curriculum_stage_1_orientation_weight  # 12.0
+            stage_2_pos = self.task_cfg.rewards.curriculum_stage_2_position_weight  # 10.0
+            stage_2_ori = self.task_cfg.rewards.curriculum_stage_2_orientation_weight  # 30.0
+            
+            self.reward_weights["position_tracking"] = stage_1_pos + progress * (stage_2_pos - stage_1_pos)
+            self.reward_weights["orientation_tracking"] = stage_1_ori + progress * (stage_2_ori - stage_1_ori)
+            
+            # Log every 1M steps during transition
+            if self.current_training_step % 1_000_000 < 100_000:
+                print(f"[Session 8h] Transition progress: {progress*100:.1f}% @ {self.current_training_step:,} steps | "
+                      f"pos={self.reward_weights['position_tracking']:.1f}, "
+                      f"ori={self.reward_weights['orientation_tracking']:.1f}")
+        
+        else:
+            # Stage 2: Full weights reached (10.0, 30.0)
+            if self.curriculum_stage < 2:
+                self.reward_weights["position_tracking"] = self.task_cfg.rewards.curriculum_stage_2_position_weight
+                self.reward_weights["orientation_tracking"] = self.task_cfg.rewards.curriculum_stage_2_orientation_weight
+                self.curriculum_stage = 2
+                print(f"\n{'='*80}")
+                print(f"[Session 8h] Curriculum Stage 2 Complete @ {self.current_training_step:,} steps")
+                print(f"  Position weight: {self.task_cfg.rewards.curriculum_stage_1_position_weight} → {self.reward_weights['position_tracking']}")
+                print(f"  Orientation weight: {self.task_cfg.rewards.curriculum_stage_1_orientation_weight} → {self.reward_weights['orientation_tracking']}")
+                print(f"  Transition method: 10M gradual ramp (vs 8g's instant switch)")
+                print(f"{'='*80}\n")
+    
     def _apply_action(self):
         """Apply actions to the simulation (called by parent)."""
+        # Update curriculum stage if enabled
+        self._update_curriculum_stage()
         pass  # Actions applied in _pre_physics_step
     
     def _scale_actions_to_joint_limits(self, actions: torch.Tensor) -> torch.Tensor:

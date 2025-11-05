@@ -2,13 +2,7 @@ import numpy as np
 
 DEBUG=False
 
-def compute_reward(base_pos, ee_pos, target_pos, base_yaw, wrap_angle_fn, base_lin_vel, base_ang_vel):
-    is_base_over_target = False
-    if base_pos[0] > target_pos[0] or (base_pos[1] * target_pos[1] > 0 and abs(base_pos[1]) > abs(target_pos[1])):
-        is_base_over_target = True
-        if DEBUG:
-            print(f"Base is over target: base_pos={base_pos}, target_pos={target_pos}")
-
+def compute_reward(base_pos, base_lin_vel, ee_pos, target_pos, base_yaw, wrap_angle_fn, remaining_ratio=None):
     total_reward = 0.0
     info = {}
     target_len = np.linalg.norm(np.array(target_pos[:2], dtype=float))
@@ -19,22 +13,37 @@ def compute_reward(base_pos, ee_pos, target_pos, base_yaw, wrap_angle_fn, base_l
     # dist_reward, dist_info = compute_distance_reward(base_pos, target_pos, 0.5)
     
     # 末端执行器误差——距离误差
-    dist_reward, dist_info = compute_distance_reward(ee_pos, target_pos, 0.5)
+    # dist_reward, dist_info = compute_nonlinear_distance_reward(ee_pos, target_pos, 2.0)
+    dist_reward, dist_info = compute_distance_reward(ee_pos, target_pos, 2.0) # 使用线性的，要不然因为跟踪精度不愿意往前走
     
-    # 底盘角度误差
-    # yaw_reward, yaw_info = compute_yaw_reward(base_pos, target_pos, base_yaw, wrap_angle_fn, yaw_ratio)
-    
+    # 底盘速度过快惩罚
+    vel_reward, vel_info = compute_velocity_reward(base_lin_vel, thresh=0.3, ratio=1.0)
+
     # 末端执行器高程误差
     # reward_ee_height, ee_height_info = compute_height_reward(ee_pos[2], target_pos[2])
 
-    # total_reward = dist_reward + yaw_reward + reward_vel
-    total_reward = dist_reward
+    # 进度惩罚
+    progress_reward = compute_progress_reward(remaining_ratio, ratio=2.0)
+    
+    total_reward = dist_reward + progress_reward + vel_reward
+    total_reward = float(np.clip(total_reward, -5.0, 5.0))
+    
     info.update(dist_info)
     # info.update(yaw_info)
     # info.update(ee_height_info)
     if DEBUG:
-        print(f"Reward: {total_reward:.2f} (dist: {dist_reward:.2f})")
+        print(f"Reward: {total_reward:.2f} (dist: {dist_reward:.2f}, progress: {progress_reward:.2f}, vel: {vel_reward:.2f})")
     return total_reward, info
+
+def compute_progress_reward(remaining_ratio, ratio=1.0):
+    """Compute progress-based reward (negative with scaling).
+
+    Returns (reward, info) where info contains 'remaining_ratio'.
+    """
+    reward = -1.0 * remaining_ratio * ratio
+    if DEBUG:
+        print(f"progress reward: {reward:.2f} (remaining_ratio={remaining_ratio:.2f})")
+    return reward
 
 def compute_height_reward(ee_height, target_height):
     reward = 0.0
@@ -43,22 +52,42 @@ def compute_height_reward(ee_height, target_height):
 
     return reward, {"ee_height": ee_height, "target_height": target_height}
 
-def compute_velocity_reward(base_lin_vel, base_ang_vel, is_base_over_target, max_vel, max_ang_vel):
-    lin_reward, ang_reward = 0.0, 0.0
-    if is_base_over_target:
-        lin_reward = -abs(base_lin_vel)
-        ang_reward = -abs(base_ang_vel)
+def compute_velocity_reward(base_lin_vel, thresh=1.0, ratio=1.0):
+    reward = 0.0
+    if base_lin_vel > thresh:
+        reward = -abs(base_lin_vel - thresh) * ratio
+
+    if DEBUG:
+        print(f"velocity Reward: {reward:.2f} (lin_vel={base_lin_vel:.2f}, thresh={thresh:.2f}, ratio={ratio:.2f})")
+
+    return reward, {}
+
+def compute_nonlinear_distance_reward(base_pos, target_pos, dist_weight=1.0):
+    """Compute nonlinear distance-based reward (negative with scaling).
+
+    Returns (reward, info) where info contains 'distance'.
+    """
+    reward = 0.0
+    base_xy = np.array(base_pos[:3], dtype=float)
+    target_xy = np.array(target_pos[:3], dtype=float)
+    dist = float(np.linalg.norm(target_xy - base_xy))
+    
+    if dist < 0.1:
+        reward = -2.0 * dist
     else:
-        if base_lin_vel > max_vel:
-            lin_reward = -(base_lin_vel - max_vel)
-        if base_ang_vel > max_ang_vel:
-            ang_reward = max(-1.0, -(base_ang_vel - max_ang_vel))
-    reward = lin_reward + ang_reward
+        reward = -0.2 - 1.0 * (dist - 0.1)
+        
+    # dist   reward
+    # 0.1    -0.2
+    # 0.2    -0.3
+    # 0.3    -0.4
+    # 1.0    -1.1
 
-    print(f"Velocity Reward: lin_vel={base_lin_vel:.2f} (max {max_vel:.2f}), ang_vel={base_ang_vel:.2f} (max {max_ang_vel:.2f}),"
-          f" lin_reward={lin_reward:.3f}, ang_reward={ang_reward:.3f}, total_reward={reward:.3f}")
+    reward *= dist_weight
 
-    return reward, {"velocity_error": (lin_reward, ang_reward)}
+    if DEBUG:
+        print(f"nonlinear distance reward: {reward:.2f} (dist={dist:.2f}, weight={dist_weight})")
+    return reward, {"ee_distance": dist}
 
 def compute_distance_reward(base_pos, target_pos, dist_weight=1.0):
     """Compute distance-based reward (negative with scaling).

@@ -11,9 +11,9 @@ except Exception:
     Image = None
 
 from .reward_helpers import compute_reward, DEBUG
-from .target_generator import TargetGenerator, FixedTarget, RandomTarget, RandomTargetForEpisode, JSONNearestTargetGenerator
+from .target_generator import TargetGenerator, FixedTarget, JSONNearestTargetGenerator
 
-class MobileMMBulletEnv(gym.Env):
+class MobileMMTrajEnv(gym.Env):
     """Minimal PyBullet-based mobile manipulator tracking env.
 
     Loads URDF from project: assets_own/mobile_manipulator_PPR_base_corrected.urdf
@@ -23,7 +23,7 @@ class MobileMMBulletEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
-    def __init__(self, urdf_path=None, frame_skip=10, max_steps=500, render=False,
+    def __init__(self, urdf_path=None, frame_skip=24, max_steps=500, render=False,
                  save_image_on_reset=False, save_image_path=None, image_width=800, image_height=600,
                  reward_distance_weight: float = 1.0, reward_yaw_weight: float = 1.0,
                  target_generator: Optional[TargetGenerator] = None):
@@ -58,29 +58,18 @@ class MobileMMBulletEnv(gym.Env):
 
         # action / obs spaces
         self.n_j = len(self.joint_ids) # 关节个数
+        self.lookahead_num = 5
 
         # 目前仅控制底盘的2自由度——x平移和theta旋转
         self.action_space = spaces.Box(low=-1, high=1, shape=(2+6,), dtype=np.float32) # 2个底盘自由度 + 6个机械臂自由度
-        obs_dim = self.n_j * 2 + 3 + 3 + 3 # joint pos(9), joint vel(9), ee_pos(3) + target_pos(3)
+        obs_dim = self.n_j * 2 + 3 + 3 + 3*(1 + self.lookahead_num) + 1 # joint pos(9), joint vel(9), ee_pos(3) + target_pos(3*5当前1个，预瞄5个) + remaining(1)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
 
-        # ee初始位置是[0.4, 0.0, 0.9]
-        # base_pos初始位置是[0.0, 0.0, 0.2]
-        default_target = np.array([10.0, 1.0, 0.2], dtype=np.float32)
-        if target_generator is None:
-            self._target_generator = FixedTarget(tuple(default_target.tolist()))
-        else:
-            self._target_generator = target_generator
-        # initialise current target via generator
-        try:
-            self._target = self._target_generator.reset()
-        except Exception:
-            # fallback to default target if generator fails
-            self._target = default_target
-
-        # reward shaping weights
-        self.reward_distance_weight = float(reward_distance_weight)
-        self.reward_yaw_weight = float(reward_yaw_weight)
+        self._target_generator = target_generator
+        self._target = self._target_generator.reset()
+        self.is_finish_step1 = False
+        self.remain_traj_ratio = 1.0
+        self._traj_id = 0
 
     def _load_robot_once(self):
         # load plane and robot, then remove (we re-create on reset)
@@ -115,15 +104,48 @@ class MobileMMBulletEnv(gym.Env):
         if seed is not None:
             np.random.seed(seed)
         self._target = self._target_generator.reset()
+        self.is_finish_step1 = False
+        self.remain_traj_ratio = 1.0
         self.step_count = 0
+        self._traj_id = 0
         p.resetSimulation()
         p.setGravity(0, 0, -9.81)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.loadURDF("plane.urdf")
         self.robot = p.loadURDF(self.urdf_path, useFixedBase=False)
+
+        start_pos = self._target_generator.traj.get_position(0, 0.0)
+
         # reset joints to random small values
         for idx in self.joint_ids:
             p.resetJointState(self.robot, idx, targetValue=0.0, targetVelocity=0.0)
+
+        # p.resetJointState(self.robot, self.joint_name2ids['joint_x'],
+        #                   targetValue=start_pos[0] + np.random.uniform(-0.5, 0.5), targetVelocity=0.0)
+        # p.resetJointState(self.robot, self.joint_name2ids['joint_y'],
+        #                   targetValue=start_pos[1] + np.random.uniform(-0.5, 0.5), targetVelocity=0.0)
+        # p.resetJointState(self.robot, self.joint_name2ids['joint_theta'],
+        #                   targetValue=np.random.uniform(-np.pi, np.pi), targetVelocity=0.0)
+        
+        # 初始点做简化，方向尽量一致，ee尽量靠近起点
+        p.resetJointState(self.robot, self.joint_name2ids['joint_x'],
+                          targetValue=start_pos[0] + np.random.uniform(-1.0, -0.7), targetVelocity=0.0)
+        p.resetJointState(self.robot, self.joint_name2ids['joint_y'],
+                          targetValue=start_pos[1] + np.random.uniform(-0.1, 0.1), targetVelocity=0.0)
+        
+        # 各机械臂设置为初始位置
+        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint1'],
+                          targetValue=-1.61, targetVelocity=0.0)
+        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint2'],
+                          targetValue=0.00, targetVelocity=0.0)
+        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint3'],
+                          targetValue=-0.32, targetVelocity=0.0)
+        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint4'],
+                          targetValue=-1.56, targetVelocity=0.0)
+        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint5'],
+                          targetValue=-1.13, targetVelocity=0.0)
+        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint6'],
+                          targetValue=0.0, targetVelocity=0.0)
 
         # optionally save image after robot spawned
         if self.save_image_on_reset:
@@ -401,6 +423,24 @@ class MobileMMBulletEnv(gym.Env):
         self._abstract_chassis_desired_yaw = desired_yaw
         return desired_yaw
 
+    def _get_target(self, ee_pos):
+        # self._target_generator.test_vel()
+        if not self.is_finish_step1:
+            self._traj_id, self._target = 0, self._target_generator.traj.get_position(0)
+        else:
+            self._traj_id, self._target = self._target_generator.get_projection(ee_pos)
+        remaining_traj_num, self.remain_traj_ratio = self._target_generator.get_remaining_traj_nums(self._traj_id)
+        # 预瞄2个点，每个点间隔0.1s
+        future_xp = self._target_generator.get_lookahead(self._traj_id, 0.1, self.lookahead_num)
+        future_xp = np.array(future_xp, dtype=np.float32).reshape(-1)
+        
+        if DEBUG:
+            print(f"Current target position: {self._target}, traj_id={self._traj_id}, "
+                  f"future_2p={future_xp}, "
+                  f"remaining_traj_num={remaining_traj_num}, remain_traj_ratio={self.remain_traj_ratio:.2f}, "
+                  f"is_finish_step1={self.is_finish_step1}")
+        return self._target, future_xp
+
     def _get_obs(self):
         q = [] # 关节位置
         qdot = [] # 关节速度
@@ -414,9 +454,10 @@ class MobileMMBulletEnv(gym.Env):
         base_pos = self._get_base_pos()
         self._joint_states = np.concatenate([q, qdot], axis=0)
         desired_yaw = np.array([self._get_desired_yaw(base_pos, self._target)])
+        target, future_5targets = self._get_target(ee_pos)
 
-        obs = np.concatenate([q, qdot, base_pos, ee_pos, self._target]).astype(np.float32)
-        # obs = np.concatenate([q, qdot, base_pos, ee_pos, self._target, desired_yaw]).astype(np.float32)
+        obs = np.concatenate([q, qdot, base_pos, ee_pos, target, future_5targets,
+                              np.array([self.remain_traj_ratio])]).astype(np.float32)
         return obs
 
     def _get_target_position(self):
@@ -449,7 +490,7 @@ class MobileMMBulletEnv(gym.Env):
         
         action_ds = action[0] * 0.1
         action_dtheta = action[1] * 0.01
-        joint_delta_limit = 0.01
+        joint_delta_limit = 0.02
         action_left_arm1 = action[2] * joint_delta_limit
         action_left_arm2 = action[3] * joint_delta_limit
         action_left_arm3 = action[4] * joint_delta_limit
@@ -474,6 +515,7 @@ class MobileMMBulletEnv(gym.Env):
         if DEBUG:
             print(f"action: ds={action_ds:.3f}"
                   f"(dx={action_dx:.3f}, dy={action_dy:.3f}), dtheta={action_dtheta:.3f}, "
+                  f"target=(x={target_x:.3f}, y={target_y:.3f}, theta={target_theta:.3f}), "
                   f"left_arm1={action_left_arm1:.3f}, left_arm2={action_left_arm2:.3f}, "
                   f"left_arm3={action_left_arm3:.3f}, left_arm4={action_left_arm4:.3f}, "
                   f"left_arm5={action_left_arm5:.3f}, left_arm6={action_left_arm6:.3f}")
@@ -526,30 +568,15 @@ class MobileMMBulletEnv(gym.Env):
         base_lin_vel_norm = np.linalg.norm(base_lin_vel_chassis_frame)
         base_ang_vel_norm = np.linalg.norm(base_ang_vel)
 
-        # update target from the target generator if it supports stateful updates
-        try:
-            # prefer the newer API which accepts ee_pos
-            self._target = self._target_generator.step(self.step_count, ee_pos=ee_pos)
-        except TypeError:
-            # older generators may not accept ee_pos
-            try:
-                self._target = self._target_generator.step(self.step_count)
-            except Exception:
-                # leave existing target unchanged on error
-                pass
-
         if DEBUG:
             cur_state_left_arm1, cur_state_left_arm2, cur_state_left_arm3, cur_state_left_arm4, \
                 cur_state_left_arm5, cur_state_left_arm6 = self._get_arm_state()
             print(f"current arm states: 1={cur_state_left_arm1:.3f}, 2={cur_state_left_arm2:.3f}, 3={cur_state_left_arm3:.3f}, 4={cur_state_left_arm4:.3f}, 5={cur_state_left_arm5:.3f}, 6={cur_state_left_arm6:.3f}")
-
-        # print(f"actual movement: act dx = {base_pos[0] - last_pos[0]:.3f}, dy = {base_pos[1] - last_pos[1]:.3f}, dtheta = {self._wrap_angle(base_yaw - last_yaw):.3f}")
+            print(f"actual movement: act dx = {base_pos[0] - last_pos[0]:.3f}, dy = {base_pos[1] - last_pos[1]:.3f}, dtheta = {self._wrap_angle(base_yaw - last_yaw):.3f}")
         
-        reward, info = compute_reward(base_pos, ee_pos, self._target, base_yaw,
+        reward, info = compute_reward(base_pos, base_lin_vel_norm, ee_pos, self._target, base_yaw,
                                     wrap_angle_fn=self._wrap_angle,
-                                    base_lin_vel=base_lin_vel_norm,
-                                    base_ang_vel=base_ang_vel_norm)
-
+                                    remaining_ratio=self.remain_traj_ratio)
 
         # terminated: 成功或者失败的自然终止
         static_arm_thr = 0.02
@@ -568,7 +595,10 @@ class MobileMMBulletEnv(gym.Env):
             is_joint7_static and is_joint8_static and is_joint9_static
         
 
-        reached_goal = bool(info.get("ee_distance", 9999.0) < 0.05) and \
+        if not self.is_finish_step1 and bool(info.get("ee_distance", 9999.0) < 0.05):
+            self.is_finish_step1 = True
+
+        reached_goal = bool(self.remain_traj_ratio < 0.05) and bool(info.get("ee_distance", 9999.0) < 0.05) and \
             bool(base_lin_vel_norm < 0.1) and bool(base_ang_vel_norm < 0.1) and \
             is_arm_joints_static
         # if reached_goal and is_arm_joints_static:
@@ -577,37 +607,27 @@ class MobileMMBulletEnv(gym.Env):
         target_len = np.linalg.norm(self._target[:2])
         base_len = np.linalg.norm(base_pos[:2])
 
-        # detect out-of-bounds / catastrophic failure conditions (treat as terminal failure)
-        out_of_bounds = bool(base_len > target_len * 1.5) or bool(base_pos[0] < -2.0) or bool(abs(base_pos[1]) > 2.0 * abs(self._target[1]))
-        out_of_bounds = False # 不使用，自行探索
-
         # terminated is True for natural success OR terminal failure (out_of_bounds)
-        terminated = reached_goal or out_of_bounds
+        terminated = reached_goal
 
         # truncated: episode ended because of time/step limit only
         truncated = bool(self.step_count >= self.max_steps)
 
-        # penalize terminal failures so agent learns to avoid them
-        if out_of_bounds:
-            reward += -1e9
-            info['failure_reason'] = 'out_of_bounds'
-            info['out_of_bounds'] = True
-            info['is_success'] = False
-
         # annotate info for downstream wrappers / loggers
         if truncated:
             info['TimeLimit.truncated'] = True
-        if reached_goal and not out_of_bounds:
+        if reached_goal:
             info['is_success'] = True
 
         
         if DEBUG:
-            print(f"Step {self.step_count}: Distance: {info.get('distance', 0.0):.1f}m, YawErr: {info.get('yaw_error', 0.0):.1f}rad,"
-                f" Target: ({self._target[0]:.1f}, {self._target[1]:.1f}, {self._target[2]:.1f})m, {self._abstract_chassis_desired_yaw:.2f}rad, "
-                f"base_pos = ({base_pos[0]:.1f}, {base_pos[1]:.1f}, {base_pos[2]:.1f}), "
-                f"ee_pos = ({ee_pos[0]:.2f}, {ee_pos[1]:.2f}, {ee_pos[2]:.2f}), "
+            print(f"Step {self.step_count}: finish_step1 = {self.is_finish_step1}, Distance: {info['ee_distance']:.1f}m, "
+                f"Target: ({self._target[0]:.3f}, {self._target[1]:.3f}, {self._target[2]:.3f})m, "
+                f"base_pos = ({base_pos[0]:.3f}, {base_pos[1]:.3f}, {base_pos[2]:.3f}), "
+                f"ee_pos = ({ee_pos[0]:.3f}, {ee_pos[1]:.3f}, {ee_pos[2]:.3f}), "
                 f"Reward: {reward:.2f} \n")
 
+        # import pdb; pdb.set_trace()
         return obs, reward, terminated, truncated, info
 
     def render(self, mode="human"):

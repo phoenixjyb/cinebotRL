@@ -4,7 +4,8 @@ import argparse
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 from pybullet_envs.mobile_mm import MobileMMBulletEnv
-from pybullet_envs.target_generator import FixedTarget, RandomTarget, RandomTargetForEpisode, CurriculumTarget
+from pybullet_envs.mobile_mm_traj import MobileMMTrajEnv
+from pybullet_envs.target_generator import FixedTarget, RandomTargetForEpisode, JSONNearestTargetGenerator
 import torch
 from pybullet_envs.transformer_extractor import TransformerFeaturesExtractor
 
@@ -48,7 +49,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--timesteps", type=int, default=5_000_000)
     parser.add_argument("--render", action="store_true", help="Use GUI")
-    parser.add_argument("--policy", type=str, default="MlpPolicy",
+    parser.add_argument("--policy", type=str, default="Transformer",
                         choices=["MlpPolicy", "LargeMlp", "Transformer"],
                         help="Policy architecture to use. Transformer = Transformer-based feature extractor")
     # transformer-specific options
@@ -77,7 +78,7 @@ def main():
                         help="Run evaluation every N timesteps (0 to disable)")
     parser.add_argument("--eval_episodes", type=int, default=5,
                         help="Number of eval episodes per evaluation run")
-    parser.add_argument("--learning_rate", type=float, default=1e-4,
+    parser.add_argument("--learning_rate", type=float, default=3e-5,
                         help="Initial learning rate for the optimizer (overrides SB3 default if set)")
     args = parser.parse_args()
 
@@ -114,10 +115,15 @@ def main():
         return float(max(1e-7, initial_lr * (1.0 - t)))
 
     os.makedirs(args.save_dir, exist_ok=True)
-    env_fn = lambda: MobileMMBulletEnv(render=args.render,
-                                       target_generator=RandomTargetForEpisode(
-                                           low=(4.0, -2.0, 0.5),
-                                           high=(10.0, 2.0, 1.5)
+    # env_fn = lambda: MobileMMBulletEnv(render=args.render,
+    #                                    target_generator=RandomTargetForEpisode(
+    #                                        low=(4.0, -2.0, 0.5),
+    #                                        high=(10.0, 2.0, 1.5)
+    #                                    ))
+    env_fn = lambda: MobileMMTrajEnv(render=args.render,
+                                       target_generator=JSONNearestTargetGenerator(
+                                        #    json_path="trajectoryToLearn/world_json/scene_1/traj_1.json",
+                                             json_path="trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
                                        ))
     if args.n_envs > 1:
         from stable_baselines3.common.vec_env import SubprocVecEnv
@@ -184,6 +190,8 @@ def main():
     )
     # use warmup + linear decay schedule for learning rate (callable accepted by SB3)
     model_kwargs['learning_rate'] = lr_schedule
+    # reduce gradient clipping threshold from SB3 default (0.5) to be more conservative
+    model_kwargs['max_grad_norm'] = 0.3
 
     if args.load_model:
         print(f"Loading model from: {args.load_model}")
@@ -221,20 +229,7 @@ def main():
         ckpt_cb = CheckpointCallback(save_freq=args.save_interval, save_path=ckpt_dir,
                                      name_prefix=f"ppo_mobile_mm")
         callbacks.append(ckpt_cb)
-    # evaluation callback (periodic eval runs, logs mean_reward to tensorboard and saves best model)
-    if args.eval_freq and args.eval_freq > 0:
-        from stable_baselines3.common.callbacks import EvalCallback
-        # create a deterministic eval env with a fixed target (midpoint of train RandomTargetForEpisode)
-        eval_target = ((4.0 + 10.0) / 2.0, (-2.0 + 2.0) / 2.0, 0.2)
-        eval_env = DummyVecEnv([lambda: MobileMMBulletEnv(render=False, target_generator=FixedTarget(eval_target))])
-        best_model_dir = os.path.join(args.save_dir, f"logs_{ts}/best_model")
-        os.makedirs(best_model_dir, exist_ok=True)
-        eval_cb = EvalCallback(eval_env, best_model_save_path=best_model_dir, log_path=log_dir,
-                               eval_freq=args.eval_freq, n_eval_episodes=args.eval_episodes,
-                               deterministic=True, render=False)
-        callbacks.append(eval_cb)
 
-    # import pdb;     pdb.set_trace()
     model.learn(total_timesteps=args.timesteps, callback=callbacks or None)
     model_filename = f"logs_{ts}/ppo_mobile_mm_final"
     model.save(os.path.join(args.save_dir, model_filename))

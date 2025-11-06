@@ -3,6 +3,7 @@ import argparse
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
+import json
 import torch
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -54,6 +55,18 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False,
         obs = vec_env.reset()
         # get underlying env instance from DummyVecEnv for visualization helpers
         env = vec_env.envs[0]
+        # prepare per-episode joint angles log (one line per step, space-separated)
+        angles_path = os.path.join(save_dir, f"episode_{episode+1}_joint_angles.txt")
+        try:
+            angles_f = open(angles_path, 'w')
+        except Exception:
+            angles_f = None
+        # prepare per-episode chassis velocity jsonl (one json object per step)
+        chassis_path = os.path.join(save_dir, f"episode_{episode+1}_chassis_vel.jsonl")
+        try:
+            chassis_f = open(chassis_path, 'w')
+        except Exception:
+            chassis_f = None
         
         # target = vec_env.
 
@@ -205,6 +218,87 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False,
             except Exception:
                 episode_joint_angles.append((np.nan,)*6)
 
+            # write latest joint angles to per-episode txt (if file opened)
+            try:
+                if angles_f is not None:
+                    last = episode_joint_angles[-1]
+                    # ensure tuple-like of length 6
+                    if last is None:
+                        line_vals = ['nan'] * 6
+                    else:
+                        vals = list(last)
+                        if len(vals) < 6:
+                            vals = vals + ([np.nan] * (6 - len(vals)))
+                        line_vals = [f"{float(x):.6f}" if not (isinstance(x, float) and np.isnan(x)) else 'nan' for x in vals[:6]]
+                    angles_f.write(' '.join(line_vals) + '\n')
+            except Exception:
+                # don't fail the episode if logging fails
+                pass
+
+            # record chassis linear_x and angular_z into JSONL per step
+            try:
+                if chassis_f is not None:
+                    # linear_x: prefer world-frame forward velocity if available
+                    linear_x = np.nan
+                    try:
+                        lw = episode_world_vels[-1]
+                        linear_x = float(lw[0])
+                    except Exception:
+                        try:
+                            lc = episode_chassis_vels[-1]
+                            linear_x = float(lc[0])
+                        except Exception:
+                            linear_x = float('nan')
+
+                    # angular_z: try common env attributes for angular velocity
+                    angular_z = None
+                    cand_names = ['_abstract_chassis_ang_vel', '_abstract_chassis_ang_vel_world', '_abstract_chassis_angular_vel', '_abstract_chassis_ang_vel_chassis', '_abstract_chassis_omega']
+                    for name in cand_names:
+                        try:
+                            if hasattr(env, name):
+                                val = getattr(env, name)
+                                if val is None:
+                                    continue
+                                if isinstance(val, (list, tuple, np.ndarray)):
+                                    if len(val) >= 3:
+                                        angular_z = float(val[2])
+                                    else:
+                                        angular_z = float(val[0])
+                                else:
+                                    angular_z = float(val)
+                                break
+                        except Exception:
+                            continue
+
+                    # fallback to unwrapped
+                    if angular_z is None:
+                        try:
+                            ue = getattr(env, 'unwrapped', None)
+                            if ue is not None:
+                                for name in cand_names:
+                                    if hasattr(ue, name):
+                                        val = getattr(ue, name)
+                                        if val is None:
+                                            continue
+                                        if isinstance(val, (list, tuple, np.ndarray)):
+                                            if len(val) >= 3:
+                                                angular_z = float(val[2]); break
+                                            else:
+                                                angular_z = float(val[0]); break
+                                        else:
+                                            angular_z = float(val); break
+                        except Exception:
+                            pass
+
+                    if angular_z is None:
+                        angular_z = float('nan')
+
+                    tval = float(step_count) / 10.0
+                    obj = {"linear_x": linear_x, "angular_z": angular_z, "time": tval}
+                    chassis_f.write(json.dumps(obj) + ',\n')
+            except Exception:
+                pass
+
             terminated = done_flag
             
             # # 每50步保存一张图片
@@ -267,6 +361,16 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False,
             generate_velocity_plot(episode_world_vels, episode_chassis_vels, save_dir, episode=episode+1, joint_angles=episode_joint_angles, ee_heights=episode_ee_heights)
         except Exception as e:
             print(f'Failed to generate per-episode velocity plot for episode {episode+1}: {e}')
+        # close per-episode joint angles file
+        try:
+            if angles_f is not None:
+                angles_f.close()
+                print(f"Saved joint angles: {angles_path}")
+            if chassis_f is not None:
+                chassis_f.close()
+                print(f"Saved chassis velocities: {chassis_path}")
+        except Exception:
+            pass
     
     vec_env.close()
     
@@ -542,13 +646,13 @@ if __name__ == "__main__":
     # delta = 0.05
     model_path = "linux_env_dev/models/logs_20251105_000224/ppo_mobile_mm_final.zip"
     # Transformer特征提取器
-    model_path = "linux_env_dev/models/logs_20251105_110047/ppo_mobile_mm_final.zip"
+    # model_path = "linux_env_dev/models/logs_20251105_110047/ppo_mobile_mm_final.zip"
     render = False
     
     if os.path.exists(model_path):
         print("Starting model testing...")
         # target_x, target_y, target_z = 5.5, -0.5, 0.7
-        target_x, target_y, target_z = 4.7, -1.7, 0.7
+        target_x, target_y, target_z = 8.8, 1.7, 1.4
         num_episode = 1
         distances, rewards, success_count = test_trained_model(model_path, num_episodes=num_episode, render=render, max_steps=500,
                                                                 # low=(4.0, -2.0, 0.5),

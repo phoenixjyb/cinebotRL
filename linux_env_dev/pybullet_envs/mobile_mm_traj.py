@@ -67,6 +67,13 @@ class MobileMMTrajEnv(gym.Env):
 
         self._target_generator = target_generator
         self._target = self._target_generator.reset()
+        # EMA smoothing for chassis translational (ds) and rotational (dtheta) deltas.
+        # These can be tuned from outside by setting `self.ema_alpha_ds` and
+        # `self.ema_alpha_dtheta` on the env instance.
+        self.ema_alpha_ds = 0.1
+        self.ema_alpha_dtheta = 0.1
+        self._ema_ds = None
+        self._ema_dtheta = None
         self.finish_step1_step = None
         self.remain_traj_ratio = 1.0
         self._traj_id = 0
@@ -108,6 +115,8 @@ class MobileMMTrajEnv(gym.Env):
         self.remain_traj_ratio = 1.0
         self.step_count = 0
         self._traj_id = 0
+        self._ema_ds = None
+        self._ema_dtheta = None
         p.resetSimulation()
         p.setGravity(0, 0, -9.81)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -498,8 +507,22 @@ class MobileMMTrajEnv(gym.Env):
         last_yaw = self._abstract_chassis_yaw
         last_pos = self._abstract_chassis_pos
         
-        action_ds = action[0] * 0.1
-        action_dtheta = action[1] * 0.01
+        # raw requested deltas (before smoothing)
+        raw_action_ds = float(action[0]) * 0.1
+        raw_action_dtheta = float(action[1]) * 0.01
+
+        # apply EMA smoothing
+        if getattr(self, '_ema_ds', None) is None:
+            smooth_ds = raw_action_ds
+        else:
+            smooth_ds = float(self.ema_alpha_ds) * raw_action_ds + (1.0 - float(self.ema_alpha_ds)) * float(self._ema_ds)
+        self._ema_ds = smooth_ds
+
+        if getattr(self, '_ema_dtheta', None) is None:
+            smooth_dtheta = raw_action_dtheta
+        else:
+            smooth_dtheta = float(self.ema_alpha_dtheta) * raw_action_dtheta + (1.0 - float(self.ema_alpha_dtheta)) * float(self._ema_dtheta)
+        self._ema_dtheta = smooth_dtheta
         joint_delta_limit = 0.02
         action_left_arm1 = action[2] * joint_delta_limit
         action_left_arm2 = action[3] * joint_delta_limit
@@ -508,13 +531,15 @@ class MobileMMTrajEnv(gym.Env):
         action_left_arm5 = action[6] * joint_delta_limit
         action_left_arm6 = action[7] * joint_delta_limit
         
-        action_dx = action_ds * np.cos(last_yaw)
-        action_dy = action_ds * np.sin(last_yaw)
+        # compute chassis frame translations from smoothed ds
+        action_dx = smooth_ds * np.cos(last_yaw)
+        action_dy = smooth_ds * np.sin(last_yaw)
         
+        # record the (smoothed) requested target deltas
         self.control_info['target'] = {
             'dx': action_dx,
             'dy': action_dy,
-            'dtheta': action_dtheta,
+            'dtheta': smooth_dtheta,
             'left_arm1': action_left_arm1,
             'left_arm2': action_left_arm2,
             'left_arm3': action_left_arm3,
@@ -525,7 +550,7 @@ class MobileMMTrajEnv(gym.Env):
         
         target_x = last_pos[0] + action_dx
         target_y = last_pos[1] + action_dy
-        target_theta = self._wrap_angle(last_yaw + action_dtheta) # 底盘theta是不限制范围的，所以需要wrap一下
+        target_theta = self._wrap_angle(last_yaw + smooth_dtheta) # 底盘theta是不限制范围的，所以需要wrap一下
 
         target_left_arm1 = self.limit_action(last_state_left_arm1 + action_left_arm1, self.joint_limits['left_arm_joint1'])
         target_left_arm2 = self.limit_action(last_state_left_arm2 + action_left_arm2, self.joint_limits['left_arm_joint2'])

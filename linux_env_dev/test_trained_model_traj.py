@@ -12,7 +12,7 @@ from pybullet_envs.mobile_mm_traj import MobileMMTrajEnv
 from pybullet_envs.target_generator import RandomTargetForEpisode, JSONNearestTargetGenerator
 from pybullet_envs.transformer_extractor import TransformerFeaturesExtractor
 
-def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False):
+def test_trained_model(model_path, num_episodes=1, json_paths=None, max_steps=1000, render=False):
     """
     测试训练好的模型并生成可视化结果
     
@@ -39,8 +39,8 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
     # 创建测试环境（render 参数可控）
     env_fn = lambda: MobileMMTrajEnv(render=render,
                                     target_generator=JSONNearestTargetGenerator(
-                                        # json_path="trajectoryToLearn/world_json/scene_1/traj_1.json",
-                                        json_path="trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
+                                        json_paths=json_paths,
+                                        mode="seq"
                                     ))
     vec_env = DummyVecEnv([env_fn])
     
@@ -65,6 +65,8 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
         # collect per-step velocities (world frame and chassis frame)
         episode_world_vels = []  # list of (vx_world, vy_world)
         episode_chassis_vels = []  # list of (vx_chassis, vy_chassis)
+        # collect per-step control_info dicts if env populates them
+        episode_control_info = []
         # collect per-step traj id (index of current target along trajectory)
         episode_traj_ids = []
         # collect per-step abstract chassis yaw (radians)
@@ -185,6 +187,20 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
             except Exception:
                 episode_traj_ids.append(np.nan)
 
+            # collect env.control_info if present (store shallow copy to avoid later mutation)
+            try:
+                ci = getattr(env, 'control_info', None)
+                if ci is not None:
+                    # try to copy relevant numeric fields; keep dict if copy fails
+                    try:
+                        episode_control_info.append(dict(ci))
+                    except Exception:
+                        episode_control_info.append(ci)
+                else:
+                    episode_control_info.append(None)
+            except Exception:
+                episode_control_info.append(None)
+
             # collect velocities: prefer explicit attributes if present, else try to call _get_base_pos()
             try:
                 # ensure env has updated base/link velocity stored
@@ -263,16 +279,6 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
                 episode_joint_angles.append((np.nan,)*6)
 
             terminated = done_flag
-            
-            # # 每50步保存一张图片
-            # if step_count % 50 == 0:
-            #     img_path = os.path.join(save_dir, f"episode_{episode+1}_step_{step_count}.png")
-            #     try:
-            #         # pass collected EE trajectory for overlay
-            #         env.save_robot_image(img_path, width=800, height=600, traj=episode_ee_positions, draw_origin=True)
-            #         print(f"Saved image: {img_path}")
-            #     except Exception as e:
-            #         print(f"Failed to save image: {e}")
         
             # 检查是否成功到达目标
             final_distance = episode_distances[-1] if episode_distances else float('nan')
@@ -283,9 +289,6 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
         else:
             print(f"Episode {episode + 1}: FAILED (distance: {final_distance:.4f})")
         
-        # episode_ee_positions
-        # episode_base_positions
-        # import pdb; pdb.set_trace()
 
         all_distances.append(episode_distances)
         all_rewards.append(episode_rewards)
@@ -317,6 +320,13 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
         except Exception:
             episode_targets_trimmed = episode_targets
         all_targets.append(np.array(episode_targets_trimmed) if len(episode_targets_trimmed) > 0 else None)
+        # store control_info for this episode
+        if 'all_control_info' not in locals():
+            all_control_info = []
+        try:
+            all_control_info.append(episode_control_info[:-2])
+        except Exception:
+            all_control_info.append([])
 
         # Generate per-episode 3D trajectory plot immediately for this episode
         try:
@@ -327,7 +337,11 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False)
 
         # Generate per-episode velocity plot (world-frame vs chassis-frame)
         try:
-            generate_velocity_plot(episode_world_vels, episode_chassis_vels, save_dir, episode=episode+1, joint_angles=episode_joint_angles, ee_heights=episode_ee_heights, traj_ids=episode_traj_ids[:-2], ee_distances=episode_distances[:-2], chassis_yaw=episode_chassis_yaw[:-2])
+            generate_velocity_plot(episode_world_vels, episode_chassis_vels, save_dir, 
+                                   episode=episode+1, joint_angles=episode_joint_angles,
+                                   ee_heights=episode_ee_heights, traj_ids=episode_traj_ids[:-2],
+                                   ee_distances=episode_distances[:-2], chassis_yaw=episode_chassis_yaw[:-2],
+                                   control_infos=episode_control_info[:-2])
         except Exception as e:
             print(f'Failed to generate per-episode velocity plot for episode {episode+1}: {e}')
     
@@ -568,7 +582,7 @@ def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_target
 
 def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1,
                            joint_angles=None, ee_heights=None, traj_ids=None,
-                           ee_distances=None, chassis_yaw=None):
+                           ee_distances=None, chassis_yaw=None, control_infos=None):
     """Generate a 2-panel plot (side-by-side) comparing world-frame and chassis-frame
     longitudinal (vx) and lateral (vy) linear velocities over time for one episode.
 
@@ -578,6 +592,7 @@ def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1,
         save_dir: directory to save the PNG
         episode: episode number (used for filename)
     """
+    # import pdb; pdb.set_trace()
     # convert to arrays (N,2)
     w = np.array(world_vels, dtype=np.float32) if len(world_vels) > 0 else np.zeros((0, 2), dtype=np.float32)
     c = np.array(chassis_vels, dtype=np.float32) if len(chassis_vels) > 0 else np.zeros((0, 2), dtype=np.float32)
@@ -585,11 +600,11 @@ def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1,
     steps_w = np.arange(w.shape[0]) if w.shape[0] > 0 else np.arange(0)
     steps_c = np.arange(c.shape[0]) if c.shape[0] > 0 else np.arange(0)
 
-    # create a figure with 4 rows: two side-by-side velocity plots on top row,
+    # create a figure with 5 rows: two side-by-side velocity plots on top row,
     # joint-angles and ee-height in the second row, traj_id and ee_distance in the third row,
-    # and chassis_yaw as a full-width fourth row
-    fig = plt.figure(figsize=(14, 12))
-    gs = fig.add_gridspec(4, 2, height_ratios=[1, 0.8, 0.6, 0.6])
+    # chassis_yaw as a full-width fourth row, and control_info dx/dy comparison in fifth row
+    fig = plt.figure(figsize=(14, 14))
+    gs = fig.add_gridspec(5, 2, height_ratios=[1, 0.8, 0.6, 0.6, 0.6])
 
     ax = fig.add_subplot(gs[0, 0])
     # World-frame velocities
@@ -703,6 +718,70 @@ def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1,
     except Exception:
         pass
 
+    # Fifth row: control_info comparison (two side-by-side plots for dx and dy)
+    try:
+        ax_dx = fig.add_subplot(gs[4, 0])
+        ax_dy = fig.add_subplot(gs[4, 1], sharey=ax_dx)
+
+        if control_infos is None or len(control_infos) == 0:
+            ax_dx.text(0.5, 0.5, 'No control_info data', ha='center', va='center')
+            ax_dy.text(0.5, 0.5, 'No control_info data', ha='center', va='center')
+        else:
+            # extract target.dx, reality.dx and target.dy, reality.dy sequences
+            targ_dx = []
+            real_dx = []
+            targ_dy = []
+            real_dy = []
+            for ci in control_infos:
+                if ci is None:
+                    targ_dx.append(np.nan); real_dx.append(np.nan); targ_dy.append(np.nan); real_dy.append(np.nan)
+                    continue
+                # prefer dict access; handle nested dicts
+                try:
+                    t = ci.get('target', {}) if isinstance(ci, dict) else {}
+                    r = ci.get('reality', {}) if isinstance(ci, dict) else {}
+                    td_x = t.get('dx', np.nan) if isinstance(t, dict) else np.nan
+                    rd_x = r.get('dx', np.nan) if isinstance(r, dict) else np.nan
+                    td_y = t.get('dy', np.nan) if isinstance(t, dict) else np.nan
+                    rd_y = r.get('dy', np.nan) if isinstance(r, dict) else np.nan
+                except Exception:
+                    td_x = np.nan; rd_x = np.nan; td_y = np.nan; rd_y = np.nan
+                try:
+                    targ_dx.append(float(td_x))
+                except Exception:
+                    targ_dx.append(np.nan)
+                try:
+                    real_dx.append(float(rd_x))
+                except Exception:
+                    real_dx.append(np.nan)
+                try:
+                    targ_dy.append(float(td_y))
+                except Exception:
+                    targ_dy.append(np.nan)
+                try:
+                    real_dy.append(float(rd_y))
+                except Exception:
+                    real_dy.append(np.nan)
+
+            steps_ci = np.arange(len(targ_dx))
+            ax_dx.plot(steps_ci, targ_dx, label='target.dx', color='C0')
+            ax_dx.plot(steps_ci, real_dx, label='reality.dx', color='C1', linestyle='--')
+            ax_dx.set_xlabel('Step')
+            ax_dx.set_ylabel('dx (m)')
+            ax_dx.set_title('Control: target.dx vs reality.dx')
+            ax_dx.grid(True)
+            ax_dx.legend()
+
+            ax_dy.plot(steps_ci, targ_dy, label='target.dy', color='C0')
+            ax_dy.plot(steps_ci, real_dy, label='reality.dy', color='C1', linestyle='--')
+            ax_dy.set_xlabel('Step')
+            ax_dy.set_ylabel('dy (m)')
+            ax_dy.set_title('Control: target.dy vs reality.dy')
+            ax_dy.grid(True)
+            ax_dy.legend()
+    except Exception:
+        pass
+
     out_path = os.path.join(save_dir, f'episode_{episode}_velocities.png')
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
     plt.close(fig)
@@ -752,12 +831,26 @@ if __name__ == "__main__":
     model_path = "linux_env_dev/models/logs_20251110_181111/checkpoints/ppo_mobile_mm_3200000_steps.zip"
     # model_path = "linux_env_dev/models/logs_20251110_212705/checkpoints/ppo_mobile_mm_3200000_steps.zip"
     
+    model_path = "linux_env_dev/models/logs_20251111_155620/ppo_mobile_mm_final.zip"
+    # model_path = "linux_env_dev/models/logs_20251111_155641/ppo_mobile_mm_final.zip"
+    # model_path = "linux_env_dev/models/logs_20251111_213922/ppo_mobile_mm_final.zip"
+    model_path = "linux_env_dev/models/logs_20251111_214013/ppo_mobile_mm_final.zip"
+    model_path = "linux_env_dev/models/logs_20251111_214013/checkpoints/ppo_mobile_mm_3200000_steps.zip"
+    model_path = "linux_env_dev/models/logs_20251112_120834/ppo_mobile_mm_final.zip"
+    model_path = "linux_env_dev/models/logs_20251113_220830/ppo_mobile_mm_final.zip"
+    model_path = "linux_env_dev/models/logs_20251113_221014/ppo_mobile_mm_final.zip"
+    
     render = False
     
     if os.path.exists(model_path):
         print("Starting model testing...")
         num_episode = 5
-        distances, rewards, success_count = test_trained_model(model_path, num_episodes=num_episode, render=render, max_steps=500)
+        distances, rewards, success_count = test_trained_model(model_path, json_paths=["trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
+                                                               "trajectoryToLearn/world_json/scene_1/traj_random_20251110_215950.json",
+                                                               "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154427.json",
+                                                               "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154646.json",
+                                                               "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154810.json"],
+                                                               num_episodes=num_episode, render=render, max_steps=500)
         print(f"\nTesting completed! Success rate: {success_count}/{num_episode} ({success_count/num_episode*100:.1f}%)")
     else:
         print(f"Model file not found: {model_path}")

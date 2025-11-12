@@ -17,22 +17,22 @@ def compute_reward(base_pos, base_lin_vel, ee_pos, target_pos, base_yaw, wrap_an
     dist_reward, dist_info = compute_distance_reward(ee_pos, target_pos, 2.0) # 使用线性的，要不然因为跟踪精度不愿意往前走
     
     # 底盘速度过快惩罚
-    vel_reward, vel_info = compute_velocity_reward(base_lin_vel, thresh=0.3, ratio=1.0)
+    # vel_reward, vel_info = compute_velocity_reward(base_lin_vel, thresh=0.0, ratio=2.0)
 
     # 末端执行器高程误差
     # reward_ee_height, ee_height_info = compute_height_reward(ee_pos[2], target_pos[2])
 
     # 进度惩罚
-    progress_reward = compute_progress_reward(remaining_ratio, ratio=2.0)
+    # progress_reward = compute_progress_reward(remaining_ratio, ratio=2.0)
     
-    total_reward = dist_reward + progress_reward + vel_reward
+    total_reward = dist_reward
     total_reward = float(np.clip(total_reward, -5.0, 5.0))
     
     info.update(dist_info)
     # info.update(yaw_info)
     # info.update(ee_height_info)
     if DEBUG:
-        print(f"Reward: {total_reward:.2f} (dist: {dist_reward:.2f}, progress: {progress_reward:.2f}, vel: {vel_reward:.2f})")
+        print(f"Reward: {total_reward:.2f} (dist: {dist_reward:.2f})")
     return total_reward, info
 
 def compute_progress_reward(remaining_ratio, ratio=1.0):

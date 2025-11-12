@@ -123,7 +123,12 @@ def main():
     env_fn = lambda: MobileMMTrajEnv(render=args.render,
                                        target_generator=JSONNearestTargetGenerator(
                                         #    json_path="trajectoryToLearn/world_json/scene_1/traj_1.json",
-                                             json_path="trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
+                                             json_paths=["trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
+                                                         "trajectoryToLearn/world_json/scene_1/traj_random_20251110_215950.json",
+                                                         "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154427.json",
+                                                         "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154646.json",
+                                                         "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154810.json"],
+                                             mode="random"
                                        ))
     if args.n_envs > 1:
         from stable_baselines3.common.vec_env import SubprocVecEnv

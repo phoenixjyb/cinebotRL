@@ -836,7 +836,7 @@ if __name__ == "__main__":
     # model_path = "linux_env_dev/models/logs_20251111_213922/ppo_mobile_mm_final.zip"
     model_path = "linux_env_dev/models/logs_20251111_214013/ppo_mobile_mm_final.zip"
     model_path = "linux_env_dev/models/logs_20251111_214013/checkpoints/ppo_mobile_mm_3200000_steps.zip"
-    model_path = "linux_env_dev/models/logs_20251112_120722/checkpoints/ppo_mobile_mm_4000000_steps.zip"
+    model_path = "linux_env_dev/models/logs_20251112_120834/ppo_mobile_mm_final.zip"
     
     render = False
     

@@ -70,8 +70,8 @@ class MobileMMTrajEnv(gym.Env):
         # EMA smoothing for chassis translational (ds) and rotational (dtheta) deltas.
         # These can be tuned from outside by setting `self.ema_alpha_ds` and
         # `self.ema_alpha_dtheta` on the env instance.
-        self.ema_alpha_ds = 0.1
-        self.ema_alpha_dtheta = 0.1
+        self.ema_alpha_ds = 0.7
+        self.ema_alpha_dtheta = 0.7
         self._ema_ds = None
         self._ema_dtheta = None
         self.finish_step1_step = None
@@ -615,9 +615,9 @@ class MobileMMTrajEnv(gym.Env):
         base_lin_vel_norm = np.linalg.norm(base_lin_vel_chassis_frame)
         base_ang_vel_norm = np.linalg.norm(base_ang_vel)
 
+        cur_state_left_arm1, cur_state_left_arm2, cur_state_left_arm3, cur_state_left_arm4, \
+            cur_state_left_arm5, cur_state_left_arm6 = self._get_arm_state()
         if DEBUG:
-            cur_state_left_arm1, cur_state_left_arm2, cur_state_left_arm3, cur_state_left_arm4, \
-                cur_state_left_arm5, cur_state_left_arm6 = self._get_arm_state()
             print(f"current arm states: 1={cur_state_left_arm1:.3f}, 2={cur_state_left_arm2:.3f}, 3={cur_state_left_arm3:.3f}, 4={cur_state_left_arm4:.3f}, 5={cur_state_left_arm5:.3f}, 6={cur_state_left_arm6:.3f}")
             print(f"actual movement: act dx = {base_pos[0] - last_pos[0]:.3f}, dy = {base_pos[1] - last_pos[1]:.3f}, dtheta = {self._wrap_angle(base_yaw - last_yaw):.3f}")
         

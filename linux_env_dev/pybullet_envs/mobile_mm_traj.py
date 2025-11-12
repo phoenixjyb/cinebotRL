@@ -70,6 +70,7 @@ class MobileMMTrajEnv(gym.Env):
         self.finish_step1_step = None
         self.remain_traj_ratio = 1.0
         self._traj_id = 0
+        self.last_chassis_vel = None
 
     def _load_robot_once(self):
         # load plane and robot, then remove (we re-create on reset)
@@ -108,6 +109,7 @@ class MobileMMTrajEnv(gym.Env):
         self.remain_traj_ratio = 1.0
         self.step_count = 0
         self._traj_id = 0
+        self.last_chassis_vel = None
         p.resetSimulation()
         p.setGravity(0, 0, -9.81)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -497,8 +499,10 @@ class MobileMMTrajEnv(gym.Env):
 
         last_yaw = self._abstract_chassis_yaw
         last_pos = self._abstract_chassis_pos
-        
-        action_ds = action[0] * 0.1
+
+        last_chassis_vel = self.last_chassis_vel if self.last_chassis_vel is not None else 0.0
+        # ds = vt + 1/2*at^2
+        action_ds = 0.1 * last_chassis_vel + 0.5 * (1.0 * action[0]) * 0.1 * 0.1 # 加速度限制1m/s^2
         action_dtheta = action[1] * 0.01
         joint_delta_limit = 0.02
         action_left_arm1 = action[2] * joint_delta_limit
@@ -663,6 +667,7 @@ class MobileMMTrajEnv(gym.Env):
                 f"ee_pos = ({ee_pos[0]:.3f}, {ee_pos[1]:.3f}, {ee_pos[2]:.3f}), "
                 f"Reward: {reward:.2f} \n")
 
+        self.last_chassis_vel = base_lin_vel_norm
         # import pdb; pdb.set_trace()
         return obs, reward, terminated, truncated, info
 

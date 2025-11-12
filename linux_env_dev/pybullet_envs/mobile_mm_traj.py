@@ -67,7 +67,7 @@ class MobileMMTrajEnv(gym.Env):
 
         self._target_generator = target_generator
         self._target = self._target_generator.reset()
-        self.is_finish_step1 = False
+        self.finish_step1_step = None
         self.remain_traj_ratio = 1.0
         self._traj_id = 0
 
@@ -104,7 +104,7 @@ class MobileMMTrajEnv(gym.Env):
         if seed is not None:
             np.random.seed(seed)
         self._target = self._target_generator.reset()
-        self.is_finish_step1 = False
+        self.finish_step1_step = None
         self.remain_traj_ratio = 1.0
         self.step_count = 0
         self._traj_id = 0
@@ -128,10 +128,14 @@ class MobileMMTrajEnv(gym.Env):
         #                   targetValue=np.random.uniform(-np.pi, np.pi), targetVelocity=0.0)
         
         # 初始点做简化，方向尽量一致，ee尽量靠近起点
+        # p.resetJointState(self.robot, self.joint_name2ids['joint_x'],
+        #                   targetValue=start_pos[0] + np.random.uniform(-1.0, -0.7), targetVelocity=0.0)
+        # p.resetJointState(self.robot, self.joint_name2ids['joint_y'],
+        #                   targetValue=start_pos[1] + np.random.uniform(-0.1, 0.1), targetVelocity=0.0)
         p.resetJointState(self.robot, self.joint_name2ids['joint_x'],
-                          targetValue=start_pos[0] + np.random.uniform(-1.0, -0.7), targetVelocity=0.0)
+                          targetValue=start_pos[0] - 0.6, targetVelocity=0.0)
         p.resetJointState(self.robot, self.joint_name2ids['joint_y'],
-                          targetValue=start_pos[1] + np.random.uniform(-0.1, 0.1), targetVelocity=0.0)
+                          targetValue=start_pos[1], targetVelocity=0.0)
         
         # 各机械臂设置为初始位置
         p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint1'],
@@ -425,10 +429,13 @@ class MobileMMTrajEnv(gym.Env):
 
     def _get_target(self, ee_pos):
         # self._target_generator.test_vel()
-        if not self.is_finish_step1:
+        # self._target_generator.test_target_given_speed_profile()
+        if self.finish_step1_step is None:
             self._traj_id, self._target = 0, self._target_generator.traj.get_position(0)
         else:
-            self._traj_id, self._target = self._target_generator.get_projection(ee_pos)
+            # self._traj_id, self._target = self._target_generator.get_projection(ee_pos)
+            self._traj_id, self._target = self._target_generator.cal_target_given_speed_profile(self.step_count - self.finish_step1_step)
+            
         remaining_traj_num, self.remain_traj_ratio = self._target_generator.get_remaining_traj_nums(self._traj_id)
         # 预瞄2个点，每个点间隔0.1s
         future_xp = self._target_generator.get_lookahead(self._traj_id, 0.1, self.lookahead_num)
@@ -438,7 +445,7 @@ class MobileMMTrajEnv(gym.Env):
             print(f"Current target position: {self._target}, traj_id={self._traj_id}, "
                   f"future_2p={future_xp}, "
                   f"remaining_traj_num={remaining_traj_num}, remain_traj_ratio={self.remain_traj_ratio:.2f}, "
-                  f"is_finish_step1={self.is_finish_step1}")
+                  f"finish_step1_step={self.finish_step1_step}")
         return self._target, future_xp
 
     def _get_obs(self):
@@ -478,6 +485,9 @@ class MobileMMTrajEnv(gym.Env):
 
     def step(self, action):
         self.step_count += 1
+        self.control_info = {}
+        self.control_info['target'] = {}
+        self.control_info['reality'] = {}
         # if self.step_count > 200:
         #     import pdb; pdb.set_trace()
         action = np.array(action, dtype=np.float32).flatten()
@@ -500,6 +510,18 @@ class MobileMMTrajEnv(gym.Env):
         
         action_dx = action_ds * np.cos(last_yaw)
         action_dy = action_ds * np.sin(last_yaw)
+        
+        self.control_info['target'] = {
+            'dx': action_dx,
+            'dy': action_dy,
+            'dtheta': action_dtheta,
+            'left_arm1': action_left_arm1,
+            'left_arm2': action_left_arm2,
+            'left_arm3': action_left_arm3,
+            'left_arm4': action_left_arm4,
+            'left_arm5': action_left_arm5,
+            'left_arm6': action_left_arm6
+        }
         
         target_x = last_pos[0] + action_dx
         target_y = last_pos[1] + action_dy
@@ -574,6 +596,18 @@ class MobileMMTrajEnv(gym.Env):
             print(f"current arm states: 1={cur_state_left_arm1:.3f}, 2={cur_state_left_arm2:.3f}, 3={cur_state_left_arm3:.3f}, 4={cur_state_left_arm4:.3f}, 5={cur_state_left_arm5:.3f}, 6={cur_state_left_arm6:.3f}")
             print(f"actual movement: act dx = {base_pos[0] - last_pos[0]:.3f}, dy = {base_pos[1] - last_pos[1]:.3f}, dtheta = {self._wrap_angle(base_yaw - last_yaw):.3f}")
         
+        self.control_info['reality'] = {
+            'dx': base_pos[0] - last_pos[0],
+            'dy': base_pos[1] - last_pos[1],
+            'dtheta': self._wrap_angle(base_yaw - last_yaw),
+            'left_arm1': cur_state_left_arm1 - last_state_left_arm1,
+            'left_arm2': cur_state_left_arm2 - last_state_left_arm2,
+            'left_arm3': cur_state_left_arm3 - last_state_left_arm3,
+            'left_arm4': cur_state_left_arm4 - last_state_left_arm4,
+            'left_arm5': cur_state_left_arm5 - last_state_left_arm5,
+            'left_arm6': cur_state_left_arm6 - last_state_left_arm6
+        }
+        
         reward, info = compute_reward(base_pos, base_lin_vel_norm, ee_pos, self._target, base_yaw,
                                     wrap_angle_fn=self._wrap_angle,
                                     remaining_ratio=self.remain_traj_ratio)
@@ -595,10 +629,11 @@ class MobileMMTrajEnv(gym.Env):
             is_joint7_static and is_joint8_static and is_joint9_static
         
 
-        if not self.is_finish_step1 and bool(info.get("ee_distance", 9999.0) < 0.05):
-            self.is_finish_step1 = True
+        if not self.finish_step1_step and bool(info.get("ee_distance", 9999.0) < 0.05):
+            self.finish_step1_step = self.step_count
 
-        reached_goal = bool(self.remain_traj_ratio < 0.05) and bool(info.get("ee_distance", 9999.0) < 0.05) and \
+        reached_goal = bool(self._traj_id == self._target_generator.traj.get_position_len() - 1) and \
+            bool(info.get("ee_distance", 9999.0) < 0.05) and \
             bool(base_lin_vel_norm < 0.1) and bool(base_ang_vel_norm < 0.1) and \
             is_arm_joints_static
         # if reached_goal and is_arm_joints_static:
@@ -621,7 +656,7 @@ class MobileMMTrajEnv(gym.Env):
 
         
         if DEBUG:
-            print(f"Step {self.step_count}: finish_step1 = {self.is_finish_step1}, Distance: {info['ee_distance']:.1f}m, "
+            print(f"Step {self.step_count}: finish_step1_step = {self.finish_step1_step}, Distance: {info['ee_distance']:.1f}m, "
                 f"Target: ({self._target[0]:.3f}, {self._target[1]:.3f}, {self._target[2]:.3f})m, "
                 f"base_pos = ({base_pos[0]:.3f}, {base_pos[1]:.3f}, {base_pos[2]:.3f}), "
                 f"ee_pos = ({ee_pos[0]:.3f}, {ee_pos[1]:.3f}, {ee_pos[2]:.3f}), "

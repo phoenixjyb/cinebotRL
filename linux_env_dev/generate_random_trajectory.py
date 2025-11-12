@@ -61,7 +61,7 @@ def generate_trajectory(n_points=300, step=0.01, z_min=0.85, z_max=1.3, seed=Non
     roll = 0.0
 
     # delta noise std controls curvature; set small values for continuity
-    yaw_std = 0.02  # radians per step
+    yaw_std = 0.05  # radians per step
     pitch_std = 0.005
     roll_std = 0.005
 
@@ -159,7 +159,6 @@ def main():
         os.makedirs(os.path.dirname(out) or '.', exist_ok=True)
 
     traj = generate_trajectory(n_points=args.n, step=args.step, z_min=args.zmin, z_max=args.zmax, seed=args.seed)
-    import pdb; pdb.set_trace()
     with open(out, 'w') as f:
         json.dump(traj, f, indent=2)
 

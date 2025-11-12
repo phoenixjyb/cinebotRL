@@ -65,7 +65,27 @@ class JSONTrajectory:
         self.num_points = int(self.positions.shape[0])
         if self.num_points == 0:
             raise ValueError("Trajectory contains no poses")
+        self.len_per_point, self.total_length = self.cal_length_per_point()
 
+    def cal_length_per_point(self,):
+        total_len = 0.0
+        n = self.positions.shape[0]
+        len_per_point = [0.0] * n
+        if n == 0:
+            self.total_length = 0.0
+            return
+        prev_pos = self.positions[0]
+        len_per_point[0] = 0.0
+        for i in range(1, n):
+            cur_pos = self.positions[i]
+            diff = cur_pos - prev_pos
+            seg_len = float(np.linalg.norm(diff))
+            total_len += seg_len
+            len_per_point[i] = total_len
+            prev_pos = cur_pos
+        total_length = float(total_len)
+        return len_per_point, total_length
+    
     def get_position(self, idx: int, alpha: float = 0.0) -> np.ndarray:
         """Return interpolated position between idx and idx+1 by alpha in [0,1].
         If idx is the last index, returns last position regardless of alpha."""

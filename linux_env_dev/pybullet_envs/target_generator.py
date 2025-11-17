@@ -3,6 +3,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, List
+import math
 
 
 class TargetGenerator(abc.ABC):
@@ -117,10 +118,12 @@ class JSONNearestTargetGenerator(TargetGenerator):
     randomly at construction (or deterministically if `seed` is provided).
     """
 
-    def __init__(self, json_paths: Optional[List[str]] = None, json_path: Optional[str] = None,
+    def __init__(self, json_paths: Optional[List[str]] = None, json_txt: Optional[str] = None,
                  mode: str = "random", lookahead_steps: int = 0, lookahead_dt: float = 1.0):
         # config
         self.json_paths = json_paths
+        self.json_txt = json_txt
+        self.read_all_jsons()
         self.traj_mode = mode
         if self.traj_mode == "random":
             self.random_select_path()
@@ -143,13 +146,30 @@ class JSONNearestTargetGenerator(TargetGenerator):
         self.len_per_point = None
         self.total_length = None
 
-    def random_select_path(self):
+    def read_json_from_txt(self,):
         paths: List[str] = []
-        if isinstance(self.json_paths, (list, tuple)):
-            paths = list(self.json_paths)
+        if self.json_txt is None:
+            raise ValueError("json_txt is None; cannot read paths.")
+        with open(self.json_txt, "r") as f:
+            for line in f:
+                line = line.strip()
+                if len(line) > 0:
+                    paths.append(line)
+        # print(f"{paths[:5]}")
+        # import pdb; pdb.set_trace()
+        self.json_paths = paths[:]
+        # self.json_paths = ['linux_env_dev/new_json_50/cinematic_db_arc_left_push_arc_left_push_090.json']
+    
+    def read_all_jsons(self):
+        if self.json_txt is not None:
+            # txt读取优先，否则json
+            self.read_json_from_txt() # 覆盖self.json_paths
         else:
-            paths = [str(self.json_paths)]
-
+            self.json_paths = self.json_paths
+        print(f"Total {len(self.json_paths)} paths available")
+    
+    def random_select_path(self):
+        paths: List[str] = self.json_paths
         # RNG for deterministic selection if seed provided
         _rng = np.random.default_rng()
         self.sel_idx = int(_rng.integers(0, len(paths)))
@@ -157,17 +177,38 @@ class JSONNearestTargetGenerator(TargetGenerator):
 
         self.traj = JSONTrajectory(selected_path)
     
+    def get_traj_path(self,):
+        return self.json_paths[self.sel_idx]
+
+    def get_path_heading(self,):
+        preview_dist = 0.1
+        point_start = self.traj.positions[0]
+        for i in range(1, self.traj.get_position_len()):
+            point_10i = self.traj.positions[10 * i]
+            vec = point_10i[0:2] - point_start[0:2]
+            dist = np.linalg.norm(vec)
+            if dist >= preview_dist:
+                heading = math.atan2(float(vec[1]), float(vec[0]))
+                return heading
+        # import pdb; pdb.set_trace()
+        return 0.0
+    
     def reset(self, rng: Optional[np.random.Generator] = None):
         # default initial target is first pose
         self._last_ee_pos = None
         self.len_per_point = None
         self.total_length = None
+        self.traj = None
         if self.traj_mode == "random":
             self.random_select_path()
+            # print(f"Random to {self.sel_idx}th path")
         elif self.traj_mode == "seq":
             self.sel_idx = (self.sel_idx + 1) % len(self.json_paths)
             self.traj = JSONTrajectory(self.json_paths[self.sel_idx])
-            print(f"Switch to {self.sel_idx}th path: {self.traj}")
+            print(f"Switch to {self.sel_idx}th path: {self.json_paths[self.sel_idx]}, "
+                  f"final p = {self.traj.positions[-1]}")
+        else:
+            raise ValueError(f"Unknown mode: {self.traj_mode}")
         pos = self.traj.positions[0].astype(np.float32)
         return pos
 

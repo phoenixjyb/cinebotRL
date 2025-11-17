@@ -25,15 +25,34 @@ def compute_reward(base_pos, base_lin_vel, ee_pos, target_pos, base_yaw, wrap_an
     # 进度惩罚
     # progress_reward = compute_progress_reward(remaining_ratio, ratio=2.0)
     
-    total_reward = dist_reward
+    # 机械臂和本体的干涉惩罚
+    collision_reward = compute_collision_reward(base_pos, ee_pos, ratio=50.0)
+    
+    total_reward = dist_reward + collision_reward
     total_reward = float(np.clip(total_reward, -5.0, 5.0))
     
     info.update(dist_info)
     # info.update(yaw_info)
     # info.update(ee_height_info)
     if DEBUG:
-        print(f"Reward: {total_reward:.2f} (dist: {dist_reward:.2f})")
+        print(f"Reward: {total_reward:.2f} (dist: {dist_reward:.2f}, collision: {collision_reward:.2f})")
     return total_reward, info
+
+def compute_collision_reward(base_pos, ee_pos, ratio=1.0):
+    reward = 0.0
+    base_xy = np.array(base_pos[:2], dtype=float)
+    ee_xy = np.array(ee_pos[:2], dtype=float)
+    dist = float(np.linalg.norm(ee_xy - base_xy))
+    if dist < 0.3:
+        reward = -1.0 * (0.3 - dist) * ratio
+    
+    # 距离0.25，ratio=100，惩罚-50，ratio=1000，惩罚-500
+    # 距离0.20，ratio=100，惩罚-100，ratio=1000，惩罚-1000
+
+    if DEBUG:
+        print(f"collision Reward: {reward:.2f} (dist={dist:.2f}, ratio={ratio:.2f})")
+
+    return reward
 
 def compute_progress_reward(remaining_ratio, ratio=1.0):
     """Compute progress-based reward (negative with scaling).

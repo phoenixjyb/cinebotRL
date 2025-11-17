@@ -115,20 +115,19 @@ def main():
         return float(max(1e-7, initial_lr * (1.0 - t)))
 
     os.makedirs(args.save_dir, exist_ok=True)
-    # env_fn = lambda: MobileMMBulletEnv(render=args.render,
-    #                                    target_generator=RandomTargetForEpisode(
-    #                                        low=(4.0, -2.0, 0.5),
-    #                                        high=(10.0, 2.0, 1.5)
-    #                                    ))
     env_fn = lambda: MobileMMTrajEnv(render=args.render,
                                        target_generator=JSONNearestTargetGenerator(
-                                        #    json_path="trajectoryToLearn/world_json/scene_1/traj_1.json",
-                                             json_paths=["trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
-                                                         "trajectoryToLearn/world_json/scene_1/traj_random_20251110_215950.json",
-                                                         "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154427.json",
-                                                         "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154646.json",
-                                                         "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154810.json"],
-                                             mode="random"
+                                            json_paths=[
+                                                #  "linux_env_dev/new_json_50/cinematic_db_arc_right_pull_arc_right_pull_004.json",
+                                                #  "trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
+                                                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251110_215950.json",
+                                                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154427.json",
+                                                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154646.json",
+                                                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154810.json"
+                                                    ],
+                                            json_txt="linux_env_dev/new_json_50/train.txt",
+                                            # json_txt="linux_env_dev/new_json_50/train_stage1.txt",
+                                            mode="random"
                                        ))
     if args.n_envs > 1:
         from stable_baselines3.common.vec_env import SubprocVecEnv

@@ -12,7 +12,8 @@ from pybullet_envs.mobile_mm_traj import MobileMMTrajEnv
 from pybullet_envs.target_generator import RandomTargetForEpisode, JSONNearestTargetGenerator
 from pybullet_envs.transformer_extractor import TransformerFeaturesExtractor
 
-def test_trained_model(model_path, num_episodes=1, json_paths=None, max_steps=1000, render=False):
+def test_trained_model(model_path, num_episodes=1, json_paths=None, test_txt=None,
+                       should_vis=True, max_steps=1000, render=False):
     """
     测试训练好的模型并生成可视化结果
     
@@ -40,6 +41,7 @@ def test_trained_model(model_path, num_episodes=1, json_paths=None, max_steps=10
     env_fn = lambda: MobileMMTrajEnv(render=render,
                                     target_generator=JSONNearestTargetGenerator(
                                         json_paths=json_paths,
+                                        json_txt=test_txt,
                                         mode="seq"
                                     ))
     vec_env = DummyVecEnv([env_fn])
@@ -47,10 +49,12 @@ def test_trained_model(model_path, num_episodes=1, json_paths=None, max_steps=10
     # 存储测试结果
     all_distances = []
     all_rewards = []
+    all_traj_path = []
     success_count = 0
     
     for episode in range(num_episodes):
         print(f"\n=== Episode {episode + 1} ===")
+        
         
         obs = vec_env.reset()
         # get underlying env instance from DummyVecEnv for visualization helpers
@@ -75,6 +79,7 @@ def test_trained_model(model_path, num_episodes=1, json_paths=None, max_steps=10
         episode_joint_angles = []  # list of length-6 tuples
         # collect per-step end-effector heights (z)
         episode_ee_heights = []
+        
 
         def _get_ee_pos_from_env(e):
             return e._get_ee_pos()
@@ -116,6 +121,8 @@ def test_trained_model(model_path, num_episodes=1, json_paths=None, max_steps=10
         episode_rewards = []
         terminated = False
         step_count = 0
+        all_traj_path.append(env._target_generator.get_traj_path())
+        cur_traj_path = env._target_generator.get_traj_path()
         
         while not terminated:
             # 使用模型预测动作
@@ -248,6 +255,8 @@ def test_trained_model(model_path, num_episodes=1, json_paths=None, max_steps=10
                 elif hasattr(env, 'env') and hasattr(env.env, '_abstract_chassis_yaw'):
                     yaw = env.env._abstract_chassis_yaw
                 # normalize to float if possible
+                # if abs(yaw - episode_chassis_yaw[-1]) > 0.02:
+                #     import pdb; pdb.set_trace()
                 episode_chassis_yaw.append(float(yaw) if yaw is not None else np.nan)
             except Exception:
                 episode_chassis_yaw.append(np.nan)
@@ -282,7 +291,12 @@ def test_trained_model(model_path, num_episodes=1, json_paths=None, max_steps=10
         
             # 检查是否成功到达目标
             final_distance = episode_distances[-1] if episode_distances else float('nan')
-        
+            
+            if step_count % 1000 == 0:
+                img_path = os.path.join(save_dir, f"episode_{episode+1}_step_{step_count:04d}.png")
+                env.save_robot_image(img_path, width=800, height=600, traj=episode_ee_positions, draw_origin=True, target=episode_targets)
+                
+                
         if final_distance < 0.05:
             success_count += 1
             print(f"Episode {episode + 1}: SUCCESS (distance: {final_distance:.4f})")
@@ -292,15 +306,6 @@ def test_trained_model(model_path, num_episodes=1, json_paths=None, max_steps=10
 
         all_distances.append(episode_distances)
         all_rewards.append(episode_rewards)
-        
-        # 保存该episode的轨迹图片（包含已经收集的EE轨迹），并传入target以在图中显示
-        # final_img_path = os.path.join(save_dir, f"episode_{episode+1}_final.png")
-        # try:
-        #     last_target = episode_targets[-1] if len(episode_targets) > 0 else None
-        #     env.save_robot_image(final_img_path, width=800, height=600, traj=episode_ee_positions, draw_origin=True, target=episode_targets)
-        #     print(f"Saved final image: {final_img_path}")
-        # except Exception as e:
-        #     print(f"Failed to save final image: {e}")
 
         # accumulate base and ee positions for cross-episode plotting (still keep for summary if needed)
         if 'all_base_positions' not in locals():
@@ -329,38 +334,47 @@ def test_trained_model(model_path, num_episodes=1, json_paths=None, max_steps=10
             all_control_info.append([])
 
         # Generate per-episode 3D trajectory plot immediately for this episode
-        try:
+        print(f"Mean error : {np.mean(episode_distances[:-2]):.2f} m")
+        if should_vis or (np.mean(episode_distances[:-2]) > 0.1):
             # pass single-episode lists wrapped in lists to match function signature
-            generate_3d_trajectory_plot([episode_base_trimmed], [episode_ee_trimmed], [episode_targets_trimmed], save_dir, episode=episode+1)
-        except Exception as e:
-            print(f'Failed to generate per-episode 3D trajectory plot for episode {episode+1}: {e}')
-
-        # Generate per-episode velocity plot (world-frame vs chassis-frame)
-        try:
-            generate_velocity_plot(episode_world_vels, episode_chassis_vels, save_dir, 
+                generate_3d_trajectory_plot([episode_base_trimmed], [episode_ee_trimmed], [episode_targets_trimmed],
+                                            cur_traj_path, save_dir, episode=episode+1)
+                generate_velocity_plot(episode_world_vels, episode_chassis_vels, save_dir, 
                                    episode=episode+1, joint_angles=episode_joint_angles,
                                    ee_heights=episode_ee_heights, traj_ids=episode_traj_ids[:-2],
                                    ee_distances=episode_distances[:-2], chassis_yaw=episode_chassis_yaw[:-2],
-                                   control_infos=episode_control_info[:-2])
-        except Exception as e:
-            print(f'Failed to generate per-episode velocity plot for episode {episode+1}: {e}')
+                                       control_infos=episode_control_info[:-2], traj_path=cur_traj_path)
     
     vec_env.close()
+    print(f"\n")
     
     # 生成性能图表
     generate_performance_plots(all_distances, all_rewards, save_dir, success_count, num_episodes)
     
     # 生成测试报告
     generate_test_report(all_distances, all_rewards, success_count, num_episodes, save_dir)
-    # 生成3D轨迹图（底座与末端执行器）
-    # try:
-    #     if 'all_base_positions' in locals() and 'all_ee_positions' in locals():
-    #         generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_targets, save_dir, episode)
-    #     else:
-    #         print('No trajectory data collected to plot 3D trajectories.')
-    # except Exception as e:
-    #     print(f'Failed to generate 3D trajectory plot: {e}')
-    
+    # 计算并打印所有 episode 的 ee_distance 平均值（忽略 None/NaN）
+    try:
+        flat_vals = []
+        for d in all_distances:
+            for v in d:
+                try:
+                    if v is None:
+                        continue
+                    fv = float(v)
+                    if np.isnan(fv):
+                        continue
+                    flat_vals.append(fv)
+                except Exception:
+                    continue
+        if len(flat_vals) > 0:
+            avg_ee_distance = float(np.mean(flat_vals))
+            print(f"Average ee_distance across all episodes and steps: {avg_ee_distance:.6f} m")
+        else:
+            print("No ee_distance values recorded across episodes.")
+    except Exception as e:
+        print(f"Failed to compute average ee_distance: {e}")
+
     return all_distances, all_rewards, success_count
 
 
@@ -452,7 +466,7 @@ def generate_test_report(all_distances, all_rewards, success_count, num_episodes
     print(f"Saved test report: {report_path}")
 
 
-def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_targets, save_dir, episode=1):
+def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_targets, traj_path, save_dir, episode=1):
     """生成3D轨迹图：机器人底座和末端执行器位置的变化（不渲染机器人）"""
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
     # Create a 2x2 layout:
@@ -504,15 +518,6 @@ def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_target
                 except Exception:
                     target_arr = None
 
-            if target_arr is None:
-                traj_path = "trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json"
-                if os.path.exists(traj_path):
-                    with open(traj_path, 'r') as f:
-                        traj_data = json.load(f)
-                    traj_data = [p['position'] for p in traj_data.get('poses', [])]
-                    if len(traj_data) > 0:
-                        target_arr = np.array(traj_data)
-
             if target_arr is not None:
                 try:
                     ax3d.plot(target_arr[:, 0], target_arr[:, 1], target_arr[:, 2], linestyle='--', color='green', label=f'traj p{i+1}')
@@ -544,7 +549,16 @@ def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_target
     ax3d.set_xlabel('X (m)')
     ax3d.set_ylabel('Y (m)')
     ax3d.set_zlabel('Z (m)')
-    ax3d.set_title('3D Trajectories: Base (solid) and End-Effector (dashed)')
+    # include traj path (short name) in the title if provided
+    title_main = '3D Trajectories: Base (solid) and End-Effector (dashed)'
+    if traj_path:
+        try:
+            short = os.path.basename(traj_path)
+        except Exception:
+            short = str(traj_path)
+        ax3d.set_title(f"{title_main} — {short}")
+    else:
+        ax3d.set_title(title_main)
     ax3d.legend(loc='upper left')
 
     # finalize EE / target subplot appearance and add clear legends
@@ -574,7 +588,7 @@ def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_target
     ax_ty.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    out_path = os.path.join(save_dir, f'trajectories_3d_episode_{episode}.png')
+    out_path = os.path.join(save_dir, f'trajectories_3d_episode_{episode}_{os.path.basename(traj_path)[:-5]}.png')
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Saved 3D trajectory plot: {out_path}")
@@ -582,7 +596,7 @@ def generate_3d_trajectory_plot(all_base_positions, all_ee_positions, all_target
 
 def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1,
                            joint_angles=None, ee_heights=None, traj_ids=None,
-                           ee_distances=None, chassis_yaw=None, control_infos=None):
+                           ee_distances=None, chassis_yaw=None, control_infos=None, traj_path=None):
     """Generate a 2-panel plot (side-by-side) comparing world-frame and chassis-frame
     longitudinal (vx) and lateral (vy) linear velocities over time for one episode.
 
@@ -661,7 +675,15 @@ def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1,
         ax_ee.grid(True)
         ax_ee.legend()
 
-    plt.suptitle(f'Episode {episode}: Velocities, Joint Angles and Chassis Yaw')
+    # include trajectory path (short name) in the suptitle when available
+    title = f'Episode {episode}: Velocities, Joint Angles and Chassis Yaw'
+    if traj_path:
+        try:
+            short = os.path.basename(traj_path)
+        except Exception:
+            short = str(traj_path)
+        title = f"{title} — {short}"
+    plt.suptitle(title)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     # bottom row: plot traj_ids over steps if provided
 
@@ -782,75 +804,34 @@ def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1,
     except Exception:
         pass
 
-    out_path = os.path.join(save_dir, f'episode_{episode}_velocities.png')
+    out_path = os.path.join(save_dir, f'episode_{episode}_{os.path.basename(traj_path)[:-5]}_velocities.png')
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f"Saved velocity plot: {out_path}")
 
 
-if __name__ == "__main__":
-    # 轨迹点跟踪
-    # model_path = "linux_env_dev/models/logs_20251105_184132/ppo_mobile_mm_final.zip"
-    # 正确设置初始位置
-    # model_path = "linux_env_dev/models/logs_20251106_135934/checkpoints/ppo_mobile_mm_3200000_steps.zip"
-    # 减小progress reward系数
-    # model_path = "linux_env_dev/models/logs_20251106_164136/checkpoints/ppo_mobile_mm_3200000_steps.zip"
-    # 稍微增大progress reward系数，且初始点随机
-    model_path = "linux_env_dev/models/logs_20251106_175008/checkpoints/ppo_mobile_mm_2400000_steps.zip"
-    # 增加速度惩罚
-    model_path = "linux_env_dev/models/logs_20251106_205849/ppo_mobile_mm_final.zip"
-    # 增加阶段
-    model_path = "linux_env_dev/models/logs_20251106_212524/ppo_mobile_mm_final.zip"
-    # 增加obs
-    model_path = "linux_env_dev/models/logs_20251107_114919/checkpoints/ppo_mobile_mm_4000000_steps.zip"
-    # Transformer
-    model_path = "linux_env_dev/models/logs_20251107_115356/checkpoints/ppo_mobile_mm_3200000_steps.zip"
-    # transformer优化
-    model_path = "linux_env_dev/models/logs_20251107_181539/checkpoints/ppo_mobile_mm_3200000_steps.zip"
-    model_path = "linux_env_dev/models/logs_20251108_110310/checkpoints/ppo_mobile_mm_2400000_steps.zip"
-    # non linear distance reward
-    model_path = "linux_env_dev/models/logs_20251108_112108/ppo_mobile_mm_final.zip"
-    # arbitrary start
-    # model_path = "linux_env_dev/models/logs_20251108_191150/ppo_mobile_mm_final.zip"
-    model_path = "linux_env_dev/models/logs_20251109_004553/checkpoints/ppo_mobile_mm_4800000_steps.zip"
-    # larger progress
-    # model_path = "linux_env_dev/models/logs_20251109_005013/checkpoints/ppo_mobile_mm_4800000_steps.zip"
-    # new traj
-    # model_path = "linux_env_dev/models/logs_20251109_150030/checkpoints/ppo_mobile_mm_4000000_steps.zip"
-    # model_path = "linux_env_dev/models/logs_20251109_150030/ppo_mobile_mm_final.zip"
-    # new traj + 2 ratio progress
-    # model_path = "linux_env_dev/models/logs_20251109_175231/ppo_mobile_mm_final.zip"
-    # simplified start
-    model_path = "linux_env_dev/models/logs_20251109_231419/checkpoints/ppo_mobile_mm_2400000_steps.zip"
-    model_path = "linux_env_dev/models/logs_20251109_231645/checkpoints/ppo_mobile_mm_4800000_steps.zip"
-    # linear reward 
-    # model_path = "linux_env_dev/models/logs_20251109_235444/ppo_mobile_mm_final.zip"
-    # simpl
-    # model_path = "linux_env_dev/models/logs_20251110_112850/ppo_mobile_mm_final.zip"
-    # model_path = "linux_env_dev/models/logs_20251110_190257/checkpoints/ppo_mobile_mm_3200000_steps.zip"
-    model_path = "linux_env_dev/models/logs_20251110_181111/checkpoints/ppo_mobile_mm_3200000_steps.zip"
-    # model_path = "linux_env_dev/models/logs_20251110_212705/checkpoints/ppo_mobile_mm_3200000_steps.zip"
-    
-    model_path = "linux_env_dev/models/logs_20251111_155620/ppo_mobile_mm_final.zip"
-    # model_path = "linux_env_dev/models/logs_20251111_155641/ppo_mobile_mm_final.zip"
-    # model_path = "linux_env_dev/models/logs_20251111_213922/ppo_mobile_mm_final.zip"
-    model_path = "linux_env_dev/models/logs_20251111_214013/ppo_mobile_mm_final.zip"
-    model_path = "linux_env_dev/models/logs_20251111_214013/checkpoints/ppo_mobile_mm_3200000_steps.zip"
-    model_path = "linux_env_dev/models/logs_20251112_120834/ppo_mobile_mm_final.zip"
-    model_path = "linux_env_dev/models/logs_20251113_220830/ppo_mobile_mm_final.zip"
-    model_path = "linux_env_dev/models/logs_20251113_221014/ppo_mobile_mm_final.zip"
+if __name__ == "__main__":    
+    model_path = "linux_env_dev/models/logs_20251126_112856/ppo_mobile_mm_final.zip"
+    # model_path = "linux_env_dev/models/logs_20251126_112856/checkpoints/ppo_mobile_mm_4800000_steps.zip"
     
     render = False
     
     if os.path.exists(model_path):
         print("Starting model testing...")
-        num_episode = 5
-        distances, rewards, success_count = test_trained_model(model_path, json_paths=["trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
-                                                               "trajectoryToLearn/world_json/scene_1/traj_random_20251110_215950.json",
-                                                               "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154427.json",
-                                                               "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154646.json",
-                                                               "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154810.json"],
-                                                               num_episodes=num_episode, render=render, max_steps=500)
+        num_episode = 943
+        distances, rewards, success_count = test_trained_model(model_path, json_paths=[
+                                                            # "linux_env_dev/new_json_50/cinematic_db_arc_right_pull_arc_right_pull_004.json",
+                                                            #    "trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
+                                                            #    "trajectoryToLearn/world_json/scene_1/traj_random_20251110_215950.json",
+                                                            #    "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154427.json",
+                                                            #    "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154646.json",
+                                                            #    "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154810.json"
+                                                            ],
+                                                            # test_txt="linux_env_dev/new_json_50/test.txt",
+                                                            test_txt="linux_env_dev/new_json_50/train.txt",
+                                                            # test_txt="linux_env_dev/new_json_50/train_stage1.txt",
+                                                               num_episodes=num_episode, render=render, max_steps=500,
+                                                               should_vis=False)
         print(f"\nTesting completed! Success rate: {success_count}/{num_episode} ({success_count/num_episode*100:.1f}%)")
     else:
         print(f"Model file not found: {model_path}")

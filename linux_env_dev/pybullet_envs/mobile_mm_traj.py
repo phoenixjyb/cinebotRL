@@ -5,10 +5,8 @@ import gymnasium as gym
 from gymnasium import spaces
 import pybullet as p
 import pybullet_data
-try:
-    from PIL import Image
-except Exception:
-    Image = None
+from PIL import Image
+import math
 
 from .reward_helpers import compute_reward, DEBUG
 from .target_generator import TargetGenerator, FixedTarget, JSONNearestTargetGenerator
@@ -66,18 +64,20 @@ class MobileMMTrajEnv(gym.Env):
         self.action_space = spaces.Box(low=-1, high=1, shape=(2+6,), dtype=np.float32) # 2个底盘自由度 + 6个机械臂自由度
         # obs layout: joint pos (n_j), joint vel (n_j), chassis_history (hist_num*3), base_pos(3), ee_pos(3),
         # target + lookahead (3*(1+lookahead_num)), remain_ratio(1)
-        obs_dim = self.n_j * 2 + (self.hist_num * 3) + 3 + 3 + 3*(1 + self.lookahead_num) + 1
+        obs_dim = self.n_j * 2 + (self.hist_num * 3) + 3 + 3 + 3*(1 + self.lookahead_num) + 1 + 1
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
 
         self._target_generator = target_generator
         self._target = self._target_generator.reset()
         self.finish_step1_step = None
+        self.finish_step1_step = 0
         self.remain_traj_ratio = 1.0
         self._traj_id = 0
+        self._last_traj_id = 0
         # chassis joint history buffer: shape (hist_num, 3) columns = [joint_x, joint_y, joint_theta]
         self._chassis_hist = np.zeros((self.hist_num, 3), dtype=np.float32)
         self.last_chassis_vel = None
-
+    
     def _load_robot_once(self):
         # load plane and robot, then remove (we re-create on reset)
         plane = p.loadURDF("plane.urdf")
@@ -112,9 +112,11 @@ class MobileMMTrajEnv(gym.Env):
             np.random.seed(seed)
         self._target = self._target_generator.reset()
         self.finish_step1_step = None
+        self.finish_step1_step = 0
         self.remain_traj_ratio = 1.0
         self.step_count = 0
         self._traj_id = 0
+        self._last_traj_id = 0
         self.last_chassis_vel = None
         self._chassis_hist = np.zeros((self.hist_num, 3), dtype=np.float32)
         p.resetSimulation()
@@ -129,22 +131,24 @@ class MobileMMTrajEnv(gym.Env):
         for idx in self.joint_ids:
             p.resetJointState(self.robot, idx, targetValue=0.0, targetVelocity=0.0)
 
-        # p.resetJointState(self.robot, self.joint_name2ids['joint_x'],
-        #                   targetValue=start_pos[0] + np.random.uniform(-0.5, 0.5), targetVelocity=0.0)
-        # p.resetJointState(self.robot, self.joint_name2ids['joint_y'],
-        #                   targetValue=start_pos[1] + np.random.uniform(-0.5, 0.5), targetVelocity=0.0)
-        # p.resetJointState(self.robot, self.joint_name2ids['joint_theta'],
-        #                   targetValue=np.random.uniform(-np.pi, np.pi), targetVelocity=0.0)
+        original_heading = self._target_generator.get_path_heading()
         
-        # 初始点做简化，方向尽量一致，ee尽量靠近起点
-        # p.resetJointState(self.robot, self.joint_name2ids['joint_x'],
-        #                   targetValue=start_pos[0] + np.random.uniform(-1.0, -0.7), targetVelocity=0.0)
-        # p.resetJointState(self.robot, self.joint_name2ids['joint_y'],
-        #                   targetValue=start_pos[1] + np.random.uniform(-0.1, 0.1), targetVelocity=0.0)
+        # 初始状态下，base和ee的平面距离为0.6m，为了让机械臂位于原点，base需要后退0.6m
+        ds_mv = 0.65 + 0.05 * np.random.uniform(-1.0, 1.0)
+        dx = ds_mv * math.cos(original_heading)
+        dy = ds_mv * math.sin(original_heading)
+        dtheta = 0.05 * np.random.uniform(-1.0, 1.0)
         p.resetJointState(self.robot, self.joint_name2ids['joint_x'],
-                          targetValue=start_pos[0] - 0.6, targetVelocity=0.0)
+                          targetValue=start_pos[0] - dx, targetVelocity=0.0)
         p.resetJointState(self.robot, self.joint_name2ids['joint_y'],
-                          targetValue=start_pos[1], targetVelocity=0.0)
+                          targetValue=start_pos[1] - dy, targetVelocity=0.0)
+        p.resetJointState(self.robot, self.joint_name2ids['joint_theta'],
+                          targetValue=self._wrap_angle(original_heading + dtheta), targetVelocity=0.0)
+        # p.resetJointState(self.robot, self.joint_name2ids['joint_theta'],
+        #                   targetValue=np.pi / 2, targetVelocity=0.0)
+        if DEBUG:
+            print(f"Reset robot base to x={start_pos[0]-dx:.2f}, y={start_pos[1]-dy:.2f}, heading={original_heading:.2f} rad, "
+                  f"dx = {dx:.2f}, dy={dy:.2f}")
         
         # 各机械臂设置为初始位置
         p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint1'],
@@ -420,6 +424,7 @@ class MobileMMTrajEnv(gym.Env):
         #       f"chassis_lin_vel_world=({link_lin_vel_world_frame[0]:.3f}, {link_lin_vel_world_frame[1]:.3f}), "
         #       f"chassis_ang_vel={link_ang_vel_world_frame[2]:.3f}, "
         #       f"vx_r={vx_r:.3f}, vy_r={vy_r:.3f}")
+        # import pdb; pdb.set_trace()
 
         return abs_pos
 
@@ -451,7 +456,7 @@ class MobileMMTrajEnv(gym.Env):
         
         if DEBUG:
             print(f"Current target position: {self._target}, traj_id={self._traj_id}, "
-                  f"future_2p={future_xp}, "
+                #   f"future_2p={future_xp}, "
                   f"remaining_traj_num={remaining_traj_num}, remain_traj_ratio={self.remain_traj_ratio:.2f}, "
                   f"finish_step1_step={self.finish_step1_step}")
         return self._target, future_xp
@@ -469,8 +474,8 @@ class MobileMMTrajEnv(gym.Env):
             # shift left
             self._chassis_hist = np.roll(self._chassis_hist, -1, axis=0)
         self._chassis_hist[-1, :] = np.array([jx_vel, jy_vel, jth_vel], dtype=np.float32)
-        if DEBUG:
-            print(f"Chassis joint history:\n{self._chassis_hist}")
+        # if DEBUG:
+        #     print(f"Chassis joint history:\n{self._chassis_hist}")
     
     def _get_obs(self):
         q = [] # 关节位置
@@ -480,6 +485,7 @@ class MobileMMTrajEnv(gym.Env):
             q.append(s[0])
             qdot.append(s[1])
         q = np.array(q, dtype=np.float32)
+        q_with_ang = np.concatenate([q[:2], [np.cos(q[2]), np.sin(q[2])], q[3:]])
         qdot = np.array(qdot, dtype=np.float32)
         
         self._get_hist_chassis()
@@ -491,9 +497,14 @@ class MobileMMTrajEnv(gym.Env):
 
         # include flattened chassis history in observation
         chassis_hist_flat = self._chassis_hist.reshape(-1).astype(np.float32)
+        # obs = np.concatenate([q, qdot, chassis_hist_flat, base_pos, ee_pos, target, future_5targets,
+        #                       np.array([self.remain_traj_ratio])]).astype(np.float32)
 
-        obs = np.concatenate([q, qdot, chassis_hist_flat, base_pos, ee_pos, target, future_5targets,
+        obs = np.concatenate([q_with_ang, qdot, chassis_hist_flat, base_pos, ee_pos, target, future_5targets,
                               np.array([self.remain_traj_ratio])]).astype(np.float32)
+        
+        if DEBUG:
+            print(f"obs = {q[:3]}")
         return obs
 
     def _get_target_position(self):
@@ -517,14 +528,13 @@ class MobileMMTrajEnv(gym.Env):
         self.control_info = {}
         self.control_info['target'] = {}
         self.control_info['reality'] = {}
-        # if self.step_count > 200:
-        #     import pdb; pdb.set_trace()
         action = np.array(action, dtype=np.float32).flatten()
         self._get_base_pos()
         last_state_left_arm1, last_state_left_arm2, last_state_left_arm3, last_state_left_arm4, \
             last_state_left_arm5, last_state_left_arm6 = self._get_arm_state()
 
-        last_yaw = self._abstract_chassis_yaw
+        # last_yaw = self._abstract_chassis_yaw
+        last_yaw = p.getJointState(self.robot, 2)[0]
         last_pos = self._abstract_chassis_pos
 
         last_chassis_vel = self.last_chassis_vel if self.last_chassis_vel is not None else 0.0
@@ -539,12 +549,16 @@ class MobileMMTrajEnv(gym.Env):
         action_left_arm5 = action[6] * joint_delta_limit
         action_left_arm6 = action[7] * joint_delta_limit
         
+        # action_dx = (action_ds - 0.05) * np.cos(last_yaw)
+        # action_dy = (action_ds - 0.05) * np.sin(last_yaw)
         action_dx = action_ds * np.cos(last_yaw)
         action_dy = action_ds * np.sin(last_yaw)
         
         self.control_info['target'] = {
             'dx': action_dx,
             'dy': action_dy,
+            # 'dx': action_ds * np.cos(last_yaw),
+            # 'dy': action_ds * np.sin(last_yaw),
             'dtheta': action_dtheta,
             'left_arm1': action_left_arm1,
             'left_arm2': action_left_arm2,
@@ -556,7 +570,8 @@ class MobileMMTrajEnv(gym.Env):
         
         target_x = last_pos[0] + action_dx
         target_y = last_pos[1] + action_dy
-        target_theta = self._wrap_angle(last_yaw + action_dtheta) # 底盘theta是不限制范围的，所以需要wrap一下
+        # target_theta = self._wrap_angle(last_yaw + action_dtheta) # 底盘theta是不限制范围的，所以需要wrap一下
+        target_theta = last_yaw + action_dtheta
 
         target_left_arm1 = self.limit_action(last_state_left_arm1 + action_left_arm1, self.joint_limits['left_arm_joint1'])
         target_left_arm2 = self.limit_action(last_state_left_arm2 + action_left_arm2, self.joint_limits['left_arm_joint2'])
@@ -566,6 +581,7 @@ class MobileMMTrajEnv(gym.Env):
         target_left_arm6 = self.limit_action(last_state_left_arm6 + action_left_arm6, self.joint_limits['left_arm_joint6'])
 
         if DEBUG:
+            print(f"last_chassis_vel = {last_chassis_vel:.3f}, last_theta = {last_yaw:.3f}, action = {action[0]}")
             print(f"action: ds={action_ds:.3f}"
                   f"(dx={action_dx:.3f}, dy={action_dy:.3f}), dtheta={action_dtheta:.3f}, "
                   f"target=(x={target_x:.3f}, y={target_y:.3f}, theta={target_theta:.3f}), "
@@ -619,6 +635,7 @@ class MobileMMTrajEnv(gym.Env):
         base_ang_vel = getattr(self, '_abstract_chassis_ang_vel', np.array([0.0, 0.0, 0.0], dtype=float))
         
         base_lin_vel_norm = np.linalg.norm(base_lin_vel_chassis_frame)
+        
         base_ang_vel_norm = np.linalg.norm(base_ang_vel)
 
         cur_state_left_arm1, cur_state_left_arm2, cur_state_left_arm3, cur_state_left_arm4, \
@@ -661,8 +678,8 @@ class MobileMMTrajEnv(gym.Env):
             is_joint7_static and is_joint8_static and is_joint9_static
         
 
-        if not self.finish_step1_step and bool(info.get("ee_distance", 9999.0) < 0.05):
-            self.finish_step1_step = self.step_count
+        # if not self.finish_step1_step and bool(info.get("ee_distance", 9999.0) < 0.05):
+        #     self.finish_step1_step = self.step_count
 
         reached_goal = bool(self._traj_id == self._target_generator.traj.get_position_len() - 1) and \
             bool(info.get("ee_distance", 9999.0) < 0.05) and \
@@ -694,7 +711,10 @@ class MobileMMTrajEnv(gym.Env):
                 f"ee_pos = ({ee_pos[0]:.3f}, {ee_pos[1]:.3f}, {ee_pos[2]:.3f}), "
                 f"Reward: {reward:.2f} \n")
 
-        self.last_chassis_vel = base_lin_vel_norm
+        self.last_chassis_vel = base_lin_vel_chassis_frame[0]
+        if self._last_traj_id > self._traj_id:
+            import pdb; pdb.set_trace()
+        self._last_traj_id = self._traj_id
         # import pdb; pdb.set_trace()
         return obs, reward, terminated, truncated, info
 

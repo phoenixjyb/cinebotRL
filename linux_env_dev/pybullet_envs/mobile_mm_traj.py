@@ -502,7 +502,7 @@ class MobileMMTrajEnv(gym.Env):
 
         obs = np.concatenate([q_with_ang, qdot, chassis_hist_flat, base_pos, ee_pos, target, future_5targets,
                               np.array([self.remain_traj_ratio])]).astype(np.float32)
-        
+
         if DEBUG:
             print(f"obs = {q[:3]}")
         return obs
@@ -539,7 +539,7 @@ class MobileMMTrajEnv(gym.Env):
 
         last_chassis_vel = self.last_chassis_vel if self.last_chassis_vel is not None else 0.0
         # ds = vt + 1/2*at^2
-        action_ds = 0.1 * last_chassis_vel + 0.5 * (1.5 * action[0]) * 0.1 * 0.1 # 加速度限制1m/s^2
+        action_ds = 0.1 * last_chassis_vel + 0.5 * (1.5 * action[0]) * 0.1 * 0.1 # 加速度限制1.5m/s^2
         action_dtheta = action[1] * 0.01
         joint_delta_limit = 0.02
         action_left_arm1 = action[2] * joint_delta_limit

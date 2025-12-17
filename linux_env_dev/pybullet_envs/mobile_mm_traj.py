@@ -10,6 +10,8 @@ import math
 
 from .reward_helpers import compute_reward, DEBUG
 from .target_generator import TargetGenerator, FixedTarget, JSONNearestTargetGenerator
+from .robot_specs import get_robot_spec
+from .urdf_utils import prepare_urdf_for_pybullet
 
 class MobileMMTrajEnv(gym.Env):
     """Minimal PyBullet-based mobile manipulator tracking env.
@@ -21,17 +23,28 @@ class MobileMMTrajEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
-    def __init__(self, urdf_path=None, frame_skip=24, max_steps=500, render=False,
+    def __init__(self, robot: str = "mobile_mm", urdf_path=None, frame_skip=24, max_steps=500, render=False,
                  save_image_on_reset=False, save_image_path=None, image_width=800, image_height=600,
                  reward_distance_weight: float = 1.0, reward_yaw_weight: float = 1.0,
                  target_generator: Optional[TargetGenerator] = None):
         self.project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-        # self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "mobile_manipulator_PPR_base_corrected.urdf")
-        # self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "mobile_manipulator_PPR_theta_before_x.urdf")
-        self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "mobile_manipulator_little_xy_link.urdf")
-        self.frame_skip = frame_skip
-        self.max_steps = max_steps
-        self.render = render
+        self.robot_name = (robot or "mobile_mm").strip().lower()
+        self.robot_spec = get_robot_spec(self.robot_name)
+
+        raw_urdf_path = urdf_path or self.robot_spec.default_urdf_path
+        cache_dir = os.path.join(self.project_root, "linux_env_dev", "_urdf_cache")
+        self.urdf_path = prepare_urdf_for_pybullet(raw_urdf_path, self.robot_spec.package_rewrites, cache_dir)
+
+        self.base_joint_x, self.base_joint_y, self.base_joint_yaw = self.robot_spec.base_joints_xyz_yaw
+        self.arm_joints = list(self.robot_spec.arm_joints)
+        self.stabilized_joints = list(self.robot_spec.stabilized_joints)
+        self.base_link_name = self.robot_spec.base_link_name
+        self.ee_link_name = self.robot_spec.ee_link_name
+
+        self.frame_skip = int(frame_skip)
+        self.max_steps = int(max_steps)
+        self.render = bool(render)
+        self.use_fixed_base = bool(self.robot_name == "recomo")
 
         # image saving options
         self.save_image_on_reset = bool(save_image_on_reset)
@@ -45,6 +58,10 @@ class MobileMMTrajEnv(gym.Env):
         else:
             self.cid = p.connect(p.DIRECT)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        try:
+            p.setTimeStep(1.0 / 240.0)
+        except Exception:
+            pass
         p.setGravity(0, 0, -9.81)
 
         # placeholders
@@ -60,13 +77,24 @@ class MobileMMTrajEnv(gym.Env):
         # number of historical frames to include for chassis joints (joint_x, joint_y, joint_theta)
         self.hist_num = 3
 
-        # 目前仅控制底盘的2自由度——x平移和theta旋转
-        self.action_space = spaces.Box(low=-1, high=1, shape=(2+6,), dtype=np.float32) # 2个底盘自由度 + 6个机械臂自由度
+        # action dims: mobile_mm uses (2 base + 6 arm); recomo uses (3 base + 2 arm)
+        self.base_action_dim = 3 if self.robot_name == "recomo" else 2
+        self.action_space = spaces.Box(
+            low=-1, high=1, shape=(self.base_action_dim + len(self.arm_joints),), dtype=np.float32
+        )
         # obs layout: joint pos (n_j), joint vel (n_j), chassis_history (hist_num*3), base_pos(3), ee_pos(3),
         # target + lookahead (3*(1+lookahead_num)), remain_ratio(1)
         obs_dim = self.n_j * 2 + (self.hist_num * 3) + 3 + 3 + 3*(1 + self.lookahead_num) + 1 + 1
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
 
+        if target_generator is None:
+            default_train_txt = os.path.join(self.project_root, "linux_env_dev", "new_json_50", "train.txt")
+            if not os.path.isfile(default_train_txt):
+                raise ValueError(
+                    "MobileMMTrajEnv requires a trajectory-based target_generator, "
+                    f"but none was provided and default file is missing: {default_train_txt}"
+                )
+            target_generator = JSONNearestTargetGenerator(json_paths=[], json_txt=default_train_txt, mode="random")
         self._target_generator = target_generator
         self._target = self._target_generator.reset()
         self.finish_step1_step = None
@@ -77,12 +105,26 @@ class MobileMMTrajEnv(gym.Env):
         # chassis joint history buffer: shape (hist_num, 3) columns = [joint_x, joint_y, joint_theta]
         self._chassis_hist = np.zeros((self.hist_num, 3), dtype=np.float32)
         self.last_chassis_vel = None
+
+        # reward shaping (robot-aware)
+        if self.robot_name == "recomo":
+            # ee_tool is nearly above base in XY; disable base-vs-ee collision penalty
+            self._reward_kwargs = {
+                "dist_weight": 2.0,
+                "collision_ratio": 0.0,
+            }
+        else:
+            self._reward_kwargs = {
+                "dist_weight": 2.0,
+                "collision_threshold": 0.3,
+                "collision_ratio": 50.0,
+            }
     
     def _load_robot_once(self):
         # load plane and robot, then remove (we re-create on reset)
         plane = p.loadURDF("plane.urdf")
         try:
-            robot = p.loadURDF(self.urdf_path, useFixedBase=False)
+            robot = p.loadURDF(self.urdf_path, useFixedBase=self.use_fixed_base)
         except Exception as e:
             raise FileNotFoundError(f"URDF not found or failed to load: {self.urdf_path} -> {e}")
         # collect non-fixed joint ids
@@ -103,6 +145,16 @@ class MobileMMTrajEnv(gym.Env):
                 self.joint_name2ids[joint_name] = joint_idx
                 self.joint_effort_limit[joint_name] = info[10]
 
+        required_joints = [self.base_joint_x, self.base_joint_y, self.base_joint_yaw] + self.arm_joints
+        missing = [jn for jn in required_joints if jn and jn not in self.joint_name2ids]
+        if missing:
+            raise KeyError(
+                f"[{self.robot_name}] Required joint(s) not found in URDF: {missing}. "
+                f"URDF={self.urdf_path}"
+            )
+        # stabilized joints (e.g. gimbal) are optional: keep only those present
+        self.stabilized_joints = [jn for jn in self.stabilized_joints if jn in self.joint_name2ids]
+
         # clean up
         p.removeBody(robot)
         p.removeBody(plane)
@@ -122,8 +174,12 @@ class MobileMMTrajEnv(gym.Env):
         p.resetSimulation()
         p.setGravity(0, 0, -9.81)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        try:
+            p.setTimeStep(1.0 / 240.0)
+        except Exception:
+            pass
         p.loadURDF("plane.urdf")
-        self.robot = p.loadURDF(self.urdf_path, useFixedBase=False)
+        self.robot = p.loadURDF(self.urdf_path, useFixedBase=self.use_fixed_base)
 
         start_pos = self._target_generator.traj.get_position(0, 0.0)
 
@@ -133,16 +189,22 @@ class MobileMMTrajEnv(gym.Env):
 
         original_heading = self._target_generator.get_path_heading()
         
-        # 初始状态下，base和ee的平面距离为0.6m，为了让机械臂位于原点，base需要后退0.6m
-        ds_mv = 0.65 + 0.05 * np.random.uniform(-1.0, 1.0)
-        dx = ds_mv * math.cos(original_heading)
-        dy = ds_mv * math.sin(original_heading)
+        # mobile_mm: start with base offset behind the target so the arm can reach.
+        # recomo: holonomic base + short arm, so start near the target.
+        if self.robot_name == "recomo":
+            xy_jitter = 0.05
+            dx = float(np.random.uniform(-xy_jitter, xy_jitter))
+            dy = float(np.random.uniform(-xy_jitter, xy_jitter))
+        else:
+            ds_mv = 0.65 + 0.05 * np.random.uniform(-1.0, 1.0)
+            dx = ds_mv * math.cos(original_heading)
+            dy = ds_mv * math.sin(original_heading)
         dtheta = 0.05 * np.random.uniform(-1.0, 1.0)
-        p.resetJointState(self.robot, self.joint_name2ids['joint_x'],
-                          targetValue=start_pos[0] - dx, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['joint_y'],
-                          targetValue=start_pos[1] - dy, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['joint_theta'],
+        p.resetJointState(self.robot, self.joint_name2ids[self.base_joint_x],
+                          targetValue=float(start_pos[0] - dx), targetVelocity=0.0)
+        p.resetJointState(self.robot, self.joint_name2ids[self.base_joint_y],
+                          targetValue=float(start_pos[1] - dy), targetVelocity=0.0)
+        p.resetJointState(self.robot, self.joint_name2ids[self.base_joint_yaw],
                           targetValue=self._wrap_angle(original_heading + dtheta), targetVelocity=0.0)
         # p.resetJointState(self.robot, self.joint_name2ids['joint_theta'],
         #                   targetValue=np.pi / 2, targetVelocity=0.0)
@@ -150,19 +212,32 @@ class MobileMMTrajEnv(gym.Env):
             print(f"Reset robot base to x={start_pos[0]-dx:.2f}, y={start_pos[1]-dy:.2f}, heading={original_heading:.2f} rad, "
                   f"dx = {dx:.2f}, dy={dy:.2f}")
         
-        # 各机械臂设置为初始位置
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint1'],
-                          targetValue=-1.61, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint2'],
-                          targetValue=0.00, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint3'],
-                          targetValue=-0.32, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint4'],
-                          targetValue=-1.56, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint5'],
-                          targetValue=-1.13, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint6'],
-                          targetValue=0.0, targetVelocity=0.0)
+        # arm (and optionally gimbal) initial configuration
+        if self.robot_name == "mobile_mm":
+            init_joints = {
+                "left_arm_joint1": -1.61,
+                "left_arm_joint2": 0.00,
+                "left_arm_joint3": -0.32,
+                "left_arm_joint4": -1.56,
+                "left_arm_joint5": -1.13,
+                "left_arm_joint6": 0.0,
+            }
+        elif self.robot_name == "recomo":
+            init_joints = {
+                "joint6_arm_yaw": 0.0,
+                "joint5_arm_pitch": 0.0,
+            }
+        else:
+            init_joints = {}
+
+        for jn, jv in init_joints.items():
+            if jn in self.joint_name2ids:
+                p.resetJointState(self.robot, self.joint_name2ids[jn], targetValue=float(jv), targetVelocity=0.0)
+
+        # keep stabilized joints (e.g. gimbal) at 0 on reset
+        for jn in self.stabilized_joints:
+            if jn in self.joint_name2ids:
+                p.resetJointState(self.robot, self.joint_name2ids[jn], targetValue=0.0, targetVelocity=0.0)
 
         # optionally save image after robot spawned
         if self.save_image_on_reset:
@@ -348,8 +423,11 @@ class MobileMMTrajEnv(gym.Env):
                 pass
             return
 
-    def _get_ee_pos(self, gripper_link_name='left_gripper_link'):
-        gripper_link_id = self._link_index_by_name(self.robot, gripper_link_name)
+    def _get_ee_pos(self, link_name: Optional[str] = None):
+        link_name = link_name or self.ee_link_name
+        gripper_link_id = self._link_index_by_name(self.robot, link_name)
+        if gripper_link_id is None:
+            raise KeyError(f"[{self.robot_name}] EE link not found: {link_name}")
         st = p.getLinkState(self.robot, gripper_link_id, computeForwardKinematics=True)
         ee_pos = np.array(st[0], dtype=np.float32)
         self._ee_pos = ee_pos
@@ -386,18 +464,17 @@ class MobileMMTrajEnv(gym.Env):
         return vx_r, vy_r
 
     def _get_arm_state(self):
-        st_left_arm1 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint1'])[0]
-        st_left_arm2 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint2'])[0]
-        st_left_arm3 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint3'])[0]
-        st_left_arm4 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint4'])[0]
-        st_left_arm5 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint5'])[0]
-        st_left_arm6 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint6'])[0]
-
-        return st_left_arm1, st_left_arm2, st_left_arm3, st_left_arm4, st_left_arm5, st_left_arm6
+        return tuple(
+            p.getJointState(self.robot, self.joint_name2ids[jn])[0]
+            for jn in self.arm_joints
+            if jn in self.joint_name2ids
+        )
         
     
     def _get_base_pos(self):
-        abstract_idx = self._link_index_by_name(self.robot, 'abstract_chassis_link')
+        abstract_idx = self._link_index_by_name(self.robot, self.base_link_name)
+        if abstract_idx is None:
+            raise KeyError(f"[{self.robot_name}] Base link not found: {self.base_link_name}")
         st_abs = p.getLinkState(self.robot, abstract_idx, computeForwardKinematics=True, computeLinkVelocity=True)
         abs_pos = np.array(st_abs[0], dtype=np.float32)
         euler = p.getEulerFromQuaternion(st_abs[1])   # (roll, pitch, yaw)
@@ -463,9 +540,9 @@ class MobileMMTrajEnv(gym.Env):
 
     def _get_hist_chassis(self):
         # update chassis joint history (joint_x, joint_y, joint_theta)
-        jx_vel = float(p.getJointState(self.robot, self.joint_name2ids['joint_x'])[1])
-        jy_vel = float(p.getJointState(self.robot, self.joint_name2ids['joint_y'])[1])
-        jth_vel = float(p.getJointState(self.robot, self.joint_name2ids['joint_theta'])[1])
+        jx_vel = float(p.getJointState(self.robot, self.joint_name2ids[self.base_joint_x])[1])
+        jy_vel = float(p.getJointState(self.robot, self.joint_name2ids[self.base_joint_y])[1])
+        jth_vel = float(p.getJointState(self.robot, self.joint_name2ids[self.base_joint_yaw])[1])
 
         # roll history forward and append newest
         if self._chassis_hist is None:
@@ -485,7 +562,11 @@ class MobileMMTrajEnv(gym.Env):
             q.append(s[0])
             qdot.append(s[1])
         q = np.array(q, dtype=np.float32)
-        q_with_ang = np.concatenate([q[:2], [np.cos(q[2]), np.sin(q[2])], q[3:]])
+        yaw_joint_id = self.joint_name2ids[self.base_joint_yaw]
+        yaw_pos = self.joint_ids.index(yaw_joint_id)
+        q_with_ang = np.concatenate(
+            [q[:yaw_pos], [np.cos(q[yaw_pos]), np.sin(q[yaw_pos])], q[yaw_pos + 1 :]]
+        )
         qdot = np.array(qdot, dtype=np.float32)
         
         self._get_hist_chassis()
@@ -520,106 +601,120 @@ class MobileMMTrajEnv(gym.Env):
             print(f"joint {joint_name}: current={cur:.1f}")
     
     def limit_action(self, target_action, action_limits):
-        limited_action = np.clip(target_action, action_limits[0], action_limits[1])
-        return limited_action
+        try:
+            low, high = float(action_limits[0]), float(action_limits[1])
+        except Exception:
+            return target_action
+        # PyBullet reports (lower, upper) as (1, -1) for continuous/unbounded joints.
+        if low > high:
+            return target_action
+        return float(np.clip(target_action, low, high))
 
     def step(self, action):
         self.step_count += 1
-        self.control_info = {}
-        self.control_info['target'] = {}
-        self.control_info['reality'] = {}
+        self.control_info = {"target": {}, "reality": {}}
         action = np.array(action, dtype=np.float32).flatten()
+
+        # cache last states
         self._get_base_pos()
-        last_state_left_arm1, last_state_left_arm2, last_state_left_arm3, last_state_left_arm4, \
-            last_state_left_arm5, last_state_left_arm6 = self._get_arm_state()
-
-        # last_yaw = self._abstract_chassis_yaw
-        last_yaw = p.getJointState(self.robot, 2)[0]
-        last_pos = self._abstract_chassis_pos
-
-        last_chassis_vel = self.last_chassis_vel if self.last_chassis_vel is not None else 0.0
-        # ds = vt + 1/2*at^2
-        action_ds = 0.1 * last_chassis_vel + 0.5 * (1.5 * action[0]) * 0.1 * 0.1 # 加速度限制1.5m/s^2
-        action_dtheta = action[1] * 0.01
-        joint_delta_limit = 0.02
-        action_left_arm1 = action[2] * joint_delta_limit
-        action_left_arm2 = action[3] * joint_delta_limit
-        action_left_arm3 = action[4] * joint_delta_limit
-        action_left_arm4 = action[5] * joint_delta_limit
-        action_left_arm5 = action[6] * joint_delta_limit
-        action_left_arm6 = action[7] * joint_delta_limit
-        
-        # action_dx = (action_ds - 0.05) * np.cos(last_yaw)
-        # action_dy = (action_ds - 0.05) * np.sin(last_yaw)
-        action_dx = action_ds * np.cos(last_yaw)
-        action_dy = action_ds * np.sin(last_yaw)
-        
-        self.control_info['target'] = {
-            'dx': action_dx,
-            'dy': action_dy,
-            # 'dx': action_ds * np.cos(last_yaw),
-            # 'dy': action_ds * np.sin(last_yaw),
-            'dtheta': action_dtheta,
-            'left_arm1': action_left_arm1,
-            'left_arm2': action_left_arm2,
-            'left_arm3': action_left_arm3,
-            'left_arm4': action_left_arm4,
-            'left_arm5': action_left_arm5,
-            'left_arm6': action_left_arm6
+        last_base_pos = getattr(self, "_abstract_chassis_pos", np.array([0.0, 0.0, 0.0], dtype=float))
+        last_yaw = float(p.getJointState(self.robot, self.joint_name2ids[self.base_joint_yaw])[0])
+        last_arm_state_by_name = {
+            jn: float(p.getJointState(self.robot, self.joint_name2ids[jn])[0])
+            for jn in self.arm_joints
+            if jn in self.joint_name2ids
         }
-        
-        target_x = last_pos[0] + action_dx
-        target_y = last_pos[1] + action_dy
-        # target_theta = self._wrap_angle(last_yaw + action_dtheta) # 底盘theta是不限制范围的，所以需要wrap一下
-        target_theta = last_yaw + action_dtheta
 
-        target_left_arm1 = self.limit_action(last_state_left_arm1 + action_left_arm1, self.joint_limits['left_arm_joint1'])
-        target_left_arm2 = self.limit_action(last_state_left_arm2 + action_left_arm2, self.joint_limits['left_arm_joint2'])
-        target_left_arm3 = self.limit_action(last_state_left_arm3 + action_left_arm3, self.joint_limits['left_arm_joint3'])
-        target_left_arm4 = self.limit_action(last_state_left_arm4 + action_left_arm4, self.joint_limits['left_arm_joint4'])
-        target_left_arm5 = self.limit_action(last_state_left_arm5 + action_left_arm5, self.joint_limits['left_arm_joint5'])
-        target_left_arm6 = self.limit_action(last_state_left_arm6 + action_left_arm6, self.joint_limits['left_arm_joint6'])
+        dt = float(self.frame_skip) / 240.0
+        base_acc_limit = 1.5  # m/s^2
+        base_speed_limit = 0.5  # m/s
+        yaw_rate_limit = 0.1  # rad/s
+        arm_delta_limit = 0.02  # rad
+
+        base_x = float(p.getJointState(self.robot, self.joint_name2ids[self.base_joint_x])[0])
+        base_y = float(p.getJointState(self.robot, self.joint_name2ids[self.base_joint_y])[0])
+        base_yaw = last_yaw
+
+        if self.robot_name == "recomo":
+            if action.shape[0] != (3 + len(self.arm_joints)):
+                raise ValueError(
+                    f"[recomo] Expected action dim={3 + len(self.arm_joints)}, got {action.shape[0]}"
+                )
+            vx_cmd, vy_cmd, wz_cmd = float(action[0]), float(action[1]), float(action[2])
+            dx_r = vx_cmd * base_speed_limit * dt
+            dy_r = vy_cmd * base_speed_limit * dt
+            cy = float(np.cos(base_yaw))
+            sy = float(np.sin(base_yaw))
+            dx_w = cy * dx_r - sy * dy_r
+            dy_w = sy * dx_r + cy * dy_r
+            dtheta = wz_cmd * yaw_rate_limit * dt
+            base_act_dim = 3
+        else:
+            if action.shape[0] != (2 + len(self.arm_joints)):
+                raise ValueError(
+                    f"[mobile_mm] Expected action dim={2 + len(self.arm_joints)}, got {action.shape[0]}"
+                )
+            last_forward_vel = float(self.last_chassis_vel) if self.last_chassis_vel is not None else 0.0
+            a_cmd, wz_cmd = float(action[0]), float(action[1])
+            ds = dt * last_forward_vel + 0.5 * (base_acc_limit * a_cmd) * dt * dt
+            dx_w = float(ds * np.cos(base_yaw))
+            dy_w = float(ds * np.sin(base_yaw))
+            dtheta = wz_cmd * yaw_rate_limit * dt
+            base_act_dim = 2
+
+        target_x = base_x + dx_w
+        target_y = base_y + dy_w
+        target_theta = base_yaw + dtheta
+
+        self.control_info["target"].update({"dx": dx_w, "dy": dy_w, "dtheta": dtheta})
+
+        arm_targets = {}
+        for i, jn in enumerate(self.arm_joints):
+            if jn not in self.joint_name2ids:
+                continue
+            cur = float(p.getJointState(self.robot, self.joint_name2ids[jn])[0])
+            delta = float(action[base_act_dim + i]) * arm_delta_limit
+            target = self.limit_action(cur + delta, self.joint_limits.get(jn, (1.0, -1.0)))
+            arm_targets[jn] = target
+            self.control_info["target"][jn] = delta
 
         if DEBUG:
-            print(f"last_chassis_vel = {last_chassis_vel:.3f}, last_theta = {last_yaw:.3f}, action = {action[0]}")
-            print(f"action: ds={action_ds:.3f}"
-                  f"(dx={action_dx:.3f}, dy={action_dy:.3f}), dtheta={action_dtheta:.3f}, "
-                  f"target=(x={target_x:.3f}, y={target_y:.3f}, theta={target_theta:.3f}), "
-                  f"left_arm1={action_left_arm1:.3f}, left_arm2={action_left_arm2:.3f}, "
-                  f"left_arm3={action_left_arm3:.3f}, left_arm4={action_left_arm4:.3f}, "
-                  f"left_arm5={action_left_arm5:.3f}, left_arm6={action_left_arm6:.3f}")
+            print(
+                f"[{self.robot_name}] dt={dt:.3f} dx={dx_w:.3f} dy={dy_w:.3f} dtheta={dtheta:.3f} "
+                f"target=(x={target_x:.3f}, y={target_y:.3f}, theta={target_theta:.3f})"
+            )
 
-        p.setJointMotorControlArray(self.robot,
-                                    jointIndices=[self.joint_name2ids['joint_x'], self.joint_name2ids['joint_y']],
-                                    controlMode=p.POSITION_CONTROL, targetPositions=[target_x, target_y],
-                                    forces=[100, 100])
+        base_force_xy = 200 if self.robot_name == "recomo" else 100
+        p.setJointMotorControlArray(
+            self.robot,
+            jointIndices=[self.joint_name2ids[self.base_joint_x], self.joint_name2ids[self.base_joint_y]],
+            controlMode=p.POSITION_CONTROL,
+            targetPositions=[target_x, target_y],
+            forces=[base_force_xy, base_force_xy],
+        )
+        p.setJointMotorControl2(
+            self.robot,
+            self.joint_name2ids[self.base_joint_yaw],
+            p.POSITION_CONTROL,
+            targetPosition=target_theta,
+            force=50,
+        )
 
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['joint_theta'],
-                                p.POSITION_CONTROL, targetPosition=target_theta, force=50)
-        
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint1'],
-                                p.POSITION_CONTROL, targetPosition=target_left_arm1,
-                                force=self.joint_effort_limit['left_arm_joint1'])
+        for jn, target in arm_targets.items():
+            force = float(self.joint_effort_limit.get(jn, 0.0))
+            if force <= 0.0:
+                force = 5.0
+            p.setJointMotorControl2(
+                self.robot, self.joint_name2ids[jn], p.POSITION_CONTROL, targetPosition=target, force=force
+            )
 
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint2'],
-                                p.POSITION_CONTROL, targetPosition=target_left_arm2,
-                                force=self.joint_effort_limit['left_arm_joint2'])
-
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint3'],
-                                p.POSITION_CONTROL, targetPosition=target_left_arm3,
-                                force=self.joint_effort_limit['left_arm_joint3'])
-
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint4'],
-                                p.POSITION_CONTROL, targetPosition=target_left_arm4,
-                                force=self.joint_effort_limit['left_arm_joint4'])
-
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint5'],
-                                p.POSITION_CONTROL, targetPosition=target_left_arm5,
-                                force=self.joint_effort_limit['left_arm_joint5'])
-
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint6'],
-                                p.POSITION_CONTROL, targetPosition=target_left_arm6,
-                                force=self.joint_effort_limit['left_arm_joint6'])
+        # hold stabilized joints (e.g. gimbal) fixed at 0.0
+        for jn in self.stabilized_joints:
+            if jn not in self.joint_name2ids:
+                continue
+            p.setJointMotorControl2(
+                self.robot, self.joint_name2ids[jn], p.POSITION_CONTROL, targetPosition=0.0, force=5.0
+            )
 
         # step simulation
         for _ in range(self.frame_skip):
@@ -638,44 +733,33 @@ class MobileMMTrajEnv(gym.Env):
         
         base_ang_vel_norm = np.linalg.norm(base_ang_vel)
 
-        cur_state_left_arm1, cur_state_left_arm2, cur_state_left_arm3, cur_state_left_arm4, \
-                cur_state_left_arm5, cur_state_left_arm6 = self._get_arm_state()
-        
-        if DEBUG:
-            print(f"current arm states: 1={cur_state_left_arm1:.3f}, 2={cur_state_left_arm2:.3f}, 3={cur_state_left_arm3:.3f}, 4={cur_state_left_arm4:.3f}, 5={cur_state_left_arm5:.3f}, 6={cur_state_left_arm6:.3f}")
-            print(f"actual movement: act dx = {base_pos[0] - last_pos[0]:.3f}, dy = {base_pos[1] - last_pos[1]:.3f}, dtheta = {self._wrap_angle(base_yaw - last_yaw):.3f}")
-        
-        self.control_info['reality'] = {
-            'dx': base_pos[0] - last_pos[0],
-            'dy': base_pos[1] - last_pos[1],
-            'dtheta': self._wrap_angle(base_yaw - last_yaw),
-            'left_arm1': cur_state_left_arm1 - last_state_left_arm1,
-            'left_arm2': cur_state_left_arm2 - last_state_left_arm2,
-            'left_arm3': cur_state_left_arm3 - last_state_left_arm3,
-            'left_arm4': cur_state_left_arm4 - last_state_left_arm4,
-            'left_arm5': cur_state_left_arm5 - last_state_left_arm5,
-            'left_arm6': cur_state_left_arm6 - last_state_left_arm6
+        cur_arm_state_by_name = {
+            jn: float(p.getJointState(self.robot, self.joint_name2ids[jn])[0])
+            for jn in self.arm_joints
+            if jn in self.joint_name2ids
         }
+        self.control_info["reality"] = {
+            "dx": float(base_pos[0] - last_base_pos[0]),
+            "dy": float(base_pos[1] - last_base_pos[1]),
+            "dtheta": float(self._wrap_angle(base_yaw - last_yaw)),
+        }
+        for jn, cur_v in cur_arm_state_by_name.items():
+            last_v = last_arm_state_by_name.get(jn, cur_v)
+            self.control_info["reality"][jn] = float(cur_v - last_v)
         
         reward, info = compute_reward(base_pos, base_lin_vel_norm, ee_pos, self._target, base_yaw,
                                     wrap_angle_fn=self._wrap_angle,
-                                    remaining_ratio=self.remain_traj_ratio)
+                                    remaining_ratio=self.remain_traj_ratio,
+                                    **self._reward_kwargs)
 
         # terminated: 成功或者失败的自然终止
         static_arm_thr = 0.02
-        is_joint1_static = bool(abs(self._joint_states[self.n_j+0]) < static_arm_thr)
-        is_joint2_static = bool(abs(self._joint_states[self.n_j+1]) < static_arm_thr)
-        is_joint3_static = bool(abs(self._joint_states[self.n_j+2]) < static_arm_thr)
-        is_joint4_static = bool(abs(self._joint_states[self.n_j+3]) < static_arm_thr)
-        is_joint5_static = bool(abs(self._joint_states[self.n_j+4]) < static_arm_thr)
-        is_joint6_static = bool(abs(self._joint_states[self.n_j+5]) < static_arm_thr)
-        is_joint7_static = bool(abs(self._joint_states[self.n_j+6]) < static_arm_thr)
-        is_joint8_static = bool(abs(self._joint_states[self.n_j+7]) < static_arm_thr)
-        is_joint9_static = bool(abs(self._joint_states[self.n_j+8]) < static_arm_thr)
-
-        is_arm_joints_static = is_joint1_static and is_joint2_static and is_joint3_static and \
-            is_joint4_static and is_joint5_static and is_joint6_static and \
-            is_joint7_static and is_joint8_static and is_joint9_static
+        qdot = None
+        try:
+            qdot = self._joint_states[self.n_j :]
+        except Exception:
+            qdot = None
+        is_arm_joints_static = bool(qdot is not None and np.all(np.abs(qdot) < static_arm_thr))
         
 
         # if not self.finish_step1_step and bool(info.get("ee_distance", 9999.0) < 0.05):

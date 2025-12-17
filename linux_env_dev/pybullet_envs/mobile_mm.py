@@ -545,10 +545,14 @@ class MobileMMBulletEnv(gym.Env):
 
         # print(f"actual movement: act dx = {base_pos[0] - last_pos[0]:.3f}, dy = {base_pos[1] - last_pos[1]:.3f}, dtheta = {self._wrap_angle(base_yaw - last_yaw):.3f}")
         
-        reward, info = compute_reward(base_pos, ee_pos, self._target, base_yaw,
-                                    wrap_angle_fn=self._wrap_angle,
-                                    base_lin_vel=base_lin_vel_norm,
-                                    base_ang_vel=base_ang_vel_norm)
+        reward, info = compute_reward(
+            base_pos,
+            base_lin_vel_norm,
+            ee_pos,
+            self._target,
+            base_yaw,
+            wrap_angle_fn=self._wrap_angle,
+        )
 
 
         # terminated: 成功或者失败的自然终止

@@ -2,7 +2,20 @@ import numpy as np
 
 DEBUG=False
 
-def compute_reward(base_pos, base_lin_vel, ee_pos, target_pos, base_yaw, wrap_angle_fn, remaining_ratio=None):
+def compute_reward(
+    base_pos,
+    base_lin_vel,
+    ee_pos,
+    target_pos,
+    base_yaw,
+    wrap_angle_fn,
+    remaining_ratio=None,
+    *,
+    dist_weight: float = 2.0,
+    collision_threshold: float = 0.3,
+    collision_ratio: float = 50.0,
+    clip_abs: float = 5.0,
+):
     total_reward = 0.0
     info = {}
     target_len = np.linalg.norm(np.array(target_pos[:2], dtype=float))
@@ -14,7 +27,7 @@ def compute_reward(base_pos, base_lin_vel, ee_pos, target_pos, base_yaw, wrap_an
     
     # 末端执行器误差——距离误差
     # dist_reward, dist_info = compute_nonlinear_distance_reward(ee_pos, target_pos, 2.0)
-    dist_reward, dist_info = compute_distance_reward(ee_pos, target_pos, 2.0) # 使用线性的，要不然因为跟踪精度不愿意往前走
+    dist_reward, dist_info = compute_distance_reward(ee_pos, target_pos, float(dist_weight)) # 使用线性的，要不然因为跟踪精度不愿意往前走
     
     # 底盘速度过快惩罚
     # vel_reward, vel_info = compute_velocity_reward(base_lin_vel, thresh=0.0, ratio=2.0)
@@ -26,25 +39,35 @@ def compute_reward(base_pos, base_lin_vel, ee_pos, target_pos, base_yaw, wrap_an
     # progress_reward = compute_progress_reward(remaining_ratio, ratio=2.0)
     
     # 机械臂和本体的干涉惩罚
-    collision_reward = compute_collision_reward(base_pos, ee_pos, ratio=50.0)
+    collision_reward = 0.0
+    if collision_ratio and float(collision_ratio) != 0.0 and collision_threshold is not None:
+        collision_reward = compute_collision_reward(
+            base_pos, ee_pos, thresh=float(collision_threshold), ratio=float(collision_ratio)
+        )
     
     total_reward = dist_reward + collision_reward
-    total_reward = float(np.clip(total_reward, -5.0, 5.0))
+    total_reward = float(np.clip(total_reward, -float(clip_abs), float(clip_abs)))
     
     info.update(dist_info)
+    info.update(
+        {
+            "reward_dist": float(dist_reward),
+            "reward_collision": float(collision_reward),
+        }
+    )
     # info.update(yaw_info)
     # info.update(ee_height_info)
     if DEBUG:
         print(f"Reward: {total_reward:.2f} (dist: {dist_reward:.2f}, collision: {collision_reward:.2f})")
     return total_reward, info
 
-def compute_collision_reward(base_pos, ee_pos, ratio=1.0):
+def compute_collision_reward(base_pos, ee_pos, thresh: float = 0.3, ratio: float = 1.0):
     reward = 0.0
     base_xy = np.array(base_pos[:2], dtype=float)
     ee_xy = np.array(ee_pos[:2], dtype=float)
     dist = float(np.linalg.norm(ee_xy - base_xy))
-    if dist < 0.3:
-        reward = -1.0 * (0.3 - dist) * ratio
+    if dist < float(thresh):
+        reward = -1.0 * (float(thresh) - dist) * float(ratio)
     
     # 距离0.25，ratio=100，惩罚-50，ratio=1000，惩罚-500
     # 距离0.20，ratio=100，惩罚-100，ratio=1000，惩罚-1000

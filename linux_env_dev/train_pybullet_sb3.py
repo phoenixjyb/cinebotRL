@@ -1,8 +1,10 @@
 import datetime
 import os
 import argparse
+import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 from pybullet_envs.mobile_mm import MobileMMBulletEnv
 from pybullet_envs.mobile_mm_traj import MobileMMTrajEnv
 from pybullet_envs.target_generator import FixedTarget, RandomTargetForEpisode, JSONNearestTargetGenerator
@@ -25,7 +27,7 @@ def calcaulate_time_stamp():
 def get_policy_kwargs(pi_layers_str, vf_layers_str):
     pi_layers = parse_layers(pi_layers_str)
     vf_layers = parse_layers(vf_layers_str)
-    policy_kwargs = {"net_arch": [{"pi": pi_layers, "vf": vf_layers}]}
+    policy_kwargs = {"net_arch": dict(pi=pi_layers, vf=vf_layers)}
     return policy_kwargs
 
 def calc_param_num(policy):
@@ -45,10 +47,62 @@ def calc_param_num(policy):
           f"actor_head={actor_params:,d}, value_head={value_params:,d}")
 
 
+class TrainInfoMetricsCallback(BaseCallback):
+    """Logs rolling means for env info keys to TensorBoard."""
+
+    def __init__(self, log_freq: int = 2000, verbose: int = 0):
+        super().__init__(verbose=verbose)
+        self.log_freq = int(log_freq)
+        self._ee_dist = []
+        self._rew_dist = []
+        self._rew_collision = []
+
+    def _on_step(self) -> bool:
+        infos = self.locals.get("infos", None)
+        if infos is None:
+            return True
+
+        for info in infos:
+            if not isinstance(info, dict):
+                continue
+            if "ee_distance" in info:
+                self._ee_dist.append(float(info["ee_distance"]))
+            if "reward_dist" in info:
+                self._rew_dist.append(float(info["reward_dist"]))
+            if "reward_collision" in info:
+                self._rew_collision.append(float(info["reward_collision"]))
+
+        if self.log_freq > 0 and (self.n_calls % self.log_freq) == 0:
+            if self._ee_dist:
+                self.logger.record("train/ee_distance_mean", float(np.mean(self._ee_dist)))
+                self._ee_dist.clear()
+            if self._rew_dist:
+                self.logger.record("train/reward_dist_mean", float(np.mean(self._rew_dist)))
+                self._rew_dist.clear()
+            if self._rew_collision:
+                self.logger.record("train/reward_collision_mean", float(np.mean(self._rew_collision)))
+                self._rew_collision.clear()
+        return True
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--timesteps", type=int, default=5_000_000)
     parser.add_argument("--render", action="store_true", help="Use GUI")
+    parser.add_argument(
+        "--robot",
+        type=str,
+        default="mobile_mm",
+        choices=["mobile_mm", "recomo"],
+        help="Robot model for the PyBullet env",
+    )
+    parser.add_argument("--urdf_path", type=str, default=None, help="Override URDF path (robot-specific)")
+    parser.add_argument("--frame_skip", type=int, default=24, help="Physics steps per RL step (240Hz base)")
+    parser.add_argument("--max_steps", type=int, default=500, help="Max steps per episode")
+    parser.add_argument("--train_txt", type=str, default="linux_env_dev/new_json_50/train.txt",
+                        help="Training trajectory list (txt file with one json path per line)")
+    parser.add_argument("--eval_txt", type=str, default="linux_env_dev/new_json_50/test.txt",
+                        help="Evaluation trajectory list (txt file) for --eval_freq > 0")
     parser.add_argument("--policy", type=str, default="Transformer",
                         choices=["MlpPolicy", "LargeMlp", "Transformer"],
                         help="Policy architecture to use. Transformer = Transformer-based feature extractor")
@@ -81,6 +135,13 @@ def main():
     parser.add_argument("--learning_rate", type=float, default=3e-5,
                         help="Initial learning rate for the optimizer (overrides SB3 default if set)")
     args = parser.parse_args()
+
+    # Make "LargeMlp" a convenience alias (SB3 only knows "MlpPolicy").
+    # If user didn't override layers, use a larger default net.
+    if args.policy == "LargeMlp":
+        if (args.pi_layers or "").strip() == "256,256" and (args.vf_layers or "").strip() == "256,256":
+            args.pi_layers = "512,512,256"
+            args.vf_layers = "512,512,256"
 
     # build a warmup + linear decay learning rate schedule (callable accepted by SB3)
     try:
@@ -115,28 +176,37 @@ def main():
         return float(max(1e-7, initial_lr * (1.0 - t)))
 
     os.makedirs(args.save_dir, exist_ok=True)
-    env_fn = lambda: MobileMMTrajEnv(render=args.render,
-                                       target_generator=JSONNearestTargetGenerator(
-                                            json_paths=[
-                                                #  "linux_env_dev/new_json_50/cinematic_db_arc_right_pull_arc_right_pull_004.json",
-                                                #  "trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
-                                                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251110_215950.json",
-                                                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154427.json",
-                                                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154646.json",
-                                                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154810.json"
-                                                    ],
-                                            json_txt="linux_env_dev/new_json_50/train.txt",
-                                            # json_txt="linux_env_dev/new_json_50/train_stage1.txt",
-                                            mode="random"
-                                       ))
+    env_fn = lambda: MobileMMTrajEnv(
+        robot=args.robot,
+        urdf_path=args.urdf_path,
+        frame_skip=args.frame_skip,
+        max_steps=args.max_steps,
+        render=args.render,
+        target_generator=JSONNearestTargetGenerator(
+            json_paths=[
+                #  "linux_env_dev/new_json_50/cinematic_db_arc_right_pull_arc_right_pull_004.json",
+                #  "trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
+                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251110_215950.json",
+                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154427.json",
+                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154646.json",
+                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154810.json"
+            ],
+            json_txt=args.train_txt,
+            # json_txt="linux_env_dev/new_json_50/train_stage1.txt",
+            mode="random",
+        ),
+    )
     if args.n_envs > 1:
         from stable_baselines3.common.vec_env import SubprocVecEnv
         vec_env = SubprocVecEnv([env_fn for _ in range(args.n_envs)])
     else:
         vec_env = DummyVecEnv([env_fn])
+    from stable_baselines3.common.vec_env import VecMonitor
+    vec_env = VecMonitor(vec_env)
 
     ts = calcaulate_time_stamp()
-    log_dir = os.path.join(args.save_dir, f"logs_{ts}/tensorboard_logs")
+    run_name = f"logs_{ts}" if args.robot == "mobile_mm" else f"logs_{ts}_{args.robot}"
+    log_dir = os.path.join(args.save_dir, f"{run_name}/tensorboard_logs")
     os.makedirs(log_dir, exist_ok=True)
 
 
@@ -173,11 +243,14 @@ def main():
     # we still pass a standard policy name (e.g. MlpPolicy) and provide
     # features_extractor_class via policy_kwargs.
     policy_name = args.policy
-    if args.policy == "Transformer":
+    if args.policy in {"Transformer", "LargeMlp"}:
         # SB3 does not know a policy called 'Transformer' — use MlpPolicy but
         # provide our Transformer features extractor via policy_kwargs.
         policy_name = "MlpPolicy"
-        print("Mapping requested 'Transformer' to SB3 policy 'MlpPolicy' with TransformerFeaturesExtractor")
+        if args.policy == "Transformer":
+            print("Mapping requested 'Transformer' to SB3 policy 'MlpPolicy' with TransformerFeaturesExtractor")
+        else:
+            print("Mapping requested 'LargeMlp' to SB3 policy 'MlpPolicy'")
 
     # load existing model if requested, else create a new one
     model_kwargs = dict(
@@ -226,16 +299,52 @@ def main():
 
     # prepare callbacks for periodic checkpointing
     callbacks = []
+    callbacks.append(TrainInfoMetricsCallback(log_freq=2000))
     if args.save_interval and args.save_interval > 0:
         from stable_baselines3.common.callbacks import CheckpointCallback
-        ckpt_dir = os.path.join(args.save_dir, f"logs_{ts}/checkpoints")
+        ckpt_dir = os.path.join(args.save_dir, f"{run_name}/checkpoints")
         os.makedirs(ckpt_dir, exist_ok=True)
-        ckpt_cb = CheckpointCallback(save_freq=args.save_interval, save_path=ckpt_dir,
-                                     name_prefix=f"ppo_mobile_mm")
+        name_prefix = "ppo_mobile_mm" if args.robot == "mobile_mm" else f"ppo_{args.robot}"
+        # SB3's CheckpointCallback uses callback step count (vector env steps),
+        # so convert user timesteps -> callback steps by dividing by n_envs.
+        save_freq = max(int(args.save_interval) // max(int(args.n_envs), 1), 1)
+        ckpt_cb = CheckpointCallback(save_freq=save_freq, save_path=ckpt_dir,
+                                     name_prefix=name_prefix)
         callbacks.append(ckpt_cb)
 
-    model.learn(total_timesteps=args.timesteps, callback=callbacks or None)
-    model_filename = f"logs_{ts}/ppo_mobile_mm_final"
+    if args.eval_freq and args.eval_freq > 0:
+        from stable_baselines3.common.callbacks import EvalCallback
+
+        eval_env_fn = lambda: MobileMMTrajEnv(
+            robot=args.robot,
+            urdf_path=args.urdf_path,
+            frame_skip=args.frame_skip,
+            max_steps=args.max_steps,
+            render=False,
+            target_generator=JSONNearestTargetGenerator(
+                json_paths=[],
+                json_txt=args.eval_txt,
+                mode="seq",
+            ),
+        )
+        eval_env = DummyVecEnv([eval_env_fn])
+        eval_env = VecMonitor(eval_env)
+        eval_freq = max(int(args.eval_freq) // max(int(args.n_envs), 1), 1)
+        eval_cb = EvalCallback(
+            eval_env,
+            n_eval_episodes=int(args.eval_episodes),
+            eval_freq=eval_freq,
+            log_path=os.path.join(args.save_dir, run_name),
+            best_model_save_path=os.path.join(args.save_dir, run_name, "best_model"),
+            deterministic=True,
+            render=False,
+            verbose=1,
+        )
+        callbacks.append(eval_cb)
+
+    model.learn(total_timesteps=args.timesteps, callback=CallbackList(callbacks) if callbacks else None)
+    name_prefix = "ppo_mobile_mm" if args.robot == "mobile_mm" else f"ppo_{args.robot}"
+    model_filename = f"{run_name}/{name_prefix}_final"
     model.save(os.path.join(args.save_dir, model_filename))
 
 

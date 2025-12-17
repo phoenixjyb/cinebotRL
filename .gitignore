@@ -17,5 +17,8 @@ Thumbs.db
 logs/
 outputs/
 wandb/
+linux_env_dev/_urdf_cache/
+linux_env_dev/models/logs_*/
+linux_env_dev/models/*.log
 .idea/
 .vscode/

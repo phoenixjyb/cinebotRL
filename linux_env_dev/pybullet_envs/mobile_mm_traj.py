@@ -784,8 +784,10 @@ class MobileMMTrajEnv(gym.Env):
         # annotate info for downstream wrappers / loggers
         if truncated:
             info['TimeLimit.truncated'] = True
-        if reached_goal:
-            info['is_success'] = True
+        if terminated or truncated:
+            # SB3 EvalCallback expects 'is_success' to exist for all episodes (True/False),
+            # otherwise it saves ragged success arrays and can crash.
+            info['is_success'] = bool(reached_goal)
 
         
         if DEBUG:

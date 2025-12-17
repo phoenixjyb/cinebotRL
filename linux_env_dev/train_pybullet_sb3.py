@@ -273,6 +273,11 @@ def main():
     if args.load_model:
         print(f"Loading model from: {args.load_model}")
         model = PPO.load(args.load_model, env=vec_env, device=device)
+        # Ensure resumed runs log to the new run directory (otherwise it may keep the old path).
+        try:
+            model.tensorboard_log = log_dir
+        except Exception:
+            pass
         # if user requested a different learning rate, override optimizer param groups
         if args.learning_rate is not None:
             try:

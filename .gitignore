@@ -8,6 +8,8 @@ __pycache__/
 *.pyd
 *.log
 *.egg-info/
+*.engine
+*.plan
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

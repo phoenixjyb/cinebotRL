@@ -24,6 +24,8 @@ def test_trained_model(
     robot: str = "mobile_mm",
     urdf_path: str | None = None,
     frame_skip: int = 24,
+    save_episode_plots: bool = True,
+    episode_plot_threshold: float = 0.1,
 ):
     """
     测试训练好的模型并生成可视化结果
@@ -358,8 +360,9 @@ def test_trained_model(
             all_control_info.append([])
 
         # Generate per-episode 3D trajectory plot immediately for this episode
-        print(f"Mean error : {np.mean(episode_distances[:-2]):.2f} m")
-        if should_vis or (np.mean(episode_distances[:-2]) > 0.1):
+        mean_err = float(np.mean(episode_distances[:-2])) if len(episode_distances) > 2 else float("nan")
+        print(f"Mean error : {mean_err:.2f} m")
+        if save_episode_plots and (should_vis or (mean_err > float(episode_plot_threshold))):
             # pass single-episode lists wrapped in lists to match function signature
                 generate_3d_trajectory_plot([episode_base_trimmed], [episode_ee_trimmed], [episode_targets_trimmed],
                                             cur_traj_path, save_dir, episode=episode+1)
@@ -846,6 +849,10 @@ if __name__ == "__main__":
     parser.add_argument("--frame_skip", type=int, default=24)
     parser.add_argument("--render", action="store_true", help="Use PyBullet GUI")
     parser.add_argument("--should_vis", action="store_true", help="Always render plots (can be slow)")
+    parser.add_argument("--no_episode_plots", action="store_true",
+                        help="Disable per-episode trajectory/velocity plots (still writes summary/report)")
+    parser.add_argument("--plot_threshold", type=float, default=0.1,
+                        help="When --no_episode_plots is not set, plot episode if mean error > this threshold")
     args = parser.parse_args()
 
     if not os.path.exists(args.model_path):
@@ -862,6 +869,8 @@ if __name__ == "__main__":
         robot=args.robot,
         urdf_path=args.urdf_path,
         frame_skip=int(args.frame_skip),
+        save_episode_plots=not bool(args.no_episode_plots),
+        episode_plot_threshold=float(args.plot_threshold),
     )
     print(
         f"\nTesting completed! Success rate: {success_count}/{args.num_episodes} "

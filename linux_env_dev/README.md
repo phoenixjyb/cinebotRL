@@ -68,6 +68,21 @@ Useful env knobs:
 python linux_env_dev/train_pybullet_sb3.py --n_envs 16 --train_txt linux_env_dev/new_json_50/train.txt
 ```
 
+Curriculum (single run)
+-----------------------
+
+Instead of manually running stage1 then stage2, you can enable an automatic curriculum:
+
+```bash
+# Switch: train only stage1 for the first N timesteps, then stage2
+python linux_env_dev/train_pybullet_sb3.py --robot recomo --n_envs 16 \
+  --curriculum switch --curriculum_stage1_steps 1000000
+
+# Mix: stage2 sampling probability ramps 0->1 over N timesteps
+python linux_env_dev/train_pybullet_sb3.py --robot recomo --n_envs 16 \
+  --curriculum mix --curriculum_stage1_steps 1000000
+```
+
 6. Test
 
 6.1 set model_path = 'linux_env_dev/models/your_path_to/ppo_mobile_mm_final.zip'

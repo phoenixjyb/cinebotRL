@@ -492,3 +492,83 @@ class JSONNearestTargetGenerator(TargetGenerator):
         
         return look_pos
 
+
+class CurriculumJSONNearestTargetGenerator(TargetGenerator):
+    """Curriculum wrapper around two JSONNearestTargetGenerator instances.
+
+    Selects stage2 with probability `stage2_prob` at each reset and delegates
+    all other methods/attributes to the active generator for the episode.
+    """
+
+    def __init__(
+        self,
+        stage1_txt: str,
+        stage2_txt: str,
+        *,
+        mode: str = "random",
+        stage2_prob: float = 0.0,
+    ):
+        self.stage1_txt = str(stage1_txt)
+        self.stage2_txt = str(stage2_txt)
+        self._rng = np.random.default_rng()
+
+        self.stage1 = JSONNearestTargetGenerator(json_paths=[], json_txt=self.stage1_txt, mode=mode)
+        self.stage2 = JSONNearestTargetGenerator(json_paths=[], json_txt=self.stage2_txt, mode=mode)
+
+        self._active = self.stage1
+        self._active_stage = 1
+        self._last_target = None
+        self.set_stage2_prob(stage2_prob)
+
+    def set_stage2_prob(self, p: float):
+        try:
+            p = float(p)
+        except Exception:
+            p = 0.0
+        self.stage2_prob = float(np.clip(p, 0.0, 1.0))
+
+    def get_active_stage(self) -> int:
+        return int(self._active_stage)
+
+    @property
+    def traj(self):
+        return self._active.traj
+
+    def reset(self, rng: Optional[np.random.Generator] = None):
+        if rng is not None:
+            self._rng = rng
+        u = float(self._rng.random())
+        if u < float(self.stage2_prob):
+            self._active = self.stage2
+            self._active_stage = 2
+        else:
+            self._active = self.stage1
+            self._active_stage = 1
+        out = self._active.reset(rng=self._rng)
+        try:
+            self._last_target = np.asarray(out, dtype=np.float32)
+        except Exception:
+            self._last_target = out
+        return out
+
+    def step(self, step_count: int, ee_pos: Optional[np.ndarray] = None) -> np.ndarray:
+        fn = getattr(self._active, "step", None)
+        if callable(fn):
+            try:
+                out = fn(step_count, ee_pos=ee_pos)
+            except TypeError:
+                try:
+                    out = fn(step_count)
+                except TypeError:
+                    out = fn()
+            if out is not None:
+                self._last_target = np.asarray(out, dtype=np.float32)
+                return self._last_target
+        if self._last_target is not None:
+            return np.asarray(self._last_target, dtype=np.float32)
+        # fallback to first point of the current trajectory
+        return self.traj.positions[0].astype(np.float32)
+
+    def __getattr__(self, name):
+        # Delegate unknown attrs/methods (e.g. traj helpers) to the active generator.
+        return getattr(self._active, name)

@@ -811,3 +811,12 @@ class MobileMMTrajEnv(gym.Env):
     def close(self):
         if p.isConnected():
             p.disconnect()
+
+    def set_curriculum_stage2_prob(self, stage2_prob: float):
+        """Update curriculum mixing prob inside the env target generator (if supported)."""
+        try:
+            setter = getattr(self._target_generator, "set_stage2_prob", None)
+            if callable(setter):
+                setter(stage2_prob)
+        except Exception:
+            pass

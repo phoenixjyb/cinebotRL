@@ -7,7 +7,12 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 from pybullet_envs.mobile_mm import MobileMMBulletEnv
 from pybullet_envs.mobile_mm_traj import MobileMMTrajEnv
-from pybullet_envs.target_generator import FixedTarget, RandomTargetForEpisode, JSONNearestTargetGenerator
+from pybullet_envs.target_generator import (
+    FixedTarget,
+    RandomTargetForEpisode,
+    JSONNearestTargetGenerator,
+    CurriculumJSONNearestTargetGenerator,
+)
 import torch
 from pybullet_envs.transformer_extractor import TransformerFeaturesExtractor
 
@@ -85,6 +90,61 @@ class TrainInfoMetricsCallback(BaseCallback):
         return True
 
 
+class CurriculumCallback(BaseCallback):
+    """Broadcasts curriculum stage2 mixing probability to all envs.
+
+    - mode='switch': stage2_prob = 0 until `stage1_steps`, then 1
+    - mode='mix': stage2_prob ramps linearly 0->1 over `stage1_steps`
+    """
+
+    def __init__(self, mode: str, stage1_steps: int, update_freq: int = 50_000, verbose: int = 0):
+        super().__init__(verbose=verbose)
+        self.mode = (mode or "none").strip().lower()
+        self.stage1_steps = int(stage1_steps)
+        self.update_freq = int(update_freq)
+        self._last_update_at = -1
+        self._last_prob = None
+
+    def _compute_prob(self, num_timesteps: int) -> float:
+        if self.mode == "switch":
+            if self.stage1_steps <= 0:
+                return 1.0
+            return 0.0 if int(num_timesteps) < int(self.stage1_steps) else 1.0
+        if self.mode == "mix":
+            if self.stage1_steps <= 0:
+                return 1.0
+            return float(np.clip(float(num_timesteps) / float(self.stage1_steps), 0.0, 1.0))
+        return 1.0
+
+    def _apply(self, prob: float):
+        try:
+            env = self.model.get_env()
+            env.env_method("set_curriculum_stage2_prob", float(prob))
+        except Exception:
+            # best-effort only; curriculum is optional
+            pass
+        self.logger.record("curriculum/stage2_prob", float(prob))
+        self._last_prob = float(prob)
+
+    def _on_training_start(self) -> None:
+        if self.mode in {"switch", "mix"}:
+            self._apply(self._compute_prob(self.num_timesteps))
+            self._last_update_at = int(self.num_timesteps)
+
+    def _on_step(self) -> bool:
+        if self.mode not in {"switch", "mix"}:
+            return True
+        if self.update_freq <= 0:
+            return True
+        if (int(self.num_timesteps) - int(self._last_update_at)) < int(self.update_freq):
+            return True
+        self._last_update_at = int(self.num_timesteps)
+        prob = self._compute_prob(self.num_timesteps)
+        if self._last_prob is None or abs(float(prob) - float(self._last_prob)) > 1e-9:
+            self._apply(prob)
+        return True
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--timesteps", type=int, default=5_000_000)
@@ -103,6 +163,20 @@ def main():
                         help="Training trajectory list (txt file with one json path per line)")
     parser.add_argument("--eval_txt", type=str, default="linux_env_dev/new_json_50/test.txt",
                         help="Evaluation trajectory list (txt file) for --eval_freq > 0")
+    parser.add_argument(
+        "--curriculum",
+        type=str,
+        default="none",
+        choices=["none", "switch", "mix"],
+        help="Curriculum over trajectory lists. 'switch': stage1 -> stage2 at --curriculum_stage1_steps. "
+             "'mix': stage2 sampling prob ramps 0->1 over --curriculum_stage1_steps.",
+    )
+    parser.add_argument("--curriculum_stage1_txt", type=str, default="linux_env_dev/new_json_50/train_stage1.txt",
+                        help="Stage1 trajectory list for curriculum (used when --curriculum != none)")
+    parser.add_argument("--curriculum_stage1_steps", type=int, default=1_000_000,
+                        help="Timesteps for stage1-only (switch) or ramp length (mix)")
+    parser.add_argument("--curriculum_update_freq", type=int, default=50_000,
+                        help="How often to update curriculum prob (timesteps)")
     parser.add_argument("--policy", type=str, default="Transformer",
                         choices=["MlpPolicy", "LargeMlp", "Transformer"],
                         help="Policy architecture to use. Transformer = Transformer-based feature extractor")
@@ -143,6 +217,12 @@ def main():
             args.pi_layers = "512,512,256"
             args.vf_layers = "512,512,256"
 
+    if args.curriculum != "none":
+        if not os.path.isfile(args.curriculum_stage1_txt):
+            raise FileNotFoundError(f"--curriculum_stage1_txt not found: {args.curriculum_stage1_txt}")
+        if not os.path.isfile(args.train_txt):
+            raise FileNotFoundError(f"--train_txt (stage2) not found: {args.train_txt}")
+
     # build a warmup + linear decay learning rate schedule (callable accepted by SB3)
     try:
         initial_lr = float(args.learning_rate) if args.learning_rate is not None else 1e-4
@@ -182,18 +262,19 @@ def main():
         frame_skip=args.frame_skip,
         max_steps=args.max_steps,
         render=args.render,
-        target_generator=JSONNearestTargetGenerator(
-            json_paths=[
-                #  "linux_env_dev/new_json_50/cinematic_db_arc_right_pull_arc_right_pull_004.json",
-                #  "trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
-                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251110_215950.json",
-                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154427.json",
-                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154646.json",
-                #          "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154810.json"
-            ],
-            json_txt=args.train_txt,
-            # json_txt="linux_env_dev/new_json_50/train_stage1.txt",
-            mode="random",
+        target_generator=(
+            CurriculumJSONNearestTargetGenerator(
+                stage1_txt=args.curriculum_stage1_txt,
+                stage2_txt=args.train_txt,
+                mode="random",
+                stage2_prob=0.0,
+            )
+            if args.curriculum != "none"
+            else JSONNearestTargetGenerator(
+                json_paths=[],
+                json_txt=args.train_txt,
+                mode="random",
+            )
         ),
     )
     if args.n_envs > 1:
@@ -304,6 +385,14 @@ def main():
 
     # prepare callbacks for periodic checkpointing
     callbacks = []
+    if args.curriculum != "none":
+        callbacks.append(
+            CurriculumCallback(
+                mode=args.curriculum,
+                stage1_steps=args.curriculum_stage1_steps,
+                update_freq=args.curriculum_update_freq,
+            )
+        )
     callbacks.append(TrainInfoMetricsCallback(log_freq=2000))
     if args.save_interval and args.save_interval > 0:
         from stable_baselines3.common.callbacks import CheckpointCallback

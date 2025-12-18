@@ -11,8 +11,19 @@ from pybullet_envs.mobile_mm_traj import MobileMMTrajEnv
 from pybullet_envs.target_generator import RandomTargetForEpisode, JSONNearestTargetGenerator
 from pybullet_envs.transformer_extractor import TransformerFeaturesExtractor
 
-def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False,
-                       low=(4.0, -2.0, 0.5), high=(6.0, 2.0, 1.5)):
+def test_trained_model(
+    model_path,
+    num_episodes=1,
+    max_steps=500,
+    render=False,
+    low=(4.0, -2.0, 0.5),
+    high=(6.0, 2.0, 1.5),
+    *,
+    robot: str = "mobile_mm",
+    urdf_path: str | None = None,
+    frame_skip: int = 24,
+    test_txt: str | None = None,
+):
     """
     测试训练好的模型并生成可视化结果
     
@@ -42,10 +53,21 @@ def test_trained_model(model_path, num_episodes=1, max_steps=1000, render=False,
     #                                        low=low,
     #                                        high=high
     #                                    ))
-    env_fn = lambda: MobileMMTrajEnv(render=render,
-                                    target_generator=JSONNearestTargetGenerator(
-                                        json_path="trajectoryToLearn/world_json/scene_1/traj_1.json",
-                                    ))
+    # If test_txt is provided, iterate trajectories sequentially; else fall back to a single demo path.
+    if test_txt is None:
+        json_paths = ["trajectoryToLearn/world_json/scene_1/traj_1.json"]
+        target_gen = JSONNearestTargetGenerator(json_paths=json_paths, mode="seq")
+    else:
+        target_gen = JSONNearestTargetGenerator(json_paths=[], json_txt=test_txt, mode="seq")
+
+    env_fn = lambda: MobileMMTrajEnv(
+        robot=robot,
+        urdf_path=urdf_path,
+        frame_skip=frame_skip,
+        max_steps=max_steps,
+        render=render,
+        target_generator=target_gen,
+    )
     vec_env = DummyVecEnv([env_fn])
     
     # 存储测试结果

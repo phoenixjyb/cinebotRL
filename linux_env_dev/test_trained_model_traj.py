@@ -12,8 +12,19 @@ from pybullet_envs.mobile_mm_traj import MobileMMTrajEnv
 from pybullet_envs.target_generator import RandomTargetForEpisode, JSONNearestTargetGenerator
 from pybullet_envs.transformer_extractor import TransformerFeaturesExtractor
 
-def test_trained_model(model_path, num_episodes=1, json_paths=None, test_txt=None,
-                       should_vis=True, max_steps=1000, render=False):
+def test_trained_model(
+    model_path,
+    num_episodes=1,
+    json_paths=None,
+    test_txt=None,
+    should_vis=True,
+    max_steps=500,
+    render=False,
+    *,
+    robot: str = "mobile_mm",
+    urdf_path: str | None = None,
+    frame_skip: int = 24,
+):
     """
     测试训练好的模型并生成可视化结果
     
@@ -38,12 +49,18 @@ def test_trained_model(model_path, num_episodes=1, json_paths=None, test_txt=Non
     print(policy)
     
     # 创建测试环境（render 参数可控）
-    env_fn = lambda: MobileMMTrajEnv(render=render,
-                                    target_generator=JSONNearestTargetGenerator(
-                                        json_paths=json_paths,
-                                        json_txt=test_txt,
-                                        mode="seq"
-                                    ))
+    env_fn = lambda: MobileMMTrajEnv(
+        robot=robot,
+        urdf_path=urdf_path,
+        frame_skip=frame_skip,
+        max_steps=max_steps,
+        render=render,
+        target_generator=JSONNearestTargetGenerator(
+            json_paths=json_paths or [],
+            json_txt=test_txt,
+            mode="seq",
+        ),
+    )
     vec_env = DummyVecEnv([env_fn])
     
     # 存储测试结果
@@ -294,7 +311,14 @@ def test_trained_model(model_path, num_episodes=1, json_paths=None, test_txt=Non
             
             if step_count % 1000 == 0:
                 img_path = os.path.join(save_dir, f"episode_{episode+1}_step_{step_count:04d}.png")
-                env.save_robot_image(img_path, width=800, height=600, traj=episode_ee_positions, draw_origin=True, target=episode_targets)
+                env.save_robot_image(
+                    img_path,
+                    width=800,
+                    height=600,
+                    traj=episode_ee_positions,
+                    draw_origin=True,
+                    target=(episode_targets[-1] if episode_targets else None),
+                )
                 
                 
         if final_distance < 0.05:
@@ -810,29 +834,36 @@ def generate_velocity_plot(world_vels, chassis_vels, save_dir, episode=1,
     print(f"Saved velocity plot: {out_path}")
 
 
-if __name__ == "__main__":    
-    model_path = "linux_env_dev/models/logs_20251126_112856/ppo_mobile_mm_final.zip"
-    # model_path = "linux_env_dev/models/logs_20251126_112856/checkpoints/ppo_mobile_mm_4800000_steps.zip"
-    
-    render = False
-    
-    if os.path.exists(model_path):
-        print("Starting model testing...")
-        num_episode = 943
-        distances, rewards, success_count = test_trained_model(model_path, json_paths=[
-                                                            # "linux_env_dev/new_json_50/cinematic_db_arc_right_pull_arc_right_pull_004.json",
-                                                            #    "trajectoryToLearn/world_json/scene_1/traj_random_20251110_112441.json",
-                                                            #    "trajectoryToLearn/world_json/scene_1/traj_random_20251110_215950.json",
-                                                            #    "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154427.json",
-                                                            #    "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154646.json",
-                                                            #    "trajectoryToLearn/world_json/scene_1/traj_random_20251111_154810.json"
-                                                            ],
-                                                            # test_txt="linux_env_dev/new_json_50/test.txt",
-                                                            test_txt="linux_env_dev/new_json_50/train.txt",
-                                                            # test_txt="linux_env_dev/new_json_50/train_stage1.txt",
-                                                               num_episodes=num_episode, render=render, max_steps=500,
-                                                               should_vis=False)
-        print(f"\nTesting completed! Success rate: {success_count}/{num_episode} ({success_count/num_episode*100:.1f}%)")
-    else:
-        print(f"Model file not found: {model_path}")
-        print("Please train the model first or check the model path.")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_path", type=str, required=True, help="Path to PPO .zip checkpoint")
+    parser.add_argument("--robot", type=str, default="mobile_mm", choices=["mobile_mm", "recomo"])
+    parser.add_argument("--urdf_path", type=str, default=None, help="Optional URDF override (robot-specific)")
+    parser.add_argument("--test_txt", type=str, default="linux_env_dev/new_json_50/test.txt",
+                        help="Txt file with one json path per line")
+    parser.add_argument("--num_episodes", type=int, default=10)
+    parser.add_argument("--max_steps", type=int, default=500)
+    parser.add_argument("--frame_skip", type=int, default=24)
+    parser.add_argument("--render", action="store_true", help="Use PyBullet GUI")
+    parser.add_argument("--should_vis", action="store_true", help="Always render plots (can be slow)")
+    args = parser.parse_args()
+
+    if not os.path.exists(args.model_path):
+        raise FileNotFoundError(f"Model file not found: {args.model_path}")
+
+    print("Starting model testing...")
+    distances, rewards, success_count = test_trained_model(
+        args.model_path,
+        test_txt=args.test_txt,
+        num_episodes=int(args.num_episodes),
+        render=bool(args.render),
+        max_steps=int(args.max_steps),
+        should_vis=bool(args.should_vis),
+        robot=args.robot,
+        urdf_path=args.urdf_path,
+        frame_skip=int(args.frame_skip),
+    )
+    print(
+        f"\nTesting completed! Success rate: {success_count}/{args.num_episodes} "
+        f"({(success_count / max(1, int(args.num_episodes))) * 100:.1f}%)"
+    )

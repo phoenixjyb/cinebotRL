@@ -39,6 +39,12 @@ python pybulletDeploy/test_pybullet_onnx.py \
   --model pybulletDeploy/policy_recomo.onnx \
   --robot recomo --iterations 100
 ```
+Optional parity check (SB3 deterministic vs ONNX outputs):
+```bash
+python pybulletDeploy/compare_sb3_vs_onnx.py \
+  --checkpoint linux_env_dev/models/logs_20251217_184738_recomo/best_model/best_model.zip \
+  --onnx pybulletDeploy/policy_recomo.onnx --n_samples 200
+```
 To force GPU execution locally (onnxruntime-gpu, CUDA 12.x, cuDNN 9 from the venv wheels), export the CUDA libs before running:
 ```bash
 export LD_LIBRARY_PATH="$PWD/.venv/lib/python3.10/site-packages/nvidia/cudnn/lib:$PWD/.venv/lib/python3.10/site-packages/nvidia/cublas/lib:$PWD/.venv/lib/python3.10/site-packages/nvidia/cufft/lib:$PWD/.venv/lib/python3.10/site-packages/nvidia/curand/lib:$PWD/.venv/lib/python3.10/site-packages/nvidia/cusolver/lib:$PWD/.venv/lib/python3.10/site-packages/nvidia/cusparse/lib:$PWD/.venv/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH"

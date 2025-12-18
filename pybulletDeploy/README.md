@@ -75,6 +75,18 @@ Notes:
 - Use `--int8` only with calibration data; `--workspace` can be increased if memory allows.
 - The engine is device-specific; build it on the target Orin.
 
+## ROS2 Topic Contract (recomoDemo1)
+
+For Orin ROS2 integration we align to the recomoDemo1 stack topic conventions (odom + chassis + arm + gimbal + reference stream).
+
+- Mapping file: `pybulletDeploy/ros2_io_recomo.yaml`
+- Key topics:
+  - `/odom_wheel` (`nav_msgs/Odometry`)
+  - `/cr/chassis_imu` (`sensor_msgs/Imu`, vx/vy/wz packed in `orientation.x/y/z`)
+  - `/mobile_base/commands/velocity` (`geometry_msgs/Twist`, body-frame vx/vy/wz)
+  - `/right_arm/joint_states` (`sensor_msgs/JointState`, joint5/joint6)
+  - `/right_arm/joint_command` (`geometry_msgs/TwistStamped`, position in `twist.linear.(x,y)`)
+
 ## I/O specification
 - **mobile_mm**
   - **Observation (53 floats):** `[q_with_cos_sin_theta(10), qdot(9), chassis_hist(9), base_xyz(3), ee_xyz(3), target_xyz(3), lookahead_xyz*5(15), remain_ratio(1)]`

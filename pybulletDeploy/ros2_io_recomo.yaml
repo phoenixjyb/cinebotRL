@@ -1,0 +1,93 @@
+# ROS2 I/O mapping and calibration knobs for recomoDemo1 deployment.
+#
+# This file mirrors the ROS2 topic contracts used by the recomoDemo1 Orin stack
+# in `gikWBC9DOF/config/ros2_io_recomo.yaml` and is included here so the RL
+# ONNX policy deployment can share the same conventions.
+#
+# Calibration convention:
+#   q_urdf = sign .* q_hw + zero_offset_rad
+#   q_hw   = sign .* (q_urdf - zero_offset_rad)   (since sign ∈ {+1,-1})
+#
+# Start with sign=+1 and zero_offset_rad=0, then calibrate per-axis on hardware.
+
+version: 0.1
+
+frames:
+  world_frame: odom
+  base_frame: base_link
+  ee_frame: ee_tool
+
+topics:
+  odom_pose: /odom_wheel                         # nav_msgs/Odometry
+
+  chassis_cmd_vel: /mobile_base/commands/velocity # geometry_msgs/Twist
+  chassis_feedback_imu: /cr/chassis_imu           # sensor_msgs/Imu (orientation encodes vx/vy/wz)
+
+  arm_joint_states: /right_arm/joint_states       # sensor_msgs/JointState
+  arm_joint_command: /right_arm/joint_command     # geometry_msgs/TwistStamped
+
+  gimbal_state: /gimbal/state                     # jc2804_gimbal_driver/msg/GimbalState
+  gimbal_command: /gimbal/command                 # jc2804_gimbal_driver/msg/GimbalCommand
+
+  # Reference trajectory streaming (topic-based mode).
+  reference_ee_pose: /recomo/reference/ee_pose     # geometry_msgs/PoseStamped
+  reference_index: /recomo/reference/index         # std_msgs/UInt32
+  reference_path: /recomo/reference/path           # nav_msgs/Path (latched)
+
+  # Optional obstacle discs for distance-constraint avoidance.
+  obstacles_discs: /recomo/obstacles/discs         # std_msgs/Float64MultiArray ([x,y,r] triples in odom)
+
+chassis:
+  cmd_units:
+    linear: m/s
+    angular: rad/s
+  driver_internal_units:
+    linear: mm/s
+    angular: "0.001 rad/s"
+  feedback_mapping:
+    vx_from: imu.orientation.x
+    vy_from: imu.orientation.y
+    wz_from: imu.orientation.z
+  axis_convention:
+    x: forward
+    y: left
+    z: up
+    wz_positive: CCW
+
+arm:
+  # Verified mapping (no known sign flips at the moment):
+  #   right_arm_joint5 -> joint5_arm_pitch
+  #   right_arm_joint6 -> joint6_arm_yaw
+  ros_joint_names: [right_arm_joint5, right_arm_joint6]
+  urdf_joint_names: [joint5_arm_pitch, joint6_arm_yaw]
+  sign: [1, 1]
+  zero_offset_rad: [0.0, 0.0]
+  command_layout:
+    # /right_arm/joint_command (geometry_msgs/msg/TwistStamped)
+    position_rad:
+      joint5: twist.linear.x
+      joint6: twist.linear.y
+    velocity_rad_s:
+      joint5: twist.angular.x
+      joint6: twist.angular.y
+
+gimbal:
+  # URDF chain (arm -> ee):
+  #   joint3_gimbal_yaw -> joint2_gimbal_pitch -> joint1_gimbal_roll -> ee_tool
+  #
+  # Driver interface uses roll/pitch/yaw fields (radians), so we map:
+  #   roll  -> joint1_gimbal_roll (closest to ee_tool)
+  #   pitch -> joint2_gimbal_pitch
+  #   yaw   -> joint3_gimbal_yaw  (closest to arm)
+  axis_order_driver: [roll, pitch, yaw]
+  urdf_joint_names: [joint1_gimbal_roll, joint2_gimbal_pitch, joint3_gimbal_yaw]
+  sign: [1, 1, 1]
+  zero_offset_rad: [0.0, 0.0, 0.0]
+  notes:
+    direction: "jc2804_gimbal_driver convention: clockwise '-' , counter-clockwise '+'"
+  command_layout:
+    # /gimbal/command (jc2804_gimbal_driver/msg/GimbalCommand)
+    command_type_field: command_type
+    position_fields_rad: [roll_rad, pitch_rad, yaw_rad]
+    velocity_fields_rpm: [roll_velocity_rpm, pitch_velocity_rpm, yaw_velocity_rpm]
+

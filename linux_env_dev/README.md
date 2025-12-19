@@ -58,6 +58,7 @@ Useful env knobs:
 
 - `--frame_skip` (default `24`, i.e. 0.1s per RL step at 240Hz)
 - `--max_steps` episode horizon
+- `--obs_frame auto|world|chassis` (`chassis` recommended for recomo holonomic base)
 
 Useful training knobs (PPO):
 
@@ -70,6 +71,24 @@ Optional normalization:
 
 - `--vec_normalize` enables `VecNormalize` (obs normalization); stats saved to `linux_env_dev/models/<run>/vecnormalize.pkl`
 - If you enable `--vec_normalize`, deployment/inference must apply the same normalization stats to observations.
+
+Recommended recomo accuracy preset
+----------------------------------
+
+This preset tunes PPO defaults for faster, more stable learning and better fine tracking.
+
+```bash
+python linux_env_dev/train_pybullet_sb3.py --preset recomo_accuracy --timesteps 8000000
+```
+
+Preset values (unless you override them explicitly):
+
+- `--robot recomo --policy Transformer --device cuda`
+- `--obs_frame chassis`
+- `--n_envs 16 --n_steps 1024 --batch_size 4096 --n_epochs 5`
+- `--gamma 0.995 --learning_rate 1e-4 --ent_coef 0.005 --target_kl 0.03`
+- `--curriculum mix --curriculum_stage1_steps 2000000`
+- `--reward_close_bonus 0.5 --reward_close_threshold 0.05`
 
 
 5. Run stage2 training:

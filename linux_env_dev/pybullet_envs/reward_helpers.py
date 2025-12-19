@@ -14,6 +14,8 @@ def compute_reward(
     dist_weight: float = 2.0,
     collision_threshold: float = 0.3,
     collision_ratio: float = 50.0,
+    close_threshold: float = 0.05,
+    close_bonus: float = 0.0,
     clip_abs: float = 5.0,
 ):
     total_reward = 0.0
@@ -45,7 +47,17 @@ def compute_reward(
             base_pos, ee_pos, thresh=float(collision_threshold), ratio=float(collision_ratio)
         )
     
-    total_reward = dist_reward + collision_reward
+    close_reward = 0.0
+    if close_bonus and float(close_bonus) != 0.0 and close_threshold and float(close_threshold) > 0.0:
+        try:
+            dist = float(dist_info.get("ee_distance", 0.0))
+        except Exception:
+            dist = 0.0
+        if dist < float(close_threshold):
+            frac = 1.0 - (dist / float(close_threshold))
+            close_reward = float(close_bonus) * float(np.clip(frac, 0.0, 1.0))
+
+    total_reward = dist_reward + collision_reward + close_reward
     total_reward = float(np.clip(total_reward, -float(clip_abs), float(clip_abs)))
     
     info.update(dist_info)
@@ -53,6 +65,7 @@ def compute_reward(
         {
             "reward_dist": float(dist_reward),
             "reward_collision": float(collision_reward),
+            "reward_close": float(close_reward),
         }
     )
     # info.update(yaw_info)

@@ -30,6 +30,9 @@ class MobileMMTrajEnv(gym.Env):
                  reward_collision_threshold: Optional[float] = None,
                  reward_collision_ratio: Optional[float] = None,
                  reward_clip_abs: Optional[float] = None,
+                 reward_close_bonus: Optional[float] = None,
+                 reward_close_threshold: Optional[float] = None,
+                 obs_frame: str = "auto",
                  target_generator: Optional[TargetGenerator] = None):
         self.project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         self.robot_name = (robot or "mobile_mm").strip().lower()
@@ -49,6 +52,11 @@ class MobileMMTrajEnv(gym.Env):
         self.max_steps = int(max_steps)
         self.render = bool(render)
         self.use_fixed_base = bool(self.robot_name == "recomo")
+        self.obs_frame = (obs_frame or "auto").strip().lower()
+        if self.obs_frame == "auto":
+            self.obs_frame = "chassis" if self.robot_name == "recomo" else "world"
+        if self.obs_frame not in {"world", "chassis"}:
+            raise ValueError(f"Unknown obs_frame='{obs_frame}'. Expected one of: auto, world, chassis")
 
         # image saving options
         self.save_image_on_reset = bool(save_image_on_reset)
@@ -100,6 +108,18 @@ class MobileMMTrajEnv(gym.Env):
                 )
             target_generator = JSONNearestTargetGenerator(json_paths=[], json_txt=default_train_txt, mode="random")
         self._target_generator = target_generator
+        # Keep trajectory time-base consistent with the RL step time (dt = frame_skip / 240Hz).
+        # This matters when changing --frame_skip.
+        step_dt = float(self.frame_skip) / 240.0
+        try:
+            if hasattr(self._target_generator, "step_dt"):
+                setattr(self._target_generator, "step_dt", step_dt)
+            if hasattr(self._target_generator, "stage1") and hasattr(self._target_generator.stage1, "step_dt"):
+                setattr(self._target_generator.stage1, "step_dt", step_dt)
+            if hasattr(self._target_generator, "stage2") and hasattr(self._target_generator.stage2, "step_dt"):
+                setattr(self._target_generator.stage2, "step_dt", step_dt)
+        except Exception:
+            pass
         self._target = self._target_generator.reset()
         self.finish_step1_step = None
         self.finish_step1_step = 0
@@ -116,6 +136,7 @@ class MobileMMTrajEnv(gym.Env):
             self._reward_kwargs = {
                 "dist_weight": 2.0,
                 "collision_ratio": 0.0,
+                "close_bonus": 0.5,
             }
         else:
             self._reward_kwargs = {
@@ -136,6 +157,10 @@ class MobileMMTrajEnv(gym.Env):
             self._reward_kwargs["collision_ratio"] = float(reward_collision_ratio)
         if reward_clip_abs is not None:
             self._reward_kwargs["clip_abs"] = float(reward_clip_abs)
+        if reward_close_bonus is not None:
+            self._reward_kwargs["close_bonus"] = float(reward_close_bonus)
+        if reward_close_threshold is not None:
+            self._reward_kwargs["close_threshold"] = float(reward_close_threshold)
     
     def _load_robot_once(self):
         # load plane and robot, then remove (we re-create on reset)
@@ -589,17 +614,42 @@ class MobileMMTrajEnv(gym.Env):
         self._get_hist_chassis()
         ee_pos = self._get_ee_pos()
         base_pos = self._get_base_pos()
+        base_yaw = float(getattr(self, "_abstract_chassis_yaw", 0.0))
         self._joint_states = np.concatenate([q, qdot], axis=0)
         # desired_yaw = np.array([self._get_desired_yaw(base_pos, self._target)])
         target, future_5targets = self._get_target(ee_pos)
 
         # include flattened chassis history in observation
         chassis_hist_flat = self._chassis_hist.reshape(-1).astype(np.float32)
-        # obs = np.concatenate([q, qdot, chassis_hist_flat, base_pos, ee_pos, target, future_5targets,
-        #                       np.array([self.remain_traj_ratio])]).astype(np.float32)
+        if self.obs_frame == "chassis":
+            cy = float(np.cos(base_yaw))
+            sy = float(np.sin(base_yaw))
 
-        obs = np.concatenate([q_with_ang, qdot, chassis_hist_flat, base_pos, ee_pos, target, future_5targets,
-                              np.array([self.remain_traj_ratio])]).astype(np.float32)
+            def _world_to_chassis(v_world: np.ndarray) -> np.ndarray:
+                vx = float(v_world[0])
+                vy = float(v_world[1])
+                vz = float(v_world[2])
+                return np.array([cy * vx + sy * vy, -sy * vx + cy * vy, vz], dtype=np.float32)
+
+            ee_rel = _world_to_chassis(np.asarray(ee_pos, dtype=np.float32) - np.asarray(base_pos, dtype=np.float32))
+            target_rel = _world_to_chassis(np.asarray(target, dtype=np.float32) - np.asarray(base_pos, dtype=np.float32))
+
+            fut = np.asarray(future_5targets, dtype=np.float32).reshape(self.lookahead_num, 3)
+            fut_rel = fut - np.asarray(base_pos, dtype=np.float32)[None, :]
+            fut_x = cy * fut_rel[:, 0] + sy * fut_rel[:, 1]
+            fut_y = -sy * fut_rel[:, 0] + cy * fut_rel[:, 1]
+            fut_z = fut_rel[:, 2]
+            future_rel = np.stack([fut_x, fut_y, fut_z], axis=1).astype(np.float32).reshape(-1)
+
+            obs = np.concatenate(
+                [q_with_ang, qdot, chassis_hist_flat, base_pos, ee_rel, target_rel, future_rel, np.array([self.remain_traj_ratio])],
+                axis=0,
+            ).astype(np.float32)
+        else:
+            obs = np.concatenate(
+                [q_with_ang, qdot, chassis_hist_flat, base_pos, ee_pos, target, future_5targets, np.array([self.remain_traj_ratio])],
+                axis=0,
+            ).astype(np.float32)
 
         if DEBUG:
             print(f"obs = {q[:3]}")

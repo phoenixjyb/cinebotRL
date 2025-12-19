@@ -51,6 +51,7 @@ class TransformerFeaturesExtractor(BaseFeaturesExtractor):
             nhead=max(1, n_heads),
             dim_feedforward=max(1, int(ff_dim)),
             dropout=dropout,
+            batch_first=True,
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=max(1, n_layers))
 
@@ -65,13 +66,9 @@ class TransformerFeaturesExtractor(BaseFeaturesExtractor):
         x = x.view(bsz, self.seq_len, self.embed_dim)  # (batch, seq_len, embed_dim) (bs, 8, 256)
 
         # 编码
-        x = x.permute(1, 0, 2) # (8, bs, 256)
-        x = self.transformer(x)  # (seq_len, batch, embed_dim) (8, bs, 256)
-
-        # back to (batch, seq_len, embed_dim)
-        x = x.permute(1, 2, 0) # (8, bs, 256) -> (bs, 256, 8)
+        x = self.transformer(x)  # (batch, seq_len, embed_dim)
         # pool over sequence dimension
-        x = torch.mean(x, dim=2) # (batch, embed_dim) (bs, 256)
+        x = torch.mean(x, dim=1) # (batch, embed_dim)
         x = self.ln(x) # (batch, embed_dim) (bs, 256)
 
         return x

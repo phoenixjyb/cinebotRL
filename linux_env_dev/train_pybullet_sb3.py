@@ -1,6 +1,7 @@
 import datetime
 import os
 import argparse
+import sys
 import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -64,6 +65,7 @@ class TrainInfoMetricsCallback(BaseCallback):
         self._ee_dist = []
         self._rew_dist = []
         self._rew_collision = []
+        self._rew_close = []
         self._base_vx = []
         self._base_vy = []
         self._base_wz = []
@@ -84,6 +86,8 @@ class TrainInfoMetricsCallback(BaseCallback):
                 self._rew_dist.append(float(info["reward_dist"]))
             if "reward_collision" in info:
                 self._rew_collision.append(float(info["reward_collision"]))
+            if "reward_close" in info:
+                self._rew_close.append(float(info["reward_close"]))
             if "base_vx" in info:
                 self._base_vx.append(float(info["base_vx"]))
             if "base_vy" in info:
@@ -105,6 +109,9 @@ class TrainInfoMetricsCallback(BaseCallback):
             if self._rew_collision:
                 self.logger.record("train/reward_collision_mean", float(np.mean(self._rew_collision)))
                 self._rew_collision.clear()
+            if self._rew_close:
+                self.logger.record("train/reward_close_mean", float(np.mean(self._rew_close)))
+                self._rew_close.clear()
             if self._base_vx:
                 self.logger.record("train/base_vx_mean", float(np.mean(self._base_vx)))
                 self._base_vx.clear()
@@ -313,6 +320,13 @@ class CurriculumCallback(BaseCallback):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--preset",
+        type=str,
+        default="none",
+        choices=["none", "recomo_accuracy"],
+        help="Convenience hyperparameter preset for new training runs.",
+    )
     parser.add_argument("--timesteps", type=int, default=5_000_000)
     parser.add_argument("--render", action="store_true", help="Use GUI")
     parser.add_argument(
@@ -333,6 +347,13 @@ def main():
     parser.add_argument("--urdf_path", type=str, default=None, help="Override URDF path (robot-specific)")
     parser.add_argument("--frame_skip", type=int, default=24, help="Physics steps per RL step (240Hz base)")
     parser.add_argument("--max_steps", type=int, default=500, help="Max steps per episode")
+    parser.add_argument(
+        "--obs_frame",
+        type=str,
+        default="auto",
+        choices=["auto", "world", "chassis"],
+        help="Observation frame for target/ee/future points. 'chassis' is recommended for holonomic base.",
+    )
     parser.add_argument("--train_txt", type=str, default="linux_env_dev/new_json_50/train.txt",
                         help="Training trajectory list (txt file with one json path per line)")
     parser.add_argument("--eval_txt", type=str, default="linux_env_dev/new_json_50/test.txt",
@@ -402,7 +423,63 @@ def main():
     parser.add_argument("--reward_collision_threshold", type=float, default=None, help="Override collision distance threshold")
     parser.add_argument("--reward_collision_ratio", type=float, default=None, help="Override collision penalty ratio")
     parser.add_argument("--reward_clip_abs", type=float, default=None, help="Override per-step reward clip abs value")
+    parser.add_argument("--reward_close_bonus", type=float, default=None, help="Override close-to-target shaping bonus")
+    parser.add_argument("--reward_close_threshold", type=float, default=None, help="Override close-to-target threshold (meters)")
     args = parser.parse_args()
+
+    argv = sys.argv[1:]
+
+    def _arg_set(flag: str) -> bool:
+        if flag in argv:
+            return True
+        return any(a.startswith(flag + "=") for a in argv)
+
+    if args.preset == "recomo_accuracy":
+        # Only override values the user did not explicitly provide on the CLI.
+        if not _arg_set("--robot"):
+            args.robot = "recomo"
+        if not _arg_set("--policy"):
+            args.policy = "Transformer"
+        if not _arg_set("--device"):
+            args.device = "cuda"
+        if not _arg_set("--n_envs"):
+            args.n_envs = 16
+        if not _arg_set("--n_steps"):
+            args.n_steps = 1024
+        if not _arg_set("--batch_size"):
+            args.batch_size = 4096
+        if not _arg_set("--n_epochs"):
+            args.n_epochs = 5
+        if not _arg_set("--gamma"):
+            args.gamma = 0.995
+        if not _arg_set("--learning_rate"):
+            args.learning_rate = 1e-4
+        if not _arg_set("--warmup_frac"):
+            args.warmup_frac = 0.05
+        if not _arg_set("--ent_coef"):
+            args.ent_coef = 0.005
+        if not _arg_set("--max_grad_norm"):
+            args.max_grad_norm = 0.5
+        if not _arg_set("--target_kl"):
+            args.target_kl = 0.03
+        if not _arg_set("--eval_freq"):
+            args.eval_freq = 20000
+        if not _arg_set("--eval_episodes"):
+            args.eval_episodes = 10
+        if not _arg_set("--save_interval"):
+            args.save_interval = 200000
+        if not _arg_set("--curriculum"):
+            args.curriculum = "mix"
+        if not _arg_set("--curriculum_stage1_steps"):
+            args.curriculum_stage1_steps = 2_000_000
+        if not _arg_set("--obs_frame"):
+            args.obs_frame = "chassis"
+        if not _arg_set("--tf_dropout"):
+            args.tf_dropout = 0.0
+        if not _arg_set("--reward_close_bonus"):
+            args.reward_close_bonus = 0.5
+        if not _arg_set("--reward_close_threshold"):
+            args.reward_close_threshold = 0.05
 
     # Make "LargeMlp" a convenience alias (SB3 only knows "MlpPolicy").
     # If user didn't override layers, use a larger default net.
@@ -458,10 +535,13 @@ def main():
         frame_skip=args.frame_skip,
         max_steps=args.max_steps,
         render=args.render,
+        obs_frame=args.obs_frame,
         reward_dist_weight=args.reward_dist_weight,
         reward_collision_threshold=args.reward_collision_threshold,
         reward_collision_ratio=args.reward_collision_ratio,
         reward_clip_abs=args.reward_clip_abs,
+        reward_close_bonus=args.reward_close_bonus,
+        reward_close_threshold=args.reward_close_threshold,
         target_generator=(
             CurriculumJSONNearestTargetGenerator(
                 stage1_txt=args.curriculum_stage1_txt,
@@ -669,10 +749,13 @@ def main():
             frame_skip=args.frame_skip,
             max_steps=args.max_steps,
             render=False,
+            obs_frame=args.obs_frame,
             reward_dist_weight=args.reward_dist_weight,
             reward_collision_threshold=args.reward_collision_threshold,
             reward_collision_ratio=args.reward_collision_ratio,
             reward_clip_abs=args.reward_clip_abs,
+            reward_close_bonus=args.reward_close_bonus,
+            reward_close_threshold=args.reward_close_threshold,
             target_generator=JSONNearestTargetGenerator(
                 json_paths=[],
                 json_txt=args.eval_txt,
@@ -712,6 +795,7 @@ def main():
                 "base_wz",
                 "base_lin_vel_norm",
                 "base_ang_vel_norm",
+                "reward_close",
             ),
         )
         callbacks.append(eval_cb)

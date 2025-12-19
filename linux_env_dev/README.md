@@ -59,6 +59,18 @@ Useful env knobs:
 - `--frame_skip` (default `24`, i.e. 0.1s per RL step at 240Hz)
 - `--max_steps` episode horizon
 
+Useful training knobs (PPO):
+
+- `--device auto|cuda|cpu` (use `cuda` to force GPU)
+- `--gamma`, `--gae_lambda`, `--clip_range`, `--clip_range_vf`
+- `--ent_coef`, `--vf_coef`, `--max_grad_norm`, `--target_kl`
+- `--pi_layers`, `--vf_layers` (actor/critic MLP sizes)
+
+Optional normalization:
+
+- `--vec_normalize` enables `VecNormalize` (obs normalization); stats saved to `linux_env_dev/models/<run>/vecnormalize.pkl`
+- If you enable `--vec_normalize`, deployment/inference must apply the same normalization stats to observations.
+
 
 5. Run stage2 training:
 

@@ -22,8 +22,16 @@ class TransformerFeaturesExtractor(BaseFeaturesExtractor):
     - dropout: dropout inside TransformerEncoderLayer
     """
 
-    def __init__(self, observation_space: spaces.Box, seq_len: int = 8, embed_dim: int = 256,
-                 n_heads: int = 8, n_layers: int = 3, dropout: float = 0.1):
+    def __init__(
+        self,
+        observation_space: spaces.Box,
+        seq_len: int = 8,
+        embed_dim: int = 256,
+        n_heads: int = 8,
+        n_layers: int = 3,
+        dropout: float = 0.1,
+        ff_dim: int = 2048,
+    ):
         assert isinstance(observation_space, spaces.Box), "TransformerFeaturesExtractor expects Box observation"
         obs_shape = observation_space.shape
         assert len(obs_shape) == 1, "Only 1D Box observation supported by this extractor"
@@ -38,7 +46,12 @@ class TransformerFeaturesExtractor(BaseFeaturesExtractor):
         # Project flat observation into seq_len * embed_dim and reshape to (batch, seq_len, embed_dim)
         self.proj = nn.Linear(obs_dim, self.seq_len * self.embed_dim)
 
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.embed_dim, nhead=max(1, n_heads), dropout=dropout)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=self.embed_dim,
+            nhead=max(1, n_heads),
+            dim_feedforward=max(1, int(ff_dim)),
+            dropout=dropout,
+        )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=max(1, n_layers))
 
         # simple layernorm & final projection (identity size)

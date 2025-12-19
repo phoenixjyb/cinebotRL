@@ -4,7 +4,10 @@ import argparse
 import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
-from stable_baselines3.common.callbacks import BaseCallback, CallbackList
+from stable_baselines3.common.callbacks import BaseCallback, CallbackList, EvalCallback
+from stable_baselines3.common.utils import set_random_seed
+from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.vec_env import sync_envs_normalization
 from pybullet_envs.mobile_mm import MobileMMBulletEnv
 from pybullet_envs.mobile_mm_traj import MobileMMTrajEnv
 from pybullet_envs.target_generator import (
@@ -61,6 +64,11 @@ class TrainInfoMetricsCallback(BaseCallback):
         self._ee_dist = []
         self._rew_dist = []
         self._rew_collision = []
+        self._base_vx = []
+        self._base_vy = []
+        self._base_wz = []
+        self._base_lin_norm = []
+        self._remain_ratio = []
 
     def _on_step(self) -> bool:
         infos = self.locals.get("infos", None)
@@ -76,6 +84,16 @@ class TrainInfoMetricsCallback(BaseCallback):
                 self._rew_dist.append(float(info["reward_dist"]))
             if "reward_collision" in info:
                 self._rew_collision.append(float(info["reward_collision"]))
+            if "base_vx" in info:
+                self._base_vx.append(float(info["base_vx"]))
+            if "base_vy" in info:
+                self._base_vy.append(float(info["base_vy"]))
+            if "base_wz" in info:
+                self._base_wz.append(float(info["base_wz"]))
+            if "base_lin_vel_norm" in info:
+                self._base_lin_norm.append(float(info["base_lin_vel_norm"]))
+            if "remain_traj_ratio" in info:
+                self._remain_ratio.append(float(info["remain_traj_ratio"]))
 
         if self.log_freq > 0 and (self.n_calls % self.log_freq) == 0:
             if self._ee_dist:
@@ -87,7 +105,155 @@ class TrainInfoMetricsCallback(BaseCallback):
             if self._rew_collision:
                 self.logger.record("train/reward_collision_mean", float(np.mean(self._rew_collision)))
                 self._rew_collision.clear()
+            if self._base_vx:
+                self.logger.record("train/base_vx_mean", float(np.mean(self._base_vx)))
+                self._base_vx.clear()
+            if self._base_vy:
+                self.logger.record("train/base_vy_mean", float(np.mean(self._base_vy)))
+                self._base_vy.clear()
+            if self._base_wz:
+                self.logger.record("train/base_wz_mean", float(np.mean(self._base_wz)))
+                self._base_wz.clear()
+            if self._base_lin_norm:
+                self.logger.record("train/base_lin_vel_norm_mean", float(np.mean(self._base_lin_norm)))
+                self._base_lin_norm.clear()
+            if self._remain_ratio:
+                self.logger.record("train/remain_traj_ratio_mean", float(np.mean(self._remain_ratio)))
+                self._remain_ratio.clear()
         return True
+
+
+class EvalInfoMetricsCallback(EvalCallback):
+    """EvalCallback that also logs extra info keys at episode end.
+
+    The env must put desired scalars into `info` on the terminal step of each eval episode.
+    """
+
+    def __init__(self, *args, info_keys: tuple[str, ...] = (), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.info_keys = tuple(info_keys or ())
+        self._metric_buffer = {k: [] for k in self.info_keys}
+        self.evaluations_metrics = {k: [] for k in self.info_keys}
+
+    def _log_success_callback(self, locals_: dict, globals_: dict) -> None:
+        info = locals_["info"]
+        if locals_["done"]:
+            maybe_is_success = info.get("is_success")
+            if maybe_is_success is not None:
+                self._is_success_buffer.append(maybe_is_success)
+            for k in self.info_keys:
+                v = info.get(k, np.nan)
+                try:
+                    self._metric_buffer[k].append(float(v))
+                except Exception:
+                    self._metric_buffer[k].append(np.nan)
+
+    def _on_step(self) -> bool:
+        continue_training = True
+
+        if self.eval_freq > 0 and self.n_calls % self.eval_freq == 0:
+            # Sync training and eval env if there is VecNormalize
+            if self.model.get_vec_normalize_env() is not None:
+                try:
+                    sync_envs_normalization(self.training_env, self.eval_env)
+                except AttributeError as e:
+                    raise AssertionError(
+                        "Training and eval env are not wrapped the same way, "
+                        "see https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html#evalcallback "
+                        "and warning above."
+                    ) from e
+
+            # Reset buffers
+            self._is_success_buffer = []
+            self._metric_buffer = {k: [] for k in self.info_keys}
+
+            episode_rewards, episode_lengths = evaluate_policy(
+                self.model,
+                self.eval_env,
+                n_eval_episodes=self.n_eval_episodes,
+                render=self.render,
+                deterministic=self.deterministic,
+                return_episode_rewards=True,
+                warn=self.warn,
+                callback=self._log_success_callback,
+            )
+
+            # Persist eval history
+            if self.log_path is not None:
+                self.evaluations_timesteps.append(self.num_timesteps)
+                self.evaluations_results.append(episode_rewards)
+                self.evaluations_length.append(episode_lengths)
+
+                kwargs = {}
+                # Save success log if present
+                if len(self._is_success_buffer) > 0:
+                    self.evaluations_successes.append(self._is_success_buffer)
+                    kwargs["successes"] = self.evaluations_successes
+
+                # Save per-episode terminal info metrics
+                for k in self.info_keys:
+                    self.evaluations_metrics[k].append(self._metric_buffer.get(k, []))
+                    kwargs[f"{k}s"] = self.evaluations_metrics[k]
+
+                np.savez(
+                    self.log_path,
+                    timesteps=self.evaluations_timesteps,
+                    results=self.evaluations_results,
+                    ep_lengths=self.evaluations_length,
+                    **kwargs,
+                )
+
+            mean_reward, std_reward = float(np.mean(episode_rewards)), float(np.std(episode_rewards))
+            mean_ep_length, std_ep_length = float(np.mean(episode_lengths)), float(np.std(episode_lengths))
+            self.last_mean_reward = mean_reward
+
+            if self.verbose >= 1:
+                print(f"Eval num_timesteps={self.num_timesteps}, episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
+                print(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
+
+            # Add to current Logger
+            self.logger.record("eval/mean_reward", mean_reward)
+            self.logger.record("eval/mean_ep_length", mean_ep_length)
+
+            if len(self._is_success_buffer) > 0:
+                success_rate = float(np.mean(self._is_success_buffer))
+                if self.verbose >= 1:
+                    print(f"Success rate: {100 * success_rate:.2f}%")
+                self.logger.record("eval/success_rate", success_rate)
+
+            # Extra metrics (terminal step values)
+            for k in self.info_keys:
+                arr = np.array(self._metric_buffer.get(k, []), dtype=float)
+                if arr.size == 0:
+                    continue
+                self.logger.record(f"eval/final_{k}_mean", float(np.nanmean(arr)))
+
+            # Dump log so the evaluation results are printed with the correct timestep
+            self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
+            self.logger.dump(self.num_timesteps)
+
+            # Save best model (same logic as SB3 EvalCallback) + keep VecNormalize stats in sync if present
+            if mean_reward > self.best_mean_reward:
+                if self.verbose >= 1:
+                    print("New best mean reward!")
+                if self.best_model_save_path is not None:
+                    self.model.save(os.path.join(self.best_model_save_path, "best_model"))
+                    try:
+                        venv = self.model.get_vec_normalize_env()
+                        if venv is not None and hasattr(venv, "save"):
+                            venv.save(os.path.join(self.best_model_save_path, "vecnormalize.pkl"))
+                    except Exception:
+                        pass
+                self.best_mean_reward = mean_reward
+                # Trigger callback on new best model, if needed
+                if self.callback_on_new_best is not None:
+                    continue_training = self.callback_on_new_best.on_step()
+
+            # Trigger callback after every evaluation, if needed
+            if self.callback is not None:
+                continue_training = continue_training and self._on_event()
+
+        return continue_training
 
 
 class CurriculumCallback(BaseCallback):
@@ -150,6 +316,14 @@ def main():
     parser.add_argument("--timesteps", type=int, default=5_000_000)
     parser.add_argument("--render", action="store_true", help="Use GUI")
     parser.add_argument(
+        "--device",
+        type=str,
+        default="auto",
+        choices=["auto", "cpu", "cuda"],
+        help="Torch device for SB3 policy network. 'auto' picks CUDA if available.",
+    )
+    parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
+    parser.add_argument(
         "--robot",
         type=str,
         default="mobile_mm",
@@ -186,6 +360,7 @@ def main():
     parser.add_argument("--tf_layers", type=int, default=3, help="Number of Transformer encoder layers")
     parser.add_argument("--tf_heads", type=int, default=8, help="Number of attention heads")
     parser.add_argument("--tf_dropout", type=float, default=0.1, help="Transformer dropout")
+    parser.add_argument("--tf_ff_dim", type=int, default=2048, help="Transformer feedforward dimension")
     parser.add_argument("--warmup_frac", type=float, default=0.05,
                         help="Fraction of total training for linear warmup (0-1)")
     parser.add_argument("--save_dir", type=str, default="linux_env_dev/models")
@@ -194,6 +369,16 @@ def main():
     parser.add_argument("--n_steps", type=int, default=2048, help="PPO n_steps (per env)")
     parser.add_argument("--batch_size", type=int, default=64, help="PPO batch_size")
     parser.add_argument("--n_epochs", type=int, default=10, help="PPO n_epochs")
+    parser.add_argument("--gamma", type=float, default=0.99, help="PPO discount factor")
+    parser.add_argument("--gae_lambda", type=float, default=0.95, help="PPO GAE lambda")
+    parser.add_argument("--clip_range", type=float, default=0.2, help="PPO clip range")
+    parser.add_argument("--clip_range_vf", type=float, default=None, help="PPO clip range for value function (None=disabled)")
+    parser.add_argument("--normalize_advantage", action="store_true", help="Enable advantage normalization (SB3 default=True)")
+    parser.add_argument("--no_normalize_advantage", action="store_true", help="Disable advantage normalization")
+    parser.add_argument("--ent_coef", type=float, default=0.0, help="Entropy coefficient")
+    parser.add_argument("--vf_coef", type=float, default=0.5, help="Value function coefficient")
+    parser.add_argument("--max_grad_norm", type=float, default=0.3, help="Max gradient norm (clipping)")
+    parser.add_argument("--target_kl", type=float, default=None, help="Target KL divergence (None=disabled)")
     parser.add_argument("--pi_layers", type=str, default="256,256",
                         help="Comma-separated sizes for actor (pi) MLP, e.g. '256,256'")
     parser.add_argument("--vf_layers", type=str, default="256,256",
@@ -208,6 +393,15 @@ def main():
                         help="Number of eval episodes per evaluation run")
     parser.add_argument("--learning_rate", type=float, default=3e-5,
                         help="Initial learning rate for the optimizer (overrides SB3 default if set)")
+    parser.add_argument("--vec_normalize", action="store_true", help="Enable VecNormalize (obs normalization)")
+    parser.add_argument("--vecnorm_norm_reward", action="store_true", help="Also normalize rewards (VecNormalize)")
+    parser.add_argument("--vecnorm_clip_obs", type=float, default=10.0, help="VecNormalize clip_obs")
+    parser.add_argument("--vecnorm_clip_reward", type=float, default=10.0, help="VecNormalize clip_reward")
+    parser.add_argument("--vecnorm_path", type=str, default=None, help="Path to VecNormalize stats to load when resuming")
+    parser.add_argument("--reward_dist_weight", type=float, default=None, help="Override distance reward weight")
+    parser.add_argument("--reward_collision_threshold", type=float, default=None, help="Override collision distance threshold")
+    parser.add_argument("--reward_collision_ratio", type=float, default=None, help="Override collision penalty ratio")
+    parser.add_argument("--reward_clip_abs", type=float, default=None, help="Override per-step reward clip abs value")
     args = parser.parse_args()
 
     # Make "LargeMlp" a convenience alias (SB3 only knows "MlpPolicy").
@@ -256,12 +450,18 @@ def main():
         return float(max(1e-7, initial_lr * (1.0 - t)))
 
     os.makedirs(args.save_dir, exist_ok=True)
+    if args.seed is not None:
+        set_random_seed(int(args.seed))
     env_fn = lambda: MobileMMTrajEnv(
         robot=args.robot,
         urdf_path=args.urdf_path,
         frame_skip=args.frame_skip,
         max_steps=args.max_steps,
         render=args.render,
+        reward_dist_weight=args.reward_dist_weight,
+        reward_collision_threshold=args.reward_collision_threshold,
+        reward_collision_ratio=args.reward_collision_ratio,
+        reward_clip_abs=args.reward_clip_abs,
         target_generator=(
             CurriculumJSONNearestTargetGenerator(
                 stage1_txt=args.curriculum_stage1_txt,
@@ -282,8 +482,40 @@ def main():
         vec_env = SubprocVecEnv([env_fn for _ in range(args.n_envs)])
     else:
         vec_env = DummyVecEnv([env_fn])
-    from stable_baselines3.common.vec_env import VecMonitor
+    from stable_baselines3.common.vec_env import VecMonitor, VecNormalize
     vec_env = VecMonitor(vec_env)
+    if args.vec_normalize:
+        stats_candidates = []
+        if args.vecnorm_path:
+            stats_candidates.append(args.vecnorm_path)
+        if args.load_model:
+            # Common layouts:
+            # - <run_dir>/best_model/best_model.zip
+            # - <run_dir>/checkpoints/xxx.zip
+            # We try nearby parents for vecnormalize.pkl
+            mdir = os.path.dirname(os.path.abspath(args.load_model))
+            stats_candidates.extend(
+                [
+                    os.path.join(mdir, "vecnormalize.pkl"),
+                    os.path.join(os.path.dirname(mdir), "vecnormalize.pkl"),
+                    os.path.join(os.path.dirname(os.path.dirname(mdir)), "vecnormalize.pkl"),
+                ]
+            )
+
+        stats_path = next((p for p in stats_candidates if p and os.path.isfile(p)), None)
+        if stats_path:
+            print(f"Loading VecNormalize stats from: {stats_path}")
+            vec_env = VecNormalize.load(stats_path, vec_env)
+        else:
+            vec_env = VecNormalize(
+                vec_env,
+                norm_obs=True,
+                norm_reward=bool(args.vecnorm_norm_reward),
+                clip_obs=float(args.vecnorm_clip_obs),
+                clip_reward=float(args.vecnorm_clip_reward),
+                gamma=float(args.gamma),
+            )
+        vec_env.training = True
 
     ts = calcaulate_time_stamp()
     run_name = f"logs_{ts}" if args.robot == "mobile_mm" else f"logs_{ts}_{args.robot}"
@@ -293,29 +525,39 @@ def main():
 
     policy_kwargs = get_policy_kwargs(args.pi_layers, args.vf_layers)
 
-    # select device explicitly: prefer CUDA when available
-    try:
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        if device != 'cuda':
-            print(f"CUDA not available, using device='{device}'")
-        else:
+    # select device explicitly
+    if args.device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    else:
+        device = str(args.device)
+    if device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError(
+            "Requested --device cuda but torch reports CUDA is not available. "
+            "Check that your venv has a CUDA-enabled torch build and that the NVIDIA driver is visible."
+        )
+    if device == "cuda":
+        try:
+            print(f"Using CUDA device for training: {torch.cuda.get_device_name(0)} (torch cuda={torch.version.cuda})")
+        except Exception:
             print("Using CUDA device for training")
-    except Exception:
-        device = 'cpu'
-        print("Warning: failed to query CUDA availability; falling back to 'cpu'")
+    else:
+        print(f"Using device='{device}' for training")
 
     # If Transformer policy requested, wire custom features extractor
     if args.policy == "Transformer":
-        # override policy_kwargs to use our features extractor
-        policy_kwargs = dict(
-            features_extractor_class=TransformerFeaturesExtractor,
-            features_extractor_kwargs={
-                'seq_len': int(args.tf_seq_len),
-                'embed_dim': int(args.tf_embed_dim),
-                'n_heads': int(args.tf_heads),
-                'n_layers': int(args.tf_layers),
-                'dropout': float(args.tf_dropout),
-            }
+        # Add Transformer feature extractor while keeping actor/critic net_arch.
+        policy_kwargs.update(
+            dict(
+                features_extractor_class=TransformerFeaturesExtractor,
+                features_extractor_kwargs={
+                    "seq_len": int(args.tf_seq_len),
+                    "embed_dim": int(args.tf_embed_dim),
+                    "n_heads": int(args.tf_heads),
+                    "n_layers": int(args.tf_layers),
+                    "dropout": float(args.tf_dropout),
+                    "ff_dim": int(args.tf_ff_dim),
+                },
+            )
         )
         print(f"Using Transformer feature extractor: seq_len={args.tf_seq_len}, embed_dim={args.tf_embed_dim}, layers={args.tf_layers}, heads={args.tf_heads}")
 
@@ -334,22 +576,36 @@ def main():
             print("Mapping requested 'LargeMlp' to SB3 policy 'MlpPolicy'")
 
     # load existing model if requested, else create a new one
+    if args.no_normalize_advantage:
+        normalize_advantage = False
+    elif args.normalize_advantage:
+        normalize_advantage = True
+    else:
+        # SB3 default
+        normalize_advantage = True
     model_kwargs = dict(
         policy=policy_name,
         env=vec_env,
         n_steps=args.n_steps,
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,
+        gamma=float(args.gamma),
+        gae_lambda=float(args.gae_lambda),
+        clip_range=float(args.clip_range),
+        clip_range_vf=args.clip_range_vf,
+        normalize_advantage=bool(normalize_advantage),
         policy_kwargs=policy_kwargs,
-        ent_coef=0.0,
+        ent_coef=float(args.ent_coef),
+        vf_coef=float(args.vf_coef),
         device=device,
         verbose=1,
         tensorboard_log=log_dir,
+        seed=args.seed,
+        target_kl=args.target_kl,
     )
     # use warmup + linear decay schedule for learning rate (callable accepted by SB3)
     model_kwargs['learning_rate'] = lr_schedule
-    # reduce gradient clipping threshold from SB3 default (0.5) to be more conservative
-    model_kwargs['max_grad_norm'] = 0.3
+    model_kwargs["max_grad_norm"] = float(args.max_grad_norm)
 
     if args.load_model:
         print(f"Loading model from: {args.load_model}")
@@ -407,14 +663,16 @@ def main():
         callbacks.append(ckpt_cb)
 
     if args.eval_freq and args.eval_freq > 0:
-        from stable_baselines3.common.callbacks import EvalCallback
-
         eval_env_fn = lambda: MobileMMTrajEnv(
             robot=args.robot,
             urdf_path=args.urdf_path,
             frame_skip=args.frame_skip,
             max_steps=args.max_steps,
             render=False,
+            reward_dist_weight=args.reward_dist_weight,
+            reward_collision_threshold=args.reward_collision_threshold,
+            reward_collision_ratio=args.reward_collision_ratio,
+            reward_clip_abs=args.reward_clip_abs,
             target_generator=JSONNearestTargetGenerator(
                 json_paths=[],
                 json_txt=args.eval_txt,
@@ -423,8 +681,20 @@ def main():
         )
         eval_env = DummyVecEnv([eval_env_fn])
         eval_env = VecMonitor(eval_env)
+        if args.vec_normalize:
+            from stable_baselines3.common.vec_env import VecNormalize
+
+            eval_env = VecNormalize(
+                eval_env,
+                training=False,
+                norm_obs=True,
+                norm_reward=False,
+                clip_obs=float(args.vecnorm_clip_obs),
+                clip_reward=float(args.vecnorm_clip_reward),
+                gamma=float(args.gamma),
+            )
         eval_freq = max(int(args.eval_freq) // max(int(args.n_envs), 1), 1)
-        eval_cb = EvalCallback(
+        eval_cb = EvalInfoMetricsCallback(
             eval_env,
             n_eval_episodes=int(args.eval_episodes),
             eval_freq=eval_freq,
@@ -433,6 +703,16 @@ def main():
             deterministic=True,
             render=False,
             verbose=1,
+            info_keys=(
+                "ee_distance",
+                "traj_id",
+                "remain_traj_ratio",
+                "base_vx",
+                "base_vy",
+                "base_wz",
+                "base_lin_vel_norm",
+                "base_ang_vel_norm",
+            ),
         )
         callbacks.append(eval_cb)
 
@@ -440,6 +720,15 @@ def main():
     name_prefix = "ppo_mobile_mm" if args.robot == "mobile_mm" else f"ppo_{args.robot}"
     model_filename = f"{run_name}/{name_prefix}_final"
     model.save(os.path.join(args.save_dir, model_filename))
+    if hasattr(vec_env, "save") and args.vec_normalize:
+        try:
+            run_root = os.path.join(args.save_dir, run_name)
+            os.makedirs(run_root, exist_ok=True)
+            stats_path = os.path.join(run_root, "vecnormalize.pkl")
+            vec_env.save(stats_path)
+            print(f"Saved VecNormalize stats to: {stats_path}")
+        except Exception as e:
+            print(f"Warning: failed to save VecNormalize stats: {e}")
 
 
 if __name__ == "__main__":

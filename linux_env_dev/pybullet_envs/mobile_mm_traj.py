@@ -26,6 +26,10 @@ class MobileMMTrajEnv(gym.Env):
     def __init__(self, robot: str = "mobile_mm", urdf_path=None, frame_skip=24, max_steps=500, render=False,
                  save_image_on_reset=False, save_image_path=None, image_width=800, image_height=600,
                  reward_distance_weight: float = 1.0, reward_yaw_weight: float = 1.0,
+                 reward_dist_weight: Optional[float] = None,
+                 reward_collision_threshold: Optional[float] = None,
+                 reward_collision_ratio: Optional[float] = None,
+                 reward_clip_abs: Optional[float] = None,
                  target_generator: Optional[TargetGenerator] = None):
         self.project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         self.robot_name = (robot or "mobile_mm").strip().lower()
@@ -119,6 +123,19 @@ class MobileMMTrajEnv(gym.Env):
                 "collision_threshold": 0.3,
                 "collision_ratio": 50.0,
             }
+
+        # Optional reward overrides (useful for hyperparameter sweeps)
+        if reward_dist_weight is not None:
+            self._reward_kwargs["dist_weight"] = float(reward_dist_weight)
+        elif reward_distance_weight != 1.0:
+            # Backward-compatible: legacy arg was previously unused; apply only if user overrides it.
+            self._reward_kwargs["dist_weight"] = float(reward_distance_weight)
+        if reward_collision_threshold is not None:
+            self._reward_kwargs["collision_threshold"] = float(reward_collision_threshold)
+        if reward_collision_ratio is not None:
+            self._reward_kwargs["collision_ratio"] = float(reward_collision_ratio)
+        if reward_clip_abs is not None:
+            self._reward_kwargs["clip_abs"] = float(reward_clip_abs)
     
     def _load_robot_once(self):
         # load plane and robot, then remove (we re-create on reset)
@@ -751,6 +768,18 @@ class MobileMMTrajEnv(gym.Env):
                                     wrap_angle_fn=self._wrap_angle,
                                     remaining_ratio=self.remain_traj_ratio,
                                     **self._reward_kwargs)
+        info.update(
+            {
+                "traj_id": int(self._traj_id),
+                "remain_traj_ratio": float(self.remain_traj_ratio),
+                "base_yaw": float(base_yaw),
+                "base_vx": float(base_lin_vel_chassis_frame[0]),
+                "base_vy": float(base_lin_vel_chassis_frame[1]),
+                "base_wz": float(base_ang_vel[2]) if base_ang_vel is not None and len(base_ang_vel) > 2 else 0.0,
+                "base_lin_vel_norm": float(base_lin_vel_norm),
+                "base_ang_vel_norm": float(base_ang_vel_norm),
+            }
+        )
 
         # terminated: 成功或者失败的自然终止
         static_arm_thr = 0.02

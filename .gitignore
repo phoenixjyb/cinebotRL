@@ -23,6 +23,8 @@ wandb/
 linux_env_dev/_urdf_cache/
 linux_env_dev/models/logs_*/
 linux_env_dev/models/*.log
+linux_env_dev/models/*.out
+linux_env_dev/models/*.pid
 rlDeploy2Orin/
 .idea/
 .vscode/

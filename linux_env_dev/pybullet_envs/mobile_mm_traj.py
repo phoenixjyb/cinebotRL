@@ -28,7 +28,8 @@ class MobileMMTrajEnv(gym.Env):
         self.project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         # self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "mobile_manipulator_PPR_base_corrected.urdf")
         # self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "mobile_manipulator_PPR_theta_before_x.urdf")
-        self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "mobile_manipulator_little_xy_link.urdf")
+        # self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "mobile_manipulator_little_xy_link.urdf")  # 旧版本
+        self.urdf_path = urdf_path or os.path.join(self.project_root, "assets_own", "recomoProto1-190.urdf")  # 新版本 2026-02-25
         self.frame_skip = frame_skip
         self.max_steps = max_steps
         self.render = render
@@ -138,30 +139,30 @@ class MobileMMTrajEnv(gym.Env):
         dx = ds_mv * math.cos(original_heading)
         dy = ds_mv * math.sin(original_heading)
         dtheta = 0.05 * np.random.uniform(-1.0, 1.0)
-        p.resetJointState(self.robot, self.joint_name2ids['joint_x'],
+        p.resetJointState(self.robot, self.joint_name2ids['base_joint_vx'],
                           targetValue=start_pos[0] - dx, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['joint_y'],
+        p.resetJointState(self.robot, self.joint_name2ids['base_joint_vy'],
                           targetValue=start_pos[1] - dy, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['joint_theta'],
+        p.resetJointState(self.robot, self.joint_name2ids['base_joint_wz'],
                           targetValue=self._wrap_angle(original_heading + dtheta), targetVelocity=0.0)
-        # p.resetJointState(self.robot, self.joint_name2ids['joint_theta'],
+        # p.resetJointState(self.robot, self.joint_name2ids['base_joint_wz'],
         #                   targetValue=np.pi / 2, targetVelocity=0.0)
         if DEBUG:
             print(f"Reset robot base to x={start_pos[0]-dx:.2f}, y={start_pos[1]-dy:.2f}, heading={original_heading:.2f} rad, "
                   f"dx = {dx:.2f}, dy={dy:.2f}")
         
         # 各机械臂设置为初始位置
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint1'],
+        p.resetJointState(self.robot, self.joint_name2ids['joint6_arm_yaw'],
                           targetValue=-1.61, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint2'],
+        p.resetJointState(self.robot, self.joint_name2ids['joint5_arm_pitch'],
                           targetValue=0.00, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint3'],
+        p.resetJointState(self.robot, self.joint_name2ids['joint4_elbow_pitch'],
                           targetValue=-0.32, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint4'],
+        p.resetJointState(self.robot, self.joint_name2ids['joint3_gimbal_yaw'],
                           targetValue=-1.56, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint5'],
+        p.resetJointState(self.robot, self.joint_name2ids['joint2_gimbal_roll'],
                           targetValue=-1.13, targetVelocity=0.0)
-        p.resetJointState(self.robot, self.joint_name2ids['left_arm_joint6'],
+        p.resetJointState(self.robot, self.joint_name2ids['joint1_gimbal_pitch'],
                           targetValue=0.0, targetVelocity=0.0)
 
         # optionally save image after robot spawned
@@ -348,7 +349,7 @@ class MobileMMTrajEnv(gym.Env):
                 pass
             return
 
-    def _get_ee_pos(self, gripper_link_name='left_gripper_link'):
+    def _get_ee_pos(self, gripper_link_name='ee_tool'):
         gripper_link_id = self._link_index_by_name(self.robot, gripper_link_name)
         st = p.getLinkState(self.robot, gripper_link_id, computeForwardKinematics=True)
         ee_pos = np.array(st[0], dtype=np.float32)
@@ -386,18 +387,18 @@ class MobileMMTrajEnv(gym.Env):
         return vx_r, vy_r
 
     def _get_arm_state(self):
-        st_left_arm1 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint1'])[0]
-        st_left_arm2 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint2'])[0]
-        st_left_arm3 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint3'])[0]
-        st_left_arm4 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint4'])[0]
-        st_left_arm5 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint5'])[0]
-        st_left_arm6 = p.getJointState(self.robot, self.joint_name2ids['left_arm_joint6'])[0]
+        st_left_arm1 = p.getJointState(self.robot, self.joint_name2ids['joint6_arm_yaw'])[0]
+        st_left_arm2 = p.getJointState(self.robot, self.joint_name2ids['joint5_arm_pitch'])[0]
+        st_left_arm3 = p.getJointState(self.robot, self.joint_name2ids['joint4_elbow_pitch'])[0]
+        st_left_arm4 = p.getJointState(self.robot, self.joint_name2ids['joint3_gimbal_yaw'])[0]
+        st_left_arm5 = p.getJointState(self.robot, self.joint_name2ids['joint2_gimbal_roll'])[0]
+        st_left_arm6 = p.getJointState(self.robot, self.joint_name2ids['joint1_gimbal_pitch'])[0]
 
         return st_left_arm1, st_left_arm2, st_left_arm3, st_left_arm4, st_left_arm5, st_left_arm6
         
     
     def _get_base_pos(self):
-        abstract_idx = self._link_index_by_name(self.robot, 'abstract_chassis_link')
+        abstract_idx = self._link_index_by_name(self.robot, 'base_link')
         st_abs = p.getLinkState(self.robot, abstract_idx, computeForwardKinematics=True, computeLinkVelocity=True)
         abs_pos = np.array(st_abs[0], dtype=np.float32)
         euler = p.getEulerFromQuaternion(st_abs[1])   # (roll, pitch, yaw)
@@ -463,9 +464,9 @@ class MobileMMTrajEnv(gym.Env):
 
     def _get_hist_chassis(self):
         # update chassis joint history (joint_x, joint_y, joint_theta)
-        jx_vel = float(p.getJointState(self.robot, self.joint_name2ids['joint_x'])[1])
-        jy_vel = float(p.getJointState(self.robot, self.joint_name2ids['joint_y'])[1])
-        jth_vel = float(p.getJointState(self.robot, self.joint_name2ids['joint_theta'])[1])
+        jx_vel = float(p.getJointState(self.robot, self.joint_name2ids['base_joint_vx'])[1])
+        jy_vel = float(p.getJointState(self.robot, self.joint_name2ids['base_joint_vy'])[1])
+        jth_vel = float(p.getJointState(self.robot, self.joint_name2ids['base_joint_wz'])[1])
 
         # roll history forward and append newest
         if self._chassis_hist is None:
@@ -573,12 +574,12 @@ class MobileMMTrajEnv(gym.Env):
         # target_theta = self._wrap_angle(last_yaw + action_dtheta) # 底盘theta是不限制范围的，所以需要wrap一下
         target_theta = last_yaw + action_dtheta
 
-        target_left_arm1 = self.limit_action(last_state_left_arm1 + action_left_arm1, self.joint_limits['left_arm_joint1'])
-        target_left_arm2 = self.limit_action(last_state_left_arm2 + action_left_arm2, self.joint_limits['left_arm_joint2'])
-        target_left_arm3 = self.limit_action(last_state_left_arm3 + action_left_arm3, self.joint_limits['left_arm_joint3'])
-        target_left_arm4 = self.limit_action(last_state_left_arm4 + action_left_arm4, self.joint_limits['left_arm_joint4'])
-        target_left_arm5 = self.limit_action(last_state_left_arm5 + action_left_arm5, self.joint_limits['left_arm_joint5'])
-        target_left_arm6 = self.limit_action(last_state_left_arm6 + action_left_arm6, self.joint_limits['left_arm_joint6'])
+        target_left_arm1 = self.limit_action(last_state_left_arm1 + action_left_arm1, self.joint_limits['joint6_arm_yaw'])
+        target_left_arm2 = self.limit_action(last_state_left_arm2 + action_left_arm2, self.joint_limits['joint5_arm_pitch'])
+        target_left_arm3 = self.limit_action(last_state_left_arm3 + action_left_arm3, self.joint_limits['joint4_elbow_pitch'])
+        target_left_arm4 = self.limit_action(last_state_left_arm4 + action_left_arm4, self.joint_limits['joint3_gimbal_yaw'])
+        target_left_arm5 = self.limit_action(last_state_left_arm5 + action_left_arm5, self.joint_limits['joint2_gimbal_roll'])
+        target_left_arm6 = self.limit_action(last_state_left_arm6 + action_left_arm6, self.joint_limits['joint1_gimbal_pitch'])
 
         if DEBUG:
             print(f"last_chassis_vel = {last_chassis_vel:.3f}, last_theta = {last_yaw:.3f}, action = {action[0]}")
@@ -590,36 +591,36 @@ class MobileMMTrajEnv(gym.Env):
                   f"left_arm5={action_left_arm5:.3f}, left_arm6={action_left_arm6:.3f}")
 
         p.setJointMotorControlArray(self.robot,
-                                    jointIndices=[self.joint_name2ids['joint_x'], self.joint_name2ids['joint_y']],
+                                    jointIndices=[self.joint_name2ids['base_joint_vx'], self.joint_name2ids['base_joint_vy']],
                                     controlMode=p.POSITION_CONTROL, targetPositions=[target_x, target_y],
                                     forces=[100, 100])
 
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['joint_theta'],
+        p.setJointMotorControl2(self.robot, self.joint_name2ids['base_joint_wz'],
                                 p.POSITION_CONTROL, targetPosition=target_theta, force=50)
         
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint1'],
+        p.setJointMotorControl2(self.robot, self.joint_name2ids['joint6_arm_yaw'],
                                 p.POSITION_CONTROL, targetPosition=target_left_arm1,
-                                force=self.joint_effort_limit['left_arm_joint1'])
+                                force=self.joint_effort_limit['joint6_arm_yaw'])
 
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint2'],
+        p.setJointMotorControl2(self.robot, self.joint_name2ids['joint5_arm_pitch'],
                                 p.POSITION_CONTROL, targetPosition=target_left_arm2,
-                                force=self.joint_effort_limit['left_arm_joint2'])
+                                force=self.joint_effort_limit['joint5_arm_pitch'])
 
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint3'],
+        p.setJointMotorControl2(self.robot, self.joint_name2ids['joint4_elbow_pitch'],
                                 p.POSITION_CONTROL, targetPosition=target_left_arm3,
-                                force=self.joint_effort_limit['left_arm_joint3'])
+                                force=self.joint_effort_limit['joint4_elbow_pitch'])
 
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint4'],
+        p.setJointMotorControl2(self.robot, self.joint_name2ids['joint3_gimbal_yaw'],
                                 p.POSITION_CONTROL, targetPosition=target_left_arm4,
-                                force=self.joint_effort_limit['left_arm_joint4'])
+                                force=self.joint_effort_limit['joint3_gimbal_yaw'])
 
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint5'],
+        p.setJointMotorControl2(self.robot, self.joint_name2ids['joint2_gimbal_roll'],
                                 p.POSITION_CONTROL, targetPosition=target_left_arm5,
-                                force=self.joint_effort_limit['left_arm_joint5'])
+                                force=self.joint_effort_limit['joint2_gimbal_roll'])
 
-        p.setJointMotorControl2(self.robot, self.joint_name2ids['left_arm_joint6'],
+        p.setJointMotorControl2(self.robot, self.joint_name2ids['joint1_gimbal_pitch'],
                                 p.POSITION_CONTROL, targetPosition=target_left_arm6,
-                                force=self.joint_effort_limit['left_arm_joint6'])
+                                force=self.joint_effort_limit['joint1_gimbal_pitch'])
 
         # step simulation
         for _ in range(self.frame_skip):

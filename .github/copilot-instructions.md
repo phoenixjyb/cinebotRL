@@ -25,8 +25,8 @@ Conventions and patterns to follow (concrete)
 Common quick examples to follow (copy-paste-safe)
 - Launch training (preferred):
   .\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
-- Direct Isaac Lab call (matches `launch_training_windows.ps1`):
-  I:\isaaclab\isaaclab.bat -p scripts/reinforcement_learning/sb3/train.py --task MobileMMTrackEE-v0 --num_envs 64 --headless
+- Direct Isaac Lab call — use ISAAC_LAB_ROOT env var (default fallback: I:\isaaclab):
+  & "$env:ISAAC_LAB_ROOT\isaaclab.bat" -p scripts/reinforcement_learning/sb3/train.py --task MobileMMTrackEE-v0 --num_envs 64 --headless
 
 Gotchas and explicit guards
 - Gymnasium plugin crash on Windows: launcher disables plugin entrypoints via env var `GYMNASIUM_DISABLE_PLUGIN_ENTRYPOINTS=1` — keep this for Windows runs to avoid `ale_py` issues.

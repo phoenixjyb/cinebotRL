@@ -95,8 +95,8 @@ python -m venv .venv_windows
 pip install isaacsim==5.0.0.0
 pip install isaaclab==2.2.0
 
-# Install PyTorch with CUDA
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# Install PyTorch with CUDA 12.8 (required for Isaac Lab 2.x + torch 2.7.0+cu128)
+pip install torch==2.7.0+cu128 torchvision==0.22.0+cu128 --index-url https://download.pytorch.org/whl/cu128
 
 # Install your project
 pip install -e .
@@ -320,9 +320,9 @@ nvidia-smi
 python -c "import torch; print(torch.cuda.is_available())"
 ```
 
-If False, reinstall PyTorch with CUDA:
+If False, reinstall PyTorch with CUDA 12.8:
 ```powershell
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install torch==2.7.0+cu128 torchvision==0.22.0+cu128 --index-url https://download.pytorch.org/whl/cu128
 ```
 
 ### Issue: "Out of memory"

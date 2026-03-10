@@ -45,6 +45,7 @@ echo -e "${GREEN}[✓]${NC} Python $PYTHON_VERSION activated"
 # ============================================================================
 echo -e "${BLUE}[2/4]${NC} Configuring CUDA paths..."
 
+CUDA_PREFIX=${CUDA_PREFIX:-$(ls -d /usr/local/cuda-12.* 2>/dev/null | sort -V | tail -1)}
 CUDA_PREFIX=${CUDA_PREFIX:-/usr/local/cuda-12.6}
 if [ -d "$CUDA_PREFIX/lib64" ]; then
     export LD_LIBRARY_PATH="/usr/lib/wsl/lib:${CUDA_PREFIX}/lib64:${LD_LIBRARY_PATH:-}"

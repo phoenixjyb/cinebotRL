@@ -24,7 +24,14 @@ fi
 # shellcheck disable=SC1090
 source "$VENV_PATH/bin/activate"
 
-CUDA_PREFIX=${CUDA_PREFIX:-/usr/local/cuda-12.6}
+# Prefer cuda-12.8 (matches torch cu128), fall back to cuda-12.6
+if [[ -z "${CUDA_PREFIX:-}" ]]; then
+  if [[ -d /usr/local/cuda-12.8 ]]; then
+    CUDA_PREFIX=/usr/local/cuda-12.8
+  else
+    CUDA_PREFIX=/usr/local/cuda-12.6
+  fi
+fi
 if [[ -d "$CUDA_PREFIX/lib64" ]]; then
   export LD_LIBRARY_PATH="/usr/lib/wsl/lib:${CUDA_PREFIX}/lib64:${LD_LIBRARY_PATH:-}"
   export PATH="${CUDA_PREFIX}/bin:${PATH}"

@@ -47,7 +47,7 @@ python scripts/verify_isaaclab_wsl.py
 
 ### 3. Quick import test
 ```bash
-python -c "import omni.isaac.lab; print('✓ Isaac Lab ready')"
+python -c "import isaaclab; print('✓ Isaac Lab ready')"
 ```
 
 ### 4. Test custom task
@@ -80,8 +80,11 @@ sudo apt install libvulkan1 mesa-vulkan-drivers vulkan-tools
 ```
 
 ### Isaac Lab pip package not found
-As of Oct 2024, Isaac Lab may not be available via pip yet.
-Use Option 3 (source install) instead.
+Isaac Lab 2.2.0 is available via pip on the NVIDIA index:
+```bash
+pip install --extra-index-url https://pypi.nvidia.com isaaclab==2.2.0
+```
+Use Option 3 (source install) only if you need a development/editable install.
 
 ## Environment Variables (Auto-configured)
 
@@ -147,7 +150,8 @@ With RTX 3090 (24 GB):
 | Asset conversion (URDF→USD) | Windows Isaac Sim GUI | Visual feedback, easier debugging |
 | Visual debugging | Windows Isaac Sim GUI | See robot, trajectories in 3D |
 | ROS 2 visualization | Windows | Better ROS 2 integration |
-| RL Training | WSL Isaac Lab | 10x faster, headless, reproducible |
-| Batch experiments | WSL Isaac Lab | Scriptable, no GUI overhead |
+| RL Training | **Windows** Isaac Lab | Primary path: faster, CUDA 12.8, fully tested |
+| Batch experiments | **Windows** Isaac Lab | PowerShell launchers in scripts/ |
+| RL Analysis (offline) | WSL venv | PyTorch available without full Isaac Sim |
 
 Both access same assets via `/mnt/c/` mount!

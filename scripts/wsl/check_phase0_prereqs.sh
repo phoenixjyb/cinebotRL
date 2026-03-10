@@ -14,11 +14,14 @@ fi
 info 'Checking for CUDA toolkit (nvcc)'
 if command -v nvcc >/dev/null 2>&1; then
   nvcc --version | head -n 1
+elif [ -x /usr/local/cuda-12.8/bin/nvcc ]; then
+  warn 'nvcc not on PATH, but detected at /usr/local/cuda-12.8/bin/nvcc'
+  /usr/local/cuda-12.8/bin/nvcc --version | head -n 1
 elif [ -x /usr/local/cuda-12.6/bin/nvcc ]; then
   warn 'nvcc not on PATH, but detected at /usr/local/cuda-12.6/bin/nvcc'
   /usr/local/cuda-12.6/bin/nvcc --version | head -n 1
 else
-  warn 'nvcc not found. Install or expose cuda-toolkit-12.6.'
+  warn 'nvcc not found. Install cuda-toolkit-12.8 (or 12.6): bash scripts/wsl/install_cuda_wsl.sh'
 fi
 
 info 'Checking for python3'

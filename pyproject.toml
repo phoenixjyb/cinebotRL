@@ -20,10 +20,11 @@ classifiers = [
 ]
 
 dependencies = [
+    # Lower bounds match verified working versions (see requirements-lock.txt for exact pins).
     "torch>=2.7.0",
-    "gymnasium>=1.0.0",
-    "stable-baselines3>=2.0.0",
-    "numpy>=1.20.0",
+    "gymnasium>=1.2.0",
+    "stable-baselines3>=2.5.0",
+    "numpy>=1.26.0",
 ]
 
 [project.optional-dependencies]
@@ -43,7 +44,10 @@ where = ["src"]
 [tool.setuptools.package-data]
 "*" = ["*.json", "*.yaml", "*.yml", "*.usd", "*.md"]
 
-[tool.black]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
 line-length = 100
 target-version = ['py310', 'py311']
 

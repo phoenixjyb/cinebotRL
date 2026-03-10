@@ -90,6 +90,8 @@ def main():
     print("=" * 60)
     
     obs = env.reset()
+    if isinstance(obs, tuple):
+        obs, _ = obs
     episode_rewards = []
     episode_steps = []
     current_episode_reward = 0
@@ -104,7 +106,8 @@ def main():
             action, _states = model.predict(obs, deterministic=True)
             
             # Step the environment
-            obs, rewards, dones, infos = env.step(action)
+            obs, rewards, terminateds, truncateds, infos = env.step(action)
+            dones = terminateds | truncateds
             
             current_episode_reward += rewards[0]
             current_episode_steps += 1

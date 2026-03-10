@@ -1,18 +1,25 @@
 # CinebotRL Project Roadmap
 
-**Last Updated:** October 29, 2025  
-**Current Status:** 🎉 **Training Complete, Ready for Deployment**
+**Last Updated:** November 8, 2025  
+**Current Status:** 🔄 **Session 8i v3 Complete — Evaluating & Tuning for Reachability**
 
 ---
 
 ## ✅ COMPLETED: Phase 1 - Training & Preparation
 
-### Training (Session 7d)
-- [x] **200M timesteps training** (October 28-29, 2025)
+### Training Sessions (through Session 8i v3)
+- [x] **Session 5b** (100M+ steps) — base mobility validated, jerk penalty fixed
+- [x] **Session 7d** (200M steps, October 28-29, 2025)
   - 16,384 parallel environments
   - 1,038 cinematic trajectories
   - 15.3 hours training time
   - Final model: `policy_final.onnx` (466 KB)
+- [x] **Sessions 8c–8h** — iterative reward shaping experiments
+- [x] **Session 8i v3** (41.94M steps, November 8, 2025)
+  - Sigmoid smooth transition replaces hard reward threshold
+  - Eliminated emergency pauses (previously crashed at 20.97M and 29.36M)
+  - KL Divergence: 0.0222 (< 0.05 target), Explained Variance: 0.342
+  - ⚠️ **Reachability: 0.3%** (54/16384 envs) — needs improvement
 
 ### Model Export
 - [x] **ONNX export** successful
@@ -38,6 +45,21 @@
   - ONNX inference: 0.02ms latency (CPU)
   - ROS2 integration: Package builds successfully
   - Confidence: 95% for Orin deployment
+
+---
+
+## 🔄 CURRENT: Phase 1.5 - Evaluate & Fix Reachability
+
+### Immediate Priorities (Next Session)
+- [ ] **Evaluate Session 8i v3** — run `evaluate.py` on 100+ episodes, measure position/orientation error
+- [ ] **Diagnose low reachability (0.3%)** — check reward shaping, workspace coverage, trajectory difficulty
+- [ ] **Tune reward weights** — adjust sigmoid parameters or reachability reward to improve task success rate
+- [ ] **Session 8j** — retrain with tuned reward after diagnosis
+
+### Success Criteria to proceed to Phase 2
+- ✅ Policy runs stably (no emergency pauses) — **already achieved in 8i v3**
+- ⏭️ Mean position error < 0.15 m
+- ⏭️ Reachability > 30% across evaluation episodes
 
 ---
 

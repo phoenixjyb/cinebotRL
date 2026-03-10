@@ -1,0 +1,70 @@
+# CinebotRL — Pinned dependency lock file
+#
+# These are the exact versions verified working in the Isaac Lab Windows training environment
+# as of 2026-03-10. The environment runs inside Isaac Lab's bundled Python 3.11.13.
+#
+# ── Isaac Sim / Isaac Lab ──────────────────────────────────────────────────────────────────
+# Isaac Sim 5.0.0  is installed as a system package at %ISAAC_LAB_ROOT%\_isaac_sim.
+# Isaac Lab pip packages (note: pip internal version ≠ GitHub release tag):
+#   isaaclab==0.46.2        ← corresponds to Isaac Lab 2.x GitHub release
+#   isaaclab_assets==0.2.2
+#   isaaclab_rl==0.4.1
+#   isaaclab_tasks==0.11.0
+#   isaaclab_mimic==1.0.14
+#
+# These are installed inside the Isaac Lab venv and are NOT listed below because
+# they come pre-installed with Isaac Lab — do not pip-install them separately.
+#
+# ── Installation instructions ─────────────────────────────────────────────────────────────
+# 1. Set up Isaac Lab at %ISAAC_LAB_ROOT% (see docs/01_setup/isaaclab_windows.md)
+# 2. Activate the Isaac Lab Python:
+#      %ISAAC_LAB_ROOT%\_isaac_sim\python.bat -m pip install -r requirements-lock.txt
+# 3. Or install the project in editable mode (which installs pyproject.toml deps):
+#      %ISAAC_LAB_ROOT%\_isaac_sim\python.bat -m pip install -e .
+#
+# ── Core ML (CUDA 12.8 wheel index required for torch) ─────────────────────────────────────
+# --extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.7.0+cu128
+torchvision==0.22.0+cu128
+
+# ── RL Framework ───────────────────────────────────────────────────────────────────────────
+gymnasium==1.2.0
+stable_baselines3==2.5.0
+
+# ── Numerical / Scientific ─────────────────────────────────────────────────────────────────
+numpy==1.26.4
+scipy==1.11.4
+pandas==2.3.2
+scikit-learn==1.7.2
+
+# ── Visualisation & Logging ────────────────────────────────────────────────────────────────
+matplotlib==3.10.3
+seaborn==0.13.2
+tensorboard==2.20.0
+tensorboardX==2.6.4
+wandb==0.22.0
+plotly==5.3.1
+
+# ── Config / Utilities ─────────────────────────────────────────────────────────────────────
+hydra-core==1.3.2
+omegaconf==2.3.0
+PyYAML==6.0.2
+tqdm==4.67.1
+cloudpickle==3.1.1
+pillow==11.2.1
+imageio==2.37.0
+imageio-ffmpeg==0.6.0
+opencv-python==4.11.0.86
+trimesh==4.5.1
+einops==0.8.1
+numba==0.59.1
+
+# ── ONNX Export ────────────────────────────────────────────────────────────────────────────
+onnx==1.19.0
+onnxruntime==1.23.2
+
+# ── Dev / Testing (install with: pip install -e .[dev]) ────────────────────────────────────
+# pytest==8.4.2
+# black  (see pyproject.toml [tool.black])
+# isort  (see pyproject.toml [tool.isort])
+# mypy

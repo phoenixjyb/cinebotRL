@@ -61,25 +61,35 @@ Write-Host "${Blue}  Cinebot RL - Windows Training Launcher${Reset}"
 Write-Host "${Blue}========================================${Reset}"
 Write-Host ""
 
-# Check if Isaac Lab exists
-$IsaacLabPath = "I:\isaaclab"
+# Resolve Isaac Lab path: prefer ISAAC_LAB_ROOT env var, fall back to default
+if ($env:ISAAC_LAB_ROOT -and (Test-Path $env:ISAAC_LAB_ROOT)) {
+    $IsaacLabPath = $env:ISAAC_LAB_ROOT
+} else {
+    $IsaacLabPath = "I:\isaaclab"
+}
+
 if (-not (Test-Path $IsaacLabPath)) {
     Write-Host "${Red}✗ Isaac Lab not found at: $IsaacLabPath${Reset}"
-    Write-Host "  Please verify your Isaac Lab installation path."
+    Write-Host "  Set the ISAAC_LAB_ROOT environment variable to your Isaac Lab installation path."
+    Write-Host "  e.g.: `$env:ISAAC_LAB_ROOT = 'D:\isaaclab'"
     exit 1
 }
 Write-Host "${Green}✓${Reset} Isaac Lab found: $IsaacLabPath"
 
-# Check if project exists
-$ProjectPath = "C:\Users\yanbo\wSpace\cinebotRL"
-if (-not (Test-Path $ProjectPath)) {
-    # Try alternate path
-    $ProjectPath = "I:\wSpace\cinebotRL"
-    if (-not (Test-Path $ProjectPath)) {
-        Write-Host "${Red}✗ Project not found${Reset}"
-        Write-Host "  Looked in: C:\Users\yanbo\wSpace\cinebotRL and I:\wSpace\cinebotRL"
-        exit 1
+# Resolve project path: use script location (works regardless of where you call from)
+$ProjectPath = Split-Path -Parent $PSScriptRoot
+if (-not (Test-Path (Join-Path $ProjectPath "pyproject.toml"))) {
+    # Fallback: try common locations
+    foreach ($candidate in @("C:\Users\yanbo\wSpace\cinebotRL", "I:\wSpace\cinebotRL")) {
+        if (Test-Path (Join-Path $candidate "pyproject.toml")) {
+            $ProjectPath = $candidate
+            break
+        }
     }
+}
+if (-not (Test-Path (Join-Path $ProjectPath "pyproject.toml"))) {
+    Write-Host "${Red}✗ Project root not found (no pyproject.toml found near script)${Reset}"
+    exit 1
 }
 Write-Host "${Green}✓${Reset} Project found: $ProjectPath"
 

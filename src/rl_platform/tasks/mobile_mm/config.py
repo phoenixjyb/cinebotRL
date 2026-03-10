@@ -75,6 +75,14 @@ class RobotLimits:
 class RewardWeights:
     """Reward term weights for the tracking task.
 
+Session 8i implements distance-gated orientation rewards (OBS: 70→73 dims):
+- STRATEGY: Separate reach-mode (far, ori_weight=4.0) from align-mode (close, ori_weight=30.0)
+- Distance gate threshold: 0.7m (comfort zone for precise orientation tuning)
+- New observations: axis-angle error (+3 dims) provides shortest rotation path
+- Goal: Improve orientation 135°→80-100° while maintaining position ~237cm
+- Baseline: Session 8h @ 40M (237.3cm pos, 135.1° ori)
+- Reference: docs/training_sessions/session_8i/SESSION_8I_IMPLEMENTATION_PLAN.md
+
 Session 8f implements distance-gated penalty system + playbook fixes:
 - CRITICAL: Distance-gated penalties (far=mobilization, near=precision) 
 - Two-zone linear reachability (0.35-0.5-0.6m with plateau, simpler than 8e's bell curve)
@@ -106,9 +114,9 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     # ========================================
     reachability_maintenance_reward: float = 40.0  # Bonus when in optimal working zone (KEEP at 40!)
     reachability_distance_weight: float = 30.0  # Penalty weight for exceeding hard margin (REDUCED from 60)
-    reachability_soft_margin: float = 0.2  # Width of bell curve around optimal distance (±0.2m)
+    reachability_soft_margin: float = 0.2  # Two-zone linear model: soft margin width (±0.2m around optimal)
     reachability_hard_margin: float = 0.7  # Hard cutoff radius (m) - EXPANDED from 0.6m to match FK workspace
-    reachability_optimal_distance: float = 0.6  # Peak of bell curve - FK median (was 0.5m)
+    reachability_optimal_distance: float = 0.6  # Optimal working distance - FK median (was 0.5m)
     inner_margin_penalty: float = 15.0  # Penalty for base getting too close (<0.35m)
     inner_margin_min_distance: float = 0.35  # Minimum comfortable working distance
     base_overshoot_penalty: float = 30.0  # Penalises chassis that rush past the target
@@ -140,6 +148,24 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     kl_threshold: float = 0.1  # Pause if KL divergence exceeds this
     variance_threshold: float = -0.3  # Pause if explained variance drops below this (allow negative in early training)
     checkpoint_frequency_steps: int = 2_000_000  # Save every 2M steps (finer granularity than 8g)
+    
+    # ========================================
+    # SESSION 8i: DISTANCE-GATED ORIENTATION REWARDS
+    # ========================================
+    # Strategy: Separate "reaching mode" from "alignment mode" using distance threshold
+    # - Far from target (>0.7m): Medium orientation weight (8.0), focus on base mobilization
+    # - Close to target (<0.7m): High orientation weight (30.0), focus on precise alignment
+    # Goal: Improve orientation from 135° → 80-100° while maintaining position ~237cm
+    # Session 8i v1 FAILED @ 29M: 7.5x jump (4.0→30.0), hard threshold caused policy oscillation
+    # Session 8i v2 FAILED @ 21M: 3.75x jump (8.0→30.0), still unstable (hard threshold is root cause)
+    # Session 8i v3 FIX: Sigmoid smooth transition eliminates discontinuity at boundary
+    
+    distance_gate_threshold: float = 0.7  # Distance (m) separating reach-mode from align-mode
+    distance_gate_smoothness: float = 0.15  # Sigmoid transition width (0.55m-0.85m zone) - v3 NEW
+    orientation_tracking_far: float = 8.0  # Orientation weight when far (>threshold)
+    orientation_tracking_close: float = 30.0  # Orientation weight when close (<threshold)
+    orientation_progress_bonus: float = 0.0  # DISABLED for A/B test (was 2.0)
+    angular_velocity_penalty: float = 0.0  # DISABLED for A/B test (was 1.0)
     
     # ========================================
     # MOTION QUALITY PENALTIES (Reduce these)

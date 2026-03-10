@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Automates CUDA toolkit installation inside WSL2 (Ubuntu 22.04).
-# Requires sudo privileges for apt operations. Set CUDA_VERSION env var to override default (12-6).
+# Requires sudo privileges for apt operations. Set CUDA_VERSION env var to override default (12-8).
 
 set -euo pipefail
 
-CUDA_VERSION="${CUDA_VERSION:-12-6}"
+CUDA_VERSION="${CUDA_VERSION:-12-8}"
 CUDA_VERSION_DOT="${CUDA_VERSION/-/.}"
 CUDA_REPO_URL="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64"
 CUDA_KEY_URL="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub"

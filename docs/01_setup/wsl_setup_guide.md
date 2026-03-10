@@ -26,7 +26,7 @@ bash scripts/wsl/check_wsl_setup.sh
 This checks:
 - ✓ Ubuntu 22.04 installation
 - ✓ GPU access (nvidia-smi)
-- ✓ CUDA toolkit (12.6)
+- ✓ CUDA toolkit (12.6 or 12.8)
 - ✓ Python virtual environment (.venv_rl311)
 - ✓ PyTorch CUDA availability
 - ✓ ROS 2 Humble installation
@@ -103,7 +103,7 @@ source scripts/wsl/activate_rl_env_wsl.sh
 ```
 
 **What's included:**
-- PyTorch 2.6.0+cu124 (CUDA enabled)
+- PyTorch 2.7.0+cu128 (CUDA enabled — see setup_rl_venv.sh)
 - stable-baselines3 2.7.0
 - gymnasium 1.2.1
 - pandas, numpy, matplotlib
@@ -161,7 +161,7 @@ nvidia-smi
 nvcc --version
 ```
 
-**Expected:** Should show CUDA 12.6.85
+**Expected:** Should show CUDA 12.6.x or 12.8.x
 
 ### Test 3: PyTorch CUDA
 
@@ -217,11 +217,11 @@ ros2 run demo_nodes_cpp listener
 
 **Fix:**
 ```bash
-# Install CUDA toolkit 12.6
+# Install CUDA toolkit 12.8 (recommended; 12.6 also works)
 wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-keyring_1.0-1_all.deb
 sudo dpkg -i cuda-keyring_1.0-1_all.deb
 sudo apt-get update
-sudo apt-get -y install cuda-toolkit-12-6
+sudo apt-get -y install cuda-toolkit-12-8
 ```
 
 ### Issue: PyTorch CUDA not available
@@ -233,7 +233,7 @@ sudo apt-get -y install cuda-toolkit-12-6
 source scripts/wsl/activate_rl_env_wsl.sh
 # Check paths
 echo $LD_LIBRARY_PATH
-# Should include /usr/lib/wsl/lib and /usr/local/cuda-12.6/lib64
+# Should include /usr/lib/wsl/lib and /usr/local/cuda-12.8/lib64 (or cuda-12.6/lib64)
 ```
 
 ### Issue: ROS 2 topics not visible from Windows
@@ -271,8 +271,8 @@ FASTDDS_DEFAULT_PROFILES_FILE=$HOME/fastdds_windows.xml
 ### RL Mode (Venv Python 3.11)
 
 ```bash
-LD_LIBRARY_PATH="/usr/lib/wsl/lib:/usr/local/cuda-12.6/lib64:$LD_LIBRARY_PATH"
-PATH="/usr/local/cuda-12.6/bin:$PATH"
+LD_LIBRARY_PATH="/usr/lib/wsl/lib:/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH"
+PATH="/usr/local/cuda-12.8/bin:$PATH"
 ```
 
 ---

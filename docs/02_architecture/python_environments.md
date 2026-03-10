@@ -129,27 +129,24 @@ ros2 run demo_nodes_cpp talker
 
 ---
 
-## Proposed Fix
+## Recommended Setup (Current Default)
 
-Since you've verified the Python 3.8 version works, let me update the scripts to use that by default, unless you prefer to test the Python 3.10 version?
+**Option A has been implemented.** `scripts\networking\setup_ros2_humble_windows.ps1` defaults to
+`I:\ros2\ros2-windows` (Python 3.8, verified). To use the Python 3.10 installation:
 
-### Option A: Update to use verified Python 3.8 installation
 ```powershell
-# Change default in setup_ros2_humble_windows.ps1
-param(
-    [string]$RosInstall = 'I:\ros2\ros2-windows'  # ← Change to verified installation
-)
+.\scripts\networking\setup_ros2_humble_windows.ps1 -RosInstall 'I:\ros2humble\ros2-windows'
 ```
 
-### Option B: Keep Python 3.10 and verify it works
-- Test the Python 3.10 installation with WSL
-- If it works, update lessons learned
-- If not, fall back to Option A
-
-**What would you prefer?** Should I:
-1. Update scripts to use the verified Python 3.8 installation (`I:\ros2\ros2-windows`)
-2. Keep Python 3.10 and help you test it
-3. Document both and let you choose at runtime
+Test it with:
+```powershell
+ros2 run demo_nodes_cpp listener
+```
+```bash
+# WSL simultaneously
+ros2 run demo_nodes_cpp talker
+```
+**Expected:** Windows listener shows `I heard: [Hello World: N]`
 
 ---
 

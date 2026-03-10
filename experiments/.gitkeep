@@ -1,0 +1,6 @@
+# experiments/ — Ablation / hyperparameter experiment configs
+#
+# Intended use: store YAML/JSON config files and result summaries for
+# hyperparameter sweeps, reward shaping experiments, and ablation studies.
+# Use one subdirectory per experiment (e.g., experiments/entropy_sweep/).
+# Currently unused. Populate when running systematic experiments.

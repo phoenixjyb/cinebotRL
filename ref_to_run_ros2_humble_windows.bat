@@ -1,3 +1,16 @@
+:: ============================================================================
+:: ref_to_run_ros2_humble_windows.bat
+:: Reference script showing how to activate Windows ROS 2 Humble (Python 3.8).
+::
+:: TWO installations exist on this machine:
+::   I:\ros2\ros2-windows         -- Python 3.8  (VERIFIED WORKING ✅) ← this script uses it
+::   I:\ros2humble\ros2-windows   -- Python 3.10 (not yet tested)
+::
+:: For a full PowerShell launcher that supports both, use:
+::   .\scripts\networking\setup_ros2_humble_windows.ps1
+::   .\scripts\networking\setup_ros2_humble_windows.ps1 -RosInstall 'I:\ros2humble\ros2-windows'
+:: ============================================================================
+
 :: set bundle path
 set "ROS2=I:\ros2\ros2-windows"
 

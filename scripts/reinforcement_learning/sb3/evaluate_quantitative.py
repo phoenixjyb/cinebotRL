@@ -688,6 +688,8 @@ def main():
     
     # Evaluation loop
     obs = env.reset()
+    if isinstance(obs, tuple):
+        obs, _ = obs
     episode_count = 0
     current_episode_reward = np.zeros(args.num_envs)
     current_episode_length = np.zeros(args.num_envs)
@@ -704,9 +706,8 @@ def main():
         action, _states = model.predict(obs, deterministic=args.deterministic)
         
         # Step environment
-        obs, rewards, dones, infos = env.step(action)
-        
-        # Extract environment states for logging
+        obs, rewards, terminateds, truncateds, infos = env.step(action)
+        dones = terminateds | truncateds
         env_states = extract_env_states(env, obs, rewards, infos)
         
         # Log step data (sample every N steps to reduce memory)

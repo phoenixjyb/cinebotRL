@@ -219,6 +219,8 @@ def main():
     all_base_movements = []
     
     obs = env.reset()
+    if isinstance(obs, tuple):
+        obs, _ = obs
     episode_count = 0
     current_episode_errors = []
     current_episode_rewards = []
@@ -226,7 +228,8 @@ def main():
     
     while episode_count < args.num_episodes:
         action, _states = model.predict(obs, deterministic=True)
-        obs, reward, done, info = env.step(action)
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated | truncated
         
         # Extract tracking statistics from info
         if isinstance(info, dict) and 'ee_error' in info:
@@ -272,6 +275,8 @@ def main():
                 current_base_start_pos = None
             
             obs = env.reset()
+            if isinstance(obs, tuple):
+                obs, _ = obs
     
     # Compute final statistics
     print(f"\n{'='*80}")

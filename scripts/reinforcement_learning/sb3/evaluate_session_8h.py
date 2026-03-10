@@ -417,13 +417,20 @@ def evaluate_single_checkpoint(
     workspace_violations = []
     
     obs = env_wrapped.reset()
-    
+    if isinstance(obs, tuple):
+        obs, _ = obs
+
     while episode_count < args.num_episodes:
         # Get action from policy
         action, _states = model.predict(obs, deterministic=args.deterministic)
         
-        # Step environment
-        obs, rewards, dones, infos = env_wrapped.step(action)
+        # Step environment (handle both SB3 VecEnv 4-return and raw Gymnasium 5-return)
+        step_result = env_wrapped.step(action)
+        if len(step_result) == 5:
+            obs, rewards, terminateds, truncateds, infos = step_result
+            dones = terminateds | truncateds
+        else:
+            obs, rewards, dones, infos = step_result
         
         # Log metrics from info dict
         for i, done in enumerate(dones):

@@ -50,6 +50,8 @@ print(f"\n[3/3] Running {args_cli.num_steps} steps and collecting stats...")
 print()
 
 obs = env.reset()
+if isinstance(obs, tuple):
+    obs, _ = obs
 all_actions = []
 all_rewards = []
 step_count = 0
@@ -64,7 +66,8 @@ while step_count < args_cli.num_steps:
     action, _ = model.predict(obs, deterministic=True)
     
     # Step
-    obs, reward, done, info = env.step(action)
+    obs, reward, terminated, truncated, info = env.step(action)
+    done = terminated | truncated
     
     # Record
     all_actions.append(action[0])  # First env
@@ -82,6 +85,8 @@ while step_count < args_cli.num_steps:
     if done[0]:
         print(f"     | [EPISODE DONE - resetting]")
         obs = env.reset()
+        if isinstance(obs, tuple):
+            obs, _ = obs
         cumulative_reward = 0.0
 
 print()

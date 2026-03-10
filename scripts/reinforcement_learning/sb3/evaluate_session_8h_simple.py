@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +22,8 @@ import glob
 # Add project root to Python path
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
+
+ISAAC_LAB_ROOT = Path(os.environ.get("ISAAC_LAB_ROOT", "I:/isaaclab"))
 
 def parse_args():
     """Parse command line arguments."""
@@ -124,7 +127,7 @@ def run_evaluation(checkpoint_path: Path, checkpoint_name: str, args: argparse.N
     print(f"{'='*80}\n")
     
     # Build command
-    isaac_lab_bat = Path("I:/isaaclab/isaaclab.bat")
+    isaac_lab_bat = ISAAC_LAB_ROOT / "isaaclab.bat"
     eval_script = SCRIPT_DIR / "evaluate_quantitative.py"
     
     output_subdir = Path(args.output_dir) / checkpoint_name.replace(" ", "_").replace("@", "at")

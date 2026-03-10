@@ -73,7 +73,7 @@ info "Checking CUDA toolkit..."
 if command -v nvcc >/dev/null 2>&1; then
     CUDA_VERSION=$(nvcc --version | grep -oP "release \K[0-9.]+")
     echo "  NVCC version: $CUDA_VERSION"
-    success "CUDA toolkit installed (expected 12.6)"
+    success "CUDA toolkit installed (found $CUDA_VERSION — 12.8 recommended to match torch cu128)"
 else
     warn "nvcc not found in PATH - CUDA toolkit may not be installed"
     ((WARNINGS++))

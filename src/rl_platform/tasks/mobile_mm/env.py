@@ -98,7 +98,7 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         # Compute observation dimension
         self.num_observations = get_observation_dimensions(
             num_joints=6,  # Arm joints
-            num_contacts=0,  # No contact sensors initially
+            num_contacts=1,  # Collision signal from contact sensors (single normalized scalar)
             use_lookahead=self.task_config.use_lookahead,
             lookahead_steps=self.task_config.lookahead_steps,
             use_action_history=self.task_config.include_action_history,
@@ -448,6 +448,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             self.num_envs, self.cfg.num_actions, device=self.device
         )
         self.prev_tracking_error = torch.zeros(self.num_envs, device=self.device)
+        self.prev_ee_ori_error = torch.zeros(self.num_envs, device=self.device)  # SESSION 8i: Previous orientation error
         
         # Tracking error buffers for evaluation/logging
         self.ee_pos_error_buf = torch.zeros(self.num_envs, 3, device=self.device)  # [x, y, z] position error
@@ -1432,7 +1433,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Normalize base velocities for observations (to match policy's expected range [0,1])
         base_lin_vel_obs = base_lin_vel / self.robot_limits["max_linear_velocity"]  # [0, 1.5] -> [0, 1]
         base_ang_vel_obs = base_ang_vel / self.robot_limits["max_angular_velocity"]  # [0, 2.0] -> [0, 1]
-        
+
+        # Collision signal from contact sensors: normalized force magnitude [0, 1]
+        # 0 = no collision, approaches 1 as contact forces exceed the self-collision threshold.
+        # Uses the same sensor data as self_collision_penalty in _get_rewards(), giving the
+        # policy an explicit "touch" signal so it can learn to avoid collisions proactively.
+        raw_contact = self._get_filtered_contact_forces()  # [num_envs]
+        coll_threshold = self.reward_weights.get("self_collision_threshold", 1.0)
+        contact_obs = torch.clamp(raw_contact / (coll_threshold * 10.0), 0.0, 1.0).unsqueeze(-1)  # [num_envs, 1]
+
         # Compose full observation
         obs = compose_observation(
             base_pos=base_pos,
@@ -1449,8 +1458,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             target_quat=target_quat,
             lookahead_pos=lookahead_pos,
             action_history=self.action_history,
-            contact_forces=None,  # TODO: Add contact sensors
-            min_obstacle_dist=None,  # TODO: Add obstacle distance computation
+            contact_forces=contact_obs,   # Collision severity [num_envs, 1]: 0=clean, →1 at heavy collision
+            min_obstacle_dist=None,  # No obstacles in current scene; enable via ObstacleConfig.enable_obstacles
         )
         
         return {"policy": obs}
@@ -1702,6 +1711,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         prev_commanded_linear_accel_world[:, 1] = ax_body * torch.sin(yaw)
         prev_commanded_linear_accel_world[:, 2] = prev_commanded_linear_accel[:, 2]
         
+        # SESSION 8i: Calculate current orientation error for distance-gated rewards
+        dot_product_for_reward = torch.sum(ee_quat * target_quat, dim=-1).abs()
+        dot_product_for_reward = torch.clamp(dot_product_for_reward, 0.0, 1.0)
+        current_ee_ori_error = 2 * torch.acos(dot_product_for_reward)  # [num_envs] - angular error in radians
+        
+        # Get EE angular velocity for smoothness penalty
+        ee_ang_vel = self.robot.data.body_ang_vel_w[:, self._ee_body_idx, :]  # [num_envs, 3]
+        
         # Compute rewards with all new constraint penalties
         # Use COMMANDED velocities (now in world frame) for penalty calculation to avoid penalizing simulation artifacts
         rewards, self.reward_components = compute_combined_reward(
@@ -1718,7 +1735,6 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             base_ang_vel=commanded_ang,
             base_quat=base_quat,  # Base orientation for lateral penalty
             base_target_distance=base_target_distance,
-            workspace_distance=workspace_distance,
             joint_pos=arm_joint_pos,  # ARM joints only [6]
             joint_vel=arm_joint_vel,  # ARM joint velocities only [6]
             prev_base_pos=self.prev_base_pos,  # NEW: Previous base position
@@ -1729,9 +1745,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             joint_upper=self.joint_upper_limits,  # ARM limits [6]
             robot_limits=self.robot_limits,
             contact_forces=contact_force_mag_per_env[:, None, None],  # Shape [num_envs, 1, 1] to match expected [num_envs, num_bodies, 3]
-            min_obstacle_dist=None,  # Not using obstacles for now
             dt=self.control_dt,
             weights=self.reward_weights,
+            workspace_distance=workspace_distance,
+            min_obstacle_dist=None,  # No obstacles in scene; requires ObstacleConfig.enable_obstacles + obstacle prims
+            prev_ori_error=self.prev_ee_ori_error,  # SESSION 8i: Previous orientation error
+            current_ori_error=current_ee_ori_error,  # SESSION 8i: Current orientation error
+            ee_ang_vel=ee_ang_vel,  # SESSION 8i: EE angular velocity
         )
 
         if workspace_distance is None:
@@ -1743,6 +1763,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         
         # Update history for next step - store COMMANDED velocities for consistent penalty calculation
         self.prev_tracking_error = torch.norm(target_pos - ee_pos, dim=-1)
+        self.prev_ee_ori_error = current_ee_ori_error.clone()  # SESSION 8i: Store orientation error for next step
         
         # Store tracking errors for evaluation/logging
         self.ee_pos_error_buf = target_pos - ee_pos  # [num_envs, 3] - vector error (x, y, z)

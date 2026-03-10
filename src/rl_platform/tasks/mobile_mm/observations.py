@@ -66,10 +66,21 @@ def compose_observation(
     # End-effector state (13 dims)
     components.extend([ee_pos, ee_quat, ee_lin_vel, ee_ang_vel])
     
-    # Tracking error (7 dims: position error + orientation error)
+    # Tracking error (10 dims: position error + quaternion error + axis-angle error)
+    # SESSION 8i: Expanded from 7→10 dims with axis-angle representation
     pos_error = target_pos - ee_pos
     quat_error = quat_diff(ee_quat, target_quat)  # Relative quaternion
     components.extend([pos_error, quat_error])
+    
+    # NEW (Session 8i): Axis-angle error for better orientation learning (+3 dims)
+    # Gives "shortest rotation path" - more intuitive than quaternion for learning
+    axis_angle_error = quat_to_axis_angle(quat_error)  # [num_envs, 3]
+    components.append(axis_angle_error)
+    # Enables smoothness rewards and damping penalties for orientation control
+    # Note: ee_ang_vel already added above in EE state, but we add it again here
+    # for clarity in Session 8i (will be de-duplicated if needed)
+    # Actually, ee_ang_vel is already in components from line 66, so skip duplicate
+    # components.append(ee_ang_vel)  # SKIP - already included above
     
     # CRITICAL FIX: Base-to-target information (4 dims: dx, dy, distance, out_of_reach_flag)
     # Policy needs explicit signal about when to move base!
@@ -183,6 +194,41 @@ def quat_multiply(q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
     return torch.stack([w, x, y, z], dim=-1)
 
 
+def quat_to_axis_angle(quat_diff: torch.Tensor) -> torch.Tensor:
+    """Convert relative quaternion to axis-angle representation.
+    
+    SESSION 8i: Added for better orientation learning
+    Axis-angle gives "shortest rotation path" - more intuitive than quaternion
+    
+    Args:
+        quat_diff: Relative quaternion [num_envs, 4] (w, x, y, z)
+        
+    Returns:
+        axis_angle: Rotation axis * angle magnitude [num_envs, 3]
+                   Direction = rotation axis, Magnitude = angle in radians
+    """
+    # Extract components
+    w, x, y, z = quat_diff[:, 0], quat_diff[:, 1], quat_diff[:, 2], quat_diff[:, 3]
+    
+    # Angle (always positive)
+    angle = 2 * torch.acos(torch.clamp(w.abs(), 0.0, 1.0))  # [num_envs]
+    
+    # Axis (normalized)
+    axis_norm = torch.sqrt(x**2 + y**2 + z**2 + 1e-8)  # Avoid division by zero
+    axis_x = x / axis_norm
+    axis_y = y / axis_norm
+    axis_z = z / axis_norm
+    
+    # Axis-angle: axis * angle (encodes both direction and magnitude)
+    axis_angle = torch.stack([
+        axis_x * angle,
+        axis_y * angle,
+        axis_z * angle
+    ], dim=-1)  # [num_envs, 3]
+    
+    return axis_angle
+
+
 def get_observation_dimensions(
     num_joints: int,
     num_contacts: int = 0,
@@ -219,8 +265,9 @@ def get_observation_dimensions(
     # EE state: pos(3) + quat(4) + lin_vel(3) + ang_vel(3) = 13
     dim += 13
     
-    # Tracking error: pos_error(3) + quat_error(4) = 7
-    dim += 7
+    # Tracking error: pos_error(3) + quat_error(4) + axis_angle_error(3) = 10
+    # Session 8i: Added axis_angle_error (+3 dims) for better orientation learning
+    dim += 10  # Was 7, now 10
     
     # Base-to-target info: dx(1) + dy(1) + distance(1) + out_of_reach_flag(1) + heading_cue(2) + workspace_comfort(2) = 8
     # Session 8f: Added heading_cue (sin/cos of yaw error) = +2 dims

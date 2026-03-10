@@ -1,0 +1,5 @@
+# stages/ — Curriculum / staged training checkpoints
+#
+# Intended use: store intermediate policy checkpoints when implementing
+# curriculum learning (e.g., stage 1 = slow trajectories, stage 2 = full speed).
+# Currently unused. Populate as curriculum learning is implemented (Phase 4+).

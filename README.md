@@ -1,32 +1,24 @@
 # Cinebot RL Environment
 
-> **🔴 CRITICAL FIXES APPLIED** (Current Session)  
-> ✅ **Jerk penalty fixed** (5.0 → 50.0 m/s³) - Root cause of frozen base resolved!  
-> ✅ **Shape mismatch fixed** (prev_joint_vel: 6 → 9 columns)  
-> ⚠️ **USD limits verification pending** - Check joint_theta not locked at [0,0]  
-> ⚠️ **Contact forces debug pending** - Find correct PhysX array  
-> 📋 **Next**: Run verification scripts → Launch Session 6  
-> 📖 **Details**: See [`docs/CRITICAL_FIXES_APPLIED.md`](docs/CRITICAL_FIXES_APPLIED.md)
-
 ## Overview
 
 This project implements **reinforcement learning** for a **mobile manipulator robot** (6-DOF arm + differential drive base) using **Isaac Sim** and **Isaac Lab** on **Windows native**. The system trains a PPO agent to perform precise end-effector trajectory tracking using 8,192 parallel environments.
 
-**Current Status (2025-10-22):** ✅ **Session 5b Complete** - 100M+ steps trained, base mobility fixes validated, comprehensive documentation published
+**Current Status (2025-11-08):** ✅ **Session 8i v3 Complete** - 41.94M steps, sigmoid smooth transition resolves hard-threshold instability; reachability needs further improvement
 
 **Key Achievements:**
 - ✅ **Windows Training Operational** - Isaac Lab + Stable-Baselines3 PPO verified
-- ✅ **Session 5b Success** - Base mobility fixed, 100M steps completed (~18 hours)
+- ✅ **Session 8i v3 Success** - Sigmoid transition eliminates emergency pauses; KL 0.0222, Explained Variance 0.342
 - ✅ **Comprehensive Documentation** - Reward system, model architecture, training guides
 - ✅ **8,192 Parallel Envs** - High-throughput training (~12M interactions/sec)
-- ✅ **Critical Fixes Applied** - Jerk penalty and shape mismatch resolved
+- ⚠️ **Reachability 0.3%** - Task performance needs evaluation and next-session tuning
 
 ## Architecture
 
 ```
 Windows (Primary Training Platform) ✅
-├── Isaac Sim 5.0.0-rc.45
-├── Isaac Lab 2.2.0 (Python 3.11.13, torch 2.7.0+cu128)
+├── Isaac Sim 5.0.0
+├── Isaac Lab 2.x / pip:isaaclab==0.46.2 (Python 3.11.13, torch 2.7.0+cu128)
 ├── Stable Baselines3 PPO Training
 ├── Custom IsaacLabToSB3VecEnvWrapper (Isaac Lab ↔ SB3 bridge)
 ├── ROS 2 Humble (optional, for topic bridging)
@@ -57,9 +49,15 @@ cd C:\Users\yanbo\wSpace\cinebotRL
 
 **Alternative: Direct Isaac Lab Launcher**
 ```powershell
-I:\isaaclab\isaaclab.bat -p scripts/reinforcement_learning/sb3/train.py `
+# Set ISAAC_LAB_ROOT once (or add to your profile):
+$env:ISAAC_LAB_ROOT = "I:\isaaclab"   # adjust to your installation
+
+& "$env:ISAAC_LAB_ROOT\isaaclab.bat" -p scripts/reinforcement_learning/sb3/train.py `
   --task MobileMMTrackEE-v0 --num_envs 64 --headless true
 ```
+
+> **Tip:** Set `ISAAC_LAB_ROOT` as a system environment variable to avoid editing scripts when
+> moving your Isaac Lab installation. The launcher script reads it automatically.
 
 **📚 Documentation**: 
 - **⚡ Quick Start**: [START_TRAINING_NOW.md](START_TRAINING_NOW.md) - Get training running in 3 commands!
@@ -159,19 +157,19 @@ python experiments/analyze_logs.py
 ## Environment Details
 
 ### Windows Side (Primary Training Platform)
-- **Isaac Sim:** `I:\isaacsim` (5.0.0-rc.45, Python 3.11.13)
-- **Isaac Lab:** `I:\isaaclab` (2.2.0, torch 2.7.0+cu128, editable install with SB3)
+- **Isaac Sim:** `I:\isaacsim` (5.0.0, Python 3.11.13)
+- **Isaac Lab:** `I:\isaaclab` (pip:isaaclab==0.46.2 / GitHub 2.x, torch 2.7.0+cu128, editable install with SB3)
 - **Training Framework:** Stable Baselines3 PPO with custom `IsaacLabToSB3VecEnvWrapper`
 - **Training GPU:** RTX 3090 (CUDA device 0, auto-detected)
 - **Display GPU:** Quadro P2000 (CUDA device 1)
-- **ROS 2 Humble:** `I:\ros2humble\ros2-windows` (optional, Python 3.10)
+- **ROS 2 Humble:** two installs — `I:\ros2\ros2-windows` **(Python 3.8, verified ✅)** and `I:\ros2humble\ros2-windows` (Python 3.10, not yet tested). Use `scripts\networking\setup_ros2_humble_windows.ps1` (defaults to 3.8 install).
 - **Status:** ✅ All compatibility issues resolved, training verified working
 
 ### WSL Side (Optional - Not Required for Training)
 - **OS:** Ubuntu 22.04 (WSL2)
 - **ROS 2 Humble:** System Python 3.10 (`/opt/ros/humble`) - for monitoring only
-- **RL Environment:** `.venv_rl311` Python 3.11 (PyTorch 2.6.0+cu124, SB3 2.7.0) - for analysis only
-- **CUDA:** 12.6.85 (GPU passthrough available but not used)
+- **RL Environment:** `.venv_rl311` Python 3.11 (PyTorch 2.7.0+cu128, SB3 2.5.0) - for analysis only; run `setup_rl_venv.sh` to update
+- **CUDA:** 12.6.x installed; 12.8 recommended (`install_cuda_wsl.sh` default updated)
 
 ## Common Commands
 
@@ -320,7 +318,7 @@ Custom `IsaacLabToSB3VecEnvWrapper` bridges Isaac Lab (dict observations, torch 
 
 ## Next Steps
 
-**Current Phase (Phase 1.5 - Optimization & Documentation):**
+**Current Phase (Phase 2 - Scaling & Deployment):**
 1. ✅ Environment setup complete
 2. ✅ ROS 2 communication tested (optional)
 3. ✅ Windows training verified working
@@ -330,20 +328,21 @@ Custom `IsaacLabToSB3VecEnvWrapper` bridges Isaac Lab (dict observations, torch 
 7. ✅ **Session 5b completed** (100M+ steps, base mobility validated)
 8. ✅ **Comprehensive documentation published** (Reward System, Model Architecture)
 9. ✅ **Documentation reorganized** (37 files into 8 categorized directories)
+10. ✅ **Session 8i v3 completed** (41.94M steps, sigmoid transition, training stable)
 
-**Next Phase (Phase 2 - Scaling & Deployment):**
-10. ⏭️ Analyze Session 5b metrics with TensorBoard
-11. ⏭️ Scale to 16,384 envs for faster convergence (requires RTX A6000 or 2× RTX 3090)
-12. ⏭️ Evaluate trained policy on diverse test trajectories
-13. ⏭️ Implement real-time policy inference pipeline
-14. ⏭️ Deploy to physical robot hardware
+**Next Steps:**
+11. ⏭️ Evaluate Session 8i v3 policy on diverse test trajectories (reachability currently 0.3%)
+12. ⏭️ Tune reward shaping to improve reachability rate
+13. ⏭️ Scale to 16,384 envs for faster convergence (requires RTX A6000 or 2× RTX 3090)
+14. ⏭️ Implement real-time policy inference pipeline
+15. ⏭️ Deploy to physical robot hardware
 
 **See [ROADMAP.md](ROADMAP.md) for complete project timeline.**
 
 ---
 
-**Last Updated:** 2025-10-22  
-**Training Status:** ✅ Session 5b Complete (100M+ steps)  
+**Last Updated:** 2025-11-08  
+**Training Status:** ✅ Session 8i v3 Complete (41.94M steps, sigmoid transition)  
 **Documentation:** ✅ Comprehensive (Reward System + Model Architecture)  
 **GPU Utilization:** 75% (18GB/24GB on RTX 3090)
 

@@ -72,6 +72,54 @@ def progress_bonus(
     return torch.clamp(improvement, min=0.0)
 
 
+def orientation_progress_bonus(
+    prev_ori_error: torch.Tensor,
+    current_ori_error: torch.Tensor,
+) -> torch.Tensor:
+    """Bonus for reducing orientation error (like position progress_bonus).
+    
+    SESSION 8i: Added to reward gradual orientation improvements
+    
+    Args:
+        prev_ori_error: Previous orientation error in radians [num_envs]
+        current_ori_error: Current orientation error in radians [num_envs]
+        
+    Returns:
+        Bonus values [num_envs]
+    """
+    improvement = prev_ori_error - current_ori_error
+    return torch.clamp(improvement, min=0.0)
+
+
+def angular_velocity_penalty(
+    ee_ang_vel: torch.Tensor,
+    joint_vel: torch.Tensor,
+    scale_ee: float = 1.0,
+    scale_joint: float = 0.5,
+) -> torch.Tensor:
+    """Penalty for excessive angular velocity (smoothness).
+    
+    SESSION 8i: Added to encourage smooth orientation changes
+    Penalizes both end-effector angular velocity and arm joint velocities.
+    
+    Args:
+        ee_ang_vel: End-effector angular velocity [num_envs, 3]
+        joint_vel: Arm joint velocities [num_envs, 6] (already filtered to arm only)
+        scale_ee: Weight for EE angular velocity
+        scale_joint: Weight for joint velocities
+        
+    Returns:
+        Penalty values [num_envs]
+    """
+    # EE angular speed (magnitude)
+    ee_ang_speed = torch.norm(ee_ang_vel, dim=-1)
+    
+    # Arm joint velocity magnitude (already 6-DOF arm only, no slicing needed)
+    joint_speed = torch.norm(joint_vel, dim=-1)
+    
+    return scale_ee * ee_ang_speed + scale_joint * joint_speed
+
+
 
 def distance_tracking_penalty(
     error_distance: torch.Tensor,
@@ -884,7 +932,6 @@ def compute_combined_reward(
     base_ang_vel: torch.Tensor,
     base_quat: torch.Tensor,  # Base orientation for lateral penalty
     base_target_distance: torch.Tensor,  # Pre-computed base->target planar distance
-    workspace_distance: torch.Tensor | None,  # Distance to workstation boundary (None if reach map disabled)
     joint_pos: torch.Tensor,
     joint_vel: torch.Tensor,
     
@@ -901,13 +948,19 @@ def compute_combined_reward(
     
     # Safety terms
     contact_forces: torch.Tensor,
-    min_obstacle_dist: torch.Tensor | None,
     
     # Timing
     dt: float,
     
     # Weights
     weights: dict[str, float],
+    
+    # Optional parameters (must come last)
+    workspace_distance: torch.Tensor | None = None,  # Distance to workstation boundary (None if reach map disabled)
+    min_obstacle_dist: torch.Tensor | None = None,
+    prev_ori_error: torch.Tensor | None = None,  # SESSION 8i: Previous orientation error for progress bonus
+    current_ori_error: torch.Tensor | None = None,  # SESSION 8i: Current orientation error for progress bonus
+    ee_ang_vel: torch.Tensor | None = None,  # SESSION 8i: EE angular velocity for smoothness penalty
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     """Compute combined reward from all components with robot constraints.
     
@@ -920,7 +973,14 @@ def compute_combined_reward(
         actions: Current actions [num_envs, action_dim]
         prev_actions: Previous actions [num_envs, action_dim]
         prev_prev_actions: Actions from 2 steps ago [num_envs, action_dim]
-        base_lin_vel: Base linear velocity [num_envs, 3]\n        base_ang_vel: Base angular velocity [num_envs, 3]\n        base_target_distance: Planar distance between base and target [num_envs]\n        workspace_distance: Distance to reachable workspace boundary [num_envs] (None if unavailable)\n        joint_pos: Joint positions [num_envs, num_joints]\n        joint_vel: Joint velocities [num_envs, num_joints]
+        base_pos: Base position [num_envs, 3]
+        base_lin_vel: Base linear velocity [num_envs, 3]
+        base_ang_vel: Base angular velocity [num_envs, 3]
+        base_quat: Base orientation [num_envs, 4]
+        base_target_distance: Planar distance between base and target [num_envs]
+        joint_pos: Joint positions [num_envs, num_joints]
+        joint_vel: Joint velocities [num_envs, num_joints]
+        prev_base_pos: Previous base position [num_envs, 3]
         prev_base_lin_vel: Previous base velocity [num_envs, 3]
         prev_joint_vel: Previous joint velocities [num_envs, num_joints]
         prev_base_accel: Previous base acceleration [num_envs, 3]
@@ -928,24 +988,94 @@ def compute_combined_reward(
         joint_upper: Upper joint limits [num_joints]
         robot_limits: Dictionary of robot limit values
         contact_forces: Contact forces [num_envs, num_bodies]
-        min_obstacle_dist: Min obstacle distances [num_envs] or None
         dt: Control timestep (seconds)
         weights: Dictionary of reward weights
+        workspace_distance: Distance to reachable workspace boundary [num_envs] (None if unavailable)
+        min_obstacle_dist: Min obstacle distances [num_envs] or None
+        prev_ori_error: SESSION 8i - Previous orientation error [num_envs] (for progress bonus)
+        current_ori_error: SESSION 8i - Current orientation error [num_envs] (for progress bonus)
+        ee_ang_vel: SESSION 8i - EE angular velocity [num_envs, 3] (for smoothness penalty)
         
     Returns:
         total_reward: Combined reward [num_envs]
         reward_components: Dictionary of individual reward components
     """
-    # Tracking rewards
+    # ========================================
+    # TRACKING REWARDS
+    # ========================================
+    # Position tracking (always same weight)
     pos_reward = weights["position_tracking"] * position_tracking_reward(
         current_ee_pos, target_pos, scale=1.0
     )
     
-    ori_reward = weights["orientation_tracking"] * orientation_tracking_reward(
-        current_ee_quat, target_quat, scale=0.5
-    )
+    # ========================================
+    # SESSION 8i: DISTANCE-GATED ORIENTATION REWARDS
+    # ========================================
+    # When far from target: focus on reaching (low orientation weight)
+    # When close to target: focus on alignment (high orientation weight)
+    # 
+    # v1/v2 FAILED: Hard threshold caused policy oscillation at boundary
+    # v3 FIX: Sigmoid smooth transition eliminates discontinuity
+    current_error = torch.norm(target_pos - current_ee_pos, dim=-1)  # [num_envs]
+    distance_threshold = weights.get("distance_gate_threshold", 0.7)  # meters
+    smoothness = weights.get("distance_gate_smoothness", 0.15)  # Transition width
     
-    current_error = torch.norm(target_pos - current_ee_pos, dim=-1)
+    # Orientation tracking (SMOOTH GATED by distance)
+    # Far: use low weight, Close: use high weight
+    ori_weight_far = weights.get("orientation_tracking_far", 8.0)
+    ori_weight_close = weights.get("orientation_tracking_close", 30.0)
+    
+    # Sigmoid smooth transition (instead of hard threshold)
+    # sigmoid(x) = 1 / (1 + exp(x))
+    # When distance > threshold: sigmoid → 0 (use far_weight)
+    # When distance < threshold: sigmoid → 1 (use close_weight)
+    sigmoid_factor = 1.0 / (1.0 + torch.exp((current_error - distance_threshold) / smoothness))
+    ori_weight_current = ori_weight_far + (ori_weight_close - ori_weight_far) * sigmoid_factor
+    # Result: Smooth transition from far_weight to close_weight around threshold
+    
+    ori_reward_base = orientation_tracking_reward(
+        current_ee_quat, target_quat, scale=0.5
+    )  # [num_envs]
+    ori_reward = ori_weight_current * ori_reward_base  # Element-wise multiply
+    
+    # Compute comfort zone mask for progress bonus and penalty (use sigmoid factor > 0.5)
+    in_comfort_zone = sigmoid_factor > 0.5  # [num_envs] boolean (distance < threshold)
+    
+    # Orientation progress bonus (ONLY in comfort zone)
+    ori_progress_bonus_weight = weights.get("orientation_progress_bonus", 0.0)
+    if ori_progress_bonus_weight > 0 and prev_ori_error is not None and current_ori_error is not None:
+        ori_progress = orientation_progress_bonus(
+            prev_ori_error, current_ori_error
+        )  # [num_envs]
+        
+        # Only apply in comfort zone
+        ori_progress_masked = torch.where(
+            in_comfort_zone,
+            ori_progress,
+            torch.zeros_like(ori_progress)
+        )
+        ori_progress_reward = ori_progress_bonus_weight * ori_progress_masked
+    else:
+        ori_progress_reward = torch.zeros_like(current_error)
+    
+    # Angular velocity penalty (ONLY in comfort zone - for smoothness)
+    ang_vel_penalty_weight = weights.get("angular_velocity_penalty", 0.0)
+    if ang_vel_penalty_weight > 0:
+        ang_vel_pen = angular_velocity_penalty(
+            ee_ang_vel, joint_vel, scale_ee=1.0, scale_joint=0.5
+        )  # [num_envs]
+        
+        # Only apply in comfort zone
+        ang_vel_pen_masked = torch.where(
+            in_comfort_zone,
+            ang_vel_pen,
+            torch.zeros_like(ang_vel_pen)
+        )
+        ang_vel_penalty = -ang_vel_penalty_weight * ang_vel_pen_masked
+    else:
+        ang_vel_penalty = torch.zeros_like(current_error)
+    
+    # Position progress bonus
     prog_bonus = weights["progress_bonus"] * progress_bonus(
         prev_tracking_error, current_error
     )
@@ -1110,6 +1240,7 @@ def compute_combined_reward(
     total_reward = (
         pos_reward
         + ori_reward
+        + ori_progress_reward  # SESSION 8i: Orientation progress bonus (masked to comfort zone)
         + prog_bonus
         + base_mob_reward  # Reward base movement when target is far (configurable cap)
         + base_alignment_reward  # Reward moving toward unreachable targets
@@ -1131,12 +1262,14 @@ def compute_combined_reward(
         - lateral_penalty
         - self_coll_penalty
         - stab_penalty
+        + ang_vel_penalty  # SESSION 8i: Angular velocity smoothness penalty (masked to comfort zone, note: negative)
     )
     
     # Store components for logging
     components = {
         "position_tracking": pos_reward,
         "orientation_tracking": ori_reward,
+        "orientation_progress_bonus": ori_progress_reward,  # SESSION 8i: New component
         "progress_bonus": prog_bonus,
         "base_mobilization": base_mob_reward,
         "base_target_alignment": base_alignment_reward,
@@ -1157,6 +1290,7 @@ def compute_combined_reward(
         "lateral_motion_penalty": lateral_penalty,
         "self_collision_penalty": self_coll_penalty,
         "stability_penalty": stab_penalty,
+        "angular_velocity_penalty": ang_vel_penalty,  # SESSION 8i: New component
         "obstacle_reward": obst_reward,
     }
     

@@ -75,7 +75,9 @@ def main():
     
     # Reset and sample trajectory targets
     obs = env.reset()
-    
+    if isinstance(obs, tuple):
+        obs, _ = obs
+
     print("\nSampling 100 timesteps from current trajectories:")
     print("-"*80)
     
@@ -127,6 +129,8 @@ def main():
     
     for reset_idx in range(5):
         obs = env.reset()
+        if isinstance(obs, tuple):
+            obs, _ = obs
         target_pos, _ = unwrapped_env.trajectory_manager.get_target_pose()
         print(f"  Reset {reset_idx + 1}: Target = {target_pos[0].cpu().numpy()}")
         

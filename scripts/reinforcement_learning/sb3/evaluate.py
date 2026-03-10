@@ -394,6 +394,8 @@ def main():
     tracking_errors = []
     
     obs = env.reset()
+    if isinstance(obs, tuple):
+        obs, _ = obs
     episode_count = 0
     current_episode_reward = np.zeros(args.num_envs)
     current_episode_length = np.zeros(args.num_envs)
@@ -406,9 +408,8 @@ def main():
         action, _states = model.predict(obs, deterministic=args.deterministic)
         
         # Step environment
-        obs, rewards, dones, infos = env.step(action)
-        
-        # Debug: Print reward components every 100 steps (first episode only)
+        obs, rewards, terminateds, truncateds, infos = env.step(action)
+        dones = terminateds | truncateds
         if episode_count == 0 and global_step % 100 == 0:
             print(f"\n[DEBUG Step {global_step}] Total reward: {rewards[0]:.2f}")
             if hasattr(env.unwrapped, 'reward_components') and env.unwrapped.reward_components:

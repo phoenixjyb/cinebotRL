@@ -6,14 +6,14 @@ using the PPO algorithm from Stable Baselines3.
 Designed for Windows with Isaac Lab. No WSL-specific workarounds needed!
 
 Usage:
-    # On Windows with Isaac Lab:
-    I:\isaaclab\isaaclab.bat -p scripts/reinforcement_learning/sb3/train.py \\
+    # Recommended — use the PowerShell launcher (handles paths automatically):
+    .\\scripts\\launch_training_windows.ps1 -Headless -NumEnvs 1024
+
+    # Direct Isaac Lab call (set ISAAC_LAB_ROOT env var first):
+    & "$env:ISAAC_LAB_ROOT\\isaaclab.bat" -p scripts/reinforcement_learning/sb3/train.py \\
         --task MobileMMTrackEE-v0 \\
         --num_envs 1024 \\
         --headless
-        
-    # Or use the convenient launcher:
-    .\scripts\launch_training_windows.ps1 -Headless -NumEnvs 1024
 """
 
 import argparse

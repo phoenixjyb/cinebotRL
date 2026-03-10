@@ -228,7 +228,15 @@ def register_isaac_lab_tasks():
         )
         
         print("[task_spec] Registered Isaac Lab task: MobileMMTrackEE-v0")
-        
+
+        # RecomoProto1 robot task
+        from rl_platform.tasks.recomoproto1 import RecomoProto1TrackEEEnv, RecomoProto1TrackEEEnvCfg  # noqa: F401
+        gym.register(
+            id="RecomoProto1TrackEE-v0",
+            entry_point="rl_platform.tasks.recomoproto1:RecomoProto1TrackEEEnv",
+        )
+        print("[task_spec] Registered Isaac Lab task: RecomoProto1TrackEE-v0")
+
     except ImportError as e:
         print(f"[task_spec] Could not register Isaac Lab tasks: {e}")
         print("[task_spec] This is expected if running outside Isaac Lab environment")

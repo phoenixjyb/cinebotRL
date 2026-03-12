@@ -34,6 +34,10 @@ dev = [
     "isort",
     "mypy",
 ]
+il = [
+    "imitation>=0.6.0",     # GAIL / DAgger if needed later (BC is implemented natively)
+    "sb3-contrib>=2.5.0",   # Additional SB3 algorithms (TQC, TRPO) for future use
+]
 
 [tool.setuptools]
 py-modules = []

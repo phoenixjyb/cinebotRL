@@ -215,6 +215,13 @@ def parse_args():
         default=None,
         help="Path to checkpoint to resume from",
     )
+    parser.add_argument(
+        "--pretrained_policy",
+        type=str,
+        default=None,
+        help="Path to BC-pretrained policy (.zip) to warm-start PPO. "
+             "Transfers actor (policy) network weights only; critic is re-initialised.",
+    )
     
     # Device selection
     parser.add_argument(
@@ -1259,6 +1266,26 @@ def main():
             )
             print(f"    [OK] PPO model created on {device}")
             
+            if args.pretrained_policy:
+                print(f"    Loading BC pretrained policy from: {args.pretrained_policy}")
+                try:
+                    bc_model = PPO.load(args.pretrained_policy, device=device)
+                    # Transfer actor network weights only (policy, not value function)
+                    model.policy.mlp_extractor.policy_net.load_state_dict(
+                        bc_model.policy.mlp_extractor.policy_net.state_dict()
+                    )
+                    model.policy.action_net.load_state_dict(
+                        bc_model.policy.action_net.state_dict()
+                    )
+                    model.policy.log_std.data.copy_(bc_model.policy.log_std.data)
+                    print(f"    [OK] BC policy weights loaded (actor network + log_std)")
+                    print(f"    [OK] Critic network randomly initialised (will learn from RL)")
+                    del bc_model
+                    torch.cuda.empty_cache()
+                except Exception as e:
+                    print(f"    [WARN] Failed to load BC pretrained policy: {e}")
+                    print(f"    [WARN] Continuing with randomly initialised policy")
+            
     except Exception as e:
         print(f"    [FAIL] Failed to create model: {e}")
         import traceback
@@ -1292,6 +1319,8 @@ def main():
     print(f"Save frequency:    {args.save_freq:,} steps")
     print(f"Log directory:     {args.log_dir}")
     print(f"Device:            {device}")
+    if args.pretrained_policy:
+        print(f"Pretrained policy: {args.pretrained_policy}")
     print("=" * 70 + "\n")
     
     # Train

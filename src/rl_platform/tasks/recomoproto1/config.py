@@ -221,15 +221,40 @@ class DomainRandomization:
 
 
 @dataclass
+class ILConfig:
+    """Configuration for Imitation Learning (IL) pre-training phase."""
+
+    # Demo collection
+    demo_dir: str = "data/il_demos"
+    demo_filename: str = "demos.npz"
+    num_demo_episodes: int = 500
+
+    # DifferentialIK solver settings (arm expert controller)
+    ik_max_iterations: int = 100
+    ik_damping: float = 0.05
+
+    # Base proportional controller settings
+    base_kp: float = 1.0
+    base_max_vel: float = 1.0  # normalized [-1, 1]
+
+    # Behavioural Cloning (BC) pretraining
+    bc_epochs: int = 50
+    bc_lr: float = 3e-4
+    bc_batch_size: int = 256
+    bc_val_fraction: float = 0.1
+
+
+@dataclass
 class RecomoProto1TrackConfig:
     """Master configuration for MobileMMTrackEE task."""
-    
+
     # Sub-configurations
     trajectory: TrajectoryConfig = field(default_factory=TrajectoryConfig)
     obstacles: ObstacleConfig = field(default_factory=ObstacleConfig)
     rewards: RewardWeights = field(default_factory=RewardWeights)
     robot_limits: RobotLimits = field(default_factory=RobotLimits)
     domain_rand: DomainRandomization = field(default_factory=DomainRandomization)
+    il: ILConfig = field(default_factory=ILConfig)
     
     # Episode settings
     episode_length_s: float = 20.0

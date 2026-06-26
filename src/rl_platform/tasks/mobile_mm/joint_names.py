@@ -1,7 +1,7 @@
 """Central joint name definitions for the mobile manipulator.
 
-Maps between the cinebotRL internal convention and the PNC URDF
-(recomoProto1-1190_moveit.urdf) joint names.
+Maps between the cinebotRL internal convention and the latest PNC URDF
+(recomoProto2-1190_moveit.urdf) joint names.
 
 PNC URDF joint order (actuated only):
   0: base_joint_vx     (prismatic)  — base X translation
@@ -13,7 +13,7 @@ PNC URDF joint order (actuated only):
   6: joint3_gimbal_yaw (revolute)   — arm J4 (wrist yaw)
   7: joint2_gimbal_roll(revolute)   — arm J5 (wrist roll)
   8: joint1_gimbal_pitch(revolute)  — arm J6 (wrist pitch)
-  9-11: ee1_rot_z/y/x  (revolute)  — virtual EE gimbal (excluded from RL)
+  9-11: ee1_rot_z/y/x  (revolute)  - virtual EE gimbal (excluded from RL)
 """
 
 # --- Base joints (PPR: prismatic-prismatic-revolute) ---
@@ -38,7 +38,7 @@ ARM_JOINT_NAMES_EXPR = ["joint[1-6]_.*"]
 # --- EE link ---
 EE_LINK_NAME = "cam_link"
 
-# --- Virtual EE gimbal joints (excluded from RL action/observation) ---
+# --- Virtual EE gimbal joints (kept for MoveIt-style frames; excluded from RL action/observation) ---
 EE_VIRTUAL_JOINT_NAMES = ["ee1_rot_z", "ee1_rot_y", "ee1_rot_x"]
 
 # --- Counts ---

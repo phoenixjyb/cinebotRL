@@ -25,20 +25,26 @@ class MobileManipulatorAssets:
 
 def get_mobile_mm_assets() -> MobileManipulatorAssets:
     """Return paths to the mobile manipulator USD and supporting configuration."""
-    # PNC URDF (recomoProto1-1190_moveit) converted to USD
-    usd_dir = assets_root() / "recomoProto1-1190_moveit"
-    usd_path = usd_dir / "recomoProto1-1190_moveit.usd"
+    # Latest PNC URDF (recomoProto2-1190) converted to USD.
+    usd_dir = assets_root() / "recomoProto2-1190_moveit"
+    usd_path = usd_dir / "recomoProto2-1190_moveit.usd"
 
-    # Fallback to legacy asset if new USD not yet generated
+    # Fallbacks keep the previous Proto1/legacy setups runnable while Proto2 is
+    # being generated or validated on a new machine.
     if not usd_path.is_file():
-        legacy_dir = assets_root() / "usd"
-        usd_path = legacy_dir / "mobile_manipulator_PPR_theta_x_y.usd"
-        usd_dir = legacy_dir
+        proto1_dir = assets_root() / "recomoProto1-1190_moveit"
+        proto1_path = proto1_dir / "recomoProto1-1190_moveit.usd"
+        if proto1_path.is_file():
+            usd_dir = proto1_dir
+            usd_path = proto1_path
+        else:
+            legacy_dir = assets_root() / "usd"
+            usd_path = legacy_dir / "mobile_manipulator_PPR_theta_x_y.usd"
+            usd_dir = legacy_dir
         import warnings
         warnings.warn(
-            f"PNC USD not found at {assets_root() / 'recomoProto1-1190_moveit'}. "
-            "Falling back to legacy mobile_manipulator_PPR_theta_x_y.usd. "
-            "Run URDF-to-USD conversion to use the PNC robot model.",
+            f"Proto2 PNC USD not found at {assets_root() / 'recomoProto2-1190_moveit'}. "
+            f"Falling back to {usd_path}. Run URDF-to-USD conversion to use Proto2.",
             stacklevel=2,
         )
 

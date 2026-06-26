@@ -46,6 +46,15 @@ simulation_app = app_launcher.app
 # Now we can import Isaac Sim modules (must be after app launch)
 import carb
 import sys, glob
+import omni.kit.app
+import omni.kit.commands
+
+# AppLauncher does not always enable the URDF importer extension for bare
+# conversion scripts, so enable it explicitly before acquiring the interface.
+ext_manager = omni.kit.app.get_app().get_extension_manager()
+ext_manager.set_extension_enabled_immediate("isaacsim.asset.importer.urdf", True)
+simulation_app.update()
+
 # Add URDF importer extension to path (needed when extension is copied, not junctioned)
 urdf_ext_dirs = glob.glob(r"G:\isaaclab_venv\Lib\site-packages\isaacsim\kit\data\kit\isaac-sim\5.1\exts\3\isaacsim.asset.importer.urdf-*")
 for d in urdf_ext_dirs:
@@ -65,6 +74,14 @@ except ImportError:
         spec.loader.exec_module(_urdf)
 from pxr import Usd, UsdPhysics
 
+def set_if_available(obj, name: str, value) -> None:
+    """Set an Isaac Sim importer option only if this version exposes it."""
+    if hasattr(obj, name):
+        setattr(obj, name, value)
+    else:
+        print(f"Skipping unsupported URDF importer option: {name}")
+
+
 def main():
     """Convert URDF to USD with proper configuration."""
     
@@ -83,50 +100,62 @@ def main():
     
     # Validate input file exists
     if not urdf_path.is_file():
-        print(f"❌ ERROR: URDF file not found: {urdf_path}")
+        print(f"ERROR: URDF file not found: {urdf_path}")
         return 1
     
     # Create output directory if needed
     usd_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Import URDF
-    print("🔄 Importing URDF...")
+    print("Importing URDF...")
     try:
-        # Get URDF interface
-        urdf_interface = _urdf.acquire_urdf_interface()
-        
         # Configure import settings
-        import_config = _urdf.ImportConfig()
-        import_config.merge_fixed_joints = False  # Keep all joints
-        import_config.convex_decomp = False  # Use original collision meshes
-        import_config.import_inertia_tensor = True  # Import inertia from URDF
-        import_config.fix_base = False  # Mobile base, not fixed
-        import_config.self_collision = False  # Disable for now
-        import_config.default_drive_type = _urdf.UrdfJointTargetType.JOINT_DRIVE_POSITION
-        import_config.default_position_drive_damping = 1000.0
-        import_config.default_position_drive_stiffness = 10000.0
-        import_config.distance_scale = args_cli.mesh_scale  # Convert mm→m
+        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
+        if not status:
+            print("Failed to create URDF import config")
+            return 1
+        set_if_available(import_config, "merge_fixed_joints", False)  # Keep all joints
+        set_if_available(import_config, "convex_decomp", False)  # Use original collision meshes
+        set_if_available(import_config, "import_inertia_tensor", True)  # Import inertia from URDF
+        set_if_available(import_config, "fix_base", False)  # Mobile base, not fixed
+        set_if_available(import_config, "self_collision", False)  # Disable for now
+        if hasattr(_urdf, "UrdfJointTargetType"):
+            set_if_available(import_config, "default_drive_type", _urdf.UrdfJointTargetType.JOINT_DRIVE_POSITION)
+        set_if_available(import_config, "default_position_drive_damping", 1000.0)
+        set_if_available(import_config, "default_position_drive_stiffness", 10000.0)
+        set_if_available(import_config, "distance_scale", args_cli.mesh_scale)  # Convert mm->m
         
         # Import URDF to USD
-        success, prim_path = urdf_interface.parse_urdf(
-            str(urdf_path),
-            import_config,
-            str(usd_path)
+        success, prim_path = omni.kit.commands.execute(
+            "URDFParseAndImportFile",
+            urdf_path=str(urdf_path),
+            import_config=import_config,
+            dest_path=str(usd_path),
+            get_articulation_root=True,
         )
         
         if not success:
-            print(f"❌ URDF import failed!")
+            print("URDF import failed!")
             return 1
-        
-        print(f"✅ URDF imported successfully to: {prim_path}")
+
+        print(f"URDF imported successfully to: {prim_path}")
         
         # Open the stage to verify
-        print("🔄 Opening USD stage for verification...")
+        print("Opening USD stage for verification...")
         stage = Usd.Stage.Open(str(usd_path))
         
         if not stage:
-            print(f"❌ Failed to open USD stage: {usd_path}")
+            print(f"Failed to open USD stage: {usd_path}")
             return 1
+
+        if not stage.GetDefaultPrim():
+            root_prims = [prim for prim in stage.GetPseudoRoot().GetChildren() if prim.IsActive()]
+            if not root_prims:
+                print(f"Failed to find a root prim in USD stage: {usd_path}")
+                return 1
+            stage.SetDefaultPrim(root_prims[0])
+            stage.GetRootLayer().Save()
+            print(f"Set USD defaultPrim to: {root_prims[0].GetPath()}")
         
         # Print summary
         print()
@@ -147,8 +176,8 @@ def main():
         print(f"Joints: {len(joint_prims)}")
         
         print()
-        print("✅ USD conversion complete!")
-        print(f"📁 Output saved to: {usd_path}")
+        print("USD conversion complete!")
+        print(f"Output saved to: {usd_path}")
         print()
         print("Next steps:")
         print("  1. Verify USD with: I:\\isaaclab\\isaaclab.bat -p scripts/test_mobile_mm_env.py")
@@ -158,7 +187,7 @@ def main():
         return 0
         
     except Exception as e:
-        print(f"❌ ERROR during conversion: {e}")
+        print(f"ERROR during conversion: {e}")
         import traceback
         traceback.print_exc()
         return 1

@@ -53,6 +53,7 @@ except ImportError as e:
     def configclass(cls):  # type: ignore
         return dataclass(cls)
 
+from rl_platform.robots import assets_root
 from rl_platform.robots.recomoproto1 import get_recomoproto1_usd_path
 from .config import RecomoProto1TrackConfig, RewardWeights
 from .trajectories import TrajectoryManager
@@ -162,6 +163,8 @@ class RecomoProto1TrackEEEnvCfg(DirectRLEnvCfg):
                     ARM_JOINT_NAMES[3]: 0.0,
                     ARM_JOINT_NAMES[4]: 0.0,
                     ARM_JOINT_NAMES[5]: 0.0,
+                    # Keep MoveIt helper gimbal joints in the asset, but passive for RL.
+                    **{name: 0.0 for name in EE_VIRTUAL_JOINT_NAMES},
                 },
             ),
             actuators={
@@ -177,13 +180,21 @@ class RecomoProto1TrackEEEnvCfg(DirectRLEnvCfg):
                     effort_limit=1000.0,  # Override URDF effort=0
                     velocity_limit=2.0,   # Override URDF velocity=0
                 ),
+                "ee_virtual": ImplicitActuatorCfg(
+                    joint_names_expr=EE_VIRTUAL_JOINT_NAMES,
+                    stiffness=0.0,
+                    damping=0.0,
+                ),
             },
         )
         
         # Ground plane
         ground_cfg = AssetBaseCfg(
             prim_path="/World/Ground",  # USD prim path for ground
-            spawn=sim_utils.GroundPlaneCfg(),
+            spawn=sim_utils.GroundPlaneCfg(
+                usd_path=str(assets_root() / "usd" / "local_ground_plane.usda"),
+                color=None,
+            ),
             init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0)),
         )
         
@@ -205,20 +216,20 @@ class RecomoProto1TrackEEEnvCfg(DirectRLEnvCfg):
         # 1. Chassis sensor: Detects arm-base collisions (filters out ground support)
         # 2. Arm sensor: Detects arm-ground collisions
         scene_cfg.contact_sensor = ContactSensorCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/abstract_chassis_link",  # Monitor chassis
+            prim_path="{ENV_REGEX_NS}/Robot/base_root/base_link",
             update_period=0.0,  # Update every sim step (5ms physics)
             history_length=1,   # Only need current forces
             debug_vis=False,    # Disable visualization for performance
-            filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/left_arm.*"],  # Only report arm-chassis contacts
         )
         
         # Add arm contact sensor to detect arm-ground collisions
         scene_cfg.arm_contact_sensor = ContactSensorCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/left_arm.*",  # Monitor all arm links
+            prim_path=(
+                "{ENV_REGEX_NS}/Robot/base_root/arm_link_.*"
+            ),
             update_period=0.0,
             history_length=1,
             debug_vis=False,
-            filter_prim_paths_expr=["/World/Ground"],  # Only report arm-ground contacts (actual prim path)
         )
         
         return scene_cfg

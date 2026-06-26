@@ -24,17 +24,13 @@ class RecomoProto1Assets:
 
 
 def get_recomoproto1_assets() -> RecomoProto1Assets:
-    """Return paths to the RecomoProto1 USD and supporting configuration.
-
-    TODO: Update 'recomoproto1.usd' to the actual USD file name once placed
-    under assets_own/usd/.  The config_dir should contain joint YAML / URDF
-    side-files if needed, or point to the same 'configuration/' dir used by
-    other robots.
-    """
-    usd_dir = assets_root() / "usd"
+    """Return paths to the current RecomoProto USD and supporting configuration."""
+    # The task name is kept for compatibility, but the active robot asset is
+    # Proto2 from the latest PNC/MoveIt URDF.
+    usd_dir = assets_root() / "recomoProto2-1190_moveit"
     return RecomoProto1Assets(
-        usd_path=usd_dir / "recomoproto1.usd",  # <-- set actual filename here
-        config_dir=usd_dir / "configuration",
+        usd_path=usd_dir / "recomoProto2-1190_moveit.usd",
+        config_dir=usd_dir / "configuration" if (usd_dir / "configuration").is_dir() else usd_dir,
     )
 
 

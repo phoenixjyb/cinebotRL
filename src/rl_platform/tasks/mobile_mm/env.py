@@ -53,6 +53,7 @@ except ImportError as e:
     def configclass(cls):  # type: ignore
         return dataclass(cls)
 
+from rl_platform.robots import assets_root
 from rl_platform.robots.mobile_mm import get_mobile_mm_usd_path
 from .config import MobileMMTrackConfig, RewardWeights
 from .trajectories import TrajectoryManager
@@ -190,7 +191,10 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         # Ground plane
         ground_cfg = AssetBaseCfg(
             prim_path="/World/Ground",  # USD prim path for ground
-            spawn=sim_utils.GroundPlaneCfg(),
+            spawn=sim_utils.GroundPlaneCfg(
+                usd_path=str(assets_root() / "usd" / "local_ground_plane.usda"),
+                color=None,
+            ),
             init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0)),
         )
         
@@ -212,20 +216,20 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         # 1. Chassis sensor: Detects arm-base collisions (filters out ground support)
         # 2. Arm sensor: Detects arm-ground collisions
         scene_cfg.contact_sensor = ContactSensorCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/base_link",  # Monitor chassis (PNC: base_link)
+            prim_path="{ENV_REGEX_NS}/Robot/base_root/base_link",
             update_period=0.0,  # Update every sim step (5ms physics)
             history_length=1,   # Only need current forces
             debug_vis=False,    # Disable visualization for performance
-            filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/arm_link.*"],  # Only report arm-chassis contacts
         )
 
         # Add arm contact sensor to detect arm-ground collisions
         scene_cfg.arm_contact_sensor = ContactSensorCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/arm_link.*",  # Monitor all arm links (PNC naming)
+            prim_path=(
+                "{ENV_REGEX_NS}/Robot/base_root/arm_link_.*"
+            ),
             update_period=0.0,
             history_length=1,
             debug_vis=False,
-            filter_prim_paths_expr=["/World/Ground"],  # Only report arm-ground contacts (actual prim path)
         )
         
         return scene_cfg

@@ -36,6 +36,7 @@ parser.add_argument(
     default=0.001,
     help="Scale factor for mesh geometry (default: 0.001 for mm→m conversion)",
 )
+AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
 # Launch Isaac Sim
@@ -44,7 +45,24 @@ simulation_app = app_launcher.app
 
 # Now we can import Isaac Sim modules (must be after app launch)
 import carb
-from omni.isaac.urdf import _urdf
+import sys, glob
+# Add URDF importer extension to path (needed when extension is copied, not junctioned)
+urdf_ext_dirs = glob.glob(r"G:\isaaclab_venv\Lib\site-packages\isaacsim\kit\data\kit\isaac-sim\5.1\exts\3\isaacsim.asset.importer.urdf-*")
+for d in urdf_ext_dirs:
+    if d not in sys.path:
+        sys.path.insert(0, d)
+try:
+    from isaacsim.asset.importer.urdf import _urdf
+except ImportError:
+    try:
+        from omni.isaac.urdf import _urdf
+    except ImportError:
+        # Direct import from extension directory
+        import importlib.util
+        pyd_path = glob.glob(r"G:\isaaclab_venv\Lib\site-packages\isaacsim\kit\data\kit\isaac-sim\5.1\exts\3\isaacsim.asset.importer.urdf-*\isaacsim\asset\importer\urdf\_urdf*.pyd")[0]
+        spec = importlib.util.spec_from_file_location("_urdf", pyd_path)
+        _urdf = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_urdf)
 from pxr import Usd, UsdPhysics
 
 def main():

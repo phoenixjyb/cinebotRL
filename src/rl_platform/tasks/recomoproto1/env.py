@@ -15,6 +15,12 @@ import numpy as np
 
 # Isaac Lab imports (correct for Isaac Lab 2.2.0 pip package)
 # NOTE: Must import AFTER AppLauncher/SimulationApp is created!
+from rl_platform.tasks.recomoproto1.joint_names import (
+    BASE_JOINT_NAMES, BASE_JOINT_VX, BASE_JOINT_VY, BASE_JOINT_WZ,
+    ARM_JOINT_NAMES, ARM_JOINT_NAMES_EXPR, EE_LINK_NAME,
+    EE_VIRTUAL_JOINT_NAMES,
+)
+
 try:
     # Isaac Lab 2.2.0 pip package uses 'isaaclab' not 'omni.isaac.lab'
     import isaaclab.sim as sim_utils
@@ -150,22 +156,22 @@ class RecomoProto1TrackEEEnvCfg(DirectRLEnvCfg):
                 pos=(0.0, 0.0, 0.0),
                 joint_pos={
                     # Arm joints (mid-range initialization)
-                    "left_arm_joint1": 0.0,
-                    "left_arm_joint2": 1.6,
-                    "left_arm_joint3": -1.6,
-                    "left_arm_joint4": 0.0,
-                    "left_arm_joint5": 0.0,
-                    "left_arm_joint6": 0.0,
+                    ARM_JOINT_NAMES[0]: 0.0,
+                    ARM_JOINT_NAMES[1]: 1.6,
+                    ARM_JOINT_NAMES[2]: -1.6,
+                    ARM_JOINT_NAMES[3]: 0.0,
+                    ARM_JOINT_NAMES[4]: 0.0,
+                    ARM_JOINT_NAMES[5]: 0.0,
                 },
             ),
             actuators={
                 "arm": ImplicitActuatorCfg(
-                    joint_names_expr=["left_arm_joint[1-6]"],
+                    joint_names_expr=ARM_JOINT_NAMES_EXPR,
                     stiffness=400.0,
                     damping=40.0,
                 ),
                 "base": ImplicitActuatorCfg(
-                    joint_names_expr=["joint_x", "joint_y", "joint_theta"],
+                    joint_names_expr=BASE_JOINT_NAMES,
                     stiffness=1000.0,   # k=1000 N/m → ω_n=31.6 rad/s (5Hz, controllable at 20Hz)
                     damping=316.0,      # ζ=0.5 underdamped for 20Hz control (96% in 1 step!)
                     effort_limit=1000.0,  # Override URDF effort=0
@@ -1024,7 +1030,7 @@ class RecomoProto1TrackEEEnv(DirectRLEnv):
     def _initialize_ee_body_idx(self):
         """Initialize end-effector body index (lazy initialization)."""
         if not self._ee_body_idx_initialized and hasattr(self.robot, '_root_physx_view'):
-            ee_link_name = "left_gripper_link"
+            ee_link_name = EE_LINK_NAME
             if ee_link_name in self.robot.body_names:
                 self._ee_body_idx = self.robot.body_names.index(ee_link_name)
                 print(f"[RecomoProto1TrackEE] Found EE link '{ee_link_name}' at index {self._ee_body_idx}")
@@ -1044,8 +1050,8 @@ class RecomoProto1TrackEEEnv(DirectRLEnv):
             print(f"Joint names: {self.robot.joint_names}")
             
             # Expected mapping for RecomoProto1 manipulator with PPR base
-            expected_base_joints = ["joint_x", "joint_y", "joint_theta"]
-            expected_arm_joints = [f"left_arm_joint{i}" for i in range(1, 7)]
+            expected_base_joints = BASE_JOINT_NAMES
+            expected_arm_joints = ARM_JOINT_NAMES
             
             print(f"\nExpected BASE joints (indices 0-2): {expected_base_joints}")
             print(f"Expected ARM joints (indices 3-8): {expected_arm_joints}")
@@ -1128,9 +1134,9 @@ class RecomoProto1TrackEEEnv(DirectRLEnv):
         # We only control the 6 arm joints via position targets
         if not hasattr(self, '_arm_joint_ids'):
             # Find indices of arm joints (left_arm_joint1 through left_arm_joint6)
-            arm_joint_names = [f"left_arm_joint{i}" for i in range(1, 7)]
+            # arm joint names from joint_names.py
             self._arm_joint_ids = []
-            for name in arm_joint_names:
+            for name in ARM_JOINT_NAMES:
                 if name in self.robot.joint_names:
                     idx = self.robot.joint_names.index(name)
                     self._arm_joint_ids.append(idx)
@@ -1910,9 +1916,9 @@ class RecomoProto1TrackEEEnv(DirectRLEnv):
         # FIXED: Set PPR joints to ZERO (they are offsets, not world positions!)
         # Initialize base joint indices if needed
         if not hasattr(self, '_base_joint_ids'):
-            base_joint_names = ["joint_x", "joint_y", "joint_theta"]
+            # base joint names from joint_names.py
             self._base_joint_ids = []
-            for name in base_joint_names:
+            for name in BASE_JOINT_NAMES:
                 if name in self.robot.joint_names:
                     idx = self.robot.joint_names.index(name)
                     self._base_joint_ids.append(idx)
@@ -1958,12 +1964,9 @@ class RecomoProto1TrackEEEnv(DirectRLEnv):
             
             # Get arm joint IDs (indices 3-8, after the 3 base joints)
             if not hasattr(self, '_arm_joint_ids'):
-                arm_joint_names = [
-                    "left_arm_joint1", "left_arm_joint2", "left_arm_joint3",
-                    "left_arm_joint4", "left_arm_joint5", "left_arm_joint6"
-                ]
+                # arm joint names from joint_names.py
                 self._arm_joint_ids = []
-                for name in arm_joint_names:
+                for name in ARM_JOINT_NAMES:
                     if name in self.robot.joint_names:
                         idx = self.robot.joint_names.index(name)
                         self._arm_joint_ids.append(idx)

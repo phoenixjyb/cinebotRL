@@ -25,12 +25,26 @@ class MobileManipulatorAssets:
 
 def get_mobile_mm_assets() -> MobileManipulatorAssets:
     """Return paths to the mobile manipulator USD and supporting configuration."""
-    usd_dir = assets_root() / "usd"
-    # Use theta_x_y USD with correct joint order (theta→x→y) for reachability map
-    # Fixed: No invalid root_joint, proper physics chain
+    # PNC URDF (recomoProto1-1190_moveit) converted to USD
+    usd_dir = assets_root() / "recomoProto1-1190_moveit"
+    usd_path = usd_dir / "recomoProto1-1190_moveit.usd"
+
+    # Fallback to legacy asset if new USD not yet generated
+    if not usd_path.is_file():
+        legacy_dir = assets_root() / "usd"
+        usd_path = legacy_dir / "mobile_manipulator_PPR_theta_x_y.usd"
+        usd_dir = legacy_dir
+        import warnings
+        warnings.warn(
+            f"PNC USD not found at {assets_root() / 'recomoProto1-1190_moveit'}. "
+            "Falling back to legacy mobile_manipulator_PPR_theta_x_y.usd. "
+            "Run URDF-to-USD conversion to use the PNC robot model.",
+            stacklevel=2,
+        )
+
     return MobileManipulatorAssets(
-        usd_path=usd_dir / "mobile_manipulator_PPR_theta_x_y.usd",
-        config_dir=usd_dir / "configuration",
+        usd_path=usd_path,
+        config_dir=usd_dir / "configuration" if (usd_dir / "configuration").is_dir() else usd_dir,
     )
 
 

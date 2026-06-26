@@ -4,7 +4,9 @@
 
 This project implements **reinforcement learning** for a **mobile manipulator robot** (6-DOF arm + differential drive base) using **Isaac Sim** and **Isaac Lab** on **Windows native**. The system trains a PPO agent to perform precise end-effector trajectory tracking using 8,192 parallel environments.
 
-**Current Status (2025-11-08):** ✅ **Session 8i v3 Complete** - 41.94M steps, sigmoid smooth transition resolves hard-threshold instability; reachability needs further improvement
+**Current Status (2026-06-26):** Proto2 baseline active. The repo now loads
+`recomoProto2-1190` by default and exposes `RecomoProto2TrackEE-v0` for the
+first 8-action SB3 baseline.
 
 **Key Achievements:**
 - ✅ **Windows Training Operational** - Isaac Lab + Stable-Baselines3 PPO verified
@@ -40,8 +42,8 @@ WSL2 (Optional Support - Not Required)
 # 1. Navigate to project
 cd C:\Users\yanbo\wSpace\cinebotRL
 
-# 2. Launch training (default: 64 envs, headless, 5M steps)
-.\scripts\launch_training_windows.ps1 -Task MobileMMTrackEE-v0 -NumEnvs 64 -Headless
+# 2. Launch training (default task: RecomoProto2TrackEE-v0)
+.\scripts\launch_training_windows.ps1 -NumEnvs 64 -Headless
 
 # 3. Monitor in separate window
 .\scripts\monitor_training.ps1 -Mode all
@@ -53,7 +55,7 @@ cd C:\Users\yanbo\wSpace\cinebotRL
 $env:ISAAC_LAB_ROOT = "I:\isaaclab"   # adjust to your installation
 
 & "$env:ISAAC_LAB_ROOT\isaaclab.bat" -p scripts/reinforcement_learning/sb3/train.py `
-  --task MobileMMTrackEE-v0 --num_envs 64 --headless true
+  --task RecomoProto2TrackEE-v0 --num_envs 64 --headless
 ```
 
 > **Tip:** Set `ISAAC_LAB_ROOT` as a system environment variable to avoid editing scripts when
@@ -61,6 +63,7 @@ $env:ISAAC_LAB_ROOT = "I:\isaaclab"   # adjust to your installation
 
 **📚 Documentation**: 
 - **⚡ Quick Start**: [START_TRAINING_NOW.md](START_TRAINING_NOW.md) - Get training running in 3 commands!
+- **Proto2 Baseline**: [docs/03_training/PROTO2_BASELINE.md](docs/03_training/PROTO2_BASELINE.md) - Active USD, task alias, action contract, and validation gates
 - **📖 Complete Documentation**: [docs/README.md](docs/README.md) - Organized learning path
 - **🔧 Quick Reference**: [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) - One-page command cheat sheet
 - **📊 Reward System**: [docs/reference/REWARD_SYSTEM_DESIGN.md](docs/reference/REWARD_SYSTEM_DESIGN.md) - How rewards are designed
@@ -345,4 +348,3 @@ Custom `IsaacLabToSB3VecEnvWrapper` bridges Isaac Lab (dict observations, torch 
 **Training Status:** ✅ Session 8i v3 Complete (41.94M steps, sigmoid transition)  
 **Documentation:** ✅ Comprehensive (Reward System + Model Architecture)  
 **GPU Utilization:** 75% (18GB/24GB on RTX 3090)
-

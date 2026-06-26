@@ -218,22 +218,33 @@ def register_isaac_lab_tasks():
     try:
         import gymnasium as gym
         from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnv, MobileMMTrackEEEnvCfg
-        
-        # Register the tracking task
-        # NOTE: Don't pass cfg in kwargs - let gym.make() pass num_envs directly
-        gym.register(
-            id="MobileMMTrackEE-v0",
-            entry_point="rl_platform.tasks.mobile_mm:MobileMMTrackEEEnv",
-            # Remove hardcoded cfg to allow num_envs override
+
+        def register_once(task_id: str, entry_point: str) -> None:
+            if task_id in gym.envs.registry:
+                return
+            gym.register(id=task_id, entry_point=entry_point)
+
+        # Primary tracking task. Do not pass cfg in kwargs; gym.make() passes
+        # num_envs and trajectory overrides directly into the environment.
+        register_once(
+            "MobileMMTrackEE-v0",
+            "rl_platform.tasks.mobile_mm:MobileMMTrackEEEnv",
         )
-        
         print("[task_spec] Registered Isaac Lab task: MobileMMTrackEE-v0")
 
-        # RecomoProto1 robot task
+        # Explicit Proto2 alias for the active recomoProto2-1190 USD baseline.
+        register_once(
+            "RecomoProto2TrackEE-v0",
+            "rl_platform.tasks.mobile_mm:MobileMMTrackEEEnv",
+        )
+        print("[task_spec] Registered Isaac Lab task: RecomoProto2TrackEE-v0")
+
+        # RecomoProto1 compatibility task. The implementation currently points
+        # to the Proto2 USD, but the ID is retained for older scripts.
         from rl_platform.tasks.recomoproto1 import RecomoProto1TrackEEEnv, RecomoProto1TrackEEEnvCfg  # noqa: F401
-        gym.register(
-            id="RecomoProto1TrackEE-v0",
-            entry_point="rl_platform.tasks.recomoproto1:RecomoProto1TrackEEEnv",
+        register_once(
+            "RecomoProto1TrackEE-v0",
+            "rl_platform.tasks.recomoproto1:RecomoProto1TrackEEEnv",
         )
         print("[task_spec] Registered Isaac Lab task: RecomoProto1TrackEE-v0")
 

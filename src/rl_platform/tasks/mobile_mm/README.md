@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `MobileMMTrackEE-v0` task trains a mobile manipulator to track a reference trajectory with its end-effector while maintaining stability and avoiding obstacles.
+The `MobileMMTrackEE-v0` task trains a mobile manipulator to track a reference trajectory with its end-effector while maintaining stability and avoiding obstacles. The active robot asset is `recomoProto2-1190`; use `RecomoProto2TrackEE-v0` as the explicit Proto2 task alias.
 
 ## Task Structure
 
@@ -30,19 +30,24 @@ The observation includes:
 - Base state: position, orientation, velocities (13 dims)
 - Joint state: positions and velocities (12 dims for 6 joints)
 - End-effector state: position, orientation, velocities (13 dims)
-- Tracking error: position and orientation errors (7 dims)
+- Tracking error: position, quaternion, and axis-angle orientation errors (10 dims)
 - Optional: Lookahead targets (configurable)
 - Optional: Action history (configurable)
 - Optional: Contact forces (TODO)
 - Optional: Obstacle distances (TODO)
 
-**Default observation dimension**: 46
+**Default observation dimension**: computed from config at startup.
 
 ### Action Space
 
 8-dimensional continuous actions:
 - 6 arm joint position targets
-- 2 base DOF commands (v_x, omega_z) (TODO: integrate base control)
+- 2 base commands (`base_vx`, `base_wz`)
+
+The Proto2 USD also contains `base_joint_vy` and virtual gimbal joints
+(`ee1_rot_z`, `ee1_rot_y`, `ee1_rot_x`). These joints are locked/passive in the
+v1 policy and must not be added to the action space without revisiting
+observations, rewards, and checkpoint compatibility.
 
 ### Reward Function
 
@@ -104,7 +109,7 @@ cfg = MobileMMTrackEEEnvCfg(task_config=task_config)
 ```bash
 # Windows with Isaac Lab
 I:\isaaclab\isaaclab-3090.bat -p scripts/reinforcement_learning/sb3/train.py \
-    --task MobileMMTrackEE-v0 \
+    --task RecomoProto2TrackEE-v0 \
     --num_envs 1024 \
     --headless
 ```
@@ -113,7 +118,7 @@ I:\isaaclab\isaaclab-3090.bat -p scripts/reinforcement_learning/sb3/train.py \
 
 ```bash
 I:\isaaclab\isaaclab-3090.bat -p scripts/reinforcement_learning/sb3/train.py \
-    --task MobileMMTrackEE-v0 \
+    --task RecomoProto2TrackEE-v0 \
     --num_envs 2048 \
     --headless \
     --total_timesteps 5000000 \
@@ -128,7 +133,7 @@ I:\isaaclab\isaaclab-3090.bat -p scripts/reinforcement_learning/sb3/train.py \
 
 ```bash
 I:\isaaclab\isaaclab-3090.bat -p scripts/reinforcement_learning/sb3/train.py \
-    --task MobileMMTrackEE-v0 \
+    --task RecomoProto2TrackEE-v0 \
     --num_envs 1024 \
     --headless \
     --checkpoint logs/sb3/mobile_mm_track_ee/20251013_143022/checkpoints/ppo_mobile_mm_1000000_steps

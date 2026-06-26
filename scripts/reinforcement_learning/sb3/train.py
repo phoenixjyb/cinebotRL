@@ -11,7 +11,7 @@ Usage:
 
     # Direct Isaac Lab call (set ISAAC_LAB_ROOT env var first):
     & "$env:ISAAC_LAB_ROOT\\isaaclab.bat" -p scripts/reinforcement_learning/sb3/train.py \\
-        --task MobileMMTrackEE-v0 \\
+        --task RecomoProto2TrackEE-v0 \\
         --num_envs 1024 \\
         --headless
 """
@@ -21,6 +21,11 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # Add project root to Python path
 # Get the script's actual location, then go up to project root
@@ -48,7 +53,7 @@ def parse_args():
     parser.add_argument(
         "--task",
         type=str,
-        default="MobileMMTrackEE-v0",
+        default="RecomoProto2TrackEE-v0",
         help="Task ID to train on",
     )
     parser.add_argument(
@@ -288,7 +293,7 @@ def main():
         from isaaclab.app import AppLauncher
         import torch
         
-        # Enable TF32 for Tensor Cores (RTX 30xx/40xx optimization)
+        # Enable TF32 for Tensor Cores when the selected GPU supports it.
         # Provides ~8x speedup on matrix multiplications with minimal precision loss
         if torch.cuda.is_available():
             torch.backends.cuda.matmul.allow_tf32 = True
@@ -332,7 +337,7 @@ def main():
         print(f"    [FAIL] Failed to initialize Isaac Sim: {e}")
         import traceback
         traceback.print_exc()
-        return
+        return 1
     
     # Step 2: NOW we can safely import and register our custom tasks
     # Isaac Sim is running, so Isaac Lab imports will work
@@ -346,7 +351,7 @@ def main():
         import traceback
         traceback.print_exc()
         simulation_app.close()
-        return
+        return 1
     
     # Step 3: Import SB3 and other training dependencies
     print("\n[3/6] Importing training dependencies...")
@@ -840,6 +845,7 @@ def main():
                     obs = obs_tensor.cpu().numpy()
                 else:
                     obs = np.array(obs_tensor)
+                obs = np.nan_to_num(obs, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32, copy=False)
                 
                 # Update observation space on first reset
                 if not self._obs_space_updated:
@@ -886,10 +892,12 @@ def main():
                     obs = obs_tensor.cpu().numpy()
                 else:
                     obs = np.array(obs_tensor)
+                obs = np.nan_to_num(obs, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32, copy=False)
             
             # Convert rewards and dones to numpy
             if hasattr(rewards, 'cpu'):
                 rewards = rewards.cpu().numpy()
+            rewards = np.nan_to_num(rewards, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32, copy=False)
             if hasattr(dones, 'cpu'):
                 dones = dones.cpu().numpy()
             
@@ -1058,7 +1066,7 @@ def main():
         import traceback
         traceback.print_exc()
         simulation_app.close()
-        return
+        return 1
     
     try:
         
@@ -1085,7 +1093,7 @@ def main():
         import traceback
         traceback.print_exc()
         simulation_app.close()
-        return
+        return 1
     
     # Step 6: Create and train PPO model
     print("\n[6/6] Setting up PPO training...")
@@ -1220,13 +1228,13 @@ def main():
         else:
             print("    Creating new PPO model...")
             
-            # Enhanced network architecture for 9DOF robot with trajectory tracking
-            # Obs: 70 dims (base 13 + joints 12 + EE 13 + error 7 + lookahead 9 + action_hist 16)
-            # Actions: 8 dims (6 arm joints + 2 base velocities)
+            # Enhanced network architecture for Proto2 trajectory tracking.
+            obs_dim = int(np.prod(env.observation_space.shape))
+            action_dim = int(np.prod(env.action_space.shape))
             policy_kwargs = dict(
                 net_arch=dict(
-                    pi=[256, 256, 128],  # Actor: 3-layer network (70->256->256->128->8)
-                    vf=[256, 256, 128]   # Critic: 3-layer network (70->256->256->128->1)
+                    pi=[256, 256, 128],
+                    vf=[256, 256, 128],
                 ),
                 activation_fn=torch.nn.ReLU,
                 ortho_init=True,  # Orthogonal initialization (better for RL)
@@ -1234,9 +1242,8 @@ def main():
             )
             
             print("    Network Architecture:")
-            print("      Actor (Policy):  [70] -> [256] -> [256] -> [128] -> [8]  (~118K params)")
-            print("      Critic (Value):  [70] -> [256] -> [256] -> [128] -> [1]  (~117K params)")
-            print("      Total: ~235K parameters (16x larger than default)")
+            print(f"      Actor (Policy):  [{obs_dim}] -> [256] -> [256] -> [128] -> [{action_dim}]")
+            print(f"      Critic (Value):  [{obs_dim}] -> [256] -> [256] -> [128] -> [1]")
             print("    Action Distribution:")
             print("      Initial std:     ~0.37 (log_std_init=-1.0)")
             print("      Std control:     Entropy decay + KL schedule")
@@ -1292,7 +1299,7 @@ def main():
         traceback.print_exc()
         env.close()
         simulation_app.close()
-        return
+        return 1
     
     # Print training configuration
     print("\n" + "=" * 70)
@@ -1324,6 +1331,7 @@ def main():
     print("=" * 70 + "\n")
     
     # Train
+    exit_code = 0
     try:
         print("Starting training...\n")
         model.learn(
@@ -1346,6 +1354,7 @@ def main():
         
     except KeyboardInterrupt:
         print("\n\n[WARN]  Training interrupted by user")
+        exit_code = 130
         
         # Save interrupt checkpoint
         interrupt_path = os.path.join(args.log_dir, "interrupt_checkpoint")
@@ -1358,6 +1367,7 @@ def main():
         print(f"\n[FAIL] Training failed: {e}")
         import traceback
         traceback.print_exc()
+        exit_code = 1
     
     finally:
         print("\nCleaning up...")
@@ -1366,8 +1376,8 @@ def main():
             wandb.finish()
         simulation_app.close()
         print("Done!")
+    return exit_code
 
 
 if __name__ == "__main__":
-    main()
-
+    sys.exit(main())

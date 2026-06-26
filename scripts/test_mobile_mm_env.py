@@ -1,23 +1,18 @@
 #!/usr/bin/env python3
-"""Test MobileMMTrackEE-v0 environment with Isaac Lab 2.2.0.
+"""Smoke-test the Proto2-backed MobileMMTrackEE Isaac Lab environment.
 
-This test follows Isaac Lab's app launcher pattern for proper initialization.
+This follows Isaac Lab's app launcher pattern and works with either the legacy
+MobileMMTrackEE-v0 task ID or the RecomoProto2TrackEE-v0 alias.
 """
 
 import argparse
 import sys
 import os
 
-#!/usr/bin/env python3
-"""Test MobileMMTrackEE-v0 environment with Isaac Lab 2.2.0.
-
-This test runs natively on Windows with full GPU support.
-No WSL-specific workarounds needed!
-"""
-
-import argparse
-import sys
-import os
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # Add project root to path (must be done before importing project modules)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -34,72 +29,10 @@ os.environ["GYMNASIUM_DISABLE_PLUGIN_ENTRYPOINTS"] = "1"
 print("[DEBUG] Disabled Gymnasium plugin entrypoints to prevent ale_py crash")
 
 # ============================================================================
-# GPU Auto-detection for Windows
+# GPU auto-detection
 # ============================================================================
-# System has 2 GPUs:
-#   GPU 0: RTX 3090 (CUDA capability 8.6 - Training GPU)
-#   GPU 1: Quadro P2000 (CUDA capability 6.1 - Display GPU, not supported by PyTorch 2.7+)
-#
-# Note: Windows GPU enumeration may differ from WSL2!
-# Auto-detection strategy:
-#   1. Let PyTorch detect available GPUs
-#   2. Select GPU with highest compute capability >= 7.0
-#   3. On Windows, Vulkan and Warp work natively - no special setup needed!
-# ============================================================================
-
-def get_best_gpu_device():
-    """Automatically detect the best GPU device for training.
-    
-    Returns:
-        str: Device string like "cuda:0" or "cuda:1"
-    """
-    try:
-        import torch
-        if not torch.cuda.is_available():
-            print("    ⚠️  No CUDA devices available, using CPU")
-            return "cpu"
-        
-        num_gpus = torch.cuda.device_count()
-        if num_gpus == 1:
-            return "cuda:0"
-        
-        # Multiple GPUs: find the one with highest compute capability
-        best_device = 0
-        best_compute_cap = 0.0
-        
-        for i in range(num_gpus):
-            compute_cap = torch.cuda.get_device_capability(i)
-            compute_cap_value = compute_cap[0] + compute_cap[1] * 0.1
-            device_name = torch.cuda.get_device_name(i)
-            
-            print(f"    GPU {i}: {device_name} (compute {compute_cap[0]}.{compute_cap[1]})")
-            
-            # Only consider GPUs with compute capability >= 7.0 (Volta+)
-            if compute_cap_value >= 7.0 and compute_cap_value > best_compute_cap:
-                best_compute_cap = compute_cap_value
-                best_device = i
-        
-        device_str = f"cuda:{best_device}"
-        print(f"    ✓ Selected {torch.cuda.get_device_name(best_device)} as {device_str}")
-        return device_str
-        
-    except ImportError:
-        # Torch not yet imported (before Isaac Lab initialization)
-        # Fallback: assume device 0 is the best (Windows native enumeration)
-        return "cuda:0"
-
-# ============================================================================
-# GPU Auto-detection for Windows/WSL
-# ============================================================================
-# System has 2 GPUs:
-#   GPU 0: Quadro P2000 (CUDA capability 6.1 - NOT supported by PyTorch 2.7+)
-#   GPU 1: RTX 3090 (CUDA capability 8.6 - SUPPORTED)
-#
-# Auto-detection strategy:
-#   1. Detect available GPUs with compute capability >= 7.0
-#   2. Select RTX 3090 automatically (highest compute capability)
-#   3. Works on both Windows and WSL without hardcoding device IDs
-# ============================================================================
+# Select the highest-compute CUDA device >= 7.0. This avoids hardcoding the
+# Windows/WSL GPU enumeration order on the .98 machine.
 
 def get_best_gpu_device():
     """Automatically detect the best GPU device for training.
@@ -139,7 +72,7 @@ def get_best_gpu_device():
         
     except ImportError:
         # Torch not yet imported (before Isaac Lab initialization)
-        return "cuda:1"  # Fallback to device 1 (RTX 3090)
+        return "cuda:0"
 
 # Accept EULA
 os.environ["ACCEPT_EULA"] = "YES"
@@ -154,6 +87,7 @@ def main():
     
     # Parse arguments for Isaac Lab app launcher
     parser = argparse.ArgumentParser(description="Test custom MobileMMTrackEE environment")
+    parser.add_argument("--task", type=str, default="RecomoProto2TrackEE-v0", help="Gym task ID")
     parser.add_argument("--headless", action="store_true", default=True, help="Run headless")
     parser.add_argument("--num_envs", type=int, default=1, help="Number of environments")
     parser.add_argument("--steps", type=int, default=10, help="Number of test steps")
@@ -211,7 +145,7 @@ def main():
         return 1
     
     # Register task
-    print("[3/8] Registering MobileMMTrackEE-v0 task...")
+    print(f"[3/8] Registering {args_cli.task} task...")
     try:
         # Ensure project paths are in sys.path
         if PROJECT_ROOT not in sys.path:
@@ -226,11 +160,11 @@ def main():
         from task_spec import register_isaac_lab_tasks
         register_isaac_lab_tasks()
         
-        if 'MobileMMTrackEE-v0' in gym.envs.registry:
+        if args_cli.task in gym.envs.registry:
             print("    ✓ Task registered successfully")
         else:
             print("    ✗ Task not found in registry")
-            print(f"    Available tasks: {[k for k in gym.envs.registry.keys() if 'Mobile' in k]}")
+            print(f"    Available tasks: {[k for k in gym.envs.registry.keys() if 'TrackEE' in k]}")
             simulation_app.close()
             return 1
     except Exception as e:
@@ -244,7 +178,7 @@ def main():
     print(f"[4/8] Creating environment ({args_cli.num_envs} env(s))...")
     try:
         env = gym.make(
-            'MobileMMTrackEE-v0',
+            args_cli.task,
             num_envs=args_cli.num_envs,
             headless=args_cli.headless,
         )
@@ -270,6 +204,8 @@ def main():
         obs, info = env.reset()
         print("    ✓ Reset successful")
         print(f"    - Observation shape: {obs['policy'].shape}")
+        if env.action_space.shape[-1] != 8:
+            raise AssertionError(f"Expected 8-action Proto2 v1 policy, got {env.action_space.shape}")
     except Exception as e:
         print(f"    ✗ Failed to reset: {e}")
         import traceback
@@ -289,11 +225,17 @@ def main():
         if hasattr(unwrapped_env, 'robot'):
             robot = unwrapped_env.robot
             print(f"    ✓ Robot loaded")
-            if hasattr(robot, 'body_names') and 'left_gripper_link' in robot.body_names:
-                idx = robot.body_names.index('left_gripper_link')
-                print(f"    ✓ Found 'left_gripper_link' at index {idx}")
+            required_bodies = ["base_link", "arm_link_1", "arm_link_2", "arm_link_3",
+                               "arm_link_4", "arm_link_5", "arm_link_6", "cam_link"]
+            missing_bodies = [name for name in required_bodies if name not in robot.body_names]
+            if missing_bodies:
+                raise AssertionError(f"Missing Proto2 bodies: {missing_bodies}")
+            print("    ✓ Required Proto2 bodies present")
     except Exception as e:
-        print(f"    ⚠ Could not fully check robot: {e}")
+        print(f"    ✗ Robot structure check failed: {e}")
+        env.close()
+        simulation_app.close()
+        return 1
     
     # Execute steps
     print(f"[7/8] Testing environment stepping ({args_cli.steps} steps)...")
@@ -313,6 +255,18 @@ def main():
         
         print(f"    ✓ Completed {args_cli.steps} steps")
         print(f"    Final reward: {reward[0].item():.4f}")
+
+        from rl_platform.tasks.mobile_mm.joint_names import PASSIVE_JOINT_NAMES
+
+        robot = env.unwrapped.robot
+        passive_ids = [robot.joint_names.index(name) for name in PASSIVE_JOINT_NAMES]
+        passive_pos = robot.data.joint_pos[:, passive_ids]
+        max_passive_abs = passive_pos.abs().max().item()
+        print(f"    Passive joint max abs position: {max_passive_abs:.6f}")
+        if max_passive_abs > 1e-3:
+            raise AssertionError(
+                f"Passive Proto2 joints drifted from zero: {PASSIVE_JOINT_NAMES} max={max_passive_abs}"
+            )
     except Exception as e:
         print(f"    ✗ Failed during stepping: {e}")
         import traceback
@@ -338,11 +292,11 @@ def main():
     print()
     print("  2. Run short training:")
     print("     python scripts/reinforcement_learning/sb3/train.py \\")
-    print("         --task MobileMMTrackEE-v0 --num_envs 16 --total_timesteps 10000")
+    print("         --task RecomoProto2TrackEE-v0 --num_envs 16 --total_timesteps 10000")
     print()
     print("  3. Full training:")
     print("     python scripts/reinforcement_learning/sb3/train.py \\")
-    print("         --task MobileMMTrackEE-v0 --num_envs 1024 --headless")
+    print("         --task RecomoProto2TrackEE-v0 --num_envs 1024 --headless")
     print()
     
     return 0

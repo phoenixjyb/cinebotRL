@@ -8,7 +8,7 @@
     provides convenient parameter passing.
 
 .PARAMETER Task
-    Task ID to train (default: MobileMMTrackEE-v0)
+    Task ID to train (default: RecomoProto2TrackEE-v0)
 
 .PARAMETER NumEnvs
     Number of parallel environments (default: 1024)
@@ -39,7 +39,7 @@
 #>
 
 param(
-    [string]$Task = "MobileMMTrackEE-v0",
+    [string]$Task = "RecomoProto2TrackEE-v0",
     [int]$NumEnvs = 1024,
     [switch]$Headless,
     [int]$TotalTimesteps = 1000000,
@@ -100,7 +100,7 @@ try {
     $gpuInfo = nvidia-smi --query-gpu=index,name,compute_cap --format=csv,noheader
     $gpuLines = $gpuInfo -split "`n"
     foreach ($line in $gpuLines) {
-        if ($line -match "RTX 3090") {
+        if ($line -match "RTX|GeForce|Ada|Blackwell") {
             Write-Host "${Green}  ✓ $line${Reset}"
         } elseif ($line.Trim() -ne "") {
             Write-Host "    $line"
@@ -141,6 +141,7 @@ if ($Test) {
     $scriptPath = Join-Path $ProjectPath "scripts\test_mobile_mm_env.py"
     $scriptArgs = @(
         "-p", $scriptPath,
+        "--task", $Task,
         "--num_envs", "1",
         "--steps", "5"
     )

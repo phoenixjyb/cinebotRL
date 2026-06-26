@@ -21,6 +21,7 @@ BASE_JOINT_VX = "base_joint_vx"
 BASE_JOINT_VY = "base_joint_vy"
 BASE_JOINT_WZ = "base_joint_wz"
 BASE_JOINT_NAMES = [BASE_JOINT_VX, BASE_JOINT_VY, BASE_JOINT_WZ]
+LOCKED_BASE_JOINT_NAMES = [BASE_JOINT_VY]
 
 # --- Arm joints (6-DOF, ordered from base to tip) ---
 ARM_JOINT_1 = "joint6_arm_yaw"
@@ -40,8 +41,17 @@ EE_LINK_NAME = "cam_link"
 
 # --- Virtual EE gimbal joints (kept for MoveIt-style frames; excluded from RL action/observation) ---
 EE_VIRTUAL_JOINT_NAMES = ["ee1_rot_z", "ee1_rot_y", "ee1_rot_x"]
+PASSIVE_JOINT_NAMES = LOCKED_BASE_JOINT_NAMES + EE_VIRTUAL_JOINT_NAMES
 
 # --- Counts ---
 NUM_BASE_JOINTS = len(BASE_JOINT_NAMES)
 NUM_ARM_JOINTS = len(ARM_JOINT_NAMES)
 NUM_ACTUATED_JOINTS = NUM_BASE_JOINTS + NUM_ARM_JOINTS  # 9 (excludes EE virtual)
+
+# --- V1 policy action contract ---
+# Keep SB3 checkpoints and launchers compatible while the Proto2 USD carries the
+# full PPR base and virtual gimbal frame chain.
+POLICY_ARM_ACTION_SLICE = slice(0, 6)
+POLICY_BASE_VX_ACTION_INDEX = 6
+POLICY_BASE_WZ_ACTION_INDEX = 7
+POLICY_ACTION_DIM = NUM_ARM_JOINTS + 2

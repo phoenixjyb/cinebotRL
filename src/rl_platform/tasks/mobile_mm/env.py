@@ -1674,13 +1674,31 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"  Upper: {self.joint_upper_limits}")
 
     def _get_obstacle_clearance(self, base_pos: torch.Tensor) -> torch.Tensor:
-        """Return signed planar clearance from base footprint to the obstacle disc."""
+        """Return signed planar clearance from base footprint to the obstacle disc.
+
+        Simulator transients can briefly produce non-finite root poses. Do not let
+        those values leak into observations, rewards, or TensorBoard; mark those
+        environments unsafe so PPO receives a finite penalty instead of NaNs.
+        """
         if not self.obstacles_enabled:
             return torch.full((self.num_envs,), 10.0, device=self.device)
 
         obstacle_xy_world = self.scene.env_origins[:, :2] + self.obstacle_disc_xy_local.unsqueeze(0)
-        center_distance = torch.norm(base_pos[:, :2] - obstacle_xy_world, dim=-1)
+        base_xy = base_pos[:, :2]
+        finite_base_xy = torch.isfinite(base_xy).all(dim=-1)
+        safe_base_xy = torch.nan_to_num(base_xy, nan=0.0, posinf=1e3, neginf=-1e3)
+        center_distance = torch.norm(safe_base_xy - obstacle_xy_world, dim=-1)
         clearance = center_distance - (self.robot_footprint_radius + self.obstacle_disc_radius)
+        finite_clearance = torch.isfinite(clearance)
+        invalid = (~finite_base_xy) | (~finite_clearance)
+        if invalid.any():
+            penalty_clearance = -self.reward_weights.get("safety_radius", 0.2)
+            clearance = torch.where(
+                invalid,
+                torch.full_like(clearance, penalty_clearance),
+                torch.nan_to_num(clearance, nan=penalty_clearance, posinf=10.0, neginf=penalty_clearance),
+            )
+            self._obstacle_nonfinite_count = getattr(self, "_obstacle_nonfinite_count", 0) + int(invalid.sum().item())
         return clearance
 
     def _get_filtered_contact_forces(self) -> torch.Tensor:

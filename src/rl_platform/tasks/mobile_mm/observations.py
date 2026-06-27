@@ -46,7 +46,7 @@ def compose_observation(
         lookahead_pos: Lookahead positions [num_envs, steps, 3] or None
         action_history: Previous actions [num_envs, history_len, action_dim] or None
         contact_forces: Contact forces [num_envs, num_bodies] or None
-        min_obstacle_dist: Minimum obstacle distance [num_envs, 1] or None
+        min_obstacle_dist: Signed obstacle clearance [num_envs, 1] or None
 
     Returns:
         observations: Flattened observation tensor [num_envs, obs_dim]

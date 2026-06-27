@@ -274,6 +274,14 @@ def parse_args():
         default=None,
         help="Limit number of trajectories to load (None = all, useful for debugging)",
     )
+    parser.add_argument(
+        "--enable_obstacles",
+        action="store_true",
+        help="Enable the static ground-disc obstacle avoidance task.",
+    )
+    parser.add_argument("--obstacle_x", type=float, default=0.0, help="Obstacle disc X in each env local frame.")
+    parser.add_argument("--obstacle_y", type=float, default=0.5, help="Obstacle disc Y in each env local frame.")
+    parser.add_argument("--obstacle_radius", type=float, default=0.18, help="Obstacle disc radius in meters.")
     
     return parser.parse_args()
 
@@ -579,6 +587,7 @@ def main():
                             'excessive_base_movement_penalty',
                             'velocity_limit_penalty',
                             'jerk_limit_penalty',
+                            'obstacle_reward',
                         ]
                         for key in important_rewards:
                             if key in rewards_dict:
@@ -644,6 +653,20 @@ def main():
                         self.logger.record("monitoring/workspace_soft_exceed_pct", beyond_soft_pct)
                         self.logger.record("monitoring/workspace_hard_exceed_pct", beyond_hard_pct)
                     
+                    if hasattr(isaac_env, '_obstacle_clearance_buf') and getattr(isaac_env, 'obstacles_enabled', False):
+                        clearance = isaac_env._obstacle_clearance_buf
+                        safety_radius = isaac_env.reward_weights.get("safety_radius", 0.2)
+                        unsafe_pct = (clearance < safety_radius).float().mean().item() * 100
+                        collision_pct = (clearance < 0.0).float().mean().item() * 100
+                        print(f"\n[Obstacle Clearance]")
+                        print(f"  Clearance (m):      mean={clearance.mean().item():.4f}, min={clearance.min().item():.4f}")
+                        print(f"  Unsafe (<{safety_radius:.2f}m): {unsafe_pct:.1f}%")
+                        print(f"  Collision (<0m):    {collision_pct:.1f}%")
+                        self.logger.record("monitoring/obstacle_clearance_mean", clearance.mean().item())
+                        self.logger.record("monitoring/obstacle_clearance_min", clearance.min().item())
+                        self.logger.record("monitoring/obstacle_unsafe_pct", unsafe_pct)
+                        self.logger.record("monitoring/obstacle_collision_pct", collision_pct)
+
                     # Base movement statistics
                     if hasattr(isaac_env, '_robot') and hasattr(isaac_env._robot.data, 'root_lin_vel_w'):
                         base_vel = isaac_env._robot.data.root_lin_vel_w
@@ -1028,6 +1051,7 @@ def main():
         
         # Create custom environment configuration
         env_cfg = MobileMMTrackEEEnvCfg()
+        env_cfg.num_envs = args.num_envs
         env_cfg.scene.num_envs = args.num_envs
         
         # Convert trajectory_dir to absolute path if it's relative
@@ -1041,6 +1065,17 @@ def main():
                 trajectory_dir = str(PROJECT_ROOT / trajectory_dir)
                 print(f"    Resolved relative path to: {trajectory_dir}")
         
+        env_cfg.task_config.obstacles.enable_obstacles = args.enable_obstacles
+        env_cfg.task_config.obstacles.disc_position_xy = (args.obstacle_x, args.obstacle_y)
+        env_cfg.task_config.obstacles.disc_radius = args.obstacle_radius
+        if args.enable_obstacles:
+            env_cfg.scene = env_cfg._create_scene_config()
+            env_cfg.scene.num_envs = args.num_envs
+            print(
+                f"    Obstacle disc: pos=({args.obstacle_x:.2f}, {args.obstacle_y:.2f}), "
+                f"radius={args.obstacle_radius:.2f}m"
+            )
+
         # Configure trajectory
         env_cfg.task_config.trajectory = TrajectoryConfig(
             type=args.trajectory_type,

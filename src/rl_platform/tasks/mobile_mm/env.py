@@ -212,6 +212,35 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         scene_cfg.robot = robot_cfg
         scene_cfg.ground = ground_cfg
 
+        if self.task_config.obstacles.enable_obstacles:
+            obs_cfg = self.task_config.obstacles
+            scene_cfg.obstacle_disc = AssetBaseCfg(
+                prim_path="{ENV_REGEX_NS}/ObstacleDisc",
+                spawn=sim_utils.CylinderCfg(
+                    radius=obs_cfg.disc_radius,
+                    height=obs_cfg.disc_height,
+                    axis="Z",
+                    rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                        rigid_body_enabled=True,
+                        kinematic_enabled=True,
+                        disable_gravity=True,
+                    ),
+                    collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled=True),
+                    physics_material=sim_utils.RigidBodyMaterialCfg(
+                        static_friction=1.0,
+                        dynamic_friction=1.0,
+                        restitution=0.0,
+                    ),
+                    visual_material=sim_utils.PreviewSurfaceCfg(
+                        diffuse_color=(0.95, 0.25, 0.12),
+                        roughness=0.8,
+                    ),
+                ),
+                init_state=AssetBaseCfg.InitialStateCfg(
+                    pos=(obs_cfg.disc_position_xy[0], obs_cfg.disc_position_xy[1], obs_cfg.disc_height * 0.5),
+                ),
+            )
+
         # Add contact sensor for chassis (to detect when arm links collide with it)
         # Following official Isaac Lab pattern from contact_sensor.py example
         # filter_prim_paths_expr limits to only report contacts with arm links
@@ -290,6 +319,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         waypoint_file_override = kwargs.pop("waypoint_file", None)
         use_all_trajectories = kwargs.pop("use_all_trajectories", None)
         use_chassis_only = kwargs.pop("use_chassis_only", None)
+        enable_obstacles_override = kwargs.pop("enable_obstacles", None)
+        obstacle_x_override = kwargs.pop("obstacle_x", None)
+        obstacle_y_override = kwargs.pop("obstacle_y", None)
+        obstacle_radius_override = kwargs.pop("obstacle_radius", None)
 
         print(f"[MobileMMTrackEE] DEBUG: Before config handling, num_envs_override={num_envs_override}")
 
@@ -306,6 +339,25 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         if cfg.scene is not None and num_envs_override is not None:
             cfg.scene.num_envs = num_envs_override
+
+        scene_needs_rebuild = False
+        obstacle_cfg = cfg.task_config.obstacles
+        if enable_obstacles_override is not None:
+            obstacle_cfg.enable_obstacles = bool(enable_obstacles_override)
+            scene_needs_rebuild = True
+        if obstacle_x_override is not None or obstacle_y_override is not None:
+            x = obstacle_cfg.disc_position_xy[0] if obstacle_x_override is None else float(obstacle_x_override)
+            y = obstacle_cfg.disc_position_xy[1] if obstacle_y_override is None else float(obstacle_y_override)
+            obstacle_cfg.disc_position_xy = (x, y)
+            scene_needs_rebuild = True
+        if obstacle_radius_override is not None:
+            obstacle_cfg.disc_radius = float(obstacle_radius_override)
+            scene_needs_rebuild = True
+
+        if scene_needs_rebuild:
+            cfg.scene = cfg._create_scene_config()
+            if num_envs_override is not None:
+                cfg.scene.num_envs = num_envs_override
 
         # Apply trajectory overrides (works for provided or auto-created cfg)
         traj_cfg = cfg.task_config.trajectory
@@ -327,6 +379,34 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             traj_cfg.trajectory_filter_indices = self._load_chassis_required_indices(max_trajectories_override)
         elif use_all_trajectories:
             traj_cfg.trajectory_filter_indices = None
+
+        # Rebuild scene and spaces after runtime overrides so obstacle-enabled
+        # configs expose the correct observation dimension before DirectRLEnv init.
+        cfg.num_actions = POLICY_ACTION_DIM
+        cfg.num_observations = get_observation_dimensions(
+            num_joints=6,
+            num_contacts=1,
+            use_lookahead=cfg.task_config.use_lookahead,
+            lookahead_steps=cfg.task_config.lookahead_steps,
+            use_action_history=cfg.task_config.include_action_history,
+            action_history_length=cfg.task_config.action_history_length,
+            action_dim=cfg.num_actions,
+            use_obstacles=cfg.task_config.obstacles.enable_obstacles,
+        )
+        cfg.observation_space = gym.spaces.Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(cfg.num_observations,),
+            dtype=np.float32,
+        )
+        cfg.action_space = gym.spaces.Box(
+            low=-1.0,
+            high=1.0,
+            shape=(cfg.num_actions,),
+            dtype=np.float32,
+        )
+        cfg.scene = cfg._create_scene_config()
+        cfg.scene.num_envs = cfg.num_envs
 
         print(f"[MobileMMTrackEE] DEBUG: About to call super().__init__() with cfg.num_envs={cfg.num_envs if cfg else 'None'}")
 
@@ -432,6 +512,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                   f"{self.task_cfg.rewards.curriculum_stage_2_orientation_weight})")
 
 
+        if self.task_cfg.obstacles.enable_obstacles:
+            print(
+                "[MobileMMTrackEE] Obstacle disc enabled: "
+                f"pos_xy={self.task_cfg.obstacles.disc_position_xy}, "
+                f"radius={self.task_cfg.obstacles.disc_radius:.3f}m, "
+                f"robot_radius={self.task_cfg.obstacles.robot_footprint_radius:.3f}m"
+            )
+
         # Robot limits dictionary
         self.robot_limits = {
             "max_linear_velocity": self.task_cfg.robot_limits.max_linear_velocity,
@@ -513,6 +601,18 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             f"[MobileMMTrackEE] Proto2 policy safety: arm target slew <= "
             f"{self.max_arm_target_delta:.4f} rad/control-step, action radius={self.arm_action_radius.tolist()}"
         )
+
+        # Obstacle state. Obstacle XY is stored in each environment's local frame;
+        # world XY adds scene.env_origins so clearance works for replicated envs.
+        self.obstacles_enabled = self.task_cfg.obstacles.enable_obstacles
+        self.obstacle_disc_xy_local = torch.tensor(
+            self.task_cfg.obstacles.disc_position_xy,
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.obstacle_disc_radius = float(self.task_cfg.obstacles.disc_radius)
+        self.robot_footprint_radius = float(self.task_cfg.obstacles.robot_footprint_radius)
+        self._obstacle_clearance_buf = torch.full((self.num_envs,), 10.0, device=self.device)
 
         # Position history for base progress tracking
         self.prev_base_pos = torch.zeros(self.num_envs, 3, device=self.device)
@@ -1573,6 +1673,16 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"  Lower: {self.joint_lower_limits}")
             print(f"  Upper: {self.joint_upper_limits}")
 
+    def _get_obstacle_clearance(self, base_pos: torch.Tensor) -> torch.Tensor:
+        """Return signed planar clearance from base footprint to the obstacle disc."""
+        if not self.obstacles_enabled:
+            return torch.full((self.num_envs,), 10.0, device=self.device)
+
+        obstacle_xy_world = self.scene.env_origins[:, :2] + self.obstacle_disc_xy_local.unsqueeze(0)
+        center_distance = torch.norm(base_pos[:, :2] - obstacle_xy_world, dim=-1)
+        clearance = center_distance - (self.robot_footprint_radius + self.obstacle_disc_radius)
+        return clearance
+
     def _get_filtered_contact_forces(self) -> torch.Tensor:
         """Get hard self-collision forces from filtered base-arm contacts.
 
@@ -1665,6 +1775,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         coll_threshold = self.reward_weights.get("self_collision_threshold", 1.0)
         contact_obs = torch.clamp(raw_contact / (coll_threshold * 10.0), 0.0, 1.0).unsqueeze(-1)  # [num_envs, 1]
 
+        obstacle_clearance = self._get_obstacle_clearance(base_pos)
+        self._obstacle_clearance_buf = obstacle_clearance.clone()
+        obstacle_obs = None
+        if self.obstacles_enabled:
+            safety_radius = max(self.reward_weights.get("safety_radius", 0.2), 1e-6)
+            obstacle_obs = torch.clamp(obstacle_clearance / safety_radius, -2.0, 5.0).unsqueeze(-1)
+
         # Compose full observation
         obs = compose_observation(
             base_pos=base_pos,
@@ -1682,7 +1799,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             lookahead_pos=lookahead_pos,
             action_history=self.action_history,
             contact_forces=contact_obs,   # Collision severity [num_envs, 1]: 0=clean, →1 at heavy collision
-            min_obstacle_dist=None,  # No obstacles in current scene; enable via ObstacleConfig.enable_obstacles
+            min_obstacle_dist=obstacle_obs,
         )
 
         return {"policy": obs}
@@ -1822,6 +1939,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         # Actual acceleration from simulator (for diagnostics only)
         actual_accel = (base_lin_vel - self.prev_base_lin_vel) / self.control_dt
+
+        obstacle_clearance = self._get_obstacle_clearance(base_pos)
+        self._obstacle_clearance_buf = obstacle_clearance.clone()
 
         # Get base orientation for lateral penalty calculation
         base_quat = self.robot.data.root_quat_w
@@ -2015,7 +2135,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             dt=self.control_dt,
             weights=self.reward_weights,
             workspace_distance=workspace_distance,
-            min_obstacle_dist=None,  # No obstacles in scene; requires ObstacleConfig.enable_obstacles + obstacle prims
+            min_obstacle_dist=obstacle_clearance if self.obstacles_enabled else None,
             prev_ori_error=self.prev_ee_ori_error,  # SESSION 8i: Previous orientation error
             current_ori_error=current_ee_ori_error,  # SESSION 8i: Current orientation error
             ee_ang_vel=ee_ang_vel,  # SESSION 8i: EE angular velocity
@@ -2074,6 +2194,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "base_action_z_mean": self.prev_actions[:, POLICY_BASE_WZ_ACTION_INDEX].mean().item(),
             "base_action_z_std": self.prev_actions[:, POLICY_BASE_WZ_ACTION_INDEX].std().item(),
         }
+        if self.obstacles_enabled:
+            self.extras["obstacle_diagnostics"] = {
+                "clearance_mean": obstacle_clearance.mean().item(),
+                "clearance_min": obstacle_clearance.min().item(),
+                "unsafe_pct": (obstacle_clearance < self.reward_weights.get("safety_radius", 0.2)).float().mean().item() * 100.0,
+                "collision_pct": (obstacle_clearance < 0.0).float().mean().item() * 100.0,
+            }
 
         # === ADD REACHABILITY-GUIDED REWARDS ===
         rewards += reachability_bonus + base_direction_reward

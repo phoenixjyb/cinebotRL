@@ -41,7 +41,11 @@ class ObstacleConfig:
 
     # Obstacle placement
     enable_obstacles: bool = False
-    num_obstacles: int = 3
+    num_obstacles: int = 1
+    disc_position_xy: tuple[float, float] = (0.0, 0.5)  # Local env-frame XY, on the default circle trajectory
+    disc_radius: float = 0.18
+    disc_height: float = 0.08
+    robot_footprint_radius: float = 0.35
     min_distance_from_robot: float = 1.0
     max_distance_from_robot: float = 3.0
     obstacle_radius_range: tuple[float, float] = (0.1, 0.3)
@@ -195,8 +199,8 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     self_collision_continuous: bool = True  # Continuous vs binary penalty
 
     # Obstacle avoidance
-    min_obstacle_distance_weight: float = 1.0
-    safety_radius: float = 0.2  # meters
+    min_obstacle_distance_weight: float = 2.0
+    safety_radius: float = 0.2  # Desired clearance beyond robot footprint + obstacle radius
 
     # ========================================
     # AUXILIARY TRACKING SHAPING

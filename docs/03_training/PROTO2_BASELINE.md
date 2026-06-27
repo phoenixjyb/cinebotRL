@@ -63,6 +63,30 @@ The previous 512-env probing run reached `524,288` steps but auto-paused on
 negative explained variance. Treat v2 as the next stability gate, not as a final
 performance policy.
 
+## Obstacle Avoidance Mode
+
+The static-disc obstacle task is opt-in so the plain 9D baseline stays reproducible.
+It spawns a kinematic ground cylinder in each replicated environment and feeds one
+additional observation dimension: signed base-footprint clearance normalized by
+the configured safety radius. The reward path uses the raw signed clearance via
+`obstacle_distance_reward`.
+
+Example short gate:
+
+```powershell
+G:\isaaclab_venv\Scripts\python.exe G:\wSpace\cinebotRL\scripts\reinforcement_learning\sb3\train.py `
+  --task RecomoProto2TrackEE-v0 `
+  --headless `
+  --num_envs 8 `
+  --total_timesteps 2048 `
+  --n_steps 64 `
+  --batch_size 128 `
+  --enable_obstacles
+```
+
+Default disc: local env-frame `xy=(0.0, 0.5)`, radius `0.18m`, height `0.08m`.
+Override with `--obstacle_x`, `--obstacle_y`, and `--obstacle_radius`.
+
 ## Validation Gates
 
 Smoke test:

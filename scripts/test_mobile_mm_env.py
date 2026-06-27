@@ -91,6 +91,7 @@ def main():
     parser.add_argument("--headless", action="store_true", default=True, help="Run headless")
     parser.add_argument("--num_envs", type=int, default=1, help="Number of environments")
     parser.add_argument("--steps", type=int, default=10, help="Number of test steps")
+    parser.add_argument("--enable_obstacles", action="store_true", help="Enable static obstacle disc")
     args_cli = parser.parse_args()
 
     # Import Isaac Lab app launcher
@@ -181,6 +182,7 @@ def main():
             args_cli.task,
             num_envs=args_cli.num_envs,
             headless=args_cli.headless,
+            enable_obstacles=args_cli.enable_obstacles,
         )
         print("    ✓ Environment created")
         print(f"    - Observation space: {env.observation_space.shape}")

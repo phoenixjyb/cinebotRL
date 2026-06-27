@@ -275,13 +275,46 @@ def parse_args():
         help="Limit number of trajectories to load (None = all, useful for debugging)",
     )
     parser.add_argument(
+        "--min_trajectory_duration",
+        type=float,
+        default=5.0,
+        help="Reject recorded trajectories shorter than this many seconds.",
+    )
+    parser.add_argument(
         "--enable_obstacles",
         action="store_true",
-        help="Enable the static ground-disc obstacle avoidance task.",
+        help="Enable the ground-disc obstacle avoidance task.",
     )
-    parser.add_argument("--obstacle_x", type=float, default=0.0, help="Obstacle disc X in each env local frame.")
-    parser.add_argument("--obstacle_y", type=float, default=0.5, help="Obstacle disc Y in each env local frame.")
+    parser.add_argument("--obstacle_x", type=float, default=0.0, help="Static obstacle disc X in each env local frame.")
+    parser.add_argument("--obstacle_y", type=float, default=0.5, help="Static obstacle disc Y in each env local frame.")
     parser.add_argument("--obstacle_radius", type=float, default=0.18, help="Obstacle disc radius in meters.")
+    parser.add_argument(
+        "--disable_obstacle_randomization",
+        action="store_true",
+        help="Keep the obstacle at --obstacle_x/--obstacle_y instead of randomizing per reset.",
+    )
+    parser.add_argument(
+        "--obstacle_x_range",
+        type=float,
+        nargs=2,
+        default=(-0.35, 0.35),
+        metavar=("MIN", "MAX"),
+        help="Randomized obstacle local X range when obstacles are enabled.",
+    )
+    parser.add_argument(
+        "--obstacle_y_range",
+        type=float,
+        nargs=2,
+        default=(0.45, 1.0),
+        metavar=("MIN", "MAX"),
+        help="Randomized obstacle local Y range when obstacles are enabled.",
+    )
+    parser.add_argument(
+        "--min_obstacle_start_clearance",
+        type=float,
+        default=0.10,
+        help="Minimum reset-time base footprint clearance from randomized obstacle.",
+    )
     
     return parser.parse_args()
 
@@ -670,6 +703,18 @@ def main():
                         print(f"  Clearance (m):      mean={clearance.mean().item():.4f}, min={clearance.min().item():.4f}")
                         print(f"  Unsafe (<{safety_radius:.2f}m): {unsafe_pct:.1f}%")
                         print(f"  Collision (<0m):    {collision_pct:.1f}%")
+                        if hasattr(isaac_env, '_obstacle_xy_buf'):
+                            obstacle_xy = isaac_env._obstacle_xy_buf
+                            print(
+                                f"  Obstacle XY local:  x_mean={obstacle_xy[:, 0].mean().item():.3f}, "
+                                f"x_std={obstacle_xy[:, 0].std().item():.3f}, "
+                                f"y_mean={obstacle_xy[:, 1].mean().item():.3f}, "
+                                f"y_std={obstacle_xy[:, 1].std().item():.3f}"
+                            )
+                            self.logger.record("monitoring/obstacle_x_mean", obstacle_xy[:, 0].mean().item())
+                            self.logger.record("monitoring/obstacle_x_std", obstacle_xy[:, 0].std().item())
+                            self.logger.record("monitoring/obstacle_y_mean", obstacle_xy[:, 1].mean().item())
+                            self.logger.record("monitoring/obstacle_y_std", obstacle_xy[:, 1].std().item())
                         self.logger.record("monitoring/obstacle_clearance_mean", clearance.mean().item())
                         self.logger.record("monitoring/obstacle_clearance_min", clearance.min().item())
                         self.logger.record("monitoring/obstacle_unsafe_pct", unsafe_pct)
@@ -1076,12 +1121,19 @@ def main():
         env_cfg.task_config.obstacles.enable_obstacles = args.enable_obstacles
         env_cfg.task_config.obstacles.disc_position_xy = (args.obstacle_x, args.obstacle_y)
         env_cfg.task_config.obstacles.disc_radius = args.obstacle_radius
+        env_cfg.task_config.obstacles.randomize_per_reset = not args.disable_obstacle_randomization
+        env_cfg.task_config.obstacles.disc_position_x_range = tuple(args.obstacle_x_range)
+        env_cfg.task_config.obstacles.disc_position_y_range = tuple(args.obstacle_y_range)
+        env_cfg.task_config.obstacles.min_start_clearance = args.min_obstacle_start_clearance
         if args.enable_obstacles:
             env_cfg.scene = env_cfg._create_scene_config()
             env_cfg.scene.num_envs = args.num_envs
             print(
                 f"    Obstacle disc: pos=({args.obstacle_x:.2f}, {args.obstacle_y:.2f}), "
-                f"radius={args.obstacle_radius:.2f}m"
+                f"radius={args.obstacle_radius:.2f}m, "
+                f"randomized={not args.disable_obstacle_randomization}, "
+                f"x_range=({args.obstacle_x_range[0]:.2f}, {args.obstacle_x_range[1]:.2f}), "
+                f"y_range=({args.obstacle_y_range[0]:.2f}, {args.obstacle_y_range[1]:.2f})"
             )
 
         # Configure trajectory
@@ -1091,6 +1143,7 @@ def main():
             trajectory_pattern="**/*.json",
             trajectory_filter_indices=trajectory_config.get('filter_indices'),
             max_trajectories=trajectory_config.get('max_trajectories'),
+            min_duration_seconds=args.min_trajectory_duration,
         )
         
         # Create environment directly with config

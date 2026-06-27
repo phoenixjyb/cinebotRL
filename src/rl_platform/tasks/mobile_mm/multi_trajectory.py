@@ -26,6 +26,8 @@ class MultiTrajectoryLoader:
         max_trajectories: int | None = None,
         filter_by_indices: List[int] | None = None,
         exclude_macosx: bool = True,
+        waypoint_dt: float = 0.1,
+        min_duration_seconds: float = 0.0,
     ):
         """Initialize multi-trajectory loader.
         
@@ -36,9 +38,13 @@ class MultiTrajectoryLoader:
             max_trajectories: Maximum number of trajectories to load (None = all)
             filter_by_indices: Only load trajectories at these indices (from analysis results)
             exclude_macosx: Filter out __MACOSX files (default True)
+            waypoint_dt: Seconds represented by each waypoint when timestamps are absent
+            min_duration_seconds: Skip trajectories shorter than this duration
         """
         self.device = device
         self.trajectory_dir = Path(trajectory_dir)
+        self.waypoint_dt = waypoint_dt
+        self.min_duration_seconds = min_duration_seconds
         
         # Find all trajectory files
         self.trajectory_files = sorted(self.trajectory_dir.glob(pattern))
@@ -86,6 +92,14 @@ class MultiTrajectoryLoader:
                     print(f"  ⚠ Skipping {traj_file.name}: no poses found")
                     continue
                 
+                duration_seconds = len(poses) * self.waypoint_dt
+                if duration_seconds < self.min_duration_seconds:
+                    print(
+                        f"  ⚠ Skipping {traj_file.name}: "
+                        f"duration {duration_seconds:.2f}s < {self.min_duration_seconds:.2f}s"
+                    )
+                    continue
+
                 # Extract positions and orientations
                 positions = []
                 orientations = []
@@ -105,18 +119,26 @@ class MultiTrajectoryLoader:
                     "positions": torch.tensor(positions, dtype=torch.float32, device=self.device),
                     "orientations": torch.tensor(orientations, dtype=torch.float32, device=self.device),
                     "length": len(poses),
+                    "duration_seconds": duration_seconds,
                 })
                 
             except Exception as e:
                 print(f"  ✗ Error loading {traj_file.name}: {e}")
         
         print(f"[MultiTrajectoryLoader] Successfully loaded {len(self.trajectories)} trajectories")
+        if not self.trajectories:
+            raise ValueError(
+                f"No trajectories remain after duration filtering "
+                f"(min={self.min_duration_seconds:.2f}s)"
+            )
         
         # Print statistics
         if self.trajectories:
             lengths = [t["length"] for t in self.trajectories]
             categories = set(t["category"] for t in self.trajectories)
             print(f"  - Trajectory lengths: min={min(lengths)}, max={max(lengths)}, mean={sum(lengths)/len(lengths):.1f}")
+            durations = [t["duration_seconds"] for t in self.trajectories]
+            print(f"  - Durations: min={min(durations):.2f}s, max={max(durations):.2f}s, mean={sum(durations)/len(durations):.2f}s")
             print(f"  - Categories: {len(categories)} - {', '.join(sorted(categories))}")
     
     def sample_trajectory(self) -> dict:

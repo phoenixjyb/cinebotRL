@@ -27,6 +27,7 @@ class TrajectoryManager:
         trajectory_pattern: str = "**/*.json",
         trajectory_filter_indices: list[int] | None = None,
         max_trajectories: int | None = None,
+        min_duration_seconds: float = 0.0,
     ):
         """Initialize trajectory manager.
         
@@ -43,6 +44,7 @@ class TrajectoryManager:
             trajectory_pattern: Glob pattern for finding trajectories (default: "**/*.json")
             trajectory_filter_indices: Filter to specific trajectory indices from analysis
             max_trajectories: Maximum number of trajectories to load
+            min_duration_seconds: Reject recorded trajectories shorter than this duration
         """
         self.traj_type = traj_type
         self.num_envs = num_envs
@@ -52,6 +54,7 @@ class TrajectoryManager:
         self.height = height
         self.dt = dt
         self.waypoint_dt = waypoint_dt if waypoint_dt is not None else dt
+        self.min_duration_seconds = min_duration_seconds
         
         # Phase tracking (one per environment)
         self.phase = torch.zeros(num_envs, device=device)
@@ -80,7 +83,8 @@ class TrajectoryManager:
                 trajectory_dir, 
                 trajectory_pattern, 
                 trajectory_filter_indices,
-                max_trajectories
+                max_trajectories,
+                min_duration_seconds,
             )
         elif traj_type == "multi_recorded":
             print(f"[TrajectoryManager] ⚠️  WARNING: traj_type='multi_recorded' but trajectory_dir is None!")
@@ -372,6 +376,13 @@ class TrajectoryManager:
         if not poses:
             raise ValueError(f"No poses found in {waypoint_file}")
         
+        duration_seconds = len(poses) * self.waypoint_dt
+        if duration_seconds < self.min_duration_seconds:
+            raise ValueError(
+                f"Recorded trajectory {waypoint_file} is too short: "
+                f"{duration_seconds:.2f}s < {self.min_duration_seconds:.2f}s"
+            )
+
         # Extract positions and orientations
         positions = []
         orientations = []
@@ -398,6 +409,7 @@ class TrajectoryManager:
         )
         
         print(f"[TrajectoryManager] Loaded {len(poses)} waypoints from {waypoint_file}")
+        print(f"[TrajectoryManager] Recorded duration: {duration_seconds:.2f}s")
         print(f"[TrajectoryManager] Position range: {positions_array.min(dim=0)[0]} to {positions_array.max(dim=0)[0]}")
     
     def _init_multi_trajectory(
@@ -405,7 +417,8 @@ class TrajectoryManager:
         trajectory_dir: str,
         pattern: str = "**/*.json",
         filter_indices: list[int] | None = None,
-        max_trajectories: int | None = None
+        max_trajectories: int | None = None,
+        min_duration_seconds: float = 0.0
     ) -> None:
         """Initialize multi-trajectory loader.
         
@@ -423,6 +436,8 @@ class TrajectoryManager:
             device=self.device,
             max_trajectories=max_trajectories,
             filter_by_indices=filter_indices,
+            waypoint_dt=self.waypoint_dt,
+            min_duration_seconds=min_duration_seconds,
         )
         
         # Sample initial trajectories for all environments

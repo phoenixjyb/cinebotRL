@@ -28,7 +28,7 @@ try:
     # Isaac Lab 2.2.0 pip package uses 'isaaclab' not 'omni.isaac.lab'
     import isaaclab.sim as sim_utils
     from isaaclab.actuators import ImplicitActuatorCfg
-    from isaaclab.assets import ArticulationCfg, AssetBaseCfg
+    from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
     from isaaclab.envs import DirectRLEnv, DirectRLEnvCfg
     from isaaclab.scene import InteractiveSceneCfg
     from isaaclab.sensors import ContactSensorCfg
@@ -47,6 +47,7 @@ except ImportError as e:
     print(f"[env.py] ✗ Failed to import Isaac Lab: {e}", file=sys.stderr)
     DirectRLEnv = None
     DirectRLEnvCfg = None
+    RigidObjectCfg = None
     configclass = None
     # Create dummy versions for type hints
     class DirectRLEnv:  # type: ignore
@@ -214,7 +215,7 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
 
         if self.task_config.obstacles.enable_obstacles:
             obs_cfg = self.task_config.obstacles
-            scene_cfg.obstacle_disc = AssetBaseCfg(
+            scene_cfg.obstacle_disc = RigidObjectCfg(
                 prim_path="{ENV_REGEX_NS}/ObstacleDisc",
                 spawn=sim_utils.CylinderCfg(
                     radius=obs_cfg.disc_radius,
@@ -236,7 +237,7 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
                         roughness=0.8,
                     ),
                 ),
-                init_state=AssetBaseCfg.InitialStateCfg(
+                init_state=RigidObjectCfg.InitialStateCfg(
                     pos=(obs_cfg.disc_position_xy[0], obs_cfg.disc_position_xy[1], obs_cfg.disc_height * 0.5),
                 ),
             )
@@ -550,6 +551,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             trajectory_pattern=self.task_cfg.trajectory.trajectory_pattern,
             trajectory_filter_indices=self.task_cfg.trajectory.trajectory_filter_indices,
             max_trajectories=self.task_cfg.trajectory.max_trajectories,
+            min_duration_seconds=self.task_cfg.trajectory.min_duration_seconds,
         )
 
         # Load reachability map for intelligent base planning
@@ -605,14 +607,17 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Obstacle state. Obstacle XY is stored in each environment's local frame;
         # world XY adds scene.env_origins so clearance works for replicated envs.
         self.obstacles_enabled = self.task_cfg.obstacles.enable_obstacles
-        self.obstacle_disc_xy_local = torch.tensor(
+        default_obstacle_xy = torch.tensor(
             self.task_cfg.obstacles.disc_position_xy,
             device=self.device,
             dtype=torch.float32,
         )
+        self._default_obstacle_disc_xy_local = default_obstacle_xy
+        self.obstacle_disc_xy_local = default_obstacle_xy.unsqueeze(0).repeat(self.num_envs, 1)
         self.obstacle_disc_radius = float(self.task_cfg.obstacles.disc_radius)
         self.robot_footprint_radius = float(self.task_cfg.obstacles.robot_footprint_radius)
         self._obstacle_clearance_buf = torch.full((self.num_envs,), 10.0, device=self.device)
+        self._obstacle_xy_buf = self.obstacle_disc_xy_local.clone()
         self._base_target_distance_buf = torch.full((self.num_envs,), 0.5, device=self.device)
         self._base_target_nonfinite_count = 0
 
@@ -711,6 +716,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         """Setup the scene entities."""
         # Get robot articulation
         self.robot = self.scene["robot"]
+
+        self.obstacle_disc = self.scene["obstacle_disc"] if self.cfg.task_config.obstacles.enable_obstacles else None
 
         # Joint mapping verification will happen lazily after PhysX view is initialized
         self._joint_mapping_verified = False
@@ -1675,6 +1682,61 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"  Lower: {self.joint_lower_limits}")
             print(f"  Upper: {self.joint_upper_limits}")
 
+    def _randomize_obstacles(self, env_ids: torch.Tensor, base_xy_local: torch.Tensor) -> None:
+        """Randomize obstacle XY positions for reset environments and move the sim objects."""
+        if not self.obstacles_enabled or env_ids.numel() == 0:
+            return
+
+        obs_cfg = self.task_cfg.obstacles
+        count = int(env_ids.numel())
+        if obs_cfg.randomize_per_reset:
+            x_min, x_max = obs_cfg.disc_position_x_range
+            y_min, y_max = obs_cfg.disc_position_y_range
+            samples = torch.empty((count, 2), device=self.device, dtype=torch.float32)
+            samples[:, 0].uniform_(float(x_min), float(x_max))
+            samples[:, 1].uniform_(float(y_min), float(y_max))
+
+            min_center_distance = self.robot_footprint_radius + self.obstacle_disc_radius + float(obs_cfg.min_start_clearance)
+            for _ in range(8):
+                clearance = torch.norm(samples - base_xy_local, dim=-1) - (self.robot_footprint_radius + self.obstacle_disc_radius)
+                too_close = clearance < float(obs_cfg.min_start_clearance)
+                if not too_close.any():
+                    break
+                samples[too_close, 0].uniform_(float(x_min), float(x_max))
+                samples[too_close, 1].uniform_(float(y_min), float(y_max))
+
+            clearance = torch.norm(samples - base_xy_local, dim=-1) - (self.robot_footprint_radius + self.obstacle_disc_radius)
+            too_close = clearance < float(obs_cfg.min_start_clearance)
+            if too_close.any():
+                fallback = base_xy_local[too_close].clone()
+                fallback[:, 1] += min_center_distance
+                fallback[:, 0] = torch.clamp(fallback[:, 0], float(x_min), float(x_max))
+                fallback[:, 1] = torch.clamp(fallback[:, 1], float(y_min), float(y_max))
+                samples[too_close] = fallback
+        else:
+            samples = self._default_obstacle_disc_xy_local.unsqueeze(0).repeat(count, 1)
+
+        self.obstacle_disc_xy_local[env_ids] = samples
+        self._obstacle_xy_buf = self.obstacle_disc_xy_local.clone()
+        self._write_obstacle_poses_to_sim(env_ids)
+
+    def _write_obstacle_poses_to_sim(self, env_ids: torch.Tensor | None = None) -> None:
+        """Move kinematic obstacle cylinders to the current randomized local XY positions."""
+        if not self.obstacles_enabled or self.obstacle_disc is None:
+            return
+        if not hasattr(self.obstacle_disc, "write_root_pose_to_sim"):
+            return
+
+        if env_ids is None:
+            env_ids = torch.arange(self.num_envs, device=self.device)
+        env_origins = self.scene.env_origins[env_ids]
+        local_xy = self.obstacle_disc_xy_local[env_ids]
+        pose = torch.zeros((int(env_ids.numel()), 7), device=self.device, dtype=torch.float32)
+        pose[:, 0:2] = env_origins[:, 0:2] + local_xy
+        pose[:, 2] = float(self.task_cfg.obstacles.disc_height) * 0.5
+        pose[:, 3] = 1.0
+        self.obstacle_disc.write_root_pose_to_sim(pose, env_ids=env_ids)
+
     def _get_obstacle_clearance(self, base_pos: torch.Tensor) -> torch.Tensor:
         """Return signed planar clearance from base footprint to the obstacle disc.
 
@@ -1685,7 +1747,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         if not self.obstacles_enabled:
             return torch.full((self.num_envs,), 10.0, device=self.device)
 
-        obstacle_xy_world = self.scene.env_origins[:, :2] + self.obstacle_disc_xy_local.unsqueeze(0)
+        obstacle_xy_world = self.scene.env_origins[:, :2] + self.obstacle_disc_xy_local
         base_xy = base_pos[:, :2]
         finite_base_xy = torch.isfinite(base_xy).all(dim=-1)
         safe_base_xy = torch.nan_to_num(base_xy, nan=0.0, posinf=1e3, neginf=-1e3)
@@ -2260,6 +2322,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 "clearance_min": obstacle_clearance.min().item(),
                 "unsafe_pct": (obstacle_clearance < self.reward_weights.get("safety_radius", 0.2)).float().mean().item() * 100.0,
                 "collision_pct": (obstacle_clearance < 0.0).float().mean().item() * 100.0,
+                "x_mean": self.obstacle_disc_xy_local[:, 0].mean().item(),
+                "y_mean": self.obstacle_disc_xy_local[:, 1].mean().item(),
+                "x_std": self.obstacle_disc_xy_local[:, 0].std().item(),
+                "y_std": self.obstacle_disc_xy_local[:, 1].std().item(),
             }
 
         # === ADD REACHABILITY-GUIDED REWARDS ===
@@ -2368,6 +2434,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Reset velocities to zero
         new_root_state[:, 7:10] = 0.0  # Linear velocity
         new_root_state[:, 10:13] = 0.0  # Angular velocity
+
+        if self.obstacles_enabled:
+            self._randomize_obstacles(env_ids, new_root_state[:, 0:2])
 
         # Apply the new root state
         self.robot.write_root_state_to_sim(new_root_state, env_ids=env_ids)

@@ -27,6 +27,7 @@ class TrajectoryConfig:
     trajectory_pattern: str = "**/*.json"
     trajectory_filter_indices: list[int] | None = None  # Filter to specific indices
     max_trajectories: int | None = None  # Limit number of trajectories
+    min_duration_seconds: float = 5.0  # Reject recorded trajectories shorter than this duration
 
     # Curriculum settings
     enable_curriculum: bool = True
@@ -45,14 +46,14 @@ class ObstacleConfig:
     disc_position_xy: tuple[float, float] = (0.0, 0.5)  # Local env-frame XY, on the default circle trajectory
     disc_radius: float = 0.18
     disc_height: float = 0.08
+    disc_position_x_range: tuple[float, float] = (-0.35, 0.35)
+    disc_position_y_range: tuple[float, float] = (0.45, 1.0)
     robot_footprint_radius: float = 0.35
-    min_distance_from_robot: float = 1.0
-    max_distance_from_robot: float = 3.0
-    obstacle_radius_range: tuple[float, float] = (0.1, 0.3)
+    min_start_clearance: float = 0.10
 
     # Randomization
     randomize_per_reset: bool = True
-    seed: int | None = None
+    seed: int | None = None  # Reserved for deterministic obstacle sampling
 
 
 @dataclass

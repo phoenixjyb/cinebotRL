@@ -2082,9 +2082,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             # so one NaN does not crash the whole PPO rollout.
             finite_targets = torch.isfinite(target_in_arm_frame).all(dim=-1)
             is_reachable = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            max_workspace_distance = self.reward_weights.get("reachability_hard_margin", 0.7) + 1.0
             workspace_distance = torch.full(
                 (self.num_envs,),
-                self.reward_weights.get("reachability_hard_margin", 0.7) + 1.0,
+                max_workspace_distance,
                 device=self.device,
             )
             if finite_targets.any():
@@ -2092,8 +2093,18 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     target_in_arm_frame[finite_targets],
                     tolerance=0.1,
                 )
-                workspace_distance[finite_targets] = self.reach_map.distance_to_workspace(
+                raw_workspace_distance = self.reach_map.distance_to_workspace(
                     target_in_arm_frame[finite_targets]
+                )
+                workspace_distance[finite_targets] = torch.clamp(
+                    torch.nan_to_num(
+                        raw_workspace_distance,
+                        nan=max_workspace_distance,
+                        posinf=max_workspace_distance,
+                        neginf=max_workspace_distance,
+                    ),
+                    min=0.0,
+                    max=max_workspace_distance,
                 )
             if (~finite_targets).any() and not hasattr(self, "_nonfinite_reachability_warned"):
                 print("[MobileMMTrackEE] WARNING: Non-finite reachability target detected; "

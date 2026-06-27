@@ -1430,11 +1430,16 @@ def main():
     exit_code = 0
     try:
         print("Starting training...\n")
+        reset_num_timesteps = args.checkpoint is None
+        if args.checkpoint:
+            print("Resuming from checkpoint with preserved timestep counters.")
+
         model.learn(
             total_timesteps=args.total_timesteps,
             callback=callbacks,
             log_interval=1,
             tb_log_name="PPO",
+            reset_num_timesteps=reset_num_timesteps,
         )
         
         # Save final model

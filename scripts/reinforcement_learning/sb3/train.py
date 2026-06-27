@@ -402,6 +402,7 @@ def main():
         import numpy as np
         from stable_baselines3 import PPO
         from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
+        from stable_baselines3.common.utils import constant_fn
         from stable_baselines3.common.vec_env import VecNormalize, VecEnv, VecEnvWrapper
         print("    [OK] Dependencies imported")
     except ImportError as e:
@@ -1321,6 +1322,20 @@ def main():
                 print("    [WARN]  Continuing without normalization stats (may affect curriculum learning)")
             
             model = PPO.load(args.checkpoint, env=env, device=device)
+            model.learning_rate = args.learning_rate
+            model.lr_schedule = constant_fn(args.learning_rate)
+            for param_group in model.policy.optimizer.param_groups:
+                param_group["lr"] = args.learning_rate
+            model.n_epochs = args.n_epochs
+            model.batch_size = args.batch_size
+            model.gamma = args.gamma
+            model.gae_lambda = args.gae_lambda
+            model.clip_range = constant_fn(args.clip_range)
+            model.clip_range_vf = constant_fn(args.clip_range_vf) if args.clip_range_vf is not None else None
+            model.target_kl = args.target_kl
+            model.ent_coef = args.ent_coef
+            model.ent_coef_schedule = constant_fn(args.ent_coef)
+            print("    [OK] Resume hyperparameters applied to loaded PPO model")
         else:
             print("    Creating new PPO model...")
             

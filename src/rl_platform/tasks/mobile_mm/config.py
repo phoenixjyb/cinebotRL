@@ -55,6 +55,10 @@ class ObstacleConfig:
     randomize_per_reset: bool = True
     seed: int | None = None  # Reserved for deterministic obstacle sampling
 
+    # Termination
+    terminate_on_collision: bool = True
+    collision_grace_steps: int = 12  # Ignore reset-settling transients for 0.6s at 20 Hz control
+
 
 @dataclass
 class RobotLimits:
@@ -261,5 +265,4 @@ class MobileMMTrackConfig:
     terminate_on_collision: bool = False  # External collisions (not used)
     terminate_on_tracking_error: bool = True
     max_tracking_error: float = 2.0  # meters
-
 

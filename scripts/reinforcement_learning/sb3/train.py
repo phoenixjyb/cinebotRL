@@ -315,6 +315,51 @@ def parse_args():
         default=0.10,
         help="Minimum reset-time base footprint clearance from randomized obstacle.",
     )
+    parser.add_argument(
+        "--enable_obstacle_curriculum",
+        action="store_true",
+        help="Linearly ramp randomized obstacle difficulty during training.",
+    )
+    parser.add_argument(
+        "--obstacle_curriculum_steps",
+        type=int,
+        default=500_000,
+        help="Number of timesteps used to ramp from start obstacle settings to final settings.",
+    )
+    parser.add_argument(
+        "--obstacle_curriculum_start_x_range",
+        type=float,
+        nargs=2,
+        default=(-0.15, 0.15),
+        metavar=("MIN", "MAX"),
+        help="Initial obstacle local X range for curriculum.",
+    )
+    parser.add_argument(
+        "--obstacle_curriculum_start_y_range",
+        type=float,
+        nargs=2,
+        default=(1.30, 1.80),
+        metavar=("MIN", "MAX"),
+        help="Initial obstacle local Y range for curriculum.",
+    )
+    parser.add_argument(
+        "--obstacle_curriculum_start_clearance",
+        type=float,
+        default=0.45,
+        help="Initial minimum reset-time obstacle clearance for curriculum.",
+    )
+    parser.add_argument(
+        "--obstacle_curriculum_start_weight",
+        type=float,
+        default=0.5,
+        help="Initial obstacle reward weight for curriculum.",
+    )
+    parser.add_argument(
+        "--obstacle_curriculum_final_weight",
+        type=float,
+        default=None,
+        help="Final obstacle reward weight for curriculum (default: task config value).",
+    )
     
     return parser.parse_args()
 
@@ -755,10 +800,111 @@ def main():
                     print(f"[TrainingMonitor] Could not access detailed metrics: {e}")
             
             return True
-        
+
         def _on_step(self) -> bool:
             """Called at every step. Required by BaseCallback."""
             return True
+
+    class ObstacleCurriculumCallback(BaseCallback):
+        """Ramp obstacle placement and reward weight from easy to target settings."""
+
+        def __init__(
+            self,
+            start_x_range,
+            final_x_range,
+            start_y_range,
+            final_y_range,
+            start_clearance: float,
+            final_clearance: float,
+            start_weight: float,
+            final_weight: float,
+            transition_steps: int,
+            verbose: int = 1,
+        ):
+            super().__init__(verbose)
+            self.start_x_range = tuple(float(v) for v in start_x_range)
+            self.final_x_range = tuple(float(v) for v in final_x_range)
+            self.start_y_range = tuple(float(v) for v in start_y_range)
+            self.final_y_range = tuple(float(v) for v in final_y_range)
+            self.start_clearance = float(start_clearance)
+            self.final_clearance = float(final_clearance)
+            self.start_weight = float(start_weight)
+            self.final_weight = float(final_weight)
+            self.transition_steps = max(int(transition_steps), 1)
+            self._last_logged_bucket = None
+
+        @staticmethod
+        def _lerp_pair(start, final, progress: float):
+            return tuple(start[i] + (final[i] - start[i]) * progress for i in range(2))
+
+        @staticmethod
+        def _unwrap_isaac_env(env):
+            while hasattr(env, "venv"):
+                env = env.venv
+            return env.unwrapped if hasattr(env, "unwrapped") else env
+
+        def _on_training_start(self) -> None:
+            self._apply_curriculum()
+
+        def _on_rollout_end(self) -> bool:
+            self._apply_curriculum()
+            return True
+
+        def _on_step(self) -> bool:
+            return True
+
+        def _apply_curriculum(self) -> None:
+            isaac_env = self._unwrap_isaac_env(self.training_env)
+            if not getattr(isaac_env, "obstacles_enabled", False):
+                return
+
+            progress = min(max(float(self.num_timesteps) / float(self.transition_steps), 0.0), 1.0)
+            x_range = self._lerp_pair(self.start_x_range, self.final_x_range, progress)
+            y_range = self._lerp_pair(self.start_y_range, self.final_y_range, progress)
+            clearance = self.start_clearance + (self.final_clearance - self.start_clearance) * progress
+            weight = self.start_weight + (self.final_weight - self.start_weight) * progress
+
+            obstacle_cfg = isaac_env.task_cfg.obstacles
+            obstacle_cfg.disc_position_x_range = x_range
+            obstacle_cfg.disc_position_y_range = y_range
+            obstacle_cfg.min_start_clearance = clearance
+            isaac_env.reward_weights["min_obstacle_distance_weight"] = weight
+
+            self.logger.record("curriculum/obstacle_progress", progress)
+            self.logger.record("curriculum/obstacle_x_min", x_range[0])
+            self.logger.record("curriculum/obstacle_x_max", x_range[1])
+            self.logger.record("curriculum/obstacle_y_min", y_range[0])
+            self.logger.record("curriculum/obstacle_y_max", y_range[1])
+            self.logger.record("curriculum/obstacle_min_start_clearance", clearance)
+            self.logger.record("curriculum/obstacle_weight", weight)
+
+            bucket = int(progress * 10)
+            bucket_changed = bucket != self._last_logged_bucket
+            if bucket_changed and hasattr(isaac_env, "_randomize_obstacles"):
+                try:
+                    import torch
+
+                    robot = getattr(isaac_env, "robot", None) or getattr(isaac_env, "_robot", None)
+                    if robot is not None and hasattr(robot, "data"):
+                        env_ids = torch.arange(isaac_env.num_envs, device=isaac_env.device)
+                        base_xy_local = (
+                            robot.data.root_pos_w[env_ids, :2]
+                            - isaac_env.scene.env_origins[env_ids, :2]
+                        )
+                        isaac_env._randomize_obstacles(env_ids, base_xy_local)
+                except Exception as exc:
+                    if self.verbose > 0:
+                        print(f"[ObstacleCurriculum] WARNING: obstacle resample failed: {exc}")
+
+            if self.verbose > 0 and bucket != self._last_logged_bucket:
+                print(
+                    "[ObstacleCurriculum] "
+                    f"step={self.num_timesteps:,}, progress={progress:.2f}, "
+                    f"x=({x_range[0]:.2f},{x_range[1]:.2f}), "
+                    f"y=({y_range[0]:.2f},{y_range[1]:.2f}), "
+                    f"clearance={clearance:.2f}, weight={weight:.2f}"
+                )
+                self._last_logged_bucket = bucket
     
     # Session 8h: Auto-pause callback for training instability detection
     class AutoPauseCallback(BaseCallback):
@@ -1271,6 +1417,36 @@ def main():
         callbacks.append(kl_schedule_callback)
         print(f"    [OK] Adaptive KL schedule enabled: very_early={max(args.kl_warmup * 4, 1.0):.2f}, early={max(args.kl_warmup * 2, 0.5):.2f}")
         print(f"      Stages: 0-5M (explore), 5-20M (learn), 20-60M (balance), 60-80M (stable), 80-100M (finetune)")
+
+    if args.enable_obstacles and args.enable_obstacle_curriculum:
+        final_obstacle_weight = (
+            args.obstacle_curriculum_final_weight
+            if args.obstacle_curriculum_final_weight is not None
+            else env_cfg.task_config.rewards.min_obstacle_distance_weight
+        )
+        obstacle_curriculum_callback = ObstacleCurriculumCallback(
+            start_x_range=args.obstacle_curriculum_start_x_range,
+            final_x_range=args.obstacle_x_range,
+            start_y_range=args.obstacle_curriculum_start_y_range,
+            final_y_range=args.obstacle_y_range,
+            start_clearance=args.obstacle_curriculum_start_clearance,
+            final_clearance=args.min_obstacle_start_clearance,
+            start_weight=args.obstacle_curriculum_start_weight,
+            final_weight=final_obstacle_weight,
+            transition_steps=args.obstacle_curriculum_steps,
+            verbose=1,
+        )
+        callbacks.append(obstacle_curriculum_callback)
+        print("    [OK] Obstacle curriculum enabled:")
+        print(
+            f"      x: {tuple(args.obstacle_curriculum_start_x_range)} -> {tuple(args.obstacle_x_range)}, "
+            f"y: {tuple(args.obstacle_curriculum_start_y_range)} -> {tuple(args.obstacle_y_range)}"
+        )
+        print(
+            f"      clearance: {args.obstacle_curriculum_start_clearance:.2f} -> {args.min_obstacle_start_clearance:.2f}, "
+            f"weight: {args.obstacle_curriculum_start_weight:.2f} -> {final_obstacle_weight:.2f}, "
+            f"steps: {args.obstacle_curriculum_steps:,}"
+        )
     
     # Training monitor callback (detailed metrics logging)
     monitor_callback = TrainingMonitorCallback(

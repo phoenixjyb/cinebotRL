@@ -2380,6 +2380,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             # This will only trigger on arm-ground or arm-base collisions, not normal base support
             terminated |= mature_envs & (contact_force_mag > self.task_cfg.self_collision_termination_threshold)
 
+        # End obstacle episodes on physical footprint overlap. Keeping collision
+        # states alive pollutes rollout statistics and makes avoidance harder to learn.
+        obstacle_cfg = self.task_cfg.obstacles
+        if self.obstacles_enabled and getattr(obstacle_cfg, "terminate_on_collision", True):
+            mature_envs = self.episode_length_buf >= int(getattr(obstacle_cfg, "collision_grace_steps", 0))
+            obstacle_clearance = self._get_obstacle_clearance(self.robot.data.root_pos_w)
+            terminated |= mature_envs & (obstacle_clearance < 0.0)
+
         # Timeout after max episode length
         time_out = self.episode_length_buf >= self.max_episode_length - 1
 

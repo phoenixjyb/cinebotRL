@@ -782,6 +782,7 @@ def main():
             enable: bool = True,
             kl_threshold: float = 0.1,
             variance_threshold: float = 0.0,
+            variance_patience: int = 3,
             warmup_steps: int = 500_000,  # Skip monitoring in first 500K steps (early instability is normal)
             checkpoint_dir: str = None,
             verbose: int = 1
@@ -790,6 +791,8 @@ def main():
             self.enable = enable
             self.kl_threshold = kl_threshold
             self.variance_threshold = variance_threshold
+            self.variance_patience = variance_patience
+            self.variance_violation_count = 0
             self.warmup_steps = warmup_steps
             self.checkpoint_dir = checkpoint_dir
             self.triggered = False
@@ -797,7 +800,7 @@ def main():
             if self.enable:
                 print(f"[AutoPause] Monitoring enabled:")
                 print(f"  KL threshold: {kl_threshold}")
-                print(f"  Variance threshold: {variance_threshold}")
+                print(f"  Variance threshold: {variance_threshold} (patience={variance_patience})")
                 print(f"  Warmup period: {warmup_steps:,} steps (monitoring starts after)")
         
         def _on_rollout_end(self) -> bool:
@@ -826,12 +829,28 @@ def main():
                     
                     # Check explained variance
                     if current_variance < self.variance_threshold:
-                        self._trigger_pause(
-                            reason=f"Explained variance dropped below threshold: {current_variance:.4f} < {self.variance_threshold}",
-                            current_kl=current_kl,
-                            current_variance=current_variance
-                        )
-                        return False
+                        self.variance_violation_count += 1
+                        if self.verbose > 0:
+                            print(
+                                f"[AutoPause] Explained variance below threshold "
+                                f"({current_variance:.4f} < {self.variance_threshold}); "
+                                f"violation {self.variance_violation_count}/{self.variance_patience}"
+                            )
+                        if self.variance_violation_count >= self.variance_patience:
+                            self._trigger_pause(
+                                reason=(
+                                    "Explained variance remained below threshold for "
+                                    f"{self.variance_violation_count} consecutive rollouts: "
+                                    f"{current_variance:.4f} < {self.variance_threshold}"
+                                ),
+                                current_kl=current_kl,
+                                current_variance=current_variance
+                            )
+                            return False
+                    else:
+                        if self.variance_violation_count and self.verbose > 0:
+                            print("[AutoPause] Explained variance recovered; resetting violation counter")
+                        self.variance_violation_count = 0
                 
             except Exception as e:
                 if self.verbose > 1:
@@ -1264,6 +1283,7 @@ def main():
                         enable=True,
                         kl_threshold=kl_threshold,
                         variance_threshold=variance_threshold,
+                        variance_patience=3,
                         warmup_steps=500_000,  # Skip monitoring in first 500K steps
                         checkpoint_dir=os.path.join(args.log_dir, "checkpoints"),
                         verbose=1

@@ -783,6 +783,7 @@ def main():
             kl_threshold: float = 0.1,
             variance_threshold: float = 0.0,
             variance_patience: int = 3,
+            variance_clip_threshold: float = 0.25,
             warmup_steps: int = 500_000,  # Skip monitoring in first 500K steps (early instability is normal)
             checkpoint_dir: str = None,
             verbose: int = 1
@@ -792,6 +793,7 @@ def main():
             self.kl_threshold = kl_threshold
             self.variance_threshold = variance_threshold
             self.variance_patience = variance_patience
+            self.variance_clip_threshold = variance_clip_threshold
             self.variance_violation_count = 0
             self.warmup_steps = warmup_steps
             self.checkpoint_dir = checkpoint_dir
@@ -801,6 +803,7 @@ def main():
                 print(f"[AutoPause] Monitoring enabled:")
                 print(f"  KL threshold: {kl_threshold}")
                 print(f"  Variance threshold: {variance_threshold} (patience={variance_patience})")
+                print(f"  Variance requires clip_fraction > {variance_clip_threshold} to pause")
                 print(f"  Warmup period: {warmup_steps:,} steps (monitoring starts after)")
         
         def _on_rollout_end(self) -> bool:
@@ -817,6 +820,7 @@ def main():
                 if hasattr(self.logger, 'name_to_value'):
                     current_kl = self.logger.name_to_value.get('train/approx_kl', 0.0)
                     current_variance = self.logger.name_to_value.get('train/explained_variance', 1.0)
+                    current_clip_fraction = self.logger.name_to_value.get('train/clip_fraction', 0.0)
                     
                     # Check KL divergence
                     if current_kl > self.kl_threshold:
@@ -829,19 +833,32 @@ def main():
                     
                     # Check explained variance
                     if current_variance < self.variance_threshold:
-                        self.variance_violation_count += 1
+                        update_is_aggressive = current_clip_fraction > self.variance_clip_threshold
                         if self.verbose > 0:
                             print(
                                 f"[AutoPause] Explained variance below threshold "
-                                f"({current_variance:.4f} < {self.variance_threshold}); "
-                                f"violation {self.variance_violation_count}/{self.variance_patience}"
+                                f"({current_variance:.4f} < {self.variance_threshold}), "
+                                f"clip_fraction={current_clip_fraction:.4f}"
                             )
+                        if update_is_aggressive:
+                            self.variance_violation_count += 1
+                            if self.verbose > 0:
+                                print(
+                                    f"[AutoPause] Low-variance violation "
+                                    f"{self.variance_violation_count}/{self.variance_patience}"
+                                )
+                        else:
+                            if self.variance_violation_count and self.verbose > 0:
+                                print("[AutoPause] Policy update is stable; resetting variance violation counter")
+                            self.variance_violation_count = 0
+                            return True
                         if self.variance_violation_count >= self.variance_patience:
                             self._trigger_pause(
                                 reason=(
                                     "Explained variance remained below threshold for "
-                                    f"{self.variance_violation_count} consecutive rollouts: "
-                                    f"{current_variance:.4f} < {self.variance_threshold}"
+                                    f"{self.variance_violation_count} aggressive rollouts: "
+                                    f"{current_variance:.4f} < {self.variance_threshold}, "
+                                    f"clip_fraction={current_clip_fraction:.4f} > {self.variance_clip_threshold}"
                                 ),
                                 current_kl=current_kl,
                                 current_variance=current_variance
@@ -1284,6 +1301,7 @@ def main():
                         kl_threshold=kl_threshold,
                         variance_threshold=variance_threshold,
                         variance_patience=3,
+                        variance_clip_threshold=0.25,
                         warmup_steps=500_000,  # Skip monitoring in first 500K steps
                         checkpoint_dir=os.path.join(args.log_dir, "checkpoints"),
                         verbose=1

@@ -237,7 +237,7 @@ ros2 topic list
 
 **Robot Specifications:**
 - **DOF:** 9 total (6 arm joints + 3 base: PPR = prismatic X, prismatic Y, revolute Z)
-- **Action Space:** 8D continuous (6 arm joint positions + base v_x + base ω_z, differential drive)
+- **Action Space:** 9D continuous (6 arm joint positions + body-frame base v_x, v_y, and ω_z)
 - **Observation Space:** 46D (base state + arm joints + EE state + tracking errors + base-to-target signals)
 - **Algorithm:** Stable Baselines3 PPO with enhanced 3-layer MLP ([256, 256, 128] → ~235K params)
 

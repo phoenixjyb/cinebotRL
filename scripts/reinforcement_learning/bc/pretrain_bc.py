@@ -50,7 +50,7 @@ def parse_args() -> argparse.Namespace:
         help="Output path for the SB3-compatible .zip policy (no extension needed)",
     )
     parser.add_argument("--obs_dim",  type=int, required=True, help="Observation dimension")
-    parser.add_argument("--act_dim",  type=int, default=8,     help="Action dimension (default: 8)")
+    parser.add_argument("--act_dim",  type=int, default=9,     help="Action dimension (default: 9)")
     parser.add_argument("--epochs",   type=int, default=50)
     parser.add_argument("--lr",       type=float, default=3e-4)
     parser.add_argument("--batch_size", type=int, default=256)

@@ -20,7 +20,8 @@ from rl_platform.tasks.mobile_mm.joint_names import (
     ARM_JOINT_NAMES, ARM_JOINT_NAMES_EXPR, EE_LINK_NAME,
     EE_VIRTUAL_JOINT_NAMES, PASSIVE_JOINT_NAMES,
     POLICY_ACTION_DIM, POLICY_ARM_ACTION_SLICE,
-    POLICY_BASE_VX_ACTION_INDEX, POLICY_BASE_WZ_ACTION_INDEX,
+    POLICY_BASE_VX_ACTION_INDEX, POLICY_BASE_VY_ACTION_INDEX,
+    POLICY_BASE_WZ_ACTION_INDEX,
 )
 
 try:
@@ -65,10 +66,10 @@ from .rewards import compute_combined_reward
 
 def quat_to_yaw(quat: torch.Tensor) -> torch.Tensor:
     """Extract yaw angle (rotation around Z-axis) from quaternion.
-    
+
     Args:
         quat: Quaternion in (w, x, y, z) format, shape [..., 4]
-        
+
     Returns:
         Yaw angles in radians, shape [...]
     """
@@ -80,30 +81,30 @@ def quat_to_yaw(quat: torch.Tensor) -> torch.Tensor:
 @configclass
 class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
     """Configuration for the mobile manipulator tracking environment."""
-    
+
     # Simulation settings
     decimation = 10  # 200Hz physics / 10 = 20Hz control (realistic for mobile manipulators)
     episode_length_s = 20.0
     num_envs = 1  # Default to 1, can be overridden
-    
+
     # Task-specific configuration
     task_config: MobileMMTrackConfig = field(default_factory=MobileMMTrackConfig)
-    
+
     # Scene configuration (will be populated in __post_init__)
     scene: InteractiveSceneCfg = None
-    
+
     # Action/Observation spaces (computed based on robot)
-    num_actions: int = POLICY_ACTION_DIM  # 6 arm joints + base v_x/omega_z
+    num_actions: int = POLICY_ACTION_DIM  # 6 arm joints + base v_x/v_y/omega_z
     num_observations: int = 46  # Will be computed based on config
-    
+
     def __post_init__(self):
         """Initialize scene configuration and compute dimensions."""
         if not ISAAC_LAB_AVAILABLE:
             return
-            
+
         # Create scene configuration
         self.scene = self._create_scene_config()
-        
+
         # Compute observation dimension
         self.num_observations = get_observation_dimensions(
             num_joints=6,  # Arm joints
@@ -115,7 +116,7 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
             action_dim=self.num_actions,
             use_obstacles=self.task_config.obstacles.enable_obstacles,
         )
-        
+
         # Define observation space (continuous, normalized)
         self.observation_space = gym.spaces.Box(
             low=-np.inf,
@@ -123,16 +124,16 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
             shape=(self.num_observations,),
             dtype=np.float32,
         )
-        
+
         # Define action space (continuous, normalized)
-        # Actions: [arm_joint_targets (6), base_vel_x, base_angular_vel]
+        # Actions: [arm_joint_targets (6), base_vel_x, base_vel_y, base_angular_vel]
         self.action_space = gym.spaces.Box(
             low=-1.0,
             high=1.0,
             shape=(self.num_actions,),
             dtype=np.float32,
         )
-        
+
         # Set physics simulation parameters
         # Note: device will be auto-selected by AppLauncher
         # No need to specify here - Isaac Lab will use the device from AppLauncher
@@ -140,14 +141,14 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
             dt=0.005,  # 200 Hz physics
             render_interval=self.decimation,
         )
-    
+
     def _create_scene_config(self) -> InteractiveSceneCfg:
         """Create the scene configuration with robot and environment."""
         print(f"[MobileMMTrackEE] DEBUG: _create_scene_config called with self.num_envs = {self.num_envs}")
-        
+
         # Get robot USD path
         robot_usd_path = str(get_mobile_mm_usd_path())
-        
+
         # Configure robot articulation
         robot_cfg = ArticulationCfg(
             prim_path="{ENV_REGEX_NS}/Robot",  # USD prim path for robot
@@ -160,8 +161,8 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
                 joint_pos={
                     # Arm joints (mid-range initialization)
                     ARM_JOINT_NAMES[0]: 0.0,
-                    ARM_JOINT_NAMES[1]: 1.5,  # PNC URDF limit: ±1.5708
-                    ARM_JOINT_NAMES[2]: -1.6,
+                    ARM_JOINT_NAMES[1]: 1.0,  # Conservative Proto2 home, away from +1.57 limit
+                    ARM_JOINT_NAMES[2]: -1.2,
                     ARM_JOINT_NAMES[3]: 0.0,
                     ARM_JOINT_NAMES[4]: 0.0,
                     ARM_JOINT_NAMES[5]: 0.0,
@@ -189,7 +190,7 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
                 ),
             },
         )
-        
+
         # Ground plane
         ground_cfg = AssetBaseCfg(
             prim_path="/World/Ground",  # USD prim path for ground
@@ -199,18 +200,18 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
             ),
             init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0)),
         )
-        
+
         # Create scene
         scene_cfg = InteractiveSceneCfg(
             num_envs=self.num_envs,  # Use num_envs from parent config
             env_spacing=4.0,
             replicate_physics=True,
         )
-        
+
         # Add assets to scene
         scene_cfg.robot = robot_cfg
         scene_cfg.ground = ground_cfg
-        
+
         # Add contact sensor for chassis (to detect when arm links collide with it)
         # Following official Isaac Lab pattern from contact_sensor.py example
         # filter_prim_paths_expr limits to only report contacts with arm links
@@ -219,12 +220,28 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
         # 2. Arm sensor: Detects arm-ground collisions
         scene_cfg.contact_sensor = ContactSensorCfg(
             prim_path="{ENV_REGEX_NS}/Robot/base_root/base_link",
+            filter_prim_paths_expr=[
+                "{ENV_REGEX_NS}/Robot/base_root/arm_link_1",
+                "{ENV_REGEX_NS}/Robot/base_root/arm_link_2",
+                "{ENV_REGEX_NS}/Robot/base_root/arm_link_3",
+                "{ENV_REGEX_NS}/Robot/base_root/ee1_rotz_link",
+                "{ENV_REGEX_NS}/Robot/base_root/arm_link_4",
+                "{ENV_REGEX_NS}/Robot/base_root/ee1_roty_link",
+                "{ENV_REGEX_NS}/Robot/base_root/arm_link_5",
+                "{ENV_REGEX_NS}/Robot/base_root/ee1_rotx_link",
+                "{ENV_REGEX_NS}/Robot/base_root/arm_link_6",
+                "{ENV_REGEX_NS}/Robot/base_root/ee1_tool",
+                "{ENV_REGEX_NS}/Robot/base_root/cam_link",
+                "{ENV_REGEX_NS}/Robot/base_root/ee_tool",
+            ],
             update_period=0.0,  # Update every sim step (5ms physics)
             history_length=1,   # Only need current forces
             debug_vis=False,    # Disable visualization for performance
         )
 
-        # Add arm contact sensor to detect arm-ground collisions
+        # Add arm contact sensor for diagnostics only. Do not use this broad multi-body
+        # sensor as a hard self-collision terminator; IsaacLab filtered contacts are
+        # reliable only for one sensor body against many filtered bodies.
         scene_cfg.arm_contact_sensor = ContactSensorCfg(
             prim_path=(
                 "{ENV_REGEX_NS}/Robot/base_root/arm_link_.*"
@@ -233,22 +250,22 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
             history_length=1,
             debug_vis=False,
         )
-        
+
         return scene_cfg
 
 
 class MobileMMTrackEEEnv(DirectRLEnv):
     """Mobile manipulator end-effector tracking environment.
-    
+
     This environment trains the robot to track a reference trajectory with
     its end-effector while maintaining stability and avoiding obstacles.
     """
-    
+
     cfg: MobileMMTrackEEEnvCfg
-    
+
     def __init__(self, cfg: MobileMMTrackEEEnvCfg | None = None, render_mode: str | None = None, **kwargs):
         """Initialize the environment.
-        
+
         Args:
             cfg: Environment configuration (optional, created if None)
             render_mode: Rendering mode (None for headless) - currently unused
@@ -262,7 +279,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"  cfg.task_config.trajectory.trajectory_dir: {cfg.task_config.trajectory.trajectory_dir}")
         print(f"  kwargs: {list(kwargs.keys())}")
         print(f"{'='*70}\n")
-        
+
         # Extract overrides before building config
         num_envs_override = kwargs.pop("num_envs", None)
         trajectory_type_override = kwargs.pop("trajectory_type", None)
@@ -273,9 +290,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         waypoint_file_override = kwargs.pop("waypoint_file", None)
         use_all_trajectories = kwargs.pop("use_all_trajectories", None)
         use_chassis_only = kwargs.pop("use_chassis_only", None)
-        
+
         print(f"[MobileMMTrackEE] DEBUG: Before config handling, num_envs_override={num_envs_override}")
-        
+
         if cfg is None:
             from dataclasses import replace
             cfg = MobileMMTrackEEEnvCfg()
@@ -286,13 +303,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             if num_envs_override is not None:
                 cfg.num_envs = num_envs_override
                 print(f"[MobileMMTrackEE] Updated existing config to num_envs={cfg.num_envs}")
-        
+
         if cfg.scene is not None and num_envs_override is not None:
             cfg.scene.num_envs = num_envs_override
-        
+
         # Apply trajectory overrides (works for provided or auto-created cfg)
         traj_cfg = cfg.task_config.trajectory
-        
+
         if trajectory_type_override is not None:
             traj_cfg.type = trajectory_type_override
         if trajectory_dir_override is not None:
@@ -303,26 +320,26 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             traj_cfg.max_trajectories = max_trajectories_override
         if waypoint_file_override is not None:
             traj_cfg.waypoint_file = waypoint_file_override
-        
+
         if trajectory_filter_override is not None:
             traj_cfg.trajectory_filter_indices = trajectory_filter_override
         elif use_chassis_only and traj_cfg.type == "multi_recorded":
             traj_cfg.trajectory_filter_indices = self._load_chassis_required_indices(max_trajectories_override)
         elif use_all_trajectories:
             traj_cfg.trajectory_filter_indices = None
-        
+
         print(f"[MobileMMTrackEE] DEBUG: About to call super().__init__() with cfg.num_envs={cfg.num_envs if cfg else 'None'}")
-        
+
         # DirectRLEnv only takes cfg, not render_mode
         super().__init__(cfg, **kwargs)
-        
+
         print(f"[MobileMMTrackEE] DEBUG: After super().__init__(), self.num_envs={self.num_envs}")
-        
+
         # ============================================================================
         # COORDINATE FRAME CONVENTIONS (FIXED: Session 7c)
         # ============================================================================
         # BASE CONTROL FIX (2024-10-27): Resolved dual control mechanism bug
-        # 
+        #
         # PREVIOUS BUG:
         # - Both write_root_state_to_sim() AND set_joint_position_target() controlled base
         # - PPR joints accumulated world-frame displacements (joint_y reached -6.3m!)
@@ -356,10 +373,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # CRITICAL: Never mix frames! EE (body_pos_w) and base (root_pos_w) are
         # both in world frame, so "EE relative to base" = body_pos_w - root_pos_w
         # ============================================================================
-        
+
         # Task configuration
         self.task_cfg = cfg.task_config
-        
+
         # Build reward weights dictionary with new constraint penalties
         self.reward_weights = {
             "position_tracking": self.task_cfg.rewards.position_tracking,
@@ -393,17 +410,17 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "mobilization_progress_cap": self.task_cfg.rewards.mobilization_progress_cap,
             "position_distance_penalty": self.task_cfg.rewards.position_distance_penalty,
         }
-        
+
         # Session 8h: Curriculum learning - track stage and original weights
         self.use_curriculum = self.task_cfg.rewards.use_curriculum
         self.curriculum_stage_1_steps = self.task_cfg.rewards.curriculum_stage_1_steps
         self.current_training_step = 0  # Will be updated during training
         self.curriculum_stage = 1 if self.use_curriculum else 2  # Start in stage 1 if enabled
-        
+
         # Store original weights for curriculum switching
         self.base_position_weight = self.reward_weights["position_tracking"]
         self.base_orientation_weight = self.reward_weights["orientation_tracking"]
-        
+
         # Apply Stage 1 weights if curriculum enabled
         if self.use_curriculum:
             self.reward_weights["position_tracking"] = self.task_cfg.rewards.curriculum_stage_1_position_weight
@@ -414,7 +431,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"[Session 8h] Gradual transition: 45M-55M linear ramp → ({self.task_cfg.rewards.curriculum_stage_2_position_weight}, "
                   f"{self.task_cfg.rewards.curriculum_stage_2_orientation_weight})")
 
-        
+
         # Robot limits dictionary
         self.robot_limits = {
             "max_linear_velocity": self.task_cfg.robot_limits.max_linear_velocity,
@@ -426,10 +443,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "max_joint_acceleration": self.task_cfg.robot_limits.max_joint_acceleration,
             "joint_limit_margin": self.task_cfg.robot_limits.joint_limit_margin,
         }
-        
+
         # Control timestep (for derivative calculations)
         self.control_dt = self.physics_dt * self.cfg.decimation
-        
+
         # Trajectory manager
         self.trajectory_manager = TrajectoryManager(
             traj_type=self.task_cfg.trajectory.type,
@@ -446,7 +463,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             trajectory_filter_indices=self.task_cfg.trajectory.trajectory_filter_indices,
             max_trajectories=self.task_cfg.trajectory.max_trajectories,
         )
-        
+
         # Load reachability map for intelligent base planning
         print("[MobileMMTrackEE] Loading reachability map...")
         try:
@@ -458,7 +475,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"[MobileMMTrackEE] ⚠ Failed to load reachability map: {e}")
             print(f"[MobileMMTrackEE] ⚠ Continuing without reachability guidance")
             self.reach_map = None
-        
+
         # State buffers for tracking history (needed for derivatives)
         self.prev_actions = torch.zeros(
             self.num_envs, self.cfg.num_actions, device=self.device
@@ -468,14 +485,38 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         )
         self.prev_tracking_error = torch.zeros(self.num_envs, device=self.device)
         self.prev_ee_ori_error = torch.zeros(self.num_envs, device=self.device)  # SESSION 8i: Previous orientation error
-        
+
         # Tracking error buffers for evaluation/logging
         self.ee_pos_error_buf = torch.zeros(self.num_envs, 3, device=self.device)  # [x, y, z] position error
         self.ee_ori_error_buf = torch.zeros(self.num_envs, device=self.device)  # Angular error (radians)
-        
+
+        # Conservative command filters keep random early policies from slamming the arm
+        # into full-range position targets between adjacent 20 Hz control steps.
+        self.arm_safe_home = torch.tensor(
+            [0.0, 1.0, -1.2, 0.0, 0.0, 0.0],
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.arm_action_radius = torch.tensor(
+            [1.0, 0.45, 0.8, 1.0, 0.8, 0.8],
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.filtered_arm_targets = torch.zeros(
+            self.num_envs, len(ARM_JOINT_NAMES), device=self.device
+        )
+        self._arm_command_filter_initialized = False
+        self.max_arm_target_delta = (
+            self.robot_limits["max_joint_acceleration"] * self.control_dt * self.control_dt
+        )
+        print(
+            f"[MobileMMTrackEE] Proto2 policy safety: arm target slew <= "
+            f"{self.max_arm_target_delta:.4f} rad/control-step, action radius={self.arm_action_radius.tolist()}"
+        )
+
         # Position history for base progress tracking
         self.prev_base_pos = torch.zeros(self.num_envs, 3, device=self.device)
-        
+
         # Velocity history for acceleration calculation
         self.prev_base_lin_vel = torch.zeros(self.num_envs, 3, device=self.device)
         print(f"[MobileMMTrackEE] DEBUG: Initializing velocity buffers with num_envs={self.num_envs}")
@@ -486,10 +527,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self.prev_joint_vel = torch.zeros(
             self.num_envs, 9, device=self.device  # 9 total joints (3 base PPR + 6 arm)
         )
-        
+
         # Acceleration history for jerk calculation
         self.prev_base_accel = torch.zeros(self.num_envs, 3, device=self.device)
-        
+
         # Action history buffer
         if self.task_cfg.include_action_history:
             self.action_history = torch.zeros(
@@ -500,22 +541,22 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             )
         else:
             self.action_history = None
-        
+
         # Reward component tracking for logging
         self.reward_components = {}
         # End-effector body index (will be set in _setup_scene)
         self._ee_body_idx = None
-        
+
         # Joint limits (will be extracted in _setup_scene)
         self.joint_lower_limits = None
         self.joint_upper_limits = None
-        
+
         # Visualization markers (initialized in _setup_scene)
         self._target_markers = None
         self._ee_markers = None
         self._error_line_markers = None
         self._visualization_enabled = False
-        
+
         print(f"[MobileMMTrackEE] Environment initialized:")
         print(f"  - Num envs: {self.num_envs}")
         print(f"  - Observation dim: {self.cfg.num_observations}")
@@ -563,24 +604,24 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         print("[MobileMMTrackEE] WARNING: use_chassis_only requested but no chassis indices found. Using all trajectories.")
         return None
-    
+
     def _setup_scene(self):
         """Setup the scene entities."""
         # Get robot articulation
         self.robot = self.scene["robot"]
-        
+
         # Joint mapping verification will happen lazily after PhysX view is initialized
         self._joint_mapping_verified = False
-        
+
         # Joint limits will be extracted lazily when needed (after first reset)
         self.joint_lower_limits = None
         self.joint_upper_limits = None
         self._joint_limits_initialized = False
-        
+
         # End-effector body index will be found lazily
         self._ee_body_idx = None
         self._ee_body_idx_initialized = False
-        
+
         # Clone environments
         self.scene.clone_environments(copy_from_source=False)
 
@@ -592,13 +633,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self._marker_creation_attempts = 0
         self._debug_vis_requested = False
         self._debug_vis_active = False
-        
+
         # Setup visualization markers (only in GUI mode)
         self._setup_visualization_markers()
-    
+
     def _setup_visualization_markers(self):
         """Setup visual markers for trajectory visualization.
-        
+
         Note: Markers are created lazily on first use after simulation starts,
         not during scene setup. This ensures USD stage is ready.
         """
@@ -610,19 +651,19 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self._past_target_markers = None
         self._ee_markers = None
         print("[MobileMMTrackEE] ℹ Visual markers deferred (will create after first reset)")
-    
+
     def _create_markers_if_needed(self):
         """Create markers on first use (lazy initialization)."""
         if self._markers_created or not self._visualization_enabled:
             return
-        
+
         try:
             # Import Isaac Lab marker utilities
             from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
             import isaaclab.sim as sim_utils
-            
+
             print(f"[MobileMMTrackEE] Attempting marker creation (num_envs={self.num_envs})...")
-            
+
             # Red spheres for current target waypoint
             current_target_cfg = VisualizationMarkersCfg(
                 prim_path="/World/Visuals/current_target_markers",
@@ -633,7 +674,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     )
                 },
             )
-            
+
             # Green spheres for future waypoints
             future_target_cfg = VisualizationMarkersCfg(
                 prim_path="/World/Visuals/future_target_markers",
@@ -644,7 +685,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     )
                 },
             )
-            
+
             # Blue spheres for past waypoints
             past_target_cfg = VisualizationMarkersCfg(
                 prim_path="/World/Visuals/past_target_markers",
@@ -655,7 +696,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     )
                 },
             )
-            
+
             # Yellow spheres for end-effector positions
             ee_marker_cfg = VisualizationMarkersCfg(
                 prim_path="/World/Visuals/ee_markers",
@@ -666,24 +707,24 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     )
                 },
             )
-            
+
             # Initialize markers
             print("[MobileMMTrackEE] Creating current target markers...")
             self._current_target_markers = VisualizationMarkers(current_target_cfg)
             print(f"  ✓ Current: {self._current_target_markers is not None}")
-            
+
             print("[MobileMMTrackEE] Creating future target markers...")
             self._future_target_markers = VisualizationMarkers(future_target_cfg)
             print(f"  ✓ Future: {self._future_target_markers is not None}")
-            
+
             print("[MobileMMTrackEE] Creating past target markers...")
             self._past_target_markers = VisualizationMarkers(past_target_cfg)
             print(f"  ✓ Past: {self._past_target_markers is not None}")
-            
+
             print("[MobileMMTrackEE] Creating EE markers...")
             self._ee_markers = VisualizationMarkers(ee_marker_cfg)
             print(f"  ✓ EE: {self._ee_markers is not None}")
-            
+
             # Change dome light to white background for better marker visibility
             try:
                 from pxr import Usd, UsdGeom, UsdLux
@@ -697,7 +738,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     print("[MobileMMTrackEE] ✓ Changed background to white for better visibility")
             except Exception as light_err:
                 print(f"[MobileMMTrackEE] ⚠ Could not change background color: {light_err}")
-            
+
             print("[MobileMMTrackEE] ✓ Visual markers enabled")
             print("  - Red (large) = Current target waypoint")
             print("  - Green (medium) = Future waypoints")
@@ -718,20 +759,20 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 print("  Traceback:")
                 traceback.print_exc()
             return
-    
+
     def _set_debug_vis_impl(self, debug_vis: bool):
         """Implementation of debug visualization control.
-        
+
         Called by DirectRLEnv when set_debug_vis() is called.
         Controls visibility of trajectory markers.
-        
+
         Args:
             debug_vis: Whether to enable debug visualization
         """
         # If enabling visualization, create markers first (lazy initialization)
         if debug_vis:
             self._create_markers_if_needed()
-        
+
         # Check if ALL markers were successfully created
         self._debug_vis_requested = debug_vis
 
@@ -742,7 +783,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             if debug_vis:
                 print("[MobileMMTrackEE] ⚠ Cannot enable debug vis: one or more markers not initialized")
             return
-        
+
         if debug_vis:
             # Enable marker visibility
             self._current_target_markers.set_visibility(True)
@@ -759,42 +800,42 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             self._ee_markers.set_visibility(False)
             print("[MobileMMTrackEE] ℹ Marker visibility disabled")
             self._debug_vis_active = False
-    
+
     def _debug_vis_callback(self, event):
         """Debug visualization callback - called automatically by DirectRLEnv on render events.
-        
+
         This is where we update marker positions. DirectRLEnv calls this automatically
         during render updates if debug_vis is enabled.
-        
+
         Args:
             event: Event object (unused, required by callback signature)
         """
         if not self._visualization_enabled:
             return
-        
+
         # Create markers on first call (lazy initialization after simulation starts)
         self._create_markers_if_needed()
-        
+
         # Skip if marker creation failed
         if self._current_target_markers is None:
             return
-        
+
         # Get current EE and target positions
         ee_pos = self.robot.data.body_pos_w[:, self._ee_body_idx, :]
         target_pos, _ = self.trajectory_manager.get_target_pose()
-        
+
         # Call the marker update method
         self._update_visualization_markers(ee_pos, target_pos)
-    
+
     def _update_visualization_markers(self, ee_pos: torch.Tensor, target_pos: torch.Tensor):
         """Update visualization markers for trajectory tracking.
-        
+
         Shows all trajectory waypoints with different colors:
         - Red (large): Current target waypoint
         - Green (medium): Future waypoints
         - Blue (small): Past waypoints
         - Yellow (medium): Current end-effector position
-        
+
         Args:
             ee_pos: End-effector positions [num_envs, 3]
             target_pos: Target positions [num_envs, 3]
@@ -901,22 +942,22 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             if not hasattr(self, '_vis_step_count'):
                 self._vis_step_count = 0
             self._vis_step_count += 1
-            
+
             if self._vis_step_count % 50 == 0:
                 tracking_error = torch.norm(target_pos - ee_pos, dim=-1)
-                
+
                 # Get base position (using root_pos_w - actual world position)
                 base_pos_world = self.robot.data.root_pos_w
-                
+
                 # Show PPR joints (FIXED: should stay near zero now)
                 base_ppr = self.robot.data.joint_pos[:, 0:3]  # [joint_x, joint_y, joint_theta]
-                
+
                 base_to_target_2d = torch.norm(target_pos[:, :2] - base_pos_world[:, :2], dim=-1)
-                
+
                 # Calculate EE distance from base for all envs
                 ee_relative_all = ee_pos - base_pos_world
                 ee_dist_from_base = torch.norm(ee_relative_all[:, :2], dim=-1)
-                
+
                 # Get reward components if available
                 base_mob = torch.zeros(self.num_envs, device=self.device)
                 pos_track = torch.zeros(self.num_envs, device=self.device)
@@ -925,71 +966,71 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     base_mob = self.reward_components.get('base_mobilization', base_mob)
                     pos_track = self.reward_components.get('position_tracking', pos_track)
                     dist_pen = self.reward_components.get('target_distance_penalty', dist_pen)
-                
+
                 # ========== OVERALL STATISTICS ==========
                 print(f"\n{'='*80}")
                 print(f"[TRACKING Step {self._vis_step_count}] OVERALL STATISTICS ({self.num_envs} envs)")
                 print(f"{'='*80}")
-                
+
                 # Count problematic environments
                 num_broken = (tracking_error > 2.0).sum().item()
                 num_excellent = (tracking_error < 0.1).sum().item()
                 num_good = ((tracking_error >= 0.1) & (tracking_error < 0.3)).sum().item()
-                
+
                 print(f"📊 Environment Health:")
                 print(f"   Excellent (<0.1m):  {num_excellent:4d} ({100*num_excellent/self.num_envs:.1f}%)")
                 print(f"   Good (0.1-0.3m):    {num_good:4d} ({100*num_good/self.num_envs:.1f}%)")
                 print(f"   Poor (0.3-2.0m):    {self.num_envs-num_excellent-num_good-num_broken:4d} ({100*(self.num_envs-num_excellent-num_good-num_broken)/self.num_envs:.1f}%)")
                 print(f"   Broken (>2.0m):     {num_broken:4d} ({100*num_broken/self.num_envs:.1f}%)")
-                
+
                 print(f"\n📏 EE Tracking Error (m):")
                 print(f"   min={tracking_error.min():.4f}  mean={tracking_error.mean():.4f}  max={tracking_error.max():.4f}  std={tracking_error.std():.4f}")
-                
+
                 print(f"📐 Base-Target Distance (m):")
                 print(f"   min={base_to_target_2d.min():.4f}  mean={base_to_target_2d.mean():.4f}  max={base_to_target_2d.max():.4f}  std={base_to_target_2d.std():.4f}")
-                
+
                 # NEW: Track actual base movement since episode start
                 base_displacement = torch.norm(base_pos_world[:, :2] - self._episode_start_base_pos[:, :2], dim=-1)
                 print(f"🚗 Base Movement from Start (m):")
                 print(f"   min={base_displacement.min():.4f}  mean={base_displacement.mean():.4f}  max={base_displacement.max():.4f}  std={base_displacement.std():.4f}")
-                
+
                 print(f"🤖 EE Distance from Base (m):")
                 print(f"   min={ee_dist_from_base.min():.4f}  mean={ee_dist_from_base.mean():.4f}  max={ee_dist_from_base.max():.4f}  std={ee_dist_from_base.std():.4f}")
-                
+
                 print(f"\n💰 Rewards:")
                 print(f"   base_mobilization:    min={base_mob.min():.4f}  mean={base_mob.mean():.4f}  max={base_mob.max():.4f}")
                 print(f"   position_tracking:    min={pos_track.min():.4f}  mean={pos_track.mean():.4f}  max={pos_track.max():.4f}")
                 print(f"   target_distance_pen:  min={dist_pen.min():.4f}  mean={dist_pen.mean():.4f}  max={dist_pen.max():.4f}")
-                
+
                 # ========== SAMPLE ENVIRONMENTS ==========
                 # Pick 3 random envs, 1 best, 1 worst
                 random_env_ids = torch.randperm(self.num_envs)[:3].tolist()
                 best_env_id = tracking_error.argmin().item()
                 worst_env_id = tracking_error.argmax().item()
-                
+
                 # Combine and remove duplicates while preserving order
                 display_env_ids = []
                 display_labels = []
-                
+
                 for env_id in random_env_ids:
                     if env_id not in display_env_ids:
                         display_env_ids.append(env_id)
                         display_labels.append("RANDOM")
-                
+
                 if best_env_id not in display_env_ids:
                     display_env_ids.append(best_env_id)
                     display_labels.append("✅ BEST")
                 else:
                     idx = display_env_ids.index(best_env_id)
                     display_labels[idx] = "✅ BEST"
-                
+
                 if worst_env_id not in display_env_ids:
                     display_env_ids.append(worst_env_id)
                     display_labels.append("❌ WORST")
                 else:
                     idx = display_env_ids.index(worst_env_id)
                     display_labels[idx] = "❌ WORST"
-                
+
                 # Display each selected environment
                 for env_id, label in zip(display_env_ids, display_labels):
                     # Get trajectory interpolation info (if available)
@@ -1002,7 +1043,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                         wp_dt = self.trajectory_manager.waypoint_dt
                         alpha = min(time_accum / wp_dt, 1.0)
                         traj_info = f" | 🎬 WP {current_wp}→{current_wp + 1} (α={alpha:.2f})"
-                    
+
                     print(f"\n{'-'*80}")
                     print(f"Env {env_id:4d} [{label}]{traj_info}")
                     print(f"{'-'*80}")
@@ -1010,36 +1051,36 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     print(f"  🟢 EE Pos:       [{ee_pos[env_id, 0]:7.3f}, {ee_pos[env_id, 1]:7.3f}, {ee_pos[env_id, 2]:7.3f}]")
                     print(f"  🚗 Base Pos:     [{base_pos_world[env_id, 0]:7.3f}, {base_pos_world[env_id, 1]:7.3f}, {base_pos_world[env_id, 2]:7.3f}]")
                     print(f"  🔧 PPR offsets:  [{base_ppr[env_id, 0]:7.3f}, {base_ppr[env_id, 1]:7.3f}, {base_ppr[env_id, 2]:7.3f}] (X, Y, θ)")
-                    
+
                     # Calculate EE position relative to base
                     ee_relative = ee_pos[env_id] - base_pos_world[env_id]
                     print(f"  📍 EE from base: [{ee_relative[0]:7.3f}, {ee_relative[1]:7.3f}, {ee_relative[2]:7.3f}] | dist={ee_dist_from_base[env_id]:.3f}m")
-                    
+
                     print(f"  📏 EE Error:     {tracking_error[env_id].item():.4f} m")
                     print(f"  📐 Base-Target:  {base_to_target_2d[env_id].item():.4f} m (arm reach: 0.6m)")
                     print(f"  🚗 Base Moved:   {base_displacement[env_id].item():.4f} m (from episode start)")
-                    
+
                     # Show if base should be moving
                     if base_to_target_2d[env_id].item() > 0.6:
                         beyond_reach = base_to_target_2d[env_id].item() - 0.6
                         print(f"  ⚠️  Base SHOULD move! (target {beyond_reach:.3f}m beyond reach → penalty {10.0 * beyond_reach:.2f} pts)")
-                    
+
                     print(f"  💰 Rewards: base_mob={base_mob[env_id].item():7.4f} | pos_track={pos_track[env_id].item():7.4f} | dist_pen={dist_pen[env_id].item():7.4f}")
-                
+
                 print(f"{'='*80}\n")
             return
-        
+
         try:
             # Update target markers (red spheres at target positions)
             self._target_markers.visualize(target_pos)
-            
+
             # Update EE markers (green spheres at end-effector positions)
             self._ee_markers.visualize(ee_pos)
-            
+
         except Exception as e:
             # Silently disable if visualization fails
             self._visualization_enabled = False
-    
+
     def _get_joint_ids(self, joint_names: list[str], cache_attr: str) -> torch.Tensor:
         """Resolve joint names to Isaac Lab joint ids and cache the result."""
         cached = getattr(self, cache_attr, None)
@@ -1061,31 +1102,36 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         setattr(self, cache_attr, ids)
         return ids
 
-    def _lock_passive_joints(self, env_ids: torch.Tensor | None = None) -> None:
-        """Keep lateral base and virtual gimbal joints out of the RL policy."""
-        passive_ids = self._get_joint_ids(PASSIVE_JOINT_NAMES, "_passive_joint_ids")
-        if env_ids is None:
-            count = self.num_envs
-        else:
-            count = len(env_ids)
-
-        targets = torch.zeros(count, len(PASSIVE_JOINT_NAMES), device=self.device)
+    def _write_zero_joint_state(
+        self,
+        joint_names: list[str],
+        cache_attr: str,
+        env_ids: torch.Tensor | None = None,
+    ) -> None:
+        """Set selected joint targets and simulated joint state to zero."""
+        joint_ids = self._get_joint_ids(joint_names, cache_attr)
+        count = self.num_envs if env_ids is None else len(env_ids)
+        targets = torch.zeros(count, len(joint_names), device=self.device)
         velocities = torch.zeros_like(targets)
         if env_ids is None:
-            self.robot.set_joint_position_target(targets, joint_ids=passive_ids)
-            self.robot.write_joint_state_to_sim(targets, velocities, joint_ids=passive_ids)
+            self.robot.set_joint_position_target(targets, joint_ids=joint_ids)
+            self.robot.write_joint_state_to_sim(targets, velocities, joint_ids=joint_ids)
         else:
-            self.robot.set_joint_position_target(
-                targets,
-                joint_ids=passive_ids,
-                env_ids=env_ids,
-            )
+            self.robot.set_joint_position_target(targets, joint_ids=joint_ids, env_ids=env_ids)
             self.robot.write_joint_state_to_sim(
                 targets,
                 velocities,
-                joint_ids=passive_ids,
+                joint_ids=joint_ids,
                 env_ids=env_ids,
             )
+
+    def _lock_base_ppr_joints(self, env_ids: torch.Tensor | None = None) -> None:
+        """Keep PPR base offsets at zero; base motion is applied via root velocity."""
+        self._write_zero_joint_state(BASE_JOINT_NAMES, "_base_joint_ids", env_ids=env_ids)
+
+    def _lock_passive_joints(self, env_ids: torch.Tensor | None = None) -> None:
+        """Keep lateral base and virtual gimbal joints out of the RL policy."""
+        self._write_zero_joint_state(PASSIVE_JOINT_NAMES, "_passive_joint_ids", env_ids=env_ids)
 
     def _initialize_ee_body_idx(self):
         """Initialize end-effector body index (lazy initialization)."""
@@ -1099,7 +1145,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 self._ee_body_idx = -1
                 print(f"[MobileMMTrackEE] WARNING: EE link '{ee_link_name}' not found, using last body")
             self._ee_body_idx_initialized = True
-    
+
     def _verify_joint_mapping(self):
         """Verify joint mapping (lazy initialization after PhysX view is ready)."""
         if not self._joint_mapping_verified and hasattr(self.robot, '_root_physx_view'):
@@ -1109,7 +1155,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"Total joints in robot: {len(self.robot.joint_names)}")
             print(f"Joint names: {self.robot.joint_names}")
             print(f"Body names: {self.robot.body_names}")
-            
+
             # Expected mapping for mobile manipulator with PPR base
             expected_base_joints = BASE_JOINT_NAMES
             expected_arm_joints = ARM_JOINT_NAMES
@@ -1127,14 +1173,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     "Proto2 USD mapping validation failed. "
                     f"Missing joints={missing_joints}, missing bodies={missing_bodies}"
                 )
-            
+
             print(f"\nExpected BASE joints: {expected_base_joints}")
             print(f"Expected ARM joints by name: {expected_arm_joints}")
             print(f"Expected VIRTUAL joints (locked): {expected_virtual_joints}")
             print(f"Policy action contract: {POLICY_ACTION_DIM}D "
                   f"[6 arm targets, base_vx index {POLICY_BASE_VX_ACTION_INDEX}, "
+                  f"base_vy index {POLICY_BASE_VY_ACTION_INDEX}, "
                   f"base_wz index {POLICY_BASE_WZ_ACTION_INDEX}]")
-            
+
             # Verify actual indices
             for i, name in enumerate(self.robot.joint_names):
                 joint_type = "UNKNOWN"
@@ -1149,13 +1196,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 elif name in expected_virtual_joints:
                     joint_type = "VIRTUAL_LOCKED"
                 print(f"  [{i}] {name:20s} -> {joint_type}")
-            
+
             print("="*80 + "\n")
             self._joint_mapping_verified = True
-    
+
     def _pre_physics_step(self, actions: torch.Tensor):
         """Process actions before physics step.
-        
+
         Args:
             actions: Actions from policy [num_envs, num_actions]
         """
@@ -1165,9 +1212,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"[MobileMMTrackEE] DEBUG: self.num_envs = {self.num_envs}")
             print(f"[MobileMMTrackEE] DEBUG: Expected shape = [{self.num_envs}, {self.cfg.num_actions}]")
             self._first_action_printed = True
-        
+
         # Ensure actions are 2D [num_envs, num_actions]
-        # Sometimes actions come in as 3D [1, 1, 8] - squeeze to [1, 8]
+        # Sometimes actions come in as 3D [1, 1, action_dim] - squeeze to [1, action_dim]
         while actions.ndim > 2:
             if actions.shape[0] == 1:
                 actions = actions.squeeze(0)
@@ -1175,125 +1222,141 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 actions = actions.squeeze(1)
             else:
                 break
-        
+
         if actions.ndim == 1:
             actions = actions.unsqueeze(0)
         actions = torch.nan_to_num(actions, nan=0.0, posinf=1.0, neginf=-1.0)
         actions = torch.clamp(actions, -1.0, 1.0)
-        
+
         # Update action history for derivative calculations (jerk/smoothness)
         # Store 3 timesteps: current, t-1, t-2
         if not hasattr(self, '_actions_t_minus_2'):
             self._actions_t_minus_2 = torch.zeros_like(actions)
-        
+
         self._actions_t_minus_2 = self.prev_prev_actions.clone()
         self.prev_prev_actions = self.prev_actions.clone()
         self.prev_actions = actions.clone()
-        
-        # Update action history buffer  
+
+        # Update action history buffer
         if self.action_history is not None:
             # Store raw actions [-1,1] for policy consistency
             # NOTE: Base actions will be scaled when applied to robot, but history keeps original policy outputs
             self.action_history = torch.roll(self.action_history, shifts=-1, dims=1)
             self.action_history[:, -1, :] = actions
-        
+
         # Apply actions to robot
-        # Action space is 8D: [6 arm joint positions, vx, wz]
+        # Action space is 9D: [6 arm joint positions, vx, vy, wz]
         # Proto2 USD has 12 joints: 3 base, 6 arm, and 3 virtual gimbal joints.
-        # The v1 policy controls 6 arm joints plus base vx/wz; base vy and the
-        # virtual gimbal joints stay locked at zero.
+        # The v3 policy controls 6 arm joints plus body-frame base vx/vy/wz.
+        # Virtual gimbal joints stay locked at zero.
 
         if actions.shape[-1] != POLICY_ACTION_DIM:
             raise ValueError(
                 f"Expected {POLICY_ACTION_DIM} policy actions "
-                f"[6 arm targets, base_vx, base_wz], got shape {tuple(actions.shape)}"
+                f"[6 arm targets, base_vx, base_vy, base_wz], got shape {tuple(actions.shape)}"
             )
 
-        # Split actions using the explicit Proto2 v1 policy contract.
+        # Split actions using the explicit Proto2 v3 policy contract.
         arm_actions = actions[:, POLICY_ARM_ACTION_SLICE]
         base_vx = actions[:, POLICY_BASE_VX_ACTION_INDEX:POLICY_BASE_VX_ACTION_INDEX + 1]
+        base_vy = actions[:, POLICY_BASE_VY_ACTION_INDEX:POLICY_BASE_VY_ACTION_INDEX + 1]
         base_wz = actions[:, POLICY_BASE_WZ_ACTION_INDEX:POLICY_BASE_WZ_ACTION_INDEX + 1]
-        
-        # Scale arm actions from [-1, 1] to actual joint limits with safety margins
+
+        # Scale arm actions from [-1, 1] to actual joint limits with safety margins,
+        # then slew-limit absolute targets. This preserves the external policy contract while
+        # preventing random early PPO samples from teleporting position targets across
+        # the full arm workspace in one 20 Hz control step.
         arm_actions_scaled = self._scale_actions_to_joint_limits(arm_actions)
-        
+
         # Apply arm joint position targets to the actuated arm joints only
         # We only control the 6 arm joints via position targets.
         self._verify_joint_mapping()
         self._arm_joint_ids = self._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
+        arm_actions_filtered = self._filter_arm_position_targets(arm_actions_scaled)
 
-        # Set scaled joint position targets for arm joints only
-        self.robot.set_joint_position_target(arm_actions_scaled, joint_ids=self._arm_joint_ids)
+        # Set filtered joint position targets for arm joints only
+        self.robot.set_joint_position_target(arm_actions_filtered, joint_ids=self._arm_joint_ids)
         self._lock_passive_joints()
-        
+
         # Apply base velocity commands via direct root control (FIXED: no more joint accumulation)
         # Get current base orientation from root state (unified source of truth)
         base_quat = self.robot.data.root_quat_w
         theta = quat_to_yaw(base_quat)  # Extract yaw for body-to-world transform
-        
+
         # Scale base actions from [-1, 1] to actual velocity limits
         base_vx_desired = base_vx * self.robot_limits["max_linear_velocity"]  # [-1.5, +1.5] m/s
+        base_vy_desired = base_vy * self.robot_limits["max_linear_velocity"]  # [-1.5, +1.5] m/s
         base_wz_desired = base_wz * self.robot_limits["max_angular_velocity"]  # [-2.0, +2.0] rad/s
-        
+
         # Rate limit velocities to respect acceleration constraints
         dt = self.cfg.sim.dt * self.cfg.decimation
         max_linear_accel = self.robot_limits["max_linear_acceleration"]
         max_angular_accel = self.robot_limits["max_angular_acceleration"]
         max_vel_delta_linear = max_linear_accel * dt  # Max velocity change per step
         max_vel_delta_angular = max_angular_accel * dt
-        
+
         # Get previous commanded velocities (body frame) for rate limiting
         prev_vx = self.prev_commanded_vel[:, 0:1]
+        prev_vy = self.prev_commanded_vel[:, 1:2]
         prev_wz = self.prev_commanded_vel[:, 2:3]
-        
+
         # Clamp velocity changes to respect acceleration limits
         vel_delta_x = base_vx_desired - prev_vx
         vel_delta_x_clamped = torch.clamp(vel_delta_x, -max_vel_delta_linear, max_vel_delta_linear)
         base_vx_scaled = prev_vx + vel_delta_x_clamped
-        
+
+        vel_delta_y = base_vy_desired - prev_vy
+        vel_delta_y_clamped = torch.clamp(vel_delta_y, -max_vel_delta_linear, max_vel_delta_linear)
+        base_vy_scaled = prev_vy + vel_delta_y_clamped
+
         vel_delta_wz = base_wz_desired - prev_wz
         vel_delta_wz_clamped = torch.clamp(vel_delta_wz, -max_vel_delta_angular, max_vel_delta_angular)
         base_wz_scaled = prev_wz + vel_delta_wz_clamped
-        
+
         # Store commanded velocities (body frame) for reward calculation
         self.current_commanded_vel.zero_()
         self.current_commanded_vel[:, 0:1] = base_vx_scaled  # Linear velocity (x)
+        self.current_commanded_vel[:, 1:2] = base_vy_scaled  # Linear velocity (y/strafe)
         self.current_commanded_vel[:, 2:3] = base_wz_scaled  # Angular velocity (yaw)
-        
+
         # Transform body-frame velocities to world frame
         cos_theta = torch.cos(theta)
         sin_theta = torch.sin(theta)
-        vel_world_x = base_vx_scaled.squeeze(-1) * cos_theta  # World X velocity
-        vel_world_y = base_vx_scaled.squeeze(-1) * sin_theta  # World Y velocity
-        
+        vx_body = base_vx_scaled.squeeze(-1)
+        vy_body = base_vy_scaled.squeeze(-1)
+        vel_world_x = vx_body * cos_theta - vy_body * sin_theta  # World X velocity
+        vel_world_y = vx_body * sin_theta + vy_body * cos_theta  # World Y velocity
+
         # CRITICAL FIX (Session 8f): Write root state atomically to prevent control conflict
         # Previously: write_root_link_velocity_to_sim() then write_root_pose_to_sim()
         # Problem: Pose write could fight/wipe velocity write, making base "numb"
         # Solution: Single atomic write of pose + velocities together
         # Reference: mobile_mm_training_playbook.md §1
-        
+
         root_state = torch.zeros(self.num_envs, 13, device=self.device)
-        
+
         # Position [0:3] - with Z clamped to ground
         root_state[:, 0:3] = self.robot.data.root_pos_w
         root_state[:, 2] = 0.0  # Keep chassis at ground level
-        
+
         # Orientation [3:7] - preserve current quaternion
         root_state[:, 3:7] = self.robot.data.root_quat_w
-        
+
         # Linear velocity [7:10]
         root_state[:, 7] = vel_world_x  # X velocity (world frame)
         root_state[:, 8] = vel_world_y  # Y velocity (world frame)
         root_state[:, 9] = 0.0  # Z velocity (always 0 for ground robot)
-        
+
         # Angular velocity [10:13]
         root_state[:, 10] = 0.0  # Roll rate (always 0)
         root_state[:, 11] = 0.0  # Pitch rate (always 0)
         root_state[:, 12] = base_wz_scaled.squeeze(-1)  # Yaw rate
-        
+
         # Single atomic write - no control conflict!
         self.robot.write_root_state_to_sim(root_state)
-        
+        self._lock_base_ppr_joints()
+        self._lock_passive_joints()
+
         # DEBUG: Print base velocity on first few steps
         if not hasattr(self, '_base_debug_count'):
             self._base_debug_count = 0
@@ -1301,32 +1364,33 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             root_pos = self.robot.data.root_pos_w[0]
             print(f"\n[BASE DEBUG Step {self._base_debug_count}]")
             print(f"  base_vx action: {base_vx[0].item():.4f} -> scaled: {base_vx_scaled[0].item():.4f} m/s")
+            print(f"  base_vy action: {base_vy[0].item():.4f} -> scaled: {base_vy_scaled[0].item():.4f} m/s")
             print(f"  base_wz action: {base_wz[0].item():.4f} -> scaled: {base_wz_scaled[0].item():.4f} rad/s")
             print(f"  root_vel_w (world): [{vel_world_x[0].item():.4f}, {vel_world_y[0].item():.4f}, {base_wz_scaled[0].item():.4f}]")
             print(f"  root_pos_w: [{root_pos[0].item():.4f}, {root_pos[1].item():.4f}, {root_pos[2].item():.4f}]")
             print(f"  yaw (from quat): {theta[0].item():.4f} rad")
             self._base_debug_count += 1
-    
+
     def _update_curriculum_stage(self):
         """Update curriculum stage with gradual weight interpolation (Session 8h).
-        
+
         Session 8g failed with instant transition @ 50M (value function shock).
         Session 8h uses 10M linear ramp (45M-55M) to prevent instability.
         """
         if not self.use_curriculum:
             return
-        
+
         # Estimate current training step from episode count
         # This is approximate, will be more accurate with explicit step tracking
         self.current_training_step = self.episode_length_buf.max().item() * len(self.episode_length_buf)
-        
+
         stage_1_end = self.curriculum_stage_1_steps  # 45M
         transition_end = stage_1_end + self.task_cfg.rewards.curriculum_transition_steps  # 55M
-        
+
         if self.current_training_step < stage_1_end:
             # Stage 1: Keep reduced weights (4.0, 12.0)
             return
-        
+
         elif self.current_training_step < transition_end:
             # Transition: Linear interpolation 45M-55M
             if self.curriculum_stage == 1:
@@ -1336,26 +1400,26 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 print(f"  Session 8g lesson: Instant switch @ 50M caused collapse")
                 print(f"{'='*80}\n")
                 self.curriculum_stage = 1.5  # Mark as transitioning
-            
+
             # Calculate interpolation progress [0.0, 1.0]
             progress = (self.current_training_step - stage_1_end) / self.task_cfg.rewards.curriculum_transition_steps
             progress = min(1.0, max(0.0, progress))  # Clamp to [0, 1]
-            
+
             # Linear interpolation
             stage_1_pos = self.task_cfg.rewards.curriculum_stage_1_position_weight  # 4.0
             stage_1_ori = self.task_cfg.rewards.curriculum_stage_1_orientation_weight  # 12.0
             stage_2_pos = self.task_cfg.rewards.curriculum_stage_2_position_weight  # 10.0
             stage_2_ori = self.task_cfg.rewards.curriculum_stage_2_orientation_weight  # 30.0
-            
+
             self.reward_weights["position_tracking"] = stage_1_pos + progress * (stage_2_pos - stage_1_pos)
             self.reward_weights["orientation_tracking"] = stage_1_ori + progress * (stage_2_ori - stage_1_ori)
-            
+
             # Log every 1M steps during transition
             if self.current_training_step % 1_000_000 < 100_000:
                 print(f"[Session 8h] Transition progress: {progress*100:.1f}% @ {self.current_training_step:,} steps | "
                       f"pos={self.reward_weights['position_tracking']:.1f}, "
                       f"ori={self.reward_weights['orientation_tracking']:.1f}")
-        
+
         else:
             # Stage 2: Full weights reached (10.0, 30.0)
             if self.curriculum_stage < 2:
@@ -1368,43 +1432,134 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 print(f"  Orientation weight: {self.task_cfg.rewards.curriculum_stage_1_orientation_weight} → {self.reward_weights['orientation_tracking']}")
                 print(f"  Transition method: 10M gradual ramp (vs 8g's instant switch)")
                 print(f"{'='*80}\n")
-    
+
     def _apply_action(self):
         """Apply actions to the simulation (called by parent)."""
         # Update curriculum stage if enabled
         self._update_curriculum_stage()
         pass  # Actions applied in _pre_physics_step
-    
+
+    def _filter_arm_position_targets(self, targets: torch.Tensor) -> torch.Tensor:
+        """Slew-limit absolute arm targets for stable early-policy exploration."""
+        if not self._arm_command_filter_initialized:
+            self._arm_command_filter_initialized = True
+            current_joint_pos = self.robot.data.joint_pos[:, self._arm_joint_ids]
+            self.filtered_arm_targets = torch.nan_to_num(current_joint_pos, nan=0.0).clone()
+
+        target_delta = torch.nan_to_num(targets - self.filtered_arm_targets, nan=0.0)
+        target_delta = torch.clamp(
+            target_delta,
+            -self.max_arm_target_delta,
+            self.max_arm_target_delta,
+        )
+        self.filtered_arm_targets = self.filtered_arm_targets + target_delta
+        return self.filtered_arm_targets
+
+    def _sanitize_arm_joint_state(self, env_ids: torch.Tensor | None = None) -> None:
+        """Project arm joint state back into a finite, safe envelope.
+
+        PhysX can occasionally fling the lightweight Proto2 arm outside joint limits
+        during random-policy startup. Do not let those invalid states enter PPO
+        observations/rewards or cascade into NaNs.
+        """
+        self._initialize_joint_limits()
+        arm_joint_ids = self._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
+        env_sel = slice(None) if env_ids is None else env_ids
+        joint_pos = self.robot.data.joint_pos[env_sel][:, arm_joint_ids]
+        joint_vel = self.robot.data.joint_vel[env_sel][:, arm_joint_ids]
+
+        margin = self.robot_limits["joint_limit_margin"]
+        lower_safe = self.joint_lower_limits + margin
+        upper_safe = self.joint_upper_limits - margin
+        safe_home = self.arm_safe_home.to(dtype=joint_pos.dtype).expand_as(joint_pos)
+
+        finite_pos = torch.isfinite(joint_pos)
+        finite_vel = torch.isfinite(joint_vel)
+        repaired_pos = torch.where(finite_pos, joint_pos, safe_home)
+        repaired_pos = torch.clamp(repaired_pos, lower_safe, upper_safe)
+        repaired_vel = torch.where(finite_vel, joint_vel, torch.zeros_like(joint_vel))
+        repaired_vel = torch.clamp(
+            repaired_vel,
+            -self.robot_limits["max_joint_velocity"],
+            self.robot_limits["max_joint_velocity"],
+        )
+
+        needs_repair = (
+            (~finite_pos).any(dim=-1)
+            | (~finite_vel).any(dim=-1)
+            | (joint_pos < lower_safe).any(dim=-1)
+            | (joint_pos > upper_safe).any(dim=-1)
+            | (torch.abs(joint_vel) > self.robot_limits["max_joint_velocity"]).any(dim=-1)
+        )
+        if not needs_repair.any():
+            return
+
+        if env_ids is None:
+            repair_env_ids = torch.nonzero(needs_repair, as_tuple=False).squeeze(-1)
+            pos_to_write = repaired_pos[repair_env_ids]
+            vel_to_write = torch.zeros_like(pos_to_write)
+        else:
+            repair_env_ids = env_ids[needs_repair]
+            pos_to_write = repaired_pos[needs_repair]
+            vel_to_write = torch.zeros_like(pos_to_write)
+
+        self.robot.write_joint_state_to_sim(
+            pos_to_write,
+            vel_to_write,
+            joint_ids=arm_joint_ids,
+            env_ids=repair_env_ids,
+        )
+        self.robot.set_joint_position_target(
+            pos_to_write,
+            joint_ids=arm_joint_ids,
+            env_ids=repair_env_ids,
+        )
+        self.filtered_arm_targets[repair_env_ids] = pos_to_write
+
+        if not hasattr(self, "_arm_state_repair_count"):
+            self._arm_state_repair_count = 0
+        if self._arm_state_repair_count < 5:
+            print(
+                f"[MobileMMTrackEE] Repaired arm state for {int(needs_repair.sum().item())} env(s); "
+                f"sample env={int(repair_env_ids[0].item())}"
+            )
+        self._arm_state_repair_count += int(needs_repair.sum().item())
+
     def _scale_actions_to_joint_limits(self, actions: torch.Tensor) -> torch.Tensor:
         """
         Scale normalized actions from [-1, 1] to actual joint limits with safety margins.
-        
+
         Args:
             actions: Normalized actions in [-1, 1], shape [num_envs, num_joints]
-            
+
         Returns:
             Scaled actions in physical joint limits, shape [num_envs, num_joints]
         """
         # Ensure joint limits are initialized
         self._initialize_joint_limits()
-        
+
         # Get joint limits (these are already for arm joints only)
         lower = self.joint_lower_limits  # Shape: [6]
         upper = self.joint_upper_limits  # Shape: [6]
-        
-        # Add safety margin (5% from each limit to avoid hard stops)
-        range_size = upper - lower
-        safety_margin = 0.05 * range_size
-        lower_safe = lower + safety_margin
-        upper_safe = upper - safety_margin
-        
-        # Scale from [-1, 1] to [lower_safe, upper_safe]
-        # Formula: scaled = (action + 1) * 0.5 * (upper - lower) + lower
+        margin = self.robot_limits["joint_limit_margin"]
+
+        # Proto2 v2 safety profile: keep early PPO exploration in a conservative
+        # envelope around a known stable home pose. The external policy remains normalized
+        # normalized actions; only the physical target envelope is narrowed.
+        lower_safe = torch.maximum(lower + margin, self.arm_safe_home - self.arm_action_radius)
+        upper_safe = torch.minimum(upper - margin, self.arm_safe_home + self.arm_action_radius)
+
         actions_normalized = (actions + 1.0) * 0.5  # Convert [-1, 1] to [0, 1]
         scaled_actions = actions_normalized * (upper_safe - lower_safe) + lower_safe
-        
+
+        if not hasattr(self, "_arm_action_envelope_printed"):
+            print("[MobileMMTrackEE] Proto2 arm action envelope:")
+            print(f"  Lower: {lower_safe}")
+            print(f"  Upper: {upper_safe}")
+            self._arm_action_envelope_printed = True
+
         return scaled_actions
-    
+
     def _initialize_joint_limits(self):
         """Initialize joint limits from robot data (lazy initialization)."""
         if not self._joint_limits_initialized and hasattr(self.robot, 'data'):
@@ -1417,58 +1572,36 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"[MobileMMTrackEE] Joint limits initialized for Proto2 arm joints:")
             print(f"  Lower: {self.joint_lower_limits}")
             print(f"  Upper: {self.joint_upper_limits}")
-    
+
     def _get_filtered_contact_forces(self) -> torch.Tensor:
-        """Get contact forces filtered to exclude normal base-ground contact.
-        
-        We use two sensors:
-        1. Chassis sensor: Reports arm-chassis collisions (sensor on base, filtered to arm contacts)
-        2. Arm sensor: Reports arm-ground collisions (sensor on arm, filtered to ground contacts)
-        
-        This excludes:
-        - Chassis ↔ Ground (normal 2-3kN support load - not reported by either sensor)
-        
+        """Get hard self-collision forces from filtered base-arm contacts.
+
+        The chassis sensor is configured as one base body filtered against arm/EE
+        bodies, so IsaacLab exposes the pairwise contact matrix in force_matrix_w.
+        We intentionally do not combine the broad arm_contact_sensor here: that
+        sensor covers multiple arm bodies and reports net forces that include
+        reset-settling/ground artifacts, which caused false hard terminations.
+
         Returns:
-            Tensor of shape [num_envs] with maximum filtered contact force per env
+            Tensor of shape [num_envs] with maximum filtered base-arm force.
         """
-        # Get forces from chassis sensor (arm-chassis collisions)
         chassis_sensor = self.scene["contact_sensor"]
-        chassis_forces = chassis_sensor.data.net_forces_w  # [num_envs, num_bodies, 3] or [num_envs, 3]
-        
-        # Calculate chassis contact magnitudes
+        force_matrix = getattr(chassis_sensor.data, "force_matrix_w", None)
+
+        if force_matrix is not None:
+            # Shape: [num_envs, sensor_bodies=1, filtered_shapes, 3]
+            return torch.norm(force_matrix, dim=-1).amax(dim=(1, 2))
+
+        # Defensive fallback for misconfigured sensors: use broad net force only so
+        # the problem is visible, but the configured path above should be active.
+        chassis_forces = chassis_sensor.data.net_forces_w
         if len(chassis_forces.shape) == 3:
-            chassis_force_mag = torch.norm(chassis_forces, dim=-1).max(dim=-1)[0]  # [num_envs]
-        else:
-            chassis_force_mag = torch.norm(chassis_forces, dim=-1)  # [num_envs]
-        
-        # Get forces from arm sensor (arm-ground collisions)
-        # Check both possible key formats: direct key or via sensors dict
-        arm_sensor = None
-        if "arm_contact_sensor" in self.scene.sensors:
-            arm_sensor = self.scene.sensors["arm_contact_sensor"]
-        elif hasattr(self.scene, "arm_contact_sensor"):
-            arm_sensor = self.scene.arm_contact_sensor
-        
-        if arm_sensor is not None:
-            arm_forces = arm_sensor.data.net_forces_w
-            
-            # Calculate arm contact magnitudes
-            if len(arm_forces.shape) == 3:
-                arm_force_mag = torch.norm(arm_forces, dim=-1).max(dim=-1)[0]  # [num_envs]
-            else:
-                arm_force_mag = torch.norm(arm_forces, dim=-1)  # [num_envs]
-            
-            # Combined: max of arm-chassis OR arm-ground
-            contact_force_per_env = torch.maximum(chassis_force_mag, arm_force_mag)
-        else:
-            # Fallback: only chassis sensor available (should not happen with new config)
-            contact_force_per_env = chassis_force_mag
-        
-        return contact_force_per_env
-    
+            return torch.norm(chassis_forces, dim=-1).max(dim=-1)[0]
+        return torch.norm(chassis_forces, dim=-1)
+
     def _get_observations(self) -> dict[str, torch.Tensor]:
         """Compute environment observations.
-        
+
         Returns:
             Dictionary with "policy" key containing observation tensor
         """
@@ -1476,16 +1609,19 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self._initialize_joint_limits()
         self._initialize_ee_body_idx()
         self._verify_joint_mapping()  # Verify joint mapping on first call
-        
+        self._sanitize_arm_joint_state()
+        self._lock_base_ppr_joints()
+        self._lock_passive_joints()
+
         # Robot state - FIXED: Use root_pos_w for base (unified source of truth)
         # Base position controlled directly via root velocity commands (no joint accumulation)
         joint_pos = self.robot.data.joint_pos
         joint_vel = self.robot.data.joint_vel
-        
+
         # Base position from PhysX root (actual world position)
         base_pos = self.robot.data.root_pos_w.clone()
         base_quat = self.robot.data.root_quat_w
-        
+
         # Use root velocities (these are in world frame and correct)
         base_lin_vel = self.robot.data.root_lin_vel_w
         base_ang_vel = self.robot.data.root_ang_vel_w
@@ -1495,11 +1631,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         ee_quat = self.robot.data.body_quat_w[:, self._ee_body_idx, :]
         ee_lin_vel = self.robot.data.body_lin_vel_w[:, self._ee_body_idx, :]
         ee_ang_vel = self.robot.data.body_ang_vel_w[:, self._ee_body_idx, :]
-        
+
         # Get target from trajectory
         target_pos, target_quat = self.trajectory_manager.get_target_pose()
         base_target_distance = torch.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)
-        
+
         if self._visualization_enabled:
             prev_markers_created = self._markers_created
             self._create_markers_if_needed()
@@ -1508,7 +1644,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 self._set_debug_vis_impl(True)
             if self._current_target_markers is not None:
                 self._update_visualization_markers(ee_pos, target_pos)
-        
+
         # Optional: Lookahead
         lookahead_pos = None
         if self.task_cfg.use_lookahead:
@@ -1516,7 +1652,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 steps=self.task_cfg.lookahead_steps,
                 lookahead_dt=self.task_cfg.lookahead_dt,
             )
-        
+
         # Normalize base velocities for observations (to match policy's expected range [0,1])
         base_lin_vel_obs = base_lin_vel / self.robot_limits["max_linear_velocity"]  # [0, 1.5] -> [0, 1]
         base_ang_vel_obs = base_ang_vel / self.robot_limits["max_angular_velocity"]  # [0, 2.0] -> [0, 1]
@@ -1548,46 +1684,59 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             contact_forces=contact_obs,   # Collision severity [num_envs, 1]: 0=clean, →1 at heavy collision
             min_obstacle_dist=None,  # No obstacles in current scene; enable via ObstacleConfig.enable_obstacles
         )
-        
+
         return {"policy": obs}
-    
+
     def _get_rewards(self) -> torch.Tensor:
         """Compute rewards for all environments.
-        
+
         Returns:
             Reward tensor [num_envs]
         """
+        self._sanitize_arm_joint_state()
+        self._lock_base_ppr_joints()
+        self._lock_passive_joints()
+
         # Get current EE pose
         ee_pos = self.robot.data.body_pos_w[:, self._ee_body_idx, :]
         ee_quat = self.robot.data.body_quat_w[:, self._ee_body_idx, :]
-        
+
         # Get target pose
         target_pos, target_quat = self.trajectory_manager.get_target_pose()
-        
+
         # Get robot state - use root_pos_w (actual world position maintained by PhysX)
         base_pos = self.robot.data.root_pos_w.clone()
         base_quat = self.robot.data.root_quat_w
         base_lin_vel = self.robot.data.root_lin_vel_w
         base_ang_vel = self.robot.data.root_ang_vel_w
         base_target_distance = torch.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)
-        
+
         arm_joint_ids = self._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
         base_joint_ids = self._get_joint_ids(BASE_JOINT_NAMES, "_base_joint_ids")
         joint_pos = self.robot.data.joint_pos
         arm_joint_pos = joint_pos[:, arm_joint_ids]  # ARM joints only
         joint_vel = self.robot.data.joint_vel  # All joint velocities (needed for monitoring)
         arm_joint_vel = joint_vel[:, arm_joint_ids]  # ARM joint velocities
-        
-        # Get contact forces from ContactSensor (Isaac Lab 2.2.0 pattern)
-        # Use filtered contact forces (excludes base-ground static load)
-        contact_force_mag_per_env = self._get_filtered_contact_forces()  # [num_envs]
+
+        # Get contact forces from ContactSensor (Isaac Lab 2.2.0 pattern).
+        # Mask the reset-settling window so startup contact spikes do not cause
+        # immediate terminations or poisoned reward rollouts.
+        raw_contact_force_mag_per_env = self._get_filtered_contact_forces()  # [num_envs]
+        contact_grace_steps = getattr(self.task_cfg, "contact_grace_steps", 0)
+        collision_check_active = self.episode_length_buf >= contact_grace_steps
+        contact_force_mag_per_env = torch.where(
+            collision_check_active,
+            raw_contact_force_mag_per_env,
+            torch.zeros_like(raw_contact_force_mag_per_env),
+        )
         max_force = contact_force_mag_per_env.max().item()
-        
+        raw_max_force = raw_contact_force_mag_per_env.max().item()
+
         if not hasattr(self, '_contact_force_checked'):
             print(f"\n{'='*80}")
             print(f"CONTACT FORCE API VERIFICATION (Filtered)")
             print(f"{'='*80}")
-            print(f"Max filtered contact force: {max_force:.4f} N")
+            print(f"Max filtered contact force: {raw_max_force:.4f} N raw, {max_force:.4f} N after grace mask")
             if max_force < 0.001:
                 print(f"⚠️  WARNING: Filtered contact forces are zero!")
                 print(f"   Either no collisions or filtering is too aggressive!")
@@ -1597,60 +1746,60 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"{'='*80}\n")
             self._contact_force_checked = True
             self._collision_step_count = 0
-        
+
         # Monitor for actual collisions (contact forces > threshold)
         collision_threshold = self.reward_weights["self_collision_threshold"]
         if max_force > collision_threshold:
             if not hasattr(self, '_last_collision_warning_step'):
                 self._last_collision_warning_step = -100
-            
+
             # Print warning every 100 steps to avoid spam
             if self._collision_step_count - self._last_collision_warning_step >= 100:
                 print(f"\n⚠️  [COLLISION DETECTED] Step {self._collision_step_count}")
                 print(f"   Max filtered contact force: {max_force:.2f} N (threshold: {collision_threshold:.2f} N)")
                 print(f"   (Base-ground contact excluded from detection)")
                 self._last_collision_warning_step = self._collision_step_count
-        
+
         # Monitor for wild joint velocities
         max_joint_vel = torch.abs(joint_vel).max().item()
         if max_joint_vel > 5.0:  # rad/s - very fast!
             if not hasattr(self, '_last_wild_vel_warning_step'):
                 self._last_wild_vel_warning_step = -100
-            
+
             if self._collision_step_count - self._last_wild_vel_warning_step >= 100:
                 print(f"\n⚠️  [WILD ARM MOTION] Step {self._collision_step_count}")
                 print(f"   Max joint velocity: {max_joint_vel:.2f} rad/s")
                 print(f"   Joint velocities [env 0]: {joint_vel[0].cpu().numpy()}")
                 self._last_wild_vel_warning_step = self._collision_step_count
-        
+
         # Monitor for joint limit violations (potential disengagement)
         base_joint_pos = self.robot.data.joint_pos[:, base_joint_ids]
         arm_joint_pos = self.robot.data.joint_pos[:, arm_joint_ids]
-        
+
         # Check ARM joint limits (base has huge limits ±50m, not useful to check)
         arm_lower_violations = (arm_joint_pos < self.joint_lower_limits).any(dim=-1)
         arm_upper_violations = (arm_joint_pos > self.joint_upper_limits).any(dim=-1)
-        
+
         if arm_lower_violations.any() or arm_upper_violations.any():
             if not hasattr(self, '_last_limit_warning_step'):
                 self._last_limit_warning_step = -100
-            
+
             if self._collision_step_count - self._last_limit_warning_step >= 100:
                 print(f"\n⚠️  [JOINT LIMIT VIOLATION] Step {self._collision_step_count}")
                 print(f"   BASE joints [env 0]: {base_joint_pos[0].cpu().numpy()} (X_m, Y_m, theta_rad)")
                 print(f"   ARM joints [env 0]: {arm_joint_pos[0].cpu().numpy()}")
                 print(f"   ARM Lower limits: {self.joint_lower_limits.cpu().numpy()}")
                 print(f"   ARM Upper limits: {self.joint_upper_limits.cpu().numpy()}")
-                
+
                 # Calculate ARM violations
                 lower_diff = arm_joint_pos[0] - self.joint_lower_limits
                 upper_diff = self.joint_upper_limits - arm_joint_pos[0]
                 print(f"   ARM Lower margin: {lower_diff.cpu().numpy()}")
                 print(f"   ARM Upper margin: {upper_diff.cpu().numpy()}")
                 self._last_limit_warning_step = self._collision_step_count
-        
+
         self._collision_step_count += 1
-        
+
         # Normalize velocities for observations/diagnostics (policy still sees normalized values)
         base_lin_vel_normalized = base_lin_vel / self.robot_limits["max_linear_velocity"]
         base_ang_vel_normalized = base_ang_vel / self.robot_limits["max_angular_velocity"]
@@ -1660,14 +1809,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         commanded_vel = self.current_commanded_vel
         prev_commanded_vel = self.prev_commanded_vel
         commanded_linear = torch.zeros_like(commanded_vel)
-        commanded_linear[:, 0:1] = commanded_vel[:, 0:1]
+        commanded_linear[:, 0:2] = commanded_vel[:, 0:2]
         prev_commanded_linear = torch.zeros_like(prev_commanded_vel)
-        prev_commanded_linear[:, 0:1] = prev_commanded_vel[:, 0:1]
+        prev_commanded_linear[:, 0:2] = prev_commanded_vel[:, 0:2]
         commanded_ang = torch.zeros_like(commanded_vel)
         commanded_ang[:, 2:3] = commanded_vel[:, 2:3]
 
         commanded_linear_accel = torch.zeros_like(commanded_vel)
         commanded_linear_accel[:, 0:1] = (commanded_vel[:, 0:1] - prev_commanded_vel[:, 0:1]) / self.control_dt
+        commanded_linear_accel[:, 1:2] = (commanded_vel[:, 1:2] - prev_commanded_vel[:, 1:2]) / self.control_dt
         prev_commanded_linear_accel = self.prev_commanded_accel
 
         # Actual acceleration from simulator (for diagnostics only)
@@ -1675,7 +1825,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         # Get base orientation for lateral penalty calculation
         base_quat = self.robot.data.root_quat_w
-        
+
         # ============================================================================
         # REACHABILITY-GUIDED BASE PLANNING
         # ============================================================================
@@ -1683,7 +1833,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # If not reachable → encourage base movement toward target
         reachability_bonus = torch.zeros(self.num_envs, device=self.device)
         base_direction_reward = torch.zeros(self.num_envs, device=self.device)
-        
+
         if self.reach_map is not None:
             # FIXED: Use root state (world pose) instead of joint offsets
             # Extract base world pose from root state
@@ -1691,10 +1841,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             base_world_y = base_pos[:, 1]
             base_world_yaw = quat_to_yaw(base_quat)  # Extract yaw from root quaternion
             base_pose = torch.stack([base_world_x, base_world_y, base_world_yaw], dim=1)  # [N, 3]
-            
+
             # Transform target EE position from world frame to arm base frame
             target_in_arm_frame = self.reach_map.world_to_arm_frame(target_pos, base_pose)
-            
+
             # Check reachability. Guard against transient invalid simulator state
             # so one NaN does not crash the whole PPO rollout.
             finite_targets = torch.isfinite(target_in_arm_frame).all(dim=-1)
@@ -1716,19 +1866,19 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 print("[MobileMMTrackEE] WARNING: Non-finite reachability target detected; "
                       "marking those envs unreachable for this step.")
                 self._nonfinite_reachability_warned = True
-            
+
             # Count reachable/unreachable for logging
             n_reachable = is_reachable.sum().item()
             n_unreachable = (~is_reachable).sum().item()
-            
+
             # === CASE 1: Target IS reachable from current base position ===
             if is_reachable.any():
                 # Bonus for being in a good base position (Session 7c: Reduced to 1.0 from 2.0 - was too dominant)
                 reachability_bonus[is_reachable] = 1.0
-                
+
                 # Optional: Get best arm config as IK hint (future enhancement)
                 # arm_configs, _ = self.reach_map.get_best_configs(target_in_arm_frame[is_reachable])
-            
+
             # === CASE 2: Target is NOT reachable from current base position ===
             unreachable_finite = (~is_reachable) & finite_targets
             alignment = torch.empty(0, device=self.device)
@@ -1737,36 +1887,37 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 # Compute direction to target in world X-Y plane
                 target_xy = target_pos[unreachable_finite, :2]  # [M, 2]: world X, Y
                 base_xy = base_pose[unreachable_finite, :2]     # [M, 2]: world X, Y
-                
+
                 # Direction vector from base to target
                 direction_to_target = target_xy - base_xy  # [M, 2]
                 distance_to_target_xy = torch.norm(direction_to_target, dim=-1, keepdim=True)  # [M, 1]
                 direction_normalized = direction_to_target / (distance_to_target_xy + 1e-6)  # [M, 2]
-                
-                # Transform base velocity from body frame to world frame
-                # Base velocity in body frame: [vx_body, 0, wz] (differential drive can't strafe)
+
+                # Transform base velocity from body frame to world frame.
+                # Base velocity in body frame: [vx_body, vy_body, wz].
                 base_theta = base_pose[unreachable_finite, 2]  # [M]
                 base_vx_body = commanded_linear[unreachable_finite, 0]  # [M]
-                
+                base_vy_body = commanded_linear[unreachable_finite, 1]  # [M]
+
                 # World frame velocity (rotation matrix applied to body velocity)
-                base_vx_world = base_vx_body * torch.cos(base_theta)  # X component in world
-                base_vy_world = base_vx_body * torch.sin(base_theta)  # Y component in world
+                base_vx_world = base_vx_body * torch.cos(base_theta) - base_vy_body * torch.sin(base_theta)
+                base_vy_world = base_vx_body * torch.sin(base_theta) + base_vy_body * torch.cos(base_theta)
                 base_vel_xy_world = torch.stack([base_vx_world, base_vy_world], dim=-1)  # [M, 2]
-                
+
                 # Compute alignment: dot product of velocity with desired direction
                 alignment = (base_vel_xy_world * direction_normalized).sum(dim=-1)  # [M]
-                
+
                 # Reward moving in correct direction (Session 7c: Reduced to 1.5 from 3.0)
                 base_direction_reward[unreachable_finite] = 1.5 * torch.clamp(alignment, min=0.0)
-                
+
                 # Bonus for higher speed when moving in right direction (Session 7c: Reduced to 0.5 from 1.0)
                 speed_xy = torch.norm(base_vel_xy_world, dim=-1)  # [M]
                 base_direction_reward[unreachable_finite] += 0.5 * speed_xy * torch.clamp(alignment, min=0.0)
-            
+
             # Log reachability statistics (every 100 steps to avoid spam)
             if not hasattr(self, '_reach_log_step'):
                 self._reach_log_step = 0
-            
+
             # Store stats for training monitor callback
             avg_alignment = alignment.mean().item() if alignment.numel() > 0 else 0.0
             avg_distance = distance_to_target_xy.mean().item() if distance_to_target_xy.numel() > 0 else 0.0
@@ -1777,7 +1928,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 'avg_alignment': avg_alignment,
                 'avg_distance': avg_distance
             }
-            
+
             if self._reach_log_step % 100 == 0:
                 print(f"\n[Reachability Stats] Step {self._reach_log_step}")
                 print(f"  Reachable: {n_reachable}/{self.num_envs} envs")
@@ -1785,53 +1936,56 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 if n_unreachable > 0:
                     print(f"  Avg base→target alignment: {avg_alignment:.3f}")
                     print(f"  Avg base→target distance: {avg_distance:.3f} m")
-            
+
             self._reach_log_step += 1
         else:
             workspace_distance = None
-        
+
         # BUGFIX: Convert commanded velocities from body frame to world frame
-        # Most reward functions expect world-frame velocities (lateral_motion_penalty, 
+        # Most reward functions expect world-frame velocities (lateral_motion_penalty,
         # velocity_limit_penalty, etc.) but commanded_vel is in body frame.
         # Only base_target_alignment_reward expects body frame, so we'll handle that specially.
-        
+
         # Extract yaw from quaternion for rotation
         w, x, y, z = base_quat[:, 0], base_quat[:, 1], base_quat[:, 2], base_quat[:, 3]
         yaw = torch.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y**2 + z**2))
-        
+
         # Current commanded velocity: body → world
         vx_body = commanded_linear[:, 0]
+        vy_body = commanded_linear[:, 1]
         commanded_linear_world = torch.zeros_like(commanded_linear)
-        commanded_linear_world[:, 0] = vx_body * torch.cos(yaw)  # X component in world
-        commanded_linear_world[:, 1] = vx_body * torch.sin(yaw)  # Y component in world
+        commanded_linear_world[:, 0] = vx_body * torch.cos(yaw) - vy_body * torch.sin(yaw)
+        commanded_linear_world[:, 1] = vx_body * torch.sin(yaw) + vy_body * torch.cos(yaw)
         commanded_linear_world[:, 2] = commanded_linear[:, 2]     # Z unchanged (usually 0)
-        
+
         # Previous commanded velocity: body → world
         vx_body_prev = prev_commanded_linear[:, 0]
+        vy_body_prev = prev_commanded_linear[:, 1]
         prev_commanded_linear_world = torch.zeros_like(prev_commanded_linear)
-        prev_commanded_linear_world[:, 0] = vx_body_prev * torch.cos(yaw)
-        prev_commanded_linear_world[:, 1] = vx_body_prev * torch.sin(yaw)
+        prev_commanded_linear_world[:, 0] = vx_body_prev * torch.cos(yaw) - vy_body_prev * torch.sin(yaw)
+        prev_commanded_linear_world[:, 1] = vx_body_prev * torch.sin(yaw) + vy_body_prev * torch.cos(yaw)
         prev_commanded_linear_world[:, 2] = prev_commanded_linear[:, 2]
-        
+
         # Previous commanded acceleration: body → world
         ax_body = prev_commanded_linear_accel[:, 0]
+        ay_body = prev_commanded_linear_accel[:, 1]
         prev_commanded_linear_accel_world = torch.zeros_like(prev_commanded_linear_accel)
-        prev_commanded_linear_accel_world[:, 0] = ax_body * torch.cos(yaw)
-        prev_commanded_linear_accel_world[:, 1] = ax_body * torch.sin(yaw)
+        prev_commanded_linear_accel_world[:, 0] = ax_body * torch.cos(yaw) - ay_body * torch.sin(yaw)
+        prev_commanded_linear_accel_world[:, 1] = ax_body * torch.sin(yaw) + ay_body * torch.cos(yaw)
         prev_commanded_linear_accel_world[:, 2] = prev_commanded_linear_accel[:, 2]
-        
+
         # SESSION 8i: Calculate current orientation error for distance-gated rewards
         dot_product_for_reward = torch.sum(ee_quat * target_quat, dim=-1).abs()
         dot_product_for_reward = torch.clamp(dot_product_for_reward, 0.0, 1.0)
         current_ee_ori_error = 2 * torch.acos(dot_product_for_reward)  # [num_envs] - angular error in radians
-        
+
         # Get EE angular velocity for smoothness penalty
         ee_ang_vel = self.robot.data.body_ang_vel_w[:, self._ee_body_idx, :]  # [num_envs, 3]
         if self.prev_joint_vel.shape[1] > int(arm_joint_ids.max().item()):
             prev_arm_joint_vel = self.prev_joint_vel[:, arm_joint_ids]
         else:
             prev_arm_joint_vel = self.prev_joint_vel[:, :len(ARM_JOINT_NAMES)]
-        
+
         # Compute rewards with all new constraint penalties
         # Use COMMANDED velocities (now in world frame) for penalty calculation to avoid penalizing simulation artifacts
         rewards, self.reward_components = compute_combined_reward(
@@ -1873,103 +2027,114 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             workspace_distance_log = workspace_distance
         self._workspace_distance_buf = workspace_distance_log.clone()
         self._base_target_distance_buf = base_target_distance.clone()
-        
+
         # Update history for next step - store COMMANDED velocities for consistent penalty calculation
         self.prev_tracking_error = torch.norm(target_pos - ee_pos, dim=-1)
         self.prev_ee_ori_error = current_ee_ori_error.clone()  # SESSION 8i: Store orientation error for next step
-        
+
         # Store tracking errors for evaluation/logging
         self.ee_pos_error_buf = target_pos - ee_pos  # [num_envs, 3] - vector error (x, y, z)
-        
+
         # Compute orientation error (same as orientation_tracking_reward)
         dot_product = torch.sum(ee_quat * target_quat, dim=-1).abs()
         dot_product = torch.clamp(dot_product, 0.0, 1.0)
         self.ee_ori_error_buf = 2 * torch.acos(dot_product)  # [num_envs] - angular error in radians
-        
+
         self.prev_base_pos = base_pos.clone()  # NEW: Store base position for next step
         self.prev_base_lin_vel = base_lin_vel.clone()
         self.prev_joint_vel = joint_vel.clone()
         self.prev_base_accel = actual_accel.clone()
         self.prev_commanded_vel = commanded_vel.clone()
         self.prev_commanded_accel = commanded_linear_accel.clone()
-        
+
         # Advance trajectory to next target
         # This must happen after reward calculation so current target is used for this step
         self.trajectory_manager.step()
-        
+
         # Log reward components
         self.extras["reward_components"] = {
             k: v.mean().item() for k, v in self.reward_components.items()
         }
-        
+
         # DIAGNOSTIC: Track base movement metrics
         self.extras["base_diagnostics"] = {
             "base_vel_x_mean": base_lin_vel[:, 0].mean().item(),
             "base_vel_x_std": base_lin_vel[:, 0].std().item(),
             "base_vel_x_max": base_lin_vel[:, 0].abs().max().item(),
+            "base_vel_y_mean": base_lin_vel[:, 1].mean().item(),
+            "base_vel_y_std": base_lin_vel[:, 1].std().item(),
+            "base_vel_y_max": base_lin_vel[:, 1].abs().max().item(),
             "base_vel_z_mean": base_ang_vel[:, 2].mean().item(),
             "base_vel_z_std": base_ang_vel[:, 2].std().item(),
             "base_vel_z_max": base_ang_vel[:, 2].abs().max().item(),
-            "base_action_x_mean": self.prev_actions[:, 6].mean().item(),
-            "base_action_x_std": self.prev_actions[:, 6].std().item(),
-            "base_action_z_mean": self.prev_actions[:, 7].mean().item(),
-            "base_action_z_std": self.prev_actions[:, 7].std().item(),
+            "base_action_x_mean": self.prev_actions[:, POLICY_BASE_VX_ACTION_INDEX].mean().item(),
+            "base_action_x_std": self.prev_actions[:, POLICY_BASE_VX_ACTION_INDEX].std().item(),
+            "base_action_y_mean": self.prev_actions[:, POLICY_BASE_VY_ACTION_INDEX].mean().item(),
+            "base_action_y_std": self.prev_actions[:, POLICY_BASE_VY_ACTION_INDEX].std().item(),
+            "base_action_z_mean": self.prev_actions[:, POLICY_BASE_WZ_ACTION_INDEX].mean().item(),
+            "base_action_z_std": self.prev_actions[:, POLICY_BASE_WZ_ACTION_INDEX].std().item(),
         }
-        
+
         # === ADD REACHABILITY-GUIDED REWARDS ===
         rewards += reachability_bonus + base_direction_reward
-        
+
         # Log reachability reward components
         if self.reach_map is not None:
             self.extras["reward_components"]["reachability_bonus"] = reachability_bonus.mean().item()
             self.extras["reward_components"]["base_direction_reward"] = base_direction_reward.mean().item()
-        
+
         return rewards
-    
+
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute termination and timeout conditions.
-        
+
         Returns:
             terminated: Environments that should terminate [num_envs]
             time_out: Environments that reached max episode length [num_envs]
         """
+        self._sanitize_arm_joint_state()
+        self._lock_base_ppr_joints()
+        self._lock_passive_joints()
+
         terminated = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
-        
+
         # Check for excessive tracking error
         if self.task_cfg.terminate_on_tracking_error:
             ee_pos = self.robot.data.body_pos_w[:, self._ee_body_idx, :]
             target_pos, _ = self.trajectory_manager.get_target_pose()
             tracking_error = torch.norm(target_pos - ee_pos, dim=-1)
             terminated |= tracking_error > self.task_cfg.max_tracking_error
-        
+
         # Check for self-collision (CRITICAL for mobile manipulator!)
         if self.task_cfg.terminate_on_self_collision:
-            # Get filtered contact forces (excludes base-ground static load)
+            # Get filtered contact forces (excludes base-ground static load).
+            # Skip reset-settling steps; reward contact is masked the same way.
             contact_force_mag = self._get_filtered_contact_forces()  # [num_envs]
-            
+            mature_envs = self.episode_length_buf >= self.task_cfg.contact_grace_steps
+
             # Terminate if filtered contact force exceeds threshold
             # This will only trigger on arm-ground or arm-base collisions, not normal base support
-            terminated |= contact_force_mag > self.task_cfg.self_collision_termination_threshold
-        
+            terminated |= mature_envs & (contact_force_mag > self.task_cfg.self_collision_termination_threshold)
+
         # Timeout after max episode length
         time_out = self.episode_length_buf >= self.max_episode_length - 1
-        
+
         return terminated, time_out
-    
+
     def _reset_idx(self, env_ids: torch.Tensor | None):
         """Reset specified environments.
-        
+
         Args:
             env_ids: Indices of environments to reset
         """
         if env_ids is None or len(env_ids) == 0:
             return
-        
+
         super()._reset_idx(env_ids)
-        
+
         # Reset trajectory phase BEFORE getting first waypoint
         self.trajectory_manager.reset(env_ids)
-        
+
         # DEBUG: Verify trajectory was reset correctly
         if len(env_ids) > 0:
             test_wp_idx = self.trajectory_manager.current_waypoint_idx[env_ids[0]].item()
@@ -1985,11 +2150,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         if self._visualization_enabled:
             self._create_markers_if_needed()
-        
+
         # CRITICAL: Get first waypoint AFTER trajectory reset
         # This ensures we're positioning base relative to trajectory start, not mid-trajectory
         first_target_pos, _ = self.trajectory_manager.get_target_pose()
-        
+
         # DEBUG: Print what we got from get_target_pose AND what's in recorded_positions
         if len(env_ids) > 0 and self.trajectory_manager.recorded_positions is not None:
             # Safety check: ensure env_ids is not empty and contains valid indices
@@ -2002,7 +2167,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 print(f"  recorded_positions:   [{from_recorded[0]:.3f}, {from_recorded[1]:.3f}, {from_recorded[2]:.3f}]")
                 print(f"  waypoint_idx:         {self.trajectory_manager.current_waypoint_idx[env_idx].item()}")
                 print(f"  time_accum:           {self.trajectory_manager._recorded_time_accum[env_idx].item():.4f}")
-        
+
         # Set base position with offset from target, accounting for arm kinematics
         # FK analysis (all joints at zero): EE is at [0.1415, 0.2405, 0.9465] in base frame
         # We offset base 44cm behind and 24cm left of target XY to allow 30cm forward reach
@@ -2012,38 +2177,48 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         new_root_state[:, 1] = first_target_pos[env_ids, 1] - 0.2405  # Y: compensate for lateral offset
         new_root_state[:, 2] = 0.0  # Ground level (matches runtime clamping line 1162)
         # Keep orientation from default (facing forward)
-        
+
         # Reset velocities to zero
         new_root_state[:, 7:10] = 0.0  # Linear velocity
         new_root_state[:, 10:13] = 0.0  # Angular velocity
-        
+
         # Apply the new root state
         self.robot.write_root_state_to_sim(new_root_state, env_ids=env_ids)
-        
+
         # FIXED: Set PPR joints to ZERO (they are offsets, not world positions!)
         self._base_joint_ids = self._get_joint_ids(BASE_JOINT_NAMES, "_base_joint_ids")
-        
+
         # Set base joints to zero offset (root_pos_w controls world position directly)
         base_joint_pos = torch.zeros(len(env_ids), 3, device=self.device)
+        base_joint_vel = torch.zeros_like(base_joint_pos)
         self.robot.set_joint_position_target(
-            base_joint_pos, 
+            base_joint_pos,
             joint_ids=self._base_joint_ids,
             env_ids=env_ids
         )
+        self.robot.write_joint_state_to_sim(
+            base_joint_pos,
+            base_joint_vel,
+            joint_ids=self._base_joint_ids,
+            env_ids=env_ids,
+        )
+        self._lock_base_ppr_joints(env_ids=env_ids)
         self._lock_passive_joints(env_ids=env_ids)
-        
+
         # Print actual base position and target for debugging
         print(f"[RESET] Env {env_ids[0].item() if len(env_ids) > 0 else 'N/A'}: Base=[{new_root_state[0, 0]:.3f}, {new_root_state[0, 1]:.3f}, {new_root_state[0, 2]:.3f}], Target=[{first_target_pos[env_ids[0], 0]:.3f}, {first_target_pos[env_ids[0], 1]:.3f}, {first_target_pos[env_ids[0], 2]:.3f}], Reach=0.30m forward")
-        
+
         # NEW: Store episode start base position for movement tracking
         if not hasattr(self, '_episode_start_base_pos'):
             self._episode_start_base_pos = torch.zeros(self.num_envs, 3, device=self.device)
         self._episode_start_base_pos[env_ids] = new_root_state[:, 0:3]
-        
+
         # Reset state buffers - use root_pos_w (actual world position)
         self.prev_base_pos[env_ids] = new_root_state[:, 0:3]
         self.prev_actions[env_ids] = 0.0
         self.prev_prev_actions[env_ids] = 0.0
+        if hasattr(self, "filtered_arm_targets") and hasattr(self, "_arm_joint_ids"):
+            self.filtered_arm_targets[env_ids] = self.robot.data.joint_pos[env_ids][:, self._arm_joint_ids]
         self.prev_tracking_error[env_ids] = 0.0
         self.prev_base_lin_vel[env_ids] = 0.0
         self.prev_joint_vel[env_ids] = 0.0
@@ -2051,26 +2226,42 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self.current_commanded_vel[env_ids] = 0.0
         self.prev_commanded_vel[env_ids] = 0.0
         self.prev_commanded_accel[env_ids] = 0.0
-        
+
         if self.action_history is not None:
             self.action_history[env_ids] = 0.0
-        
+
         # Randomize initial joint positions (ARM joints only, not base)
         if self.task_cfg.randomize_initial_joint_positions:
             # Only randomize the 6 arm joints, not the 3 base joints
             arm_joint_noise = torch.randn(
                 len(env_ids), 6, device=self.device
             ) * self.task_cfg.initial_joint_noise_std
-            
+
             self._arm_joint_ids = self._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
-            
-            default_arm_joint_pos = self.robot.data.default_joint_pos[env_ids][:, self._arm_joint_ids]
+
+            safe_arm_home = self.arm_safe_home.to(dtype=self.robot.data.joint_pos.dtype).expand(len(env_ids), -1)
+            reset_arm_joint_pos = safe_arm_home + arm_joint_noise
+            self._initialize_joint_limits()
+            reset_arm_joint_pos = torch.clamp(
+                reset_arm_joint_pos,
+                self.joint_lower_limits + self.robot_limits["joint_limit_margin"],
+                self.joint_upper_limits - self.robot_limits["joint_limit_margin"],
+            )
+            reset_arm_joint_vel = torch.zeros_like(reset_arm_joint_pos)
             self.robot.set_joint_position_target(
-                default_arm_joint_pos + arm_joint_noise, 
+                reset_arm_joint_pos,
                 joint_ids=self._arm_joint_ids,
                 env_ids=env_ids
             )
+            self.robot.write_joint_state_to_sim(
+                reset_arm_joint_pos,
+                reset_arm_joint_vel,
+                joint_ids=self._arm_joint_ids,
+                env_ids=env_ids,
+            )
+            self.filtered_arm_targets[env_ids] = reset_arm_joint_pos
+            self._arm_command_filter_initialized = True
             self._lock_passive_joints(env_ids=env_ids)
-        
+
         # Advance trajectory by one step to start
         self.trajectory_manager.step()

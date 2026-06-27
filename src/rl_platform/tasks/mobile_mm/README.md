@@ -40,14 +40,14 @@ The observation includes:
 
 ### Action Space
 
-8-dimensional continuous actions:
+9-dimensional continuous actions:
 - 6 arm joint position targets
-- 2 base commands (`base_vx`, `base_wz`)
+- 3 base commands (`base_vx`, `base_vy`, `base_wz`)
 
-The Proto2 USD also contains `base_joint_vy` and virtual gimbal joints
+The Proto2 USD also contains virtual gimbal joints
 (`ee1_rot_z`, `ee1_rot_y`, `ee1_rot_x`). These joints are locked/passive in the
-v1 policy and must not be added to the action space without revisiting
-observations, rewards, and checkpoint compatibility.
+v3 policy. Base PPR joint offsets remain zeroed by the environment; `base_vx`,
+`base_vy`, and `base_wz` drive body-frame root velocity commands.
 
 ### Reward Function
 

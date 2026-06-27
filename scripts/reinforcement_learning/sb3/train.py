@@ -78,7 +78,7 @@ def parse_args():
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=2e-4,  # Session 8h: Lower for stability (8g used 3e-4)
+        default=1e-4,  # Proto2 v2: lower for safer policy updates on fragile startup
         help="Learning rate for PPO",
     )
     parser.add_argument(
@@ -104,8 +104,8 @@ def parse_args():
     parser.add_argument(
         "--ent_coef",
         type=float,
-        default=0.01,
-        help="Entropy coefficient for exploration (recommend 0.001 for tracking tasks)",
+        default=0.001,
+        help="Entropy coefficient for exploration (Proto2 v2 default: conservative 0.001)",
     )
     parser.add_argument(
         "--target_kl",
@@ -1238,14 +1238,14 @@ def main():
                 ),
                 activation_fn=torch.nn.ReLU,
                 ortho_init=True,  # Orthogonal initialization (better for RL)
-                log_std_init=-1.0,  # Initial log(std) = -1.0 -> std ~ 0.37
+                log_std_init=-2.0,  # Proto2 v2: std ~0.14 to avoid destabilizing random startup actions
             )
             
             print("    Network Architecture:")
             print(f"      Actor (Policy):  [{obs_dim}] -> [256] -> [256] -> [128] -> [{action_dim}]")
             print(f"      Critic (Value):  [{obs_dim}] -> [256] -> [256] -> [128] -> [1]")
             print("    Action Distribution:")
-            print("      Initial std:     ~0.37 (log_std_init=-1.0)")
+            print("      Initial std:     ~0.14 (log_std_init=-2.0)")
             print("      Std control:     Entropy decay + KL schedule")
             
             model = PPO(
@@ -1266,7 +1266,7 @@ def main():
                 max_grad_norm=0.5,
                 target_kl=args.target_kl,
                 # Note: log_std_bounds not available in SB3 2.5.0
-                # Std control via: entropy decay + KL schedule + log_std_init=-1.0
+                # Std control via: entropy decay + KL schedule + log_std_init=-2.0
                 tensorboard_log=args.log_dir,
                 device=device,
                 verbose=1,

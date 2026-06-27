@@ -10,24 +10,26 @@
 The Proto2 USD preserves the MoveIt-style virtual gimbal joints. They are not
 part of the RL policy action space.
 
-## V1 Policy Contract
+## V3 Policy Contract
 
-The first Proto2 baseline intentionally keeps the existing 8-action SB3 policy
-shape:
+The active Proto2 baseline uses a 9-action SB3 policy shape:
 
 ```text
-[arm_j1, arm_j2, arm_j3, arm_j4, arm_j5, arm_j6, base_vx, base_wz]
+[arm_j1, arm_j2, arm_j3, arm_j4, arm_j5, arm_j6, base_vx, base_vy, base_wz]
 ```
 
 Locked/passive joints:
 
 ```text
-base_joint_vy, ee1_rot_z, ee1_rot_y, ee1_rot_x
+ee1_rot_z, ee1_rot_y, ee1_rot_x
 ```
 
-Do not switch to a 9-action full-PPR policy without also updating the reward,
-observation history, launchers, checkpoint compatibility notes, and evaluation
-scripts.
+`base_vx` and `base_vy` are body-frame root linear velocities, and `base_wz`
+is root yaw rate. The USD PPR base joints are still zeroed every control/readout
+step, so policies do not accumulate base joint offsets.
+
+Checkpoint compatibility: prior 8D Proto2 policies are not shape-compatible
+with this v3 action contract and must not be resumed directly.
 
 ## Regenerate USD
 
@@ -39,6 +41,27 @@ G:\isaaclab_venv\Scripts\python.exe G:\wSpace\cinebotRL\scripts\convert_urdf_to_
   --usd assets_own\recomoProto2-1190_moveit\recomoProto2-1190_moveit.usd `
   --headless
 ```
+
+
+## Proto2 v2 Policy Safety Profile
+
+Before starting another long training run, use the v2 safety defaults now baked
+into the task and SB3 launcher:
+
+- `log_std_init=-2.0` (`std ~= 0.14`) instead of the old `-1.0` startup noise.
+- Default `learning_rate=1e-4` and `ent_coef=0.001` for lower-variance PPO updates.
+- Arm position targets are slew-limited per control step before being sent to Isaac.
+- Arm reset positions are written directly to sim state, then used to seed the command filter.
+- Initial joint reset noise is reduced to `0.03 rad`.
+- Self-collision termination/reward contact is masked for the first `12` post-reset control steps.
+- Hard self-collision now uses filtered base-arm/EE contact only, not broad arm-ground net forces.
+- Base PPR joints are locked to zero every control/readout step; 9D base policy actions drive body-frame root velocity only.
+- Arm actions are mapped to a conservative safe-home envelope for v2 stability, not the full joint range.
+- Arm joint state is projected back into finite safe limits before dones/observations/rewards.
+
+The previous 512-env probing run reached `524,288` steps but auto-paused on
+negative explained variance. Treat v2 as the next stability gate, not as a final
+performance policy.
 
 ## Validation Gates
 

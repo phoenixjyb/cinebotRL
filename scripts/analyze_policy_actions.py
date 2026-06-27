@@ -63,18 +63,18 @@ try:
     from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnvCfg, MobileMMTrackEEEnv
     from rl_platform.tasks.mobile_mm.config import TrajectoryConfig
     from stable_baselines3 import PPO
-    
+
     # Create custom environment configuration
     env_cfg = MobileMMTrackEEEnvCfg()
     env_cfg.scene.num_envs = 1
-    
+
     # Configure trajectory
     env_cfg.task_config.trajectory = TrajectoryConfig(
         type="multi_recorded",
         trajectory_dir="trajectoryToLearn/world_json",
         trajectory_pattern="**/*.json",
     )
-    
+
     # Create environment directly with config
     env = MobileMMTrackEEEnv(cfg=env_cfg)
     print("    ✓ Environment created\n")
@@ -102,11 +102,11 @@ arm_activity = []  # Track if arm is moving significantly
 
 try:
     obs = env.reset()
-    
+
     # Handle new Gymnasium API: reset() returns (obs, info)
     if isinstance(obs, tuple):
         obs, info = obs
-    
+
     for step in range(args.num_steps):
         # obs is a dict of torch tensors from Isaac Lab
         # Get the policy observation
@@ -114,19 +114,19 @@ try:
             obs_tensor = obs.get("policy", list(obs.values())[0])
         else:
             obs_tensor = obs
-        
+
         # Convert to numpy if needed for SB3
         if hasattr(obs_tensor, 'cpu'):
             obs_np = obs_tensor.cpu().numpy()
         else:
             obs_np = np.array(obs_tensor)
-        
+
         # Predict action (SB3 expects numpy array)
         action, _ = model.predict(obs_np, deterministic=True)
-        
+
         # Step environment
         obs, reward, terminated, truncated, info = env.step(torch.from_numpy(action).float().to(env.device))
-        
+
         # Split actions: first 6 for arm, last 2 for base (vx, wz)
         if isinstance(action, np.ndarray):
             if len(action.shape) > 1:
@@ -134,14 +134,14 @@ try:
                 action_single = action[0]
             else:
                 action_single = action
-            
+
             arm_actions_list.append(action_single[:6])
             base_actions_list.append(action_single[6:])
-            
+
             # Check if arm is moving significantly
             arm_magnitude = np.linalg.norm(action_single[:6])
             arm_activity.append(arm_magnitude > 0.01)  # Threshold for "moving"
-        
+
         # Reset if episode done
         if terminated.any() if hasattr(terminated, 'any') else terminated:
             obs = env.reset()
@@ -152,14 +152,14 @@ try:
     arm_actions = np.array(arm_actions_list)
     base_actions = np.array(base_actions_list)
     arm_activity = np.array(arm_activity)
-    
+
     print("\n" + "=" * 70)
     print("POLICY ACTION ANALYSIS")
     print("=" * 70)
     print(f"\n📊 COLLECTED DATA:")
     print(f"   Steps analyzed: {len(arm_actions)}")
-    print(f"   Action dim: 6 (arm) + 2 (base) = 8 total")
-    
+    print(f"   Action dim: 6 (arm) + 3 (base) = 9 total")
+
     print(f"\n🤖 ARM ACTIONS (DOF 0-5):")
     print(f"   Shape: {arm_actions.shape}")
     print(f"   Mean: {arm_actions.mean(axis=0)}")
@@ -168,36 +168,41 @@ try:
     print(f"   Max:  {arm_actions.max(axis=0)}")
     arm_moving_pct = (arm_activity.sum() / len(arm_activity)) * 100
     print(f"   % Steps with arm activity (|action| > 0.01): {arm_moving_pct:.1f}%")
-    
-    print(f"\n🚀 BASE ACTIONS (vx, wz):")
+
+    print(f"\n🚀 BASE ACTIONS (vx, vy, wz):")
     print(f"   Shape: {base_actions.shape}")
     print(f"   vx (linear velocity):")
     print(f"     Mean: {base_actions[:, 0].mean():.6f}")
     print(f"     Std:  {base_actions[:, 0].std():.6f}")
     print(f"     Min:  {base_actions[:, 0].min():.6f}")
     print(f"     Max:  {base_actions[:, 0].max():.6f}")
-    print(f"   wz (angular velocity):")
+    print(f"   vy (lateral velocity):")
     print(f"     Mean: {base_actions[:, 1].mean():.6f}")
     print(f"     Std:  {base_actions[:, 1].std():.6f}")
     print(f"     Min:  {base_actions[:, 1].min():.6f}")
     print(f"     Max:  {base_actions[:, 1].max():.6f}")
-    
+    print(f"   wz (angular velocity):")
+    print(f"     Mean: {base_actions[:, 2].mean():.6f}")
+    print(f"     Std:  {base_actions[:, 2].std():.6f}")
+    print(f"     Min:  {base_actions[:, 2].min():.6f}")
+    print(f"     Max:  {base_actions[:, 2].max():.6f}")
+
     # Count steps with meaningful base motion
     base_magnitude = np.linalg.norm(base_actions, axis=1)
     meaningful_base = (base_magnitude > 0.01).sum()
     pct_meaningful = (meaningful_base / len(base_actions)) * 100
-    
+
     print(f"\n   Base motion magnitude:")
     print(f"     Mean: {base_magnitude.mean():.6f}")
     print(f"     Std:  {base_magnitude.std():.6f}")
     print(f"     Min:  {base_magnitude.min():.6f}")
     print(f"     Max:  {base_magnitude.max():.6f}")
     print(f"   % Steps with base activity (magnitude > 0.01): {pct_meaningful:.1f}%")
-    
+
     print("\n" + "=" * 70)
     print("DIAGNOSIS")
     print("=" * 70)
-    
+
     if pct_meaningful < 1.0:
         print("🔴 CRITICAL: Policy is NOT using base actions at all!")
         print("   → The policy learned to ignore chassis movement")
@@ -218,7 +223,7 @@ try:
         else:
             print(f"   → Arm less active ({arm_moving_pct:.1f}% of steps)")
             print("   → Policy prioritizing base motion")
-    
+
     print("\n" + "=" * 70)
 
 except Exception as e:

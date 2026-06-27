@@ -52,7 +52,7 @@ def quat_to_yaw(quat: torch.Tensor) -> torch.Tensor:
 
 def main():
     """Run base movement validation test."""
-    
+
     # Create environment with disabled termination for testing
     env = gym.make(
         "MobileMMTrackEE-v0",
@@ -60,7 +60,7 @@ def main():
         device=args_cli.device,
         headless=args_cli.headless,
     )
-    
+
     # CRITICAL: Disable ALL terminations for this test
     # We're only testing base movement, not task performance
     print("\n⚠️  Disabling terminations for base movement test...")
@@ -68,11 +68,11 @@ def main():
     env.unwrapped.task_cfg.terminate_on_tracking_error = False
     env.unwrapped.task_cfg.self_collision_termination_threshold = 999999.0
     env.unwrapped.task_cfg.max_tracking_error = 999999.0
-    
+
     # Also zero out collision penalty to avoid confusing logs
     if hasattr(env.unwrapped, 'reward_cfg'):
         env.unwrapped.reward_cfg.self_collision_penalty = 0.0
-    
+
     print("\n" + "="*80)
     print("Base Movement Validation Test")
     print("="*80)
@@ -83,57 +83,58 @@ def main():
     print(f"⚠️  ALL terminations DISABLED for test")
     print(f"⚠️  Collision penalty ZEROED for test")
     print("="*80 + "\n")
-    
+
     # Reset environment
     obs_dict, _ = env.reset()
     obs = obs_dict["policy"]  # Extract policy observation tensor
-    
+
     # Record initial state (USE ROOT STATE, NOT JOINT STATE!)
     robot = env.unwrapped.scene["robot"]
     initial_root_pos = robot.data.root_pos_w.clone()
     initial_root_quat = robot.data.root_quat_w.clone()
     initial_joint_pos = robot.data.joint_pos[:, 0:3].clone()  # PPR joints for monitoring
-    
+
     print("Initial state:")
     print(f"  Root position (world): {initial_root_pos[0, :3]}")
     print(f"  Root orientation (yaw): {quat_to_yaw(initial_root_quat[0:1]).item():.3f} rad")
     print(f"  PPR joint positions: {initial_joint_pos[0]}")
     print()
-    
+
     # Run for 10 seconds with constant forward command
     dt = env.unwrapped.cfg.sim.dt * env.unwrapped.cfg.decimation  # ~0.1s per step
     num_steps = int(10.0 / dt)
-    
-    # Action space: [arm_joints (0-5), base_vx (6), base_wz (7)]
+
+    # Action space: [arm_joints (0-5), base_vx (6), base_vy (7), base_wz (8)]
     # Base actions in indices 6 and 7, normalized to [-1, 1]
     # Scaled by max_linear_velocity (1.5 m/s) and max_angular_velocity (1.0 rad/s)
     # To get 0.5 m/s forward: 0.5 / 1.5 = 0.333 normalized
-    actions = torch.zeros(args_cli.num_envs, 8, device=args_cli.device)
+    actions = torch.zeros(args_cli.num_envs, 9, device=args_cli.device)
     actions[:, 6] = 0.5 / 1.5  # Index 6: Normalized forward velocity → 0.5 m/s
-    actions[:, 7] = 0.0         # Index 7: No rotation
+    actions[:, 7] = 0.0         # Index 7: No lateral motion
+    actions[:, 8] = 0.0         # Index 8: No rotation
     # Arm joints (0-5) stay at current positions (zeros are fine)
-    
+
     print(f"Running {num_steps} steps at {dt:.3f}s per step...")
-    print(f"  Action indices: arm=[0-5], base_vx=[6], base_wz=[7]")
+    print(f"  Action indices: arm=[0-5], base_vx=[6], base_vy=[7], base_wz=[8]")
     print(f"  Commanding: base_vx={actions[0, 6].item():.3f} (normalized) → 0.5 m/s\n")
-    
+
     for step in range(num_steps):
         obs_dict, reward, terminated, truncated, info = env.step(actions)
         obs = obs_dict["policy"]  # Extract policy observation
-        
+
         # Print progress every 2 seconds
         if (step + 1) % int(2.0 / dt) == 0:
             current_root_pos = robot.data.root_pos_w
             displacement = current_root_pos - initial_root_pos
             current_vel = robot.data.root_lin_vel_w
             print(f"  Step {step+1}/{num_steps}: displacement = {displacement[0, :2]}, velocity = {current_vel[0, :2]}")
-    
+
     # Record final state
     final_root_pos = robot.data.root_pos_w.clone()
     final_root_quat = robot.data.root_quat_w.clone()
     final_joint_pos = robot.data.joint_pos[:, 0:3].clone()
     final_vel = robot.data.root_lin_vel_w.clone()
-    
+
     # Calculate metrics (USE ROOT STATE!)
     displacement = final_root_pos - initial_root_pos
     mean_displacement_x = displacement[:, 0].mean().item()
@@ -141,11 +142,11 @@ def main():
     mean_displacement_z = displacement[:, 2].mean().item()
     mean_velocity_x = final_vel[:, 0].mean().item()
     mean_velocity_y = final_vel[:, 1].mean().item()
-    
+
     # PPR joint drift
     joint_drift = (final_joint_pos - initial_joint_pos).abs()
     max_joint_drift = joint_drift.max().item()
-    
+
     print("\n" + "="*80)
     print("RESULTS")
     print("="*80)
@@ -158,44 +159,44 @@ def main():
     print(f"  Y: {mean_velocity_y:.3f} m/s")
     print(f"Max PPR joint drift: {max_joint_drift:.5f} m")
     print("="*80 + "\n")
-    
+
     # Validation checks
     print("VALIDATION:")
     checks = []
-    
+
     # Check 1: Forward displacement should be ~5.0m (0.5 m/s * 10s)
     expected_displacement = 5.0
     tolerance = 0.5
     check1 = abs(mean_displacement_x - expected_displacement) < tolerance
     checks.append(check1)
     print(f"  1. Forward displacement: {mean_displacement_x:.3f}m (expected {expected_displacement}±{tolerance}m) - {'✅ PASS' if check1 else '❌ FAIL'}")
-    
+
     # Check 2: Velocity should be ~0.5 m/s
     expected_vel = 0.5
     vel_tolerance = 0.1
     check2 = abs(mean_velocity_x - expected_vel) < vel_tolerance
     checks.append(check2)
     print(f"  2. Forward velocity: {mean_velocity_x:.3f}m/s (expected {expected_vel}±{vel_tolerance}m/s) - {'✅ PASS' if check2 else '❌ FAIL'}")
-    
+
     # Check 3: PPR joints naturally change when base moves - skip or use loose threshold
     # (joint_pos[0:3] are the base's theta/x/y which SHOULD change with movement)
     max_drift_threshold = 0.5  # Loose threshold since these joints track base motion
     check3 = max_joint_drift < max_drift_threshold
     checks.append(check3)
     print(f"  3. PPR joint drift: {max_joint_drift:.5f}m (threshold {max_drift_threshold}m - NOTE: these track base motion) - {'✅ PASS' if check3 else '❌ FAIL'}")
-    
+
     # Check 4: Lateral drift should be small
     lateral_threshold = 0.5
     check4 = abs(mean_displacement_y) < lateral_threshold
     checks.append(check4)
     print(f"  4. Lateral drift: {abs(mean_displacement_y):.3f}m (threshold {lateral_threshold}m) - {'✅ PASS' if check4 else '❌ FAIL'}")
-    
+
     # Check 5: Vertical drift should be minimal
     vertical_threshold = 0.1
     check5 = abs(mean_displacement_z) < vertical_threshold
     checks.append(check5)
     print(f"  5. Vertical drift: {abs(mean_displacement_z):.3f}m (threshold {vertical_threshold}m) - {'✅ PASS' if check5 else '❌ FAIL'}")
-    
+
     # Overall result
     all_passed = all(checks)
     print("\n" + "="*80)
@@ -204,7 +205,7 @@ def main():
     else:
         print("❌ SOME CHECKS FAILED - Base movement fix may have issues!")
     print("="*80 + "\n")
-    
+
     env.close()
     return 0 if all_passed else 1
 
@@ -219,5 +220,5 @@ if __name__ == "__main__":
         exit_code = 1
     finally:
         simulation_app.close()
-    
+
     exit(exit_code)

@@ -613,6 +613,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self.obstacle_disc_radius = float(self.task_cfg.obstacles.disc_radius)
         self.robot_footprint_radius = float(self.task_cfg.obstacles.robot_footprint_radius)
         self._obstacle_clearance_buf = torch.full((self.num_envs,), 10.0, device=self.device)
+        self._base_target_distance_buf = torch.full((self.num_envs,), 0.5, device=self.device)
+        self._base_target_nonfinite_count = 0
 
         # Position history for base progress tracking
         self.prev_base_pos = torch.zeros(self.num_envs, 3, device=self.device)
@@ -1701,6 +1703,36 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             self._obstacle_nonfinite_count = getattr(self, "_obstacle_nonfinite_count", 0) + int(invalid.sum().item())
         return clearance
 
+    def _get_base_target_distance(self, base_pos: torch.Tensor, target_pos: torch.Tensor) -> torch.Tensor:
+        """Return finite planar base-target distances for rewards and diagnostics.
+
+        Early random policies can occasionally throw a replicated env into a bad
+        root pose for one step. Keep that as a strong far-target signal, but cap
+        it so one transient does not dominate PPO reward scales or logs.
+        """
+        hard_margin = self.reward_weights.get("reachability_hard_margin", 0.7)
+        max_distance = hard_margin + 1.0
+
+        base_xy = base_pos[:, :2]
+        target_xy = target_pos[:, :2]
+        finite_xy = torch.isfinite(base_xy).all(dim=-1) & torch.isfinite(target_xy).all(dim=-1)
+
+        safe_base_xy = torch.nan_to_num(base_xy, nan=0.0, posinf=max_distance, neginf=-max_distance)
+        safe_target_xy = torch.nan_to_num(target_xy, nan=0.0, posinf=max_distance, neginf=-max_distance)
+        distance = torch.norm(safe_target_xy - safe_base_xy, dim=-1)
+        finite_distance = torch.isfinite(distance)
+        invalid = (~finite_xy) | (~finite_distance)
+
+        distance = torch.clamp(
+            torch.nan_to_num(distance, nan=max_distance, posinf=max_distance, neginf=max_distance),
+            min=0.0,
+            max=max_distance,
+        )
+        if invalid.any():
+            distance = torch.where(invalid, torch.full_like(distance, max_distance), distance)
+            self._base_target_nonfinite_count += int(invalid.sum().item())
+        return distance
+
     def _get_filtered_contact_forces(self) -> torch.Tensor:
         """Get hard self-collision forces from filtered base-arm contacts.
 
@@ -1762,7 +1794,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         # Get target from trajectory
         target_pos, target_quat = self.trajectory_manager.get_target_pose()
-        base_target_distance = torch.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)
+        base_target_distance = self._get_base_target_distance(base_pos, target_pos)
+        self._base_target_distance_buf = base_target_distance.clone()
 
         if self._visualization_enabled:
             prev_markers_created = self._markers_created
@@ -1844,7 +1877,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         base_quat = self.robot.data.root_quat_w
         base_lin_vel = self.robot.data.root_lin_vel_w
         base_ang_vel = self.robot.data.root_ang_vel_w
-        base_target_distance = torch.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)
+        base_target_distance = self._get_base_target_distance(base_pos, target_pos)
 
         arm_joint_ids = self._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
         base_joint_ids = self._get_joint_ids(BASE_JOINT_NAMES, "_base_joint_ids")
@@ -2026,10 +2059,19 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 target_xy = target_pos[unreachable_finite, :2]  # [M, 2]: world X, Y
                 base_xy = base_pose[unreachable_finite, :2]     # [M, 2]: world X, Y
 
-                # Direction vector from base to target
+                # Direction vector from base to target. Normalize with the true finite
+                # vector length, but cap distance diagnostics separately so transient
+                # bad root poses do not dominate monitoring output.
                 direction_to_target = target_xy - base_xy  # [M, 2]
-                distance_to_target_xy = torch.norm(direction_to_target, dim=-1, keepdim=True)  # [M, 1]
-                direction_normalized = direction_to_target / (distance_to_target_xy + 1e-6)  # [M, 2]
+                safe_direction_to_target = torch.nan_to_num(
+                    direction_to_target, nan=0.0, posinf=1.7, neginf=-1.7
+                )
+                direction_distance = torch.norm(safe_direction_to_target, dim=-1, keepdim=True)
+                distance_to_target_xy = self._get_base_target_distance(
+                    base_pos[unreachable_finite],
+                    target_pos[unreachable_finite],
+                ).unsqueeze(-1)
+                direction_normalized = safe_direction_to_target / (direction_distance + 1e-6)  # [M, 2]
 
                 # Transform base velocity from body frame to world frame.
                 # Base velocity in body frame: [vx_body, vy_body, wz].

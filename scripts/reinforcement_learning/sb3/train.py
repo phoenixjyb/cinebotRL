@@ -607,10 +607,18 @@ def main():
                         print(f"                       min={pos_error.min().item():.4f}, max={pos_error.max().item():.4f}")
                     
                     # CRITICAL: Base-target and workspace distance diagnostics
-                    if hasattr(isaac_env, '_robot') and hasattr(isaac_env, '_target_positions'):
-                        base_pos = isaac_env._robot.data.root_pos_w
-                        target_pos = isaac_env._target_positions
-                        base_target_dist = torch.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)
+                    if hasattr(isaac_env, '_base_target_distance_buf') or (
+                        hasattr(isaac_env, '_robot') and hasattr(isaac_env, '_target_positions')
+                    ):
+                        if hasattr(isaac_env, '_base_target_distance_buf'):
+                            base_target_dist = isaac_env._base_target_distance_buf
+                        else:
+                            base_pos = isaac_env._robot.data.root_pos_w
+                            target_pos = isaac_env._target_positions
+                            base_target_dist = torch.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)
+                            base_target_dist = torch.nan_to_num(
+                                base_target_dist, nan=1.7, posinf=1.7, neginf=1.7
+                            ).clamp(max=1.7)
 
                         optimal_margin = 0.4
                         hard_margin = isaac_env.reward_weights.get("reachability_hard_margin", 0.6)

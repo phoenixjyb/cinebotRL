@@ -465,6 +465,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "progress_bonus": self.task_cfg.rewards.progress_bonus,
             "base_progress_reward": self.task_cfg.rewards.base_progress_reward,
             "base_target_alignment": self.task_cfg.rewards.base_target_alignment,  # BUGFIX: Was missing!
+            "base_target_away_penalty": self.task_cfg.rewards.base_target_away_penalty,
+            "base_target_regression_penalty": self.task_cfg.rewards.base_target_regression_penalty,
             "target_distance_penalty": self.task_cfg.rewards.target_distance_penalty,
             "excessive_base_movement_penalty": self.task_cfg.rewards.excessive_base_movement_penalty,  # BUGFIX: Was missing!
             "action_magnitude": self.task_cfg.rewards.action_magnitude,

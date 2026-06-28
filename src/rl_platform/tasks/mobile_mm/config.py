@@ -86,6 +86,19 @@ class RobotLimits:
 
 
 @dataclass
+class BaseAssistConfig:
+    """Optional curriculum assist for learning recovery base commands."""
+
+    enable: bool = False
+    initial_blend: float = 0.0  # 0=policy only, 1=expert base command only
+    final_blend: float = 0.0
+    decay_steps: int = 2_000_000  # Vectorized env steps over which the assist decays
+    activation_distance: float = 0.7  # Only assist when target is outside this base-target distance
+    full_speed_distance: float = 1.4  # Distance where expert command reaches max_action
+    max_action: float = 0.8  # Normalized vx/vy command cap for the expert
+
+
+@dataclass
 class RewardWeights:
     """Reward term weights for the tracking task.
 
@@ -248,6 +261,7 @@ class MobileMMTrackConfig:
     # Sub-configurations
     trajectory: TrajectoryConfig = field(default_factory=TrajectoryConfig)
     obstacles: ObstacleConfig = field(default_factory=ObstacleConfig)
+    base_assist: BaseAssistConfig = field(default_factory=BaseAssistConfig)
     rewards: RewardWeights = field(default_factory=RewardWeights)
     robot_limits: RobotLimits = field(default_factory=RobotLimits)
     domain_rand: DomainRandomization = field(default_factory=DomainRandomization)

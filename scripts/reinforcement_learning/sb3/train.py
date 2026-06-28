@@ -320,6 +320,52 @@ def parse_args():
         help="Place the base near waypoint zero even when target playback starts later.",
     )
     parser.add_argument(
+        "--enable_base_assist",
+        action="store_true",
+        help="Blend an expert body-frame vx/vy command into executed base control.",
+    )
+    parser.add_argument(
+        "--disable_auto_base_assist",
+        action="store_true",
+        help="Do not auto-enable base assist for stage1_recovery.",
+    )
+    parser.add_argument(
+        "--base_assist_initial_blend",
+        type=float,
+        default=0.6,
+        help="Initial executed-command blend toward expert base command.",
+    )
+    parser.add_argument(
+        "--base_assist_final_blend",
+        type=float,
+        default=0.0,
+        help="Final executed-command blend after decay.",
+    )
+    parser.add_argument(
+        "--base_assist_decay_steps",
+        type=int,
+        default=2_000_000,
+        help="Vectorized env steps over which base assist decays.",
+    )
+    parser.add_argument(
+        "--base_assist_activation_distance",
+        type=float,
+        default=0.7,
+        help="Enable base assist only beyond this base-target XY distance.",
+    )
+    parser.add_argument(
+        "--base_assist_full_speed_distance",
+        type=float,
+        default=1.4,
+        help="Distance where expert base assist reaches max normalized action.",
+    )
+    parser.add_argument(
+        "--base_assist_max_action",
+        type=float,
+        default=0.8,
+        help="Normalized expert vx/vy action cap for base assist.",
+    )
+    parser.add_argument(
         "--enable_obstacles",
         action="store_true",
         help="Enable the ground-disc obstacle avoidance task.",
@@ -1383,11 +1429,28 @@ def main():
         auto_recovery_reset = args.trajectory_stage == "stage1_recovery"
         randomize_start_waypoint = args.random_start_waypoint or auto_recovery_reset
         reset_base_to_trajectory_start = args.reset_base_to_trajectory_start or auto_recovery_reset
+        auto_base_assist = auto_recovery_reset and not args.disable_auto_base_assist
+        enable_base_assist = args.enable_base_assist or auto_base_assist
         if auto_recovery_reset:
             print(
                 "    [Session 8h] stage1_recovery reset: target starts at "
                 f"{args.start_waypoint_min_fraction:.2f}-{args.start_waypoint_max_fraction:.2f} "
                 "trajectory fraction; base starts near waypoint zero"
+            )
+        env_cfg.task_config.base_assist.enable = enable_base_assist
+        env_cfg.task_config.base_assist.initial_blend = args.base_assist_initial_blend
+        env_cfg.task_config.base_assist.final_blend = args.base_assist_final_blend
+        env_cfg.task_config.base_assist.decay_steps = args.base_assist_decay_steps
+        env_cfg.task_config.base_assist.activation_distance = args.base_assist_activation_distance
+        env_cfg.task_config.base_assist.full_speed_distance = args.base_assist_full_speed_distance
+        env_cfg.task_config.base_assist.max_action = args.base_assist_max_action
+        if enable_base_assist:
+            print(
+                "    Base assist: enabled "
+                f"blend={args.base_assist_initial_blend:.2f}->{args.base_assist_final_blend:.2f} "
+                f"over {args.base_assist_decay_steps:,} steps, "
+                f"distance={args.base_assist_activation_distance:.2f}-{args.base_assist_full_speed_distance:.2f}m, "
+                f"max_action={args.base_assist_max_action:.2f}"
             )
 
         # Configure trajectory

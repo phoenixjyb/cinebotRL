@@ -651,6 +651,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self.current_commanded_vel = torch.zeros(self.num_envs, 3, device=self.device)  # Rate-limited commanded velocities for THIS step
         self.prev_commanded_vel = torch.zeros(self.num_envs, 3, device=self.device)
         print(f"[MobileMMTrackEE] DEBUG: current_commanded_vel.shape = {self.current_commanded_vel.shape}")
+        self._base_assist_step_count = 0
+        self._base_assist_coeff = torch.zeros(self.num_envs, device=self.device)
+        self._base_assist_expert_action = torch.zeros(self.num_envs, 2, device=self.device)
         self.prev_commanded_accel = torch.zeros(self.num_envs, 3, device=self.device)
         self.prev_joint_vel = torch.zeros(
             self.num_envs, 9, device=self.device  # 9 total joints (3 base PPR + 6 arm)
@@ -1414,8 +1417,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         theta = quat_to_yaw(base_quat)  # Extract yaw for body-to-world transform
 
         # Scale base actions from [-1, 1] to actual velocity limits
-        base_vx_desired = base_vx * self.robot_limits["max_linear_velocity"]  # [-1.5, +1.5] m/s
-        base_vy_desired = base_vy * self.robot_limits["max_linear_velocity"]  # [-1.5, +1.5] m/s
+        base_vx_control, base_vy_control = self._apply_base_assist(base_vx, base_vy, theta)
+        base_vx_desired = base_vx_control * self.robot_limits["max_linear_velocity"]  # [-1.5, +1.5] m/s
+        base_vy_desired = base_vy_control * self.robot_limits["max_linear_velocity"]  # [-1.5, +1.5] m/s
         base_wz_desired = base_wz * self.robot_limits["max_angular_velocity"]  # [-2.0, +2.0] rad/s
 
         # Rate limit velocities to respect acceleration constraints
@@ -1496,10 +1500,77 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"  base_vx action: {base_vx[0].item():.4f} -> scaled: {base_vx_scaled[0].item():.4f} m/s")
             print(f"  base_vy action: {base_vy[0].item():.4f} -> scaled: {base_vy_scaled[0].item():.4f} m/s")
             print(f"  base_wz action: {base_wz[0].item():.4f} -> scaled: {base_wz_scaled[0].item():.4f} rad/s")
+            if self.task_cfg.base_assist.enable:
+                print(f"  base assist coeff: {self._base_assist_coeff[0].item():.3f}")
+                print(
+                    "  expert base action: "
+                    f"[{self._base_assist_expert_action[0, 0].item():.4f}, "
+                    f"{self._base_assist_expert_action[0, 1].item():.4f}]"
+                )
             print(f"  root_vel_w (world): [{vel_world_x[0].item():.4f}, {vel_world_y[0].item():.4f}, {base_wz_scaled[0].item():.4f}]")
             print(f"  root_pos_w: [{root_pos[0].item():.4f}, {root_pos[1].item():.4f}, {root_pos[2].item():.4f}]")
             print(f"  yaw (from quat): {theta[0].item():.4f} rad")
             self._base_debug_count += 1
+
+    def _apply_base_assist(
+        self,
+        base_vx: torch.Tensor,
+        base_vy: torch.Tensor,
+        theta: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Blend an expert holonomic base command into executed vx/vy during curriculum."""
+        assist_cfg = self.task_cfg.base_assist
+        if not assist_cfg.enable:
+            self._base_assist_coeff.zero_()
+            self._base_assist_expert_action.zero_()
+            return base_vx, base_vy
+
+        self._base_assist_step_count += self.num_envs
+        decay_steps = max(int(assist_cfg.decay_steps), 1)
+        progress = min(float(self._base_assist_step_count) / float(decay_steps), 1.0)
+        blend = float(assist_cfg.initial_blend) + (
+            float(assist_cfg.final_blend) - float(assist_cfg.initial_blend)
+        ) * progress
+        blend = max(0.0, min(1.0, blend))
+
+        target_pos, _ = self.trajectory_manager.get_target_pose()
+        base_xy = self.robot.data.root_pos_w[:, :2]
+        target_xy = target_pos[:, :2]
+        base_to_target = target_xy - base_xy
+        dist = torch.norm(base_to_target, dim=-1)
+        target_dir_world = base_to_target / (dist.unsqueeze(-1) + 1e-6)
+
+        cos_theta = torch.cos(theta)
+        sin_theta = torch.sin(theta)
+        expert_body = torch.stack(
+            (
+                cos_theta * target_dir_world[:, 0] + sin_theta * target_dir_world[:, 1],
+                -sin_theta * target_dir_world[:, 0] + cos_theta * target_dir_world[:, 1],
+            ),
+            dim=-1,
+        )
+
+        activation_distance = max(float(assist_cfg.activation_distance), 1e-6)
+        full_speed_distance = max(float(assist_cfg.full_speed_distance), activation_distance + 1e-6)
+        speed_fraction = torch.clamp(
+            (dist - activation_distance) / (full_speed_distance - activation_distance),
+            min=0.0,
+            max=1.0,
+        )
+        expert_action = expert_body * (float(assist_cfg.max_action) * speed_fraction).unsqueeze(-1)
+        expert_action = torch.nan_to_num(expert_action, nan=0.0, posinf=0.0, neginf=0.0)
+        expert_action = torch.clamp(expert_action, -1.0, 1.0)
+
+        coeff = torch.full((self.num_envs,), blend, dtype=base_vx.dtype, device=self.device)
+        far_gate = (dist > activation_distance).to(base_vx.dtype)
+        coeff = coeff * far_gate
+        self._base_assist_coeff = coeff
+        self._base_assist_expert_action = expert_action
+
+        policy_base = torch.cat((base_vx, base_vy), dim=-1)
+        assisted_base = (1.0 - coeff.unsqueeze(-1)) * policy_base + coeff.unsqueeze(-1) * expert_action
+        assisted_base = torch.clamp(assisted_base, -1.0, 1.0)
+        return assisted_base[:, 0:1], assisted_base[:, 1:2]
 
     def _update_curriculum_stage(self):
         """Update curriculum stage with gradual weight interpolation (Session 8h).
@@ -2347,6 +2418,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "base_action_y_std": self.prev_actions[:, POLICY_BASE_VY_ACTION_INDEX].std().item(),
             "base_action_z_mean": self.prev_actions[:, POLICY_BASE_WZ_ACTION_INDEX].mean().item(),
             "base_action_z_std": self.prev_actions[:, POLICY_BASE_WZ_ACTION_INDEX].std().item(),
+            "base_assist_coeff_mean": self._base_assist_coeff.mean().item(),
+            "base_assist_active_pct": (self._base_assist_coeff > 0.0).float().mean().item() * 100.0,
+            "base_assist_expert_x_mean": self._base_assist_expert_action[:, 0].mean().item(),
+            "base_assist_expert_y_mean": self._base_assist_expert_action[:, 1].mean().item(),
         }
         if self.obstacles_enabled:
             self.extras["obstacle_diagnostics"] = {

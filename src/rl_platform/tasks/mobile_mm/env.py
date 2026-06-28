@@ -2367,6 +2367,23 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             ee_ang_vel=ee_ang_vel,  # SESSION 8i: EE angular velocity
         )
 
+        assist_cfg = self.task_cfg.base_assist
+        base_assist_imitation_penalty = torch.zeros_like(rewards)
+        base_assist_policy_error = torch.zeros_like(rewards)
+        if assist_cfg.enable and float(assist_cfg.imitation_weight) > 0.0:
+            policy_base_action = self.prev_actions[
+                :,
+                [POLICY_BASE_VX_ACTION_INDEX, POLICY_BASE_VY_ACTION_INDEX],
+            ]
+            expert_base_action = self._base_assist_expert_action.detach()
+            base_assist_policy_error = torch.norm(policy_base_action - expert_base_action, dim=-1)
+            action_error = base_assist_policy_error.square()
+            base_assist_imitation_penalty = (
+                float(assist_cfg.imitation_weight) * self._base_assist_coeff.detach() * action_error
+            )
+            rewards = rewards - base_assist_imitation_penalty
+        self.reward_components["base_assist_imitation_penalty"] = base_assist_imitation_penalty
+
         if workspace_distance is None:
             workspace_distance_log = torch.zeros_like(base_target_distance)
         else:
@@ -2423,6 +2440,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "base_assist_active_pct": (self._base_assist_coeff > 0.0).float().mean().item() * 100.0,
             "base_assist_expert_x_mean": self._base_assist_expert_action[:, 0].mean().item(),
             "base_assist_expert_y_mean": self._base_assist_expert_action[:, 1].mean().item(),
+            "base_assist_policy_error_mean": base_assist_policy_error.mean().item(),
+            "base_assist_policy_error_active_mean": (
+                base_assist_policy_error[self._base_assist_coeff > 0.0].mean().item()
+                if torch.any(self._base_assist_coeff > 0.0)
+                else 0.0
+            ),
+            "base_assist_imitation_penalty": base_assist_imitation_penalty.mean().item(),
         }
         if self.obstacles_enabled:
             self.extras["obstacle_diagnostics"] = {

@@ -381,6 +381,12 @@ def parse_args():
         help="Normalized expert vx/vy action cap for base assist.",
     )
     parser.add_argument(
+        "--base_assist_imitation_weight",
+        type=float,
+        default=25.0,
+        help="Auxiliary penalty weight for raw policy vx/vy error vs expert assist command.",
+    )
+    parser.add_argument(
         "--enable_obstacles",
         action="store_true",
         help="Enable the ground-disc obstacle avoidance task.",
@@ -751,9 +757,29 @@ def main():
             super().__init__(verbose)
             self.log_freq = log_freq  # Log every N iterations
             self.iteration_count = 0
+
+        @staticmethod
+        def _get_env_attr(env, name: str, default=None):
+            """Find an attribute through the small wrapper stack used by SB3/IsaacLab."""
+            visited = set()
+            stack = [env]
+            while stack:
+                current = stack.pop()
+                if current is None or id(current) in visited:
+                    continue
+                visited.add(id(current))
+                if hasattr(current, name):
+                    return getattr(current, name)
+                for child_name in ("unwrapped", "venv", "env"):
+                    child = getattr(current, child_name, None)
+                    if child is not None:
+                        stack.append(child)
+            return default
             
         def _on_rollout_end(self) -> bool:
             """Log detailed metrics at end of each rollout."""
+            import torch
+
             self.iteration_count += 1
             
             # Only log every log_freq iterations
@@ -786,6 +812,10 @@ def main():
                             'progress_bonus',
                             'base_target_alignment',
                             'base_target_away_penalty',
+                            'base_target_command_reward',
+                            'base_target_command_away_penalty',
+                            'base_target_command_tracking_penalty',
+                            'base_assist_imitation_penalty',
                             'reachability_bonus',
                             'reachability_distance_penalty',
                             'position_distance_penalty',
@@ -906,15 +936,15 @@ def main():
                             base_ang_vel = isaac_env._robot.data.root_ang_vel_w[:, 2]  # Yaw rate
                             print(f"  Yaw rate (rad/s):   mean={base_ang_vel.mean().item():.4f}, std={base_ang_vel.std().item():.4f}")
 
-                    if hasattr(isaac_env, '_base_assist_coeff'):
-                        coeff = isaac_env._base_assist_coeff
+                    coeff = self._get_env_attr(isaac_env, '_base_assist_coeff')
+                    if coeff is not None:
                         active_pct = (coeff > 0.0).float().mean().item() * 100
                         print(f"\n[Base Assist]")
                         print(f"  Coeff:              mean={coeff.mean().item():.4f}, active={active_pct:.1f}%")
                         self.logger.record("monitoring/base_assist_coeff_mean", coeff.mean().item())
                         self.logger.record("monitoring/base_assist_active_pct", active_pct)
-                        if hasattr(isaac_env, '_base_assist_expert_action'):
-                            expert = isaac_env._base_assist_expert_action
+                        expert = self._get_env_attr(isaac_env, '_base_assist_expert_action')
+                        if expert is not None:
                             expert_mag = torch.norm(expert, dim=-1)
                             print(
                                 f"  Expert action:      mag_mean={expert_mag.mean().item():.4f}, "
@@ -922,6 +952,22 @@ def main():
                             )
                             self.logger.record("monitoring/base_assist_expert_mag_mean", expert_mag.mean().item())
                             self.logger.record("monitoring/base_assist_expert_mag_max", expert_mag.max().item())
+                            prev_actions = self._get_env_attr(isaac_env, 'prev_actions')
+                            if prev_actions is not None:
+                                policy_base = prev_actions[:, -3:-1]
+                                policy_error = torch.norm(policy_base - expert, dim=-1)
+                                active_mask = coeff > 0.0
+                                active_error = (
+                                    policy_error[active_mask].mean().item()
+                                    if torch.any(active_mask)
+                                    else 0.0
+                                )
+                                print(
+                                    f"  Policy error:       mean={policy_error.mean().item():.4f}, "
+                                    f"active_mean={active_error:.4f}"
+                                )
+                                self.logger.record("monitoring/base_assist_policy_error_mean", policy_error.mean().item())
+                                self.logger.record("monitoring/base_assist_policy_error_active_mean", active_error)
                     
                     # Reachability statistics (if available from recent logs)
                     if hasattr(isaac_env, '_last_reachability_stats'):
@@ -1497,13 +1543,15 @@ def main():
         env_cfg.task_config.base_assist.activation_distance = args.base_assist_activation_distance
         env_cfg.task_config.base_assist.full_speed_distance = args.base_assist_full_speed_distance
         env_cfg.task_config.base_assist.max_action = args.base_assist_max_action
+        env_cfg.task_config.base_assist.imitation_weight = args.base_assist_imitation_weight
         if enable_base_assist:
             print(
                 "    Base assist: enabled "
                 f"blend={args.base_assist_initial_blend:.2f}->{args.base_assist_final_blend:.2f} "
                 f"over {args.base_assist_decay_steps:,} steps, "
                 f"distance={args.base_assist_activation_distance:.2f}-{args.base_assist_full_speed_distance:.2f}m, "
-                f"max_action={args.base_assist_max_action:.2f}"
+                f"max_action={args.base_assist_max_action:.2f}, "
+                f"imitation_weight={args.base_assist_imitation_weight:.1f}"
             )
 
         # Configure trajectory

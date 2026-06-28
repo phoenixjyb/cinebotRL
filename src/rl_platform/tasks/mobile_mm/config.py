@@ -97,6 +97,7 @@ class BaseAssistConfig:
     activation_distance: float = 0.7  # Only assist when target is outside this base-target distance
     full_speed_distance: float = 1.4  # Distance where expert command reaches max_action
     max_action: float = 0.8  # Normalized vx/vy command cap for the expert
+    imitation_weight: float = 25.0  # Penalize raw policy base action error vs expert command
 
 
 @dataclass

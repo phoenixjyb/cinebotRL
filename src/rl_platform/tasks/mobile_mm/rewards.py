@@ -389,6 +389,50 @@ def base_target_away_motion_penalty(
     return far_gate * (away_scale * away_speed + regression_scale * regression)
 
 
+def base_target_command_alignment(
+    actions: torch.Tensor,
+    base_pos: torch.Tensor,
+    base_quat: torch.Tensor,
+    target_pos: torch.Tensor,
+    arm_reach: float = 0.7,
+    reward_scale: float = 90.0,
+    away_scale: float = 120.0,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Reward policy base commands that point toward far targets.
+
+    Uses the normalized policy contract [..., base_vx, base_vy, base_wz], so it
+    gives the optimizer direct signal before displacement-based rewards appear.
+    """
+    base_cmd_body = actions[:, -3:-1]
+    cmd_mag = torch.clamp(torch.norm(base_cmd_body, dim=-1), min=0.0, max=1.0)
+
+    w, x, y, z = base_quat[:, 0], base_quat[:, 1], base_quat[:, 2], base_quat[:, 3]
+    yaw = torch.atan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2))
+    cos_yaw = torch.cos(yaw)
+    sin_yaw = torch.sin(yaw)
+
+    cmd_world = torch.stack(
+        (
+            base_cmd_body[:, 0] * cos_yaw - base_cmd_body[:, 1] * sin_yaw,
+            base_cmd_body[:, 0] * sin_yaw + base_cmd_body[:, 1] * cos_yaw,
+        ),
+        dim=-1,
+    )
+    cmd_dir = cmd_world / (torch.norm(cmd_world, dim=-1, keepdim=True) + 1e-6)
+
+    target_xy = target_pos[:, :2]
+    base_xy = base_pos[:, :2]
+    base_to_target = target_xy - base_xy
+    dist = torch.norm(base_to_target, dim=-1)
+    target_dir = base_to_target / (dist.unsqueeze(-1) + 1e-6)
+
+    alignment = torch.sum(cmd_dir * target_dir, dim=-1)
+    far_gate = torch.sigmoid((dist - arm_reach) * 8.0)
+    toward_reward = reward_scale * far_gate * torch.clamp(alignment, min=0.0) * cmd_mag
+    away_penalty = away_scale * far_gate * torch.clamp(-alignment, min=0.0) * cmd_mag
+    return toward_reward, away_penalty
+
+
 def target_distance_penalty(
     base_pos: torch.Tensor,
     target_pos: torch.Tensor,
@@ -1161,6 +1205,15 @@ def compute_combined_reward(
         away_scale=weights.get("base_target_away_penalty", 0.0),
         regression_scale=weights.get("base_target_regression_penalty", 0.0),
     )
+    base_command_reward, base_command_away_penalty = base_target_command_alignment(
+        actions,
+        base_pos,
+        base_quat,
+        target_pos,
+        arm_reach=weights.get("reachability_hard_margin", 0.7),
+        reward_scale=weights.get("base_target_command_reward", 0.0),
+        away_scale=weights.get("base_target_command_away_penalty", 0.0),
+    )
     
     # Distance penalty - strong gradient for base mobilization
     dist_penalty = target_distance_penalty(
@@ -1313,6 +1366,7 @@ def compute_combined_reward(
         + prog_bonus
         + base_mob_reward  # Reward base movement when target is far (configurable cap)
         + base_alignment_reward  # Reward moving toward unreachable targets
+        + base_command_reward  # Direct policy-gradient signal for far-target base commands
         + base_target_zone_reward  # Bonus for staying inside useful base-target working band
         + reach_bonus  # Smooth bonus inside comfortable workspace (bell-shaped)
         + obst_reward
@@ -1320,6 +1374,7 @@ def compute_combined_reward(
         - inner_penalty  # NEW (Session 8e): Penalty for getting too close (<0.35m)
         - base_target_far_penalty  # Non-discounted penalty for camping outside hard margin
         - base_away_penalty  # Immediate correction for moving away from far targets
+        - base_command_away_penalty  # Penalize commands that point away before the base moves
         - dist_penalty  # Legacy base-target distance penalty
         - distance_penalty_linear  # Linear fallback penalty keeps gradients informative
         - overshoot_penalty
@@ -1345,6 +1400,8 @@ def compute_combined_reward(
         "progress_bonus": prog_bonus,
         "base_mobilization": base_mob_reward,
         "base_target_alignment": base_alignment_reward,
+        "base_target_command_reward": base_command_reward,
+        "base_target_command_away_penalty": base_command_away_penalty,
         "base_target_zone_reward": base_target_zone_reward,
         "base_target_far_penalty": base_target_far_penalty,
         "base_target_away_penalty": base_away_penalty,

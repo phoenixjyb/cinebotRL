@@ -487,6 +487,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "reachability_distance_weight": self.task_cfg.rewards.reachability_distance_weight,
             "reachability_soft_margin": self.task_cfg.rewards.reachability_soft_margin,
             "reachability_hard_margin": self.task_cfg.rewards.reachability_hard_margin,
+            "base_target_zone_reward": self.task_cfg.rewards.base_target_zone_reward,
+            "base_target_far_penalty": self.task_cfg.rewards.base_target_far_penalty,
             "base_overshoot_penalty": self.task_cfg.rewards.base_overshoot_penalty,
             "mobilization_progress_cap": self.task_cfg.rewards.mobilization_progress_cap,
             "position_distance_penalty": self.task_cfg.rewards.position_distance_penalty,

@@ -128,6 +128,8 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     reachability_optimal_distance: float = 0.6  # Optimal working distance - FK median (was 0.5m)
     inner_margin_penalty: float = 15.0  # Penalty for base getting too close (<0.35m)
     inner_margin_min_distance: float = 0.35  # Minimum comfortable working distance
+    base_target_zone_reward: float = 8.0  # Bonus for keeping base-target distance inside the working band
+    base_target_far_penalty: float = 40.0  # Non-discounted penalty for drifting beyond reachability_hard_margin
     base_overshoot_penalty: float = 30.0  # Penalises chassis that rush past the target
     excessive_base_movement_penalty: float = 10.0  # Discourages back-and-forth oscillations
     mobilization_progress_cap: float = 0.35  # Maximum distance progress credited per step (meters)
@@ -265,4 +267,3 @@ class MobileMMTrackConfig:
     terminate_on_collision: bool = False  # External collisions (not used)
     terminate_on_tracking_error: bool = True
     max_tracking_error: float = 2.0  # meters
-

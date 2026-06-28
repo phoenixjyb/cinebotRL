@@ -232,6 +232,31 @@ def inner_margin_penalty(
     excess_proximity = torch.clamp(optimal_min_distance - base_target_distance, min=0.0)
     return scale * excess_proximity
 
+
+def base_target_zone_shaping(
+    base_target_distance: torch.Tensor,
+    inner_distance: float = 0.35,
+    hard_margin: float = 0.7,
+    reward_scale: float = 15.0,
+    far_penalty_scale: float = 80.0,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Reward the base staying in the useful arm band and penalize far drift.
+
+    This term is intentionally not discounted by base motion. The mobilization
+    reward still credits moving toward far targets, but the policy should not
+    keep collecting low-penalty rollout states outside the arm's working band.
+    """
+    in_band = (base_target_distance >= inner_distance) & (base_target_distance <= hard_margin)
+    band_reward = torch.where(
+        in_band,
+        torch.full_like(base_target_distance, reward_scale),
+        torch.zeros_like(base_target_distance),
+    )
+    far_excess = torch.clamp(base_target_distance - hard_margin, min=0.0)
+    far_penalty = far_penalty_scale * (far_excess ** 2)
+    return band_reward, far_penalty
+
+
 def base_mobilization_reward(
     base_pos: torch.Tensor,
     prev_base_pos: torch.Tensor,
@@ -1141,6 +1166,13 @@ def compute_combined_reward(
         optimal_min_distance=weights.get("inner_margin_min_distance", 0.35),
         scale=weights.get("inner_margin_penalty", 15.0),
     )
+    base_target_zone_reward, base_target_far_penalty = base_target_zone_shaping(
+        base_target_distance,
+        inner_distance=weights.get("inner_margin_min_distance", 0.35),
+        hard_margin=weights.get("reachability_hard_margin", 0.7),
+        reward_scale=weights.get("base_target_zone_reward", 0.0),
+        far_penalty_scale=weights.get("base_target_far_penalty", 0.0),
+    )
 
     # Overshoot penalty: Prevent base from moving past waypoints
     overshoot_penalty = base_overshoot_penalty(
@@ -1244,10 +1276,12 @@ def compute_combined_reward(
         + prog_bonus
         + base_mob_reward  # Reward base movement when target is far (configurable cap)
         + base_alignment_reward  # Reward moving toward unreachable targets
+        + base_target_zone_reward  # Bonus for staying inside useful base-target working band
         + reach_bonus  # Smooth bonus inside comfortable workspace (bell-shaped)
         + obst_reward
         - reach_distance_penalty  # Smooth penalty outside workspace
         - inner_penalty  # NEW (Session 8e): Penalty for getting too close (<0.35m)
+        - base_target_far_penalty  # Non-discounted penalty for camping outside hard margin
         - dist_penalty  # Legacy base-target distance penalty
         - distance_penalty_linear  # Linear fallback penalty keeps gradients informative
         - overshoot_penalty
@@ -1273,6 +1307,8 @@ def compute_combined_reward(
         "progress_bonus": prog_bonus,
         "base_mobilization": base_mob_reward,
         "base_target_alignment": base_alignment_reward,
+        "base_target_zone_reward": base_target_zone_reward,
+        "base_target_far_penalty": base_target_far_penalty,
         "reachability_bonus": reach_bonus,
         "reachability_distance_penalty": reach_distance_penalty,
         "inner_margin_penalty": inner_penalty,  # NEW (Session 8e)
@@ -1295,8 +1331,6 @@ def compute_combined_reward(
     }
     
     return total_reward, components
-
-
 
 
 

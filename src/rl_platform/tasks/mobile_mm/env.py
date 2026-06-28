@@ -520,6 +520,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 "[MobileMMTrackEE] Obstacle disc enabled: "
                 f"pos_xy={self.task_cfg.obstacles.disc_position_xy}, "
                 f"radius={self.task_cfg.obstacles.disc_radius:.3f}m, "
+                f"height={self.task_cfg.obstacles.disc_height:.3f}m, "
                 f"robot_radius={self.task_cfg.obstacles.robot_footprint_radius:.3f}m"
             )
 

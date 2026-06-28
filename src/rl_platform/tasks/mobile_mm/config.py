@@ -44,8 +44,8 @@ class ObstacleConfig:
     enable_obstacles: bool = False
     num_obstacles: int = 1
     disc_position_xy: tuple[float, float] = (0.0, 0.5)  # Local env-frame XY, on the default circle trajectory
-    disc_radius: float = 0.18
-    disc_height: float = 0.08
+    disc_radius: float = 0.20
+    disc_height: float = 0.50
     disc_position_x_range: tuple[float, float] = (-0.35, 0.35)
     disc_position_y_range: tuple[float, float] = (0.45, 1.0)
     robot_footprint_radius: float = 0.35

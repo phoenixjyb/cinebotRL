@@ -287,7 +287,18 @@ def parse_args():
     )
     parser.add_argument("--obstacle_x", type=float, default=0.0, help="Static obstacle disc X in each env local frame.")
     parser.add_argument("--obstacle_y", type=float, default=0.5, help="Static obstacle disc Y in each env local frame.")
-    parser.add_argument("--obstacle_radius", type=float, default=0.18, help="Obstacle disc radius in meters.")
+    parser.add_argument(
+        "--obstacle_radius",
+        type=float,
+        default=None,
+        help="Override obstacle disc radius in meters. Defaults to the task config.",
+    )
+    parser.add_argument(
+        "--obstacle_height",
+        type=float,
+        default=None,
+        help="Override obstacle disc height in meters. Defaults to the task config.",
+    )
     parser.add_argument(
         "--disable_obstacle_randomization",
         action="store_true",
@@ -1303,7 +1314,10 @@ def main():
         
         env_cfg.task_config.obstacles.enable_obstacles = args.enable_obstacles
         env_cfg.task_config.obstacles.disc_position_xy = (args.obstacle_x, args.obstacle_y)
-        env_cfg.task_config.obstacles.disc_radius = args.obstacle_radius
+        if args.obstacle_radius is not None:
+            env_cfg.task_config.obstacles.disc_radius = args.obstacle_radius
+        if args.obstacle_height is not None:
+            env_cfg.task_config.obstacles.disc_height = args.obstacle_height
         env_cfg.task_config.obstacles.randomize_per_reset = not args.disable_obstacle_randomization
         env_cfg.task_config.obstacles.disc_position_x_range = tuple(args.obstacle_x_range)
         env_cfg.task_config.obstacles.disc_position_y_range = tuple(args.obstacle_y_range)
@@ -1311,9 +1325,11 @@ def main():
         if args.enable_obstacles:
             env_cfg.scene = env_cfg._create_scene_config()
             env_cfg.scene.num_envs = args.num_envs
+            obstacle_cfg = env_cfg.task_config.obstacles
             print(
                 f"    Obstacle disc: pos=({args.obstacle_x:.2f}, {args.obstacle_y:.2f}), "
-                f"radius={args.obstacle_radius:.2f}m, "
+                f"radius={obstacle_cfg.disc_radius:.2f}m, "
+                f"height={obstacle_cfg.disc_height:.2f}m, "
                 f"randomized={not args.disable_obstacle_randomization}, "
                 f"x_range=({args.obstacle_x_range[0]:.2f}, {args.obstacle_x_range[1]:.2f}), "
                 f"y_range=({args.obstacle_y_range[0]:.2f}, {args.obstacle_y_range[1]:.2f})"

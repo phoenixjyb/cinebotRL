@@ -362,6 +362,33 @@ def base_target_alignment_reward(
     return scale * alignment * speed_scale * out_of_reach
 
 
+def base_target_away_motion_penalty(
+    base_pos: torch.Tensor,
+    prev_base_pos: torch.Tensor,
+    base_vel: torch.Tensor,
+    target_pos: torch.Tensor,
+    arm_reach: float = 0.7,
+    away_scale: float = 60.0,
+    regression_scale: float = 160.0,
+) -> torch.Tensor:
+    """Penalize chassis motion that makes far targets harder to reach."""
+    target_xy = target_pos[:, :2]
+    base_xy = base_pos[:, :2]
+    prev_base_xy = prev_base_pos[:, :2]
+
+    base_to_target = target_xy - base_xy
+    dist_current = torch.norm(base_to_target, dim=-1)
+    dist_if_static = torch.norm(target_xy - prev_base_xy, dim=-1)
+    far_gate = torch.sigmoid((dist_current - arm_reach) * 8.0)
+
+    direction = base_to_target / (dist_current.unsqueeze(-1) + 1e-6)
+    target_aligned_speed = torch.sum(base_vel[:, :2] * direction, dim=-1)
+    away_speed = torch.clamp(-target_aligned_speed, min=0.0, max=0.5)
+
+    regression = torch.clamp(dist_current - dist_if_static, min=0.0, max=0.10)
+    return far_gate * (away_scale * away_speed + regression_scale * regression)
+
+
 def target_distance_penalty(
     base_pos: torch.Tensor,
     target_pos: torch.Tensor,
@@ -1124,6 +1151,15 @@ def compute_combined_reward(
         arm_reach=0.6,
         scale=weights.get("base_target_alignment", 10.0)
     )
+    base_away_penalty = base_target_away_motion_penalty(
+        base_pos,
+        prev_base_pos,
+        base_lin_vel,
+        target_pos,
+        arm_reach=weights.get("reachability_hard_margin", 0.7),
+        away_scale=weights.get("base_target_away_penalty", 0.0),
+        regression_scale=weights.get("base_target_regression_penalty", 0.0),
+    )
     
     # Distance penalty - strong gradient for base mobilization
     dist_penalty = target_distance_penalty(
@@ -1282,6 +1318,7 @@ def compute_combined_reward(
         - reach_distance_penalty  # Smooth penalty outside workspace
         - inner_penalty  # NEW (Session 8e): Penalty for getting too close (<0.35m)
         - base_target_far_penalty  # Non-discounted penalty for camping outside hard margin
+        - base_away_penalty  # Immediate correction for moving away from far targets
         - dist_penalty  # Legacy base-target distance penalty
         - distance_penalty_linear  # Linear fallback penalty keeps gradients informative
         - overshoot_penalty
@@ -1309,6 +1346,7 @@ def compute_combined_reward(
         "base_target_alignment": base_alignment_reward,
         "base_target_zone_reward": base_target_zone_reward,
         "base_target_far_penalty": base_target_far_penalty,
+        "base_target_away_penalty": base_away_penalty,
         "reachability_bonus": reach_bonus,
         "reachability_distance_penalty": reach_distance_penalty,
         "inner_margin_penalty": inner_penalty,  # NEW (Session 8e)
@@ -1331,7 +1369,4 @@ def compute_combined_reward(
     }
     
     return total_reward, components
-
-
-
 

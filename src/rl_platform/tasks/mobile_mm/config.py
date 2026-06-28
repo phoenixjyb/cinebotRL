@@ -130,6 +130,8 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     inner_margin_min_distance: float = 0.35  # Minimum comfortable working distance
     base_target_zone_reward: float = 8.0  # Bonus for keeping base-target distance inside the working band
     base_target_far_penalty: float = 40.0  # Non-discounted penalty for drifting beyond reachability_hard_margin
+    base_target_away_penalty: float = 60.0  # Penalizes base commands that move away from far targets
+    base_target_regression_penalty: float = 160.0  # Penalizes actual chassis motion that increases base-target distance
     base_overshoot_penalty: float = 30.0  # Penalises chassis that rush past the target
     excessive_base_movement_penalty: float = 10.0  # Discourages back-and-forth oscillations
     mobilization_progress_cap: float = 0.35  # Maximum distance progress credited per step (meters)

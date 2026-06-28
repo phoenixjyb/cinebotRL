@@ -25,6 +25,7 @@ class TrajectoryConfig:
     # Multi-recorded trajectory settings
     trajectory_dir: str = "trajectoryToLearn/world_json"
     trajectory_pattern: str = "**/*.json"
+    trajectory_manifest_file: str | None = None  # Optional newline-delimited list of trajectory JSON paths
     trajectory_filter_indices: list[int] | None = None  # Filter to specific indices
     max_trajectories: int | None = None  # Limit number of trajectories
     min_duration_seconds: float = 5.0  # Reject recorded trajectories shorter than this duration

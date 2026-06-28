@@ -1254,13 +1254,18 @@ def main():
             print(f"    [Session 8h] Using trajectory curriculum: {args.trajectory_stage}")
             stage_dir = PROJECT_ROOT / "trajectoryToLearn" / args.trajectory_stage
             if stage_dir.exists():
-                # Check if stage has trajectories
-                stage_files = list(stage_dir.glob("*.json"))
-                if stage_files:
+                manifest_file = stage_dir / "manifest.txt"
+                stage_files = [p for p in stage_dir.rglob("*.json") if "__MACOSX" not in str(p)]
+                if manifest_file.exists():
+                    trajectory_config['stage_dir'] = str(PROJECT_ROOT)
+                    trajectory_config['manifest_file'] = str(manifest_file)
+                    trajectory_config['filter_indices'] = None
+                    print(f"    [OK] Using stage manifest: {manifest_file}")
+                elif stage_files:
                     # Use trajectories from stage directory
                     trajectory_config['stage_dir'] = str(stage_dir)
                     trajectory_config['filter_indices'] = None
-                    print(f"    [OK] Loaded {len(stage_files)} trajectories from {args.trajectory_stage}")
+                    print(f"    [OK] Found {len(stage_files)} trajectories from {args.trajectory_stage}")
                     print(f"      Stage directory: {stage_dir}")
                 else:
                     # Stage exists but empty - fall back to chassis-only as proxy
@@ -1358,6 +1363,7 @@ def main():
             type=args.trajectory_type,
             trajectory_dir=trajectory_dir,
             trajectory_pattern="**/*.json",
+            trajectory_manifest_file=trajectory_config.get('manifest_file'),
             trajectory_filter_indices=trajectory_config.get('filter_indices'),
             max_trajectories=trajectory_config.get('max_trajectories'),
             min_duration_seconds=args.min_trajectory_duration,

@@ -315,6 +315,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         trajectory_type_override = kwargs.pop("trajectory_type", None)
         trajectory_dir_override = kwargs.pop("trajectory_dir", None)
         trajectory_pattern_override = kwargs.pop("trajectory_pattern", None)
+        trajectory_manifest_override = kwargs.pop("trajectory_manifest_file", None)
         trajectory_filter_override = kwargs.pop("trajectory_filter_indices", None)
         max_trajectories_override = kwargs.pop("max_trajectories", None)
         waypoint_file_override = kwargs.pop("waypoint_file", None)
@@ -369,6 +370,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             traj_cfg.trajectory_dir = trajectory_dir_override
         if trajectory_pattern_override is not None:
             traj_cfg.trajectory_pattern = trajectory_pattern_override
+        if trajectory_manifest_override is not None:
+            traj_cfg.trajectory_manifest_file = trajectory_manifest_override
         if max_trajectories_override is not None:
             traj_cfg.max_trajectories = max_trajectories_override
         if waypoint_file_override is not None:
@@ -557,6 +560,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             waypoint_file=self.task_cfg.trajectory.waypoint_file,
             trajectory_dir=self.task_cfg.trajectory.trajectory_dir,
             trajectory_pattern=self.task_cfg.trajectory.trajectory_pattern,
+            trajectory_manifest_file=self.task_cfg.trajectory.trajectory_manifest_file,
             trajectory_filter_indices=self.task_cfg.trajectory.trajectory_filter_indices,
             max_trajectories=self.task_cfg.trajectory.max_trajectories,
             min_duration_seconds=self.task_cfg.trajectory.min_duration_seconds,

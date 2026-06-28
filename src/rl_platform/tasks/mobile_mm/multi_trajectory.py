@@ -25,6 +25,7 @@ class MultiTrajectoryLoader:
         device: str = "cuda",
         max_trajectories: int | None = None,
         filter_by_indices: List[int] | None = None,
+        manifest_file: str | Path | None = None,
         exclude_macosx: bool = True,
         waypoint_dt: float = 0.1,
         min_duration_seconds: float = 0.0,
@@ -37,6 +38,7 @@ class MultiTrajectoryLoader:
             device: Torch device for tensors
             max_trajectories: Maximum number of trajectories to load (None = all)
             filter_by_indices: Only load trajectories at these indices (from analysis results)
+            manifest_file: Optional newline-delimited list of trajectory JSON paths
             exclude_macosx: Filter out __MACOSX files (default True)
             waypoint_dt: Seconds represented by each waypoint when timestamps are absent
             min_duration_seconds: Skip trajectories shorter than this duration
@@ -46,8 +48,16 @@ class MultiTrajectoryLoader:
         self.waypoint_dt = waypoint_dt
         self.min_duration_seconds = min_duration_seconds
         
-        # Find all trajectory files
-        self.trajectory_files = sorted(self.trajectory_dir.glob(pattern))
+        # Find all trajectory files. A manifest takes precedence over directory
+        # globbing so curriculum stages can be curated without duplicating JSONs.
+        if manifest_file is not None:
+            self.trajectory_files = self._read_manifest(manifest_file)
+            print(
+                f"[MultiTrajectoryLoader] Found {len(self.trajectory_files)} "
+                f"trajectory files from manifest {manifest_file}"
+            )
+        else:
+            self.trajectory_files = sorted(self.trajectory_dir.glob(pattern))
         
         # Filter out __MACOSX files
         if exclude_macosx:
@@ -80,6 +90,31 @@ class MultiTrajectoryLoader:
         self.max_length = 0
         self.mean_length = 0.0
         self._load_all_trajectories()
+
+    def _read_manifest(self, manifest_file: str | Path) -> List[Path]:
+        """Read trajectory paths from a newline-delimited manifest."""
+        manifest_path = Path(manifest_file)
+        if not manifest_path.is_absolute():
+            manifest_path = self.trajectory_dir / manifest_path
+        if not manifest_path.exists():
+            raise FileNotFoundError(f"Trajectory manifest not found: {manifest_path}")
+
+        files: List[Path] = []
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            for line_number, raw_line in enumerate(f, start=1):
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                traj_path = Path(line)
+                if not traj_path.is_absolute():
+                    traj_path = self.trajectory_dir / traj_path
+                if not traj_path.exists():
+                    raise FileNotFoundError(
+                        f"Trajectory manifest entry does not exist "
+                        f"({manifest_path}:{line_number}): {traj_path}"
+                    )
+                files.append(traj_path)
+        return files
     
     def _load_all_trajectories(self):
         """Load all trajectory files into memory."""

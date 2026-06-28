@@ -25,6 +25,7 @@ class TrajectoryManager:
         waypoint_file: str | None = None,
         trajectory_dir: str | None = None,
         trajectory_pattern: str = "**/*.json",
+        trajectory_manifest_file: str | None = None,
         trajectory_filter_indices: list[int] | None = None,
         max_trajectories: int | None = None,
         min_duration_seconds: float = 0.0,
@@ -42,6 +43,7 @@ class TrajectoryManager:
             waypoint_file: Path to recorded waypoint JSON file (for 'recorded' type)
             trajectory_dir: Directory with multiple trajectories (for 'multi_recorded' type)
             trajectory_pattern: Glob pattern for finding trajectories (default: "**/*.json")
+            trajectory_manifest_file: Optional newline-delimited trajectory manifest
             trajectory_filter_indices: Filter to specific trajectory indices from analysis
             max_trajectories: Maximum number of trajectories to load
             min_duration_seconds: Reject recorded trajectories shorter than this duration
@@ -82,6 +84,7 @@ class TrajectoryManager:
             self._init_multi_trajectory(
                 trajectory_dir, 
                 trajectory_pattern, 
+                trajectory_manifest_file,
                 trajectory_filter_indices,
                 max_trajectories,
                 min_duration_seconds,
@@ -416,6 +419,7 @@ class TrajectoryManager:
         self, 
         trajectory_dir: str,
         pattern: str = "**/*.json",
+        manifest_file: str | None = None,
         filter_indices: list[int] | None = None,
         max_trajectories: int | None = None,
         min_duration_seconds: float = 0.0
@@ -425,6 +429,7 @@ class TrajectoryManager:
         Args:
             trajectory_dir: Directory containing multiple trajectory JSON files
             pattern: Glob pattern for finding trajectories
+            manifest_file: Optional newline-delimited trajectory manifest
             filter_indices: Filter to specific trajectory indices
             max_trajectories: Maximum number of trajectories to load
         """
@@ -436,6 +441,7 @@ class TrajectoryManager:
             device=self.device,
             max_trajectories=max_trajectories,
             filter_by_indices=filter_indices,
+            manifest_file=manifest_file,
             waypoint_dt=self.waypoint_dt,
             min_duration_seconds=min_duration_seconds,
         )
@@ -511,7 +517,6 @@ class TrajectoryManager:
                 first_env = env_ids[0].item()
                 first_wp = self.recorded_positions[first_env, 0].cpu().numpy()
                 print(f"[TrajectoryManager] Resampled Env {first_env}: First waypoint [{first_wp[0]:.3f}, {first_wp[1]:.3f}, {first_wp[2]:.3f}]")
-
 
 
 

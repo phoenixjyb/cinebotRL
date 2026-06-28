@@ -126,6 +126,23 @@ def parse_args():
         help="Value function clipping range (None = no clipping, 0.3 recommended for Session 8c to stabilize critic)",
     )
     parser.add_argument(
+        "--vf_coef",
+        type=float,
+        default=0.5,
+        help="Value-function loss coefficient for PPO critic updates.",
+    )
+    parser.add_argument(
+        "--max_grad_norm",
+        type=float,
+        default=0.5,
+        help="Maximum gradient norm for PPO updates.",
+    )
+    parser.add_argument(
+        "--reset_reward_stats",
+        action="store_true",
+        help="When resuming, keep observation normalization but reset VecNormalize reward-return statistics.",
+    )
+    parser.add_argument(
         "--gamma",
         type=float,
         default=0.99,
@@ -670,6 +687,7 @@ def main():
                             'orientation_tracking',
                             'progress_bonus',
                             'base_target_alignment',
+                            'base_target_away_penalty',
                             'reachability_bonus',
                             'reachability_distance_penalty',
                             'position_distance_penalty',
@@ -1547,6 +1565,14 @@ def main():
                 from stable_baselines3.common.vec_env import VecNormalize
                 env = VecNormalize.load(str(vecnorm_path), env)
                 print("    [OK] VecNormalize stats loaded successfully")
+                if args.reset_reward_stats:
+                    from stable_baselines3.common.running_mean_std import RunningMeanStd
+                    import numpy as np
+
+                    env.ret_rms = RunningMeanStd(shape=())
+                    env.returns = np.zeros(env.num_envs)
+                    env.old_reward = np.array([])
+                    print("    [OK] VecNormalize reward-return stats reset; observation stats preserved")
             else:
                 print(f"    [WARN]  VecNormalize stats not found at: {vecnorm_path}")
                 print("    [WARN]  Continuing without normalization stats (may affect curriculum learning)")
@@ -1565,6 +1591,8 @@ def main():
             model.target_kl = args.target_kl
             model.ent_coef = args.ent_coef
             model.ent_coef_schedule = constant_fn(args.ent_coef)
+            model.vf_coef = args.vf_coef
+            model.max_grad_norm = args.max_grad_norm
             print("    [OK] Resume hyperparameters applied to loaded PPO model")
         else:
             print("    Creating new PPO model...")
@@ -1603,8 +1631,8 @@ def main():
                 clip_range_vf=args.clip_range_vf if args.clip_range_vf is not None else None,  # Session 8c: 0.3 to stabilize critic
                 normalize_advantage=True,  # Session 8c: Normalize advantages for stable gradient signals
                 ent_coef=args.ent_coef,
-                vf_coef=0.5,
-                max_grad_norm=0.5,
+                vf_coef=args.vf_coef,
+                max_grad_norm=args.max_grad_norm,
                 target_kl=args.target_kl,
                 # Note: log_std_bounds not available in SB3 2.5.0
                 # Std control via: entropy decay + KL schedule + log_std_init=-2.0
@@ -1660,6 +1688,10 @@ def main():
     print(f"Gamma:             {args.gamma}")
     print(f"GAE lambda:        {args.gae_lambda}")
     print(f"Clip range:        {args.clip_range}")
+    print(f"Clip range vf:     {args.clip_range_vf if args.clip_range_vf is not None else 'None (disabled)'}")
+    print(f"VF coef:           {args.vf_coef}")
+    print(f"Max grad norm:     {args.max_grad_norm}")
+    print(f"Reset reward RMS:  {args.reset_reward_stats}")
     print(f"Target KL:         {args.target_kl if args.target_kl else 'None (disabled)'}")
     if args.enable_kl_schedule:
         print(f"  -> KL schedule:   warmup={args.kl_warmup}, main={args.kl_main}, finetune={args.kl_finetune}")

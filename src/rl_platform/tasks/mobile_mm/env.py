@@ -469,6 +469,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "base_target_regression_penalty": self.task_cfg.rewards.base_target_regression_penalty,
             "base_target_command_reward": self.task_cfg.rewards.base_target_command_reward,
             "base_target_command_away_penalty": self.task_cfg.rewards.base_target_command_away_penalty,
+            "base_target_command_tracking_penalty": self.task_cfg.rewards.base_target_command_tracking_penalty,
             "target_distance_penalty": self.task_cfg.rewards.target_distance_penalty,
             "excessive_base_movement_penalty": self.task_cfg.rewards.excessive_base_movement_penalty,  # BUGFIX: Was missing!
             "action_magnitude": self.task_cfg.rewards.action_magnitude,

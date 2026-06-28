@@ -134,6 +134,7 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     base_target_regression_penalty: float = 160.0  # Penalizes actual chassis motion that increases base-target distance
     base_target_command_reward: float = 90.0  # Rewards far-target base commands that point toward the target
     base_target_command_away_penalty: float = 120.0  # Penalizes far-target base commands that point away
+    base_target_command_tracking_penalty: float = 180.0  # Penalizes far-target base commands that do not chase the target
     base_overshoot_penalty: float = 30.0  # Penalises chassis that rush past the target
     excessive_base_movement_penalty: float = 10.0  # Discourages back-and-forth oscillations
     mobilization_progress_cap: float = 0.35  # Maximum distance progress credited per step (meters)

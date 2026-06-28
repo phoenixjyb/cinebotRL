@@ -433,6 +433,43 @@ def base_target_command_alignment(
     return toward_reward, away_penalty
 
 
+def base_target_command_tracking_penalty(
+    actions: torch.Tensor,
+    base_pos: torch.Tensor,
+    base_quat: torch.Tensor,
+    target_pos: torch.Tensor,
+    arm_reach: float = 0.7,
+    scale: float = 180.0,
+) -> torch.Tensor:
+    """Penalize far-target base commands that do not chase the target."""
+    base_cmd_body = actions[:, -3:-1]
+
+    target_xy = target_pos[:, :2]
+    base_xy = base_pos[:, :2]
+    base_to_target = target_xy - base_xy
+    dist = torch.norm(base_to_target, dim=-1)
+    target_dir_world = base_to_target / (dist.unsqueeze(-1) + 1e-6)
+
+    w, x, y, z = base_quat[:, 0], base_quat[:, 1], base_quat[:, 2], base_quat[:, 3]
+    yaw = torch.atan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2))
+    cos_yaw = torch.cos(yaw)
+    sin_yaw = torch.sin(yaw)
+
+    desired_body = torch.stack(
+        (
+            cos_yaw * target_dir_world[:, 0] + sin_yaw * target_dir_world[:, 1],
+            -sin_yaw * target_dir_world[:, 0] + cos_yaw * target_dir_world[:, 1],
+        ),
+        dim=-1,
+    )
+    desired_mag = torch.clamp((dist - arm_reach) / max(arm_reach, 1e-6), min=0.0, max=1.0)
+    desired_cmd = desired_body * desired_mag.unsqueeze(-1)
+
+    far_gate = torch.sigmoid((dist - arm_reach) * 8.0)
+    tracking_error = torch.sum((base_cmd_body - desired_cmd) ** 2, dim=-1)
+    return scale * far_gate * tracking_error
+
+
 def target_distance_penalty(
     base_pos: torch.Tensor,
     target_pos: torch.Tensor,
@@ -1214,6 +1251,14 @@ def compute_combined_reward(
         reward_scale=weights.get("base_target_command_reward", 0.0),
         away_scale=weights.get("base_target_command_away_penalty", 0.0),
     )
+    base_command_tracking_penalty = base_target_command_tracking_penalty(
+        actions,
+        base_pos,
+        base_quat,
+        target_pos,
+        arm_reach=weights.get("reachability_hard_margin", 0.7),
+        scale=weights.get("base_target_command_tracking_penalty", 0.0),
+    )
     
     # Distance penalty - strong gradient for base mobilization
     dist_penalty = target_distance_penalty(
@@ -1375,6 +1420,7 @@ def compute_combined_reward(
         - base_target_far_penalty  # Non-discounted penalty for camping outside hard margin
         - base_away_penalty  # Immediate correction for moving away from far targets
         - base_command_away_penalty  # Penalize commands that point away before the base moves
+        - base_command_tracking_penalty  # Penalize zero/incorrect chase commands for far targets
         - dist_penalty  # Legacy base-target distance penalty
         - distance_penalty_linear  # Linear fallback penalty keeps gradients informative
         - overshoot_penalty
@@ -1402,6 +1448,7 @@ def compute_combined_reward(
         "base_target_alignment": base_alignment_reward,
         "base_target_command_reward": base_command_reward,
         "base_target_command_away_penalty": base_command_away_penalty,
+        "base_target_command_tracking_penalty": base_command_tracking_penalty,
         "base_target_zone_reward": base_target_zone_reward,
         "base_target_far_penalty": base_target_far_penalty,
         "base_target_away_penalty": base_away_penalty,

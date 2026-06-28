@@ -298,6 +298,28 @@ def parse_args():
         help="Reject recorded trajectories shorter than this many seconds.",
     )
     parser.add_argument(
+        "--random_start_waypoint",
+        action="store_true",
+        help="Start recorded trajectories from a random waypoint on reset.",
+    )
+    parser.add_argument(
+        "--start_waypoint_min_fraction",
+        type=float,
+        default=0.25,
+        help="Minimum random reset waypoint as a fraction of trajectory length.",
+    )
+    parser.add_argument(
+        "--start_waypoint_max_fraction",
+        type=float,
+        default=0.70,
+        help="Maximum random reset waypoint as a fraction of trajectory length.",
+    )
+    parser.add_argument(
+        "--reset_base_to_trajectory_start",
+        action="store_true",
+        help="Place the base near waypoint zero even when target playback starts later.",
+    )
+    parser.add_argument(
         "--enable_obstacles",
         action="store_true",
         help="Enable the ground-disc obstacle avoidance task.",
@@ -1358,6 +1380,16 @@ def main():
                 f"y_range=({args.obstacle_y_range[0]:.2f}, {args.obstacle_y_range[1]:.2f})"
             )
 
+        auto_recovery_reset = args.trajectory_stage == "stage1_recovery"
+        randomize_start_waypoint = args.random_start_waypoint or auto_recovery_reset
+        reset_base_to_trajectory_start = args.reset_base_to_trajectory_start or auto_recovery_reset
+        if auto_recovery_reset:
+            print(
+                "    [Session 8h] stage1_recovery reset: target starts at "
+                f"{args.start_waypoint_min_fraction:.2f}-{args.start_waypoint_max_fraction:.2f} "
+                "trajectory fraction; base starts near waypoint zero"
+            )
+
         # Configure trajectory
         env_cfg.task_config.trajectory = TrajectoryConfig(
             type=args.trajectory_type,
@@ -1367,6 +1399,10 @@ def main():
             trajectory_filter_indices=trajectory_config.get('filter_indices'),
             max_trajectories=trajectory_config.get('max_trajectories'),
             min_duration_seconds=args.min_trajectory_duration,
+            randomize_start_waypoint=randomize_start_waypoint,
+            start_waypoint_min_fraction=args.start_waypoint_min_fraction,
+            start_waypoint_max_fraction=args.start_waypoint_max_fraction,
+            reset_base_to_trajectory_start=reset_base_to_trajectory_start,
         )
         
         # Create environment directly with config

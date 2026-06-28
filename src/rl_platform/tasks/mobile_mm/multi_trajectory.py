@@ -192,6 +192,14 @@ class MultiTrajectoryLoader:
     
     def sample_trajectories(self, num_envs: int) -> tuple[torch.Tensor, torch.Tensor]:
         """Sample trajectories for multiple environments.
+
+        Backward-compatible wrapper for callers that do not need real lengths.
+        """
+        positions, orientations, _ = self.sample_trajectories_with_lengths(num_envs)
+        return positions, orientations
+
+    def sample_trajectories_with_lengths(self, num_envs: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Sample trajectories for multiple environments.
         
         Each environment gets a randomly selected trajectory. Trajectories are
         replicated/padded to match the longest one in the batch.
@@ -202,6 +210,7 @@ class MultiTrajectoryLoader:
         Returns:
             positions: [num_envs, max_length, 3]
             orientations: [num_envs, max_length, 4]
+            lengths: real, unpadded trajectory lengths [num_envs]
         """
         # Sample one trajectory per environment
         sampled = [self.sample_trajectory() for _ in range(num_envs)]
@@ -222,10 +231,12 @@ class MultiTrajectoryLoader:
         # Pad trajectories to max length
         positions_list = []
         orientations_list = []
+        lengths_list = []
         
         for traj in sampled:
             pos = traj["positions"]  # [length, 3]
             ori = traj["orientations"]  # [length, 4]
+            lengths_list.append(traj["length"])
             
             # Pad by repeating last waypoint
             if traj["length"] < max_length:
@@ -239,8 +250,9 @@ class MultiTrajectoryLoader:
         # Stack into batch
         positions = torch.stack(positions_list, dim=0)  # [num_envs, max_length, 3]
         orientations = torch.stack(orientations_list, dim=0)  # [num_envs, max_length, 4]
+        lengths = torch.tensor(lengths_list, dtype=torch.long, device=self.device)
         
-        return positions, orientations
+        return positions, orientations, lengths
     
     def get_trajectory_by_category(self, category: str) -> List[dict]:
         """Get all trajectories from a specific category.

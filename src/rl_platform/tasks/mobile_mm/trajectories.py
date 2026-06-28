@@ -29,6 +29,9 @@ class TrajectoryManager:
         trajectory_filter_indices: list[int] | None = None,
         max_trajectories: int | None = None,
         min_duration_seconds: float = 0.0,
+        randomize_start_waypoint: bool = False,
+        start_waypoint_min_fraction: float = 0.0,
+        start_waypoint_max_fraction: float = 0.0,
     ):
         """Initialize trajectory manager.
         
@@ -47,6 +50,9 @@ class TrajectoryManager:
             trajectory_filter_indices: Filter to specific trajectory indices from analysis
             max_trajectories: Maximum number of trajectories to load
             min_duration_seconds: Reject recorded trajectories shorter than this duration
+            randomize_start_waypoint: Reset recorded trajectories at a later waypoint
+            start_waypoint_min_fraction: Minimum start waypoint as trajectory fraction
+            start_waypoint_max_fraction: Maximum start waypoint as trajectory fraction
         """
         self.traj_type = traj_type
         self.num_envs = num_envs
@@ -57,6 +63,9 @@ class TrajectoryManager:
         self.dt = dt
         self.waypoint_dt = waypoint_dt if waypoint_dt is not None else dt
         self.min_duration_seconds = min_duration_seconds
+        self.randomize_start_waypoint = randomize_start_waypoint
+        self.start_waypoint_min_fraction = start_waypoint_min_fraction
+        self.start_waypoint_max_fraction = start_waypoint_max_fraction
         
         # Phase tracking (one per environment)
         self.phase = torch.zeros(num_envs, device=device)
@@ -68,6 +77,7 @@ class TrajectoryManager:
         # Recorded trajectory data (single trajectory mode)
         self.recorded_positions = None
         self.recorded_orientations = None
+        self.recorded_lengths = None
         self.current_waypoint_idx = torch.zeros(num_envs, dtype=torch.long, device=device)
         self._recorded_time_accum = torch.zeros(num_envs, dtype=torch.float32, device=device)
         
@@ -109,6 +119,44 @@ class TrajectoryManager:
         # Resample trajectories in multi-trajectory mode
         if self.traj_type == "multi_recorded":
             self._resample_multi_trajectories(env_ids)
+            self._randomize_reset_waypoint(env_ids)
+        elif self.traj_type == "recorded":
+            self._randomize_reset_waypoint(env_ids)
+
+    def _randomize_reset_waypoint(self, env_ids: torch.Tensor) -> None:
+        """Optionally start recorded playback from a later waypoint."""
+        if (
+            not self.randomize_start_waypoint
+            or self.recorded_positions is None
+            or env_ids.numel() == 0
+        ):
+            return
+
+        max_length = self.recorded_positions.shape[1]
+        if max_length <= 1:
+            return
+
+        if self.recorded_lengths is None:
+            real_lengths = torch.full((len(env_ids),), max_length, dtype=torch.long, device=self.device)
+        else:
+            real_lengths = self.recorded_lengths[env_ids].to(torch.long)
+            real_lengths = torch.clamp(real_lengths, min=1, max=max_length)
+
+        min_frac = max(0.0, min(1.0, float(self.start_waypoint_min_fraction)))
+        max_frac = max(0.0, min(1.0, float(self.start_waypoint_max_fraction)))
+        if max_frac < min_frac:
+            min_frac, max_frac = max_frac, min_frac
+
+        last_real_idx = real_lengths - 1
+        min_idx = torch.round(min_frac * last_real_idx.float()).to(torch.long)
+        max_idx = torch.round(max_frac * last_real_idx.float()).to(torch.long)
+        max_idx = torch.maximum(min_idx, torch.minimum(max_idx, last_real_idx))
+
+        span = torch.clamp(max_idx - min_idx + 1, min=1)
+        start_idx = min_idx + torch.floor(torch.rand(len(env_ids), device=self.device) * span.float()).to(torch.long)
+
+        self.current_waypoint_idx[env_ids] = start_idx
+        self._recorded_time_accum[env_ids] = 0.0
         
     def set_center(self, center_x: torch.Tensor, center_y: torch.Tensor) -> None:
         """Set trajectory center offsets.
@@ -410,6 +458,12 @@ class TrajectoryManager:
         self.recorded_orientations = orientations_array.unsqueeze(0).expand(
             self.num_envs, -1, -1
         )
+        self.recorded_lengths = torch.full(
+            (self.num_envs,),
+            len(poses),
+            dtype=torch.long,
+            device=self.device,
+        )
         
         print(f"[TrajectoryManager] Loaded {len(poses)} waypoints from {waypoint_file}")
         print(f"[TrajectoryManager] Recorded duration: {duration_seconds:.2f}s")
@@ -470,9 +524,10 @@ class TrajectoryManager:
         
         if env_ids is None:
             # Resample all environments
-            positions, orientations = self.multi_loader.sample_trajectories(self.num_envs)
+            positions, orientations, lengths = self.multi_loader.sample_trajectories_with_lengths(self.num_envs)
             self.recorded_positions = positions
             self.recorded_orientations = orientations
+            self.recorded_lengths = lengths
             self.current_waypoint_idx.zero_()
             self._recorded_time_accum.zero_()
         else:
@@ -483,7 +538,7 @@ class TrajectoryManager:
             print(f"[TrajectoryManager] Partial reset: resampling {num_to_resample} envs (was resampling all {self.num_envs})")
             
             # Sample only the trajectories needed for reset envs
-            positions, orientations = self.multi_loader.sample_trajectories(num_to_resample)
+            positions, orientations, lengths = self.multi_loader.sample_trajectories_with_lengths(num_to_resample)
             
             # Get current max_length from existing trajectories
             current_max_length = self.recorded_positions.shape[1] if self.recorded_positions is not None else positions.shape[1]
@@ -493,9 +548,10 @@ class TrajectoryManager:
             if new_max_length != current_max_length:
                 # Need to resize buffers - resample ALL envs (rare case)
                 print(f"[TrajectoryManager] Max length changed {current_max_length} -> {new_max_length}, resampling all envs")
-                positions, orientations = self.multi_loader.sample_trajectories(self.num_envs)
+                positions, orientations, lengths = self.multi_loader.sample_trajectories_with_lengths(self.num_envs)
                 self.recorded_positions = positions
                 self.recorded_orientations = orientations
+                self.recorded_lengths = lengths
                 self.current_waypoint_idx[env_ids] = 0
                 self._recorded_time_accum[env_ids] = 0.0
             else:
@@ -504,10 +560,19 @@ class TrajectoryManager:
                     # First call, initialize buffers
                     self.recorded_positions = positions
                     self.recorded_orientations = orientations
+                    self.recorded_lengths = lengths
                 else:
                     # Insert sampled trajectories into the correct positions
                     self.recorded_positions[env_ids] = positions
                     self.recorded_orientations[env_ids] = orientations
+                    if self.recorded_lengths is None:
+                        self.recorded_lengths = torch.full(
+                            (self.num_envs,),
+                            self.recorded_positions.shape[1],
+                            dtype=torch.long,
+                            device=self.device,
+                        )
+                    self.recorded_lengths[env_ids] = lengths
                 
                 self.current_waypoint_idx[env_ids] = 0
                 self._recorded_time_accum[env_ids] = 0.0
@@ -517,6 +582,4 @@ class TrajectoryManager:
                 first_env = env_ids[0].item()
                 first_wp = self.recorded_positions[first_env, 0].cpu().numpy()
                 print(f"[TrajectoryManager] Resampled Env {first_env}: First waypoint [{first_wp[0]:.3f}, {first_wp[1]:.3f}, {first_wp[2]:.3f}]")
-
-
 

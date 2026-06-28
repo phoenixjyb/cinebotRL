@@ -29,6 +29,10 @@ class TrajectoryConfig:
     trajectory_filter_indices: list[int] | None = None  # Filter to specific indices
     max_trajectories: int | None = None  # Limit number of trajectories
     min_duration_seconds: float = 5.0  # Reject recorded trajectories shorter than this duration
+    randomize_start_waypoint: bool = False  # Start playback from a later waypoint on reset
+    start_waypoint_min_fraction: float = 0.0
+    start_waypoint_max_fraction: float = 0.0
+    reset_base_to_trajectory_start: bool = False  # Keep base near waypoint zero while target starts later
 
     # Curriculum settings
     enable_curriculum: bool = True

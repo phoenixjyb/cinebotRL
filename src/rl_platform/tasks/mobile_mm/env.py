@@ -317,6 +317,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         trajectory_pattern_override = kwargs.pop("trajectory_pattern", None)
         trajectory_manifest_override = kwargs.pop("trajectory_manifest_file", None)
         trajectory_filter_override = kwargs.pop("trajectory_filter_indices", None)
+        randomize_start_waypoint_override = kwargs.pop("randomize_start_waypoint", None)
+        reset_base_to_trajectory_start_override = kwargs.pop("reset_base_to_trajectory_start", None)
         max_trajectories_override = kwargs.pop("max_trajectories", None)
         waypoint_file_override = kwargs.pop("waypoint_file", None)
         use_all_trajectories = kwargs.pop("use_all_trajectories", None)
@@ -372,6 +374,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             traj_cfg.trajectory_pattern = trajectory_pattern_override
         if trajectory_manifest_override is not None:
             traj_cfg.trajectory_manifest_file = trajectory_manifest_override
+        if randomize_start_waypoint_override is not None:
+            traj_cfg.randomize_start_waypoint = bool(randomize_start_waypoint_override)
+        if reset_base_to_trajectory_start_override is not None:
+            traj_cfg.reset_base_to_trajectory_start = bool(reset_base_to_trajectory_start_override)
         if max_trajectories_override is not None:
             traj_cfg.max_trajectories = max_trajectories_override
         if waypoint_file_override is not None:
@@ -564,6 +570,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             trajectory_filter_indices=self.task_cfg.trajectory.trajectory_filter_indices,
             max_trajectories=self.task_cfg.trajectory.max_trajectories,
             min_duration_seconds=self.task_cfg.trajectory.min_duration_seconds,
+            randomize_start_waypoint=self.task_cfg.trajectory.randomize_start_waypoint,
+            start_waypoint_min_fraction=self.task_cfg.trajectory.start_waypoint_min_fraction,
+            start_waypoint_max_fraction=self.task_cfg.trajectory.start_waypoint_max_fraction,
         )
 
         # Load reachability map for intelligent base planning
@@ -2435,9 +2444,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         if self._visualization_enabled:
             self._create_markers_if_needed()
 
-        # CRITICAL: Get first waypoint AFTER trajectory reset
-        # This ensures we're positioning base relative to trajectory start, not mid-trajectory
+        # CRITICAL: Get target pose AFTER trajectory reset. Recovery curriculum
+        # may intentionally start playback at a later waypoint.
         first_target_pos, _ = self.trajectory_manager.get_target_pose()
+        reset_anchor_pos = first_target_pos
+        if (
+            self.task_cfg.trajectory.reset_base_to_trajectory_start
+            and self.trajectory_manager.recorded_positions is not None
+        ):
+            reset_anchor_pos = self.trajectory_manager.recorded_positions[:, 0]
 
         # DEBUG: Print what we got from get_target_pose AND what's in recorded_positions
         if len(env_ids) > 0 and self.trajectory_manager.recorded_positions is not None:
@@ -2445,11 +2460,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             if env_ids.numel() > 0:
                 env_idx = env_ids[0].item()
                 from_get_target = first_target_pos[env_idx].cpu().numpy()
-                from_recorded = self.trajectory_manager.recorded_positions[env_idx, 0].cpu().numpy()
+                current_wp = self.trajectory_manager.current_waypoint_idx[env_idx].item()
+                from_recorded = self.trajectory_manager.recorded_positions[env_idx, current_wp].cpu().numpy()
+                from_anchor = reset_anchor_pos[env_idx].cpu().numpy()
                 print(f"[DEBUG] Env {env_idx}:")
                 print(f"  get_target_pose():    [{from_get_target[0]:.3f}, {from_get_target[1]:.3f}, {from_get_target[2]:.3f}]")
                 print(f"  recorded_positions:   [{from_recorded[0]:.3f}, {from_recorded[1]:.3f}, {from_recorded[2]:.3f}]")
-                print(f"  waypoint_idx:         {self.trajectory_manager.current_waypoint_idx[env_idx].item()}")
+                print(f"  reset_anchor:         [{from_anchor[0]:.3f}, {from_anchor[1]:.3f}, {from_anchor[2]:.3f}]")
+                print(f"  waypoint_idx:         {current_wp}")
                 print(f"  time_accum:           {self.trajectory_manager._recorded_time_accum[env_idx].item():.4f}")
 
         # Set base position with offset from target, accounting for arm kinematics
@@ -2457,8 +2475,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # We offset base 44cm behind and 24cm left of target XY to allow 30cm forward reach
         # This gives natural reaching posture instead of forcing arm backwards
         new_root_state = self.robot.data.default_root_state[env_ids].clone()
-        new_root_state[:, 0] = first_target_pos[env_ids, 0] - 0.4415  # X: 30cm forward reach room
-        new_root_state[:, 1] = first_target_pos[env_ids, 1] - 0.2405  # Y: compensate for lateral offset
+        new_root_state[:, 0] = reset_anchor_pos[env_ids, 0] - 0.4415  # X: 30cm forward reach room
+        new_root_state[:, 1] = reset_anchor_pos[env_ids, 1] - 0.2405  # Y: compensate for lateral offset
         new_root_state[:, 2] = 0.0  # Ground level (matches runtime clamping line 1162)
         # Keep orientation from default (facing forward)
 

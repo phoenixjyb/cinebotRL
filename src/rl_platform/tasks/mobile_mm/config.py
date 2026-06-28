@@ -33,6 +33,7 @@ class TrajectoryConfig:
     start_waypoint_min_fraction: float = 0.0
     start_waypoint_max_fraction: float = 0.0
     reset_base_to_trajectory_start: bool = False  # Keep base near waypoint zero while target starts later
+    debug_sampling: bool = False  # Verbose trajectory resample/reset diagnostics
 
     # Curriculum settings
     enable_curriculum: bool = True
@@ -283,6 +284,7 @@ class MobileMMTrackConfig:
     lookahead_dt: float = 0.1  # seconds
     include_action_history: bool = True
     action_history_length: int = 2
+    debug_resets: bool = False  # Verbose reset pose diagnostics
 
     # Termination conditions
     terminate_on_self_collision: bool = True  # CRITICAL: End episode if robot hits itself

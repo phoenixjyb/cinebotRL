@@ -573,6 +573,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             randomize_start_waypoint=self.task_cfg.trajectory.randomize_start_waypoint,
             start_waypoint_min_fraction=self.task_cfg.trajectory.start_waypoint_min_fraction,
             start_waypoint_max_fraction=self.task_cfg.trajectory.start_waypoint_max_fraction,
+            debug_sampling=self.task_cfg.trajectory.debug_sampling,
         )
 
         # Load reachability map for intelligent base planning
@@ -2503,8 +2504,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Reset trajectory phase BEFORE getting first waypoint
         self.trajectory_manager.reset(env_ids)
 
-        # DEBUG: Verify trajectory was reset correctly
-        if len(env_ids) > 0:
+        if self.task_cfg.debug_resets and len(env_ids) > 0:
             test_wp_idx = self.trajectory_manager.current_waypoint_idx[env_ids[0]].item()
             test_time = self.trajectory_manager._recorded_time_accum[env_ids[0]].item()
             print(f"[DEBUG] After reset - Env {env_ids[0].item()}: waypoint_idx={test_wp_idx}, time_accum={test_time:.4f}")
@@ -2529,8 +2529,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         ):
             reset_anchor_pos = self.trajectory_manager.recorded_positions[:, 0]
 
-        # DEBUG: Print what we got from get_target_pose AND what's in recorded_positions
-        if len(env_ids) > 0 and self.trajectory_manager.recorded_positions is not None:
+        if (
+            self.task_cfg.debug_resets
+            and len(env_ids) > 0
+            and self.trajectory_manager.recorded_positions is not None
+        ):
             # Safety check: ensure env_ids is not empty and contains valid indices
             if env_ids.numel() > 0:
                 env_idx = env_ids[0].item()
@@ -2585,8 +2588,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self._lock_base_ppr_joints(env_ids=env_ids)
         self._lock_passive_joints(env_ids=env_ids)
 
-        # Print actual base position and target for debugging
-        print(f"[RESET] Env {env_ids[0].item() if len(env_ids) > 0 else 'N/A'}: Base=[{new_root_state[0, 0]:.3f}, {new_root_state[0, 1]:.3f}, {new_root_state[0, 2]:.3f}], Target=[{first_target_pos[env_ids[0], 0]:.3f}, {first_target_pos[env_ids[0], 1]:.3f}, {first_target_pos[env_ids[0], 2]:.3f}], Reach=0.30m forward")
+        if self.task_cfg.debug_resets:
+            print(f"[RESET] Env {env_ids[0].item() if len(env_ids) > 0 else 'N/A'}: Base=[{new_root_state[0, 0]:.3f}, {new_root_state[0, 1]:.3f}, {new_root_state[0, 2]:.3f}], Target=[{first_target_pos[env_ids[0], 0]:.3f}, {first_target_pos[env_ids[0], 1]:.3f}, {first_target_pos[env_ids[0], 2]:.3f}], Reach=0.30m forward")
 
         # NEW: Store episode start base position for movement tracking
         if not hasattr(self, '_episode_start_base_pos'):

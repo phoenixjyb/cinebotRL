@@ -320,6 +320,21 @@ def parse_args():
         help="Place the base near waypoint zero even when target playback starts later.",
     )
     parser.add_argument(
+        "--debug_resets",
+        action="store_true",
+        help="Print verbose reset pose and waypoint diagnostics.",
+    )
+    parser.add_argument(
+        "--debug_trajectory_sampling",
+        action="store_true",
+        help="Print verbose trajectory sampling diagnostics.",
+    )
+    parser.add_argument(
+        "--disable_recovery_stability_preset",
+        action="store_true",
+        help="Do not auto-apply lower LR / target_kl defaults for stage1_recovery.",
+    )
+    parser.add_argument(
         "--enable_base_assist",
         action="store_true",
         help="Blend an expert body-frame vx/vy command into executed base control.",
@@ -463,6 +478,21 @@ def parse_args():
 def main():
     """Main training loop."""
     args = parse_args()
+    explicit_args = {
+        raw_arg.split("=", 1)[0]
+        for raw_arg in sys.argv[1:]
+        if raw_arg.startswith("--")
+    }
+
+    auto_recovery_stability = (
+        args.trajectory_stage == "stage1_recovery"
+        and not args.disable_recovery_stability_preset
+    )
+    if auto_recovery_stability:
+        if "--learning_rate" not in explicit_args:
+            args.learning_rate = min(args.learning_rate, 5e-5)
+        if "--target_kl" not in explicit_args and args.target_kl is None:
+            args.target_kl = 0.04
     
     print("=" * 70)
     print("MobileMMTrackEE Training with Stable Baselines3")
@@ -875,6 +905,23 @@ def main():
                         if hasattr(isaac_env._robot.data, 'root_ang_vel_w'):
                             base_ang_vel = isaac_env._robot.data.root_ang_vel_w[:, 2]  # Yaw rate
                             print(f"  Yaw rate (rad/s):   mean={base_ang_vel.mean().item():.4f}, std={base_ang_vel.std().item():.4f}")
+
+                    if hasattr(isaac_env, '_base_assist_coeff'):
+                        coeff = isaac_env._base_assist_coeff
+                        active_pct = (coeff > 0.0).float().mean().item() * 100
+                        print(f"\n[Base Assist]")
+                        print(f"  Coeff:              mean={coeff.mean().item():.4f}, active={active_pct:.1f}%")
+                        self.logger.record("monitoring/base_assist_coeff_mean", coeff.mean().item())
+                        self.logger.record("monitoring/base_assist_active_pct", active_pct)
+                        if hasattr(isaac_env, '_base_assist_expert_action'):
+                            expert = isaac_env._base_assist_expert_action
+                            expert_mag = torch.norm(expert, dim=-1)
+                            print(
+                                f"  Expert action:      mag_mean={expert_mag.mean().item():.4f}, "
+                                f"mag_max={expert_mag.max().item():.4f}"
+                            )
+                            self.logger.record("monitoring/base_assist_expert_mag_mean", expert_mag.mean().item())
+                            self.logger.record("monitoring/base_assist_expert_mag_max", expert_mag.max().item())
                     
                     # Reachability statistics (if available from recent logs)
                     if hasattr(isaac_env, '_last_reachability_stats'):
@@ -1391,6 +1438,7 @@ def main():
         env_cfg = MobileMMTrackEEEnvCfg()
         env_cfg.num_envs = args.num_envs
         env_cfg.scene.num_envs = args.num_envs
+        env_cfg.task_config.debug_resets = args.debug_resets
         
         # Convert trajectory_dir to absolute path if it's relative
         # Session 8h: Use stage_dir if trajectory curriculum is active
@@ -1437,6 +1485,11 @@ def main():
                 f"{args.start_waypoint_min_fraction:.2f}-{args.start_waypoint_max_fraction:.2f} "
                 "trajectory fraction; base starts near waypoint zero"
             )
+        if auto_recovery_stability:
+            print(
+                "    Recovery stability preset: "
+                f"learning_rate={args.learning_rate:g}, target_kl={args.target_kl}"
+            )
         env_cfg.task_config.base_assist.enable = enable_base_assist
         env_cfg.task_config.base_assist.initial_blend = args.base_assist_initial_blend
         env_cfg.task_config.base_assist.final_blend = args.base_assist_final_blend
@@ -1466,6 +1519,7 @@ def main():
             start_waypoint_min_fraction=args.start_waypoint_min_fraction,
             start_waypoint_max_fraction=args.start_waypoint_max_fraction,
             reset_base_to_trajectory_start=reset_base_to_trajectory_start,
+            debug_sampling=args.debug_trajectory_sampling,
         )
         
         # Create environment directly with config

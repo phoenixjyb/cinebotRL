@@ -32,6 +32,7 @@ class TrajectoryManager:
         randomize_start_waypoint: bool = False,
         start_waypoint_min_fraction: float = 0.0,
         start_waypoint_max_fraction: float = 0.0,
+        debug_sampling: bool = False,
     ):
         """Initialize trajectory manager.
         
@@ -66,6 +67,7 @@ class TrajectoryManager:
         self.randomize_start_waypoint = randomize_start_waypoint
         self.start_waypoint_min_fraction = start_waypoint_min_fraction
         self.start_waypoint_max_fraction = start_waypoint_max_fraction
+        self.debug_sampling = debug_sampling
         
         # Phase tracking (one per environment)
         self.phase = torch.zeros(num_envs, device=device)
@@ -98,6 +100,7 @@ class TrajectoryManager:
                 trajectory_filter_indices,
                 max_trajectories,
                 min_duration_seconds,
+                debug_sampling,
             )
         elif traj_type == "multi_recorded":
             print(f"[TrajectoryManager] ⚠️  WARNING: traj_type='multi_recorded' but trajectory_dir is None!")
@@ -476,7 +479,8 @@ class TrajectoryManager:
         manifest_file: str | None = None,
         filter_indices: list[int] | None = None,
         max_trajectories: int | None = None,
-        min_duration_seconds: float = 0.0
+        min_duration_seconds: float = 0.0,
+        debug_sampling: bool = False,
     ) -> None:
         """Initialize multi-trajectory loader.
         
@@ -498,13 +502,14 @@ class TrajectoryManager:
             manifest_file=manifest_file,
             waypoint_dt=self.waypoint_dt,
             min_duration_seconds=min_duration_seconds,
+            debug_sampling=debug_sampling,
         )
         
         # Sample initial trajectories for all environments
         self._resample_multi_trajectories()
         
         # Debug: Print first waypoint of first few environments
-        if self.recorded_positions is not None:
+        if self.debug_sampling and self.recorded_positions is not None:
             print(f"[TrajectoryManager] First waypoints after initialization:")
             for i in range(min(3, self.num_envs)):
                 first_wp = self.recorded_positions[i, 0].cpu().numpy()
@@ -516,10 +521,12 @@ class TrajectoryManager:
         Args:
             env_ids: Environment IDs to resample (None = all)
         """
-        print(f"[DEBUG _resample_multi_trajectories] Called with env_ids={'ALL' if env_ids is None else f'{len(env_ids)} envs (first: {env_ids[0].item() if len(env_ids) > 0 else None})'}")
+        if self.debug_sampling:
+            print(f"[DEBUG _resample_multi_trajectories] Called with env_ids={'ALL' if env_ids is None else f'{len(env_ids)} envs (first: {env_ids[0].item() if len(env_ids) > 0 else None})'}")
         
         if self.multi_loader is None:
-            print(f"[DEBUG _resample_multi_trajectories] multi_loader is None! Exiting.")
+            if self.debug_sampling:
+                print(f"[DEBUG _resample_multi_trajectories] multi_loader is None! Exiting.")
             return
         
         if env_ids is None:
@@ -535,7 +542,8 @@ class TrajectoryManager:
             # This fixes the performance issue and prevents non-reset envs from getting new trajectories
             
             num_to_resample = len(env_ids)
-            print(f"[TrajectoryManager] Partial reset: resampling {num_to_resample} envs (was resampling all {self.num_envs})")
+            if self.debug_sampling:
+                print(f"[TrajectoryManager] Partial reset: resampling {num_to_resample} envs (was resampling all {self.num_envs})")
             
             # Sample only the trajectories needed for reset envs
             positions, orientations, lengths = self.multi_loader.sample_trajectories_with_lengths(num_to_resample)
@@ -547,7 +555,8 @@ class TrajectoryManager:
             # Handle shape mismatch if new trajectories have different length
             if new_max_length != current_max_length:
                 # Need to resize buffers - resample ALL envs (rare case)
-                print(f"[TrajectoryManager] Max length changed {current_max_length} -> {new_max_length}, resampling all envs")
+                if self.debug_sampling:
+                    print(f"[TrajectoryManager] Max length changed {current_max_length} -> {new_max_length}, resampling all envs")
                 positions, orientations, lengths = self.multi_loader.sample_trajectories_with_lengths(self.num_envs)
                 self.recorded_positions = positions
                 self.recorded_orientations = orientations
@@ -578,8 +587,7 @@ class TrajectoryManager:
                 self._recorded_time_accum[env_ids] = 0.0
             
             # Debug: Print first waypoint for reset environments
-            if len(env_ids) > 0:
+            if self.debug_sampling and len(env_ids) > 0:
                 first_env = env_ids[0].item()
                 first_wp = self.recorded_positions[first_env, 0].cpu().numpy()
                 print(f"[TrajectoryManager] Resampled Env {first_env}: First waypoint [{first_wp[0]:.3f}, {first_wp[1]:.3f}, {first_wp[2]:.3f}]")
-

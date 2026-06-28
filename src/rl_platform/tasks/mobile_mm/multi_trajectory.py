@@ -29,6 +29,7 @@ class MultiTrajectoryLoader:
         exclude_macosx: bool = True,
         waypoint_dt: float = 0.1,
         min_duration_seconds: float = 0.0,
+        debug_sampling: bool = False,
     ):
         """Initialize multi-trajectory loader.
         
@@ -47,6 +48,7 @@ class MultiTrajectoryLoader:
         self.trajectory_dir = Path(trajectory_dir)
         self.waypoint_dt = waypoint_dt
         self.min_duration_seconds = min_duration_seconds
+        self.debug_sampling = debug_sampling
         
         # Find all trajectory files. A manifest takes precedence over directory
         # globbing so curriculum stages can be curated without duplicating JSONs.
@@ -215,14 +217,14 @@ class MultiTrajectoryLoader:
         # Sample one trajectory per environment
         sampled = [self.sample_trajectory() for _ in range(num_envs)]
         
-        # DEBUG: Check if we're getting diverse trajectories
-        unique_files = set(t["file"] for t in sampled)
-        unique_first_pos = set(tuple(t["positions"][0].cpu().tolist()) for t in sampled)
-        print(f"[MultiTrajectoryLoader] Sampled {num_envs} trajectories:")
-        print(f"  Unique trajectory files: {len(unique_files)}/{num_envs}")
-        print(f"  Unique first positions: {len(unique_first_pos)}/{num_envs}")
-        if len(unique_first_pos) <= 5:
-            print(f"  First positions: {list(unique_first_pos)}")
+        if self.debug_sampling:
+            unique_files = set(t["file"] for t in sampled)
+            unique_first_pos = set(tuple(t["positions"][0].cpu().tolist()) for t in sampled)
+            print(f"[MultiTrajectoryLoader] Sampled {num_envs} trajectories:")
+            print(f"  Unique trajectory files: {len(unique_files)}/{num_envs}")
+            print(f"  Unique first positions: {len(unique_first_pos)}/{num_envs}")
+            if len(unique_first_pos) <= 5:
+                print(f"  First positions: {list(unique_first_pos)}")
         
         # Use the dataset-wide max length so partial env resets can be assigned
         # into existing trajectory buffers without changing the batch shape.

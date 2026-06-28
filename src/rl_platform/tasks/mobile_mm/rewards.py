@@ -902,10 +902,11 @@ def lateral_motion_penalty(
     base_quat: torch.Tensor,
     scale: float = 1.0,
 ) -> torch.Tensor:
-    """Penalty for lateral (sideways) motion in robot frame.
+    """Legacy penalty for lateral (sideways) motion in robot frame.
     
-    Differential drive robots cannot move sideways, so any y-velocity
-    in the ROBOT frame indicates slipping or unrealistic motion.
+    Differential-drive robots cannot move sideways, so any y-velocity in the
+    robot frame indicates slipping. Holonomic/mobile-base robots with an
+    explicit strafe DOF, such as Proto2, should configure this term to 0.
     
     Args:
         base_lin_vel: Base linear velocity in WORLD frame [num_envs, 3] (x, y, z)
@@ -1369,4 +1370,3 @@ def compute_combined_reward(
     }
     
     return total_reward, components
-

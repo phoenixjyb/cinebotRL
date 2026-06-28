@@ -194,7 +194,7 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     acceleration_limit_penalty: float = 1.5  # Penalises linear acceleration spikes
     jerk_limit_penalty: float = 0.005  # Soft penalty on large changes in acceleration
     joint_limit_penalty: float = 5.0  # Keeps joints away from hard stops
-    lateral_motion_penalty: float = 1.0  # Penalises sideways slipping beyond differential-drive kinematics
+    lateral_motion_penalty: float = 0.0  # Proto2 has an explicit base_vy strafe DOF; do not penalize lateral commands
 
     # ========================================
     # SAFETY PENALTIES (Keep reasonable)

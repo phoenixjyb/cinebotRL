@@ -76,6 +76,9 @@ class MultiTrajectoryLoader:
         
         # Pre-load all trajectories
         self.trajectories: List[dict] = []
+        self.min_length = 0
+        self.max_length = 0
+        self.mean_length = 0.0
         self._load_all_trajectories()
     
     def _load_all_trajectories(self):
@@ -135,8 +138,11 @@ class MultiTrajectoryLoader:
         # Print statistics
         if self.trajectories:
             lengths = [t["length"] for t in self.trajectories]
+            self.min_length = min(lengths)
+            self.max_length = max(lengths)
+            self.mean_length = sum(lengths) / len(lengths)
             categories = set(t["category"] for t in self.trajectories)
-            print(f"  - Trajectory lengths: min={min(lengths)}, max={max(lengths)}, mean={sum(lengths)/len(lengths):.1f}")
+            print(f"  - Trajectory lengths: min={self.min_length}, max={self.max_length}, mean={self.mean_length:.1f}")
             durations = [t["duration_seconds"] for t in self.trajectories]
             print(f"  - Durations: min={min(durations):.2f}s, max={max(durations):.2f}s, mean={sum(durations)/len(durations):.2f}s")
             print(f"  - Categories: {len(categories)} - {', '.join(sorted(categories))}")
@@ -174,8 +180,9 @@ class MultiTrajectoryLoader:
         if len(unique_first_pos) <= 5:
             print(f"  First positions: {list(unique_first_pos)}")
         
-        # Find max length
-        max_length = max(t["length"] for t in sampled)
+        # Use the dataset-wide max length so partial env resets can be assigned
+        # into existing trajectory buffers without changing the batch shape.
+        max_length = self.max_length
         
         # Pad trajectories to max length
         positions_list = []

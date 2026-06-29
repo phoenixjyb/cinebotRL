@@ -16,6 +16,7 @@ __pycache__/
 Thumbs.db
 logs/
 outputs/
+data/gik_ik_demos/
 wandb/
 .idea/
 .vscode/

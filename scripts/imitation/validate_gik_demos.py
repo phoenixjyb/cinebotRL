@@ -55,6 +55,10 @@ def validate_item(item: dict, demo_dir: Path) -> dict:
     q_next = data["q_next"]
     dt = data["dt"]
     valid_mask = data["action_valid_mask"]
+    target_pos = data["target_pos"] if "target_pos" in data else None
+    target_quat = data["target_quat_wxyz"] if "target_quat_wxyz" in data else None
+    actual_ee_pos = data["actual_ee_pos"] if "actual_ee_pos" in data else None
+    actual_ee_quat = data["actual_ee_quat_wxyz"] if "actual_ee_quat_wxyz" in data else None
 
     require(actions.ndim == 2 and actions.shape[1] == ACTION_DIM, f"{npz_path}: bad actions shape {actions.shape}")
     require(q_current.shape == q_next.shape, f"{npz_path}: q_current/q_next shape mismatch")
@@ -65,6 +69,23 @@ def validate_item(item: dict, demo_dir: Path) -> dict:
     require(np.isfinite(q_current).all() and np.isfinite(q_next).all(), f"{npz_path}: non-finite q")
     require(np.isfinite(dt).all() and np.all(dt > 0), f"{npz_path}: invalid dt")
     require(np.max(np.abs(actions)) <= 1.000001, f"{npz_path}: clipped actions outside [-1,1]")
+    for key, arr, width in (
+        ("target_pos", target_pos, 3),
+        ("target_quat_wxyz", target_quat, 4),
+        ("actual_ee_pos", actual_ee_pos, 3),
+        ("actual_ee_quat_wxyz", actual_ee_quat, 4),
+    ):
+        require(arr is not None, f"{npz_path}: missing {key}")
+        require(arr.shape == (actions.shape[0], width), f"{npz_path}: bad {key} shape {arr.shape}")
+        require(np.isfinite(arr).all(), f"{npz_path}: non-finite {key}")
+    require(
+        np.allclose(np.linalg.norm(target_quat, axis=1), 1.0, atol=1e-3),
+        f"{npz_path}: target quaternions are not normalized",
+    )
+    require(
+        np.allclose(np.linalg.norm(actual_ee_quat, axis=1), 1.0, atol=1e-3),
+        f"{npz_path}: actual EE quaternions are not normalized",
+    )
 
     return {
         "samples": int(actions.shape[0]),
@@ -82,7 +103,10 @@ def main() -> int:
     require(manifest_path.exists(), f"missing manifest: {manifest_path}")
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    require(manifest.get("schema") == "cinebotrl_ik_demo_v1", "unsupported demo schema")
+    require(
+        manifest.get("schema") in {"cinebotrl_ik_demo_v1", "cinebotrl_ik_demo_v2", "cinebotrl_ik_demo_v2_filtered"},
+        "unsupported demo schema",
+    )
     items = manifest.get("items", [])
     require(items, "manifest contains no demo items")
 

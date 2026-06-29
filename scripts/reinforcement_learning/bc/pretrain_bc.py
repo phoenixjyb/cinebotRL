@@ -67,6 +67,11 @@ def parse_args() -> argparse.Namespace:
         default="auto",
         choices=["auto", "cpu", "cuda"],
     )
+    parser.add_argument(
+        "--use_action_mask",
+        action="store_true",
+        help="Use action_valid_mask from the demo file and compute MSE only on valid labels.",
+    )
     return parser.parse_args()
 
 
@@ -77,15 +82,18 @@ def parse_args() -> argparse.Namespace:
 class BCDataset(Dataset):
     """Wraps numpy obs/act arrays as a PyTorch Dataset."""
 
-    def __init__(self, observations: np.ndarray, actions: np.ndarray):
+    def __init__(self, observations: np.ndarray, actions: np.ndarray, action_mask: np.ndarray | None = None):
         self.obs  = torch.tensor(observations, dtype=torch.float32)
         self.acts = torch.tensor(actions,      dtype=torch.float32)
+        self.mask = None if action_mask is None else torch.tensor(action_mask, dtype=torch.float32)
 
     def __len__(self) -> int:
         return self.obs.shape[0]
 
     def __getitem__(self, idx):
-        return self.obs[idx], self.acts[idx]
+        if self.mask is None:
+            return self.obs[idx], self.acts[idx], torch.ones_like(self.acts[idx])
+        return self.obs[idx], self.acts[idx], self.mask[idx]
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +119,7 @@ def build_mlp(input_dim: int, hidden_sizes: list[int], output_dim: int) -> nn.Se
 def train_bc(
     obs: np.ndarray,
     acts: np.ndarray,
+    action_mask: np.ndarray | None,
     args: argparse.Namespace,
 ) -> nn.Module:
     """Train a BC policy via MSE regression and return the trained network."""
@@ -125,7 +134,7 @@ def train_bc(
     net = build_mlp(args.obs_dim, hidden_sizes, args.act_dim).to(device)
 
     # Split train / val
-    dataset     = BCDataset(obs, acts)
+    dataset     = BCDataset(obs, acts, action_mask)
     val_size    = max(1, int(len(dataset) * args.val_fraction))
     train_size  = len(dataset) - val_size
     train_ds, val_ds = random_split(dataset, [train_size, val_size])
@@ -134,7 +143,11 @@ def train_bc(
     val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, shuffle=False)
 
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-    loss_fn   = nn.MSELoss()
+
+    def masked_mse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        sq = (pred - target).pow(2) * mask
+        denom = torch.clamp(mask.sum(), min=1.0)
+        return sq.sum() / denom
 
     best_val_loss  = float("inf")
     best_state     = None
@@ -147,11 +160,11 @@ def train_bc(
         # --- train ---
         net.train()
         train_total = 0.0
-        for obs_b, act_b in train_loader:
-            obs_b, act_b = obs_b.to(device), act_b.to(device)
+        for obs_b, act_b, mask_b in train_loader:
+            obs_b, act_b, mask_b = obs_b.to(device), act_b.to(device), mask_b.to(device)
             optimizer.zero_grad()
             pred = net(obs_b)
-            loss = loss_fn(pred, act_b)
+            loss = masked_mse(pred, act_b, mask_b)
             loss.backward()
             optimizer.step()
             train_total += loss.item() * obs_b.shape[0]
@@ -161,9 +174,9 @@ def train_bc(
         net.eval()
         val_total = 0.0
         with torch.no_grad():
-            for obs_b, act_b in val_loader:
-                obs_b, act_b = obs_b.to(device), act_b.to(device)
-                val_total += loss_fn(net(obs_b), act_b).item() * obs_b.shape[0]
+            for obs_b, act_b, mask_b in val_loader:
+                obs_b, act_b, mask_b = obs_b.to(device), act_b.to(device), mask_b.to(device)
+                val_total += masked_mse(net(obs_b), act_b, mask_b).item() * obs_b.shape[0]
         val_loss = val_total / val_size
 
         print(f"{epoch:>6}  {train_loss:>12.6f}  {val_loss:>12.6f}")
@@ -286,12 +299,23 @@ def main() -> None:
     data = np.load(str(demo_path))
     observations = data["observations"]  # [N, obs_dim]
     actions      = data["actions"]       # [N, act_dim]
+    action_mask = None
+    if args.use_action_mask:
+        if "action_valid_mask" not in data:
+            print("[ERROR] --use_action_mask requested, but demo file has no action_valid_mask")
+            sys.exit(1)
+        action_mask = data["action_valid_mask"].astype(np.float32)
+        if action_mask.shape != actions.shape:
+            print(f"[ERROR] action_valid_mask shape {action_mask.shape} does not match actions {actions.shape}")
+            sys.exit(1)
 
     total_transitions = observations.shape[0]
     print(f"\n[INFO] Loaded demo file: {demo_path}")
     print(f"       Total transitions : {total_transitions:,}")
     print(f"       Obs dim           : {observations.shape[1]}")
     print(f"       Act dim           : {actions.shape[1]}")
+    if action_mask is not None:
+        print(f"       Masked action mean: {np.mean(action_mask, axis=0)}")
 
     if observations.shape[1] != args.obs_dim:
         print(
@@ -303,7 +327,7 @@ def main() -> None:
     hidden_sizes = [int(x) for x in args.hidden_sizes.split(",")]
 
     # Train
-    trained_net = train_bc(observations, actions, args)
+    trained_net = train_bc(observations, actions, action_mask, args)
 
     # Save as SB3 policy
     output_path = str(PROJECT_ROOT / args.output_path)

@@ -17,6 +17,7 @@ Thumbs.db
 logs/
 outputs/
 data/gik_ik_demos/
+data/gik_rs4_attitude_demos/
 wandb/
 .idea/
 .vscode/

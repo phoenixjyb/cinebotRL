@@ -24,6 +24,7 @@ from rl_platform.tasks.mobile_mm.joint_names import (
     POLICY_BASE_WZ_ACTION_INDEX,
 )
 from rl_platform.tasks.mobile_mm.action_contracts import DEFAULT_ACTION_CONTRACT, get_action_contract
+from rl_platform.tasks.mobile_mm.rs4_adapter import Rs4RateAdapterConfig
 
 try:
     # Isaac Lab 2.2.0 pip package uses 'isaaclab' not 'omni.isaac.lab'
@@ -363,10 +364,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     "sim_6joint_gimbal_v1 joint-target path. Re-run with the default "
                     "sim_6joint_gimbal_v1 contract, or continue by explicitly wiring the experimental RS4 adapter."
                 )
-            raise NotImplementedError(
-                "experimental_rs4_adapter=True was provided, but env execution for rs4_attitude_rate_v1 "
-                "is still intentionally disabled. The pure RS4 rate adapter exists in rs4_adapter.py; "
-                "the next step is to connect it to a simulated camera attitude controller before enabling rollouts."
+            print(
+                "[MobileMMTrackEE] EXPERIMENTAL: rs4_attitude_rate_v1 will map "
+                "policy [yaw,pitch,roll] rates onto simulated gimbal joints "
+                "[joint3_yaw,joint2_roll,joint1_pitch]. This is not hardware-equivalence proof."
             )
 
         scene_needs_rebuild = False
@@ -650,6 +651,25 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             f"[MobileMMTrackEE] Proto2 policy safety: arm target slew <= "
             f"{self.max_arm_target_delta:.4f} rad/control-step, action radius={self.arm_action_radius.tolist()}"
         )
+        self.rs4_rate_adapter_config = Rs4RateAdapterConfig()
+        self.rs4_max_policy_rates_rad_s = torch.tensor(
+            np.deg2rad(self.rs4_rate_adapter_config.max_policy_order_rates),
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.rs4_max_policy_accels_rad_s2 = torch.tensor(
+            np.deg2rad(self.rs4_rate_adapter_config.max_policy_order_accels),
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.rs4_prev_policy_rates_rad_s = torch.zeros(self.num_envs, 3, device=self.device)
+        if self.action_contract.name == "rs4_attitude_rate_v1":
+            print(
+                "[MobileMMTrackEE] RS4 sim adapter: "
+                f"max_rates_deg_s={self.rs4_rate_adapter_config.max_policy_order_rates.tolist()}, "
+                f"max_accels_deg_s2={self.rs4_rate_adapter_config.max_policy_order_accels.tolist()}, "
+                f"enable_roll={self.rs4_rate_adapter_config.enable_roll}"
+            )
 
         # Obstacle state. Obstacle XY is stored in each environment's local frame;
         # world XY adds scene.env_origins so clearance works for replicated envs.
@@ -1406,35 +1426,73 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             self.action_history = torch.roll(self.action_history, shifts=-1, dims=1)
             self.action_history[:, -1, :] = actions
 
-        # Apply actions to robot
-        # Action space is 9D: [6 arm joint positions, vx, vy, wz]
-        # Proto2 USD has 12 joints: 3 base, 6 arm, and 3 virtual gimbal joints.
-        # The v3 policy controls 6 arm joints plus body-frame base vx/vy/wz.
-        # Virtual gimbal joints stay locked at zero.
-
-        if actions.shape[-1] != POLICY_ACTION_DIM:
+        # Apply actions to robot.
+        if actions.shape[-1] != self.action_contract.action_dim:
             raise ValueError(
-                f"Expected {POLICY_ACTION_DIM} policy actions "
-                f"[6 arm targets, base_vx, base_vy, base_wz], got shape {tuple(actions.shape)}"
+                f"Expected {self.action_contract.action_dim} policy actions for "
+                f"{self.action_contract.name}, got shape {tuple(actions.shape)}"
             )
 
-        # Split actions using the explicit Proto2 v3 policy contract.
-        arm_actions = actions[:, POLICY_ARM_ACTION_SLICE]
+        # Base commands keep the same indices in both 9D contracts.
         base_vx = actions[:, POLICY_BASE_VX_ACTION_INDEX:POLICY_BASE_VX_ACTION_INDEX + 1]
         base_vy = actions[:, POLICY_BASE_VY_ACTION_INDEX:POLICY_BASE_VY_ACTION_INDEX + 1]
         base_wz = actions[:, POLICY_BASE_WZ_ACTION_INDEX:POLICY_BASE_WZ_ACTION_INDEX + 1]
 
-        # Scale arm actions from [-1, 1] to actual joint limits with safety margins,
-        # then slew-limit absolute targets. This preserves the external policy contract while
-        # preventing random early PPO samples from teleporting position targets across
-        # the full arm workspace in one 20 Hz control step.
-        arm_actions_scaled = self._scale_actions_to_joint_limits(arm_actions)
-
-        # Apply arm joint position targets to the actuated arm joints only
-        # We only control the 6 arm joints via position targets.
+        # Apply arm/gimbal targets according to the selected contract.
         self._verify_joint_mapping()
         self._arm_joint_ids = self._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
-        arm_actions_filtered = self._filter_arm_position_targets(arm_actions_scaled)
+        if self.action_contract.name == "rs4_attitude_rate_v1":
+            arm_actions = actions[:, 0:3]
+            rs4_rate_actions = actions[:, 3:6]
+            arm_actions_scaled = self._scale_actions_to_joint_limits(arm_actions, joint_start=0)
+
+            if not self._arm_command_filter_initialized:
+                current_joint_pos = self.robot.data.joint_pos[:, self._arm_joint_ids]
+                self.filtered_arm_targets = torch.nan_to_num(current_joint_pos, nan=0.0).clone()
+                self._arm_command_filter_initialized = True
+
+            target_all = self.filtered_arm_targets.clone()
+            target_all[:, 0:3] = arm_actions_scaled
+
+            # Policy order is [yaw, pitch, roll]. Roll is masked by default in the
+            # config until RS4 mixed-mode roll behavior is validated.
+            desired_policy_rates = rs4_rate_actions * self.rs4_max_policy_rates_rad_s
+            if not self.rs4_rate_adapter_config.enable_roll:
+                desired_policy_rates[:, 2] = 0.0
+
+            dt = self.cfg.sim.dt * self.cfg.decimation
+            max_rate_delta = self.rs4_max_policy_accels_rad_s2 * dt
+            rate_delta = torch.clamp(
+                desired_policy_rates - self.rs4_prev_policy_rates_rad_s,
+                -max_rate_delta,
+                max_rate_delta,
+            )
+            self.rs4_prev_policy_rates_rad_s = self.rs4_prev_policy_rates_rad_s + rate_delta
+
+            # Simulated URDF gimbal target order is [yaw, roll, pitch] for
+            # [joint3_gimbal_yaw, joint2_gimbal_roll, joint1_gimbal_pitch].
+            sim_gimbal_rates = torch.stack(
+                [
+                    self.rs4_prev_policy_rates_rad_s[:, 0],
+                    self.rs4_prev_policy_rates_rad_s[:, 2],
+                    self.rs4_prev_policy_rates_rad_s[:, 1],
+                ],
+                dim=1,
+            )
+            target_all[:, 3:6] = target_all[:, 3:6] + sim_gimbal_rates * dt
+            self._initialize_joint_limits()
+            margin = self.robot_limits["joint_limit_margin"]
+            target_all[:, 3:6] = torch.clamp(
+                target_all[:, 3:6],
+                self.joint_lower_limits[3:6] + margin,
+                self.joint_upper_limits[3:6] - margin,
+            )
+            arm_actions_filtered = self._filter_arm_position_targets(target_all)
+        else:
+            # Existing sim_6joint_gimbal_v1 path: 6 normalized absolute joint targets.
+            arm_actions = actions[:, POLICY_ARM_ACTION_SLICE]
+            arm_actions_scaled = self._scale_actions_to_joint_limits(arm_actions)
+            arm_actions_filtered = self._filter_arm_position_targets(arm_actions_scaled)
 
         # Set filtered joint position targets for arm joints only
         self.robot.set_joint_position_target(arm_actions_filtered, joint_ids=self._arm_joint_ids)
@@ -1755,7 +1813,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             )
         self._arm_state_repair_count += int(needs_repair.sum().item())
 
-    def _scale_actions_to_joint_limits(self, actions: torch.Tensor) -> torch.Tensor:
+    def _scale_actions_to_joint_limits(self, actions: torch.Tensor, joint_start: int = 0) -> torch.Tensor:
         """
         Scale normalized actions from [-1, 1] to actual joint limits with safety margins.
 
@@ -1768,16 +1826,29 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Ensure joint limits are initialized
         self._initialize_joint_limits()
 
+        action_dim = actions.shape[-1]
+        joint_end = joint_start + action_dim
+        if joint_start < 0 or joint_end > len(ARM_JOINT_NAMES):
+            raise ValueError(
+                f"joint slice [{joint_start}:{joint_end}] is outside arm joint range 0:{len(ARM_JOINT_NAMES)}"
+            )
+
         # Get joint limits (these are already for arm joints only)
-        lower = self.joint_lower_limits  # Shape: [6]
-        upper = self.joint_upper_limits  # Shape: [6]
+        lower = self.joint_lower_limits[joint_start:joint_end]
+        upper = self.joint_upper_limits[joint_start:joint_end]
         margin = self.robot_limits["joint_limit_margin"]
 
         # Proto2 v2 safety profile: keep early PPO exploration in a conservative
         # envelope around a known stable home pose. The external policy remains normalized
         # normalized actions; only the physical target envelope is narrowed.
-        lower_safe = torch.maximum(lower + margin, self.arm_safe_home - self.arm_action_radius)
-        upper_safe = torch.minimum(upper - margin, self.arm_safe_home + self.arm_action_radius)
+        lower_safe = torch.maximum(
+            lower + margin,
+            self.arm_safe_home[joint_start:joint_end] - self.arm_action_radius[joint_start:joint_end],
+        )
+        upper_safe = torch.minimum(
+            upper - margin,
+            self.arm_safe_home[joint_start:joint_end] + self.arm_action_radius[joint_start:joint_end],
+        )
 
         actions_normalized = (actions + 1.0) * 0.5  # Convert [-1, 1] to [0, 1]
         scaled_actions = actions_normalized * (upper_safe - lower_safe) + lower_safe
@@ -2661,6 +2732,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self.current_commanded_vel[env_ids] = 0.0
         self.prev_commanded_vel[env_ids] = 0.0
         self.prev_commanded_accel[env_ids] = 0.0
+        if hasattr(self, "rs4_prev_policy_rates_rad_s"):
+            self.rs4_prev_policy_rates_rad_s[env_ids] = 0.0
 
         if self.action_history is not None:
             self.action_history[env_ids] = 0.0

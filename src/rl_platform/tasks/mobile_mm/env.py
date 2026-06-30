@@ -23,6 +23,7 @@ from rl_platform.tasks.mobile_mm.joint_names import (
     POLICY_BASE_VX_ACTION_INDEX, POLICY_BASE_VY_ACTION_INDEX,
     POLICY_BASE_WZ_ACTION_INDEX,
 )
+from rl_platform.tasks.mobile_mm.action_contracts import DEFAULT_ACTION_CONTRACT
 
 try:
     # Isaac Lab 2.2.0 pip package uses 'isaaclab' not 'omni.isaac.lab'
@@ -95,7 +96,7 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
     scene: InteractiveSceneCfg = None
 
     # Action/Observation spaces (computed based on robot)
-    num_actions: int = POLICY_ACTION_DIM  # 6 arm joints + base v_x/v_y/omega_z
+    num_actions: int = DEFAULT_ACTION_CONTRACT.action_dim
     num_observations: int = 46  # Will be computed based on config
 
     def __post_init__(self):
@@ -303,6 +304,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         """
         print(f"\n{'='*70}")
         print(f"[MobileMMTrackEE] __init__ called:")
+        print(f"  action_contract: {DEFAULT_ACTION_CONTRACT.describe()}")
         print(f"  cfg provided: {cfg is not None}")
         if cfg is not None:
             print(f"  cfg.task_config.trajectory.type: {cfg.task_config.trajectory.type}")
@@ -1311,10 +1313,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"\nExpected BASE joints: {expected_base_joints}")
             print(f"Expected ARM joints by name: {expected_arm_joints}")
             print(f"Expected VIRTUAL joints (locked): {expected_virtual_joints}")
-            print(f"Policy action contract: {POLICY_ACTION_DIM}D "
-                  f"[6 arm targets, base_vx index {POLICY_BASE_VX_ACTION_INDEX}, "
-                  f"base_vy index {POLICY_BASE_VY_ACTION_INDEX}, "
-                  f"base_wz index {POLICY_BASE_WZ_ACTION_INDEX}]")
+            print(f"Policy action contract: {DEFAULT_ACTION_CONTRACT.describe()}")
+            print(
+                "Policy base indices: "
+                f"base_vx={POLICY_BASE_VX_ACTION_INDEX}, "
+                f"base_vy={POLICY_BASE_VY_ACTION_INDEX}, "
+                f"base_wz={POLICY_BASE_WZ_ACTION_INDEX}"
+            )
 
             # Verify actual indices
             for i, name in enumerate(self.robot.joint_names):

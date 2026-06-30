@@ -120,4 +120,20 @@ ACTION_CONTRACTS: dict[str, ActionContract] = {
 
 # Current default remains unchanged.
 DEFAULT_ACTION_CONTRACT = SIM_6JOINT_GIMBAL_V1
+DEFAULT_ACTION_CONTRACT_NAME = DEFAULT_ACTION_CONTRACT.name
 
+
+def available_action_contract_names() -> tuple[str, ...]:
+    """Return supported action contract names in stable display order."""
+
+    return tuple(ACTION_CONTRACTS.keys())
+
+
+def get_action_contract(name: str) -> ActionContract:
+    """Resolve a named action contract or raise a useful error."""
+
+    try:
+        return ACTION_CONTRACTS[name]
+    except KeyError as exc:
+        valid = ", ".join(available_action_contract_names())
+        raise ValueError(f"unknown action contract {name!r}; valid contracts: {valid}") from exc

@@ -23,7 +23,7 @@ from rl_platform.tasks.mobile_mm.joint_names import (
     POLICY_BASE_VX_ACTION_INDEX, POLICY_BASE_VY_ACTION_INDEX,
     POLICY_BASE_WZ_ACTION_INDEX,
 )
-from rl_platform.tasks.mobile_mm.action_contracts import DEFAULT_ACTION_CONTRACT
+from rl_platform.tasks.mobile_mm.action_contracts import DEFAULT_ACTION_CONTRACT, get_action_contract
 
 try:
     # Isaac Lab 2.2.0 pip package uses 'isaaclab' not 'omni.isaac.lab'
@@ -304,7 +304,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         """
         print(f"\n{'='*70}")
         print(f"[MobileMMTrackEE] __init__ called:")
-        print(f"  action_contract: {DEFAULT_ACTION_CONTRACT.describe()}")
+        print(f"  default_action_contract: {DEFAULT_ACTION_CONTRACT.describe()}")
         print(f"  cfg provided: {cfg is not None}")
         if cfg is not None:
             print(f"  cfg.task_config.trajectory.type: {cfg.task_config.trajectory.type}")
@@ -329,6 +329,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         obstacle_x_override = kwargs.pop("obstacle_x", None)
         obstacle_y_override = kwargs.pop("obstacle_y", None)
         obstacle_radius_override = kwargs.pop("obstacle_radius", None)
+        action_contract_override = kwargs.pop("action_contract", None)
+        experimental_rs4_adapter_override = kwargs.pop("experimental_rs4_adapter", None)
 
         print(f"[MobileMMTrackEE] DEBUG: Before config handling, num_envs_override={num_envs_override}")
 
@@ -345,6 +347,27 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         if cfg.scene is not None and num_envs_override is not None:
             cfg.scene.num_envs = num_envs_override
+
+        if action_contract_override is not None:
+            cfg.task_config.action_contract_name = action_contract_override
+        if experimental_rs4_adapter_override is not None:
+            cfg.task_config.experimental_rs4_adapter = bool(experimental_rs4_adapter_override)
+
+        self.action_contract = get_action_contract(cfg.task_config.action_contract_name)
+        print(f"[MobileMMTrackEE] Active action contract: {self.action_contract.describe()}")
+        if self.action_contract.name == "rs4_attitude_rate_v1":
+            if not cfg.task_config.experimental_rs4_adapter:
+                raise RuntimeError(
+                    "rs4_attitude_rate_v1 was requested, but the RS4 simulator adapter is not wired yet. "
+                    "This guard prevents silently executing RS4 policy outputs through the old "
+                    "sim_6joint_gimbal_v1 joint-target path. Re-run with the default "
+                    "sim_6joint_gimbal_v1 contract, or continue by explicitly wiring the experimental RS4 adapter."
+                )
+            raise NotImplementedError(
+                "experimental_rs4_adapter=True was provided, but env execution for rs4_attitude_rate_v1 "
+                "is still intentionally disabled. The pure RS4 rate adapter exists in rs4_adapter.py; "
+                "the next step is to connect it to a simulated camera attitude controller before enabling rollouts."
+            )
 
         scene_needs_rebuild = False
         obstacle_cfg = cfg.task_config.obstacles
@@ -394,7 +417,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         # Rebuild scene and spaces after runtime overrides so obstacle-enabled
         # configs expose the correct observation dimension before DirectRLEnv init.
-        cfg.num_actions = POLICY_ACTION_DIM
+        cfg.num_actions = self.action_contract.action_dim
         cfg.num_observations = get_observation_dimensions(
             num_joints=6,
             num_contacts=1,
@@ -1313,7 +1336,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"\nExpected BASE joints: {expected_base_joints}")
             print(f"Expected ARM joints by name: {expected_arm_joints}")
             print(f"Expected VIRTUAL joints (locked): {expected_virtual_joints}")
-            print(f"Policy action contract: {DEFAULT_ACTION_CONTRACT.describe()}")
+            print(f"Policy action contract: {self.action_contract.describe()}")
             print(
                 "Policy base indices: "
                 f"base_vx={POLICY_BASE_VX_ACTION_INDEX}, "

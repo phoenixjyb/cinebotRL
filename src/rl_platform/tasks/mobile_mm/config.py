@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+from .action_contracts import DEFAULT_ACTION_CONTRACT_NAME
+
 
 @dataclass
 class TrajectoryConfig:
@@ -267,6 +269,11 @@ class MobileMMTrackConfig:
     rewards: RewardWeights = field(default_factory=RewardWeights)
     robot_limits: RobotLimits = field(default_factory=RobotLimits)
     domain_rand: DomainRandomization = field(default_factory=DomainRandomization)
+
+    # Action contract. Keep sim_6joint_gimbal_v1 as the default until the
+    # RS4-aware simulator adapter and dataset schema are fully wired.
+    action_contract_name: str = DEFAULT_ACTION_CONTRACT_NAME
+    experimental_rs4_adapter: bool = False
 
     # Episode settings
     episode_length_s: float = 20.0

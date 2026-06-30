@@ -330,6 +330,24 @@ def parse_args():
         help="Print verbose trajectory sampling diagnostics.",
     )
     parser.add_argument(
+        "--action_contract",
+        type=str,
+        default="sim_6joint_gimbal_v1",
+        choices=["sim_6joint_gimbal_v1", "rs4_attitude_rate_v1"],
+        help=(
+            "Policy action contract. Default preserves the existing Isaac 6-joint gimbal semantics. "
+            "rs4_attitude_rate_v1 is guarded until the simulator adapter is wired."
+        ),
+    )
+    parser.add_argument(
+        "--experimental_rs4_adapter",
+        action="store_true",
+        help=(
+            "Explicit opt-in for the experimental RS4 adapter path. This currently still fails fast "
+            "because env execution is not wired yet; it exists to prevent accidental old-semantics execution."
+        ),
+    )
+    parser.add_argument(
         "--disable_recovery_stability_preset",
         action="store_true",
         help="Do not auto-apply lower LR / target_kl defaults for stage1_recovery.",
@@ -1485,6 +1503,13 @@ def main():
         env_cfg.num_envs = args.num_envs
         env_cfg.scene.num_envs = args.num_envs
         env_cfg.task_config.debug_resets = args.debug_resets
+        env_cfg.task_config.action_contract_name = args.action_contract
+        env_cfg.task_config.experimental_rs4_adapter = args.experimental_rs4_adapter
+        print(
+            "    Action contract: "
+            f"{env_cfg.task_config.action_contract_name} "
+            f"(experimental_rs4_adapter={env_cfg.task_config.experimental_rs4_adapter})"
+        )
         
         # Convert trajectory_dir to absolute path if it's relative
         # Session 8h: Use stage_dir if trajectory curriculum is active

@@ -200,6 +200,9 @@ class TrajectoryManager:
             positions: Lookahead positions [num_envs, steps, 3]
             orientations: Lookahead orientations [num_envs, steps, 4]
         """
+        if self.traj_type in ["recorded", "multi_recorded"] and self.recorded_positions is not None:
+            return self._recorded_lookahead(steps, lookahead_dt)
+
         # Save current phase
         original_phase = self.phase.clone()
         
@@ -221,6 +224,50 @@ class TrajectoryManager:
         orientations = torch.stack(orientations, dim=1)  # [num_envs, steps, 4]
         
         return positions, orientations
+
+    def _get_recorded_real_lengths(self) -> torch.Tensor:
+        """Return per-env recorded trajectory lengths, excluding padded tails."""
+        if self.recorded_positions is None:
+            raise RuntimeError("No recorded trajectory loaded. Set waypoint_file in config.")
+
+        max_length = self.recorded_positions.shape[1]
+        if self.recorded_lengths is None:
+            return torch.full(
+                (self.num_envs,),
+                max_length,
+                dtype=torch.long,
+                device=self.device,
+            )
+        return torch.clamp(self.recorded_lengths.to(torch.long), min=1, max=max_length)
+
+    def _recorded_lookahead(self, steps: int, lookahead_dt: float) -> tuple[torch.Tensor, torch.Tensor]:
+        """Look ahead through recorded waypoints without mutating playback state."""
+        if self.recorded_positions is None or self.recorded_orientations is None:
+            raise RuntimeError("No recorded trajectory loaded. Set waypoint_file in config.")
+
+        batch_indices = torch.arange(self.num_envs, device=self.device)
+        real_lengths = self._get_recorded_real_lengths()
+        positions = []
+        orientations = []
+
+        for i in range(1, steps + 1):
+            future_time = self._recorded_time_accum + (i * lookahead_dt)
+            steps_to_advance = torch.floor(future_time / self.waypoint_dt).to(torch.long)
+            interp_time = future_time - steps_to_advance.float() * self.waypoint_dt
+            alpha = torch.clamp(interp_time / self.waypoint_dt, 0.0, 1.0)
+
+            current_idx = torch.remainder(self.current_waypoint_idx + steps_to_advance, real_lengths)
+            next_idx = torch.remainder(current_idx + 1, real_lengths)
+
+            pos_current = self.recorded_positions[batch_indices, current_idx]
+            pos_next = self.recorded_positions[batch_indices, next_idx]
+            positions.append((1.0 - alpha.unsqueeze(-1)) * pos_current + alpha.unsqueeze(-1) * pos_next)
+
+            quat_current = self.recorded_orientations[batch_indices, current_idx]
+            quat_next = self.recorded_orientations[batch_indices, next_idx]
+            orientations.append(self._slerp_quaternions(quat_current, quat_next, alpha))
+
+        return torch.stack(positions, dim=1), torch.stack(orientations, dim=1)
     
     def step(self) -> None:
         """Advance trajectory by one timestep."""
@@ -241,9 +288,8 @@ class TrajectoryManager:
                 self.current_waypoint_idx += steps_to_advance
                 self._recorded_time_accum -= steps_to_advance.float() * self.waypoint_dt
 
-                max_length = self.recorded_positions.shape[1]
-                if max_length > 0:
-                    self.current_waypoint_idx = torch.remainder(self.current_waypoint_idx, max_length)
+                real_lengths = self._get_recorded_real_lengths()
+                self.current_waypoint_idx = torch.remainder(self.current_waypoint_idx, real_lengths)
     
     def _circle_trajectory(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate circular trajectory.
@@ -317,15 +363,11 @@ class TrajectoryManager:
             raise RuntimeError("No recorded trajectory loaded. Set waypoint_file in config.")
         
         batch_indices = torch.arange(self.num_envs, device=self.device)
-        max_length = self.recorded_positions.shape[1]
+        real_lengths = self._get_recorded_real_lengths()
         
         # Get current and next waypoint indices
-        current_idx = self.current_waypoint_idx
-        next_idx = (current_idx + 1) % max_length
-        
-        # Safety: Clamp indices to valid range
-        current_idx = torch.clamp(current_idx, 0, max_length - 1)
-        next_idx = torch.clamp(next_idx, 0, max_length - 1)
+        current_idx = torch.remainder(self.current_waypoint_idx, real_lengths)
+        next_idx = torch.remainder(current_idx + 1, real_lengths)
         
         # Interpolation factor (0.0 to 1.0 between waypoints)
         # _recorded_time_accum accumulates control_dt (0.05s @ 20Hz) until it reaches waypoint_dt (0.1s)

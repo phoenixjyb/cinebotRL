@@ -546,6 +546,21 @@ def main():
             args.learning_rate = min(args.learning_rate, 5e-5)
         if "--target_kl" not in explicit_args and args.target_kl is None:
             args.target_kl = 0.04
+
+    recovery_base_assist_preset_applied = []
+    if args.trajectory_stage == "stage1_recovery" and not args.disable_auto_base_assist:
+        recovery_assist_defaults = {
+            "--base_assist_initial_blend": ("base_assist_initial_blend", 0.9),
+            "--base_assist_final_blend": ("base_assist_final_blend", 0.5),
+            "--base_assist_activation_distance": ("base_assist_activation_distance", 0.45),
+            "--base_assist_full_speed_distance": ("base_assist_full_speed_distance", 0.90),
+            "--base_assist_max_action": ("base_assist_max_action", 1.0),
+            "--base_assist_imitation_weight": ("base_assist_imitation_weight", 50.0),
+        }
+        for flag, (attr, value) in recovery_assist_defaults.items():
+            if flag not in explicit_args:
+                setattr(args, attr, value)
+                recovery_base_assist_preset_applied.append(flag)
     
     print("=" * 70)
     print("MobileMMTrackEE Training with Stable Baselines3")
@@ -1589,6 +1604,19 @@ def main():
             print(
                 "    Recovery stability preset: "
                 f"learning_rate={args.learning_rate:g}, target_kl={args.target_kl}"
+            )
+        if recovery_base_assist_preset_applied:
+            print(
+                "    Recovery base-assist preset: "
+                "blend={:.2f}->{:.2f}, distance={:.2f}-{:.2f}m, "
+                "max_action={:.2f}, imitation_weight={:.1f}".format(
+                    args.base_assist_initial_blend,
+                    args.base_assist_final_blend,
+                    args.base_assist_activation_distance,
+                    args.base_assist_full_speed_distance,
+                    args.base_assist_max_action,
+                    args.base_assist_imitation_weight,
+                )
             )
         env_cfg.task_config.base_assist.enable = enable_base_assist
         env_cfg.task_config.base_assist.initial_blend = args.base_assist_initial_blend

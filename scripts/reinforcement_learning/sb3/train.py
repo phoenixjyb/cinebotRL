@@ -244,6 +244,35 @@ def parse_args():
         help="Path to BC-pretrained policy (.zip) to warm-start PPO. "
              "Transfers actor (policy) network weights only; critic is re-initialised.",
     )
+    parser.add_argument(
+        "--pretrained_action_indices",
+        type=str,
+        default=None,
+        help=(
+            "Optional comma-separated action indices whose action-head rows should be "
+            "copied from --pretrained_policy. Use this for masked/base-only BC, e.g. "
+            "'6,7,8'. If omitted, all action rows are copied."
+        ),
+    )
+    parser.add_argument(
+        "--copy_pretrained_log_std",
+        action="store_true",
+        help=(
+            "Also copy log_std from --pretrained_policy. Default keeps the freshly "
+            "created PPO log_std_init so masked BC policies do not inject high "
+            "stochastic action noise."
+        ),
+    )
+    parser.add_argument(
+        "--pretrained_unselected_log_std",
+        type=float,
+        default=None,
+        help=(
+            "When --pretrained_action_indices is used, optionally set log_std for "
+            "non-selected action dimensions to this value. Useful for base-only BC "
+            "warm starts where arm/gimbal channels should begin near neutral."
+        ),
+    )
     
     # Device selection
     parser.add_argument(
@@ -1878,15 +1907,74 @@ def main():
                 print(f"    Loading BC pretrained policy from: {args.pretrained_policy}")
                 try:
                     bc_model = PPO.load(args.pretrained_policy, device=device)
+                    action_indices = None
+                    if args.pretrained_action_indices:
+                        action_indices = [
+                            int(idx.strip())
+                            for idx in args.pretrained_action_indices.split(",")
+                            if idx.strip()
+                        ]
+                        invalid = [
+                            idx
+                            for idx in action_indices
+                            if idx < 0 or idx >= model.policy.action_net.out_features
+                        ]
+                        if invalid:
+                            raise ValueError(
+                                f"invalid pretrained action indices {invalid}; "
+                                f"action_dim={model.policy.action_net.out_features}"
+                            )
                     # Transfer actor network weights only (policy, not value function)
                     model.policy.mlp_extractor.policy_net.load_state_dict(
                         bc_model.policy.mlp_extractor.policy_net.state_dict()
                     )
-                    model.policy.action_net.load_state_dict(
-                        bc_model.policy.action_net.state_dict()
-                    )
-                    model.policy.log_std.data.copy_(bc_model.policy.log_std.data)
-                    print(f"    [OK] BC policy weights loaded (actor network + log_std)")
+                    if action_indices is None:
+                        model.policy.action_net.load_state_dict(
+                            bc_model.policy.action_net.state_dict()
+                        )
+                        copied_action_desc = "all action head rows"
+                    else:
+                        with torch.no_grad():
+                            selected = set(action_indices)
+                            for action_idx in range(model.policy.action_net.out_features):
+                                if action_idx not in selected:
+                                    model.policy.action_net.weight.data[action_idx].zero_()
+                                    model.policy.action_net.bias.data[action_idx].zero_()
+                            for action_idx in action_indices:
+                                model.policy.action_net.weight.data[action_idx].copy_(
+                                    bc_model.policy.action_net.weight.data[action_idx]
+                                )
+                                model.policy.action_net.bias.data[action_idx].copy_(
+                                    bc_model.policy.action_net.bias.data[action_idx]
+                                )
+                        copied_action_desc = f"action head rows {action_indices}; zeroed non-selected rows"
+                    if args.copy_pretrained_log_std:
+                        if action_indices is None:
+                            model.policy.log_std.data.copy_(bc_model.policy.log_std.data)
+                            copied_std_desc = "copied all pretrained log_std values"
+                        else:
+                            with torch.no_grad():
+                                for action_idx in action_indices:
+                                    model.policy.log_std.data[action_idx].copy_(
+                                        bc_model.policy.log_std.data[action_idx]
+                                    )
+                            copied_std_desc = f"copied pretrained log_std for {action_indices}"
+                    else:
+                        copied_std_desc = "kept PPO log_std_init"
+                    if action_indices is not None and args.pretrained_unselected_log_std is not None:
+                        with torch.no_grad():
+                            selected = set(action_indices)
+                            for action_idx in range(model.policy.action_net.out_features):
+                                if action_idx not in selected:
+                                    model.policy.log_std.data[action_idx] = float(
+                                        args.pretrained_unselected_log_std
+                                    )
+                        copied_std_desc += (
+                            f"; set non-selected log_std={args.pretrained_unselected_log_std}"
+                        )
+                    print(f"    [OK] BC policy feature weights loaded")
+                    print(f"    [OK] BC policy {copied_action_desc} loaded")
+                    print(f"    [OK] {copied_std_desc}")
                     print(f"    [OK] Critic network randomly initialised (will learn from RL)")
                     del bc_model
                     torch.cuda.empty_cache()

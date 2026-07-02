@@ -100,6 +100,11 @@ class BaseAssistConfig:
     full_speed_distance: float = 1.4  # Distance where expert command reaches max_action
     max_action: float = 0.8  # Normalized vx/vy command cap for the expert
     imitation_weight: float = 25.0  # Penalize raw policy base action error vs expert command
+    lookahead_steps: int = 0  # 0 chases current target; >0 chases the final lookahead waypoint
+    yaw_enable: bool = False  # Optionally blend/imitate a heading-stabilizing base_wz expert
+    yaw_max_action: float = 0.6  # Normalized expert base_wz cap
+    yaw_full_error: float = 1.2  # Heading error (rad) that maps to yaw_max_action
+    yaw_imitation_weight: float = 10.0  # Penalize raw policy base_wz error vs yaw expert
 
 
 @dataclass

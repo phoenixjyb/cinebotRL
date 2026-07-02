@@ -700,6 +700,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self._base_assist_step_count = 0
         self._base_assist_coeff = torch.zeros(self.num_envs, device=self.device)
         self._base_assist_expert_action = torch.zeros(self.num_envs, 2, device=self.device)
+        self._base_assist_expert_wz_action = torch.zeros(self.num_envs, 1, device=self.device)
         self.prev_commanded_accel = torch.zeros(self.num_envs, 3, device=self.device)
         self.prev_joint_vel = torch.zeros(
             self.num_envs, 9, device=self.device  # 9 total joints (3 base PPR + 6 arm)
@@ -1504,10 +1505,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         theta = quat_to_yaw(base_quat)  # Extract yaw for body-to-world transform
 
         # Scale base actions from [-1, 1] to actual velocity limits
-        base_vx_control, base_vy_control = self._apply_base_assist(base_vx, base_vy, theta)
+        base_vx_control, base_vy_control, base_wz_control = self._apply_base_assist(base_vx, base_vy, base_wz, theta)
         base_vx_desired = base_vx_control * self.robot_limits["max_linear_velocity"]  # [-1.5, +1.5] m/s
         base_vy_desired = base_vy_control * self.robot_limits["max_linear_velocity"]  # [-1.5, +1.5] m/s
-        base_wz_desired = base_wz * self.robot_limits["max_angular_velocity"]  # [-2.0, +2.0] rad/s
+        base_wz_desired = base_wz_control * self.robot_limits["max_angular_velocity"]  # [-2.0, +2.0] rad/s
 
         # Rate limit velocities to respect acceleration constraints
         dt = self.cfg.sim.dt * self.cfg.decimation
@@ -1592,7 +1593,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 print(
                     "  expert base action: "
                     f"[{self._base_assist_expert_action[0, 0].item():.4f}, "
-                    f"{self._base_assist_expert_action[0, 1].item():.4f}]"
+                    f"{self._base_assist_expert_action[0, 1].item():.4f}, "
+                    f"{self._base_assist_expert_wz_action[0, 0].item():.4f}]"
                 )
             print(f"  root_vel_w (world): [{vel_world_x[0].item():.4f}, {vel_world_y[0].item():.4f}, {base_wz_scaled[0].item():.4f}]")
             print(f"  root_pos_w: [{root_pos[0].item():.4f}, {root_pos[1].item():.4f}, {root_pos[2].item():.4f}]")
@@ -1603,14 +1605,16 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self,
         base_vx: torch.Tensor,
         base_vy: torch.Tensor,
+        base_wz: torch.Tensor,
         theta: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Blend an expert holonomic base command into executed vx/vy during curriculum."""
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Blend expert base commands into executed chassis actions during curriculum."""
         assist_cfg = self.task_cfg.base_assist
         if not assist_cfg.enable:
             self._base_assist_coeff.zero_()
             self._base_assist_expert_action.zero_()
-            return base_vx, base_vy
+            self._base_assist_expert_wz_action.zero_()
+            return base_vx, base_vy, base_wz
 
         self._base_assist_step_count += self.num_envs
         decay_steps = max(int(assist_cfg.decay_steps), 1)
@@ -1621,6 +1625,13 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         blend = max(0.0, min(1.0, blend))
 
         target_pos, _ = self.trajectory_manager.get_target_pose()
+        lead_steps = max(int(getattr(assist_cfg, "lookahead_steps", 0)), 0)
+        if lead_steps > 0:
+            lead_pos, _ = self.trajectory_manager.get_lookahead(
+                steps=lead_steps,
+                lookahead_dt=float(self.task_cfg.lookahead_dt),
+            )
+            target_pos = lead_pos[:, -1, :]
         base_xy = self.robot.data.root_pos_w[:, :2]
         target_xy = target_pos[:, :2]
         base_to_target = target_xy - base_xy
@@ -1657,7 +1668,22 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         policy_base = torch.cat((base_vx, base_vy), dim=-1)
         assisted_base = (1.0 - coeff.unsqueeze(-1)) * policy_base + coeff.unsqueeze(-1) * expert_action
         assisted_base = torch.clamp(assisted_base, -1.0, 1.0)
-        return assisted_base[:, 0:1], assisted_base[:, 1:2]
+
+        assisted_wz = base_wz
+        self._base_assist_expert_wz_action.zero_()
+        if bool(getattr(assist_cfg, "yaw_enable", False)):
+            target_heading = torch.atan2(base_to_target[:, 1], base_to_target[:, 0])
+            yaw_error = torch.atan2(torch.sin(target_heading - theta), torch.cos(target_heading - theta))
+            yaw_full_error = max(float(getattr(assist_cfg, "yaw_full_error", 1.2)), 1e-6)
+            yaw_max_action = max(float(getattr(assist_cfg, "yaw_max_action", 0.6)), 0.0)
+            expert_wz = torch.clamp(yaw_error / yaw_full_error, -1.0, 1.0).unsqueeze(-1) * yaw_max_action
+            expert_wz = torch.nan_to_num(expert_wz, nan=0.0, posinf=0.0, neginf=0.0)
+            expert_wz = torch.clamp(expert_wz, -1.0, 1.0)
+            self._base_assist_expert_wz_action = expert_wz
+            assisted_wz = (1.0 - coeff.unsqueeze(-1)) * base_wz + coeff.unsqueeze(-1) * expert_wz
+            assisted_wz = torch.clamp(assisted_wz, -1.0, 1.0)
+
+        return assisted_base[:, 0:1], assisted_base[:, 1:2], assisted_wz
 
     def _update_curriculum_stage(self):
         """Update curriculum stage with gradual weight interpolation (Session 8h).
@@ -2468,6 +2494,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         assist_cfg = self.task_cfg.base_assist
         base_assist_imitation_penalty = torch.zeros_like(rewards)
+        base_assist_yaw_imitation_penalty = torch.zeros_like(rewards)
         base_assist_policy_error = torch.zeros_like(rewards)
         if assist_cfg.enable and float(assist_cfg.imitation_weight) > 0.0:
             policy_base_action = self.prev_actions[
@@ -2481,7 +2508,20 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 float(assist_cfg.imitation_weight) * self._base_assist_coeff.detach() * action_error
             )
             rewards = rewards - base_assist_imitation_penalty
+        if (
+            assist_cfg.enable
+            and bool(getattr(assist_cfg, "yaw_enable", False))
+            and float(getattr(assist_cfg, "yaw_imitation_weight", 0.0)) > 0.0
+        ):
+            policy_wz_action = self.prev_actions[:, POLICY_BASE_WZ_ACTION_INDEX:POLICY_BASE_WZ_ACTION_INDEX + 1]
+            expert_wz_action = self._base_assist_expert_wz_action.detach()
+            yaw_action_error = (policy_wz_action - expert_wz_action).squeeze(-1).square()
+            base_assist_yaw_imitation_penalty = (
+                float(assist_cfg.yaw_imitation_weight) * self._base_assist_coeff.detach() * yaw_action_error
+            )
+            rewards = rewards - base_assist_yaw_imitation_penalty
         self.reward_components["base_assist_imitation_penalty"] = base_assist_imitation_penalty
+        self.reward_components["base_assist_yaw_imitation_penalty"] = base_assist_yaw_imitation_penalty
 
         if workspace_distance is None:
             workspace_distance_log = torch.zeros_like(base_target_distance)
@@ -2539,6 +2579,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "base_assist_active_pct": (self._base_assist_coeff > 0.0).float().mean().item() * 100.0,
             "base_assist_expert_x_mean": self._base_assist_expert_action[:, 0].mean().item(),
             "base_assist_expert_y_mean": self._base_assist_expert_action[:, 1].mean().item(),
+            "base_assist_expert_wz_mean": self._base_assist_expert_wz_action[:, 0].mean().item(),
             "base_assist_policy_error_mean": base_assist_policy_error.mean().item(),
             "base_assist_policy_error_active_mean": (
                 base_assist_policy_error[self._base_assist_coeff > 0.0].mean().item()
@@ -2546,6 +2587,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 else 0.0
             ),
             "base_assist_imitation_penalty": base_assist_imitation_penalty.mean().item(),
+            "base_assist_yaw_imitation_penalty": base_assist_yaw_imitation_penalty.mean().item(),
         }
         if self.obstacles_enabled:
             self.extras["obstacle_diagnostics"] = {

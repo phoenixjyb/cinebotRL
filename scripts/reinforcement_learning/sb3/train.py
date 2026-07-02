@@ -434,6 +434,40 @@ def parse_args():
         help="Auxiliary penalty weight for raw policy vx/vy error vs expert assist command.",
     )
     parser.add_argument(
+        "--base_assist_lookahead_steps",
+        type=int,
+        default=0,
+        help="Use the final N-step lookahead target for base-assist expert direction; 0 uses current target.",
+    )
+    parser.add_argument(
+        "--enable_base_assist_yaw",
+        action="store_true",
+        help="Also blend/imitate an expert base_wz command that points the chassis toward far targets.",
+    )
+    parser.add_argument(
+        "--disable_auto_base_assist_yaw",
+        action="store_true",
+        help="Do not auto-enable yaw assist for stage1_recovery.",
+    )
+    parser.add_argument(
+        "--base_assist_yaw_max_action",
+        type=float,
+        default=0.6,
+        help="Normalized expert base_wz cap for yaw assist.",
+    )
+    parser.add_argument(
+        "--base_assist_yaw_full_error",
+        type=float,
+        default=1.2,
+        help="Heading error in radians that maps to base_assist_yaw_max_action.",
+    )
+    parser.add_argument(
+        "--base_assist_yaw_imitation_weight",
+        type=float,
+        default=10.0,
+        help="Auxiliary penalty weight for raw policy base_wz error vs yaw expert.",
+    )
+    parser.add_argument(
         "--enable_obstacles",
         action="store_true",
         help="Enable the ground-disc obstacle avoidance task.",
@@ -536,6 +570,8 @@ def main():
         for raw_arg in sys.argv[1:]
         if raw_arg.startswith("--")
     }
+    if args.trajectory_stage and "--trajectory_type" not in explicit_args:
+        args.trajectory_type = "multi_recorded"
 
     auto_recovery_stability = (
         args.trajectory_stage == "stage1_recovery"
@@ -1609,13 +1645,15 @@ def main():
             print(
                 "    Recovery base-assist preset: "
                 "blend={:.2f}->{:.2f}, distance={:.2f}-{:.2f}m, "
-                "max_action={:.2f}, imitation_weight={:.1f}".format(
+                "max_action={:.2f}, imitation_weight={:.1f}, lookahead_steps={:d}, yaw={}".format(
                     args.base_assist_initial_blend,
                     args.base_assist_final_blend,
                     args.base_assist_activation_distance,
                     args.base_assist_full_speed_distance,
                     args.base_assist_max_action,
                     args.base_assist_imitation_weight,
+                    args.base_assist_lookahead_steps,
+                    args.enable_base_assist_yaw,
                 )
             )
         env_cfg.task_config.base_assist.enable = enable_base_assist
@@ -1626,6 +1664,11 @@ def main():
         env_cfg.task_config.base_assist.full_speed_distance = args.base_assist_full_speed_distance
         env_cfg.task_config.base_assist.max_action = args.base_assist_max_action
         env_cfg.task_config.base_assist.imitation_weight = args.base_assist_imitation_weight
+        env_cfg.task_config.base_assist.lookahead_steps = max(int(args.base_assist_lookahead_steps), 0)
+        env_cfg.task_config.base_assist.yaw_enable = bool(args.enable_base_assist_yaw)
+        env_cfg.task_config.base_assist.yaw_max_action = args.base_assist_yaw_max_action
+        env_cfg.task_config.base_assist.yaw_full_error = args.base_assist_yaw_full_error
+        env_cfg.task_config.base_assist.yaw_imitation_weight = args.base_assist_yaw_imitation_weight
         if enable_base_assist:
             print(
                 "    Base assist: enabled "
@@ -1633,7 +1676,9 @@ def main():
                 f"over {args.base_assist_decay_steps:,} steps, "
                 f"distance={args.base_assist_activation_distance:.2f}-{args.base_assist_full_speed_distance:.2f}m, "
                 f"max_action={args.base_assist_max_action:.2f}, "
-                f"imitation_weight={args.base_assist_imitation_weight:.1f}"
+                f"imitation_weight={args.base_assist_imitation_weight:.1f}, "
+                f"lookahead_steps={env_cfg.task_config.base_assist.lookahead_steps}, "
+                f"yaw={env_cfg.task_config.base_assist.yaw_enable}"
             )
 
         # Configure trajectory

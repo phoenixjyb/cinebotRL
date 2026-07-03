@@ -2230,6 +2230,12 @@ def main():
             # Replace "ppo_mobile_mm" with "ppo_mobile_mm_vecnormalize"
             vecnorm_name = checkpoint_name.replace("ppo_mobile_mm", "ppo_mobile_mm_vecnormalize", 1)
             vecnorm_path = checkpoint_path.parent / f"{vecnorm_name}.pkl"
+            if not vecnorm_path.exists():
+                sibling_vecnorm_path = checkpoint_path.parent / "vec_normalize.pkl"
+                if sibling_vecnorm_path.exists():
+                    print(f"    Derived VecNormalize stats not found at: {vecnorm_path.name}")
+                    print(f"    Falling back to sibling VecNormalize stats: {sibling_vecnorm_path.name}")
+                    vecnorm_path = sibling_vecnorm_path
             
             if vecnorm_path.exists():
                 print(f"    Loading VecNormalize stats from: {vecnorm_path.name}")

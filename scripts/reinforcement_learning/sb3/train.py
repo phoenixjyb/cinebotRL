@@ -356,6 +356,15 @@ def parse_args():
         help="Place the base near waypoint zero even when target playback starts later.",
     )
     parser.add_argument(
+        "--reset_anchor_target_blend",
+        type=float,
+        default=0.0,
+        help=(
+            "Blend reset anchor from trajectory start toward the current target when "
+            "--reset_base_to_trajectory_start is active. 0 preserves the current recovery baseline; 1 starts at the current target."
+        ),
+    )
+    parser.add_argument(
         "--debug_resets",
         action="store_true",
         help="Print verbose reset pose and waypoint diagnostics.",
@@ -1665,6 +1674,7 @@ def main():
                 "    [Session 8h] stage1_recovery reset: target starts at "
                 f"{args.start_waypoint_min_fraction:.2f}-{args.start_waypoint_max_fraction:.2f} "
                 "trajectory fraction; base starts near waypoint zero"
+                f" with target-anchor blend {args.reset_anchor_target_blend:.2f}"
             )
         if auto_recovery_stability:
             print(
@@ -1724,6 +1734,7 @@ def main():
             start_waypoint_min_fraction=args.start_waypoint_min_fraction,
             start_waypoint_max_fraction=args.start_waypoint_max_fraction,
             reset_base_to_trajectory_start=reset_base_to_trajectory_start,
+            reset_anchor_target_blend=args.reset_anchor_target_blend,
             debug_sampling=args.debug_trajectory_sampling,
         )
         

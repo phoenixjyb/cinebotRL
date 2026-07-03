@@ -322,6 +322,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         trajectory_filter_override = kwargs.pop("trajectory_filter_indices", None)
         randomize_start_waypoint_override = kwargs.pop("randomize_start_waypoint", None)
         reset_base_to_trajectory_start_override = kwargs.pop("reset_base_to_trajectory_start", None)
+        reset_anchor_target_blend_override = kwargs.pop("reset_anchor_target_blend", None)
         max_trajectories_override = kwargs.pop("max_trajectories", None)
         waypoint_file_override = kwargs.pop("waypoint_file", None)
         use_all_trajectories = kwargs.pop("use_all_trajectories", None)
@@ -404,6 +405,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             traj_cfg.randomize_start_waypoint = bool(randomize_start_waypoint_override)
         if reset_base_to_trajectory_start_override is not None:
             traj_cfg.reset_base_to_trajectory_start = bool(reset_base_to_trajectory_start_override)
+        if reset_anchor_target_blend_override is not None:
+            traj_cfg.reset_anchor_target_blend = float(reset_anchor_target_blend_override)
         if max_trajectories_override is not None:
             traj_cfg.max_trajectories = max_trajectories_override
         if waypoint_file_override is not None:
@@ -2788,7 +2791,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             self.task_cfg.trajectory.reset_base_to_trajectory_start
             and self.trajectory_manager.recorded_positions is not None
         ):
-            reset_anchor_pos = self.trajectory_manager.recorded_positions[:, 0]
+            start_anchor_pos = self.trajectory_manager.recorded_positions[:, 0]
+            target_blend = max(
+                0.0,
+                min(float(getattr(self.task_cfg.trajectory, "reset_anchor_target_blend", 0.0)), 1.0),
+            )
+            reset_anchor_pos = (1.0 - target_blend) * start_anchor_pos + target_blend * first_target_pos
 
         if (
             self.task_cfg.debug_resets
@@ -2802,10 +2810,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 current_wp = self.trajectory_manager.current_waypoint_idx[env_idx].item()
                 from_recorded = self.trajectory_manager.recorded_positions[env_idx, current_wp].cpu().numpy()
                 from_anchor = reset_anchor_pos[env_idx].cpu().numpy()
+                target_blend = float(getattr(self.task_cfg.trajectory, "reset_anchor_target_blend", 0.0))
                 print(f"[DEBUG] Env {env_idx}:")
                 print(f"  get_target_pose():    [{from_get_target[0]:.3f}, {from_get_target[1]:.3f}, {from_get_target[2]:.3f}]")
                 print(f"  recorded_positions:   [{from_recorded[0]:.3f}, {from_recorded[1]:.3f}, {from_recorded[2]:.3f}]")
                 print(f"  reset_anchor:         [{from_anchor[0]:.3f}, {from_anchor[1]:.3f}, {from_anchor[2]:.3f}]")
+                print(f"  anchor_target_blend:  {target_blend:.3f}")
                 print(f"  waypoint_idx:         {current_wp}")
                 print(f"  time_accum:           {self.trajectory_manager._recorded_time_accum[env_idx].item():.4f}")
 

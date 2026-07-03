@@ -280,6 +280,49 @@ def parse_args():
             "warm starts where arm/gimbal channels should begin near neutral."
         ),
     )
+    parser.add_argument(
+        "--base_assist_aux_dataset",
+        type=str,
+        default=None,
+        help=(
+            "Optional masked action .npz dataset used for auxiliary supervised "
+            "updates after each PPO rollout. Dataset observations must already "
+            "match the policy observation normalization."
+        ),
+    )
+    parser.add_argument(
+        "--base_assist_aux_action_indices",
+        type=str,
+        default="6,7",
+        help=(
+            "Comma-separated action rows trained by --base_assist_aux_dataset, "
+            "for example '6,7' or '6,7,8'."
+        ),
+    )
+    parser.add_argument(
+        "--base_assist_aux_gradient_steps",
+        type=int,
+        default=0,
+        help="Number of masked supervised action-head minibatch updates after each PPO rollout.",
+    )
+    parser.add_argument(
+        "--base_assist_aux_batch_size",
+        type=int,
+        default=2048,
+        help="Minibatch size for auxiliary supervised action-head updates.",
+    )
+    parser.add_argument(
+        "--base_assist_aux_lr",
+        type=float,
+        default=1e-4,
+        help="Learning rate for auxiliary supervised action-head updates.",
+    )
+    parser.add_argument(
+        "--base_assist_aux_max_grad_norm",
+        type=float,
+        default=0.5,
+        help="Gradient clipping norm for auxiliary supervised action-head updates.",
+    )
     
     # Device selection
     parser.add_argument(
@@ -926,6 +969,149 @@ def main():
         
         def _on_step(self) -> bool:
             """Called at every step."""
+            return True
+
+    class MaskedActionAuxCallback(BaseCallback):
+        """Run masked supervised updates on selected action-head rows between PPO rollouts."""
+
+        def __init__(
+            self,
+            dataset_path: str,
+            action_indices: list[int],
+            gradient_steps: int,
+            batch_size: int,
+            lr: float,
+            max_grad_norm: float,
+            log_freq: int = 1,
+            verbose: int = 1,
+        ):
+            super().__init__(verbose)
+            self.dataset_path = Path(dataset_path)
+            self.action_indices = action_indices
+            self.gradient_steps = gradient_steps
+            self.batch_size = batch_size
+            self.lr = lr
+            self.max_grad_norm = max_grad_norm
+            self.log_freq = log_freq
+            self.rollout_count = 0
+            self.obs_tensor = None
+            self.action_tensor = None
+            self.mask_tensor = None
+            self.selected = None
+            self.optimizer = None
+
+        def _on_training_start(self) -> None:
+            import torch
+
+            if self.gradient_steps <= 0:
+                raise ValueError("--base_assist_aux_gradient_steps must be positive when aux dataset is enabled")
+            if not self.dataset_path.exists():
+                raise FileNotFoundError(f"base assist aux dataset not found: {self.dataset_path}")
+
+            data = np.load(self.dataset_path, allow_pickle=False)
+            required = ["observations", "actions", "action_valid_mask"]
+            missing = [key for key in required if key not in data]
+            if missing:
+                raise ValueError(f"{self.dataset_path} missing keys: {missing}")
+
+            observations = data["observations"].astype(np.float32)
+            actions = data["actions"].astype(np.float32)
+            mask = data["action_valid_mask"].astype(np.float32)
+            if observations.ndim != 2 or actions.ndim != 2 or mask.ndim != 2:
+                raise ValueError("aux dataset observations/actions/action_valid_mask must be 2D arrays")
+            if observations.shape[0] != actions.shape[0] or actions.shape != mask.shape:
+                raise ValueError(
+                    "aux dataset shape mismatch: "
+                    f"observations={observations.shape}, actions={actions.shape}, mask={mask.shape}"
+                )
+            if not np.isfinite(observations).all() or not np.isfinite(actions).all() or not np.isfinite(mask).all():
+                raise ValueError(f"{self.dataset_path} contains non-finite values")
+
+            action_dim = self.model.policy.action_net.out_features
+            invalid = [idx for idx in self.action_indices if idx < 0 or idx >= action_dim]
+            if invalid:
+                raise ValueError(f"invalid aux action indices {invalid}; action_dim={action_dim}")
+
+            selected_mask = mask[:, self.action_indices]
+            keep = selected_mask.sum(axis=1) > 0
+            if not np.any(keep):
+                raise ValueError("aux dataset has no valid labels for requested action indices")
+
+            device = self.model.device
+            self.obs_tensor = torch.as_tensor(observations[keep], dtype=torch.float32, device=device)
+            self.action_tensor = torch.as_tensor(actions[keep][:, self.action_indices], dtype=torch.float32, device=device)
+            self.mask_tensor = torch.as_tensor(selected_mask[keep], dtype=torch.float32, device=device)
+            self.selected = torch.as_tensor(self.action_indices, dtype=torch.long, device=device)
+            self.optimizer = torch.optim.Adam(
+                [self.model.policy.action_net.weight, self.model.policy.action_net.bias],
+                lr=self.lr,
+            )
+
+            if self.verbose > 0:
+                valid_counts = mask.sum(axis=0).astype(float).tolist()
+                print("[BaseAssistAux] enabled")
+                print(f"  dataset: {self.dataset_path}")
+                print(f"  samples: {self.obs_tensor.shape[0]:,}/{observations.shape[0]:,} usable")
+                print(f"  action rows: {self.action_indices}")
+                print(f"  valid counts: {valid_counts}")
+                print(
+                    "  per rollout: "
+                    f"{self.gradient_steps} steps, batch={self.batch_size}, lr={self.lr:g}"
+                )
+
+        def _predict_selected(self, obs_batch):
+            policy = self.model.policy
+            features = policy.extract_features(obs_batch)
+            latent_pi, _ = policy.mlp_extractor(features)
+            mean_actions = policy.action_net(latent_pi)
+            return mean_actions.index_select(dim=1, index=self.selected)
+
+        @staticmethod
+        def _masked_mse(pred, target, valid):
+            sq = (pred - target).pow(2) * valid
+            return sq.sum() / valid.sum().clamp_min(1.0)
+
+        def _on_rollout_end(self) -> bool:
+            import torch
+
+            self.rollout_count += 1
+            policy = self.model.policy
+            policy.set_training_mode(True)
+            sample_count = self.obs_tensor.shape[0]
+            last_loss = 0.0
+
+            with torch.no_grad():
+                before_weight = policy.action_net.weight.detach().clone()
+                before_bias = policy.action_net.bias.detach().clone()
+                unselected = torch.ones(policy.action_net.out_features, dtype=torch.bool, device=self.model.device)
+                unselected[self.selected] = False
+
+            for _ in range(self.gradient_steps):
+                batch_idx = torch.randint(0, sample_count, (self.batch_size,), device=self.model.device)
+                obs_b = self.obs_tensor.index_select(0, batch_idx)
+                act_b = self.action_tensor.index_select(0, batch_idx)
+                mask_b = self.mask_tensor.index_select(0, batch_idx)
+
+                self.optimizer.zero_grad()
+                loss = self._masked_mse(self._predict_selected(obs_b), act_b, mask_b)
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(
+                    [policy.action_net.weight, policy.action_net.bias],
+                    self.max_grad_norm,
+                )
+                self.optimizer.step()
+                last_loss = float(loss.detach().cpu().item())
+
+                with torch.no_grad():
+                    policy.action_net.weight[unselected] = before_weight[unselected]
+                    policy.action_net.bias[unselected] = before_bias[unselected]
+
+            self.logger.record("train/base_assist_aux_loss", last_loss)
+            if self.verbose > 0 and self.rollout_count % self.log_freq == 0:
+                print(f"[BaseAssistAux] rollout={self.rollout_count} loss={last_loss:.6f}")
+            return True
+
+        def _on_step(self) -> bool:
             return True
     
     # Training monitoring callback for detailed metrics
@@ -1913,6 +2099,31 @@ def main():
         print(f"    [OK] Adaptive KL schedule enabled: very_early={max(args.kl_warmup * 4, 1.0):.2f}, early={max(args.kl_warmup * 2, 0.5):.2f}")
         print(f"      Stages: 0-5M (explore), 5-20M (learn), 20-60M (balance), 60-80M (stable), 80-100M (finetune)")
 
+    if args.base_assist_aux_dataset:
+        aux_action_indices = [
+            int(idx.strip())
+            for idx in args.base_assist_aux_action_indices.split(",")
+            if idx.strip()
+        ]
+        if not aux_action_indices:
+            raise ValueError("--base_assist_aux_action_indices must contain at least one index")
+        base_assist_aux_callback = MaskedActionAuxCallback(
+            dataset_path=args.base_assist_aux_dataset,
+            action_indices=aux_action_indices,
+            gradient_steps=args.base_assist_aux_gradient_steps,
+            batch_size=args.base_assist_aux_batch_size,
+            lr=args.base_assist_aux_lr,
+            max_grad_norm=args.base_assist_aux_max_grad_norm,
+            verbose=1,
+        )
+        callbacks.append(base_assist_aux_callback)
+        print("    [OK] Base-assist auxiliary supervised callback enabled:")
+        print(f"      dataset: {args.base_assist_aux_dataset}")
+        print(
+            f"      rows: {aux_action_indices}, steps/rollout: {args.base_assist_aux_gradient_steps}, "
+            f"batch: {args.base_assist_aux_batch_size}, lr: {args.base_assist_aux_lr:g}"
+        )
+
     if args.enable_obstacles and args.enable_obstacle_curriculum:
         final_obstacle_weight = (
             args.obstacle_curriculum_final_weight
@@ -2039,6 +2250,7 @@ def main():
                 print("    [WARN]  Continuing without normalization stats (may affect curriculum learning)")
             
             model = PPO.load(args.checkpoint, env=env, device=device)
+            model.tensorboard_log = args.log_dir
             model.learning_rate = args.learning_rate
             model.lr_schedule = constant_fn(args.learning_rate)
             for param_group in model.policy.optimizer.param_groups:
@@ -2222,6 +2434,10 @@ def main():
     print("Seed:              {}".format(args.seed if args.seed is not None else "None"))
     if args.pretrained_policy:
         print(f"Pretrained policy: {args.pretrained_policy}")
+    if args.base_assist_aux_dataset:
+        print(f"Base assist aux:   {args.base_assist_aux_dataset}")
+        print(f"  -> Rows:         {args.base_assist_aux_action_indices}")
+        print(f"  -> Steps/rollout:{args.base_assist_aux_gradient_steps}")
     print("=" * 70 + "\n")
     
     # Train

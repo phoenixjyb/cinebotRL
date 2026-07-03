@@ -687,6 +687,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self._obstacle_xy_buf = self.obstacle_disc_xy_local.clone()
         self._base_target_distance_buf = torch.full((self.num_envs,), 0.5, device=self.device)
         self._base_target_nonfinite_count = 0
+        self._reachability_nonfinite_mask = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+        self._base_root_repair_count = 0
 
         # Position history for base progress tracking
         self.prev_base_pos = torch.zeros(self.num_envs, 3, device=self.device)
@@ -1396,6 +1398,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             print(f"[MobileMMTrackEE] DEBUG: Expected shape = [{self.num_envs}, {self.cfg.num_actions}]")
             self._first_action_printed = True
 
+        self._sanitize_base_root_state()
+
         # Ensure actions are 2D [num_envs, num_actions]
         # Sometimes actions come in as 3D [1, 1, action_dim] - squeeze to [1, action_dim]
         while actions.ndim > 2:
@@ -1839,6 +1843,60 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             )
         self._arm_state_repair_count += int(needs_repair.sum().item())
 
+
+    def _sanitize_base_root_state(self, env_ids: torch.Tensor | None = None) -> None:
+        """Repair non-finite base root state before it reaches rewards/observations."""
+        env_sel = slice(None) if env_ids is None else env_ids
+        root_pos = self.robot.data.root_pos_w[env_sel]
+        root_quat = self.robot.data.root_quat_w[env_sel]
+        root_lin_vel = self.robot.data.root_lin_vel_w[env_sel]
+        root_ang_vel = self.robot.data.root_ang_vel_w[env_sel]
+
+        quat_norm = torch.norm(root_quat, dim=-1)
+        needs_repair = (
+            (~torch.isfinite(root_pos)).any(dim=-1)
+            | (~torch.isfinite(root_quat)).any(dim=-1)
+            | (quat_norm < 1e-6)
+            | (~torch.isfinite(root_lin_vel)).any(dim=-1)
+            | (~torch.isfinite(root_ang_vel)).any(dim=-1)
+        )
+        if not needs_repair.any():
+            return
+
+        if env_ids is None:
+            repair_env_ids = torch.nonzero(needs_repair, as_tuple=False).squeeze(-1)
+        else:
+            repair_env_ids = env_ids[needs_repair]
+
+        repaired_root_state = self.robot.data.default_root_state[repair_env_ids].clone()
+        fallback_pos = repaired_root_state[:, 0:3]
+        if hasattr(self, "_episode_start_base_pos"):
+            episode_pos = self._episode_start_base_pos[repair_env_ids]
+            fallback_pos = torch.where(torch.isfinite(episode_pos), episode_pos, fallback_pos)
+        elif hasattr(self, "prev_base_pos"):
+            prev_pos = self.prev_base_pos[repair_env_ids]
+            fallback_pos = torch.where(torch.isfinite(prev_pos), prev_pos, fallback_pos)
+        repaired_root_state[:, 0:3] = fallback_pos
+        repaired_root_state[:, 2] = 0.0
+        repaired_root_state[:, 3:7] = 0.0
+        repaired_root_state[:, 3] = 1.0
+        repaired_root_state[:, 7:13] = 0.0
+
+        self.robot.write_root_state_to_sim(repaired_root_state, env_ids=repair_env_ids)
+        self.current_commanded_vel[repair_env_ids] = 0.0
+        self.prev_commanded_vel[repair_env_ids] = 0.0
+        self.prev_commanded_accel[repair_env_ids] = 0.0
+        self.prev_base_lin_vel[repair_env_ids] = 0.0
+        self.prev_base_accel[repair_env_ids] = 0.0
+        self.prev_base_pos[repair_env_ids] = repaired_root_state[:, 0:3]
+
+        if self._base_root_repair_count < 5:
+            print(
+                f"[MobileMMTrackEE] Repaired base root state for {int(needs_repair.sum().item())} env(s); "
+                f"sample env={int(repair_env_ids[0].item())}"
+            )
+        self._base_root_repair_count += int(needs_repair.sum().item())
+
     def _scale_actions_to_joint_limits(self, actions: torch.Tensor, joint_start: int = 0) -> torch.Tensor:
         """
         Scale normalized actions from [-1, 1] to actual joint limits with safety margins.
@@ -2050,6 +2108,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self._initialize_ee_body_idx()
         self._verify_joint_mapping()  # Verify joint mapping on first call
         self._sanitize_arm_joint_state()
+        self._sanitize_base_root_state()
         self._lock_base_ppr_joints()
         self._lock_passive_joints()
 
@@ -2142,6 +2201,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             Reward tensor [num_envs]
         """
         self._sanitize_arm_joint_state()
+        self._sanitize_base_root_state()
         self._lock_base_ppr_joints()
         self._lock_passive_joints()
 
@@ -2299,6 +2359,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             # Check reachability. Guard against transient invalid simulator state
             # so one NaN does not crash the whole PPO rollout.
             finite_targets = torch.isfinite(target_in_arm_frame).all(dim=-1)
+            self._reachability_nonfinite_mask = ~finite_targets
             is_reachable = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
             max_workspace_distance = self.reward_weights.get("reachability_hard_margin", 0.7) + 1.0
             workspace_distance = torch.full(
@@ -2324,10 +2385,40 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                     min=0.0,
                     max=max_workspace_distance,
                 )
-            if (~finite_targets).any() and not hasattr(self, "_nonfinite_reachability_warned"):
-                print("[MobileMMTrackEE] WARNING: Non-finite reachability target detected; "
-                      "marking those envs unreachable for this step.")
-                self._nonfinite_reachability_warned = True
+            nonfinite_mask = ~finite_targets
+            if nonfinite_mask.any():
+                self._base_target_nonfinite_count += int(nonfinite_mask.sum().item())
+                if not hasattr(self, "_nonfinite_reachability_warned"):
+                    bad_env = int(torch.nonzero(nonfinite_mask, as_tuple=False)[0].item())
+                    metadata = {}
+                    if (
+                        hasattr(self.trajectory_manager, "current_trajectory_metadata")
+                        and bad_env < len(self.trajectory_manager.current_trajectory_metadata)
+                    ):
+                        metadata = self.trajectory_manager.current_trajectory_metadata[bad_env]
+                    waypoint_idx = -1
+                    traj_len = -1
+                    if hasattr(self.trajectory_manager, "current_waypoint_idx"):
+                        waypoint_idx = int(self.trajectory_manager.current_waypoint_idx[bad_env].item())
+                    if getattr(self.trajectory_manager, "recorded_lengths", None) is not None:
+                        traj_len = int(self.trajectory_manager.recorded_lengths[bad_env].item())
+                    print(
+                        "[MobileMMTrackEE] WARNING: Non-finite reachability target detected; "
+                        "marking those envs unreachable for this step."
+                    )
+                    print(
+                        "  sample env={env}, trajectory={category}/{file}, waypoint={wp}/{length}".format(
+                            env=bad_env,
+                            category=metadata.get("category", "unknown"),
+                            file=metadata.get("file", "unknown"),
+                            wp=waypoint_idx,
+                            length=traj_len,
+                        )
+                    )
+                    print(f"  target_pos={target_pos[bad_env].detach().cpu().tolist()}")
+                    print(f"  base_pose={base_pose[bad_env].detach().cpu().tolist()}")
+                    print(f"  target_in_arm_frame={target_in_arm_frame[bad_env].detach().cpu().tolist()}")
+                    self._nonfinite_reachability_warned = True
 
             # Count reachable/unreachable for logging
             n_reachable = is_reachable.sum().item()
@@ -2397,7 +2488,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 'unreachable': n_unreachable,
                 'total': self.num_envs,
                 'avg_alignment': avg_alignment,
-                'avg_distance': avg_distance
+                'avg_distance': avg_distance,
+                'nonfinite': int(nonfinite_mask.sum().item()),
             }
 
             if self._reach_log_step % 100 == 0:
@@ -2407,9 +2499,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 if n_unreachable > 0:
                     print(f"  Avg base→target alignment: {avg_alignment:.3f}")
                     print(f"  Avg base→target distance: {avg_distance:.3f} m")
+                if nonfinite_mask.any():
+                    print(f"  Non-finite reachability targets: {int(nonfinite_mask.sum().item())}/{self.num_envs}")
 
             self._reach_log_step += 1
         else:
+            self._reachability_nonfinite_mask.zero_()
             workspace_distance = None
 
         # BUGFIX: Convert commanded velocities from body frame to world frame
@@ -2619,6 +2714,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             time_out: Environments that reached max episode length [num_envs]
         """
         self._sanitize_arm_joint_state()
+        self._sanitize_base_root_state()
         self._lock_base_ppr_joints()
         self._lock_passive_joints()
 
@@ -2732,6 +2828,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         # Apply the new root state
         self.robot.write_root_state_to_sim(new_root_state, env_ids=env_ids)
+        self._sanitize_base_root_state(env_ids=env_ids)
 
         # FIXED: Set PPR joints to ZERO (they are offsets, not world positions!)
         self._base_joint_ids = self._get_joint_ids(BASE_JOINT_NAMES, "_base_joint_ids")

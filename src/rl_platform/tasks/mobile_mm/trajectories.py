@@ -82,6 +82,10 @@ class TrajectoryManager:
         self.recorded_lengths = None
         self.current_waypoint_idx = torch.zeros(num_envs, dtype=torch.long, device=device)
         self._recorded_time_accum = torch.zeros(num_envs, dtype=torch.float32, device=device)
+        self.current_trajectory_metadata = [
+            {"file": "unknown", "category": "unknown", "length": 0}
+            for _ in range(num_envs)
+        ]
         
         # Multi-trajectory loader
         self.multi_loader = None
@@ -579,6 +583,7 @@ class TrajectoryManager:
             self.recorded_lengths = lengths
             self.current_waypoint_idx.zero_()
             self._recorded_time_accum.zero_()
+            self.current_trajectory_metadata = list(self.multi_loader.last_sampled_metadata)
         else:
             # FIX (8c-v2): For partial resets, only resample the envs that need new trajectories
             # This fixes the performance issue and prevents non-reset envs from getting new trajectories
@@ -605,6 +610,7 @@ class TrajectoryManager:
                 self.recorded_lengths = lengths
                 self.current_waypoint_idx[env_ids] = 0
                 self._recorded_time_accum[env_ids] = 0.0
+                self.current_trajectory_metadata = list(self.multi_loader.last_sampled_metadata)
             else:
                 # Shape matches - insert new trajectories only at reset env indices
                 if self.recorded_positions is None:
@@ -627,6 +633,10 @@ class TrajectoryManager:
                 
                 self.current_waypoint_idx[env_ids] = 0
                 self._recorded_time_accum[env_ids] = 0.0
+                sampled_metadata = self.multi_loader.last_sampled_metadata
+                for local_idx, env_id in enumerate(env_ids.detach().cpu().tolist()):
+                    if local_idx < len(sampled_metadata):
+                        self.current_trajectory_metadata[env_id] = sampled_metadata[local_idx]
             
             # Debug: Print first waypoint for reset environments
             if self.debug_sampling and len(env_ids) > 0:

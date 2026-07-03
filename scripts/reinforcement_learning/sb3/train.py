@@ -18,6 +18,7 @@ Usage:
 
 import argparse
 import os
+import random
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -66,6 +67,12 @@ def parse_args():
         "--headless",
         action="store_true",
         help="Run in headless mode (no GUI)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Random seed for reproducible short gates (Python, NumPy, Torch, env config).",
     )
     
     # Training hyperparameters
@@ -597,6 +604,15 @@ def main():
             if flag not in explicit_args:
                 setattr(args, attr, value)
                 recovery_base_assist_preset_applied.append(flag)
+
+    if args.seed is not None:
+        os.environ["PYTHONHASHSEED"] = str(args.seed)
+        random.seed(args.seed)
+        try:
+            import numpy as np
+            np.random.seed(args.seed)
+        except ImportError:
+            pass
     
     print("=" * 70)
     print("MobileMMTrackEE Training with Stable Baselines3")
@@ -615,6 +631,10 @@ def main():
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
             torch.backends.cudnn.benchmark = True  # Auto-tune kernels for your input sizes
+            if args.seed is not None:
+                torch.manual_seed(args.seed)
+                torch.cuda.manual_seed_all(args.seed)
+                torch.backends.cudnn.benchmark = False
             print("    [OK] TF32 + cuDNN benchmark enabled (8x matmul speedup + auto-tuned kernels)")
         
         # Auto-detect best GPU
@@ -975,6 +995,12 @@ def main():
                         self.logger.record("monitoring/optimal_zone_pct", optimal_pct)
                         self.logger.record("monitoring/acceptable_zone_pct", acceptable_pct)
                         self.logger.record("monitoring/unreachable_zone_pct", unreachable_pct)
+
+                    nonfinite_mask = self._get_env_attr(isaac_env, '_reachability_nonfinite_mask')
+                    if nonfinite_mask is not None:
+                        nonfinite_pct = nonfinite_mask.float().mean().item() * 100
+                        print(f"  Non-finite reachability targets: {nonfinite_pct:.1f}%")
+                        self.logger.record("monitoring/nonfinite_reachability_pct", nonfinite_pct)
 
                     if hasattr(isaac_env, '_workspace_distance_buf'):
                         workspace_dist = isaac_env._workspace_distance_buf
@@ -1582,6 +1608,10 @@ def main():
         env_cfg = MobileMMTrackEEEnvCfg()
         env_cfg.num_envs = args.num_envs
         env_cfg.scene.num_envs = args.num_envs
+        if args.seed is not None:
+            env_cfg.seed = args.seed
+            env_cfg.task_config.obstacles.seed = args.seed
+            print(f"    Seed: {args.seed}")
         env_cfg.task_config.debug_resets = args.debug_resets
         env_cfg.task_config.action_contract_name = args.action_contract
         env_cfg.task_config.experimental_rs4_adapter = args.experimental_rs4_adapter
@@ -2092,6 +2122,7 @@ def main():
     print(f"Save frequency:    {args.save_freq:,} steps")
     print(f"Log directory:     {args.log_dir}")
     print(f"Device:            {device}")
+    print("Seed:              {}".format(args.seed if args.seed is not None else "None"))
     if args.pretrained_policy:
         print(f"Pretrained policy: {args.pretrained_policy}")
     print("=" * 70 + "\n")

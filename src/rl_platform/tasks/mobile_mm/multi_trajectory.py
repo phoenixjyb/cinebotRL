@@ -49,6 +49,7 @@ class MultiTrajectoryLoader:
         self.waypoint_dt = waypoint_dt
         self.min_duration_seconds = min_duration_seconds
         self.debug_sampling = debug_sampling
+        self.last_sampled_metadata: list[dict] = []
         
         # Find all trajectory files. A manifest takes precedence over directory
         # globbing so curriculum stages can be curated without duplicating JSONs.
@@ -216,6 +217,14 @@ class MultiTrajectoryLoader:
         """
         # Sample one trajectory per environment
         sampled = [self.sample_trajectory() for _ in range(num_envs)]
+        self.last_sampled_metadata = [
+            {
+                "file": traj.get("file", "unknown"),
+                "category": traj.get("category", "unknown"),
+                "length": traj.get("length", 0),
+            }
+            for traj in sampled
+        ]
         
         if self.debug_sampling:
             unique_files = set(t["file"] for t in sampled)

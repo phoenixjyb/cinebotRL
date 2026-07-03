@@ -323,6 +323,14 @@ def parse_args():
         default=0.5,
         help="Gradient clipping norm for auxiliary supervised action-head updates.",
     )
+    parser.add_argument(
+        "--base_assist_aux_ignore_sample_weight",
+        action="store_true",
+        help=(
+            "Ignore optional sample_weight in the aux dataset. By default, datasets "
+            "with sample_weight are sampled proportionally to those weights."
+        ),
+    )
     
     # Device selection
     parser.add_argument(
@@ -982,6 +990,7 @@ def main():
             batch_size: int,
             lr: float,
             max_grad_norm: float,
+            use_sample_weight: bool = True,
             log_freq: int = 1,
             verbose: int = 1,
         ):
@@ -992,11 +1001,13 @@ def main():
             self.batch_size = batch_size
             self.lr = lr
             self.max_grad_norm = max_grad_norm
+            self.use_sample_weight = use_sample_weight
             self.log_freq = log_freq
             self.rollout_count = 0
             self.obs_tensor = None
             self.action_tensor = None
             self.mask_tensor = None
+            self.sample_prob_tensor = None
             self.selected = None
             self.optimizer = None
 
@@ -1041,6 +1052,19 @@ def main():
             self.obs_tensor = torch.as_tensor(observations[keep], dtype=torch.float32, device=device)
             self.action_tensor = torch.as_tensor(actions[keep][:, self.action_indices], dtype=torch.float32, device=device)
             self.mask_tensor = torch.as_tensor(selected_mask[keep], dtype=torch.float32, device=device)
+            if self.use_sample_weight and "sample_weight" in data:
+                sample_weight = data["sample_weight"].astype(np.float32)
+                if sample_weight.ndim != 1 or sample_weight.shape[0] != observations.shape[0]:
+                    raise ValueError(
+                        "sample_weight must be a 1D array matching observation rows: "
+                        f"sample_weight={sample_weight.shape}, observations={observations.shape}"
+                    )
+                if not np.isfinite(sample_weight).all() or np.any(sample_weight < 0.0):
+                    raise ValueError("sample_weight must contain finite non-negative values")
+                kept_weight = sample_weight[keep]
+                if float(kept_weight.sum()) > 0.0:
+                    kept_weight = kept_weight / kept_weight.sum()
+                    self.sample_prob_tensor = torch.as_tensor(kept_weight, dtype=torch.float32, device=device)
             self.selected = torch.as_tensor(self.action_indices, dtype=torch.long, device=device)
             self.optimizer = torch.optim.Adam(
                 [self.model.policy.action_net.weight, self.model.policy.action_net.bias],
@@ -1058,6 +1082,12 @@ def main():
                     "  per rollout: "
                     f"{self.gradient_steps} steps, batch={self.batch_size}, lr={self.lr:g}"
                 )
+                if self.sample_prob_tensor is not None:
+                    print("  sampling: weighted by dataset sample_weight")
+                elif "sample_weight" in data and not self.use_sample_weight:
+                    print("  sampling: uniform (sample_weight ignored)")
+                else:
+                    print("  sampling: uniform")
 
         def _predict_selected(self, obs_batch):
             policy = self.model.policy
@@ -1087,7 +1117,14 @@ def main():
                 unselected[self.selected] = False
 
             for _ in range(self.gradient_steps):
-                batch_idx = torch.randint(0, sample_count, (self.batch_size,), device=self.model.device)
+                if self.sample_prob_tensor is not None:
+                    batch_idx = torch.multinomial(
+                        self.sample_prob_tensor,
+                        num_samples=self.batch_size,
+                        replacement=True,
+                    )
+                else:
+                    batch_idx = torch.randint(0, sample_count, (self.batch_size,), device=self.model.device)
                 obs_b = self.obs_tensor.index_select(0, batch_idx)
                 act_b = self.action_tensor.index_select(0, batch_idx)
                 mask_b = self.mask_tensor.index_select(0, batch_idx)
@@ -2113,6 +2150,7 @@ def main():
             batch_size=args.base_assist_aux_batch_size,
             lr=args.base_assist_aux_lr,
             max_grad_norm=args.base_assist_aux_max_grad_norm,
+            use_sample_weight=not args.base_assist_aux_ignore_sample_weight,
             verbose=1,
         )
         callbacks.append(base_assist_aux_callback)

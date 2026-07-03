@@ -46,6 +46,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base_assist_yaw_max_action", type=float, default=0.6)
     parser.add_argument("--base_assist_yaw_full_error", type=float, default=1.2)
     parser.add_argument("--active_only", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--sample_weight_mode",
+        choices=("uniform", "base_distance"),
+        default="uniform",
+        help="Optional per-row weighting saved as sample_weight for downstream weighted aux training.",
+    )
+    parser.add_argument(
+        "--sample_weight_distance_threshold",
+        type=float,
+        default=0.70,
+        help="Base-target distance where base_distance weights start increasing.",
+    )
+    parser.add_argument(
+        "--sample_weight_full_distance",
+        type=float,
+        default=1.20,
+        help="Base-target distance where base_distance weights reach their maximum.",
+    )
+    parser.add_argument(
+        "--sample_weight_max",
+        type=float,
+        default=4.0,
+        help="Maximum per-row weight for base_distance weighting.",
+    )
     return parser.parse_args()
 
 
@@ -217,6 +241,7 @@ def main() -> int:
         observations: list[np.ndarray] = []
         actions: list[np.ndarray] = []
         masks: list[np.ndarray] = []
+        sample_weights: list[np.ndarray] = []
         active_count = 0
 
         for step in range(args.num_steps):
@@ -228,12 +253,20 @@ def main() -> int:
             coeff = tensor_np(getattr(raw_env, "_base_assist_coeff", None))
             if expert_xy is None or coeff is None:
                 raise RuntimeError("base assist expert tensors were not produced by the environment")
+            base_target_distance = tensor_np(getattr(raw_env, "_base_target_distance_buf", None))
+            if args.sample_weight_mode == "base_distance" and base_target_distance is None:
+                raise RuntimeError("_base_target_distance_buf was not produced by the environment")
 
             labels = np.zeros((args.num_envs, model.action_space.shape[0]), dtype=np.float32)
             valid = np.zeros_like(labels)
             active = coeff > 0.0
             labels[:, 6:8] = expert_xy[:, 0:2]
             valid[:, 6:8] = active[:, None].astype(np.float32)
+            weights = np.ones((args.num_envs,), dtype=np.float32)
+            if args.sample_weight_mode == "base_distance":
+                denom = max(args.sample_weight_full_distance - args.sample_weight_distance_threshold, 1e-6)
+                excess = np.clip((base_target_distance - args.sample_weight_distance_threshold) / denom, 0.0, 1.0)
+                weights = 1.0 + (args.sample_weight_max - 1.0) * excess.astype(np.float32)
 
             if args.include_yaw:
                 expert_wz = tensor_np(getattr(raw_env, "_base_assist_expert_wz_action", None))
@@ -246,11 +279,13 @@ def main() -> int:
                 observations.append(obs_before[keep])
                 actions.append(labels[keep])
                 masks.append(valid[keep])
+                sample_weights.append(weights[keep])
                 active_count += int(np.sum(keep))
             else:
                 observations.append(obs_before)
                 actions.append(labels)
                 masks.append(valid)
+                sample_weights.append(weights)
                 active_count += int(np.sum(active))
 
             if (step + 1) % 50 == 0 or step + 1 == args.num_steps:
@@ -259,6 +294,7 @@ def main() -> int:
         obs_arr = np.concatenate(observations, axis=0)
         act_arr = np.concatenate(actions, axis=0)
         mask_arr = np.concatenate(masks, axis=0)
+        weight_arr = np.concatenate(sample_weights, axis=0).astype(np.float32)
         out_path = Path(args.output)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         metadata = {
@@ -271,18 +307,29 @@ def main() -> int:
             "action_indices": action_indices,
             "include_yaw": args.include_yaw,
             "base_assist_blend": args.base_assist_blend,
+            "sample_weight_mode": args.sample_weight_mode,
+            "sample_weight_distance_threshold": args.sample_weight_distance_threshold,
+            "sample_weight_full_distance": args.sample_weight_full_distance,
+            "sample_weight_max": args.sample_weight_max,
         }
-        np.savez_compressed(
-            out_path,
-            observations=obs_arr,
-            actions=act_arr,
-            action_valid_mask=mask_arr,
-            metadata=json.dumps(metadata, indent=2),
-        )
+        output_payload = {
+            "observations": obs_arr,
+            "actions": act_arr,
+            "action_valid_mask": mask_arr,
+            "metadata": json.dumps(metadata, indent=2),
+        }
+        if args.sample_weight_mode != "uniform":
+            output_payload["sample_weight"] = weight_arr
+        np.savez_compressed(out_path, **output_payload)
         valid_counts = mask_arr.sum(axis=0)
         print(f"saved: {out_path}")
         print(f"observations: {obs_arr.shape}, actions: {act_arr.shape}")
         print(f"valid action counts: {valid_counts.tolist()}")
+        if args.sample_weight_mode != "uniform":
+            print(
+                "sample weights: "
+                f"mean={weight_arr.mean():.4f}, min={weight_arr.min():.4f}, max={weight_arr.max():.4f}"
+            )
         return 0
     finally:
         simulation_app.close()

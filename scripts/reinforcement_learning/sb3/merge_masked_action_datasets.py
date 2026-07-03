@@ -40,11 +40,21 @@ def load_dataset(path: Path) -> dict[str, np.ndarray | str]:
         raise ValueError(f"{path} contains non-finite values")
 
     metadata = data["metadata"].item() if "metadata" in data else "{}"
+    sample_weight = data["sample_weight"].astype(np.float32) if "sample_weight" in data else None
+    if sample_weight is not None:
+        if sample_weight.ndim != 1 or sample_weight.shape[0] != observations.shape[0]:
+            raise ValueError(
+                f"{path} sample_weight must be 1D and match observations: "
+                f"sample_weight={sample_weight.shape}, observations={observations.shape}"
+            )
+        if not np.isfinite(sample_weight).all() or np.any(sample_weight < 0.0):
+            raise ValueError(f"{path} sample_weight contains invalid values")
     return {
         "path": str(path),
         "observations": observations,
         "actions": actions,
         "action_valid_mask": mask,
+        "sample_weight": sample_weight,
         "metadata": metadata,
     }
 
@@ -60,6 +70,18 @@ def main() -> int:
     observations = np.concatenate([dataset["observations"] for dataset in datasets], axis=0)  # type: ignore[list-item]
     actions = np.concatenate([dataset["actions"] for dataset in datasets], axis=0)  # type: ignore[list-item]
     mask = np.concatenate([dataset["action_valid_mask"] for dataset in datasets], axis=0)  # type: ignore[list-item]
+    has_any_weight = any(dataset["sample_weight"] is not None for dataset in datasets)
+    sample_weight = None
+    if has_any_weight:
+        sample_weight = np.concatenate(
+            [
+                dataset["sample_weight"]  # type: ignore[list-item]
+                if dataset["sample_weight"] is not None
+                else np.ones(dataset["observations"].shape[0], dtype=np.float32)  # type: ignore[index,union-attr]
+                for dataset in datasets
+            ],
+            axis=0,
+        )
 
     if args.shuffle:
         rng = np.random.default_rng(args.seed)
@@ -67,6 +89,8 @@ def main() -> int:
         observations = observations[order]
         actions = actions[order]
         mask = mask[order]
+        if sample_weight is not None:
+            sample_weight = sample_weight[order]
 
     metadata = {
         "created_at": datetime.now().isoformat(timespec="seconds"),
@@ -82,17 +106,20 @@ def main() -> int:
         "shuffle": bool(args.shuffle),
         "seed": int(args.seed),
         "valid_action_counts": mask.sum(axis=0).astype(float).tolist(),
+        "has_sample_weight": sample_weight is not None,
     }
 
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(
-        output,
-        observations=observations,
-        actions=actions,
-        action_valid_mask=mask,
-        metadata=json.dumps(metadata, indent=2),
-    )
+    output_payload = {
+        "observations": observations,
+        "actions": actions,
+        "action_valid_mask": mask,
+        "metadata": json.dumps(metadata, indent=2),
+    }
+    if sample_weight is not None:
+        output_payload["sample_weight"] = sample_weight.astype(np.float32)
+    np.savez_compressed(output, **output_payload)
     print(f"saved: {output}")
     print(f"observations: {observations.shape}, actions: {actions.shape}")
     print(f"valid action counts: {metadata['valid_action_counts']}")

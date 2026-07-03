@@ -331,6 +331,15 @@ def parse_args():
             "with sample_weight are sampled proportionally to those weights."
         ),
     )
+    parser.add_argument(
+        "--base_assist_aux_sample_weight_power",
+        type=float,
+        default=1.0,
+        help=(
+            "Exponent applied to optional aux dataset sample_weight before sampling. "
+            "Use values below 1.0 to soften hard-state oversampling."
+        ),
+    )
     
     # Device selection
     parser.add_argument(
@@ -991,6 +1000,7 @@ def main():
             lr: float,
             max_grad_norm: float,
             use_sample_weight: bool = True,
+            sample_weight_power: float = 1.0,
             log_freq: int = 1,
             verbose: int = 1,
         ):
@@ -1002,6 +1012,7 @@ def main():
             self.lr = lr
             self.max_grad_norm = max_grad_norm
             self.use_sample_weight = use_sample_weight
+            self.sample_weight_power = sample_weight_power
             self.log_freq = log_freq
             self.rollout_count = 0
             self.obs_tensor = None
@@ -1016,6 +1027,8 @@ def main():
 
             if self.gradient_steps <= 0:
                 raise ValueError("--base_assist_aux_gradient_steps must be positive when aux dataset is enabled")
+            if self.sample_weight_power <= 0.0:
+                raise ValueError("--base_assist_aux_sample_weight_power must be positive")
             if not self.dataset_path.exists():
                 raise FileNotFoundError(f"base assist aux dataset not found: {self.dataset_path}")
 
@@ -1063,6 +1076,7 @@ def main():
                     raise ValueError("sample_weight must contain finite non-negative values")
                 kept_weight = sample_weight[keep]
                 if float(kept_weight.sum()) > 0.0:
+                    kept_weight = np.power(kept_weight, self.sample_weight_power).astype(np.float32)
                     kept_weight = kept_weight / kept_weight.sum()
                     self.sample_prob_tensor = torch.as_tensor(kept_weight, dtype=torch.float32, device=device)
             self.selected = torch.as_tensor(self.action_indices, dtype=torch.long, device=device)
@@ -1083,7 +1097,7 @@ def main():
                     f"{self.gradient_steps} steps, batch={self.batch_size}, lr={self.lr:g}"
                 )
                 if self.sample_prob_tensor is not None:
-                    print("  sampling: weighted by dataset sample_weight")
+                    print(f"  sampling: weighted by dataset sample_weight^{self.sample_weight_power:g}")
                 elif "sample_weight" in data and not self.use_sample_weight:
                     print("  sampling: uniform (sample_weight ignored)")
                 else:
@@ -2151,6 +2165,7 @@ def main():
             lr=args.base_assist_aux_lr,
             max_grad_norm=args.base_assist_aux_max_grad_norm,
             use_sample_weight=not args.base_assist_aux_ignore_sample_weight,
+            sample_weight_power=args.base_assist_aux_sample_weight_power,
             verbose=1,
         )
         callbacks.append(base_assist_aux_callback)

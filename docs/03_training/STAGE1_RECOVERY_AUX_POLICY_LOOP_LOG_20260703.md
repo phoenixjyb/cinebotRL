@@ -444,6 +444,118 @@ sample_weight: (8,)
 valid rows: action rows [6, 7]
 ```
 
+### Round 9: hard-category weighted aux continuation
+
+Goal: use the stratified report to mine the failing categories instead of adding another uniform dataset.
+
+New hard-category dataset:
+
+```text
+data/base_assist_distill/stage1_recovery_hardcats_weighted_normobs_vxvy_256x128.npz
+```
+
+Collection config:
+
+```text
+checkpoint = Round 7 weighted aux final_model.zip
+trajectory_categories = handheld_subtle, crane_up, crane_down
+num_envs = 256
+num_steps = 128
+sample_weight_mode = base_distance
+sample_weight_max = 5.0
+valid action rows = [6, 7]
+```
+
+Dataset result:
+
+```text
+rows = 28,451
+obs_dim = 85
+sample_weight min/mean/max = 1.0 / 1.4038 / 5.0
+valid action counts = row 6: 28,451, row 7: 28,451, row 8: 0
+```
+
+Merged dataset:
+
+```text
+data/base_assist_distill/stage1_recovery_hardcats_round5_merged_weighted_vxvy.npz
+rows = 98,479
+sample_weight min/mean/max = 1.0 / 1.2194 / 5.0
+```
+
+Failed launch to avoid repeating:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_round5_hardcats_noassist_40k_seed20260703_20260703_1828
+```
+
+Failure:
+
+```text
+VecNormalize expected obs shape (85,), environment was (84,)
+```
+
+Cause: training was launched without `--enable_obstacles`, while the checkpoint and dataset/eval path use the 85D obstacle observation contract.
+
+Valid training run:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_round5_hardcats_obs_noassist_40k_seed20260703_20260703_1829
+```
+
+Important launch requirements:
+
+```text
+--enable_obstacles
+--obstacle_radius 0.20
+--obstacle_height 0.50
+--obstacle_x_range -0.35 0.35
+--obstacle_y_range 0.45 1.00
+--min_obstacle_start_clearance 0.10
+--disable_auto_base_assist
+--disable_auto_base_assist_yaw
+--base_assist_imitation_weight 0.0
+--base_assist_yaw_imitation_weight 0.0
+```
+
+Training result:
+
+```text
+final_model.zip written
+vec_normalize.pkl written
+aux loss: about 0.085 -> 0.083
+approx_kl: <= 0.0105
+```
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_auxloss_round5_hardcats_obs_noassist_40k_smoke64_enriched/recovery_eval_raw-policy_20260703_183121.json
+evaluation_results/recovery_stratified_analysis_round5_20260703.md
+evaluation_results/recovery_stratified_analysis_round5_20260703.json
+```
+
+Same-run enriched comparison:
+
+| Candidate | Mean unreachable | P95 unreachable | Max unreachable | Workspace hard mean | Obstacle unsafe/collision |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Round 4 risk-balanced aux | `36.8615%` | `97.8069%` | `100.0000%` | `1.6678%` | `0 / 0` |
+| Round 7 weighted aux | `30.6306%` | `96.8494%` | `100.0000%` | `1.2940%` | `0 / 0` |
+| Round 9 hard-category aux | `26.8675%` | `97.4762%` | `100.0000%` | `1.0201%` | `0 / 0` |
+
+Round 9 category result:
+
+| Category | Episodes | Mean unreachable | P95 unreachable | Max unreachable | Workspace hard mean |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `crane_up` | `10` | `42.3634%` | `100.0000%` | `100.0000%` | `2.6642%` |
+| `crane_down` | `11` | `41.4291%` | `95.0914%` | `98.9130%` | `0.6958%` |
+| `handheld_subtle` | `11` | `22.5917%` | `39.7773%` | `40.2062%` | `0.1865%` |
+| `dolly_pull_out` | `23` | `20.4770%` | `44.7118%` | `50.0000%` | `0.7726%` |
+
+Decision: research checkpoint only, not deployable and not a promotion candidate.
+
+Lesson: category-aware mining worked for `handheld_subtle` but combining all hard categories in one aux bucket caused crane-tail failure to remain or worsen. Next policy work should separate crane-specific treatment from handheld-specific treatment instead of using one merged hard-category dataset.
+
 ## Recommended Next Stage
 
 Stop the current callback-only aux loop and move to one of these:

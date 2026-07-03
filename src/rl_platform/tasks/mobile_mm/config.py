@@ -34,6 +34,8 @@ class TrajectoryConfig:
     randomize_start_waypoint: bool = False  # Start playback from a later waypoint on reset
     start_waypoint_min_fraction: float = 0.0
     start_waypoint_max_fraction: float = 0.0
+    start_waypoint_max_fraction_initial: float | None = None  # Optional curriculum start value
+    start_waypoint_fraction_decay_steps: int = 0  # Timesteps to ramp initial max fraction to final max fraction
     reset_base_to_trajectory_start: bool = False  # Keep base near waypoint zero while target starts later
     reset_anchor_target_blend: float = 0.0  # 0=start anchor, 1=current target anchor
     reset_anchor_target_blend_initial: float | None = None  # Optional curriculum start value

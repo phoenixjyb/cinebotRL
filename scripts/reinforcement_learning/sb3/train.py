@@ -351,6 +351,21 @@ def parse_args():
         help="Maximum random reset waypoint as a fraction of trajectory length.",
     )
     parser.add_argument(
+        "--start_waypoint_max_fraction_initial",
+        type=float,
+        default=None,
+        help=(
+            "Optional curriculum start value for the maximum random reset waypoint fraction. "
+            "When set, it ramps linearly to --start_waypoint_max_fraction."
+        ),
+    )
+    parser.add_argument(
+        "--start_waypoint_fraction_decay_steps",
+        type=int,
+        default=0,
+        help="Timesteps over which start waypoint max fraction ramps from initial to final.",
+    )
+    parser.add_argument(
         "--reset_base_to_trajectory_start",
         action="store_true",
         help="Place the base near waypoint zero even when target playback starts later.",
@@ -1731,9 +1746,15 @@ def main():
                     f"{args.reset_anchor_target_blend_initial:.2f}->{args.reset_anchor_target_blend:.2f} "
                     f"over {args.reset_anchor_target_blend_decay_steps:,} steps"
                 )
+            start_max_desc = f"{args.start_waypoint_max_fraction:.2f}"
+            if args.start_waypoint_max_fraction_initial is not None and args.start_waypoint_fraction_decay_steps > 0:
+                start_max_desc = (
+                    f"{args.start_waypoint_max_fraction_initial:.2f}->{args.start_waypoint_max_fraction:.2f} "
+                    f"over {args.start_waypoint_fraction_decay_steps:,} steps"
+                )
             print(
                 "    [Session 8h] stage1_recovery reset: target starts at "
-                f"{args.start_waypoint_min_fraction:.2f}-{args.start_waypoint_max_fraction:.2f} "
+                f"{args.start_waypoint_min_fraction:.2f}-{start_max_desc} "
                 "trajectory fraction; base starts near waypoint zero"
                 f" with target-anchor blend {reset_blend_desc}"
             )
@@ -1794,6 +1815,8 @@ def main():
             randomize_start_waypoint=randomize_start_waypoint,
             start_waypoint_min_fraction=args.start_waypoint_min_fraction,
             start_waypoint_max_fraction=args.start_waypoint_max_fraction,
+            start_waypoint_max_fraction_initial=args.start_waypoint_max_fraction_initial,
+            start_waypoint_fraction_decay_steps=max(int(args.start_waypoint_fraction_decay_steps), 0),
             reset_base_to_trajectory_start=reset_base_to_trajectory_start,
             reset_anchor_target_blend=args.reset_anchor_target_blend,
             reset_anchor_target_blend_initial=args.reset_anchor_target_blend_initial,

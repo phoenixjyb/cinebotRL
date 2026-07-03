@@ -321,6 +321,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         trajectory_manifest_override = kwargs.pop("trajectory_manifest_file", None)
         trajectory_filter_override = kwargs.pop("trajectory_filter_indices", None)
         randomize_start_waypoint_override = kwargs.pop("randomize_start_waypoint", None)
+        start_waypoint_max_fraction_initial_override = kwargs.pop("start_waypoint_max_fraction_initial", None)
+        start_waypoint_fraction_decay_steps_override = kwargs.pop("start_waypoint_fraction_decay_steps", None)
         reset_base_to_trajectory_start_override = kwargs.pop("reset_base_to_trajectory_start", None)
         reset_anchor_target_blend_override = kwargs.pop("reset_anchor_target_blend", None)
         reset_anchor_target_blend_initial_override = kwargs.pop("reset_anchor_target_blend_initial", None)
@@ -405,6 +407,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             traj_cfg.trajectory_manifest_file = trajectory_manifest_override
         if randomize_start_waypoint_override is not None:
             traj_cfg.randomize_start_waypoint = bool(randomize_start_waypoint_override)
+        if start_waypoint_max_fraction_initial_override is not None:
+            traj_cfg.start_waypoint_max_fraction_initial = float(start_waypoint_max_fraction_initial_override)
+        if start_waypoint_fraction_decay_steps_override is not None:
+            traj_cfg.start_waypoint_fraction_decay_steps = int(start_waypoint_fraction_decay_steps_override)
         if reset_base_to_trajectory_start_override is not None:
             traj_cfg.reset_base_to_trajectory_start = bool(reset_base_to_trajectory_start_override)
         if reset_anchor_target_blend_override is not None:
@@ -1716,6 +1722,24 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         progress = min(float(getattr(self, "_training_step_count", 0)) / float(decay_steps), 1.0)
         return initial_blend + (final_blend - initial_blend) * progress
 
+    def _get_start_waypoint_max_fraction(self) -> float:
+        """Return active reset start-waypoint max fraction with optional linear curriculum."""
+        traj_cfg = self.task_cfg.trajectory
+        final_frac = max(0.0, min(float(getattr(traj_cfg, "start_waypoint_max_fraction", 0.0)), 1.0))
+        initial_frac = getattr(traj_cfg, "start_waypoint_max_fraction_initial", None)
+        decay_steps = max(int(getattr(traj_cfg, "start_waypoint_fraction_decay_steps", 0)), 0)
+        if initial_frac is None or decay_steps <= 0:
+            return final_frac
+
+        initial_frac = max(0.0, min(float(initial_frac), 1.0))
+        progress = min(float(getattr(self, "_training_step_count", 0)) / float(decay_steps), 1.0)
+        return initial_frac + (final_frac - initial_frac) * progress
+
+    def _apply_start_waypoint_fraction_curriculum(self) -> None:
+        """Update the trajectory manager's sampled start range before reset sampling."""
+        if hasattr(self, "trajectory_manager"):
+            self.trajectory_manager.start_waypoint_max_fraction = self._get_start_waypoint_max_fraction()
+
     def _update_curriculum_stage(self):
         """Update curriculum stage with gradual weight interpolation (Session 8h).
 
@@ -2790,6 +2814,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         super()._reset_idx(env_ids)
 
         # Reset trajectory phase BEFORE getting first waypoint
+        self._apply_start_waypoint_fraction_curriculum()
         self.trajectory_manager.reset(env_ids)
 
         if self.task_cfg.debug_resets and len(env_ids) > 0:

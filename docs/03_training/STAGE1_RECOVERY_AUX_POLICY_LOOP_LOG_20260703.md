@@ -556,6 +556,201 @@ Decision: research checkpoint only, not deployable and not a promotion candidate
 
 Lesson: category-aware mining worked for `handheld_subtle` but combining all hard categories in one aux bucket caused crane-tail failure to remain or worsen. Next policy work should separate crane-specific treatment from handheld-specific treatment instead of using one merged hard-category dataset.
 
+### Round 10: worst-crane exact-file aux continuation
+
+Goal: attack the exact crane files that carried the 100% tail after Round 9.
+
+Dataset:
+
+```text
+data/base_assist_distill/stage1_recovery_worstcrane_round6_normobs_vxvy_256x128.npz
+```
+
+File filter:
+
+```text
+crane_up_021.json
+crane_up_001.json
+crane_up_098.json
+crane_down_087.json
+crane_down_035.json
+crane_down_042.json
+crane_down_069.json
+crane_up_034.json
+crane_down_065.json
+crane_down_072.json
+crane_up_012.json
+crane_up_006.json
+crane_up_016.json
+```
+
+Dataset result:
+
+```text
+rows = 25,046
+obs_dim = 85
+sample_weight min/mean/max = 1.0 / 2.0034 / 6.0
+valid action rows = [6, 7]
+start fraction = 0.45 to 0.70
+```
+
+Run:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_round6_worstcrane_obs_noassist_40k_seed20260703_20260703_1850
+```
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_auxloss_round6_worstcrane_obs_noassist_40k_smoke64_enriched/recovery_eval_raw-policy_20260703_185215.json
+evaluation_results/recovery_stratified_analysis_round6_20260703.md
+evaluation_results/recovery_stratified_analysis_round6_20260703.json
+```
+
+Result:
+
+| Candidate | Mean unreachable | P95 unreachable | Max unreachable | Workspace hard mean | Obstacle unsafe/collision |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Round 9 hard-category aux | `26.8675%` | `97.4762%` | `100.0000%` | `1.0201%` | `0 / 0` |
+| Round 10 worst-crane aux | `30.8861%` | `96.9898%` | `100.0000%` | `2.2388%` | `0 / 0` |
+
+Category detail:
+
+| Category | Mean unreachable | P95 unreachable | Max unreachable | Workspace hard mean |
+| --- | ---: | ---: | ---: | ---: |
+| `crane_up` | `30.7281%` | `65.3383%` | `85.7143%` | `1.7244%` |
+| `crane_down` | `62.1532%` | `100.0000%` | `100.0000%` | `4.4438%` |
+| `handheld_subtle` | `32.2785%` | `86.3636%` | `100.0000%` | `2.2664%` |
+
+Decision: reject. It improved `crane_up` but made `crane_down`, handheld, and workspace worse.
+
+Lesson: mixing `crane_up` and `crane_down` exact-file tails in one aux dataset is still not stable. The two crane modes need separate treatment or a non-aux objective.
+
+### Round 11: crane-down-only aux continuation
+
+Goal: preserve the Round 9 base while correcting only `crane_down`.
+
+Dataset:
+
+```text
+data/base_assist_distill/stage1_recovery_cranedown_round7_normobs_vxvy_256x128.npz
+data/base_assist_distill/stage1_recovery_cranedown_round7_merged_weighted_vxvy.npz
+```
+
+File filter:
+
+```text
+crane_down_035.json
+crane_down_042.json
+crane_down_065.json
+crane_down_069.json
+crane_down_072.json
+crane_down_087.json
+crane_down_043.json
+crane_down_094.json
+```
+
+Dataset result:
+
+```text
+rows = 25,827 raw / 124,306 merged
+sample_weight min/mean/max = 1.0 / 2.0180 / 6.0 raw
+valid action rows = [6, 7]
+start fraction = 0.45 to 0.70
+```
+
+Run:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_round7_cranedown_obs_noassist_40k_seed20260703_20260703_1900
+```
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_auxloss_round7_cranedown_obs_noassist_40k_smoke64_enriched/recovery_eval_raw-policy_20260703_190503.json
+evaluation_results/recovery_stratified_analysis_round7_20260703.md
+evaluation_results/recovery_stratified_analysis_round7_20260703.json
+```
+
+Result:
+
+| Candidate | Mean unreachable | P95 unreachable | Max unreachable | Workspace hard mean | Obstacle unsafe/collision |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Round 9 hard-category aux | `26.8675%` | `97.4762%` | `100.0000%` | `1.0201%` | `0 / 0` |
+| Round 11 crane-down-only aux | `28.3968%` | `93.8231%` | `100.0000%` | `2.7793%` | `0 / 0` |
+
+Category detail:
+
+| Category | Mean unreachable | P95 unreachable | Max unreachable | Workspace hard mean |
+| --- | ---: | ---: | ---: | ---: |
+| `crane_down` | `37.2874%` | `89.2909%` | `97.2222%` | `1.3005%` |
+| `crane_up` | `48.2474%` | `99.6930%` | `100.0000%` | `12.9563%` |
+| `handheld_subtle` | `35.5199%` | `77.5635%` | `100.0000%` | `0.6725%` |
+
+Decision: reject as promotion. It improved `crane_down` p95 relative to Round 9, but it worsened mean reachability and badly worsened `crane_up`/workspace.
+
+### Round 12: crane-up-only aux continuation
+
+Goal: test the symmetric `crane_up`-only branch from the Round 9 base.
+
+Dataset:
+
+```text
+data/base_assist_distill/stage1_recovery_craneup_round8_normobs_vxvy_256x128.npz
+data/base_assist_distill/stage1_recovery_craneup_round8_merged_weighted_vxvy.npz
+```
+
+File filter:
+
+```text
+crane_up_001.json
+crane_up_006.json
+crane_up_011.json
+crane_up_012.json
+crane_up_016.json
+crane_up_021.json
+crane_up_030.json
+crane_up_034.json
+crane_up_081.json
+crane_up_098.json
+```
+
+Dataset result:
+
+```text
+rows = 26,180 raw / 124,659 merged
+sample_weight min/mean/max = 1.0 / 2.0530 / 6.0 raw
+valid action rows = [6, 7]
+start fraction = 0.45 to 0.70
+```
+
+Run:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_round8_craneup_obs_noassist_40k_seed20260703_20260703_1908
+```
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_auxloss_round8_craneup_obs_noassist_40k_smoke64_enriched/recovery_eval_raw-policy_20260703_191146.json
+evaluation_results/recovery_stratified_analysis_round8_20260703.md
+evaluation_results/recovery_stratified_analysis_round8_20260703.json
+```
+
+Result:
+
+| Candidate | Mean unreachable | P95 unreachable | Max unreachable | Workspace hard mean | Obstacle unsafe/collision |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Round 9 hard-category aux | `26.8675%` | `97.4762%` | `100.0000%` | `1.0201%` | `0 / 0` |
+| Round 12 crane-up-only aux | `36.1841%` | `98.4299%` | `100.0000%` | `1.7254%` | `0 / 0` |
+
+Decision: reject. This is worse than Round 9 on mean, p95, and workspace hard.
+
+Overall lesson from Rounds 10-12: callback-style aux mining has reached a tradeoff wall. It can move one category locally, but it does not produce a globally better raw policy and repeatedly worsens workspace or another category tail. Stop adding more aux-only exact-file datasets unless the training objective changes.
+
 ## Recommended Next Stage
 
 Stop the current callback-only aux loop and move to one of these:

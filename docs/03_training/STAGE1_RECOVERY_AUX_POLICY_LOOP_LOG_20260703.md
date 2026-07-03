@@ -1,0 +1,400 @@
+# Stage1 Recovery Aux Policy Loop Log - 2026-07-03
+
+This log records the current `RecomoProto2TrackEE-v0` stage1 recovery policy loop on the `.98` machine.
+
+Remote workspace:
+
+```text
+ssh -p 2222 yanbo@192.168.100.98
+repo: /mnt/g/wSpace/cinebotRL
+branch: win-recomoPro1
+python: /mnt/g/isaaclab_venv/Scripts/python.exe -X utf8
+```
+
+## Goal
+
+Reduce raw-policy base-target unreachable-zone time for `stage1_recovery` while preserving obstacle safety.
+
+Target for a deployable policy:
+
+```text
+unreachable_zone_pct mean < 15%
+obstacle_unsafe_pct = 0
+obstacle_collision_pct = 0
+```
+
+Current result: not achieved. Best mean so far is `25.1410%`, still above the target and with worse tail risk than the prior best.
+
+## Source Fixes Landed
+
+| Commit | Change | Reason |
+| --- | --- | --- |
+| `615ef60` | Added masked action dataset merge utility. | Needed to combine base-assist/distillation datasets without corrupting action masks. |
+| `2bfb3b5` | Added masked action auxiliary PPO callback. | Let PPO continue while applying supervised updates only to selected action rows. |
+| `74349a1` | Moved aux updates to rollout start. | Avoided mutating the policy between rollout collection and PPO train, which inflated KL and invalidated PPO data. |
+| `571c61a` | Added sibling `vec_normalize.pkl` fallback when resuming from `final_model.zip`. | Fixed invalid resume where `final_model.pkl` was missing and training silently continued without normalization. |
+| `1097cae` | Added `sample_weight` support in collection, merge, and aux training. | Allowed hard-state weighted datasets instead of only uniform sample expansion. |
+| `ded87c0` | Added `--base_assist_aux_sample_weight_power`. | Allows softening hard-state weighting, e.g. `sample_weight^0.5`, without rewriting datasets. |
+
+Repo status after these commits: clean and pushed to `origin/win-recomoPro1`.
+
+## Policy Rounds
+
+### Baseline: raw original 524k
+
+Artifact:
+
+```text
+evaluation_results/recovery_candidate_startfrac045to070slow_524k/recovery_eval_raw-policy_20260703_143113.json
+```
+
+Result:
+
+```text
+unreachable_zone_pct mean = 52.4358%
+p95 = 70.3125%
+obstacle unsafe/collision = 0
+```
+
+Decision: failed. It established the starting point.
+
+### Round 1: DAgger/base-head distillation
+
+Checkpoint:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_basehead_dagger_round2_from_cont40k_20260703/basehead_dagger_round2_e200.zip
+```
+
+VecNormalize:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_basehead_dagger_round2_from_cont40k_20260703/basehead_dagger_round2_e200.pkl
+```
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_basehead_dagger_round2_from_cont40k_smoke64/recovery_eval_raw-policy_20260703_153903.json
+```
+
+Result:
+
+```text
+unreachable_zone_pct mean = 28.0898%
+p95 = 43.7500%
+max = 46.8750%
+workspace_hard_exceed_pct mean = 0.9829%
+obstacle unsafe/collision = 0
+```
+
+Decision: useful improvement, not deployable.
+
+Lesson: base `vx/vy` imitation helps. This justified further base-only learning.
+
+### Round 2: PPO continuation with runtime base assist
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_dagger_round2_cont_assist030_40k_smoke64/recovery_eval_raw-policy_20260703_154313.json
+```
+
+Result:
+
+```text
+unreachable_zone_pct mean = 30.5216%
+p95 = 54.6875%
+obstacle_unsafe_pct mean = 0.0509%
+```
+
+Decision: reject.
+
+Lesson: do not evaluate deployment readiness with runtime base assist enabled. It can make the raw policy worse and can introduce obstacle unsafe time.
+
+### Round 3: yaw-inclusive base-head distillation
+
+Dataset:
+
+```text
+data/base_assist_distill/stage1_recovery_dagger_round2_plus_yaw_merged_vxvywz.npz
+```
+
+Checkpoint:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_basehead_dagger_round2_yaw_from_round2_20260703/basehead_dagger_round2_yaw_e200.zip
+```
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_basehead_dagger_round2_yaw_from_round2_smoke64/recovery_eval_raw-policy_20260703_155158.json
+```
+
+Result:
+
+```text
+unreachable_zone_pct mean = 33.2463%
+p95 = 51.5625%
+workspace_hard_exceed_pct mean = 2.2132%
+obstacle unsafe/collision = 0
+```
+
+Decision: reject.
+
+Lesson: do not include yaw row `8` until there is separate evidence that yaw labels are valid. Current base learning should stay on rows `[6, 7]`.
+
+### Round 4: first valid aux-loss PPO, vx/vy only
+
+Dataset:
+
+```text
+data/base_assist_distill/stage1_recovery_dagger_round2_merged_vxvy.npz
+```
+
+Run:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_vxvy_noassist_hookstart_40k_seed20260703_20260703_1606
+```
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_auxloss_vxvy_noassist_hookstart_40k_smoke64/recovery_eval_raw-policy_20260703_160142.json
+```
+
+Result:
+
+```text
+unreachable_zone_pct mean = 25.6383%
+p95 = 35.9375%
+max = 40.6250%
+base_target_dist_mean = 0.5502
+workspace_hard_exceed_pct mean = 1.5351%
+obstacle unsafe/collision = 0
+```
+
+Decision: best risk-balanced policy so far. Not deployable.
+
+Lesson: aux update at rollout start is valid and can improve the mean, but it is still far from the `<15%` target.
+
+### Round 5: collect round3 dataset from current best and train with full aux pressure
+
+New dataset:
+
+```text
+data/base_assist_distill/stage1_recovery_auxloss_round3_normobs_vxvy_256x128.npz
+```
+
+Merged dataset:
+
+```text
+data/base_assist_distill/stage1_recovery_auxloss_round3_merged_vxvy.npz
+```
+
+Run:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_round3_noassist_40k_seed20260703_20260703_1608
+```
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_auxloss_round3_noassist_40k_smoke64/recovery_eval_raw-policy_20260703_160923.json
+```
+
+Result:
+
+```text
+unreachable_zone_pct mean = 28.4422%
+p95 = 39.2187%
+max = 48.4375%
+obstacle unsafe/collision = 0
+```
+
+Decision: reject.
+
+Lesson: adding more uniformly sampled aux data diluted or destabilized the useful signal. More samples alone are not a strategy.
+
+### Round 6: lower-pressure round3 aux
+
+Run:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_round3_lowpressure_noassist_40k_seed20260703_20260703_1610
+```
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_auxloss_round3_lowpressure_noassist_40k_smoke64/recovery_eval_raw-policy_20260703_161214.json
+```
+
+Result:
+
+```text
+unreachable_zone_pct mean = 30.1574%
+p95 = 42.1875%
+max = 45.3125%
+obstacle unsafe/collision = 0
+```
+
+Decision: reject.
+
+Lesson: simply reducing aux LR/steps did not fix the round3 regression.
+
+### Round 7: weighted hard-state aux, power 1.0
+
+Weighted dataset:
+
+```text
+data/base_assist_distill/stage1_recovery_auxloss_round4_weighted_normobs_vxvy_256x128.npz
+```
+
+Dataset stats:
+
+```text
+rows = 25,825
+valid rows = action 6/7 only
+sample_weight min = 1.0
+sample_weight mean = 1.3919
+sample_weight max = 4.0
+p90 = 2.6797
+```
+
+Merged weighted dataset:
+
+```text
+data/base_assist_distill/stage1_recovery_auxloss_round4_merged_weighted_vxvy.npz
+```
+
+Merged stats:
+
+```text
+rows = 70,028
+sample_weight min = 1.0
+sample_weight mean = 1.1445
+sample_weight max = 4.0
+p90 = 1.2292
+```
+
+Run:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_round4_weighted_noassist_40k_seed20260703_20260703_1621
+```
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_auxloss_round4_weighted_noassist_40k_smoke64/recovery_eval_raw-policy_20260703_162312.json
+```
+
+Result:
+
+```text
+unreachable_zone_pct mean = 25.1410%
+p95 = 40.7812%
+max = 45.3125%
+base_target_dist_mean = 0.5296
+workspace_hard_exceed_pct mean = 0.7245%
+workspace_soft_exceed_pct mean = 11.1176%
+obstacle unsafe/collision = 0
+```
+
+Decision: best mean and workspace metrics, but worse tail than Round 4. Do not promote as generally safer.
+
+Lesson: hard-state weighting can improve average base-target distance but may worsen tail robustness. Use tail metrics in promotion decisions, not mean alone.
+
+### Round 8: softened weighted aux, power 0.5
+
+Run:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_round4_weightedpow05_noassist_40k_seed20260703_20260703_1625
+```
+
+Eval:
+
+```text
+evaluation_results/recovery_candidate_auxloss_round4_weightedpow05_noassist_40k_smoke64/recovery_eval_raw-policy_20260703_162659.json
+```
+
+Result:
+
+```text
+unreachable_zone_pct mean = 27.4514%
+p95 = 40.6250%
+max = 43.7500%
+obstacle unsafe/collision = 0
+```
+
+Decision: reject.
+
+Lesson: softening hard-state sampling did not recover the Round 4 tail and worsened the mean.
+
+## Current Best Artifacts
+
+Best risk-balanced policy:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_vxvy_noassist_hookstart_40k_seed20260703_20260703_1606/final_model.zip
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_vxvy_noassist_hookstart_40k_seed20260703_20260703_1606/vec_normalize.pkl
+```
+
+Best mean/workspace policy, but worse tail:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_round4_weighted_noassist_40k_seed20260703_20260703_1621/final_model.zip
+logs/sb3/recomoproto2trackee_v0/stage1_recovery_auxloss_round4_weighted_noassist_40k_seed20260703_20260703_1621/vec_normalize.pkl
+```
+
+Promotion recommendation:
+
+```text
+Do not promote either as deployable.
+If forced to choose a conservative candidate, use the risk-balanced Round 4 aux-loss policy, not the weighted Round 7 policy.
+```
+
+## What Has Not Been Achieved
+
+- The `<15%` unreachable-zone target has not been met.
+- Tail robustness is not solved; weighted mean improvements can hide worse p95/max behavior.
+- Arm/gimbal imitation remains out of scope for this policy loop.
+- Yaw/action row `8` is not validated and should not be mixed into the base distillation path.
+- Runtime base assist is not a deployment-ready substitute for a raw policy.
+
+## Lessons For Future Loops
+
+1. Always load the matching `vec_normalize.pkl`. If resuming from `final_model.zip`, use the sibling vecnorm fallback and verify the log prints `[OK] VecNormalize stats loaded successfully`.
+2. Run aux updates before rollouts, not after rollouts. PPO rollouts must match the policy used for PPO training.
+3. Keep raw-policy evaluation clean: use `--disable_auto_base_assist`, zero base-assist blend, and zero imitation weight.
+4. Judge by raw eval JSON, not by a single training-window printout. AutoPause can trigger even when raw eval improves, and training windows can look good while eval tails regress.
+5. Track mean, p95, max, and safety together. Mean-only promotion is unsafe for this task.
+6. Do not include yaw row `8` until it has its own validation evidence.
+7. Do not keep collecting larger uniform datasets if the previous larger round regressed. More samples can dilute the hard states.
+8. Weighted hard-state sampling improves average distance but can worsen tails. Any weighted candidate must be evaluated against p95/max before promotion.
+9. Do not spend more time on callback-only aux tuning unless there is a specific hypothesis. The next meaningful lever should be either an integrated PPO minibatch auxiliary loss or environment/reward design.
+10. Generated datasets and training artifacts are experiment outputs; source changes should be committed/pushed, but dataset artifacts should not be treated as source.
+
+## Recommended Next Stage
+
+Stop the current callback-only aux loop and move to one of these:
+
+1. Integrate the masked supervised base loss into PPO minibatch training so the auxiliary objective is optimized in the same update as PPO instead of mutating the action head outside PPO.
+2. Add direct environment/reward shaping for tail states, especially large base-target distance and repeated late-episode unreachable episodes.
+3. Build a stratified evaluation report that breaks failures by trajectory category and start fraction before doing another training run.
+
+Minimum gate for any next candidate:
+
+```text
+64-episode raw smoke:
+  unreachable mean must beat 25.1410%
+  p95 must not exceed 35.9375%
+  obstacle unsafe/collision must remain 0
+```
+
+If a candidate only improves mean but worsens p95/max, mark it as research-only, not a promotion candidate.

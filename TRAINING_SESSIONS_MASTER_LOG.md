@@ -7,6 +7,21 @@
 
 ---
 
+## Current Codex Loop: Proto2 Stage1 Recovery Aux Policy - 2026-07-03
+
+**Status:** Not deployable yet. Best mean unreachable improved to `25.1410%`, but target is `<15%` and weighted candidates worsened tail risk.
+
+**Loop log:** `docs/03_training/STAGE1_RECOVERY_AUX_POLICY_LOOP_LOG_20260703.md`
+
+**Current promotion guidance:**
+- Conservative best/risk-balanced: `stage1_recovery_auxloss_vxvy_noassist_hookstart_40k_seed20260703_20260703_1606`
+- Best mean/workspace but worse tail: `stage1_recovery_auxloss_round4_weighted_noassist_40k_seed20260703_20260703_1621`
+- Do not promote any policy as deployable until raw eval reaches `<15%` unreachable and obstacle unsafe/collision remain `0`.
+
+**Key lesson:** do not continue callback-only aux tuning blindly. Next stage should use integrated PPO minibatch auxiliary loss, reward/environment tail shaping, or stratified failure analysis before more training.
+
+---
+
 ## 🎉 **LATEST: Session 8f - BEST RESULTS!**
 
 **Status:** ✅ **COMPLETE - BEST PERFORMING SESSION**  

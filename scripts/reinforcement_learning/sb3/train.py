@@ -1071,7 +1071,7 @@ def main():
             sq = (pred - target).pow(2) * valid
             return sq.sum() / valid.sum().clamp_min(1.0)
 
-        def _on_rollout_end(self) -> bool:
+        def _on_rollout_start(self) -> None:
             import torch
 
             self.rollout_count += 1
@@ -1109,7 +1109,6 @@ def main():
             self.logger.record("train/base_assist_aux_loss", last_loss)
             if self.verbose > 0 and self.rollout_count % self.log_freq == 0:
                 print(f"[BaseAssistAux] rollout={self.rollout_count} loss={last_loss:.6f}")
-            return True
 
         def _on_step(self) -> bool:
             return True

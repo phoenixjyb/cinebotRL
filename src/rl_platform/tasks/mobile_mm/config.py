@@ -36,6 +36,8 @@ class TrajectoryConfig:
     start_waypoint_max_fraction: float = 0.0
     reset_base_to_trajectory_start: bool = False  # Keep base near waypoint zero while target starts later
     reset_anchor_target_blend: float = 0.0  # 0=start anchor, 1=current target anchor
+    reset_anchor_target_blend_initial: float | None = None  # Optional curriculum start value
+    reset_anchor_target_blend_decay_steps: int = 0  # Timesteps to decay initial blend to final blend
     debug_sampling: bool = False  # Verbose trajectory resample/reset diagnostics
 
     # Curriculum settings

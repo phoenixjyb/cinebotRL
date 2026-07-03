@@ -323,6 +323,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         randomize_start_waypoint_override = kwargs.pop("randomize_start_waypoint", None)
         reset_base_to_trajectory_start_override = kwargs.pop("reset_base_to_trajectory_start", None)
         reset_anchor_target_blend_override = kwargs.pop("reset_anchor_target_blend", None)
+        reset_anchor_target_blend_initial_override = kwargs.pop("reset_anchor_target_blend_initial", None)
+        reset_anchor_target_blend_decay_steps_override = kwargs.pop("reset_anchor_target_blend_decay_steps", None)
         max_trajectories_override = kwargs.pop("max_trajectories", None)
         waypoint_file_override = kwargs.pop("waypoint_file", None)
         use_all_trajectories = kwargs.pop("use_all_trajectories", None)
@@ -407,6 +409,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             traj_cfg.reset_base_to_trajectory_start = bool(reset_base_to_trajectory_start_override)
         if reset_anchor_target_blend_override is not None:
             traj_cfg.reset_anchor_target_blend = float(reset_anchor_target_blend_override)
+        if reset_anchor_target_blend_initial_override is not None:
+            traj_cfg.reset_anchor_target_blend_initial = float(reset_anchor_target_blend_initial_override)
+        if reset_anchor_target_blend_decay_steps_override is not None:
+            traj_cfg.reset_anchor_target_blend_decay_steps = int(reset_anchor_target_blend_decay_steps_override)
         if max_trajectories_override is not None:
             traj_cfg.max_trajectories = max_trajectories_override
         if waypoint_file_override is not None:
@@ -702,6 +708,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self.current_commanded_vel = torch.zeros(self.num_envs, 3, device=self.device)  # Rate-limited commanded velocities for THIS step
         self.prev_commanded_vel = torch.zeros(self.num_envs, 3, device=self.device)
         print(f"[MobileMMTrackEE] DEBUG: current_commanded_vel.shape = {self.current_commanded_vel.shape}")
+        self._training_step_count = 0
         self._base_assist_step_count = 0
         self._base_assist_coeff = torch.zeros(self.num_envs, device=self.device)
         self._base_assist_expert_action = torch.zeros(self.num_envs, 2, device=self.device)
@@ -1402,6 +1409,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             self._first_action_printed = True
 
         self._sanitize_base_root_state()
+        self._training_step_count += self.num_envs
 
         # Ensure actions are 2D [num_envs, num_actions]
         # Sometimes actions come in as 3D [1, 1, action_dim] - squeeze to [1, action_dim]
@@ -1691,6 +1699,19 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             assisted_wz = torch.clamp(assisted_wz, -1.0, 1.0)
 
         return assisted_base[:, 0:1], assisted_base[:, 1:2], assisted_wz
+
+    def _get_reset_anchor_target_blend(self) -> float:
+        """Return active reset anchor blend, optionally following a linear curriculum."""
+        traj_cfg = self.task_cfg.trajectory
+        final_blend = max(0.0, min(float(getattr(traj_cfg, "reset_anchor_target_blend", 0.0)), 1.0))
+        initial_blend = getattr(traj_cfg, "reset_anchor_target_blend_initial", None)
+        decay_steps = max(int(getattr(traj_cfg, "reset_anchor_target_blend_decay_steps", 0)), 0)
+        if initial_blend is None or decay_steps <= 0:
+            return final_blend
+
+        initial_blend = max(0.0, min(float(initial_blend), 1.0))
+        progress = min(float(getattr(self, "_training_step_count", 0)) / float(decay_steps), 1.0)
+        return initial_blend + (final_blend - initial_blend) * progress
 
     def _update_curriculum_stage(self):
         """Update curriculum stage with gradual weight interpolation (Session 8h).
@@ -2792,10 +2813,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             and self.trajectory_manager.recorded_positions is not None
         ):
             start_anchor_pos = self.trajectory_manager.recorded_positions[:, 0]
-            target_blend = max(
-                0.0,
-                min(float(getattr(self.task_cfg.trajectory, "reset_anchor_target_blend", 0.0)), 1.0),
-            )
+            target_blend = self._get_reset_anchor_target_blend()
             reset_anchor_pos = (1.0 - target_blend) * start_anchor_pos + target_blend * first_target_pos
 
         if (
@@ -2810,7 +2828,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 current_wp = self.trajectory_manager.current_waypoint_idx[env_idx].item()
                 from_recorded = self.trajectory_manager.recorded_positions[env_idx, current_wp].cpu().numpy()
                 from_anchor = reset_anchor_pos[env_idx].cpu().numpy()
-                target_blend = float(getattr(self.task_cfg.trajectory, "reset_anchor_target_blend", 0.0))
+                target_blend = self._get_reset_anchor_target_blend()
                 print(f"[DEBUG] Env {env_idx}:")
                 print(f"  get_target_pose():    [{from_get_target[0]:.3f}, {from_get_target[1]:.3f}, {from_get_target[2]:.3f}]")
                 print(f"  recorded_positions:   [{from_recorded[0]:.3f}, {from_recorded[1]:.3f}, {from_recorded[2]:.3f}]")

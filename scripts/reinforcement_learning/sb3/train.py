@@ -365,6 +365,21 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--reset_anchor_target_blend_initial",
+        type=float,
+        default=None,
+        help=(
+            "Optional curriculum start value for reset anchor target blend. "
+            "When set, it decays linearly to --reset_anchor_target_blend."
+        ),
+    )
+    parser.add_argument(
+        "--reset_anchor_target_blend_decay_steps",
+        type=int,
+        default=0,
+        help="Timesteps over which reset anchor target blend decays from initial to final.",
+    )
+    parser.add_argument(
         "--debug_resets",
         action="store_true",
         help="Print verbose reset pose and waypoint diagnostics.",
@@ -1670,11 +1685,17 @@ def main():
         auto_base_assist = auto_recovery_reset and not args.disable_auto_base_assist
         enable_base_assist = args.enable_base_assist or auto_base_assist
         if auto_recovery_reset:
+            reset_blend_desc = f"{args.reset_anchor_target_blend:.2f}"
+            if args.reset_anchor_target_blend_initial is not None and args.reset_anchor_target_blend_decay_steps > 0:
+                reset_blend_desc = (
+                    f"{args.reset_anchor_target_blend_initial:.2f}->{args.reset_anchor_target_blend:.2f} "
+                    f"over {args.reset_anchor_target_blend_decay_steps:,} steps"
+                )
             print(
                 "    [Session 8h] stage1_recovery reset: target starts at "
                 f"{args.start_waypoint_min_fraction:.2f}-{args.start_waypoint_max_fraction:.2f} "
                 "trajectory fraction; base starts near waypoint zero"
-                f" with target-anchor blend {args.reset_anchor_target_blend:.2f}"
+                f" with target-anchor blend {reset_blend_desc}"
             )
         if auto_recovery_stability:
             print(
@@ -1735,6 +1756,8 @@ def main():
             start_waypoint_max_fraction=args.start_waypoint_max_fraction,
             reset_base_to_trajectory_start=reset_base_to_trajectory_start,
             reset_anchor_target_blend=args.reset_anchor_target_blend,
+            reset_anchor_target_blend_initial=args.reset_anchor_target_blend_initial,
+            reset_anchor_target_blend_decay_steps=max(int(args.reset_anchor_target_blend_decay_steps), 0),
             debug_sampling=args.debug_trajectory_sampling,
         )
         

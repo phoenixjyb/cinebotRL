@@ -380,6 +380,30 @@ def parse_args():
         help="Timesteps over which reset anchor target blend decays from initial to final.",
     )
     parser.add_argument(
+        "--reachability_distance_weight",
+        type=float,
+        default=None,
+        help="Override reward weight for workspace distance beyond the hard reachability margin.",
+    )
+    parser.add_argument(
+        "--base_target_far_penalty",
+        type=float,
+        default=None,
+        help="Override penalty for base-target distance beyond the reachability hard margin.",
+    )
+    parser.add_argument(
+        "--base_target_command_tracking_penalty",
+        type=float,
+        default=None,
+        help="Override penalty for far-target base commands that fail to chase the target.",
+    )
+    parser.add_argument(
+        "--base_target_regression_penalty",
+        type=float,
+        default=None,
+        help="Override penalty for actual chassis motion that increases base-target distance.",
+    )
+    parser.add_argument(
         "--debug_resets",
         action="store_true",
         help="Print verbose reset pose and waypoint diagnostics.",
@@ -1684,6 +1708,22 @@ def main():
         reset_base_to_trajectory_start = args.reset_base_to_trajectory_start or auto_recovery_reset
         auto_base_assist = auto_recovery_reset and not args.disable_auto_base_assist
         enable_base_assist = args.enable_base_assist or auto_base_assist
+        reward_overrides = {
+            "reachability_distance_weight": args.reachability_distance_weight,
+            "base_target_far_penalty": args.base_target_far_penalty,
+            "base_target_command_tracking_penalty": args.base_target_command_tracking_penalty,
+            "base_target_regression_penalty": args.base_target_regression_penalty,
+        }
+        applied_reward_overrides = {
+            name: value for name, value in reward_overrides.items() if value is not None
+        }
+        for name, value in applied_reward_overrides.items():
+            setattr(env_cfg.task_config.rewards, name, float(value))
+        if applied_reward_overrides:
+            print(
+                "    Reward overrides: "
+                + ", ".join(f"{name}={value:g}" for name, value in applied_reward_overrides.items())
+            )
         if auto_recovery_reset:
             reset_blend_desc = f"{args.reset_anchor_target_blend:.2f}"
             if args.reset_anchor_target_blend_initial is not None and args.reset_anchor_target_blend_decay_steps > 0:

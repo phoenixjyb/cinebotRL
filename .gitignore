@@ -21,6 +21,7 @@ data/gik_ik_demos/
 data/gik_rs4_attitude_demos/
 data/gik_teacher_one_obstacle_pass/
 data/gik_teacher_obs/
+data/base_assist_distill/
 data/gik_stage2_parity_progress_*/
 data/gik_offline_teachers_*/
 data/gik_offline_teacher_obs/

@@ -82,6 +82,127 @@ def tensor_np(value):
     return np.asarray(value)
 
 
+def get_trajectory_snapshots(raw_env, num_envs: int) -> list[dict[str, object]]:
+    """Snapshot per-env trajectory metadata before it can be replaced by a reset."""
+    manager = getattr(raw_env, "trajectory_manager", None)
+    if manager is None:
+        return [{} for _ in range(num_envs)]
+
+    metadata = getattr(manager, "current_trajectory_metadata", None) or []
+    waypoint_idx = tensor_np(getattr(manager, "current_waypoint_idx", None))
+    lengths = tensor_np(getattr(manager, "recorded_lengths", None))
+    snapshots: list[dict[str, object]] = []
+    for env_id in range(num_envs):
+        item = metadata[env_id] if env_id < len(metadata) and isinstance(metadata[env_id], dict) else {}
+        current_idx = int(waypoint_idx[env_id]) if waypoint_idx is not None and env_id < len(waypoint_idx) else None
+        length = int(lengths[env_id]) if lengths is not None and env_id < len(lengths) else item.get("length")
+        length_int = int(length) if length is not None else None
+        fraction = None
+        if current_idx is not None and length_int is not None and length_int > 1:
+            fraction = float(current_idx) / float(length_int - 1)
+        snapshots.append(
+            {
+                "trajectory_file": str(item.get("file", "unknown")),
+                "trajectory_category": str(item.get("category", "unknown")),
+                "trajectory_length": length_int,
+                "waypoint_idx": current_idx,
+                "waypoint_fraction": fraction,
+            }
+        )
+    return snapshots
+
+
+def empty_episode_accumulators(num_envs: int) -> dict[str, object]:
+    return {
+        "base_sum": np.zeros(num_envs, dtype=np.float64),
+        "base_count": np.zeros(num_envs, dtype=np.int32),
+        "base_max": np.full(num_envs, np.nan, dtype=np.float64),
+        "unreachable_count": np.zeros(num_envs, dtype=np.int32),
+        "workspace_soft_count": np.zeros(num_envs, dtype=np.int32),
+        "workspace_hard_count": np.zeros(num_envs, dtype=np.int32),
+        "workspace_count": np.zeros(num_envs, dtype=np.int32),
+        "workspace_max": np.full(num_envs, np.nan, dtype=np.float64),
+        "obstacle_unsafe_count": np.zeros(num_envs, dtype=np.int32),
+        "obstacle_collision_count": np.zeros(num_envs, dtype=np.int32),
+        "obstacle_count": np.zeros(num_envs, dtype=np.int32),
+        "obstacle_clearance_min": np.full(num_envs, np.nan, dtype=np.float64),
+        "pos_errors": [[] for _ in range(num_envs)],
+        "ori_errors": [[] for _ in range(num_envs)],
+    }
+
+
+def reset_episode_accumulator(acc: dict[str, object], env_id: int) -> None:
+    for key in [
+        "base_sum",
+        "base_count",
+        "base_max",
+        "unreachable_count",
+        "workspace_soft_count",
+        "workspace_hard_count",
+        "workspace_count",
+        "workspace_max",
+        "obstacle_unsafe_count",
+        "obstacle_collision_count",
+        "obstacle_count",
+        "obstacle_clearance_min",
+    ]:
+        arr = acc[key]
+        if key.endswith("_max") or key.endswith("_min"):
+            arr[env_id] = np.nan
+        else:
+            arr[env_id] = 0
+    acc["pos_errors"][env_id].clear()
+    acc["ori_errors"][env_id].clear()
+
+
+def append_episode_detail(
+    details: list[dict[str, object]],
+    acc: dict[str, object],
+    env_id: int,
+    trajectory_snapshot: dict[str, object],
+    end_snapshot: dict[str, object],
+    reward: float,
+    length: int,
+    done_step: int,
+) -> None:
+    base_count = int(acc["base_count"][env_id])
+    workspace_count = int(acc["workspace_count"][env_id])
+    obstacle_count = int(acc["obstacle_count"][env_id])
+    pos_errors = np.asarray(acc["pos_errors"][env_id], dtype=np.float64)
+    ori_errors = np.asarray(acc["ori_errors"][env_id], dtype=np.float64)
+    detail = {
+        "episode_index": len(details),
+        "env_id": int(env_id),
+        "done_step": int(done_step),
+        "episode_reward": float(reward),
+        "episode_length": int(length),
+        **trajectory_snapshot,
+        "end_waypoint_idx": end_snapshot.get("waypoint_idx"),
+        "end_waypoint_fraction": end_snapshot.get("waypoint_fraction"),
+        "base_target_dist_mean": float(acc["base_sum"][env_id] / base_count) if base_count else None,
+        "base_target_dist_max": float(acc["base_max"][env_id]) if base_count else None,
+        "unreachable_zone_pct": float(acc["unreachable_count"][env_id] / base_count * 100.0) if base_count else None,
+        "workspace_soft_exceed_pct": (
+            float(acc["workspace_soft_count"][env_id] / workspace_count * 100.0) if workspace_count else None
+        ),
+        "workspace_hard_exceed_pct": (
+            float(acc["workspace_hard_count"][env_id] / workspace_count * 100.0) if workspace_count else None
+        ),
+        "workspace_distance_max": float(acc["workspace_max"][env_id]) if workspace_count else None,
+        "obstacle_unsafe_pct": (
+            float(acc["obstacle_unsafe_count"][env_id] / obstacle_count * 100.0) if obstacle_count else None
+        ),
+        "obstacle_collision_pct": (
+            float(acc["obstacle_collision_count"][env_id] / obstacle_count * 100.0) if obstacle_count else None
+        ),
+        "obstacle_clearance_min": float(acc["obstacle_clearance_min"][env_id]) if obstacle_count else None,
+        "ee_pos_error_mean_m": float(np.mean(pos_errors)) if pos_errors.size else None,
+        "ee_pos_error_p95_m": float(np.percentile(pos_errors, 95)) if pos_errors.size else None,
+        "ee_ori_error_mean_deg": float(np.degrees(np.mean(ori_errors))) if ori_errors.size else None,
+    }
+    details.append(detail)
+
+
 def main() -> int:
     args = parse_args()
     checkpoint = Path(args.checkpoint)
@@ -223,6 +344,9 @@ def main() -> int:
         raw_env = unwrap_isaac_env(env)
         obs = env.reset()
         collector = ScalarCollector()
+        episode_details: list[dict[str, object]] = []
+        episode_acc = empty_episode_accumulators(args.num_envs)
+        episode_start_snapshots = get_trajectory_snapshots(raw_env, args.num_envs)
         rewards_by_env = np.zeros(args.num_envs, dtype=np.float64)
         lengths_by_env = np.zeros(args.num_envs, dtype=np.int32)
         episode_rewards: list[float] = []
@@ -231,6 +355,7 @@ def main() -> int:
         max_steps = max(10_000, int(args.num_episodes / max(args.num_envs, 1) * 800) + 1_000)
 
         while len(episode_rewards) < args.num_episodes and step < max_steps:
+            pre_step_snapshots = get_trajectory_snapshots(raw_env, args.num_envs)
             action, _ = model.predict(obs, deterministic=args.deterministic)
             obs, rewards, dones, _infos = env.step(action)
             rewards_by_env += rewards
@@ -251,20 +376,53 @@ def main() -> int:
                     collector.add("optimal_zone_pct", float(np.mean(finite_base_dist < 0.40) * 100.0))
                     collector.add("acceptable_zone_pct", float(np.mean((finite_base_dist >= 0.40) & (finite_base_dist <= 0.70)) * 100.0))
                     collector.add("unreachable_zone_pct", float(np.mean(finite_base_dist > 0.70) * 100.0))
+                finite_mask = np.isfinite(base_dist)
+                if np.any(finite_mask):
+                    episode_acc["base_sum"][finite_mask] += base_dist[finite_mask]
+                    episode_acc["base_count"][finite_mask] += 1
+                    current_max = episode_acc["base_max"][finite_mask]
+                    episode_acc["base_max"][finite_mask] = np.where(
+                        np.isnan(current_max),
+                        base_dist[finite_mask],
+                        np.maximum(current_max, base_dist[finite_mask]),
+                    )
+                    episode_acc["unreachable_count"][finite_mask] += (base_dist[finite_mask] > 0.70).astype(np.int32)
             if workspace is not None:
                 collector.add("workspace_soft_exceed_pct", float(np.mean(workspace > 0.20) * 100.0))
                 collector.add("workspace_hard_exceed_pct", float(np.mean(workspace > 0.70) * 100.0))
                 collector.add("workspace_distance_max", float(np.max(workspace)))
+                finite_mask = np.isfinite(workspace)
+                if np.any(finite_mask):
+                    episode_acc["workspace_count"][finite_mask] += 1
+                    episode_acc["workspace_soft_count"][finite_mask] += (workspace[finite_mask] > 0.20).astype(np.int32)
+                    episode_acc["workspace_hard_count"][finite_mask] += (workspace[finite_mask] > 0.70).astype(np.int32)
+                    current_max = episode_acc["workspace_max"][finite_mask]
+                    episode_acc["workspace_max"][finite_mask] = np.where(
+                        np.isnan(current_max),
+                        workspace[finite_mask],
+                        np.maximum(current_max, workspace[finite_mask]),
+                    )
             if pos_error is not None:
                 pos_norm = np.linalg.norm(pos_error, axis=1)
                 pos_norm = pos_norm[np.isfinite(pos_norm)]
                 if pos_norm.size:
                     collector.add("ee_pos_error_mean_m", float(np.mean(pos_norm)))
                     collector.add("ee_pos_error_p95_m", float(np.percentile(pos_norm, 95)))
+                all_pos_norm = np.linalg.norm(pos_error, axis=1)
+                for env_id, value in enumerate(all_pos_norm):
+                    if np.isfinite(value):
+                        episode_acc["pos_errors"][env_id].append(float(value))
             if ori_error is not None:
-                finite_ori = ori_error[np.isfinite(ori_error)]
+                if ori_error.ndim > 1:
+                    ori_values = np.linalg.norm(ori_error, axis=1)
+                else:
+                    ori_values = ori_error
+                finite_ori = ori_values[np.isfinite(ori_values)]
                 if finite_ori.size:
                     collector.add("ee_ori_error_mean_deg", float(np.degrees(np.mean(finite_ori))))
+                for env_id, value in enumerate(ori_values):
+                    if np.isfinite(value):
+                        episode_acc["ori_errors"][env_id].append(float(value))
             if assist_coeff is not None:
                 collector.add("base_assist_active_pct", float(np.mean(assist_coeff > 0.0) * 100.0))
                 collector.add("base_assist_coeff_mean", float(np.mean(assist_coeff)))
@@ -273,15 +431,42 @@ def main() -> int:
                 collector.add("obstacle_unsafe_pct", float(np.mean(clearance < 0.20) * 100.0))
                 collector.add("obstacle_collision_pct", float(np.mean(clearance < 0.0) * 100.0))
                 collector.add("obstacle_clearance_min", float(np.min(clearance)))
+                finite_mask = np.isfinite(clearance)
+                if np.any(finite_mask):
+                    episode_acc["obstacle_count"][finite_mask] += 1
+                    episode_acc["obstacle_unsafe_count"][finite_mask] += (clearance[finite_mask] < 0.20).astype(np.int32)
+                    episode_acc["obstacle_collision_count"][finite_mask] += (clearance[finite_mask] < 0.0).astype(np.int32)
+                    current_min = episode_acc["obstacle_clearance_min"][finite_mask]
+                    episode_acc["obstacle_clearance_min"][finite_mask] = np.where(
+                        np.isnan(current_min),
+                        clearance[finite_mask],
+                        np.minimum(current_min, clearance[finite_mask]),
+                    )
 
             for idx, done in enumerate(dones):
                 if done:
+                    append_episode_detail(
+                        episode_details,
+                        episode_acc,
+                        idx,
+                        episode_start_snapshots[idx],
+                        pre_step_snapshots[idx],
+                        float(rewards_by_env[idx]),
+                        int(lengths_by_env[idx]),
+                        step,
+                    )
                     episode_rewards.append(float(rewards_by_env[idx]))
                     episode_lengths.append(int(lengths_by_env[idx]))
                     rewards_by_env[idx] = 0.0
                     lengths_by_env[idx] = 0
+                    reset_episode_accumulator(episode_acc, idx)
                     if len(episode_rewards) >= args.num_episodes:
                         break
+            if np.any(dones):
+                latest_snapshots = get_trajectory_snapshots(raw_env, args.num_envs)
+                for idx, done in enumerate(dones):
+                    if done:
+                        episode_start_snapshots[idx] = latest_snapshots[idx]
 
             step += 1
 
@@ -299,6 +484,7 @@ def main() -> int:
             "episode_reward_mean": float(np.mean(episode_rewards)) if episode_rewards else None,
             "episode_length_mean": float(np.mean(episode_lengths)) if episode_lengths else None,
             "metrics": collector.summary(),
+            "episode_details": episode_details[: args.num_episodes],
         }
         out_file = output_dir / f"recovery_eval_{summary['mode']}_{timestamp}.json"
         out_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")

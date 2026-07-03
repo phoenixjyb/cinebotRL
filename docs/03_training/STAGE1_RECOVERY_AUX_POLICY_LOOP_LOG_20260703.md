@@ -380,6 +380,70 @@ If forced to choose a conservative candidate, use the risk-balanced Round 4 aux-
 9. Do not spend more time on callback-only aux tuning unless there is a specific hypothesis. The next meaningful lever should be either an integrated PPO minibatch auxiliary loss or environment/reward design.
 10. Generated datasets and training artifacts are experiment outputs; source changes should be committed/pushed, but dataset artifacts should not be treated as source.
 
+## Stratified Failure Analysis Update
+
+Reusable tooling added:
+
+```text
+scripts/reinforcement_learning/sb3/evaluate_recovery_candidate.py
+scripts/reinforcement_learning/sb3/analyze_recovery_eval_strata.py
+```
+
+The evaluator now writes `episode_details` with trajectory file/category, start waypoint fraction, end waypoint fraction, per-episode unreachable percentage, workspace metrics, obstacle metrics, and EE tracking metrics. The analyzer groups enriched evals by source checkpoint, trajectory category, start-fraction bucket, and worst trajectory file.
+
+Generated analysis artifacts:
+
+```text
+evaluation_results/recovery_stratified_analysis_20260703.md
+evaluation_results/recovery_stratified_analysis_20260703.json
+```
+
+These artifacts are ignored by git, so the source scripts and this summary are the durable tracked record.
+
+Enriched 64-episode rerun results:
+
+| Candidate | Mean unreachable | P95 unreachable | Max unreachable | Workspace hard mean | Obstacle unsafe/collision |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Round 4 risk-balanced aux | `36.8615%` | `97.8069%` | `100.0000%` | `1.6678%` | `0 / 0` |
+| Round 7 weighted aux | `30.6306%` | `96.8494%` | `100.0000%` | `1.2940%` | `0 / 0` |
+
+Important caveat: these enriched reruns sampled a different 64-episode set from the earlier smoke reports, so compare them as same-run strata evidence rather than replacing all earlier promotion numbers.
+
+Worst combined categories:
+
+| Category | Episodes | Mean unreachable | P95 unreachable |
+| --- | ---: | ---: | ---: |
+| `handheld_subtle` | `33` | `46.7041%` | `98.7234%` |
+| `crane_up` | `14` | `44.2580%` | `100.0000%` |
+| `crane_down` | `28` | `39.8897%` | `98.6000%` |
+| `dolly_pull_out` | `50` | `20.0264%` | `38.5244%` |
+
+Main lesson: this is now clearly a trajectory-category tail problem, not an obstacle-avoidance failure. Hard-category data should focus on `handheld_subtle`, `crane_up`, and `crane_down`; `dolly_pull_out` should not dominate the next aux dataset.
+
+Collector update:
+
+```text
+scripts/reinforcement_learning/sb3/collect_base_assist_dataset.py
+```
+
+New options:
+
+```text
+--trajectory_categories handheld_subtle,crane_up,crane_down
+--trajectory_files crane_down_035.json,handheld_subtle_087.json
+```
+
+The collector writes a temporary filtered manifest and records its path plus selected categories/files in dataset metadata. A small smoke with `4 envs x 2 steps` selected `145/256` hard-category files and produced a valid dataset:
+
+```text
+data/base_assist_distill/_smoke_category_filter_vxvy.npz
+observations: (8, 85)
+actions: (8, 9)
+action_valid_mask: (8, 9)
+sample_weight: (8,)
+valid rows: action rows [6, 7]
+```
+
 ## Recommended Next Stage
 
 Stop the current callback-only aux loop and move to one of these:

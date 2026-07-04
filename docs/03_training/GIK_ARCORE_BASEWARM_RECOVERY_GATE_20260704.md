@@ -173,3 +173,64 @@ The run produced the usual non-fatal local warnings:
 - unresolved USD visual references for `base_footprint`
 
 These warnings were not treated as the cause of the failed policy gate.
+
+## 2026-07-05 In-Distribution Stage1 Teacher Follow-Up
+
+The July 4 result above used accepted GIK/ARCore base teachers against the raw `stage1_recovery` distribution and was rejected. The follow-up generated teacher labels directly from the `stage1_recovery` request, then aligned export to the MATLAB StageC segment instead of the merged StageA+B+C prefix.
+
+Teacher source on the Mac/GIK side:
+
+```text
+/Users/yanbo/Projects/gikWBC9DOF/outputs/rl_teacher_stage1_recovery_smoke6_basehome0_iter300_20260705
+```
+
+Imported dataset on `.98`:
+
+```text
+data/gik_stage1_recovery_smoke6_basehome0_iter300_20260705/obs_dataset_base_only.npz
+```
+
+Import result:
+
+```text
+cases: 6
+samples: 916
+obs_dim: 85
+base-only label mask: [0,0,0,0,0,0,1,1,1]
+full masked label mask: [1.0,0.1670,0.0,0.9683,0.9716,0.9694,1.0,1.0,1.0]
+```
+
+The base-only labels are suitable for a smoke gate. The full masked labels are not suitable for full 9D BC yet because some arm/gimbal channels have weak or zero validity.
+
+Base-only BC smoke artifact:
+
+```text
+logs/bc/gik_stage1_smoke6_baseonly_20260705/bc_policy.zip
+```
+
+Training summary:
+
+```text
+transitions: 916
+epochs: 10
+best val MSE: 0.001297
+```
+
+Offline evaluator artifact:
+
+```text
+evaluation_results/bc/gik_stage1_smoke6_baseonly_20260705.json
+```
+
+Evaluator summary on action rows `6,7,8`:
+
+```text
+aggregate rmse: 0.031358
+aggregate mae: 0.020651
+action 6 vx rmse: 0.044872, mae: 0.033780, bias: -0.000473
+action 7 vy rmse: 0.026196, mae: 0.016818, bias: 0.004419
+action 8 wz rmse: 0.015818, mae: 0.011354, bias: 0.003138
+worst source rmse: 0.045623
+```
+
+Decision: this passes the small in-distribution base-only BC gate. It should be used as a guarded Stage1 learning artifact, not as evidence that full 9D imitation is ready. Do not train from poor teachers, and do not promote the partial full-mask dataset until the arm/gimbal label validity problem is solved.

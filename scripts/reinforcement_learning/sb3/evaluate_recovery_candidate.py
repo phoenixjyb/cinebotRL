@@ -1,4 +1,4 @@
-"""Evaluate a stage1 recovery SB3 checkpoint under the matching Proto2 task setup."""
+"""Evaluate a Proto2 SB3 checkpoint under a controlled recorded-trajectory gate."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Evaluate Proto2 stage1 recovery candidate.")
+    parser = argparse.ArgumentParser(description="Evaluate a Proto2 recovery/feasibility candidate.")
     parser.add_argument("--checkpoint", required=True, help="PPO checkpoint/final_model.zip.")
     parser.add_argument("--vec_normalize", default=None, help="VecNormalize pkl. Defaults to checkpoint parent vec_normalize.pkl.")
     parser.add_argument("--task", default="RecomoProto2TrackEE-v0")
@@ -27,8 +27,57 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=20260703)
     parser.add_argument("--deterministic", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--trajectory_stage", default="stage1_recovery")
+    parser.add_argument(
+        "--trajectory_manifest",
+        default=None,
+        help=(
+            "Optional manifest override. Relative paths are resolved from the project root. "
+            "If omitted, trajectoryToLearn/{trajectory_stage}/manifest.txt is used."
+        ),
+    )
+    parser.add_argument(
+        "--trajectory_dir",
+        default=None,
+        help="Trajectory root passed to the loader. Defaults to the project root for stage manifests.",
+    )
+    parser.add_argument(
+        "--trajectory_category",
+        action="append",
+        default=[],
+        help="Restrict evaluation to trajectories whose parent directory matches this category. Repeatable.",
+    )
+    parser.add_argument(
+        "--trajectory_file_contains",
+        action="append",
+        default=[],
+        help="Restrict evaluation to trajectory paths containing this substring. Repeatable.",
+    )
+    parser.add_argument(
+        "--max_trajectories",
+        type=int,
+        default=None,
+        help="Limit the resolved manifest to the first N trajectories after filters.",
+    )
+    parser.add_argument(
+        "--min_trajectory_duration",
+        type=float,
+        default=5.0,
+        help="Reject recorded trajectories shorter than this many seconds.",
+    )
+    parser.add_argument(
+        "--random_start_waypoint",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Randomize the start waypoint during evaluation.",
+    )
     parser.add_argument("--start_waypoint_min_fraction", type=float, default=0.25)
     parser.add_argument("--start_waypoint_max_fraction", type=float, default=0.70)
+    parser.add_argument(
+        "--reset_base_to_trajectory_start",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Reset the base near the trajectory start anchor before playback.",
+    )
     parser.add_argument("--reset_anchor_target_blend", type=float, default=0.35)
     parser.add_argument("--enable_obstacles", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--enable_base_assist", action="store_true")
@@ -80,6 +129,65 @@ def tensor_np(value):
     if hasattr(value, "numpy"):
         return value.numpy()
     return np.asarray(value)
+
+
+def _read_manifest_entries(manifest_path: Path, trajectory_dir: Path) -> list[Path]:
+    entries: list[Path] = []
+    with manifest_path.open("r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            path = Path(line)
+            if not path.is_absolute():
+                path = trajectory_dir / path
+            entries.append(path)
+    return entries
+
+
+def _resolve_trajectory_manifest(args: argparse.Namespace, output_dir: Path) -> tuple[Path, Path, list[str]]:
+    """Resolve and optionally materialize a filtered manifest for narrow gates."""
+    trajectory_dir = Path(args.trajectory_dir) if args.trajectory_dir else PROJECT_ROOT
+    if not trajectory_dir.is_absolute():
+        trajectory_dir = PROJECT_ROOT / trajectory_dir
+
+    if args.trajectory_manifest:
+        source_manifest = Path(args.trajectory_manifest)
+        if not source_manifest.is_absolute():
+            source_manifest = PROJECT_ROOT / source_manifest
+    else:
+        source_manifest = PROJECT_ROOT / "trajectoryToLearn" / args.trajectory_stage / "manifest.txt"
+
+    if not source_manifest.exists():
+        raise FileNotFoundError(f"trajectory manifest not found: {source_manifest}")
+
+    entries = _read_manifest_entries(source_manifest, trajectory_dir)
+    categories = set(args.trajectory_category or [])
+    contains = list(args.trajectory_file_contains or [])
+    if categories:
+        entries = [p for p in entries if p.parent.name in categories]
+    if contains:
+        entries = [p for p in entries if all(fragment in str(p) for fragment in contains)]
+    if args.max_trajectories is not None:
+        if args.max_trajectories <= 0:
+            raise ValueError("--max_trajectories must be positive")
+        entries = entries[: args.max_trajectories]
+    if not entries:
+        raise ValueError("trajectory filters selected no files")
+
+    if categories or contains or args.max_trajectories is not None or source_manifest != (
+        PROJECT_ROOT / "trajectoryToLearn" / args.trajectory_stage / "manifest.txt"
+    ):
+        output_dir.mkdir(parents=True, exist_ok=True)
+        resolved_manifest = output_dir / "resolved_feasibility_manifest.txt"
+        resolved_manifest.write_text(
+            "\n".join(str(path) for path in entries) + "\n",
+            encoding="utf-8",
+        )
+    else:
+        resolved_manifest = source_manifest
+
+    return trajectory_dir, resolved_manifest, [str(path) for path in entries]
 
 
 def get_trajectory_snapshots(raw_env, num_envs: int) -> list[dict[str, object]]:
@@ -203,6 +311,50 @@ def append_episode_detail(
     details.append(detail)
 
 
+def _metric_stats(values: list[float]) -> dict[str, float | int | None]:
+    arr = np.asarray([v for v in values if v is not None and np.isfinite(v)], dtype=np.float64)
+    if arr.size == 0:
+        return {"count": 0, "mean": None, "p95": None, "max": None}
+    return {
+        "count": int(arr.size),
+        "mean": float(np.mean(arr)),
+        "p95": float(np.percentile(arr, 95)),
+        "max": float(np.max(arr)),
+    }
+
+
+def summarize_episode_details(details: list[dict[str, object]]) -> dict[str, dict[str, object]]:
+    """Aggregate final JSON by trajectory category and file for tiny-set gates."""
+    groups: dict[str, dict[str, list[float]]] = {}
+    for detail in details:
+        for prefix, group_key in [
+            ("category", str(detail.get("trajectory_category", "unknown"))),
+            ("file", str(detail.get("trajectory_file", "unknown"))),
+        ]:
+            key = f"{prefix}:{group_key}"
+            bucket = groups.setdefault(
+                key,
+                {
+                    "ee_pos_error_mean_m": [],
+                    "ee_pos_error_p95_m": [],
+                    "ee_ori_error_mean_deg": [],
+                    "unreachable_zone_pct": [],
+                    "workspace_hard_exceed_pct": [],
+                    "obstacle_unsafe_pct": [],
+                    "obstacle_collision_pct": [],
+                },
+            )
+            for metric in bucket:
+                value = detail.get(metric)
+                if isinstance(value, (int, float)):
+                    bucket[metric].append(float(value))
+
+    summary: dict[str, dict[str, object]] = {}
+    for key, metric_values in groups.items():
+        summary[key] = {metric: _metric_stats(values) for metric, values in metric_values.items()}
+    return summary
+
+
 def main() -> int:
     args = parse_args()
     checkpoint = Path(args.checkpoint)
@@ -242,6 +394,15 @@ def main() -> int:
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
 
+        output_dir = Path(args.output_dir)
+        trajectory_dir, manifest, selected_trajectories = _resolve_trajectory_manifest(args, output_dir)
+        print(f"trajectory_dir: {trajectory_dir}")
+        print(f"trajectory_manifest: {manifest}")
+        print(f"selected trajectories: {len(selected_trajectories)}")
+        if len(selected_trajectories) <= 10:
+            for item in selected_trajectories:
+                print(f"  - {item}")
+
         env_cfg = MobileMMTrackEEEnvCfg()
         env_cfg.num_envs = args.num_envs
         env_cfg.scene.num_envs = args.num_envs
@@ -256,16 +417,16 @@ def main() -> int:
             env_cfg.scene = env_cfg._create_scene_config()
             env_cfg.scene.num_envs = args.num_envs
 
-        manifest = PROJECT_ROOT / "trajectoryToLearn" / args.trajectory_stage / "manifest.txt"
         env_cfg.task_config.trajectory = TrajectoryConfig(
             type="multi_recorded",
-            trajectory_dir=str(PROJECT_ROOT),
+            trajectory_dir=str(trajectory_dir),
             trajectory_manifest_file=str(manifest),
-            min_duration_seconds=5.0,
-            randomize_start_waypoint=True,
+            max_trajectories=None,
+            min_duration_seconds=args.min_trajectory_duration,
+            randomize_start_waypoint=bool(args.random_start_waypoint),
             start_waypoint_min_fraction=args.start_waypoint_min_fraction,
             start_waypoint_max_fraction=args.start_waypoint_max_fraction,
-            reset_base_to_trajectory_start=True,
+            reset_base_to_trajectory_start=bool(args.reset_base_to_trajectory_start),
             reset_anchor_target_blend=args.reset_anchor_target_blend,
         )
 
@@ -471,13 +632,22 @@ def main() -> int:
             step += 1
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir = Path(args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         summary = {
             "timestamp": timestamp,
             "checkpoint": str(checkpoint),
             "vec_normalize": str(vec_path),
             "mode": "assisted" if args.enable_base_assist else "raw-policy",
+            "trajectory_source": {
+                "trajectory_stage": args.trajectory_stage,
+                "trajectory_dir": str(trajectory_dir),
+                "trajectory_manifest": str(manifest),
+                "selected_count": len(selected_trajectories),
+                "selected_trajectories": selected_trajectories,
+                "min_trajectory_duration": args.min_trajectory_duration,
+                "random_start_waypoint": bool(args.random_start_waypoint),
+                "reset_base_to_trajectory_start": bool(args.reset_base_to_trajectory_start),
+            },
             "num_envs": args.num_envs,
             "episodes_completed": len(episode_rewards),
             "steps": step,
@@ -485,6 +655,7 @@ def main() -> int:
             "episode_length_mean": float(np.mean(episode_lengths)) if episode_lengths else None,
             "metrics": collector.summary(),
             "episode_details": episode_details[: args.num_episodes],
+            "episode_group_summary": summarize_episode_details(episode_details[: args.num_episodes]),
         }
         out_file = output_dir / f"recovery_eval_{summary['mode']}_{timestamp}.json"
         out_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")

@@ -211,3 +211,48 @@ The grouped auxiliary-loss infrastructure works, but active base-only imitation 
 Updated lesson:
 
 Base-only teacher labels are not sufficient for this recovery policy, even when applied continuously during PPO. The next useful policy update should either bring in validated arm/gimbal teacher labels or reuse the stronger yaw-assist policy as the starting point while changing one thing at a time.
+
+## 2026-07-07 Attempt: Yaw-Assist Baseline + Base Aux
+
+Planned next gate:
+
+- resume from `logs/sb3/recomoproto2trackee_v0/stage1_recovery_yaw_assist_gate_20260702_1508/final_model.zip`
+- keep the existing flat yaw-assist policy
+- add only active base auxiliary imitation using `obs_dataset_base_only.npz`
+- run a tiny resume smoke before any 64k gate
+
+Precheck:
+
+- yaw-assist checkpoint exists
+- yaw-assist `vec_normalize.pkl` exists
+- checkpoint policy: `ActorCriticPolicy`
+- checkpoint extractor: `MlpExtractor`
+- checkpoint observation dim: `85`
+- action dim: `9`
+- matching 85D aux dataset: `obs_dataset_base_only.npz`
+
+Blocked before policy validation:
+
+```text
+RuntimeError: No CUDA GPUs are available
+```
+
+Windows/WSL GPU status:
+
+```text
+NVIDIA RTX PRO 4000 Blackwell
+Status: Error
+Problem: CM_PROB_FAILED_POST_START
+ConfigManagerErrorCode: 43
+```
+
+`nvidia-smi` also fails from both WSL and Windows paths:
+
+```text
+Failed to initialize NVML: N/A
+NVIDIA-SMI has failed because you do not have sufficient permissions.
+```
+
+Decision:
+
+Do not interpret this as a training or policy failure. The next gate is blocked by the host GPU/driver state. Resume the yaw-assist + base-aux smoke only after Windows reports the NVIDIA display adapter as `OK` and WSL/Isaac can see CUDA again.

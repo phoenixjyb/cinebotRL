@@ -234,3 +234,58 @@ worst source rmse: 0.045623
 ```
 
 Decision: this passes the small in-distribution base-only BC gate. It should be used as a guarded Stage1 learning artifact, not as evidence that full 9D imitation is ready. Do not train from poor teachers, and do not promote the partial full-mask dataset until the arm/gimbal label validity problem is solved.
+
+## 2026-07-06 Twenty-Case Stage1 Base-Only BC Gate
+
+The 20-case Stage1 teacher export from the Mac/GIK side was synced after `.98` came back online. This is the preferred base-only Stage1 imitation artifact after the 6-case smoke.
+
+Imported dataset:
+
+```text
+data/gik_stage1_recovery_gate20_basehome0_iter300_20260705/obs_dataset_base_only.npz
+```
+
+Import result:
+
+```text
+cases: 20
+samples: 2826
+obs_dim: 85
+base-only label mask: [0,0,0,0,0,0,1,1,1]
+full masked label mask: [1.0,0.1122,0.0,0.9625,0.9632,0.9632,1.0,1.0,1.0]
+```
+
+The full masked dataset remains diagnostic only because arm/gimbal validity is incomplete.
+
+Base-only BC artifact:
+
+```text
+logs/bc/gik_stage1_gate20_baseonly_20260706/bc_policy.zip
+```
+
+Training summary:
+
+```text
+transitions: 2826
+epochs: 10
+best val MSE: 0.000643
+```
+
+Offline evaluator artifact:
+
+```text
+evaluation_results/bc/gik_stage1_gate20_baseonly_20260706.json
+```
+
+Evaluator summary on action rows `6,7,8`:
+
+```text
+aggregate rmse: 0.023468
+aggregate mae: 0.015050
+action 6 vx rmse: 0.029104, mae: 0.021763, bias: 0.003874
+action 7 vy rmse: 0.025804, mae: 0.015832, bias: 0.004092
+action 8 wz rmse: 0.011802, mae: 0.007554, bias: -0.000199
+worst source rmse: 0.040504
+```
+
+Decision: this passes the 20-case in-distribution base-only BC gate and improves over the 6-case smoke. It can be used as a guarded Stage1 base prior or auxiliary signal. It is not evidence that full 9D imitation is ready.

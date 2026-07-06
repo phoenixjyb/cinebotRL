@@ -134,3 +134,80 @@ Next policy work should target one of:
 - add an auxiliary base imitation loss during PPO instead of only copying BC weights at initialization
 - evaluate grouped architecture starting from the current best yaw-assist/recovery checkpoint if compatible, rather than starting from base-only BC
 
+## Follow-up: Active Base Aux Loss Gate
+
+Code update:
+
+`scripts/reinforcement_learning/sb3/train.py`
+
+The existing `MaskedActionAuxCallback` previously assumed a flat SB3 `action_net`, so it did not support the grouped actor where `action_net` is `Identity()` and the real actor heads live under `GroupedActionMlpExtractor.action_heads`.
+
+The callback now supports both paths:
+
+- flat policy: preserve previous behavior and train selected `action_net` rows
+- grouped policy: train only grouped action heads touched by the selected rows
+
+Smoke evidence:
+
+```text
+[BaseAssistAux] enabled
+  action rows: [6, 7, 8]
+  grouped heads: ['base']
+[BaseAssistAux] rollout=1 loss=0.001829
+```
+
+Bounded run:
+
+`logs/sb3/recomoproto2trackee_v0/stage1_gate20_grouped_basebc_aux_obs84_64k_20260706`
+
+Gate:
+
+- `64` envs
+- `65,536` timesteps
+- `stage1_recovery`
+- `max_trajectories=20`
+- `min_trajectory_duration=5.0`
+- warm-start from corrected 84D base-only BC
+- active aux dataset: `obs_dataset_base_only_obs84.npz`
+- aux rows: `[6,7,8]`
+- aux gradient steps per rollout: `8`
+- aux batch size: `512`
+- aux lr: `5e-5`
+
+Final training metrics:
+
+- `base_assist_aux_loss=7.5e-05`
+- `approx_kl=0.008889617`
+- `explained_variance=0.554`
+- `value_loss=0.0642`
+- `std=0.135`
+- exit code: `0`
+
+Evaluation output:
+
+`evaluation_results/recovery_candidate/stage1_gate20_grouped_basebc_aux_obs84_64k_20260706/recovery_eval_raw-policy_20260706_235028.json`
+
+Raw-policy metrics:
+
+- `ee_pos_error_mean_m.mean=1.8187`
+- `ee_pos_error_p95_m.mean=1.9484`
+- `ee_ori_error_mean_deg.mean=164.9784`
+- `unreachable_zone_pct.mean=92.6562`
+- `workspace_hard_exceed_pct.mean=6.0938`
+- `obstacle_unsafe_pct.mean=0.0`
+- `obstacle_collision_pct.mean=0.0`
+
+Comparison:
+
+- grouped base-BC without aux: `unreachable_zone_pct.mean=91.2037`, `ee_pos_error_mean_m.mean=1.7677`
+- current yaw-assist candidate: `unreachable_zone_pct.mean=47.4211`, `ee_pos_error_mean_m.mean=1.1442`
+
+Decision:
+
+Do not promote `stage1_gate20_grouped_basebc_aux_obs84_64k_20260706`.
+
+The grouped auxiliary-loss infrastructure works, but active base-only imitation still does not improve the policy. It slightly improves workspace hard-exceed versus the no-aux grouped run, but reachability and EE tracking remain much worse than the current yaw-assist candidate.
+
+Updated lesson:
+
+Base-only teacher labels are not sufficient for this recovery policy, even when applied continuously during PPO. The next useful policy update should either bring in validated arm/gimbal teacher labels or reuse the stronger yaw-assist policy as the starting point while changing one thing at a time.

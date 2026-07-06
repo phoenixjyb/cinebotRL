@@ -1178,9 +1178,12 @@ def main():
             self.sample_prob_tensor = None
             self.selected = None
             self.optimizer = None
+            self._grouped_head_names = None
+            self._preserve_flat_unselected = False
 
         def _on_training_start(self) -> None:
             import torch
+            from scripts.reinforcement_learning.sb3.grouped_policy import GroupedActionMlpExtractor
 
             if self.gradient_steps <= 0:
                 raise ValueError("--base_assist_aux_gradient_steps must be positive when aux dataset is enabled")
@@ -1208,7 +1211,8 @@ def main():
             if not np.isfinite(observations).all() or not np.isfinite(actions).all() or not np.isfinite(mask).all():
                 raise ValueError(f"{self.dataset_path} contains non-finite values")
 
-            action_dim = self.model.policy.action_net.out_features
+            policy = self.model.policy
+            action_dim = int(policy.action_space.shape[0])
             invalid = [idx for idx in self.action_indices if idx < 0 or idx >= action_dim]
             if invalid:
                 raise ValueError(f"invalid aux action indices {invalid}; action_dim={action_dim}")
@@ -1237,10 +1241,33 @@ def main():
                     kept_weight = kept_weight / kept_weight.sum()
                     self.sample_prob_tensor = torch.as_tensor(kept_weight, dtype=torch.float32, device=device)
             self.selected = torch.as_tensor(self.action_indices, dtype=torch.long, device=device)
-            self.optimizer = torch.optim.Adam(
-                [self.model.policy.action_net.weight, self.model.policy.action_net.bias],
-                lr=self.lr,
-            )
+
+            extractor = policy.mlp_extractor
+            if isinstance(extractor, GroupedActionMlpExtractor):
+                selected_set = set(int(index) for index in self.action_indices)
+                grouped_head_names = [
+                    name
+                    for name, indices in extractor.action_groups.items()
+                    if selected_set.intersection(indices)
+                ]
+                if not grouped_head_names:
+                    raise ValueError(f"no grouped action heads selected for rows {self.action_indices}")
+                params = []
+                for name in grouped_head_names:
+                    params.extend(extractor.action_heads[name].parameters())
+                self._grouped_head_names = grouped_head_names
+                self._preserve_flat_unselected = False
+            else:
+                if not hasattr(policy.action_net, "weight") or not hasattr(policy.action_net, "bias"):
+                    raise TypeError(
+                        "auxiliary action loss only supports flat action_net policies or "
+                        "GroupedActionMlpExtractor policies"
+                    )
+                params = [policy.action_net.weight, policy.action_net.bias]
+                self._grouped_head_names = None
+                self._preserve_flat_unselected = True
+
+            self.optimizer = torch.optim.Adam(params, lr=self.lr)
 
             if self.verbose > 0:
                 valid_counts = mask.sum(axis=0).astype(float).tolist()
@@ -1248,6 +1275,8 @@ def main():
                 print(f"  dataset: {self.dataset_path}")
                 print(f"  samples: {self.obs_tensor.shape[0]:,}/{observations.shape[0]:,} usable")
                 print(f"  action rows: {self.action_indices}")
+                if self._grouped_head_names is not None:
+                    print(f"  grouped heads: {self._grouped_head_names}")
                 print(f"  valid counts: {valid_counts}")
                 print(
                     "  per rollout: "
@@ -1281,11 +1310,12 @@ def main():
             sample_count = self.obs_tensor.shape[0]
             last_loss = 0.0
 
-            with torch.no_grad():
-                before_weight = policy.action_net.weight.detach().clone()
-                before_bias = policy.action_net.bias.detach().clone()
-                unselected = torch.ones(policy.action_net.out_features, dtype=torch.bool, device=self.model.device)
-                unselected[self.selected] = False
+            if self._preserve_flat_unselected:
+                with torch.no_grad():
+                    before_weight = policy.action_net.weight.detach().clone()
+                    before_bias = policy.action_net.bias.detach().clone()
+                    unselected = torch.ones(policy.action_space.shape[0], dtype=torch.bool, device=self.model.device)
+                    unselected[self.selected] = False
 
             for _ in range(self.gradient_steps):
                 if self.sample_prob_tensor is not None:
@@ -1303,16 +1333,14 @@ def main():
                 self.optimizer.zero_grad()
                 loss = self._masked_mse(self._predict_selected(obs_b), act_b, mask_b)
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(
-                    [policy.action_net.weight, policy.action_net.bias],
-                    self.max_grad_norm,
-                )
+                torch.nn.utils.clip_grad_norm_(self.optimizer.param_groups[0]["params"], self.max_grad_norm)
                 self.optimizer.step()
                 last_loss = float(loss.detach().cpu().item())
 
-                with torch.no_grad():
-                    policy.action_net.weight[unselected] = before_weight[unselected]
-                    policy.action_net.bias[unselected] = before_bias[unselected]
+                if self._preserve_flat_unselected:
+                    with torch.no_grad():
+                        policy.action_net.weight[unselected] = before_weight[unselected]
+                        policy.action_net.bias[unselected] = before_bias[unselected]
 
             self.logger.record("train/base_assist_aux_loss", last_loss)
             if self.verbose > 0 and self.rollout_count % self.log_freq == 0:

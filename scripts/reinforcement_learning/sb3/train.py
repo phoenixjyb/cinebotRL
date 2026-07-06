@@ -312,6 +312,34 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--policy_arch",
+        type=str,
+        default="flat",
+        choices=["flat", "grouped"],
+        help=(
+            "Actor-critic architecture. 'flat' preserves the existing SB3 MlpPolicy. "
+            "'grouped' uses a shared encoder with separate arm/gimbal/base action heads."
+        ),
+    )
+    parser.add_argument(
+        "--grouped_shared_hidden_dims",
+        type=str,
+        default="256,256",
+        help="Comma-separated shared encoder dims for --policy_arch grouped.",
+    )
+    parser.add_argument(
+        "--grouped_head_hidden_dim",
+        type=int,
+        default=128,
+        help="Hidden dim for each grouped action head.",
+    )
+    parser.add_argument(
+        "--grouped_value_hidden_dims",
+        type=str,
+        default="256,128",
+        help="Comma-separated value-network dims for --policy_arch grouped.",
+    )
+    parser.add_argument(
         "--base_assist_aux_dataset",
         type=str,
         default=None,
@@ -721,6 +749,61 @@ def parse_args():
     )
     
     return parser.parse_args()
+
+
+def _parse_int_list(raw: str) -> list[int]:
+    return [int(item.strip()) for item in raw.split(",") if item.strip()]
+
+
+def _policy_action_dim(policy) -> int:
+    return int(policy.action_space.shape[0])
+
+
+def _copy_pretrained_actor(model, bc_model, action_indices: list[int] | None) -> str:
+    """Copy actor weights from BC model to PPO model for flat or grouped policies."""
+
+    import torch
+
+    from scripts.reinforcement_learning.sb3.grouped_policy import GroupedActionMlpExtractor
+
+    target_extractor = model.policy.mlp_extractor
+    source_extractor = bc_model.policy.mlp_extractor
+    if isinstance(target_extractor, GroupedActionMlpExtractor):
+        if not isinstance(source_extractor, GroupedActionMlpExtractor):
+            raise TypeError("grouped PPO warm-start requires a grouped BC policy")
+        target_extractor.copy_actor_from(
+            source_extractor,
+            action_indices=action_indices,
+            zero_unselected=action_indices is not None,
+        )
+        if action_indices is None:
+            return "grouped shared encoder and all grouped action heads"
+        return f"grouped shared encoder and selected action rows {action_indices}; zeroed non-selected rows"
+
+    if isinstance(source_extractor, GroupedActionMlpExtractor):
+        raise TypeError("flat PPO warm-start cannot copy directly from a grouped BC policy")
+
+    model.policy.mlp_extractor.policy_net.load_state_dict(
+        bc_model.policy.mlp_extractor.policy_net.state_dict()
+    )
+    if action_indices is None:
+        model.policy.action_net.load_state_dict(bc_model.policy.action_net.state_dict())
+        return "flat actor feature weights and all action head rows"
+
+    with torch.no_grad():
+        selected = set(action_indices)
+        for action_idx in range(_policy_action_dim(model.policy)):
+            if action_idx not in selected:
+                model.policy.action_net.weight.data[action_idx].zero_()
+                model.policy.action_net.bias.data[action_idx].zero_()
+        for action_idx in action_indices:
+            model.policy.action_net.weight.data[action_idx].copy_(
+                bc_model.policy.action_net.weight.data[action_idx]
+            )
+            model.policy.action_net.bias.data[action_idx].copy_(
+                bc_model.policy.action_net.bias.data[action_idx]
+            )
+    return f"flat actor feature weights and action head rows {action_indices}; zeroed non-selected rows"
 
 
 def resolve_render_experience(args) -> str | None:
@@ -2416,27 +2499,53 @@ def main():
             # Enhanced network architecture for Proto2 trajectory tracking.
             obs_dim = int(np.prod(env.observation_space.shape))
             action_dim = int(np.prod(env.action_space.shape))
-            policy_kwargs = dict(
-                net_arch=dict(
-                    pi=[256, 256, 128],
-                    vf=[256, 256, 128],
-                ),
-                activation_fn=torch.nn.ReLU,
-                ortho_init=True,  # Orthogonal initialization (better for RL)
-                log_std_init=-2.0,  # Proto2 v2: std ~0.14 to avoid destabilizing random startup actions
-            )
+            policy_class = "MlpPolicy"
+            if args.policy_arch == "grouped":
+                from scripts.reinforcement_learning.sb3.grouped_policy import GroupedActorCriticPolicy
+
+                shared_dims = _parse_int_list(args.grouped_shared_hidden_dims)
+                value_dims = _parse_int_list(args.grouped_value_hidden_dims)
+                policy_class = GroupedActorCriticPolicy
+                policy_kwargs = dict(
+                    shared_hidden_dims=shared_dims,
+                    head_hidden_dim=args.grouped_head_hidden_dim,
+                    value_hidden_dims=value_dims,
+                    activation_fn=torch.nn.ELU,
+                    ortho_init=True,
+                    log_std_init=-2.0,
+                )
+            else:
+                policy_kwargs = dict(
+                    net_arch=dict(
+                        pi=[256, 256, 128],
+                        vf=[256, 256, 128],
+                    ),
+                    activation_fn=torch.nn.ReLU,
+                    ortho_init=True,  # Orthogonal initialization (better for RL)
+                    log_std_init=-2.0,  # Proto2 v2: std ~0.14 to avoid destabilizing random startup actions
+                )
             
             print("    Network Architecture:")
-            print(f"      Actor (Policy):  [{obs_dim}] -> [256] -> [256] -> [128] -> [{action_dim}]")
-            print(f"      Critic (Value):  [{obs_dim}] -> [256] -> [256] -> [128] -> [1]")
+            if args.policy_arch == "grouped":
+                print(f"      Policy arch:     grouped shared/action-head actor")
+                print(f"      Shared encoder:  [{obs_dim}] -> {shared_dims}")
+                print(f"      Arm head:        [{shared_dims[-1]}] -> [{args.grouped_head_hidden_dim}] -> [3]")
+                print(f"      Gimbal head:     [{shared_dims[-1]}] -> [{args.grouped_head_hidden_dim}] -> [3]")
+                print(f"      Base head:       [{shared_dims[-1]}] -> [{args.grouped_head_hidden_dim}] -> [3]")
+                print(f"      Action order:    [arm0..2, gimbal0..2, base_vx, base_vy, base_wz] -> [{action_dim}]")
+                print(f"      Critic latent:   [{obs_dim}] -> {value_dims} -> [1]")
+            else:
+                print(f"      Policy arch:     flat SB3 MlpPolicy")
+                print(f"      Actor (Policy):  [{obs_dim}] -> [256] -> [256] -> [128] -> [{action_dim}]")
+                print(f"      Critic (Value):  [{obs_dim}] -> [256] -> [256] -> [128] -> [1]")
             print("    Action Distribution:")
             print("      Initial std:     ~0.14 (log_std_init=-2.0)")
             print("      Std control:     Entropy decay + KL schedule")
             
             model = PPO(
-                "MlpPolicy",
+                policy_class,
                 env,
-                policy_kwargs=policy_kwargs,  # Use enhanced architecture
+                policy_kwargs=policy_kwargs,
                 learning_rate=args.learning_rate,
                 n_steps=args.n_steps,
                 batch_size=args.batch_size,
@@ -2464,45 +2573,18 @@ def main():
                     bc_model = PPO.load(args.pretrained_policy, device=device)
                     action_indices = None
                     if args.pretrained_action_indices:
-                        action_indices = [
-                            int(idx.strip())
-                            for idx in args.pretrained_action_indices.split(",")
-                            if idx.strip()
-                        ]
+                        action_indices = _parse_int_list(args.pretrained_action_indices)
                         invalid = [
                             idx
                             for idx in action_indices
-                            if idx < 0 or idx >= model.policy.action_net.out_features
+                            if idx < 0 or idx >= _policy_action_dim(model.policy)
                         ]
                         if invalid:
                             raise ValueError(
                                 f"invalid pretrained action indices {invalid}; "
-                                f"action_dim={model.policy.action_net.out_features}"
+                                f"action_dim={_policy_action_dim(model.policy)}"
                             )
-                    # Transfer actor network weights only (policy, not value function)
-                    model.policy.mlp_extractor.policy_net.load_state_dict(
-                        bc_model.policy.mlp_extractor.policy_net.state_dict()
-                    )
-                    if action_indices is None:
-                        model.policy.action_net.load_state_dict(
-                            bc_model.policy.action_net.state_dict()
-                        )
-                        copied_action_desc = "all action head rows"
-                    else:
-                        with torch.no_grad():
-                            selected = set(action_indices)
-                            for action_idx in range(model.policy.action_net.out_features):
-                                if action_idx not in selected:
-                                    model.policy.action_net.weight.data[action_idx].zero_()
-                                    model.policy.action_net.bias.data[action_idx].zero_()
-                            for action_idx in action_indices:
-                                model.policy.action_net.weight.data[action_idx].copy_(
-                                    bc_model.policy.action_net.weight.data[action_idx]
-                                )
-                                model.policy.action_net.bias.data[action_idx].copy_(
-                                    bc_model.policy.action_net.bias.data[action_idx]
-                                )
-                        copied_action_desc = f"action head rows {action_indices}; zeroed non-selected rows"
+                    copied_action_desc = _copy_pretrained_actor(model, bc_model, action_indices)
                     if args.copy_pretrained_log_std:
                         if action_indices is None:
                             model.policy.log_std.data.copy_(bc_model.policy.log_std.data)
@@ -2519,7 +2601,7 @@ def main():
                     if action_indices is not None and args.pretrained_unselected_log_std is not None:
                         with torch.no_grad():
                             selected = set(action_indices)
-                            for action_idx in range(model.policy.action_net.out_features):
+                            for action_idx in range(_policy_action_dim(model.policy)):
                                 if action_idx not in selected:
                                     model.policy.log_std.data[action_idx] = float(
                                         args.pretrained_unselected_log_std
@@ -2550,6 +2632,7 @@ def main():
     print("TRAINING CONFIGURATION")
     print("=" * 70)
     print(f"Task:              {args.task}")
+    print(f"Policy arch:       {args.policy_arch}")
     print(f"Num environments:  {args.num_envs}")
     print(f"Total timesteps:   {args.total_timesteps:,}")
     print(f"Learning rate:     {args.learning_rate}")

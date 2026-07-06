@@ -62,6 +62,31 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated hidden layer sizes matching train.py net_arch",
     )
     parser.add_argument(
+        "--policy_arch",
+        type=str,
+        default="flat",
+        choices=["flat", "grouped"],
+        help="Output SB3 policy architecture: flat MlpPolicy or grouped arm/gimbal/base heads.",
+    )
+    parser.add_argument(
+        "--grouped_shared_hidden_dims",
+        type=str,
+        default="256,256",
+        help="Comma-separated shared encoder dims for --policy_arch grouped.",
+    )
+    parser.add_argument(
+        "--grouped_head_hidden_dim",
+        type=int,
+        default=128,
+        help="Hidden dim for each grouped action head.",
+    )
+    parser.add_argument(
+        "--grouped_value_hidden_dims",
+        type=str,
+        default="256,128",
+        help="Comma-separated value-network dims for grouped SB3 export.",
+    )
+    parser.add_argument(
         "--device",
         type=str,
         default="auto",
@@ -112,6 +137,33 @@ def build_mlp(input_dim: int, hidden_sizes: list[int], output_dim: int) -> nn.Se
     return nn.Sequential(*layers)
 
 
+class GroupedBCPolicyNet(nn.Module):
+    """BC actor wrapper using the grouped SB3 extractor."""
+
+    def __init__(
+        self,
+        obs_dim: int,
+        act_dim: int,
+        shared_hidden_dims: list[int],
+        head_hidden_dim: int,
+        activation_fn: type[nn.Module] = nn.ELU,
+    ) -> None:
+        super().__init__()
+        from scripts.reinforcement_learning.sb3.grouped_policy import GroupedActionMlpExtractor
+
+        self.extractor = GroupedActionMlpExtractor(
+            feature_dim=obs_dim,
+            action_dim=act_dim,
+            shared_hidden_dims=shared_hidden_dims,
+            head_hidden_dim=head_hidden_dim,
+            value_hidden_dims=(256, 128),
+            activation_fn=activation_fn,
+        )
+
+    def forward(self, obs: torch.Tensor) -> torch.Tensor:
+        return self.extractor.forward_actor(obs)
+
+
 # ---------------------------------------------------------------------------
 # BC training
 # ---------------------------------------------------------------------------
@@ -130,8 +182,17 @@ def train_bc(
     else:
         device = args.device
 
-    hidden_sizes = [int(x) for x in args.hidden_sizes.split(",")]
-    net = build_mlp(args.obs_dim, hidden_sizes, args.act_dim).to(device)
+    hidden_sizes = [int(x) for x in args.hidden_sizes.split(",") if x.strip()]
+    if args.policy_arch == "grouped":
+        shared_hidden_dims = [int(x) for x in args.grouped_shared_hidden_dims.split(",") if x.strip()]
+        net = GroupedBCPolicyNet(
+            obs_dim=args.obs_dim,
+            act_dim=args.act_dim,
+            shared_hidden_dims=shared_hidden_dims,
+            head_hidden_dim=args.grouped_head_hidden_dim,
+        ).to(device)
+    else:
+        net = build_mlp(args.obs_dim, hidden_sizes, args.act_dim).to(device)
 
     # Split train / val
     dataset     = BCDataset(obs, acts, action_mask)
@@ -206,6 +267,10 @@ def save_as_sb3_policy(
     output_path: str,
     hidden_sizes: list[int],
     device: str,
+    policy_arch: str = "flat",
+    grouped_shared_hidden_dims: list[int] | None = None,
+    grouped_head_hidden_dim: int = 128,
+    grouped_value_hidden_dims: list[int] | None = None,
 ) -> None:
     """Transplant trained BC weights into a PPO MlpPolicy and save as .zip.
 
@@ -234,6 +299,29 @@ def save_as_sb3_policy(
 
         def step(self, action):
             return obs_space.sample(), 0.0, False, False, {}
+
+    if policy_arch == "grouped":
+        from scripts.reinforcement_learning.sb3.grouped_policy import GroupedActorCriticPolicy
+
+        ppo_model = PPO(
+            GroupedActorCriticPolicy,
+            _DummyEnv(),
+            policy_kwargs=dict(
+                shared_hidden_dims=grouped_shared_hidden_dims or [256, 256],
+                head_hidden_dim=grouped_head_hidden_dim,
+                value_hidden_dims=grouped_value_hidden_dims or [256, 128],
+                activation_fn=torch.nn.ELU,
+                log_std_init=-2.0,
+            ),
+            device=device,
+            verbose=0,
+        )
+        if not isinstance(trained_net, GroupedBCPolicyNet):
+            raise TypeError(f"grouped export requires GroupedBCPolicyNet, got {type(trained_net)!r}")
+        ppo_model.policy.mlp_extractor.copy_actor_from(trained_net.extractor)
+        ppo_model.save(output_path)
+        print(f"[OK] SB3-compatible grouped policy saved to: {output_path}.zip")
+        return
 
     ppo_model = PPO(
         "MlpPolicy",
@@ -325,6 +413,8 @@ def main() -> None:
         args.obs_dim = observations.shape[1]
 
     hidden_sizes = [int(x) for x in args.hidden_sizes.split(",")]
+    grouped_shared_hidden_dims = [int(x) for x in args.grouped_shared_hidden_dims.split(",") if x.strip()]
+    grouped_value_hidden_dims = [int(x) for x in args.grouped_value_hidden_dims.split(",") if x.strip()]
 
     # Train
     trained_net = train_bc(observations, actions, action_mask, args)
@@ -339,6 +429,10 @@ def main() -> None:
         output_path=output_path,
         hidden_sizes=hidden_sizes,
         device=device,
+        policy_arch=args.policy_arch,
+        grouped_shared_hidden_dims=grouped_shared_hidden_dims,
+        grouped_head_hidden_dim=args.grouped_head_hidden_dim,
+        grouped_value_hidden_dims=grouped_value_hidden_dims,
     )
 
     # Summary
@@ -350,7 +444,14 @@ def main() -> None:
     print(f"  Total transitions : {total_transitions:,}")
     print(f"  Train / val split : {train_size:,} / {val_size:,}")
     print(f"  Epochs trained    : {args.epochs}")
-    print(f"  Architecture      : {args.obs_dim} → {' → '.join(str(h) for h in hidden_sizes)} → {args.act_dim}")
+    if args.policy_arch == "grouped":
+        print(
+            "  Architecture      : grouped "
+            f"shared={grouped_shared_hidden_dims}, head={args.grouped_head_hidden_dim}, "
+            f"value={grouped_value_hidden_dims}, act_dim={args.act_dim}"
+        )
+    else:
+        print(f"  Architecture      : {args.obs_dim} -> {' -> '.join(str(h) for h in hidden_sizes)} -> {args.act_dim}")
     print(f"  Saved to          : {output_path}.zip")
     print(f"{'='*60}\n")
 

@@ -289,3 +289,66 @@ worst source rmse: 0.040504
 ```
 
 Decision: this passes the 20-case in-distribution base-only BC gate and improves over the 6-case smoke. It can be used as a guarded Stage1 base prior or auxiliary signal. It is not evidence that full 9D imitation is ready.
+
+## 2026-07-06 PPO Gate With Gate20 Base BC Aux
+
+A bounded Stage1 PPO gate was run from the 20-case base-only BC policy. The purpose was to test whether the in-distribution base teacher can improve raw recovery without runtime base assist.
+
+Training artifact:
+
+```text
+logs/sb3/recomoproto2trackee_v0/stage1_gate20_basebc_aux_64k_20260706/final_model.zip
+logs/sb3/recomoproto2trackee_v0/stage1_gate20_basebc_aux_64k_20260706/vec_normalize.pkl
+```
+
+Key training settings:
+
+```text
+num_envs: 64
+total_timesteps: 65536
+pretrained_policy: logs/bc/gik_stage1_gate20_baseonly_20260706/bc_policy.zip
+pretrained_action_indices: 6,7,8
+base_assist_aux_dataset: data/gik_stage1_recovery_gate20_basehome0_iter300_20260705/obs_dataset_base_only.npz
+base_assist_aux_action_indices: 6,7,8
+runtime base assist: disabled
+obstacles: enabled, radius=0.20m, height=0.50m
+```
+
+Evaluation artifact:
+
+```text
+evaluation_results/stage1_gate20_basebc_aux_64k_20260706/recovery_eval_raw-policy_20260706_100331.json
+```
+
+Evaluation result on 64 Stage1 recovery episodes:
+
+```text
+unreachable_zone_pct mean: 60.12
+base_target_dist_mean: 0.847 m
+base_target_dist_max mean: 1.547 m
+workspace_hard_exceed_pct mean: 8.54
+obstacle_unsafe_pct: 0.0
+obstacle_collision_pct: 0.0
+obstacle_clearance_min mean: 1.042 m
+ee_pos_error_p95_m mean: 1.717
+ee_ori_error_mean_deg mean: 133.61
+```
+
+Decision: reject as a policy candidate. The gate is safe around obstacles, but reachability and EE/camera tracking remain poor. The result says the 20-case base-only BC prior plus aux loss is not sufficient by itself when runtime base assist is disabled.
+
+A headless rollout recorder was added for deterministic visual diagnostics:
+
+```text
+scripts/reinforcement_learning/sb3/record_recovery_rollout.py
+```
+
+Recorded diagnostic artifact for `crane_down_000`:
+
+```text
+evaluation_results/videos/stage1_gate20_basebc_aux_64k_20260706/crane_down_000_policy.gif
+evaluation_results/videos/stage1_gate20_basebc_aux_64k_20260706/crane_down_000_policy.png
+evaluation_results/videos/stage1_gate20_basebc_aux_64k_20260706/crane_down_000_policy.csv
+evaluation_results/videos/stage1_gate20_basebc_aux_64k_20260706/crane_down_000_policy.json
+```
+
+The recorder confirms the failure mode visually on `crane_down_000`: base-target mean around `1.00m`, max `1.52m`, EE position error mean around `1.47m`.

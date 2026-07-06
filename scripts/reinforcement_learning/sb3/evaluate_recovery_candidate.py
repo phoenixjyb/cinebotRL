@@ -403,6 +403,11 @@ def main() -> int:
             for item in selected_trajectories:
                 print(f"  - {item}")
 
+        checkpoint_obs_space = PPO.load(
+            str(checkpoint), device="cpu", print_system_info=False
+        ).observation_space
+        expected_obs_dim = int(np.prod(checkpoint_obs_space.shape))
+
         env_cfg = MobileMMTrackEEEnvCfg()
         env_cfg.num_envs = args.num_envs
         env_cfg.scene.num_envs = args.num_envs
@@ -443,8 +448,10 @@ def main() -> int:
         base_env = MobileMMTrackEEEnv(cfg=env_cfg)
 
         class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):
-            def __init__(self, venv):
+            def __init__(self, venv, expected_dim: int | None = None):
                 super().__init__(venv)
+                self.expected_dim = expected_dim
+                self._obs_adapter_logged = False
                 if hasattr(venv.action_space, "shape") and len(venv.action_space.shape) > 1:
                     action_dim = venv.action_space.shape[-1]
                     self.action_space = spaces.Box(
@@ -459,8 +466,34 @@ def main() -> int:
                     low=-np.inf, high=np.inf, shape=obs_shape, dtype=np.float32
                 )
 
-            @staticmethod
-            def _convert_obs(obs):
+            def _adapt_obs_dim(self, obs: np.ndarray) -> np.ndarray:
+                if self.expected_dim is None:
+                    return obs
+                if obs.ndim == 2 and obs.shape[1] == self.expected_dim:
+                    return obs
+                if obs.ndim == 1 and obs.shape[0] == self.expected_dim:
+                    return obs
+                # Some recorded-trajectory eval configs append progress while older
+                # PPO checkpoints were trained on the raw 84D policy observation.
+                if obs.ndim == 2 and obs.shape[1] == self.expected_dim + 1:
+                    if not self._obs_adapter_logged:
+                        print(
+                            "[obs-adapter] Dropping final observation column "
+                            f"for checkpoint compatibility: {obs.shape[1]} -> {self.expected_dim}"
+                        )
+                        self._obs_adapter_logged = True
+                    return obs[:, : self.expected_dim]
+                if obs.ndim == 1 and obs.shape[0] == self.expected_dim + 1:
+                    if not self._obs_adapter_logged:
+                        print(
+                            "[obs-adapter] Dropping final observation column "
+                            f"for checkpoint compatibility: {obs.shape[0]} -> {self.expected_dim}"
+                        )
+                        self._obs_adapter_logged = True
+                    return obs[: self.expected_dim]
+                return obs
+
+            def _convert_obs(self, obs):
                 if isinstance(obs, tuple):
                     obs = obs[0]
                 if isinstance(obs, dict):
@@ -469,7 +502,7 @@ def main() -> int:
                     obs = obs.detach()
                 if hasattr(obs, "cpu"):
                     obs = obs.cpu()
-                return np.asarray(obs, dtype=np.float32)
+                return self._adapt_obs_dim(np.asarray(obs, dtype=np.float32))
 
             def reset(self):
                 return self._convert_obs(self.venv.reset())
@@ -496,7 +529,7 @@ def main() -> int:
                     infos = [{} for _ in range(len(rewards))]
                 return obs, rewards, dones, infos
 
-        env = IsaacLabToSB3VecEnvWrapper(base_env)
+        env = IsaacLabToSB3VecEnvWrapper(base_env, expected_obs_dim)
         env = VecNormalize.load(str(vec_path), env)
         env.training = False
         env.norm_reward = False

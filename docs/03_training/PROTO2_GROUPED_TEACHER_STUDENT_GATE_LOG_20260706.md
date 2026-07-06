@@ -256,3 +256,32 @@ NVIDIA-SMI has failed because you do not have sufficient permissions.
 Decision:
 
 Do not interpret this as a training or policy failure. The next gate is blocked by the host GPU/driver state. Resume the yaw-assist + base-aux smoke only after Windows reports the NVIDIA display adapter as `OK` and WSL/Isaac can see CUDA again.
+
+Follow-up recovery attempts from WSL:
+
+- Cleared stale Isaac/Windows-Python processes from previous evaluation commands.
+- Rechecked `/usr/lib/wsl/lib/nvidia-smi`; NVML still failed.
+- Tried `pnputil /restart-device` for the exact NVIDIA PCI instance; blocked with `Access denied`.
+- Tried restarting `NVDisplay.ContainerLocalSystem`; blocked because the shell is not elevated.
+
+Privilege state:
+
+- Windows token is medium integrity.
+- `BUILTIN\Administrators` appears as deny-only, so this WSL-launched PowerShell cannot perform device-manager or service-control recovery.
+
+Required host action:
+
+Run one of the following from an elevated Windows desktop/session, then recheck WSL CUDA:
+
+```powershell
+pnputil /restart-device "PCI\VEN_10DE&DEV_2C34&SUBSYS_20521028&REV_A1\287078D8CC2DB04800"
+nvidia-smi
+```
+
+If the device remains Code 43, reboot Windows or clean-reinstall the NVIDIA driver. After recovery, WSL should satisfy:
+
+```bash
+/usr/lib/wsl/lib/nvidia-smi
+```
+
+Only then rerun the yaw-assist + base-aux smoke.

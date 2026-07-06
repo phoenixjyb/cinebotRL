@@ -81,6 +81,15 @@ def quat_to_yaw(quat: torch.Tensor) -> torch.Tensor:
     return yaw
 
 
+def yaw_to_quat(yaw: torch.Tensor) -> torch.Tensor:
+    """Construct a world-frame yaw-only quaternion in Isaac's wxyz convention."""
+    quat = torch.zeros(yaw.shape + (4,), device=yaw.device, dtype=yaw.dtype)
+    half_yaw = 0.5 * yaw
+    quat[..., 0] = torch.cos(half_yaw)
+    quat[..., 3] = torch.sin(half_yaw)
+    return quat
+
+
 @configclass
 class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
     """Configuration for the mobile manipulator tracking environment."""
@@ -461,8 +470,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         print(f"[MobileMMTrackEE] DEBUG: About to call super().__init__() with cfg.num_envs={cfg.num_envs if cfg else 'None'}")
 
-        # DirectRLEnv only takes cfg, not render_mode
-        super().__init__(cfg, **kwargs)
+        # Forward render_mode so Gymnasium RecordVideo can request Isaac RGB frames.
+        super().__init__(cfg, render_mode=render_mode, **kwargs)
 
         print(f"[MobileMMTrackEE] DEBUG: After super().__init__(), self.num_envs={self.num_envs}")
 
@@ -1585,8 +1594,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         root_state[:, 0:3] = self.robot.data.root_pos_w
         root_state[:, 2] = 0.0  # Keep chassis at ground level
 
-        # Orientation [3:7] - preserve current quaternion
-        root_state[:, 3:7] = self.robot.data.root_quat_w
+        # Orientation [3:7] - holonomic base is planar: keep yaw, remove roll/pitch.
+        root_state[:, 3:7] = yaw_to_quat(theta)
 
         # Linear velocity [7:10]
         root_state[:, 7] = vel_world_x  # X velocity (world frame)
@@ -1904,12 +1913,26 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         root_ang_vel = self.robot.data.root_ang_vel_w[env_sel]
 
         quat_norm = torch.norm(root_quat, dim=-1)
-        needs_repair = (
+        safe_quat = root_quat / torch.clamp(quat_norm.unsqueeze(-1), min=1e-6)
+        yaw_only_quat = yaw_to_quat(quat_to_yaw(safe_quat))
+        quat_planar_alignment = torch.abs(torch.sum(safe_quat * yaw_only_quat, dim=-1))
+        finite_bad = (
             (~torch.isfinite(root_pos)).any(dim=-1)
             | (~torch.isfinite(root_quat)).any(dim=-1)
             | (quat_norm < 1e-6)
             | (~torch.isfinite(root_lin_vel)).any(dim=-1)
             | (~torch.isfinite(root_ang_vel)).any(dim=-1)
+        )
+        planar_bad = (
+            (torch.abs(root_pos[:, 2]) > 1e-3)
+            | (quat_planar_alignment < 0.999)
+            | (torch.abs(root_lin_vel[:, 2]) > 1e-3)
+            | (torch.abs(root_ang_vel[:, 0]) > 1e-3)
+            | (torch.abs(root_ang_vel[:, 1]) > 1e-3)
+        )
+        needs_repair = (
+            finite_bad
+            | planar_bad
         )
         if not needs_repair.any():
             return
@@ -1920,6 +1943,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             repair_env_ids = env_ids[needs_repair]
 
         repaired_root_state = self.robot.data.default_root_state[repair_env_ids].clone()
+        current_pos = self.robot.data.root_pos_w[repair_env_ids].clone()
         fallback_pos = repaired_root_state[:, 0:3]
         if hasattr(self, "_episode_start_base_pos"):
             episode_pos = self._episode_start_base_pos[repair_env_ids]
@@ -1927,10 +1951,17 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         elif hasattr(self, "prev_base_pos"):
             prev_pos = self.prev_base_pos[repair_env_ids]
             fallback_pos = torch.where(torch.isfinite(prev_pos), prev_pos, fallback_pos)
-        repaired_root_state[:, 0:3] = fallback_pos
+        use_current_pos = torch.isfinite(current_pos).all(dim=-1, keepdim=True)
+        repaired_root_state[:, 0:3] = torch.where(use_current_pos, current_pos, fallback_pos)
         repaired_root_state[:, 2] = 0.0
-        repaired_root_state[:, 3:7] = 0.0
-        repaired_root_state[:, 3] = 1.0
+        current_quat = self.robot.data.root_quat_w[repair_env_ids].clone()
+        current_quat_norm = torch.norm(current_quat, dim=-1, keepdim=True)
+        valid_quat = torch.isfinite(current_quat).all(dim=-1, keepdim=True) & (current_quat_norm > 1e-6)
+        safe_current_quat = current_quat / torch.clamp(current_quat_norm, min=1e-6)
+        repaired_yaw_quat = yaw_to_quat(quat_to_yaw(safe_current_quat))
+        identity_quat = torch.zeros_like(repaired_yaw_quat)
+        identity_quat[:, 0] = 1.0
+        repaired_root_state[:, 3:7] = torch.where(valid_quat, repaired_yaw_quat, identity_quat)
         repaired_root_state[:, 7:13] = 0.0
 
         self.robot.write_root_state_to_sim(repaired_root_state, env_ids=repair_env_ids)

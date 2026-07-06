@@ -69,6 +69,37 @@ def parse_args():
         help="Run in headless mode (no GUI)",
     )
     parser.add_argument(
+        "--enable_cameras",
+        action="store_true",
+        help="Enable Isaac rendering/camera extensions. Required for headless video recording.",
+    )
+    parser.add_argument(
+        "--video",
+        action="store_true",
+        help="Record Isaac-rendered RGB training clips with Gymnasium RecordVideo.",
+    )
+    parser.add_argument(
+        "--video_length",
+        type=int,
+        default=400,
+        help="Length of each rendered training video clip in environment steps.",
+    )
+    parser.add_argument(
+        "--video_interval",
+        type=int,
+        default=10_000,
+        help="Record one rendered training clip every N environment steps.",
+    )
+    parser.add_argument(
+        "--render_experience",
+        type=str,
+        default=None,
+        help=(
+            "Isaac/Kit experience file to use for rendering. Defaults to the local "
+            "D3D12 headless rendering app when --video is enabled and it exists."
+        ),
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=None,
@@ -692,6 +723,43 @@ def parse_args():
     return parser.parse_args()
 
 
+def resolve_render_experience(args) -> str | None:
+    """Pick the Isaac rendering app that works on the Windows/Blackwell host."""
+    if args.render_experience:
+        return args.render_experience
+    if not args.video:
+        return None
+
+    candidates = [
+        Path(r"G:\isaaclab\apps\isaaclab.python.headless.rendering.d3d12.kit"),
+        Path("/mnt/g/isaaclab/apps/isaaclab.python.headless.rendering.d3d12.kit"),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
+def attach_record_video_vecenv_passthrough(video_env, raw_env):
+    """Expose Isaac VecEnv attributes hidden by Gymnasium RecordVideo."""
+    for name in ("num_envs", "device", "render_mode"):
+        if name != "render_mode" and hasattr(video_env, name):
+            continue
+        if name == "render_mode" and getattr(video_env, name, None) is not None:
+            continue
+        for source in (raw_env, getattr(raw_env, "unwrapped", None)):
+            if source is not None and hasattr(source, name):
+                value = getattr(source, name)
+                if name == "render_mode" and value is None:
+                    continue
+                setattr(video_env, name, value)
+                break
+        else:
+            if name == "render_mode":
+                setattr(video_env, name, "rgb_array")
+    return video_env
+
+
 def main():
     """Main training loop."""
     args = parse_args()
@@ -784,11 +852,17 @@ def main():
                     print(f"       Hint: try --num_envs {recommended_envs // 2}")
         
         # Create AppLauncher to initialize Isaac Sim
-        app_launcher = AppLauncher(
-            headless=args.headless,
-            enable_cameras=False,
-            device=f"cuda:{best_device}",
-        )
+        render_experience = resolve_render_experience(args)
+        app_launcher_kwargs = {
+            "headless": args.headless,
+            "enable_cameras": bool(args.enable_cameras or args.video),
+            "video": bool(args.video),
+            "device": f"cuda:{best_device}",
+        }
+        if render_experience:
+            app_launcher_kwargs["experience"] = render_experience
+            print(f"    [OK] Using Isaac render experience: {render_experience}")
+        app_launcher = AppLauncher(**app_launcher_kwargs)
         simulation_app = app_launcher.app
         print("    [OK] Isaac Sim initialized")
         
@@ -2062,7 +2136,18 @@ def main():
         
         # Create environment directly with config
         from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnv
-        env = MobileMMTrackEEEnv(cfg=env_cfg)
+        env = MobileMMTrackEEEnv(cfg=env_cfg, render_mode="rgb_array" if args.video else None)
+
+        if args.video:
+            video_dir = os.path.join(args.log_dir, "videos", "train")
+            env = attach_record_video_vecenv_passthrough(gym.wrappers.RecordVideo(
+                env,
+                video_dir,
+                step_trigger=lambda step: step % args.video_interval == 0,
+                video_length=args.video_length,
+                disable_logger=True,
+            ), env)
+            print(f"    [OK] Isaac rendered video recording enabled: {video_dir}")
         
         print(f"    [OK] Environment created")
         if args.trajectory_type == "multi_recorded":
@@ -2488,6 +2573,10 @@ def main():
         print(f"  -> Phase splits:  10% warmup, 70% main, 20% finetune")
     print(f"Save frequency:    {args.save_freq:,} steps")
     print(f"Log directory:     {args.log_dir}")
+    print(f"Rendered video:    {'yes' if args.video else 'no'}")
+    if args.video:
+        print(f"  -> Length:       {args.video_length} steps")
+        print(f"  -> Interval:     {args.video_interval} steps")
     print(f"Device:            {device}")
     print("Seed:              {}".format(args.seed if args.seed is not None else "None"))
     if args.pretrained_policy:

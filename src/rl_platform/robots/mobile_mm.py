@@ -27,7 +27,12 @@ def get_mobile_mm_assets() -> MobileManipulatorAssets:
     """Return paths to the mobile manipulator USD and supporting configuration."""
     # Latest PNC URDF (recomoProto2-1190) converted to USD.
     usd_dir = assets_root() / "recomoProto2-1190_moveit"
-    usd_path = usd_dir / "recomoProto2-1190_moveit.usd"
+    # The importer wrapper keeps mesh libraries outside the default prim, which
+    # makes IsaacLab's spawned reference lose robot visuals. Prefer the baked
+    # stage where visual/collision meshes are descendants of the robot prim.
+    usd_path = usd_dir / "recomoProto2-1190_moveit_wrapper_baked_scaled.usd"
+    if not usd_path.is_file():
+        usd_path = usd_dir / "recomoProto2-1190_moveit.usd"
 
     # Fallbacks keep the previous Proto1/legacy setups runnable while Proto2 is
     # being generated or validated on a new machine.

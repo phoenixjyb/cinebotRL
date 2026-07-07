@@ -835,3 +835,33 @@ Validation:
 Decision:
 
 Promote routed policy selection as the current best operational evaluation strategy. It preserves the fixed-base `large08` reference exactly while using the better moving-base policy for `base_required` trajectories. This is not yet a single deployable checkpoint; it is a policy-routing contract. The next implementation step is to make the same routing available in any runtime/evaluation entrypoint that needs mixed fixed-base and moving-base trajectories.
+
+## Stage B Larger Base-Required Curriculum Seed
+
+Goal:
+
+Start increasing moving-base target displacement before introducing obstacles. Stage B keeps the same validated FK source and action contract as Stage A, but asks the base to cover a larger generated offset.
+
+Implementation:
+
+- extended `scripts/imitation/generate_policy_envelope_fk_base_required_stage.py`
+- added optional `--include_stage_reward_overrides`
+- generated `stage0_policy_envelope_fk_base040`
+- source stage: `stage0_policy_envelope_fk_large08`
+- source dataset: `data/policy_envelope_fk_large08/obs_dataset_policy_envelope_fk_large08_arm6.npz`
+- output dataset: `data/policy_envelope_fk_base040/obs_dataset_policy_envelope_fk_base040_arm6_base3.npz`
+- base action scale: `0.25`
+- base offset radius: `0.16 m`
+- max generated base offset: `0.1649 m`
+- max abs base action: `1.0`
+- base action p95: about `0.133`, so the hard max is a spike rather than the typical command level
+
+Baseline gates:
+
+- current routed policy on `base040`: mean/p95/max EE position error `0.0505 / 0.0749 / 0.1056 m`, mean orientation error `6.35 deg`
+- direct `base040` BC, 40 epochs, offline RMSE `0.0102`, max abs action error `0.2071`
+- direct `base040` BC rollout: mean/p95/max EE position error `0.0495 / 0.0806 / 0.1119 m`, mean orientation error `6.84 deg`
+
+Decision:
+
+Do not promote `base040` yet. The routed Stage A policy can run it, but max error crosses `10 cm`, and direct BC does not improve the tail. Stage B is now a valid curriculum seed, not a solved stage. The next Stage B update should train a bounded PPO continuation from the routed/base-required candidate or use DAgger-style rollout relabeling, with Stage A routed gates kept as regressions.

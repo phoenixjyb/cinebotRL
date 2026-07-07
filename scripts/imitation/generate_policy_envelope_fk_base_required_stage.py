@@ -52,6 +52,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base_offset_radius", type=float, default=0.10)
     parser.add_argument("--max_linear_velocity", type=float, default=1.5)
     parser.add_argument("--waypoint_dt", type=float, default=0.1)
+    parser.add_argument(
+        "--include_stage_reward_overrides",
+        action="store_true",
+        help="Write generated-FK reachability/base reward overrides into reset_config.json.",
+    )
     return parser.parse_args()
 
 
@@ -268,17 +273,30 @@ def main() -> int:
 
     (stage_dir / "manifest.txt").write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
     first_pos = np.asarray(source_trajectories[0][0]["position"], dtype=np.float32)
+    reset_config = {
+        "schema": "policy_envelope_fk_base_required_reset_config_v1",
+        "reset_base_x_offset": float(first_pos[0]),
+        "reset_base_y_offset": float(first_pos[1]),
+        "source": "first source FK waypoint; generated base offset starts at zero",
+        "base_action_scale": float(args.base_action_scale),
+        "base_offset_radius": float(args.base_offset_radius),
+    }
+    if args.include_stage_reward_overrides:
+        reset_config["reward_overrides"] = {
+            "reachability_query_tolerance": 0.2,
+            "reachability_optimal_distance": 0.85,
+            "reachability_hard_margin": 1.05,
+            "reachability_distance_weight": 8.0,
+            "base_target_zone_reward": 4.0,
+            "base_target_far_penalty": 8.0,
+            "base_target_away_penalty": 20.0,
+            "base_target_regression_penalty": 40.0,
+            "base_target_command_reward": 20.0,
+            "base_target_command_away_penalty": 30.0,
+            "base_target_command_tracking_penalty": 40.0,
+        }
     (stage_dir / "reset_config.json").write_text(
-        json.dumps(
-            {
-                "schema": "policy_envelope_fk_base_required_reset_config_v1",
-                "reset_base_x_offset": float(first_pos[0]),
-                "reset_base_y_offset": float(first_pos[1]),
-                "source": "first source FK waypoint; generated base offset starts at zero",
-            },
-            indent=2,
-        )
-        + "\n",
+        json.dumps(reset_config, indent=2) + "\n",
         encoding="utf-8",
     )
 

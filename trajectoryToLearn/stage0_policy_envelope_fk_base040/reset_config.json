@@ -1,0 +1,21 @@
+{
+  "schema": "policy_envelope_fk_base_required_reset_config_v1",
+  "reset_base_x_offset": -0.8364710211753845,
+  "reset_base_y_offset": 0.036605000495910645,
+  "source": "first source FK waypoint; generated base offset starts at zero",
+  "base_action_scale": 0.25,
+  "base_offset_radius": 0.16,
+  "reward_overrides": {
+    "reachability_query_tolerance": 0.2,
+    "reachability_optimal_distance": 0.85,
+    "reachability_hard_margin": 1.05,
+    "reachability_distance_weight": 8.0,
+    "base_target_zone_reward": 4.0,
+    "base_target_far_penalty": 8.0,
+    "base_target_away_penalty": 20.0,
+    "base_target_regression_penalty": 40.0,
+    "base_target_command_reward": 20.0,
+    "base_target_command_away_penalty": 30.0,
+    "base_target_command_tracking_penalty": 40.0
+  }
+}

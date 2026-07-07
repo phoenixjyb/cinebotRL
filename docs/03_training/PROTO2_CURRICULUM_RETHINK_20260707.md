@@ -206,3 +206,54 @@ Promotion gate:
 - compare against the stage0 raw smoke/baseline once available
 - require reachable starts to stay reachable rather than optimizing reward alone
 - do not add obstacles or base-only imitation in this gate
+
+## Stage A 64k Result
+
+Run:
+
+`logs/sb3/recomoproto2trackee_v0/stage0_raw_rl_64k_20260707`
+
+Evaluation:
+
+`evaluation_results/recovery_candidate/stage0_raw_rl_64k_20260707/recovery_eval_raw-policy_20260707_093937.json`
+
+Training result:
+
+- exit code: `0`
+- final training `explained_variance=0.648`
+- final `value_loss=0.058`
+- final `approx_kl=0.0067758746`
+- final `std=0.135`
+
+Raw-policy evaluation:
+
+- `ee_pos_error_mean_m.mean=1.1552`
+- `ee_pos_error_p95_m.mean=1.3234`
+- `ee_ori_error_mean_deg.mean=145.1841`
+- `unreachable_zone_pct.mean=70.9273`
+- `workspace_hard_exceed_pct.mean=0.0`
+- `base_target_dist_mean.mean=0.7977`
+- `base_target_dist_max.mean=0.9729`
+
+Interpretation:
+
+RL-only is runnable, but the first Stage A design is still too loose. At reset the easy trajectories are reachable, but the freely explored base motion quickly moves the robot away from the target. Training reward/value metrics improved, while raw-policy reachability remained poor. This is another example where PPO scalar health is not enough.
+
+Updated Stage A requirement:
+
+Before training arm/gimbal tracking, the base must be controlled:
+
+- freeze base actions for the first raw reachable-hold stage, or
+- mask base actions to zero in the environment, or
+- add a very strong base-stationary penalty and action penalty.
+
+Recommended next engineering change:
+
+Add a CLI option such as `--freeze_base_actions` for Stage A. It should zero action rows `[6,7,8]` before they reach the env dynamics while preserving the 9D policy shape. Then rerun Stage A 64k with base frozen.
+
+New Stage A promotion target:
+
+- `unreachable_zone_pct.mean < 15%`
+- `ee_pos_error_mean_m.mean < 0.5 m`
+- `workspace_hard_exceed_pct.mean = 0`
+- raw-policy eval only

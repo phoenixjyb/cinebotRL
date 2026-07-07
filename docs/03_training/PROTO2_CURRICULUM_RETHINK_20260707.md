@@ -723,3 +723,37 @@ Longer PPO continuation:
 Decision:
 
 Do not promote the `96k` continuation as the default policy. It improves the moving-base micro stage but erodes the fixed-base regression gate. The next improvement should use a mixed objective or mixed evaluation set during training, rather than optimizing only `base025` and checking `large08` after the fact.
+
+## Stage A Mixed-Stage Probe
+
+Goal:
+
+Train with both fixed-base `large08` and moving-base `base025` trajectories in the same PPO run, so the optimizer sees the regression case during training instead of only during post-training evaluation.
+
+Implementation:
+
+- added `scripts/imitation/generate_policy_envelope_fk_mixed_stage.py`
+- generated `stage0_policy_envelope_fk_mix_large08_base025`
+- source stages are interleaved deterministically, not concatenated, so bounded runs with `--max_trajectories` see both sources
+- trajectory count: `24` from `large08` plus `24` from `base025`
+- reused `base025` reward overrides because the mixed stage still contains moving-base generated FK targets
+- added the mixed stage to the `train.py` stage whitelist
+
+Training:
+
+- resumed from the stable `32k` reward-override PPO checkpoint
+- trained `32k` more steps with `--learning_rate 3e-6`, `--policy_log_std_override -4.0`, `--disable_vec_normalize`, and `--base_action_scale 0.25`
+- run: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_mix_large08_base025_lowstd_resume_32k_20260707`
+- training stayed reachable through logged checks: `64/64`
+- final logged `approx_kl=0.00561`
+
+Validation:
+
+- mixed-stage baseline with the original `32k` policy: mean EE position error `0.0474 m`, p95 `0.0738 m`, max `0.0864 m`, mean orientation error `6.00 deg`
+- mixed-stage trained candidate: mean EE position error `0.0446 m`, p95 `0.0690 m`, max `0.0840 m`, mean orientation error `5.65 deg`
+- moving-base `base025` gate: mean EE position error `0.0462 m`, p95 `0.0752 m`, max `0.0952 m`, mean orientation error `5.84 deg`
+- fixed-base `large08` regression: mean EE position error `0.0455 m`, p95 `0.0786 m`, max `0.0904 m`, mean orientation error `5.10 deg`
+
+Decision:
+
+Do not promote the mixed-stage PPO candidate. It improves the aggregate mixed gate, but the component gates show the same underlying issue: pure moving-base performance is weaker than the `96k` candidate, and fixed-base regression is worse than the original `32k` reference. The mixed stage is useful as a diagnostic generator, but the next policy update needs an explicit anti-regression objective or staged policy selection, not just mixed sampling.

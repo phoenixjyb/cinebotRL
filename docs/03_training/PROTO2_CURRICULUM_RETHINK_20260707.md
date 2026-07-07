@@ -691,3 +691,35 @@ Validation:
 Decision:
 
 Promote the accounting fix and the stable PPO probe evidence. Do not claim policy improvement yet: PPO is now stable on `base025`, but it has not materially improved tracking beyond BC. The next update should target policy learning quality, not reachability plumbing.
+
+## Stage A Learning-Quality Probe
+
+Goal:
+
+Improve the `base025` policy without reopening reachability plumbing. The stable reference remains the low-exploration `32k` PPO probe from the reward-override stage.
+
+Weighted BC probe:
+
+- added `--action_loss_weights` to `scripts/reinforcement_learning/bc/pretrain_bc.py`
+- default behavior is unchanged; when specified, masked MSE is weighted per action dimension
+- tested weights `1,1,1,1,1,1,3,3,1` to emphasize chassis `vx/vy`
+- offline result improved strongly: RMSE `0.00367`, max abs action error `0.03563`
+- physical rollout got worse: mean EE position error `0.0485 m`, p95 `0.0995 m`, max `0.1148 m`, mean orientation error `4.70 deg`
+
+Decision:
+
+Do not promote the weighted BC policy. The offline loss improvement did not transfer to the closed-loop Isaac rollout. This is a useful tool for future controlled experiments, but weighted BC artifacts should stay out of the promoted path.
+
+Longer PPO continuation:
+
+- resumed from the stable `32k` reward-override PPO checkpoint
+- trained with `--learning_rate 5e-6`, `--policy_log_std_override -4.0`, `--disable_vec_normalize`, and `--base_action_scale 0.25`
+- run: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base025_rewardoverride_lowstd_resume_96k_20260707`
+- training stayed reachable through logged checks: `64/64`
+- final logged `approx_kl=0.00511`
+- moving-base `base025` gate improved: mean EE position error `0.0434 m`, p95 `0.0694 m`, max `0.0946 m`, mean orientation error `5.90 deg`
+- fixed-base `large08` regression worsened: mean EE position error `0.0416 m`, p95 `0.0730 m`, max `0.0780 m`, mean orientation error `5.01 deg`
+
+Decision:
+
+Do not promote the `96k` continuation as the default policy. It improves the moving-base micro stage but erodes the fixed-base regression gate. The next improvement should use a mixed objective or mixed evaluation set during training, rather than optimizing only `base025` and checking `large08` after the fact.

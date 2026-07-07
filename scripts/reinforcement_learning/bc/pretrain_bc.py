@@ -97,6 +97,15 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Use action_valid_mask from the demo file and compute MSE only on valid labels.",
     )
+    parser.add_argument(
+        "--action_loss_weights",
+        type=str,
+        default=None,
+        help=(
+            "Optional comma-separated per-action loss weights. Example: "
+            "'1,1,1,1,1,1,2,2,1' to emphasize base vx/vy labels."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -204,10 +213,22 @@ def train_bc(
     val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, shuffle=False)
 
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
+    action_weights = torch.ones(args.act_dim, dtype=torch.float32, device=device)
+    if args.action_loss_weights:
+        parsed_weights = [float(x) for x in args.action_loss_weights.split(",") if x.strip()]
+        if len(parsed_weights) != args.act_dim:
+            raise ValueError(
+                f"--action_loss_weights expected {args.act_dim} values, got {len(parsed_weights)}"
+            )
+        action_weights = torch.tensor(parsed_weights, dtype=torch.float32, device=device)
+        if torch.any(action_weights < 0.0):
+            raise ValueError("--action_loss_weights must be non-negative")
+    print(f"[INFO] Action loss weights: {action_weights.detach().cpu().numpy().round(4).tolist()}")
 
     def masked_mse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        sq = (pred - target).pow(2) * mask
-        denom = torch.clamp(mask.sum(), min=1.0)
+        weighted_mask = mask * action_weights.unsqueeze(0)
+        sq = (pred - target).pow(2) * weighted_mask
+        denom = torch.clamp(weighted_mask.sum(), min=1.0)
         return sq.sum() / denom
 
     best_val_loss  = float("inf")

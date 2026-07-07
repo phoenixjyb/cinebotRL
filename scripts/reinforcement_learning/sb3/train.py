@@ -484,6 +484,7 @@ def parse_args():
             "stage0_policy_envelope_fk_medium",
             "stage0_policy_envelope_fk_large08",
             "stage0_policy_envelope_fk_base025",
+            "stage0_policy_envelope_fk_base040",
             "stage0_policy_envelope_fk_mix_large08_base025",
             "stage0_fixedbase_micro",
             "stage0_easy",
@@ -498,6 +499,7 @@ def parse_args():
             "stage0_policy_envelope_fk_medium=medium first-stage FK targets, "
             "stage0_policy_envelope_fk_large08=larger 0.08m FK targets, "
             "stage0_policy_envelope_fk_base025=small base-required FK targets, "
+            "stage0_policy_envelope_fk_base040=larger base-required FK targets, "
             "stage0_policy_envelope_fk_mix_large08_base025=mixed fixed/base-required FK targets, "
             "stage0_fixedbase_micro=fixed-base reachable micro paths, "
             "stage0_easy=short cinematic paths, stage1=recovery, stage2=moderate, "

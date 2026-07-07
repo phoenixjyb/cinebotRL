@@ -865,3 +865,41 @@ Baseline gates:
 Decision:
 
 Do not promote `base040` yet. The routed Stage A policy can run it, but max error crosses `10 cm`, and direct BC does not improve the tail. Stage B is now a valid curriculum seed, not a solved stage. The next Stage B update should train a bounded PPO continuation from the routed/base-required candidate or use DAgger-style rollout relabeling, with Stage A routed gates kept as regressions.
+
+## Stage B Base040 PPO Continuation Probe
+
+Goal:
+
+Test whether a short, low-exploration PPO continuation on the larger `base040` moving-base curriculum improves Stage B without regressing the Stage A routed gates.
+
+Implementation:
+
+- added `stage0_policy_envelope_fk_base040` to the `train.py` trajectory-stage whitelist
+- resumed from the current base-required contract + vertical candidate checkpoint
+- trained `32k` additional PPO steps on `stage0_policy_envelope_fk_base040`
+- used `--learning_rate 3e-6`, `--policy_log_std_override -4.0`, `--disable_vec_normalize`, and `--base_action_scale 0.25`
+- run: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_from_contractz_lowstd_32k_20260707`
+
+Training health:
+
+- CUDA device active
+- stage reward overrides loaded from `stage0_policy_envelope_fk_base040/reset_config.json`
+- base action rows `[6,7,8]` scaled by `0.25`
+- training remained stable through the bounded run
+- final logged `approx_kl=0.00431`, `std=0.0183`
+
+Validation:
+
+- direct `base040` candidate: mean/p95/max EE position error `0.0491 / 0.0761 / 0.1146 m`, mean orientation error `6.22 deg`
+- previous routed `base040` baseline: `0.0505 / 0.0749 / 0.1056 m`
+- routed mixed gate with new base-required checkpoint: `0.0406 / 0.0680 / 0.0754 m`
+- routed `base025` gate with new base-required checkpoint: `0.0437 / 0.0681 / 0.0942 m`
+- routed fixed-base `large08` gate: `0.0374 / 0.0659 / 0.0801 m`, unchanged because fixed-base still routes to the promoted default checkpoint
+
+Decision:
+
+Do not promote the `base040` PPO continuation. It improves some mean metrics and keeps fixed-base routing intact, but it fails the Stage B promotion criterion because the `base040` p95/max tail is worse than the routed baseline, and the `base025` max error also worsens versus the current routed reference. Keep the checkpoint as a diagnostic artifact only.
+
+Next useful update:
+
+Target tail-error reduction on base-required trajectories instead of more same-objective PPO. Prefer a bounded DAgger-style rollout relabeling pass or a tail-weighted evaluation/training objective that explicitly penalizes final-step and p95/max EE position error, while preserving the existing router and fixed-base default checkpoint.

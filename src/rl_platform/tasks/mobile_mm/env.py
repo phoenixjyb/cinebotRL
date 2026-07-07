@@ -185,8 +185,10 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
             actuators={
                 "arm": ImplicitActuatorCfg(
                     joint_names_expr=ARM_JOINT_NAMES_EXPR,
-                    stiffness=400.0,
-                    damping=40.0,
+                    stiffness=2000.0,
+                    damping=200.0,
+                    effort_limit=500.0,
+                    velocity_limit=4.0,
                 ),
                 "base": ImplicitActuatorCfg(
                     joint_names_expr=BASE_JOINT_NAMES,
@@ -2966,38 +2968,39 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         if self.action_history is not None:
             self.action_history[env_ids] = 0.0
 
-        # Randomize initial joint positions (ARM joints only, not base)
+        # Reset arm joints every episode.  Optional randomization adds small
+        # noise around the safe home, but disabling randomization must still
+        # produce the same safe-home reset used by synthetic FK stages.
+        self._arm_joint_ids = self._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
+        safe_arm_home = self.arm_safe_home.to(dtype=self.robot.data.joint_pos.dtype).expand(len(env_ids), -1)
+        reset_arm_joint_pos = safe_arm_home.clone()
         if self.task_cfg.randomize_initial_joint_positions:
-            # Only randomize the 6 arm joints, not the 3 base joints
             arm_joint_noise = torch.randn(
                 len(env_ids), 6, device=self.device
             ) * self.task_cfg.initial_joint_noise_std
+            reset_arm_joint_pos = reset_arm_joint_pos + arm_joint_noise
 
-            self._arm_joint_ids = self._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
-
-            safe_arm_home = self.arm_safe_home.to(dtype=self.robot.data.joint_pos.dtype).expand(len(env_ids), -1)
-            reset_arm_joint_pos = safe_arm_home + arm_joint_noise
-            self._initialize_joint_limits()
-            reset_arm_joint_pos = torch.clamp(
-                reset_arm_joint_pos,
-                self.joint_lower_limits + self.robot_limits["joint_limit_margin"],
-                self.joint_upper_limits - self.robot_limits["joint_limit_margin"],
-            )
-            reset_arm_joint_vel = torch.zeros_like(reset_arm_joint_pos)
-            self.robot.set_joint_position_target(
-                reset_arm_joint_pos,
-                joint_ids=self._arm_joint_ids,
-                env_ids=env_ids
-            )
-            self.robot.write_joint_state_to_sim(
-                reset_arm_joint_pos,
-                reset_arm_joint_vel,
-                joint_ids=self._arm_joint_ids,
-                env_ids=env_ids,
-            )
-            self.filtered_arm_targets[env_ids] = reset_arm_joint_pos
-            self._arm_command_filter_initialized = True
-            self._lock_passive_joints(env_ids=env_ids)
+        self._initialize_joint_limits()
+        reset_arm_joint_pos = torch.clamp(
+            reset_arm_joint_pos,
+            self.joint_lower_limits + self.robot_limits["joint_limit_margin"],
+            self.joint_upper_limits - self.robot_limits["joint_limit_margin"],
+        )
+        reset_arm_joint_vel = torch.zeros_like(reset_arm_joint_pos)
+        self.robot.set_joint_position_target(
+            reset_arm_joint_pos,
+            joint_ids=self._arm_joint_ids,
+            env_ids=env_ids
+        )
+        self.robot.write_joint_state_to_sim(
+            reset_arm_joint_pos,
+            reset_arm_joint_vel,
+            joint_ids=self._arm_joint_ids,
+            env_ids=env_ids,
+        )
+        self.filtered_arm_targets[env_ids] = reset_arm_joint_pos
+        self._arm_command_filter_initialized = True
+        self._lock_passive_joints(env_ids=env_ids)
 
         # Advance trajectory by one step to start
         self.trajectory_manager.step()

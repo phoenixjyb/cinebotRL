@@ -1592,12 +1592,16 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         root_state = torch.zeros(self.num_envs, 13, device=self.device)
 
-        # Position [0:3] - with Z clamped to ground
+        # Position [0:3] - direct root control must advance planar pose explicitly.
+        # Writing velocity alone is not sufficient for this kinematic base setup.
         root_state[:, 0:3] = self.robot.data.root_pos_w
+        root_state[:, 0] = root_state[:, 0] + vel_world_x * dt
+        root_state[:, 1] = root_state[:, 1] + vel_world_y * dt
         root_state[:, 2] = 0.0  # Keep chassis at ground level
 
         # Orientation [3:7] - holonomic base is planar: keep yaw, remove roll/pitch.
-        root_state[:, 3:7] = yaw_to_quat(theta)
+        theta_next = theta + base_wz_scaled.squeeze(-1) * dt
+        root_state[:, 3:7] = yaw_to_quat(theta_next)
 
         # Linear velocity [7:10]
         root_state[:, 7] = vel_world_x  # X velocity (world frame)
@@ -1943,9 +1947,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             repair_env_ids = torch.nonzero(needs_repair, as_tuple=False).squeeze(-1)
         else:
             repair_env_ids = env_ids[needs_repair]
+        finite_repair_mask = finite_bad[needs_repair]
 
         repaired_root_state = self.robot.data.default_root_state[repair_env_ids].clone()
         current_pos = self.robot.data.root_pos_w[repair_env_ids].clone()
+        current_lin_vel = root_lin_vel[needs_repair].clone()
+        current_ang_vel = root_ang_vel[needs_repair].clone()
         fallback_pos = repaired_root_state[:, 0:3]
         if hasattr(self, "_episode_start_base_pos"):
             episode_pos = self._episode_start_base_pos[repair_env_ids]
@@ -1965,13 +1972,20 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         identity_quat[:, 0] = 1.0
         repaired_root_state[:, 3:7] = torch.where(valid_quat, repaired_yaw_quat, identity_quat)
         repaired_root_state[:, 7:13] = 0.0
+        planar_only_mask = ~finite_repair_mask
+        if planar_only_mask.any():
+            repaired_root_state[planar_only_mask, 7] = current_lin_vel[planar_only_mask, 0]
+            repaired_root_state[planar_only_mask, 8] = current_lin_vel[planar_only_mask, 1]
+            repaired_root_state[planar_only_mask, 12] = current_ang_vel[planar_only_mask, 2]
 
         self.robot.write_root_state_to_sim(repaired_root_state, env_ids=repair_env_ids)
-        self.current_commanded_vel[repair_env_ids] = 0.0
-        self.prev_commanded_vel[repair_env_ids] = 0.0
-        self.prev_commanded_accel[repair_env_ids] = 0.0
-        self.prev_base_lin_vel[repair_env_ids] = 0.0
-        self.prev_base_accel[repair_env_ids] = 0.0
+        if finite_repair_mask.any():
+            finite_repair_env_ids = repair_env_ids[finite_repair_mask]
+            self.current_commanded_vel[finite_repair_env_ids] = 0.0
+            self.prev_commanded_vel[finite_repair_env_ids] = 0.0
+            self.prev_commanded_accel[finite_repair_env_ids] = 0.0
+            self.prev_base_lin_vel[finite_repair_env_ids] = 0.0
+            self.prev_base_accel[finite_repair_env_ids] = 0.0
         self.prev_base_pos[repair_env_ids] = repaired_root_state[:, 0:3]
 
         if self._base_root_repair_count < 5:

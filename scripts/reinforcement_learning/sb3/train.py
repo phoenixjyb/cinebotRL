@@ -321,6 +321,12 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--policy_log_std_override",
+        type=float,
+        default=None,
+        help="Set all policy log_std entries after checkpoint/pretrained loading.",
+    )
+    parser.add_argument(
         "--freeze_base_actions",
         action="store_true",
         help=(
@@ -468,6 +474,7 @@ def parse_args():
             "stage0_policy_envelope_fk_slow",
             "stage0_policy_envelope_fk_medium",
             "stage0_policy_envelope_fk_large08",
+            "stage0_policy_envelope_fk_base025",
             "stage0_fixedbase_micro",
             "stage0_easy",
             "stage1_recovery",
@@ -480,6 +487,7 @@ def parse_args():
             "stage0_policy_envelope_fk_slow=smaller first-stage FK targets, "
             "stage0_policy_envelope_fk_medium=medium first-stage FK targets, "
             "stage0_policy_envelope_fk_large08=larger 0.08m FK targets, "
+            "stage0_policy_envelope_fk_base025=small base-required FK targets, "
             "stage0_fixedbase_micro=fixed-base reachable micro paths, "
             "stage0_easy=short cinematic paths, stage1=recovery, stage2=moderate, "
             "stage3=full)"
@@ -2821,6 +2829,11 @@ def main():
                 except Exception as e:
                     print(f"    [WARN] Failed to load BC pretrained policy: {e}")
                     print(f"    [WARN] Continuing with randomly initialised policy")
+
+            if args.policy_log_std_override is not None:
+                with torch.no_grad():
+                    model.policy.log_std.data.fill_(float(args.policy_log_std_override))
+                print(f"    [OK] Policy log_std overridden to {args.policy_log_std_override}")
             
     except Exception as e:
         print(f"    [FAIL] Failed to create model: {e}")
@@ -2870,6 +2883,8 @@ def main():
         print(f"Base action scale: {args.base_action_scale}")
     if args.pretrained_policy:
         print(f"Pretrained policy: {args.pretrained_policy}")
+    if args.policy_log_std_override is not None:
+        print(f"Policy log std:    {args.policy_log_std_override}")
     if args.base_assist_aux_dataset:
         print(f"Base assist aux:   {args.base_assist_aux_dataset}")
         print(f"  -> Rows:         {args.base_assist_aux_action_indices}")

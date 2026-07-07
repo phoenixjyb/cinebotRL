@@ -625,3 +625,38 @@ Post-training gates:
 Decision:
 
 Promote the `--base_action_scale 0.25` adapter and checkpoint evidence as the first cautious base-unfreeze step. Do not move to obstacles yet. The next step should create a small deterministic base-required stage where the target is just outside the stationary arm envelope and require the policy to reduce base-target distance without regressing the `large08` fixed-base gate.
+
+## Stage A Base-Required Micro Stage
+
+Implemented a first deterministic base-required stage:
+
+- generator: `scripts/imitation/generate_policy_envelope_fk_base_required_stage.py`
+- stage: `trajectoryToLearn/stage0_policy_envelope_fk_base025`
+- dataset: `data/policy_envelope_fk_base025/obs_dataset_policy_envelope_fk_base025_arm6_base3.npz`
+- source stage: `stage0_policy_envelope_fk_large08`
+- max generated base offset: `0.0618 m`
+- base authority contract: train/eval with `--base_action_scale 0.25`
+- valid action labels: all 9 rows `[0..8]`
+
+Base-controller fix:
+
+- `env.py` now explicitly integrates planar root `x/y/yaw` for direct root control.
+- `_sanitize_base_root_state()` no longer wipes valid planar velocity command buffers for planar-only cleanup. It still zeroes buffers for finite/invalid-state repair.
+
+Teacher and BC gates:
+
+- Open-loop teacher with base labels: mean EE position error `0.0494 m`, p95 `0.0663 m`, max `0.0670 m`, mean orientation error `4.68 deg`.
+- BC offline all-rows RMSE: `0.01534`, max abs action error `0.2625`; largest error is base `vy`.
+- BC physical rollout: mean EE position error `0.0475 m`, p95 `0.0777 m`, max `0.0932 m`, mean orientation error `6.17 deg`.
+- BC fixed-base regression on `large08` with `--freeze_base_actions`: mean EE position error `0.0366 m`, p95 `0.0710 m`, max `0.0829 m`, mean orientation error `4.43 deg`.
+
+PPO result:
+
+Do not promote PPO for this stage yet. Two PPO attempts were stopped early:
+
+- default `log_std=-2` run: reachability dropped to `29/64` and `26/64`
+- low-exploration `log_std=-4`, `ent_coef=0` run: reachability still dropped to `39/64`, `44/64`, and `39/64`
+
+Interpretation:
+
+The base-required teacher and BC policy are usable diagnostic assets, but PPO refinement is not ready. The current reachability monitor/reward appears to treat the moving-base target distribution as frequently unreachable during stochastic rollout, even though the deterministic teacher/BC gates track at centimeter scale. The next policy update should fix the moving-base reachability/reward accounting before another PPO run.

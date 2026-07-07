@@ -1,0 +1,6 @@
+{
+  "schema": "policy_envelope_fk_base_required_reset_config_v1",
+  "reset_base_x_offset": -0.8364710211753845,
+  "reset_base_y_offset": 0.036605000495910645,
+  "source": "first source FK waypoint; generated base offset starts at zero"
+}

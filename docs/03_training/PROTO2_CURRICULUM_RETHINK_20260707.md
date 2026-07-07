@@ -998,3 +998,41 @@ Naive relabel BC probe:
 Decision:
 
 Do not promote the naive DAgger-BC policy. The collector is useful and should be kept, but directly training a fresh BC policy on original + repeated tail states over-corrects closed-loop behavior. The next useful update should use the collected tail states as a constrained auxiliary loss or PPO regularizer while starting from the current base-required checkpoint, not as a standalone BC replacement.
+
+## Stage B Tail-State Auxiliary PPO Probe
+
+Goal:
+
+Use the collected `base040` tail-state DAgger dataset as a constrained auxiliary loss during PPO, instead of training a standalone BC replacement.
+
+Setup:
+
+- source checkpoint: `stage0_policy_envelope_fk_mix_contract_zpenalty80_lowstd_resume_32k_20260707/final_model.zip`
+- stage: `stage0_policy_envelope_fk_base040`
+- aux dataset: `data/policy_envelope_fk_base040/tail_dagger_contractz_p80_20260707.npz`
+- aux rows: base action rows `[6, 7, 8]`
+- aux schedule: `8` supervised steps per PPO rollout, batch `64`, lr `1e-5`, grad clip `0.25`
+- PPO: `32k` continuation, `learning_rate=3e-6`, `policy_log_std=-4.0`, `base_action_scale=0.25`
+- run: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_taildagger_baseaux_from_contractz_lowstd_32k_20260708`
+
+Training health:
+
+- aux callback activated on grouped `base` head
+- usable aux samples: `64/64`
+- aux loss stayed stable around `0.0060`
+- final PPO `approx_kl=0.00498`
+- reachability did not collapse during the bounded run
+
+Validation:
+
+- direct `base040`: `0.0608 / 0.0853 / 0.0965 m`
+- routed `base025`: `0.0590 / 0.0858 / 0.0982 m`
+- routed fixed-base `large08`: `0.0374 / 0.0659 / 0.0801 m`, unchanged because fixed-base still routes to the promoted default checkpoint
+
+Decision:
+
+Do not promote the base-head auxiliary candidate. It improves neither `base040` nor `base025` mean tracking, even though max error is bounded. The tail-state expert corrections cannot be applied to the base head alone without disrupting arm/base coordination.
+
+Next useful update:
+
+If continuing this line, test a much weaker auxiliary path or a coordinated full action-head auxiliary loss with a very small learning rate and fewer steps. Do not reuse the base-only aux settings above as a promotion candidate.

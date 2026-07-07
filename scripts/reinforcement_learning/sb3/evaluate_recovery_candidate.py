@@ -207,7 +207,7 @@ def _resolve_trajectory_manifest(args: argparse.Namespace, output_dir: Path) -> 
     return trajectory_dir, resolved_manifest, [str(path) for path in entries]
 
 
-def _load_stage_reset_config(args: argparse.Namespace) -> dict[str, float]:
+def _load_stage_reset_config(args: argparse.Namespace) -> dict[str, object]:
     """Load optional stage-local reset offsets without changing legacy defaults."""
     stage_dir = PROJECT_ROOT / "trajectoryToLearn" / args.trajectory_stage
     reset_config_file = stage_dir / "reset_config.json"
@@ -215,11 +215,17 @@ def _load_stage_reset_config(args: argparse.Namespace) -> dict[str, float]:
         return {}
     with reset_config_file.open("r", encoding="utf-8") as f:
         raw = json.load(f)
-    out: dict[str, float] = {}
+    out: dict[str, object] = {}
     if "reset_base_x_offset" in raw:
         out["reset_base_x_offset"] = float(raw["reset_base_x_offset"])
     if "reset_base_y_offset" in raw:
         out["reset_base_y_offset"] = float(raw["reset_base_y_offset"])
+    raw_reward_overrides = raw.get("reward_overrides", {})
+    if isinstance(raw_reward_overrides, dict):
+        out["reward_overrides"] = {
+            str(name): float(value)
+            for name, value in raw_reward_overrides.items()
+        }
     return out
 
 
@@ -463,6 +469,15 @@ def main() -> int:
         if args.enable_obstacles:
             env_cfg.scene = env_cfg._create_scene_config()
             env_cfg.scene.num_envs = args.num_envs
+        reward_overrides = reset_config.get("reward_overrides", {})
+        if isinstance(reward_overrides, dict):
+            for name, value in reward_overrides.items():
+                setattr(env_cfg.task_config.rewards, name, float(value))
+            if reward_overrides:
+                print(
+                    "stage reward overrides: "
+                    + ", ".join(f"{name}={float(value):g}" for name, value in reward_overrides.items())
+                )
 
         env_cfg.task_config.trajectory = TrajectoryConfig(
             type="multi_recorded",

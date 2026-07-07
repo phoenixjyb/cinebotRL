@@ -551,6 +551,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             # Session 8b: Reachability-aware base coordination
             "reachability_maintenance_reward": self.task_cfg.rewards.reachability_maintenance_reward,
             "reachability_distance_weight": self.task_cfg.rewards.reachability_distance_weight,
+            "reachability_query_tolerance": self.task_cfg.rewards.reachability_query_tolerance,
             "reachability_soft_margin": self.task_cfg.rewards.reachability_soft_margin,
             "reachability_hard_margin": self.task_cfg.rewards.reachability_hard_margin,
             "reachability_optimal_distance": self.task_cfg.rewards.reachability_optimal_distance,
@@ -2468,7 +2469,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             if finite_targets.any():
                 is_reachable[finite_targets] = self.reach_map.query(
                     target_in_arm_frame[finite_targets],
-                    tolerance=0.1,
+                    tolerance=self.reward_weights.get("reachability_query_tolerance", 0.1),
                 )
                 raw_workspace_distance = self.reach_map.distance_to_workspace(
                     target_in_arm_frame[finite_targets]

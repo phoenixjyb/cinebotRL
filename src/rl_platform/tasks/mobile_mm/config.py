@@ -157,6 +157,7 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     # ========================================
     reachability_maintenance_reward: float = 40.0  # Bonus when in optimal working zone (KEEP at 40!)
     reachability_distance_weight: float = 30.0  # Penalty weight for exceeding hard margin (REDUCED from 60)
+    reachability_query_tolerance: float = 0.1  # KD-tree tolerance for binary reachability monitoring
     reachability_soft_margin: float = 0.2  # Two-zone linear model: soft margin width (±0.2m around optimal)
     reachability_hard_margin: float = 0.7  # Hard cutoff radius (m) - EXPANDED from 0.6m to match FK workspace
     reachability_optimal_distance: float = 0.6  # Optimal working distance - FK median (was 0.5m)

@@ -660,3 +660,34 @@ Do not promote PPO for this stage yet. Two PPO attempts were stopped early:
 Interpretation:
 
 The base-required teacher and BC policy are usable diagnostic assets, but PPO refinement is not ready. The current reachability monitor/reward appears to treat the moving-base target distribution as frequently unreachable during stochastic rollout, even though the deterministic teacher/BC gates track at centimeter scale. The next policy update should fix the moving-base reachability/reward accounting before another PPO run.
+
+## Stage A Moving-Base Reachability Accounting
+
+Problem:
+
+The first `base025` PPO attempts collapsed in the reachability monitor even when deterministic teacher/BC rollouts tracked at centimeter scale. The generated FK stages naturally use a base-target working distance around `0.85-0.90 m`, while the older reward defaults treated `0.7 m` as the hard reachability margin and used a fixed reach-map query tolerance of `0.1 m`.
+
+Implementation:
+
+- added `reachability_query_tolerance` to the reward config and env reward-weight dictionary
+- env reach-map query now uses `reward_weights["reachability_query_tolerance"]` instead of hardcoded `0.1`
+- stage `reset_config.json` can now include `reward_overrides`
+- `train.py`, `evaluate_stage_rollout_gate.py`, and `evaluate_recovery_candidate.py` apply stage-local reward overrides
+- `stage0_policy_envelope_fk_base025/reset_config.json` now sets generated-FK-specific margins:
+  - `reachability_query_tolerance=0.2`
+  - `reachability_optimal_distance=0.85`
+  - `reachability_hard_margin=1.05`
+  - reduced far-target/base-command penalties for this stage only
+
+Validation:
+
+- BC gate with reward overrides still tracks the same: mean EE position error `0.0475 m`, p95 `0.0777 m`, max `0.0932 m`
+- reward mean improved from about `25.0` to `35.8`, confirming the old far-target penalties were inappropriate for this generated stage
+- low-exploration PPO probe, `32k` steps with `log_std=-4`, stayed `64/64` reachable through all logged checks
+- PPO probe training remained stable: final `approx_kl=0.00756`, `std=0.0183`
+- PPO probe rollout on `base025`: mean EE position error `0.0474 m`, p95 `0.0733 m`, max `0.0967 m`, mean orientation error `6.09 deg`
+- PPO probe fixed-base regression on `large08`: mean EE position error `0.0374 m`, p95 `0.0659 m`, max `0.0801 m`, mean orientation error `4.55 deg`
+
+Decision:
+
+Promote the accounting fix and the stable PPO probe evidence. Do not claim policy improvement yet: PPO is now stable on `base025`, but it has not materially improved tracking beyond BC. The next update should target policy learning quality, not reachability plumbing.

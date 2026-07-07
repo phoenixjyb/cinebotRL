@@ -2170,6 +2170,7 @@ def main():
         print(f"    Trajectory directory: {args.trajectory_dir}")
         
         # Session 8h: Trajectory curriculum stages
+        stage_reward_overrides = {}
         if args.trajectory_stage:
             print(f"    [Session 8h] Using trajectory curriculum: {args.trajectory_stage}")
             stage_dir = PROJECT_ROOT / "trajectoryToLearn" / args.trajectory_stage
@@ -2183,6 +2184,12 @@ def main():
                         trajectory_config["reset_base_x_offset"] = float(reset_config["reset_base_x_offset"])
                     if "reset_base_y_offset" in reset_config:
                         trajectory_config["reset_base_y_offset"] = float(reset_config["reset_base_y_offset"])
+                    raw_reward_overrides = reset_config.get("reward_overrides", {})
+                    if isinstance(raw_reward_overrides, dict):
+                        stage_reward_overrides = {
+                            str(name): float(value)
+                            for name, value in raw_reward_overrides.items()
+                        }
                     if "reset_base_x_offset" in trajectory_config and "reset_base_y_offset" in trajectory_config:
                         print(
                             "    [OK] Stage reset offset: "
@@ -2318,6 +2325,7 @@ def main():
         applied_reward_overrides = {
             name: value for name, value in reward_overrides.items() if value is not None
         }
+        applied_reward_overrides.update(stage_reward_overrides)
         for name, value in applied_reward_overrides.items():
             setattr(env_cfg.task_config.rewards, name, float(value))
         if applied_reward_overrides:

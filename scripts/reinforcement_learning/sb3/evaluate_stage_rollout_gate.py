@@ -79,16 +79,22 @@ def tensor_np(value):
     return np.asarray(value)
 
 
-def load_stage_reset_config(stage: str) -> dict[str, float]:
+def load_stage_reset_config(stage: str) -> dict[str, object]:
     path = PROJECT_ROOT / "trajectoryToLearn" / stage / "reset_config.json"
     if not path.exists():
         return {}
     data = json.loads(path.read_text(encoding="utf-8"))
-    out: dict[str, float] = {}
+    out: dict[str, object] = {}
     if "reset_base_x_offset" in data:
         out["reset_base_x_offset"] = float(data["reset_base_x_offset"])
     if "reset_base_y_offset" in data:
         out["reset_base_y_offset"] = float(data["reset_base_y_offset"])
+    raw_reward_overrides = data.get("reward_overrides", {})
+    if isinstance(raw_reward_overrides, dict):
+        out["reward_overrides"] = {
+            str(name): float(value)
+            for name, value in raw_reward_overrides.items()
+        }
     return out
 
 
@@ -145,6 +151,16 @@ def main() -> int:
         env_cfg.task_config.obstacles.enable_obstacles = False
         env_cfg.task_config.base_assist.enable = False
         env_cfg.task_config.randomize_initial_joint_positions = bool(args.enable_initial_joint_randomization)
+        reward_overrides = reset_config.get("reward_overrides", {})
+        if isinstance(reward_overrides, dict):
+            for name, value in reward_overrides.items():
+                setattr(env_cfg.task_config.rewards, name, float(value))
+            if reward_overrides:
+                print(
+                    "[gate] reward overrides "
+                    + ", ".join(f"{name}={float(value):g}" for name, value in reward_overrides.items()),
+                    flush=True,
+                )
         env_cfg.task_config.trajectory = TrajectoryConfig(
             type="multi_recorded",
             trajectory_dir=str(PROJECT_ROOT),

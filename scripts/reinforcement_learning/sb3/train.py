@@ -312,6 +312,14 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--freeze_base_actions",
+        action="store_true",
+        help=(
+            "Stage A gate: zero base action rows [6,7,8] before env dynamics "
+            "while preserving the 9D policy output shape."
+        ),
+    )
+    parser.add_argument(
         "--policy_arch",
         type=str,
         default="flat",
@@ -1869,13 +1877,20 @@ def main():
     class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):
         """VecEnv wrapper to convert Isaac Lab's dict observations with torch tensors to numpy arrays for SB3."""
         
-        def __init__(self, venv, expected_obs_dim: int | None = None):
+        def __init__(
+            self,
+            venv,
+            expected_obs_dim: int | None = None,
+            freeze_base_actions: bool = False,
+        ):
             # Isaac Lab env is already a VecEnv
             VecEnvWrapper.__init__(self, venv)
             # We'll update observation space after first reset
             self._obs_space_updated = False
             self.expected_obs_dim = expected_obs_dim
             self._obs_adapter_logged = False
+            self.freeze_base_actions = bool(freeze_base_actions)
+            self._freeze_base_logged = False
             
             # FIX: Isaac Lab's action_space includes batch dimension [num_envs, action_dim]
             # SB3 expects per-env action space [action_dim]
@@ -1889,6 +1904,20 @@ def main():
                     dtype=venv.action_space.dtype
                 )
                 print(f"[IsaacLabToSB3VecEnvWrapper] Fixed action_space: {venv.action_space.shape} -> {self.action_space.shape}")
+
+        def _adapt_actions(self, actions):
+            if not self.freeze_base_actions:
+                return actions
+            if actions.shape[-1] < 9:
+                raise ValueError(
+                    f"--freeze_base_actions requires at least 9 action dims, got {actions.shape[-1]}"
+                )
+            if not self._freeze_base_logged:
+                print("[IsaacLabToSB3VecEnvWrapper] Freezing base action rows [6,7,8]")
+                self._freeze_base_logged = True
+            actions = actions.clone()
+            actions[..., 6:9] = 0.0
+            return actions
 
         def _trajectory_progress_column(self, obs: np.ndarray) -> np.ndarray:
             raw_env = self.venv.unwrapped if hasattr(self.venv, "unwrapped") else self.venv
@@ -1987,6 +2016,7 @@ def main():
                 # Get the device from the underlying environment
                 device = self.venv.unwrapped.device if hasattr(self.venv.unwrapped, 'device') else 'cuda:0'
                 actions = torch.from_numpy(actions).float().to(device)
+            actions = self._adapt_actions(actions)
             self._actions = actions
         
         def step_wait(self):
@@ -2348,7 +2378,11 @@ def main():
                 print(f"    [OK] Checkpoint observation dim detected: {expected_obs_dim}")
             except Exception as exc:
                 print(f"    [WARN] Could not inspect checkpoint observation dim: {exc}")
-        env = IsaacLabToSB3VecEnvWrapper(env, expected_obs_dim=expected_obs_dim)
+        env = IsaacLabToSB3VecEnvWrapper(
+            env,
+            expected_obs_dim=expected_obs_dim,
+            freeze_base_actions=args.freeze_base_actions,
+        )
         
         # Do a dummy reset to let the wrapper discover the true observation shape
         # This updates the observation_space before VecNormalize reads it
@@ -2760,6 +2794,7 @@ def main():
         print(f"  -> Interval:     {args.video_interval} steps")
     print(f"Device:            {device}")
     print("Seed:              {}".format(args.seed if args.seed is not None else "None"))
+    print(f"Freeze base acts:  {'yes (rows [6,7,8] zeroed before env step)' if args.freeze_base_actions else 'no'}")
     if args.pretrained_policy:
         print(f"Pretrained policy: {args.pretrained_policy}")
     if args.base_assist_aux_dataset:

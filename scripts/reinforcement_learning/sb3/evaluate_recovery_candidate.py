@@ -85,6 +85,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base_assist_activation_distance", type=float, default=0.45)
     parser.add_argument("--base_assist_full_speed_distance", type=float, default=0.90)
     parser.add_argument("--base_assist_max_action", type=float, default=1.0)
+    parser.add_argument(
+        "--freeze_base_actions",
+        action="store_true",
+        help=(
+            "Zero base action rows [6,7,8] before env dynamics while preserving "
+            "the checkpoint's 9D policy output."
+        ),
+    )
     parser.add_argument("--output_dir", default="evaluation_results/recovery_candidate")
     return parser.parse_args()
 
@@ -448,10 +456,17 @@ def main() -> int:
         base_env = MobileMMTrackEEEnv(cfg=env_cfg)
 
         class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):
-            def __init__(self, venv, expected_dim: int | None = None):
+            def __init__(
+                self,
+                venv,
+                expected_dim: int | None = None,
+                freeze_base_actions: bool = False,
+            ):
                 super().__init__(venv)
                 self.expected_dim = expected_dim
                 self._obs_adapter_logged = False
+                self.freeze_base_actions = bool(freeze_base_actions)
+                self._freeze_base_logged = False
                 if hasattr(venv.action_space, "shape") and len(venv.action_space.shape) > 1:
                     action_dim = venv.action_space.shape[-1]
                     self.action_space = spaces.Box(
@@ -552,10 +567,25 @@ def main() -> int:
             def reset(self):
                 return self._convert_obs(self.venv.reset())
 
+            def _adapt_actions(self, actions):
+                if not self.freeze_base_actions:
+                    return actions
+                if actions.shape[-1] < 9:
+                    raise ValueError(
+                        f"--freeze_base_actions requires at least 9 action dims, got {actions.shape[-1]}"
+                    )
+                if not self._freeze_base_logged:
+                    print("[eval action-adapter] Freezing base action rows [6,7,8]")
+                    self._freeze_base_logged = True
+                actions = actions.clone()
+                actions[..., 6:9] = 0.0
+                return actions
+
             def step_async(self, actions):
                 if isinstance(actions, np.ndarray):
                     device = self.venv.unwrapped.device if hasattr(self.venv.unwrapped, "device") else "cuda:0"
                     actions = torch.from_numpy(actions).float().to(device)
+                actions = self._adapt_actions(actions)
                 self._actions = actions
 
             def step_wait(self):
@@ -574,7 +604,11 @@ def main() -> int:
                     infos = [{} for _ in range(len(rewards))]
                 return obs, rewards, dones, infos
 
-        env = IsaacLabToSB3VecEnvWrapper(base_env, expected_obs_dim)
+        env = IsaacLabToSB3VecEnvWrapper(
+            base_env,
+            expected_obs_dim,
+            freeze_base_actions=args.freeze_base_actions,
+        )
         env = VecNormalize.load(str(vec_path), env)
         env.training = False
         env.norm_reward = False
@@ -727,6 +761,7 @@ def main() -> int:
                 "reset_base_to_trajectory_start": bool(args.reset_base_to_trajectory_start),
             },
             "num_envs": args.num_envs,
+            "freeze_base_actions": bool(args.freeze_base_actions),
             "episodes_completed": len(episode_rewards),
             "steps": step,
             "episode_reward_mean": float(np.mean(episode_rewards)) if episode_rewards else None,

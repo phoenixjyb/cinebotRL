@@ -257,3 +257,71 @@ New Stage A promotion target:
 - `ee_pos_error_mean_m.mean < 0.5 m`
 - `workspace_hard_exceed_pct.mean = 0`
 - raw-policy eval only
+
+## Stage A Freeze-Base Implementation
+
+Implementation:
+
+- `scripts/reinforcement_learning/sb3/train.py` supports `--freeze_base_actions`
+- `scripts/reinforcement_learning/sb3/evaluate_recovery_candidate.py` supports `--freeze_base_actions`
+- action rows `[6,7,8]` are zeroed immediately before `env.step(...)`
+- the policy remains 9D, so this does not change checkpoint shape or action-contract naming
+
+Tiny smoke:
+
+```bash
+PYTHONUTF8=1 NO_PROXY='*' no_proxy='*' /mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 \
+  scripts/reinforcement_learning/sb3/train.py \
+  --headless \
+  --num_envs 4 \
+  --total_timesteps 32 \
+  --n_steps 8 \
+  --batch_size 8 \
+  --n_epochs 1 \
+  --trajectory_stage stage0_easy \
+  --max_trajectories 4 \
+  --min_trajectory_duration 5.0 \
+  --disable_auto_base_assist \
+  --disable_auto_base_assist_yaw \
+  --freeze_base_actions \
+  --save_freq 1000000 \
+  --log_dir logs/sb3/recomoproto2trackee_v0/stage0_raw_rl_freezebase_smoke_20260707
+```
+
+Next bounded gate:
+
+```bash
+PYTHONUTF8=1 NO_PROXY='*' no_proxy='*' /mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 \
+  scripts/reinforcement_learning/sb3/train.py \
+  --headless \
+  --num_envs 64 \
+  --total_timesteps 65536 \
+  --n_steps 256 \
+  --batch_size 1024 \
+  --n_epochs 4 \
+  --trajectory_stage stage0_easy \
+  --max_trajectories 8 \
+  --min_trajectory_duration 5.0 \
+  --disable_auto_base_assist \
+  --disable_auto_base_assist_yaw \
+  --freeze_base_actions \
+  --save_freq 32768 \
+  --log_dir logs/sb3/recomoproto2trackee_v0/stage0_raw_rl_freezebase_64k_20260707
+```
+
+Evaluate the frozen-base gate with matching action semantics:
+
+```bash
+PYTHONUTF8=1 NO_PROXY='*' no_proxy='*' /mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 \
+  scripts/reinforcement_learning/sb3/evaluate_recovery_candidate.py \
+  --headless \
+  --checkpoint logs/sb3/recomoproto2trackee_v0/stage0_raw_rl_freezebase_64k_20260707/final_model.zip \
+  --num_envs 64 \
+  --num_episodes 128 \
+  --trajectory_stage stage0_easy \
+  --max_trajectories 8 \
+  --min_trajectory_duration 5.0 \
+  --no-enable_obstacles \
+  --freeze_base_actions \
+  --output_dir evaluation_results/recovery_candidate/stage0_raw_rl_freezebase_64k_20260707
+```

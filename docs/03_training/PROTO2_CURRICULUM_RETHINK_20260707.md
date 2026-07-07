@@ -961,3 +961,40 @@ Do not promote the vertical-shaping continuation as the Stage B base-required ro
 Next useful update:
 
 Move from offline weighting to rollout-state relabeling. The next candidate should collect actual failed rollout observations around the p95/max tail states and relabel them with a dynamics-aware expert or corrective controller. Do not use tail-weighted BC artifacts as a teacher, and do not increase runtime base scale above `0.25` without a fresh gate.
+
+## Stage B Rollout-State DAgger Probe
+
+Goal:
+
+Collect actual failed rollout states from `base040` p95/max tail regions and relabel those visited observations with the generated-stage expert action for the same trajectory/waypoint. This avoids training only on offline teacher states that the closed-loop policy never visits.
+
+Implementation:
+
+- added `scripts/imitation/collect_stage_tail_dagger_dataset.py`
+- the collector runs a checkpoint in Isaac, records pre-action policy observations, maps each env's current trajectory filename and waypoint index back to the generated expert dataset row, and writes a compact `.npz`
+- selected samples are late/high-error states using `--tail_start_fraction` and `--error_percentile`
+- fixed an initial parser bug by replacing regex filename parsing with direct basename/suffix parsing
+
+Collected dataset:
+
+- source checkpoint: `stage0_policy_envelope_fk_mix_contract_zpenalty80_lowstd_resume_32k_20260707/final_model.zip`
+- stage: `stage0_policy_envelope_fk_base040`
+- output: `data/policy_envelope_fk_base040/tail_dagger_contractz_p80_20260707.npz`
+- source rollout samples: `480`
+- selected samples: `64`
+- selected criterion: `tail_start_fraction=0.65`, `error_percentile=80`
+- selected error stats: mean/p95/max `0.0748 / 0.0980 / 0.1043 m`
+- expert-vs-policy deltas show the largest corrections around base `vx/vy` and several arm rows, so the dataset is a real off-policy correction set rather than a copy of the existing policy
+
+Naive relabel BC probe:
+
+- combined original `base040` dataset with the 64 selected DAgger states repeated `4x`
+- trained grouped BC for 40 epochs
+- offline validation loss reached `0.000054`
+- real Isaac `base040` rollout regressed to `0.0659 / 0.1048 / 0.1273 m`
+- routed `base025` regressed to `0.0480 / 0.0743 / 0.0970 m`
+- fixed-base `large08` stayed preserved only because router still uses the default fixed-base checkpoint
+
+Decision:
+
+Do not promote the naive DAgger-BC policy. The collector is useful and should be kept, but directly training a fresh BC policy on original + repeated tail states over-corrects closed-loop behavior. The next useful update should use the collected tail states as a constrained auxiliary loss or PPO regularizer while starting from the current base-required checkpoint, not as a standalone BC replacement.

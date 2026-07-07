@@ -182,6 +182,14 @@ def parse_args():
         help="When resuming, keep observation normalization but reset VecNormalize reward-return statistics.",
     )
     parser.add_argument(
+        "--disable_vec_normalize",
+        action="store_true",
+        help=(
+            "Train PPO on raw observations/rewards. Intended for narrow Stage A "
+            "BC warm-start gates where the BC actor was trained on raw observations."
+        ),
+    )
+    parser.add_argument(
         "--gamma",
         type=float,
         default=0.99,
@@ -2420,16 +2428,19 @@ def main():
         # This updates the observation_space before VecNormalize reads it
         _ = env.reset()
         
-        # Then wrap with VecNormalize for better training stability
-        # NOTE: VecNormalize will now see numpy arrays instead of dicts
-        env = VecNormalize(
-            env,
-            norm_obs=True,
-            norm_reward=True,
-            clip_obs=10.0,
-            clip_reward=10.0,
-        )
-        print("    [OK] Environment created and wrapped")
+        if args.disable_vec_normalize:
+            print("    [OK] Environment created and wrapped without VecNormalize")
+        else:
+            # Then wrap with VecNormalize for better training stability
+            # NOTE: VecNormalize will now see numpy arrays instead of dicts
+            env = VecNormalize(
+                env,
+                norm_obs=True,
+                norm_reward=True,
+                clip_obs=10.0,
+                clip_reward=10.0,
+            )
+            print("    [OK] Environment created and wrapped")
     except Exception as e:
         print(f"    [FAIL] Failed to create environment: {e}")
         import traceback
@@ -2854,7 +2865,8 @@ def main():
         # Save final model
         final_model_path = os.path.join(args.log_dir, "final_model")
         model.save(final_model_path)
-        env.save(os.path.join(args.log_dir, "vec_normalize.pkl"))
+        if hasattr(env, "save"):
+            env.save(os.path.join(args.log_dir, "vec_normalize.pkl"))
         
         print(f"\n{'='*70}")
         print("[OK] Training complete!")
@@ -2869,7 +2881,8 @@ def main():
         # Save interrupt checkpoint
         interrupt_path = os.path.join(args.log_dir, "interrupt_checkpoint")
         model.save(interrupt_path)
-        env.save(os.path.join(args.log_dir, "vec_normalize_interrupt.pkl"))
+        if hasattr(env, "save"):
+            env.save(os.path.join(args.log_dir, "vec_normalize_interrupt.pkl"))
         
         print(f"Interrupt checkpoint saved to: {interrupt_path}")
     

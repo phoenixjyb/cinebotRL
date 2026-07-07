@@ -14,6 +14,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -106,6 +107,37 @@ def parse_args() -> argparse.Namespace:
             "'1,1,1,1,1,1,2,2,1' to emphasize base vx/vy labels."
         ),
     )
+    parser.add_argument(
+        "--sample_weight_mode",
+        type=str,
+        default="none",
+        choices=["none", "trajectory_tail"],
+        help=(
+            "Optional per-sample weighting. 'trajectory_tail' upweights late "
+            "waypoints inside each trajectory so BC focuses on tail/final-step errors."
+        ),
+    )
+    parser.add_argument(
+        "--trajectory_length",
+        type=int,
+        default=0,
+        help=(
+            "Trajectory length for --sample_weight_mode trajectory_tail. "
+            "If omitted, num_waypoints is read from demo metadata when present."
+        ),
+    )
+    parser.add_argument(
+        "--tail_start_fraction",
+        type=float,
+        default=0.65,
+        help="Fraction of each trajectory after which tail sample weights ramp up.",
+    )
+    parser.add_argument(
+        "--tail_weight",
+        type=float,
+        default=3.0,
+        help="Maximum sample weight applied at the final waypoint for trajectory_tail mode.",
+    )
     return parser.parse_args()
 
 
@@ -116,18 +148,61 @@ def parse_args() -> argparse.Namespace:
 class BCDataset(Dataset):
     """Wraps numpy obs/act arrays as a PyTorch Dataset."""
 
-    def __init__(self, observations: np.ndarray, actions: np.ndarray, action_mask: np.ndarray | None = None):
+    def __init__(
+        self,
+        observations: np.ndarray,
+        actions: np.ndarray,
+        action_mask: np.ndarray | None = None,
+        sample_weights: np.ndarray | None = None,
+    ):
         self.obs  = torch.tensor(observations, dtype=torch.float32)
         self.acts = torch.tensor(actions,      dtype=torch.float32)
         self.mask = None if action_mask is None else torch.tensor(action_mask, dtype=torch.float32)
+        self.sample_weights = (
+            torch.ones(self.obs.shape[0], dtype=torch.float32)
+            if sample_weights is None
+            else torch.tensor(sample_weights, dtype=torch.float32)
+        )
 
     def __len__(self) -> int:
         return self.obs.shape[0]
 
     def __getitem__(self, idx):
-        if self.mask is None:
-            return self.obs[idx], self.acts[idx], torch.ones_like(self.acts[idx])
-        return self.obs[idx], self.acts[idx], self.mask[idx]
+        mask = torch.ones_like(self.acts[idx]) if self.mask is None else self.mask[idx]
+        return self.obs[idx], self.acts[idx], mask, self.sample_weights[idx]
+
+
+def build_sample_weights(total_transitions: int, metadata: dict[str, object], args: argparse.Namespace) -> np.ndarray:
+    """Build optional per-sample BC weights without changing default behavior."""
+
+    weights = np.ones((total_transitions,), dtype=np.float32)
+    if args.sample_weight_mode == "none":
+        return weights
+    if args.sample_weight_mode != "trajectory_tail":
+        raise ValueError(f"unsupported sample_weight_mode: {args.sample_weight_mode}")
+    if not (0.0 <= args.tail_start_fraction < 1.0):
+        raise ValueError("--tail_start_fraction must be in [0, 1)")
+    if args.tail_weight < 1.0:
+        raise ValueError("--tail_weight must be >= 1.0")
+
+    trajectory_length = int(args.trajectory_length or metadata.get("num_waypoints", 0) or 0)
+    if trajectory_length <= 1:
+        raise ValueError(
+            "--sample_weight_mode trajectory_tail requires --trajectory_length or metadata.num_waypoints"
+        )
+    if total_transitions % trajectory_length != 0:
+        raise ValueError(
+            f"total transitions {total_transitions} is not divisible by trajectory length {trajectory_length}"
+        )
+
+    phase = (np.arange(total_transitions, dtype=np.float32) % trajectory_length) / float(trajectory_length - 1)
+    ramp = np.clip(
+        (phase - float(args.tail_start_fraction)) / max(1.0 - float(args.tail_start_fraction), 1e-6),
+        0.0,
+        1.0,
+    )
+    weights = 1.0 + ramp * (float(args.tail_weight) - 1.0)
+    return weights.astype(np.float32)
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +256,7 @@ def train_bc(
     obs: np.ndarray,
     acts: np.ndarray,
     action_mask: np.ndarray | None,
+    sample_weights: np.ndarray,
     args: argparse.Namespace,
 ) -> nn.Module:
     """Train a BC policy via MSE regression and return the trained network."""
@@ -204,7 +280,7 @@ def train_bc(
         net = build_mlp(args.obs_dim, hidden_sizes, args.act_dim).to(device)
 
     # Split train / val
-    dataset     = BCDataset(obs, acts, action_mask)
+    dataset     = BCDataset(obs, acts, action_mask, sample_weights)
     val_size    = max(1, int(len(dataset) * args.val_fraction))
     train_size  = len(dataset) - val_size
     train_ds, val_ds = random_split(dataset, [train_size, val_size])
@@ -225,8 +301,13 @@ def train_bc(
             raise ValueError("--action_loss_weights must be non-negative")
     print(f"[INFO] Action loss weights: {action_weights.detach().cpu().numpy().round(4).tolist()}")
 
-    def masked_mse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        weighted_mask = mask * action_weights.unsqueeze(0)
+    def masked_mse(
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        mask: torch.Tensor,
+        sample_weight: torch.Tensor,
+    ) -> torch.Tensor:
+        weighted_mask = mask * action_weights.unsqueeze(0) * sample_weight.unsqueeze(1)
         sq = (pred - target).pow(2) * weighted_mask
         denom = torch.clamp(weighted_mask.sum(), min=1.0)
         return sq.sum() / denom
@@ -242,11 +323,14 @@ def train_bc(
         # --- train ---
         net.train()
         train_total = 0.0
-        for obs_b, act_b, mask_b in train_loader:
-            obs_b, act_b, mask_b = obs_b.to(device), act_b.to(device), mask_b.to(device)
+        for obs_b, act_b, mask_b, weight_b in train_loader:
+            obs_b = obs_b.to(device)
+            act_b = act_b.to(device)
+            mask_b = mask_b.to(device)
+            weight_b = weight_b.to(device)
             optimizer.zero_grad()
             pred = net(obs_b)
-            loss = masked_mse(pred, act_b, mask_b)
+            loss = masked_mse(pred, act_b, mask_b, weight_b)
             loss.backward()
             optimizer.step()
             train_total += loss.item() * obs_b.shape[0]
@@ -256,9 +340,12 @@ def train_bc(
         net.eval()
         val_total = 0.0
         with torch.no_grad():
-            for obs_b, act_b, mask_b in val_loader:
-                obs_b, act_b, mask_b = obs_b.to(device), act_b.to(device), mask_b.to(device)
-                val_total += masked_mse(net(obs_b), act_b, mask_b).item() * obs_b.shape[0]
+            for obs_b, act_b, mask_b, weight_b in val_loader:
+                obs_b = obs_b.to(device)
+                act_b = act_b.to(device)
+                mask_b = mask_b.to(device)
+                weight_b = weight_b.to(device)
+                val_total += masked_mse(net(obs_b), act_b, mask_b, weight_b).item() * obs_b.shape[0]
         val_loss = val_total / val_size
 
         print(f"{epoch:>6}  {train_loss:>12.6f}  {val_loss:>12.6f}")
@@ -408,6 +495,12 @@ def main() -> None:
     data = np.load(str(demo_path))
     observations = data["observations"]  # [N, obs_dim]
     actions      = data["actions"]       # [N, act_dim]
+    metadata: dict[str, object] = {}
+    if "metadata" in data:
+        try:
+            metadata = json.loads(str(data["metadata"]))
+        except json.JSONDecodeError as exc:
+            print(f"[WARN] Could not parse metadata JSON: {exc}")
     action_mask = None
     if args.use_action_mask:
         if "action_valid_mask" not in data:
@@ -426,6 +519,13 @@ def main() -> None:
     if action_mask is not None:
         print(f"       Masked action mean: {np.mean(action_mask, axis=0)}")
 
+    sample_weights = build_sample_weights(total_transitions, metadata, args)
+    print(
+        "       Sample weights    : "
+        f"mode={args.sample_weight_mode}, min={float(sample_weights.min()):.3f}, "
+        f"mean={float(sample_weights.mean()):.3f}, max={float(sample_weights.max()):.3f}"
+    )
+
     if observations.shape[1] != args.obs_dim:
         print(
             f"[WARN] obs_dim mismatch: file has {observations.shape[1]}, "
@@ -438,7 +538,7 @@ def main() -> None:
     grouped_value_hidden_dims = [int(x) for x in args.grouped_value_hidden_dims.split(",") if x.strip()]
 
     # Train
-    trained_net = train_bc(observations, actions, action_mask, args)
+    trained_net = train_bc(observations, actions, action_mask, sample_weights, args)
 
     # Save as SB3 policy
     output_path = str(PROJECT_ROOT / args.output_path)

@@ -903,3 +903,61 @@ Do not promote the `base040` PPO continuation. It improves some mean metrics and
 Next useful update:
 
 Target tail-error reduction on base-required trajectories instead of more same-objective PPO. Prefer a bounded DAgger-style rollout relabeling pass or a tail-weighted evaluation/training objective that explicitly penalizes final-step and p95/max EE position error, while preserving the existing router and fixed-base default checkpoint.
+
+## Stage B Tail-Error Probes
+
+Goal:
+
+Reduce `base040` tail error after the first PPO continuation showed better mean tracking but worse p95/max tail behavior.
+
+Tail-weighted BC implementation:
+
+- added optional per-sample weights to `scripts/reinforcement_learning/bc/pretrain_bc.py`
+- default behavior remains unchanged with `--sample_weight_mode none`
+- new mode `--sample_weight_mode trajectory_tail` ramps sample weights within each trajectory after `--tail_start_fraction`
+- metadata `num_waypoints` is used automatically when `--trajectory_length` is omitted
+
+Tail-weighted BC result:
+
+- trained `base040` BC with `--sample_weight_mode trajectory_tail --tail_start_fraction 0.65 --tail_weight 3.0`
+- offline weighted validation loss improved strongly: best weighted val MSE `0.000009`
+- real Isaac `base040` rollout regressed badly: `0.0624 / 0.1110 / 0.1298 m`
+- routed `base025` also regressed: `0.0506 / 0.0904 / 0.1128 m`
+- diagnosis: tail-weighted BC overdrives the closed-loop policy, increases arm target lag to about `0.0546 rad`, and worsens tail behavior despite better offline loss
+
+Decision:
+
+Do not promote the tail-weighted BC policy. Keep the weighting option as tooling only; offline BC loss is not a sufficient selector for this stage.
+
+Base action scale sweep:
+
+- tested the current base-required checkpoint on `base040` with runtime base scales `0.50`, `0.75`, and `1.00`
+- all larger scales regressed tracking; `0.50` already worsened to `0.0815 / 0.1662 / 0.2240 m`
+- diagnosis: the policy is not merely under-scaled. Larger runtime base commands destabilize the closed-loop target/arm coordination.
+
+Decision:
+
+Keep `base_action_scale=0.25` for the current base-required route.
+
+Vertical-shaping probe:
+
+- diagnostic on the current `base040` reference showed persistent z undertracking, with mean signed XYZ error about `[+0.0112, -0.0029, -0.0336] m`
+- added `vertical_position_penalty=80.0` to `stage0_policy_envelope_fk_base040/reset_config.json`
+- trained one bounded `32k` continuation from the same contract + vertical base-required checkpoint
+- run: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_zpenalty80_from_contractz_lowstd_32k_20260707`
+- training stayed stable: final logged `approx_kl=0.00603`, `std=0.0183`
+
+Validation:
+
+- direct `base040`: `0.0482 / 0.0773 / 0.1087 m`
+- previous routed `base040` baseline: `0.0505 / 0.0749 / 0.1056 m`
+- routed `base025`: `0.0431 / 0.0688 / 0.0756 m`
+- routed fixed-base `large08`: `0.0374 / 0.0659 / 0.0801 m`, unchanged because fixed-base still routes to the promoted default checkpoint
+
+Decision:
+
+Do not promote the vertical-shaping continuation as the Stage B base-required route yet. It improves `base040` mean error and improves `base025` max error, but `base040` p95/max are still slightly worse than the existing routed baseline. Keep `vertical_position_penalty=80.0` in the `base040` stage config for future Stage B training because the measured z bias is real.
+
+Next useful update:
+
+Move from offline weighting to rollout-state relabeling. The next candidate should collect actual failed rollout observations around the p95/max tail states and relabel them with a dynamics-aware expert or corrective controller. Do not use tail-weighted BC artifacts as a teacher, and do not increase runtime base scale above `0.25` without a fresh gate.

@@ -16,6 +16,7 @@
     "base_target_regression_penalty": 40.0,
     "base_target_command_reward": 20.0,
     "base_target_command_away_penalty": 30.0,
-    "base_target_command_tracking_penalty": 40.0
+    "base_target_command_tracking_penalty": 40.0,
+    "vertical_position_penalty": 80.0
   }
 }

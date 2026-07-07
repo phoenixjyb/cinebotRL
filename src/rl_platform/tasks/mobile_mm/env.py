@@ -562,6 +562,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "base_overshoot_penalty": self.task_cfg.rewards.base_overshoot_penalty,
             "mobilization_progress_cap": self.task_cfg.rewards.mobilization_progress_cap,
             "position_distance_penalty": self.task_cfg.rewards.position_distance_penalty,
+            "vertical_position_penalty": self.task_cfg.rewards.vertical_position_penalty,
         }
 
         # Session 8h: Curriculum learning - track stage and original weights

@@ -757,3 +757,50 @@ Validation:
 Decision:
 
 Do not promote the mixed-stage PPO candidate. It improves the aggregate mixed gate, but the component gates show the same underlying issue: pure moving-base performance is weaker than the `96k` candidate, and fixed-base regression is worse than the original `32k` reference. The mixed stage is useful as a diagnostic generator, but the next policy update needs an explicit anti-regression objective or staged policy selection, not just mixed sampling.
+
+## Stage A Tracking Diagnostics and Contract-Aware Mixed Probe
+
+Goal:
+
+Improve tracking accuracy without blindly extending PPO. The previous probes showed stable reachability but inconsistent transfer between moving-base and fixed-base gates.
+
+Diagnostics implementation:
+
+- added `scripts/reinforcement_learning/sb3/diagnose_stage_tracking.py`
+- reports aggregate, per-source, per-time-bin, and worst-env tracking metrics
+- captures EE position/orientation error, signed XYZ error, arm target lag, base/target XY motion, action magnitudes, and trajectory filenames
+
+Reference diagnostic on the promoted `32k` reward-override policy:
+
+- mixed-stage mean/p95/max EE position error: `0.0474 / 0.0738 / 0.0864 m`
+- source split: `base025 = 0.0430 / 0.0673 / 0.0772 m`, `large08 = 0.0517 / 0.0754 / 0.0864 m`
+- mean signed XYZ error: `[+0.0107, -0.0161, -0.0388] m`
+- interpretation: the dominant systematic bias is vertical under-tracking, with EE roughly `3.5-4.0 cm` below target; arm target lag is modest at about `0.030 rad`
+
+Vertical penalty probe:
+
+- added optional reward weight `vertical_position_penalty`, default `0.0`
+- tested mixed-stage override `vertical_position_penalty=80.0`
+- training stayed stable and reachable: `64/64`, final `approx_kl=0.00479`
+- `base025` gate improved versus the promoted `32k` reference: `0.0461 / 0.0709 / 0.0880 m` versus `0.0474 / 0.0733 / 0.0967 m`
+- fixed-base `large08` still regressed: `0.0433 / 0.0748 / 0.0822 m` versus `0.0374 / 0.0659 / 0.0801 m`
+- decision: do not promote; vertical shaping helps moving-base tracking but does not solve fixed-base regression
+
+Contract-aware mixed adapter:
+
+- added `--freeze_base_actions_for_non_base_required` to `train.py`
+- behavior: during mixed FK training, trajectories whose metadata filename does not contain `base_required` get base rows `[6,7,8]` zeroed; `base_required` trajectories still use `--base_action_scale`
+- reason: this matches the actual gate contract better than previous mixed sampling, where fixed-base samples were trained with base motion and then evaluated with base frozen
+
+Contract-aware results:
+
+- contract + vertical penalty: stable training, final `approx_kl=0.00465`
+- contract + vertical `base025` gate: `0.0462 / 0.0682 / 0.0835 m`
+- contract + vertical fixed-base `large08` gate: `0.0384 / 0.0706 / 0.0855 m`
+- contract-only: stable training, final `approx_kl=0.00444`
+- contract-only `base025` gate: `0.0468 / 0.0716 / 0.0995 m`
+- contract-only fixed-base `large08` gate: `0.0386 / 0.0759 / 0.0872 m`
+
+Decision:
+
+Do not promote any new policy from this probe. The best moving-base metrics improved, but every candidate still regressed the fixed-base `large08` promotion gate against the `32k` reference. Keep the diagnostics and contract-aware adapter; next improvement should avoid replacing the whole policy with a single mixed PPO checkpoint. Prefer staged policy selection or DAgger-style relabeling on rollout states while preserving the fixed-base actor behavior.

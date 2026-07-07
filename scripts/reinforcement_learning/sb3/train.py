@@ -344,6 +344,15 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--freeze_base_actions_for_non_base_required",
+        action="store_true",
+        help=(
+            "For mixed FK stages, zero base rows [6,7,8] on trajectories whose "
+            "metadata filename does not contain 'base_required'. This keeps "
+            "fixed-base samples aligned with the fixed-base regression gate."
+        ),
+    )
+    parser.add_argument(
         "--policy_arch",
         type=str,
         default="flat",
@@ -1932,6 +1941,7 @@ def main():
             expected_obs_dim: int | None = None,
             freeze_base_actions: bool = False,
             base_action_scale: float = 1.0,
+            freeze_base_actions_for_non_base_required: bool = False,
         ):
             # Isaac Lab env is already a VecEnv
             VecEnvWrapper.__init__(self, venv)
@@ -1940,6 +1950,7 @@ def main():
             self.expected_obs_dim = expected_obs_dim
             self._obs_adapter_logged = False
             self.freeze_base_actions = bool(freeze_base_actions)
+            self.freeze_base_actions_for_non_base_required = bool(freeze_base_actions_for_non_base_required)
             self._freeze_base_logged = False
             self.base_action_scale = float(base_action_scale)
             self._base_scale_logged = False
@@ -1962,12 +1973,21 @@ def main():
                 raise ValueError(
                     f"base action adapter requires at least 9 action dims, got {actions.shape[-1]}"
                 )
-            if not self.freeze_base_actions and abs(self.base_action_scale - 1.0) < 1e-9:
+            if (
+                not self.freeze_base_actions
+                and not self.freeze_base_actions_for_non_base_required
+                and abs(self.base_action_scale - 1.0) < 1e-9
+            ):
                 return actions
             actions = actions.clone()
             if not self._freeze_base_logged:
                 if self.freeze_base_actions:
                     print("[IsaacLabToSB3VecEnvWrapper] Freezing base action rows [6,7,8]")
+                elif self.freeze_base_actions_for_non_base_required:
+                    print(
+                        "[IsaacLabToSB3VecEnvWrapper] Contract-aware mixed base adapter: "
+                        "scale base_required rows and freeze non-base-required rows"
+                    )
                 else:
                     print(
                         "[IsaacLabToSB3VecEnvWrapper] Scaling base action rows [6,7,8] "
@@ -1976,6 +1996,24 @@ def main():
                 self._freeze_base_logged = True
             if self.freeze_base_actions:
                 actions[..., 6:9] = 0.0
+            elif self.freeze_base_actions_for_non_base_required:
+                actions[..., 6:9] *= self.base_action_scale
+                raw_env = self.venv.unwrapped if hasattr(self.venv, "unwrapped") else self.venv
+                manager = getattr(raw_env, "trajectory_manager", None)
+                metadata = getattr(manager, "current_trajectory_metadata", None) if manager is not None else None
+                if metadata:
+                    keep = [
+                        "base_required" in str(item.get("file", ""))
+                        if isinstance(item, dict)
+                        else False
+                        for item in metadata[: actions.shape[0]]
+                    ]
+                    if len(keep) < actions.shape[0]:
+                        keep.extend([False] * (actions.shape[0] - len(keep)))
+                    keep_tensor = torch.as_tensor(keep, dtype=torch.bool, device=actions.device)
+                    actions[~keep_tensor, 6:9] = 0.0
+                else:
+                    actions[..., 6:9] = 0.0
             else:
                 actions[..., 6:9] *= self.base_action_scale
             return actions
@@ -2468,6 +2506,7 @@ def main():
             expected_obs_dim=expected_obs_dim,
             freeze_base_actions=args.freeze_base_actions,
             base_action_scale=args.base_action_scale,
+            freeze_base_actions_for_non_base_required=args.freeze_base_actions_for_non_base_required,
         )
         
         # Do a dummy reset to let the wrapper discover the true observation shape
@@ -2889,6 +2928,13 @@ def main():
     print(f"Device:            {device}")
     print("Seed:              {}".format(args.seed if args.seed is not None else "None"))
     print(f"Freeze base acts:  {'yes (rows [6,7,8] zeroed before env step)' if args.freeze_base_actions else 'no'}")
+    print(
+        "Mixed FK base mask: {}".format(
+            "yes (non-base-required trajectories freeze rows [6,7,8])"
+            if args.freeze_base_actions_for_non_base_required
+            else "no"
+        )
+    )
     if not args.freeze_base_actions:
         print(f"Base action scale: {args.base_action_scale}")
     if args.pretrained_policy:

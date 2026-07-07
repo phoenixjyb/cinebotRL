@@ -1216,6 +1216,9 @@ def compute_combined_reward(
     distance_penalty_linear = weights.get("position_distance_penalty", 0.0) * distance_tracking_penalty(
         current_error
     )
+    vertical_position_penalty = weights.get("vertical_position_penalty", 0.0) * torch.abs(
+        target_pos[:, 2] - current_ee_pos[:, 2]
+    )
     
     # Base mobilization reward - only move chassis when target is out of arm reach
     base_mob_reward = base_mobilization_reward(
@@ -1423,6 +1426,7 @@ def compute_combined_reward(
         - base_command_tracking_penalty  # Penalize zero/incorrect chase commands for far targets
         - dist_penalty  # Legacy base-target distance penalty
         - distance_penalty_linear  # Linear fallback penalty keeps gradients informative
+        - vertical_position_penalty  # Optional Stage A probe for measured z-axis under-tracking
         - overshoot_penalty
         - excessive_penalty
         - action_mag_penalty
@@ -1457,6 +1461,7 @@ def compute_combined_reward(
         "inner_margin_penalty": inner_penalty,  # NEW (Session 8e)
         "target_distance_penalty": dist_penalty,
         "position_distance_penalty": distance_penalty_linear,
+        "vertical_position_penalty": vertical_position_penalty,
         "base_overshoot_penalty": overshoot_penalty,
         "excessive_base_movement_penalty": excessive_penalty,
         "action_magnitude_penalty": action_mag_penalty,

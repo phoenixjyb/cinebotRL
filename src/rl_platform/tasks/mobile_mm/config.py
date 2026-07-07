@@ -253,6 +253,7 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     # AUXILIARY TRACKING SHAPING
     # ========================================
     position_distance_penalty: float = 80.0  # Linear fallback penalty so gradients remain informative when far
+    vertical_position_penalty: float = 0.0  # Optional abs(z target - z EE) penalty for vertical bias probes
 
 
 @dataclass

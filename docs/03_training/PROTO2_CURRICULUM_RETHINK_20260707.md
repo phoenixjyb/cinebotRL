@@ -804,3 +804,34 @@ Contract-aware results:
 Decision:
 
 Do not promote any new policy from this probe. The best moving-base metrics improved, but every candidate still regressed the fixed-base `large08` promotion gate against the `32k` reference. Keep the diagnostics and contract-aware adapter; next improvement should avoid replacing the whole policy with a single mixed PPO checkpoint. Prefer staged policy selection or DAgger-style relabeling on rollout states while preserving the fixed-base actor behavior.
+
+## Stage A Routed Policy Selection
+
+Goal:
+
+Avoid the single-policy tradeoff by selecting the best available policy per trajectory regime:
+
+- default/fixed-base trajectories: promoted `32k` reward-override checkpoint
+- `base_required` trajectories: contract + vertical candidate checkpoint
+
+Implementation:
+
+- added `scripts/reinforcement_learning/sb3/evaluate_stage_policy_router.py`
+- routes per-env actions by `trajectory_manager.current_trajectory_metadata`
+- filenames containing `base_required` use `--checkpoint_base_required`
+- all other filenames use `--checkpoint_default`
+- default-policy base rows `[6,7,8]` are frozen before env dynamics
+- base-required policy base rows `[6,7,8]` are scaled by `--base_required_action_scale`
+
+Validation:
+
+- mixed stage route count: `240` default samples, `240` base-required samples
+- mixed stage: mean/p95/max EE position error `0.0414 / 0.0678 / 0.0754 m`, mean orientation error `5.34 deg`
+- pure `base025`: mean/p95/max EE position error `0.0462 / 0.0682 / 0.0835 m`
+- pure `large08`: mean/p95/max EE position error `0.0374 / 0.0659 / 0.0801 m`
+- pure `large08` route count: `480` default samples, `0` base-required samples
+- pure `base025` route count: `0` default samples, `480` base-required samples
+
+Decision:
+
+Promote routed policy selection as the current best operational evaluation strategy. It preserves the fixed-base `large08` reference exactly while using the better moving-base policy for `base_required` trajectories. This is not yet a single deployable checkpoint; it is a policy-routing contract. The next implementation step is to make the same routing available in any runtime/evaluation entrypoint that needs mixed fixed-base and moving-base trajectories.

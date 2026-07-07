@@ -457,6 +457,7 @@ def parse_args():
         choices=[
             "stage0_policy_envelope_fk",
             "stage0_policy_envelope_fk_slow",
+            "stage0_policy_envelope_fk_medium",
             "stage0_fixedbase_micro",
             "stage0_easy",
             "stage1_recovery",
@@ -467,6 +468,7 @@ def parse_args():
             "Use staged trajectory curriculum "
             "(stage0_policy_envelope_fk=FK targets generated from allowed actions, "
             "stage0_policy_envelope_fk_slow=smaller first-stage FK targets, "
+            "stage0_policy_envelope_fk_medium=medium first-stage FK targets, "
             "stage0_fixedbase_micro=fixed-base reachable micro paths, "
             "stage0_easy=short cinematic paths, stage1=recovery, stage2=moderate, "
             "stage3=full)"

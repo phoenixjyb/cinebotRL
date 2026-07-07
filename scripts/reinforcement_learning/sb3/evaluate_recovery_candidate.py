@@ -93,6 +93,15 @@ def parse_args() -> argparse.Namespace:
             "the checkpoint's 9D policy output."
         ),
     )
+    parser.add_argument(
+        "--base_action_scale",
+        type=float,
+        default=1.0,
+        help=(
+            "Multiply base action rows [6,7,8] by this factor before env dynamics. "
+            "Ignored when --freeze_base_actions is set."
+        ),
+    )
     parser.add_argument("--output_dir", default="evaluation_results/recovery_candidate")
     return parser.parse_args()
 
@@ -381,6 +390,8 @@ def summarize_episode_details(details: list[dict[str, object]]) -> dict[str, dic
 
 def main() -> int:
     args = parse_args()
+    if args.base_action_scale < 0.0 or args.base_action_scale > 1.0:
+        raise ValueError("--base_action_scale must be in [0, 1]")
     checkpoint = Path(args.checkpoint)
     if not checkpoint.exists():
         print(f"checkpoint not found: {checkpoint}")
@@ -486,12 +497,14 @@ def main() -> int:
                 venv,
                 expected_dim: int | None = None,
                 freeze_base_actions: bool = False,
+                base_action_scale: float = 1.0,
             ):
                 super().__init__(venv)
                 self.expected_dim = expected_dim
                 self._obs_adapter_logged = False
                 self.freeze_base_actions = bool(freeze_base_actions)
-                self._freeze_base_logged = False
+                self.base_action_scale = float(base_action_scale)
+                self._base_adapter_logged = False
                 if hasattr(venv.action_space, "shape") and len(venv.action_space.shape) > 1:
                     action_dim = venv.action_space.shape[-1]
                     self.action_space = spaces.Box(
@@ -593,17 +606,26 @@ def main() -> int:
                 return self._convert_obs(self.venv.reset())
 
             def _adapt_actions(self, actions):
-                if not self.freeze_base_actions:
-                    return actions
                 if actions.shape[-1] < 9:
                     raise ValueError(
-                        f"--freeze_base_actions requires at least 9 action dims, got {actions.shape[-1]}"
+                        f"base action adapter requires at least 9 action dims, got {actions.shape[-1]}"
                     )
-                if not self._freeze_base_logged:
-                    print("[eval action-adapter] Freezing base action rows [6,7,8]")
-                    self._freeze_base_logged = True
+                if not self.freeze_base_actions and abs(self.base_action_scale - 1.0) < 1e-9:
+                    return actions
                 actions = actions.clone()
-                actions[..., 6:9] = 0.0
+                if not self._base_adapter_logged:
+                    if self.freeze_base_actions:
+                        print("[eval action-adapter] Freezing base action rows [6,7,8]")
+                    else:
+                        print(
+                            "[eval action-adapter] Scaling base action rows [6,7,8] "
+                            f"by {self.base_action_scale:.3f}"
+                        )
+                    self._base_adapter_logged = True
+                if self.freeze_base_actions:
+                    actions[..., 6:9] = 0.0
+                else:
+                    actions[..., 6:9] *= self.base_action_scale
                 return actions
 
             def step_async(self, actions):
@@ -633,6 +655,7 @@ def main() -> int:
             base_env,
             expected_obs_dim,
             freeze_base_actions=args.freeze_base_actions,
+            base_action_scale=args.base_action_scale,
         )
         env = VecNormalize.load(str(vec_path), env)
         env.training = False
@@ -787,6 +810,7 @@ def main() -> int:
             },
             "num_envs": args.num_envs,
             "freeze_base_actions": bool(args.freeze_base_actions),
+            "base_action_scale": float(args.base_action_scale),
             "episodes_completed": len(episode_rewards),
             "steps": step,
             "episode_reward_mean": float(np.mean(episode_rewards)) if episode_rewards else None,

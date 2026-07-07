@@ -575,3 +575,53 @@ Training details:
 Decision:
 
 Promote `stage0_policy_envelope_fk_large08` as the next fixed-base Stage A checkpoint. Do not jump straight to obstacles. The next curriculum step should cautiously unfreeze base behavior on a small, deterministic set while keeping the `large08` fixed-base gate as a regression test.
+
+## Stage A Base-Scale Unfreeze Gate
+
+The first base-unfreeze step should not expose full chassis authority. The fixed-base checkpoint has only been trained with rows `[6,7,8]` zeroed before environment dynamics, so its base head is not yet a trustworthy control policy.
+
+Implementation:
+
+- added `--base_action_scale` to `train.py`
+- added `--base_action_scale` to `evaluate_stage_rollout_gate.py`
+- added `--base_action_scale` to `evaluate_recovery_candidate.py`
+- semantics: when `--freeze_base_actions` is set, base rows `[6,7,8]` are still zeroed; otherwise rows `[6,7,8]` are multiplied by `--base_action_scale` before `env.step(...)`
+- valid scale range: `[0,1]`
+
+Pre-training audits on the promoted `large08` checkpoint:
+
+- frozen-base PPO gate: mean EE position error `0.0350 m`, p95 `0.0648 m`, max `0.0713 m`, mean orientation error `3.12 deg`
+- no-freeze audit: mean EE position error `0.0457 m`, p95 `0.0697 m`, max `0.0771 m`, mean orientation error `3.34 deg`
+- reduced base scale `0.25`: mean EE position error `0.0343 m`, p95 `0.0676 m`, max `0.0727 m`, mean orientation error `3.18 deg`
+
+Training:
+
+```bash
+scripts/reinforcement_learning/sb3/train.py \
+  --trajectory_stage stage0_policy_envelope_fk_large08 \
+  --checkpoint logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_large08_rawbc_novec_64k_20260707/final_model.zip \
+  --disable_vec_normalize \
+  --base_action_scale 0.25 \
+  --learning_rate 1e-5 \
+  --total_timesteps 65536
+```
+
+Run:
+
+`logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_large08_base025_resume_64k_20260707`
+
+Training observations:
+
+- exit code: `0`
+- base action adapter confirmed rows `[6,7,8]` scaled by `0.25`
+- final `approx_kl=0.0018498414`
+- brief reachability dips were seen during training (`60/64`, `62/64`), so this still needs deterministic gates before promotion
+
+Post-training gates:
+
+- reduced base scale `0.25`: mean EE position error `0.0308 m`, p95 `0.0558 m`, max `0.0624 m`, mean orientation error `3.24 deg`
+- fixed-base regression gate with `--freeze_base_actions`: mean EE position error `0.0328 m`, p95 `0.0598 m`, max `0.0694 m`, mean orientation error `3.30 deg`
+
+Decision:
+
+Promote the `--base_action_scale 0.25` adapter and checkpoint evidence as the first cautious base-unfreeze step. Do not move to obstacles yet. The next step should create a small deterministic base-required stage where the target is just outside the stationary arm envelope and require the policy to reduce base-target distance without regressing the `large08` fixed-base gate.

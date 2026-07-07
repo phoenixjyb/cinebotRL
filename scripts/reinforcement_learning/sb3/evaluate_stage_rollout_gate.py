@@ -41,6 +41,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=20260707)
     parser.add_argument("--freeze_base_actions", action="store_true")
     parser.add_argument(
+        "--base_action_scale",
+        type=float,
+        default=1.0,
+        help=(
+            "Multiply base action rows [6,7,8] by this factor before env dynamics. "
+            "Ignored when --freeze_base_actions is set."
+        ),
+    )
+    parser.add_argument(
         "--enable_initial_joint_randomization",
         action="store_true",
         help="Keep startup joint noise enabled. Default disables it for deterministic Stage A contract checks.",
@@ -85,6 +94,8 @@ def load_stage_reset_config(stage: str) -> dict[str, float]:
 
 def main() -> int:
     args = parse_args()
+    if args.base_action_scale < 0.0 or args.base_action_scale > 1.0:
+        raise ValueError("--base_action_scale must be in [0, 1]")
     checkpoint = Path(args.checkpoint)
     vec_normalize = Path(args.vec_normalize)
     require(checkpoint.exists(), f"checkpoint not found: {checkpoint}")
@@ -152,10 +163,18 @@ def main() -> int:
         print("[gate] env created", flush=True)
 
         class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):
-            def __init__(self, venv, expected_obs_dim: int | None, freeze_base_actions: bool) -> None:
+            def __init__(
+                self,
+                venv,
+                expected_obs_dim: int | None,
+                freeze_base_actions: bool,
+                base_action_scale: float,
+            ) -> None:
                 super().__init__(venv)
                 self.expected_obs_dim = expected_obs_dim
                 self.freeze_base_actions = bool(freeze_base_actions)
+                self.base_action_scale = float(base_action_scale)
+                self._base_adapter_logged = False
                 self._obs_space_updated = False
                 if hasattr(venv.action_space, "shape") and len(venv.action_space.shape) > 1:
                     action_dim = venv.action_space.shape[-1]
@@ -195,9 +214,24 @@ def main() -> int:
             def step_async(self, actions):
                 if isinstance(actions, np.ndarray):
                     actions = torch.from_numpy(actions).float().to(self.venv.unwrapped.device)
-                if self.freeze_base_actions:
+                if actions.shape[-1] < 9:
+                    raise ValueError(f"base action adapter requires at least 9 action dims, got {actions.shape[-1]}")
+                if self.freeze_base_actions or abs(self.base_action_scale - 1.0) >= 1e-9:
                     actions = actions.clone()
-                    actions[..., 6:9] = 0.0
+                    if not self._base_adapter_logged:
+                        if self.freeze_base_actions:
+                            print("[gate action-adapter] Freezing base action rows [6,7,8]", flush=True)
+                        else:
+                            print(
+                                "[gate action-adapter] Scaling base action rows [6,7,8] "
+                                f"by {self.base_action_scale:.3f}",
+                                flush=True,
+                            )
+                        self._base_adapter_logged = True
+                    if self.freeze_base_actions:
+                        actions[..., 6:9] = 0.0
+                    else:
+                        actions[..., 6:9] *= self.base_action_scale
                 self._actions = actions
 
             def step_wait(self):
@@ -217,7 +251,12 @@ def main() -> int:
                 return obs, rewards, dones, infos
 
         expected_obs_dim = int(np.prod(PPO.load(str(checkpoint), device="cpu").observation_space.shape))
-        env = IsaacLabToSB3VecEnvWrapper(base_env, expected_obs_dim, args.freeze_base_actions)
+        env = IsaacLabToSB3VecEnvWrapper(
+            base_env,
+            expected_obs_dim,
+            args.freeze_base_actions,
+            args.base_action_scale,
+        )
         _ = env.reset()
         if not args.disable_vec_normalize:
             env = VecNormalize.load(str(vec_normalize), env)
@@ -312,6 +351,7 @@ def main() -> int:
             "steps": args.steps,
             "samples": int(pos.size),
             "freeze_base_actions": bool(args.freeze_base_actions),
+            "base_action_scale": float(args.base_action_scale),
             "initial_joint_randomization": bool(args.enable_initial_joint_randomization),
             "initial_ee_pos_error_mean_m": float(np.mean(initial_pos_error)),
             "final_ee_pos_error_mean_m": float(np.mean(final_pos_error)),

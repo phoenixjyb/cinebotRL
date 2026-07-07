@@ -329,6 +329,15 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--base_action_scale",
+        type=float,
+        default=1.0,
+        help=(
+            "Gradual base-unfreeze gate: multiply base action rows [6,7,8] by this "
+            "factor before env dynamics. Ignored when --freeze_base_actions is set."
+        ),
+    )
+    parser.add_argument(
         "--policy_arch",
         type=str,
         default="flat",
@@ -889,6 +898,8 @@ def main():
     }
     if args.trajectory_stage and "--trajectory_type" not in explicit_args:
         args.trajectory_type = "multi_recorded"
+    if args.base_action_scale < 0.0 or args.base_action_scale > 1.0:
+        raise ValueError("--base_action_scale must be in [0, 1]")
 
     auto_recovery_stability = (
         args.trajectory_stage == "stage1_recovery"
@@ -1910,6 +1921,7 @@ def main():
             venv,
             expected_obs_dim: int | None = None,
             freeze_base_actions: bool = False,
+            base_action_scale: float = 1.0,
         ):
             # Isaac Lab env is already a VecEnv
             VecEnvWrapper.__init__(self, venv)
@@ -1919,6 +1931,8 @@ def main():
             self._obs_adapter_logged = False
             self.freeze_base_actions = bool(freeze_base_actions)
             self._freeze_base_logged = False
+            self.base_action_scale = float(base_action_scale)
+            self._base_scale_logged = False
             
             # FIX: Isaac Lab's action_space includes batch dimension [num_envs, action_dim]
             # SB3 expects per-env action space [action_dim]
@@ -1934,17 +1948,26 @@ def main():
                 print(f"[IsaacLabToSB3VecEnvWrapper] Fixed action_space: {venv.action_space.shape} -> {self.action_space.shape}")
 
         def _adapt_actions(self, actions):
-            if not self.freeze_base_actions:
-                return actions
             if actions.shape[-1] < 9:
                 raise ValueError(
-                    f"--freeze_base_actions requires at least 9 action dims, got {actions.shape[-1]}"
+                    f"base action adapter requires at least 9 action dims, got {actions.shape[-1]}"
                 )
-            if not self._freeze_base_logged:
-                print("[IsaacLabToSB3VecEnvWrapper] Freezing base action rows [6,7,8]")
-                self._freeze_base_logged = True
+            if not self.freeze_base_actions and abs(self.base_action_scale - 1.0) < 1e-9:
+                return actions
             actions = actions.clone()
-            actions[..., 6:9] = 0.0
+            if not self._freeze_base_logged:
+                if self.freeze_base_actions:
+                    print("[IsaacLabToSB3VecEnvWrapper] Freezing base action rows [6,7,8]")
+                else:
+                    print(
+                        "[IsaacLabToSB3VecEnvWrapper] Scaling base action rows [6,7,8] "
+                        f"by {self.base_action_scale:.3f}"
+                    )
+                self._freeze_base_logged = True
+            if self.freeze_base_actions:
+                actions[..., 6:9] = 0.0
+            else:
+                actions[..., 6:9] *= self.base_action_scale
             return actions
 
         def _trajectory_progress_column(self, obs: np.ndarray) -> np.ndarray:
@@ -2426,6 +2449,7 @@ def main():
             env,
             expected_obs_dim=expected_obs_dim,
             freeze_base_actions=args.freeze_base_actions,
+            base_action_scale=args.base_action_scale,
         )
         
         # Do a dummy reset to let the wrapper discover the true observation shape
@@ -2842,6 +2866,8 @@ def main():
     print(f"Device:            {device}")
     print("Seed:              {}".format(args.seed if args.seed is not None else "None"))
     print(f"Freeze base acts:  {'yes (rows [6,7,8] zeroed before env step)' if args.freeze_base_actions else 'no'}")
+    if not args.freeze_base_actions:
+        print(f"Base action scale: {args.base_action_scale}")
     if args.pretrained_policy:
         print(f"Pretrained policy: {args.pretrained_policy}")
     if args.base_assist_aux_dataset:

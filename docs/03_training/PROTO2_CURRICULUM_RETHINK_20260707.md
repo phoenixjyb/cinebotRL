@@ -141,3 +141,68 @@ Promotion gate:
 
 Do not run more base-only BC or base-only aux experiments unless a new audit proves the label distribution is aligned with raw-policy success.
 
+## Stage A Smoke Result
+
+Existing CLI flags are enough to express a first raw RL-only Stage A smoke:
+
+```bash
+PYTHONUTF8=1 NO_PROXY='*' no_proxy='*' /mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 \
+  scripts/reinforcement_learning/sb3/train.py \
+  --headless \
+  --num_envs 4 \
+  --total_timesteps 32 \
+  --n_steps 8 \
+  --batch_size 8 \
+  --n_epochs 1 \
+  --trajectory_stage stage0_easy \
+  --max_trajectories 4 \
+  --min_trajectory_duration 5.0 \
+  --disable_auto_base_assist \
+  --disable_auto_base_assist_yaw \
+  --save_freq 1000000 \
+  --log_dir logs/sb3/recomoproto2trackee_v0/stage0_raw_rl_smoke_20260707
+```
+
+Smoke output:
+
+- exit code: `0`
+- observation dim: `84`
+- action dim: `9`
+- trajectory manifest: `trajectoryToLearn/stage0_easy/manifest.txt`
+- selected trajectories: `4`
+- category: `handheld_subtle`
+- base assist: not enabled
+- BC/IL: not enabled
+- obstacles: not enabled
+- reset reachability: `4/4` reachable, `0/4` unreachable
+
+This proves the raw RL-only entrypoint is runnable.
+
+## Proposed Next Bounded Stage A Gate
+
+Run one small Stage A gate before any larger curriculum changes:
+
+```bash
+PYTHONUTF8=1 NO_PROXY='*' no_proxy='*' /mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 \
+  scripts/reinforcement_learning/sb3/train.py \
+  --headless \
+  --num_envs 64 \
+  --total_timesteps 65536 \
+  --n_steps 256 \
+  --batch_size 1024 \
+  --n_epochs 4 \
+  --trajectory_stage stage0_easy \
+  --max_trajectories 8 \
+  --min_trajectory_duration 5.0 \
+  --disable_auto_base_assist \
+  --disable_auto_base_assist_yaw \
+  --save_freq 32768 \
+  --log_dir logs/sb3/recomoproto2trackee_v0/stage0_raw_rl_64k_20260707
+```
+
+Promotion gate:
+
+- evaluate raw-policy only
+- compare against the stage0 raw smoke/baseline once available
+- require reachable starts to stay reachable rather than optimizing reward alone
+- do not add obstacles or base-only imitation in this gate

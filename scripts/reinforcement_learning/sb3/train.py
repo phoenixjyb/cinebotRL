@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import random
 import sys
@@ -446,6 +447,7 @@ def parse_args():
         type=str,
         default=None,
         choices=[
+            "stage0_policy_envelope_fk",
             "stage0_fixedbase_micro",
             "stage0_easy",
             "stage1_recovery",
@@ -454,9 +456,10 @@ def parse_args():
         ],
         help=(
             "Use staged trajectory curriculum "
-            "(stage0_fixedbase_micro=fixed-base reachable micro paths, "
-            "stage0_easy=short cinematic paths, stage1=recovery, "
-            "stage2=moderate, stage3=full)"
+            "(stage0_policy_envelope_fk=FK targets generated from allowed actions, "
+            "stage0_fixedbase_micro=fixed-base reachable micro paths, "
+            "stage0_easy=short cinematic paths, stage1=recovery, stage2=moderate, "
+            "stage3=full)"
         ),
     )
     parser.add_argument(
@@ -2127,6 +2130,20 @@ def main():
             stage_dir = PROJECT_ROOT / "trajectoryToLearn" / args.trajectory_stage
             if stage_dir.exists():
                 manifest_file = stage_dir / "manifest.txt"
+                reset_config_file = stage_dir / "reset_config.json"
+                if reset_config_file.exists():
+                    with reset_config_file.open("r", encoding="utf-8") as f:
+                        reset_config = json.load(f)
+                    if "reset_base_x_offset" in reset_config:
+                        trajectory_config["reset_base_x_offset"] = float(reset_config["reset_base_x_offset"])
+                    if "reset_base_y_offset" in reset_config:
+                        trajectory_config["reset_base_y_offset"] = float(reset_config["reset_base_y_offset"])
+                    if "reset_base_x_offset" in trajectory_config and "reset_base_y_offset" in trajectory_config:
+                        print(
+                            "    [OK] Stage reset offset: "
+                            f"x={trajectory_config['reset_base_x_offset']:.4f}, "
+                            f"y={trajectory_config['reset_base_y_offset']:.4f}"
+                        )
                 stage_files = [p for p in stage_dir.rglob("*.json") if "__MACOSX" not in str(p)]
                 if manifest_file.exists():
                     trajectory_config['stage_dir'] = str(PROJECT_ROOT)
@@ -2345,6 +2362,8 @@ def main():
             reset_anchor_target_blend=args.reset_anchor_target_blend,
             reset_anchor_target_blend_initial=args.reset_anchor_target_blend_initial,
             reset_anchor_target_blend_decay_steps=max(int(args.reset_anchor_target_blend_decay_steps), 0),
+            reset_base_x_offset=trajectory_config.get("reset_base_x_offset", 0.4415),
+            reset_base_y_offset=trajectory_config.get("reset_base_y_offset", 0.2405),
             debug_sampling=args.debug_trajectory_sampling,
         )
         

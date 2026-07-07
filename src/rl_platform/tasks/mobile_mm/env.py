@@ -2896,13 +2896,15 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 print(f"  waypoint_idx:         {current_wp}")
                 print(f"  time_accum:           {self.trajectory_manager._recorded_time_accum[env_idx].item():.4f}")
 
-        # Set base position with offset from target, accounting for arm kinematics
-        # FK analysis (all joints at zero): EE is at [0.1415, 0.2405, 0.9465] in base frame
-        # We offset base 44cm behind and 24cm left of target XY to allow 30cm forward reach
-        # This gives natural reaching posture instead of forcing arm backwards
+        # Set base position with offset from target, accounting for arm kinematics.
+        # Historical stages use [0.4415, 0.2405] to start with forward reach room.
+        # Synthetic FK-labelled stages may override this so action labels and
+        # reset-relative target geometry stay self-consistent.
+        reset_base_x_offset = float(getattr(self.task_cfg.trajectory, "reset_base_x_offset", 0.4415))
+        reset_base_y_offset = float(getattr(self.task_cfg.trajectory, "reset_base_y_offset", 0.2405))
         new_root_state = self.robot.data.default_root_state[env_ids].clone()
-        new_root_state[:, 0] = reset_anchor_pos[env_ids, 0] - 0.4415  # X: 30cm forward reach room
-        new_root_state[:, 1] = reset_anchor_pos[env_ids, 1] - 0.2405  # Y: compensate for lateral offset
+        new_root_state[:, 0] = reset_anchor_pos[env_ids, 0] - reset_base_x_offset
+        new_root_state[:, 1] = reset_anchor_pos[env_ids, 1] - reset_base_y_offset
         new_root_state[:, 2] = 0.0  # Ground level (matches runtime clamping line 1162)
         # Keep orientation from default (facing forward)
 

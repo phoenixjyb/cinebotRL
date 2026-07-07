@@ -40,6 +40,8 @@ class TrajectoryConfig:
     reset_anchor_target_blend: float = 0.0  # 0=start anchor, 1=current target anchor
     reset_anchor_target_blend_initial: float | None = None  # Optional curriculum start value
     reset_anchor_target_blend_decay_steps: int = 0  # Timesteps to decay initial blend to final blend
+    reset_base_x_offset: float = 0.4415  # Base root X = reset_anchor_x - offset
+    reset_base_y_offset: float = 0.2405  # Base root Y = reset_anchor_y - offset
     debug_sampling: bool = False  # Verbose trajectory resample/reset diagnostics
 
     # Curriculum settings

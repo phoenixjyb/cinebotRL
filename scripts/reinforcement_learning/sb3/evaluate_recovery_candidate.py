@@ -198,6 +198,22 @@ def _resolve_trajectory_manifest(args: argparse.Namespace, output_dir: Path) -> 
     return trajectory_dir, resolved_manifest, [str(path) for path in entries]
 
 
+def _load_stage_reset_config(args: argparse.Namespace) -> dict[str, float]:
+    """Load optional stage-local reset offsets without changing legacy defaults."""
+    stage_dir = PROJECT_ROOT / "trajectoryToLearn" / args.trajectory_stage
+    reset_config_file = stage_dir / "reset_config.json"
+    if not reset_config_file.exists():
+        return {}
+    with reset_config_file.open("r", encoding="utf-8") as f:
+        raw = json.load(f)
+    out: dict[str, float] = {}
+    if "reset_base_x_offset" in raw:
+        out["reset_base_x_offset"] = float(raw["reset_base_x_offset"])
+    if "reset_base_y_offset" in raw:
+        out["reset_base_y_offset"] = float(raw["reset_base_y_offset"])
+    return out
+
+
 def get_trajectory_snapshots(raw_env, num_envs: int) -> list[dict[str, object]]:
     """Snapshot per-env trajectory metadata before it can be replaced by a reset."""
     manager = getattr(raw_env, "trajectory_manager", None)
@@ -404,8 +420,15 @@ def main() -> int:
 
         output_dir = Path(args.output_dir)
         trajectory_dir, manifest, selected_trajectories = _resolve_trajectory_manifest(args, output_dir)
+        reset_config = _load_stage_reset_config(args)
         print(f"trajectory_dir: {trajectory_dir}")
         print(f"trajectory_manifest: {manifest}")
+        if reset_config:
+            print(
+                "stage reset offset: "
+                f"x={reset_config.get('reset_base_x_offset', 0.4415):.4f}, "
+                f"y={reset_config.get('reset_base_y_offset', 0.2405):.4f}"
+            )
         print(f"selected trajectories: {len(selected_trajectories)}")
         if len(selected_trajectories) <= 10:
             for item in selected_trajectories:
@@ -441,6 +464,8 @@ def main() -> int:
             start_waypoint_max_fraction=args.start_waypoint_max_fraction,
             reset_base_to_trajectory_start=bool(args.reset_base_to_trajectory_start),
             reset_anchor_target_blend=args.reset_anchor_target_blend,
+            reset_base_x_offset=reset_config.get("reset_base_x_offset", 0.4415),
+            reset_base_y_offset=reset_config.get("reset_base_y_offset", 0.2405),
         )
 
         assist_cfg = env_cfg.task_config.base_assist

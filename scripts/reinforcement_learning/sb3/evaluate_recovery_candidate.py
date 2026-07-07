@@ -473,6 +473,22 @@ def main() -> int:
                     return obs
                 if obs.ndim == 1 and obs.shape[0] == self.expected_dim:
                     return obs
+                if obs.ndim == 2 and obs.shape[1] == self.expected_dim - 1:
+                    if not self._obs_adapter_logged:
+                        print(
+                            "[obs-adapter] Appending trajectory progress column "
+                            f"for checkpoint compatibility: {obs.shape[1]} -> {self.expected_dim}"
+                        )
+                        self._obs_adapter_logged = True
+                    return np.concatenate([obs, self._trajectory_progress_column(obs)], axis=1)
+                if obs.ndim == 1 and obs.shape[0] == self.expected_dim - 1:
+                    if not self._obs_adapter_logged:
+                        print(
+                            "[obs-adapter] Appending zero progress column "
+                            f"for checkpoint compatibility: {obs.shape[0]} -> {self.expected_dim}"
+                        )
+                        self._obs_adapter_logged = True
+                    return np.concatenate([obs, np.zeros((1,), dtype=np.float32)], axis=0)
                 # Some recorded-trajectory eval configs append progress while older
                 # PPO checkpoints were trained on the raw 84D policy observation.
                 if obs.ndim == 2 and obs.shape[1] == self.expected_dim + 1:
@@ -492,6 +508,35 @@ def main() -> int:
                         self._obs_adapter_logged = True
                     return obs[: self.expected_dim]
                 return obs
+
+            def _trajectory_progress_column(self, obs: np.ndarray) -> np.ndarray:
+                raw_env = self.venv.unwrapped if hasattr(self.venv, "unwrapped") else self.venv
+                manager = getattr(raw_env, "trajectory_manager", None)
+                num_envs = obs.shape[0] if obs.ndim == 2 else 1
+                if manager is None:
+                    return np.zeros((num_envs, 1), dtype=np.float32)
+
+                current_idx = getattr(manager, "current_waypoint_idx", None)
+                lengths = getattr(manager, "recorded_lengths", None)
+                if current_idx is None or lengths is None:
+                    return np.zeros((num_envs, 1), dtype=np.float32)
+
+                if hasattr(current_idx, "detach"):
+                    current_idx = current_idx.detach()
+                if hasattr(lengths, "detach"):
+                    lengths = lengths.detach()
+                if hasattr(current_idx, "cpu"):
+                    current_idx = current_idx.cpu()
+                if hasattr(lengths, "cpu"):
+                    lengths = lengths.cpu()
+
+                current_np = np.asarray(current_idx, dtype=np.float32).reshape(-1)
+                lengths_np = np.asarray(lengths, dtype=np.float32).reshape(-1)
+                if current_np.shape[0] < num_envs or lengths_np.shape[0] < num_envs:
+                    return np.zeros((num_envs, 1), dtype=np.float32)
+                denom = np.maximum(lengths_np[:num_envs] - 1.0, 1.0)
+                progress = np.clip(current_np[:num_envs] / denom, 0.0, 1.0)
+                return progress.reshape(num_envs, 1).astype(np.float32, copy=False)
 
             def _convert_obs(self, obs):
                 if isinstance(obs, tuple):

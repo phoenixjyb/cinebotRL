@@ -1869,11 +1869,13 @@ def main():
     class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):
         """VecEnv wrapper to convert Isaac Lab's dict observations with torch tensors to numpy arrays for SB3."""
         
-        def __init__(self, venv):
+        def __init__(self, venv, expected_obs_dim: int | None = None):
             # Isaac Lab env is already a VecEnv
             VecEnvWrapper.__init__(self, venv)
             # We'll update observation space after first reset
             self._obs_space_updated = False
+            self.expected_obs_dim = expected_obs_dim
+            self._obs_adapter_logged = False
             
             # FIX: Isaac Lab's action_space includes batch dimension [num_envs, action_dim]
             # SB3 expects per-env action space [action_dim]
@@ -1887,7 +1889,65 @@ def main():
                     dtype=venv.action_space.dtype
                 )
                 print(f"[IsaacLabToSB3VecEnvWrapper] Fixed action_space: {venv.action_space.shape} -> {self.action_space.shape}")
-            
+
+        def _trajectory_progress_column(self, obs: np.ndarray) -> np.ndarray:
+            raw_env = self.venv.unwrapped if hasattr(self.venv, "unwrapped") else self.venv
+            manager = getattr(raw_env, "trajectory_manager", None)
+            num_envs = obs.shape[0] if obs.ndim == 2 else 1
+            if manager is None:
+                return np.zeros((num_envs, 1), dtype=np.float32)
+
+            current_idx = getattr(manager, "current_waypoint_idx", None)
+            lengths = getattr(manager, "recorded_lengths", None)
+            if current_idx is None or lengths is None:
+                return np.zeros((num_envs, 1), dtype=np.float32)
+
+            if hasattr(current_idx, "detach"):
+                current_idx = current_idx.detach()
+            if hasattr(lengths, "detach"):
+                lengths = lengths.detach()
+            if hasattr(current_idx, "cpu"):
+                current_idx = current_idx.cpu()
+            if hasattr(lengths, "cpu"):
+                lengths = lengths.cpu()
+
+            current_np = np.asarray(current_idx, dtype=np.float32).reshape(-1)
+            lengths_np = np.asarray(lengths, dtype=np.float32).reshape(-1)
+            if current_np.shape[0] < num_envs or lengths_np.shape[0] < num_envs:
+                return np.zeros((num_envs, 1), dtype=np.float32)
+            denom = np.maximum(lengths_np[:num_envs] - 1.0, 1.0)
+            progress = np.clip(current_np[:num_envs] / denom, 0.0, 1.0)
+            return progress.reshape(num_envs, 1).astype(np.float32, copy=False)
+
+        def _adapt_obs_dim(self, obs: np.ndarray) -> np.ndarray:
+            if self.expected_obs_dim is None:
+                return obs
+            if obs.ndim == 2 and obs.shape[1] == self.expected_obs_dim:
+                return obs
+            if obs.ndim == 1 and obs.shape[0] == self.expected_obs_dim:
+                return obs
+            if obs.ndim == 2 and obs.shape[1] == self.expected_obs_dim - 1:
+                if not self._obs_adapter_logged:
+                    print(
+                        "[IsaacLabToSB3VecEnvWrapper] Appending trajectory progress column "
+                        f"for checkpoint compatibility: {obs.shape[1]} -> {self.expected_obs_dim}"
+                    )
+                    self._obs_adapter_logged = True
+                return np.concatenate([obs, self._trajectory_progress_column(obs)], axis=1)
+            if obs.ndim == 2 and obs.shape[1] == self.expected_obs_dim + 1:
+                if not self._obs_adapter_logged:
+                    print(
+                        "[IsaacLabToSB3VecEnvWrapper] Dropping final observation column "
+                        f"for checkpoint compatibility: {obs.shape[1]} -> {self.expected_obs_dim}"
+                    )
+                    self._obs_adapter_logged = True
+                return obs[:, : self.expected_obs_dim]
+            if obs.ndim == 1 and obs.shape[0] == self.expected_obs_dim - 1:
+                return np.concatenate([obs, np.zeros((1,), dtype=np.float32)], axis=0)
+            if obs.ndim == 1 and obs.shape[0] == self.expected_obs_dim + 1:
+                return obs[: self.expected_obs_dim]
+            return obs
+
         def reset(self):
             obs = self.venv.reset()
             
@@ -1903,6 +1963,7 @@ def main():
                 else:
                     obs = np.array(obs_tensor)
                 obs = np.nan_to_num(obs, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32, copy=False)
+                obs = self._adapt_obs_dim(obs)
                 
                 # Update observation space on first reset
                 if not self._obs_space_updated:
@@ -1950,6 +2011,7 @@ def main():
                 else:
                     obs = np.array(obs_tensor)
                 obs = np.nan_to_num(obs, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32, copy=False)
+                obs = self._adapt_obs_dim(obs)
             
             # Convert rewards and dones to numpy
             if hasattr(rewards, 'cpu'):
@@ -2278,7 +2340,15 @@ def main():
         
         # First wrap to convert Isaac Lab format to SB3 format (dict -> numpy)
         # Isaac Lab envs are already VecEnv, so use VecEnvWrapper
-        env = IsaacLabToSB3VecEnvWrapper(env)
+        expected_obs_dim = None
+        if args.checkpoint:
+            try:
+                checkpoint_model = PPO.load(args.checkpoint, device="cpu", print_system_info=False)
+                expected_obs_dim = int(np.prod(checkpoint_model.observation_space.shape))
+                print(f"    [OK] Checkpoint observation dim detected: {expected_obs_dim}")
+            except Exception as exc:
+                print(f"    [WARN] Could not inspect checkpoint observation dim: {exc}")
+        env = IsaacLabToSB3VecEnvWrapper(env, expected_obs_dim=expected_obs_dim)
         
         # Do a dummy reset to let the wrapper discover the true observation shape
         # This updates the observation_space before VecNormalize reads it

@@ -285,3 +285,80 @@ If the device remains Code 43, reboot Windows or clean-reinstall the NVIDIA driv
 ```
 
 Only then rerun the yaw-assist + base-aux smoke.
+
+## 2026-07-07 Result: Yaw-Assist + Base Aux After GPU Recovery
+
+GPU recovery:
+
+- Windows reboot recovered the NVIDIA device.
+- `/usr/lib/wsl/lib/nvidia-smi` passed.
+- Windows `nvidia-smi.exe` passed.
+- Torch in `G:\isaaclab_venv` reported `cuda_available=True`, device `NVIDIA RTX PRO 4000 Blackwell`.
+
+Resume compatibility fix:
+
+- `scripts/reinforcement_learning/sb3/train.py` now detects checkpoint observation dim before wrapping the env.
+- If the current env returns `84D` but the checkpoint expects `85D`, the wrapper appends normalized trajectory playback progress from `trajectory_manager.current_waypoint_idx / (recorded_lengths - 1)`.
+- `scripts/reinforcement_learning/sb3/evaluate_recovery_candidate.py` has the same bidirectional adapter, so both 84D and 85D checkpoints can be evaluated against current recorded-trajectory configs.
+
+Smoke evidence:
+
+```text
+[IsaacLabToSB3VecEnvWrapper] Appending trajectory progress column for checkpoint compatibility: 84 -> 85
+[OK] VecNormalize stats loaded successfully
+[BaseAssistAux] rollout=1 loss=0.203459
+```
+
+Gate run:
+
+`logs/sb3/recomoproto2trackee_v0/yaw_assist_baseaux_resume_64k_20260707`
+
+Important caveat:
+
+- Intended gate was `+65,536` steps from the yaw-assist checkpoint.
+- The command used `--total_timesteps 131072`.
+- With `reset_num_timesteps=False`, SB3 treated this as additional timesteps, not an absolute target.
+- Actual final timestep: `196,608`, so this was `+131,072` steps from the 65,536-step baseline.
+
+Final training metrics:
+
+- `approx_kl=0.01092759`
+- `base_assist_aux_loss=0.0687`
+- `explained_variance=-1.59`
+- `value_loss=0.0167`
+- `std=0.0496`
+- exit code: `0`
+
+Evaluation output:
+
+`evaluation_results/recovery_candidate/yaw_assist_baseaux_resume_64k_20260707/recovery_eval_raw-policy_20260707_091542.json`
+
+Raw-policy metrics:
+
+- `ee_pos_error_mean_m.mean=1.7962`
+- `ee_pos_error_p95_m.mean=1.9542`
+- `ee_ori_error_mean_deg.mean=163.1632`
+- `unreachable_zone_pct.mean=87.7717`
+- `workspace_hard_exceed_pct.mean=0.0`
+- `obstacle_unsafe_pct.mean=0.0`
+- `obstacle_collision_pct.mean=0.0`
+
+Comparison against yaw-assist baseline:
+
+- baseline `ee_pos_error_mean_m.mean=1.1442`
+- baseline `ee_pos_error_p95_m.mean=1.3883`
+- baseline `ee_ori_error_mean_deg.mean=132.1662`
+- baseline `unreachable_zone_pct.mean=47.4211`
+- baseline `workspace_hard_exceed_pct.mean=3.7318`
+
+Decision:
+
+Do not promote `yaw_assist_baseaux_resume_64k_20260707`.
+
+The active base-only auxiliary loss made workspace hard-exceed cleaner, but it severely regressed reachability and EE tracking. This reinforces the earlier lesson: base-only teacher labels are not sufficient and can pull the policy away from the stronger yaw-assist behavior.
+
+Updated next step:
+
+- Stop base-only imitation gates for now.
+- Move to validated arm/gimbal teacher-label filtering or a different curriculum/reward intervention.
+- When resuming with SB3 and `reset_num_timesteps=False`, set `--total_timesteps` to the intended additional step count, not the desired absolute final counter.

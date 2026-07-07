@@ -325,3 +325,47 @@ PYTHONUTF8=1 NO_PROXY='*' no_proxy='*' /mnt/g/isaaclab_venv/Scripts/python.exe -
   --freeze_base_actions \
   --output_dir evaluation_results/recovery_candidate/stage0_raw_rl_freezebase_64k_20260707
 ```
+
+## Stage A Freeze-Base 64k Result
+
+Run:
+
+`logs/sb3/recomoproto2trackee_v0/stage0_raw_rl_freezebase_64k_20260707`
+
+Evaluation:
+
+`evaluation_results/recovery_candidate/stage0_raw_rl_freezebase_64k_20260707/recovery_eval_raw-policy_20260707_095331.json`
+
+Training result:
+
+- exit code: `0`
+- final training `explained_variance=0.801`
+- final `value_loss=0.0465`
+- final `approx_kl=0.005145751`
+- final `std=0.135`
+- action adapter confirmed rows `[6,7,8]` zeroed before env dynamics
+
+Raw-policy freeze-base evaluation:
+
+- `freeze_base_actions=true`
+- `episodes_completed=128`
+- `ee_pos_error_mean_m.mean=1.6781`
+- `ee_pos_error_p95_m.mean=1.9667`
+- `ee_ori_error_mean_deg.mean=167.6740`
+- `unreachable_zone_pct.mean=82.2338`
+- `workspace_soft_exceed_pct.mean=81.9517`
+- `workspace_hard_exceed_pct.mean=0.0`
+- `base_target_dist_mean.mean=0.8390`
+- `base_target_dist_max.mean=1.0512`
+
+Promotion result:
+
+FAILED. The base-freeze mechanism itself works, but the `stage0_easy` recorded trajectories are not a true fixed-base arm/gimbal curriculum. At reset the targets can start reachable, yet the recorded camera path moves outside the stationary-base envelope, so frozen-base Stage A cannot satisfy the reachability target.
+
+Lesson:
+
+Do not continue training this exact frozen-base gate. The next Stage A design must either:
+
+- construct fixed-base micro trajectories whose desired EE path stays inside the arm/gimbal reachable workspace, or
+- use a teacher/base-assist policy for base placement while learning arm/gimbal tracking, or
+- segment recorded trajectories into short reachable windows with base reset/re-anchor per segment.

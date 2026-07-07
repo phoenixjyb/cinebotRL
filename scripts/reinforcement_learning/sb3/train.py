@@ -445,8 +445,19 @@ def parse_args():
         "--trajectory_stage",
         type=str,
         default=None,
-        choices=["stage0_easy", "stage1_recovery", "stage2_moderate", "stage3_full"],
-        help="Session 8h: Use staged trajectory curriculum (stage0=easy, stage1=recovery, stage2=moderate, stage3=full)",
+        choices=[
+            "stage0_fixedbase_micro",
+            "stage0_easy",
+            "stage1_recovery",
+            "stage2_moderate",
+            "stage3_full",
+        ],
+        help=(
+            "Use staged trajectory curriculum "
+            "(stage0_fixedbase_micro=fixed-base reachable micro paths, "
+            "stage0_easy=short cinematic paths, stage1=recovery, "
+            "stage2=moderate, stage3=full)"
+        ),
     )
     parser.add_argument(
         "--max_trajectories",

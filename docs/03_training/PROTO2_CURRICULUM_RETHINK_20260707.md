@@ -369,3 +369,115 @@ Do not continue training this exact frozen-base gate. The next Stage A design mu
 - construct fixed-base micro trajectories whose desired EE path stays inside the arm/gimbal reachable workspace, or
 - use a teacher/base-assist policy for base placement while learning arm/gimbal tracking, or
 - segment recorded trajectories into short reachable windows with base reset/re-anchor per segment.
+
+## Stage A Fixed-Base Micro Curriculum
+
+Implementation target:
+
+- add `stage0_fixedbase_micro` as a separate curriculum stage
+- generate deterministic short paths under `trajectoryToLearn/stage0_fixedbase_micro/generated`
+- keep each path close to a known reachable target center `[1.05, 0.08, 0.86]`
+- keep base actions frozen with `--freeze_base_actions`
+- use this only as an arm/gimbal tracking gate, not as a cinematic trajectory benchmark
+
+Generation:
+
+```bash
+PYTHONUTF8=1 python3 scripts/generate_fixedbase_micro_stage.py
+```
+
+Tiny smoke:
+
+```bash
+PYTHONUTF8=1 NO_PROXY='*' no_proxy='*' /mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 \
+  scripts/reinforcement_learning/sb3/train.py \
+  --headless \
+  --num_envs 4 \
+  --total_timesteps 32 \
+  --n_steps 8 \
+  --batch_size 8 \
+  --n_epochs 1 \
+  --trajectory_stage stage0_fixedbase_micro \
+  --max_trajectories 4 \
+  --min_trajectory_duration 5.0 \
+  --disable_auto_base_assist \
+  --disable_auto_base_assist_yaw \
+  --freeze_base_actions \
+  --save_freq 1000000 \
+  --log_dir logs/sb3/recomoproto2trackee_v0/stage0_fixedbase_micro_smoke_20260707
+```
+
+Bounded gate:
+
+```bash
+PYTHONUTF8=1 NO_PROXY='*' no_proxy='*' /mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 \
+  scripts/reinforcement_learning/sb3/train.py \
+  --headless \
+  --num_envs 64 \
+  --total_timesteps 65536 \
+  --n_steps 256 \
+  --batch_size 1024 \
+  --n_epochs 4 \
+  --trajectory_stage stage0_fixedbase_micro \
+  --max_trajectories 24 \
+  --min_trajectory_duration 5.0 \
+  --disable_auto_base_assist \
+  --disable_auto_base_assist_yaw \
+  --freeze_base_actions \
+  --save_freq 32768 \
+  --log_dir logs/sb3/recomoproto2trackee_v0/stage0_fixedbase_micro_64k_20260707
+```
+
+## Stage A Fixed-Base Micro 64k Result
+
+Generated stage:
+
+- `scripts/generate_fixedbase_micro_stage.py`
+- `trajectoryToLearn/stage0_fixedbase_micro/manifest.txt`
+- 25 generated trajectories
+- 60 waypoints per trajectory
+- 6.0 seconds per trajectory at loader `waypoint_dt=0.1`
+- bounds: `x=[0.955, 1.145]`, `y=[0.030, 0.130]`, `z=[0.810, 0.910]`
+
+Run:
+
+`logs/sb3/recomoproto2trackee_v0/stage0_fixedbase_micro_64k_20260707`
+
+Evaluation:
+
+`evaluation_results/recovery_candidate/stage0_fixedbase_micro_64k_20260707/recovery_eval_raw-policy_20260707_103701.json`
+
+Training result:
+
+- exit code: `0`
+- final training `explained_variance=0.683`
+- final `value_loss=0.0367`
+- final `approx_kl=0.0059682103`
+- final `std=0.135`
+- action adapter confirmed rows `[6,7,8]` zeroed before env dynamics
+
+Raw-policy freeze-base evaluation:
+
+- `freeze_base_actions=true`
+- `episodes_completed=128`
+- `episode_length_mean=399.0`
+- `ee_pos_error_mean_m.mean=0.9691`
+- `ee_pos_error_p95_m.mean=1.0246`
+- `ee_ori_error_mean_deg.mean=152.8359`
+- `unreachable_zone_pct.mean=0.0`
+- `workspace_soft_exceed_pct.mean=0.0`
+- `workspace_hard_exceed_pct.mean=0.0`
+- `base_target_dist_mean.mean=0.5026`
+- `base_target_dist_max.mean=0.5946`
+
+Promotion result:
+
+PARTIAL PASS. The curriculum design fixed the previous reachability failure: frozen-base micro trajectories stay inside the reachable workspace for full episodes. However, the policy itself has not learned usable EE tracking after only 64k PPO steps; mean position error remains about `0.97 m` and orientation error remains about `153 deg`.
+
+Lesson:
+
+This stage is now valid as a fixed-base Stage A learning environment, but pure PPO from random initialization is still too weak for arm/gimbal tracking. The next policy update should add supervised warm-start or action-space simplification before another long run:
+
+- start with a BC/imitation seed for the 6 arm/gimbal rows on `stage0_fixedbase_micro`, or
+- temporarily train only the hold/line micro paths before oval/figure-eight paths, or
+- add a lower-level IK/PD teacher label export for these generated targets and use PPO only for refinement.

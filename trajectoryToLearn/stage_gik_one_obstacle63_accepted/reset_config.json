@@ -1,0 +1,6 @@
+{
+  "reset_base_x_offset": 0.019693002104759216,
+  "reset_base_y_offset": 0.006684720516204834,
+  "reset_arm_to_trajectory_metadata": true,
+  "notes": "Use with --reset_base_to_trajectory_start for the accepted GIK/ARCore nominal stage."
+}

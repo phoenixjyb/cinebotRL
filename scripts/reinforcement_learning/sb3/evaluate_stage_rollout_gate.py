@@ -98,6 +98,15 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable obstacle spawning and obstacle-safety metrics during the rollout gate.",
     )
+    parser.add_argument(
+        "--obstacles_from_trajectory_metadata",
+        action="store_true",
+        help=(
+            "Place each env's obstacle from the currently assigned trajectory "
+            "metadata.obstacle.center_xy during reset. Use with exported GIK "
+            "one-obstacle stages."
+        ),
+    )
     parser.add_argument("--obstacle_x", type=float, default=0.0)
     parser.add_argument("--obstacle_y", type=float, default=0.5)
     parser.add_argument("--obstacle_radius", type=float, default=None)
@@ -232,6 +241,8 @@ def main() -> int:
         raise ValueError("--recovery_route_min_pos_error must be non-negative")
     if args.recovery_route_min_base_target_distance < 0.0:
         raise ValueError("--recovery_route_min_base_target_distance must be non-negative")
+    if args.obstacles_from_trajectory_metadata and not args.enable_obstacles:
+        raise ValueError("--obstacles_from_trajectory_metadata requires --enable_obstacles")
 
     from isaaclab.app import AppLauncher
 
@@ -335,6 +346,48 @@ def main() -> int:
         base_env = MobileMMTrackEEEnv(cfg=env_cfg)
         print("[gate] env created", flush=True)
         raw_env = base_env.unwrapped if hasattr(base_env, "unwrapped") else base_env
+
+        def install_metadata_obstacle_randomizer() -> None:
+            require(
+                getattr(raw_env, "obstacles_enabled", False),
+                "--obstacles_from_trajectory_metadata requires an obstacle-enabled env",
+            )
+            original_randomize_obstacles = raw_env._randomize_obstacles
+
+            def metadata_randomize_obstacles(env_ids, base_xy_local):
+                original_randomize_obstacles(env_ids, base_xy_local)
+                metadata = getattr(raw_env.trajectory_manager, "current_trajectory_metadata", []) or []
+                rows = []
+                used = 0
+                for local_idx, env_id in enumerate(env_ids.detach().cpu().tolist()):
+                    row = raw_env.obstacle_disc_xy_local[env_id].clone()
+                    if env_id < len(metadata) and isinstance(metadata[env_id], dict):
+                        raw_meta = metadata[env_id].get("metadata", {})
+                        obstacle_meta = raw_meta.get("obstacle") if isinstance(raw_meta, dict) else None
+                        center_xy = obstacle_meta.get("center_xy") if isinstance(obstacle_meta, dict) else None
+                        if isinstance(center_xy, (list, tuple)) and len(center_xy) == 2:
+                            candidate = torch.tensor(center_xy, dtype=row.dtype, device=row.device)
+                            if torch.isfinite(candidate).all():
+                                row = candidate
+                                used += 1
+                    rows.append(row)
+                if rows:
+                    raw_env.obstacle_disc_xy_local[env_ids] = torch.stack(rows, dim=0)
+                    raw_env._obstacle_xy_buf = raw_env.obstacle_disc_xy_local.clone()
+                    raw_env._write_obstacle_poses_to_sim(env_ids)
+                if not hasattr(raw_env, "_metadata_obstacle_randomizer_logged"):
+                    print(
+                        "[gate] metadata obstacle placement active: "
+                        f"applied {used}/{int(env_ids.numel())} env(s) on first reset",
+                        flush=True,
+                    )
+                    raw_env._metadata_obstacle_randomizer_logged = True
+
+            raw_env._randomize_obstacles = metadata_randomize_obstacles
+            print("[gate] installed trajectory-metadata obstacle placement", flush=True)
+
+        if args.obstacles_from_trajectory_metadata:
+            install_metadata_obstacle_randomizer()
 
         def install_sequential_trajectory_sampler() -> None:
             manager = raw_env.trajectory_manager
@@ -568,6 +621,12 @@ def main() -> int:
         ee_pos0 = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
         base_pos0 = raw_env.robot.data.root_pos_w
         initial_pos_error = tensor_np(torch.linalg.norm(target_pos0 - ee_pos0, dim=-1))
+        initial_obstacle_clearance = None
+        initial_obstacle_xy = None
+        if getattr(raw_env, "obstacles_enabled", False):
+            initial_obstacle_clearance = tensor_np(raw_env._get_obstacle_clearance(base_pos0))
+            initial_obstacle_xy = tensor_np(raw_env.obstacle_disc_xy_local).astype(np.float64)
+            obstacle_clearances.append(initial_obstacle_clearance.reshape(-1))
         metadata0 = list(getattr(raw_env.trajectory_manager, "current_trajectory_metadata", []) or [])
         lengths0 = tensor_np(getattr(raw_env.trajectory_manager, "recorded_lengths", None))
         start_waypoint0 = tensor_np(getattr(raw_env.trajectory_manager, "current_waypoint_idx", None))
@@ -646,6 +705,11 @@ def main() -> int:
         ee_pos_end = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
         base_pos_end = raw_env.robot.data.root_pos_w
         final_pos_error = tensor_np(torch.linalg.norm(target_pos_end - ee_pos_end, dim=-1))
+        final_obstacle_clearance = None
+        final_obstacle_xy = None
+        if getattr(raw_env, "obstacles_enabled", False):
+            final_obstacle_clearance = tensor_np(raw_env._get_obstacle_clearance(base_pos_end))
+            final_obstacle_xy = tensor_np(raw_env.obstacle_disc_xy_local).astype(np.float64)
         arm_joint_ids = raw_env._get_joint_ids(
             ["joint6_arm_yaw", "joint5_arm_pitch", "joint4_elbow_pitch", "joint3_gimbal_yaw", "joint2_gimbal_roll", "joint1_gimbal_pitch"],
             "_gate_arm_joint_ids",
@@ -683,6 +747,7 @@ def main() -> int:
             "num_envs": args.num_envs,
             "steps": args.steps,
             "enable_obstacles": bool(args.enable_obstacles),
+            "obstacles_from_trajectory_metadata": bool(args.obstacles_from_trajectory_metadata),
             "samples": int(pos.size),
             "freeze_base_actions": bool(args.freeze_base_actions),
             "base_action_scale": float(args.base_action_scale),
@@ -707,6 +772,10 @@ def main() -> int:
             metrics.update(
                 {
                     "obstacle_safety_radius_m": safety_radius,
+                    "initial_obstacle_clearance_mean_m": float(np.mean(initial_obstacle_clearance)) if initial_obstacle_clearance is not None else None,
+                    "initial_obstacle_clearance_min_m": float(np.min(initial_obstacle_clearance)) if initial_obstacle_clearance is not None else None,
+                    "final_obstacle_clearance_mean_m": float(np.mean(final_obstacle_clearance)) if final_obstacle_clearance is not None else None,
+                    "final_obstacle_clearance_min_m": float(np.min(final_obstacle_clearance)) if final_obstacle_clearance is not None else None,
                     "obstacle_clearance_mean_m": float(np.mean(clearance)),
                     "obstacle_clearance_p05_m": float(np.percentile(clearance, 5)),
                     "obstacle_clearance_min_m": float(np.min(clearance)),
@@ -748,6 +817,20 @@ def main() -> int:
                         "dones_count": int(done_counts_per_env[env_id]),
                     }
                 )
+                if initial_obstacle_clearance is not None and env_id < len(initial_obstacle_clearance):
+                    per_env[-1]["initial_obstacle_clearance_m"] = float(initial_obstacle_clearance[env_id])
+                if final_obstacle_clearance is not None and env_id < len(final_obstacle_clearance):
+                    per_env[-1]["final_obstacle_clearance_m"] = float(final_obstacle_clearance[env_id])
+                if initial_obstacle_xy is not None and env_id < len(initial_obstacle_xy):
+                    per_env[-1]["initial_obstacle_xy"] = [
+                        float(initial_obstacle_xy[env_id, 0]),
+                        float(initial_obstacle_xy[env_id, 1]),
+                    ]
+                if final_obstacle_xy is not None and env_id < len(final_obstacle_xy):
+                    per_env[-1]["final_obstacle_xy"] = [
+                        float(final_obstacle_xy[env_id, 0]),
+                        float(final_obstacle_xy[env_id, 1]),
+                    ]
             metrics["per_env"] = per_env
         if route_counts:
             route_count_arr = np.asarray(route_counts, dtype=np.float64)

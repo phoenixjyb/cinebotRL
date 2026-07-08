@@ -2144,7 +2144,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         if not self.obstacles_enabled:
             return torch.full((self.num_envs,), 10.0, device=self.device)
 
-        obstacle_xy_world = self.scene.env_origins[:, :2] + self.obstacle_disc_xy_local
+        # The task root state is tracked in per-env local coordinates.  The
+        # obstacle prim still needs env-origin offsets when written to the sim,
+        # but reward/observation clearance must compare local base XY against
+        # local obstacle XY.  Adding scene.env_origins here makes clearance grow
+        # with env spacing and hides real obstacle violations.
+        obstacle_xy_world = self.obstacle_disc_xy_local
         base_xy = base_pos[:, :2]
         finite_base_xy = torch.isfinite(base_xy).all(dim=-1)
         safe_base_xy = torch.nan_to_num(base_xy, nan=0.0, posinf=1e3, neginf=-1e3)

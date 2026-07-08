@@ -95,6 +95,31 @@ def safe_float_list(values: np.ndarray) -> list[float]:
     return [float(x) for x in values.tolist()]
 
 
+def safe_float(value: np.ndarray) -> float:
+    return float(np.asarray(value).reshape(-1)[0])
+
+
+def optional_float(data: np.lib.npyio.NpzFile, key: str) -> float | None:
+    if key not in data.files:
+        return None
+    return safe_float(data[key])
+
+
+def optional_float_list(data: np.lib.npyio.NpzFile, key: str) -> list[float] | None:
+    if key not in data.files:
+        return None
+    return safe_float_list(np.asarray(data[key]).reshape(-1))
+
+
+def optional_min_float(data: np.lib.npyio.NpzFile, key: str) -> float | None:
+    if key not in data.files:
+        return None
+    values = np.asarray(data[key], dtype=np.float64).reshape(-1)
+    if values.size == 0:
+        return None
+    return float(np.min(values))
+
+
 def write_text_lf(path: Path, text: str) -> None:
     with path.open("w", encoding="utf-8", newline="\n") as f:
         f.write(text)
@@ -149,6 +174,21 @@ def main() -> int:
             target_pos = data["target_pos"].astype(np.float32)
             target_quat = data["target_quat_wxyz"].astype(np.float32)
             q_current = data["q_current"].astype(np.float32)
+            obstacle_metadata = {
+                "center_xy": optional_float_list(data, "obstacle_center_xy"),
+                "radius": optional_float(data, "obstacle_radius"),
+                "safety_margin": optional_float(data, "obstacle_safety_margin"),
+                "distance_margin": optional_float(data, "obstacle_distance_margin"),
+                "box_size": optional_float_list(data, "obstacle_box_size"),
+                "yaw": optional_float(data, "obstacle_yaw"),
+                "height": optional_float(data, "obstacle_height"),
+                "min_clearance": optional_min_float(data, "min_obstacle_dist"),
+            }
+            obstacle_metadata = {
+                key: value
+                for key, value in obstacle_metadata.items()
+                if value is not None
+            }
         require(target_pos.ndim == 2 and target_pos.shape[1] == 3, f"bad target_pos shape in {npz_path}")
         require(target_quat.ndim == 2 and target_quat.shape[1] == 4, f"bad target_quat shape in {npz_path}")
         require(target_pos.shape[0] == target_quat.shape[0], f"pose/quaternion length mismatch in {npz_path}")
@@ -187,6 +227,8 @@ def main() -> int:
                 "source_pose_count": int(target_pos.shape[0]),
                 "resampled_pose_count": int(len(poses)),
                 "initial_arm_joint_pos": safe_float_list(q_current[0, 3:9]),
+                "initial_base_q": safe_float_list(q_current[0, 0:3]),
+                "obstacle": obstacle_metadata,
                 "scenario": (item.get("teacher_metadata") or {}).get("scenario"),
                 "video_id": (item.get("teacher_metadata") or {}).get("video_id"),
                 "quality_status": (item.get("teacher_metadata") or {}).get("quality_status"),

@@ -304,6 +304,52 @@ The next promotion gate must measure both tracking and obstacle proximity on the
 - no tracking regression versus the primary BC baseline
 - meaningful obstacle clearance, not a clearance floor above `1.5 m`
 
+## Stage1 Accepted Obstacle Sim Gate - 2026-07-08
+
+Engineering updates:
+
+- `scripts/imitation/export_gik_npz_stage.py` now preserves GIK obstacle metadata in generated trajectory JSONs.
+- New stage generated: `trajectoryToLearn/stage_gik_one_obstacle63_accepted`.
+- Stage size: `63` accepted trajectories.
+- Duration range: `14.38-22.50s`.
+- Reset offset: `x=0.019693`, `y=0.006685`.
+- `scripts/reinforcement_learning/sb3/evaluate_stage_rollout_gate.py` now supports `--obstacles_from_trajectory_metadata`.
+- `src/rl_platform/tasks/mobile_mm/env.py` obstacle clearance was fixed to compare local base XY against local obstacle XY. The previous calculation added `scene.env_origins` and inflated clearance by env spacing, so obstacle reward/metrics before this fix are not trustworthy.
+
+Representative gate setup:
+
+- Stage: `stage_gik_one_obstacle63_accepted`
+- Env count/steps: `8 envs x 80 steps`
+- Assignment: `--assign_loaded_trajectories_once`
+- Reset: `--reset_base_to_trajectory_start`
+- Obstacle: per-trajectory metadata XY, `radius=0.318198055`, `height=0.50`
+- Policies: primary `gik_no_obstacle79_masked9_smoke_20260708`; optional `0.25` blend of Stage1 base-only head on action rows `[6,7,8]`
+
+Results after clearance fix:
+
+| Candidate | Base blend | EE mean | EE final mean | EE p95 | Ori mean | Reward mean | Clearance mean | Clearance min | Unsafe pct | Collision pct | Verdict |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Primary BC only | 0.00 | 0.6234 m | 0.8534 m | 1.1614 m | 58.83 deg | -40.18 | 0.1355 m | 0.0497 m | 64.35% | 0.00% | baseline, unsafe near obstacle |
+| Hybrid base head | 0.25 | 0.5617 m | 0.7592 m | 1.0517 m | 59.77 deg | -38.49 | 0.2331 m | 0.0500 m | 36.57% | 0.00% | better, but not pass-ready |
+
+Interpretation:
+
+The `0.25` Stage1 base-head blend is now a real candidate because it improves both tracking and obstacle clearance on a representative accepted-obstacle gate. It is still not an acceptable avoidance policy: more than one third of rollout samples remain inside the configured safety radius, and the first eight accepted trajectories start very near the obstacle by design (`initial_obstacle_clearance_min_m ~= 0.05`).
+
+Decision:
+
+- Keep `0.25` blend as a diagnostic candidate.
+- Do not promote it as a final policy.
+- Do not trust any obstacle metrics collected before the clearance-frame fix.
+- Next training should use the corrected obstacle clearance signal and the accepted Stage1 stage, not the old fixed `(0.0, 0.5)` obstacle gate.
+
+Next required work:
+
+- Run the same representative gate across all `63` accepted trajectories.
+- Add obstacle-safety reward/curriculum using the corrected local-frame clearance.
+- Distill or train against the Stage1 accepted set with obstacle metadata in observation, then re-gate against primary BC and `0.25` blend.
+- Promotion target: `collision_pct = 0%`, unsafe percentage near `0%`, and no tracking regression versus the primary BC baseline.
+
 Updated Stage A requirement:
 
 Before training arm/gimbal tracking, the base must be controlled:

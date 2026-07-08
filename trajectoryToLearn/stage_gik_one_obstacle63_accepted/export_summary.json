@@ -1,0 +1,519 @@
+{
+  "stage": "stage_gik_one_obstacle63_accepted",
+  "source_manifest": "data\\gik_stage1_one_obstacle_accepted63_20260708\\accepted_npz\\manifest.json",
+  "num_trajectories": 63,
+  "waypoint_dt": 0.1,
+  "min_duration": 5.0,
+  "reset_config": {
+    "reset_base_x_offset": 0.019693002104759216,
+    "reset_base_y_offset": 0.006684720516204834,
+    "reset_arm_to_trajectory_metadata": true,
+    "notes": "Use with --reset_base_to_trajectory_start for the accepted GIK/ARCore nominal stage."
+  },
+  "trajectories": [
+    {
+      "file": "0001_vid_77b7006d7cb14ee0_31526f4d24.json",
+      "duration_s": 20.29484383333333,
+      "source_pose_count": 29,
+      "resampled_pose_count": 204,
+      "z_min": 1.3408987522125244,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0003_vid_8c25c358b0e54fed_5d393489e8.json",
+      "duration_s": 17.285428083333333,
+      "source_pose_count": 26,
+      "resampled_pose_count": 174,
+      "z_min": 1.3494470119476318,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0004_vid_4216accd74e2454d_2a873ae01e.json",
+      "duration_s": 17.234745083333333,
+      "source_pose_count": 31,
+      "resampled_pose_count": 174,
+      "z_min": 0.44752347469329834,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0005_vid_4216accd74e2454d_80e630fc6b.json",
+      "duration_s": 17.16704,
+      "source_pose_count": 31,
+      "resampled_pose_count": 173,
+      "z_min": 0.4975226819515228,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0006_vid_402a77ee98d54392_3ed7a35210.json",
+      "duration_s": 16.389725833333333,
+      "source_pose_count": 32,
+      "resampled_pose_count": 165,
+      "z_min": 0.4877309501171112,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0007_vid_960a2f1c5f164758_6bef62761f.json",
+      "duration_s": 19.799785958333334,
+      "source_pose_count": 36,
+      "resampled_pose_count": 199,
+      "z_min": 0.45034077763557434,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0008_vid_960a2f1c5f164758_e7177ed552.json",
+      "duration_s": 19.723892541666668,
+      "source_pose_count": 36,
+      "resampled_pose_count": 199,
+      "z_min": 0.43034079670906067,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0009_vid_960a2f1c5f164758_e4018d6f07.json",
+      "duration_s": 20.077801708333332,
+      "source_pose_count": 36,
+      "resampled_pose_count": 202,
+      "z_min": 0.5020142197608948,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0010_vid_95ee41ad5a014a02_4825f668d8.json",
+      "duration_s": 20.950738958333332,
+      "source_pose_count": 30,
+      "resampled_pose_count": 211,
+      "z_min": 1.3483667373657227,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0011_vid_4d135398016b4c5a_883048a18a.json",
+      "duration_s": 21.106669666666665,
+      "source_pose_count": 30,
+      "resampled_pose_count": 213,
+      "z_min": 1.3484306335449219,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0013_vid_502d9bff5332465f_a3c572b8eb.json",
+      "duration_s": 15.529220041666665,
+      "source_pose_count": 24,
+      "resampled_pose_count": 157,
+      "z_min": 1.348086953163147,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0014_vid_e99fc82086e94f9e_cb083a7f48.json",
+      "duration_s": 15.438886208333333,
+      "source_pose_count": 24,
+      "resampled_pose_count": 156,
+      "z_min": 1.325667142868042,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0015_vid_c1c8fe575cab4683_e9ec2427a2.json",
+      "duration_s": 15.4841705,
+      "source_pose_count": 24,
+      "resampled_pose_count": 156,
+      "z_min": 1.3393882513046265,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0016_vid_137be254ebf04ada_b815f0ab36.json",
+      "duration_s": 14.680433041666666,
+      "source_pose_count": 23,
+      "resampled_pose_count": 148,
+      "z_min": 1.3432761430740356,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0017_vid_e1183aa1e7e14738_18f5558d50.json",
+      "duration_s": 18.167938833333334,
+      "source_pose_count": 27,
+      "resampled_pose_count": 183,
+      "z_min": 1.344524621963501,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0018_vid_ce71ae2833b341d3_dfd465f101.json",
+      "duration_s": 17.385888958333332,
+      "source_pose_count": 26,
+      "resampled_pose_count": 175,
+      "z_min": 1.3483331203460693,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0019_vid_f74f2ed41cc14f78_80e6c4cf0e.json",
+      "duration_s": 14.597073458333332,
+      "source_pose_count": 22,
+      "resampled_pose_count": 147,
+      "z_min": 1.4902914762496948,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0021_vid_5d14213d6cbc46cd_2e33cd5892.json",
+      "duration_s": 15.570463541666665,
+      "source_pose_count": 24,
+      "resampled_pose_count": 157,
+      "z_min": 1.2636679410934448,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0023_vid_ed2cab7294d24a1c_dcc38486e1.json",
+      "duration_s": 15.098261208333334,
+      "source_pose_count": 27,
+      "resampled_pose_count": 152,
+      "z_min": 1.6893645524978638,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0024_vid_ed2cab7294d24a1c_3aab31756f.json",
+      "duration_s": 14.848153416666667,
+      "source_pose_count": 25,
+      "resampled_pose_count": 150,
+      "z_min": 1.3481204509735107,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0025_vid_f4978183d850476b_29fbda0c77.json",
+      "duration_s": 16.369119958333332,
+      "source_pose_count": 25,
+      "resampled_pose_count": 165,
+      "z_min": 1.3669730424880981,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0026_vid_f4978183d850476b_474028ac53.json",
+      "duration_s": 16.203953791666667,
+      "source_pose_count": 23,
+      "resampled_pose_count": 164,
+      "z_min": 1.5669729709625244,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0029_vid_c69d14608ea244b3_686aad37a4.json",
+      "duration_s": 19.199165916666665,
+      "source_pose_count": 28,
+      "resampled_pose_count": 193,
+      "z_min": 1.350003957748413,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0032_vid_d06de78ee65d46e5_e6191504c5.json",
+      "duration_s": 19.975607125,
+      "source_pose_count": 29,
+      "resampled_pose_count": 201,
+      "z_min": 1.350000023841858,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0033_vid_20af982843cf4a26_9877167fe3.json",
+      "duration_s": 17.139374208333333,
+      "source_pose_count": 32,
+      "resampled_pose_count": 173,
+      "z_min": 0.480507493019104,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0035_vid_193d50170f504d0c_c407f2c599.json",
+      "duration_s": 18.113331958333333,
+      "source_pose_count": 26,
+      "resampled_pose_count": 183,
+      "z_min": 1.5346428155899048,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0037_vid_b84eda0d891a4c04_58cc029fad.json",
+      "duration_s": 18.195233791666666,
+      "source_pose_count": 27,
+      "resampled_pose_count": 183,
+      "z_min": 1.3426952362060547,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0038_vid_42c2d2cb6f6a4f44_ad8e049975.json",
+      "duration_s": 14.669765833333335,
+      "source_pose_count": 24,
+      "resampled_pose_count": 148,
+      "z_min": 1.3502141237258911,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0039_vid_42c2d2cb6f6a4f44_2053dd455a.json",
+      "duration_s": 14.593935083333333,
+      "source_pose_count": 24,
+      "resampled_pose_count": 147,
+      "z_min": 1.3500539064407349,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0040_vid_42c2d2cb6f6a4f44_749bc7cdef.json",
+      "duration_s": 14.615969083333333,
+      "source_pose_count": 22,
+      "resampled_pose_count": 148,
+      "z_min": 1.600000023841858,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0041_vid_d728a8e2741d416b_60cd58a5e9.json",
+      "duration_s": 20.840521416666665,
+      "source_pose_count": 30,
+      "resampled_pose_count": 210,
+      "z_min": 1.4294559955596924,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0042_vid_2eb4f7ee75764d46_e493675f05.json",
+      "duration_s": 19.928228,
+      "source_pose_count": 28,
+      "resampled_pose_count": 201,
+      "z_min": 1.5000661611557007,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0043_vid_91b18da7b0ed496e_e0dd7d36d6.json",
+      "duration_s": 14.384833208333333,
+      "source_pose_count": 22,
+      "resampled_pose_count": 145,
+      "z_min": 1.498033046722412,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0044_vid_60c19e05bce94648_636d59d09b.json",
+      "duration_s": 14.721803249999999,
+      "source_pose_count": 23,
+      "resampled_pose_count": 149,
+      "z_min": 1.339064598083496,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0045_vid_df5904476c5f419a_763bf9543d.json",
+      "duration_s": 21.806786499999998,
+      "source_pose_count": 31,
+      "resampled_pose_count": 220,
+      "z_min": 1.3059399127960205,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0046_vid_e777ad4ffe9d40f3_8463e331df.json",
+      "duration_s": 14.671450333333334,
+      "source_pose_count": 25,
+      "resampled_pose_count": 148,
+      "z_min": 1.1997621059417725,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0047_vid_e777ad4ffe9d40f3_fedb8030a6.json",
+      "duration_s": 15.230138125,
+      "source_pose_count": 28,
+      "resampled_pose_count": 154,
+      "z_min": 0.7997379302978516,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0048_vid_f41129bec06a4e6f_eb39aead5a.json",
+      "duration_s": 15.024818374999999,
+      "source_pose_count": 28,
+      "resampled_pose_count": 152,
+      "z_min": 0.8003596067428589,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0049_vid_79bec41996624802_adf34ce2e3.json",
+      "duration_s": 15.048807041666667,
+      "source_pose_count": 28,
+      "resampled_pose_count": 152,
+      "z_min": 0.7879220843315125,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0050_vid_79bec41996624802_008941d953.json",
+      "duration_s": 15.573445875,
+      "source_pose_count": 31,
+      "resampled_pose_count": 157,
+      "z_min": 0.41786015033721924,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0051_vid_cd2e7bc6126e4f4c_84dfa1d364.json",
+      "duration_s": 15.455887291666667,
+      "source_pose_count": 24,
+      "resampled_pose_count": 156,
+      "z_min": 1.4816244840621948,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0052_vid_659f3a0699654319_5a5dbcde7a.json",
+      "duration_s": 14.532908458333333,
+      "source_pose_count": 21,
+      "resampled_pose_count": 147,
+      "z_min": 1.5567089319229126,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0053_vid_5510c4c0cf274fda_5dbf418b30.json",
+      "duration_s": 15.474643333333333,
+      "source_pose_count": 23,
+      "resampled_pose_count": 156,
+      "z_min": 1.5998433828353882,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0054_vid_60c3e5c029cc460c_8e57a0a403.json",
+      "duration_s": 14.471176958333333,
+      "source_pose_count": 21,
+      "resampled_pose_count": 146,
+      "z_min": 1.5950008630752563,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0055_vid_edca3453baee4f87_63ce6e2611.json",
+      "duration_s": 14.659108541666667,
+      "source_pose_count": 22,
+      "resampled_pose_count": 148,
+      "z_min": 1.591381311416626,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0056_vid_b08ac0b8413049cc_2d7a690d20.json",
+      "duration_s": 14.661313083333333,
+      "source_pose_count": 22,
+      "resampled_pose_count": 148,
+      "z_min": 1.691481113433838,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0058_vid_520dc62c39a544c7_6f923cd2c9.json",
+      "duration_s": 14.577608291666666,
+      "source_pose_count": 22,
+      "resampled_pose_count": 147,
+      "z_min": 1.6795332431793213,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0060_vid_44aa63d28c8443ce_d6eeb28554.json",
+      "duration_s": 14.666397083333333,
+      "source_pose_count": 25,
+      "resampled_pose_count": 148,
+      "z_min": 1.1923989057540894,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0061_vid_0176ccde45044c9c_c7a3c32fb6.json",
+      "duration_s": 14.768578,
+      "source_pose_count": 25,
+      "resampled_pose_count": 149,
+      "z_min": 1.1942695379257202,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0062_vid_b2af3860c04e41d7_012e1cb8d5.json",
+      "duration_s": 14.839986666666666,
+      "source_pose_count": 25,
+      "resampled_pose_count": 150,
+      "z_min": 1.1999518871307373,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0063_vid_b2af3860c04e41d7_3de543e320.json",
+      "duration_s": 14.467723666666666,
+      "source_pose_count": 23,
+      "resampled_pose_count": 146,
+      "z_min": 1.3499521017074585,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0066_vid_f41b722d2b924ef1_c0f80b4d6f.json",
+      "duration_s": 20.972497708333336,
+      "source_pose_count": 31,
+      "resampled_pose_count": 211,
+      "z_min": 1.1859910488128662,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0067_vid_f41b722d2b924ef1_fce1ab0b75.json",
+      "duration_s": 20.840539,
+      "source_pose_count": 30,
+      "resampled_pose_count": 210,
+      "z_min": 1.386038899421692,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0069_vid_3fcec7acb2054553_5605787fc0.json",
+      "duration_s": 15.211082375,
+      "source_pose_count": 22,
+      "resampled_pose_count": 154,
+      "z_min": 1.599807858467102,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0070_vid_4b531ee104e24853_0e99999a17.json",
+      "duration_s": 18.138188208333332,
+      "source_pose_count": 27,
+      "resampled_pose_count": 183,
+      "z_min": 1.3223170042037964,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0071_vid_cc5806edf59f4e2e_81081f0dca.json",
+      "duration_s": 15.427197249999999,
+      "source_pose_count": 23,
+      "resampled_pose_count": 156,
+      "z_min": 1.4275208711624146,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0072_vid_bf4376f51aa74b6a_774e6ae394.json",
+      "duration_s": 15.963450125000001,
+      "source_pose_count": 29,
+      "resampled_pose_count": 161,
+      "z_min": 1.3500460386276245,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0073_vid_aa60529c6ff54142_a2c665f317.json",
+      "duration_s": 14.656116958333333,
+      "source_pose_count": 23,
+      "resampled_pose_count": 148,
+      "z_min": 1.3504050970077515,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0074_vid_6c2c40a45e1e4e4e_272f81a4ad.json",
+      "duration_s": 14.589349166666667,
+      "source_pose_count": 23,
+      "resampled_pose_count": 147,
+      "z_min": 1.3497430086135864,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0075_vid_6c2c40a45e1e4e4e_8cd8babdc8.json",
+      "duration_s": 14.528735291666665,
+      "source_pose_count": 23,
+      "resampled_pose_count": 147,
+      "z_min": 1.3497430086135864,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0076_vid_6c2c40a45e1e4e4e_eeec0d6415.json",
+      "duration_s": 14.60441975,
+      "source_pose_count": 23,
+      "resampled_pose_count": 148,
+      "z_min": 1.349743366241455,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0078_vid_3f2291daa0e04639_b3b923c910.json",
+      "duration_s": 19.807539249999998,
+      "source_pose_count": 29,
+      "resampled_pose_count": 200,
+      "z_min": 1.3462616205215454,
+      "z_max": 1.8899962902069092
+    },
+    {
+      "file": "0079_vid_d1837156754e4b61_8672c95896.json",
+      "duration_s": 22.504794166666667,
+      "source_pose_count": 32,
+      "resampled_pose_count": 227,
+      "z_min": 1.2893056869506836,
+      "z_max": 1.8899962902069092
+    }
+  ]
+}

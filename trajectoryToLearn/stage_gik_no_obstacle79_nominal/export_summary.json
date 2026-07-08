@@ -7,6 +7,7 @@
   "reset_config": {
     "reset_base_x_offset": -3.4107429200957995e-06,
     "reset_base_y_offset": 0.036461152136325836,
+    "reset_arm_to_trajectory_metadata": true,
     "notes": "Use with --reset_base_to_trajectory_start for the accepted GIK/ARCore nominal stage."
   },
   "trajectories": [

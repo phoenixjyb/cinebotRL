@@ -3011,6 +3011,34 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self._arm_joint_ids = self._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
         safe_arm_home = self.arm_safe_home.to(dtype=self.robot.data.joint_pos.dtype).expand(len(env_ids), -1)
         reset_arm_joint_pos = safe_arm_home.clone()
+        if self.task_cfg.trajectory.reset_arm_to_trajectory_metadata:
+            metadata = getattr(self.trajectory_manager, "current_trajectory_metadata", [])
+            teacher_rows = []
+            teacher_used = 0
+            for local_idx, env_id in enumerate(env_ids.detach().cpu().tolist()):
+                row = None
+                if env_id < len(metadata):
+                    raw_meta = metadata[env_id].get("metadata", {})
+                    raw_arm = raw_meta.get("initial_arm_joint_pos") if isinstance(raw_meta, dict) else None
+                    if isinstance(raw_arm, (list, tuple)) and len(raw_arm) == 6:
+                        candidate = torch.tensor(
+                            raw_arm,
+                            dtype=reset_arm_joint_pos.dtype,
+                            device=self.device,
+                        )
+                        if torch.isfinite(candidate).all():
+                            row = candidate
+                            teacher_used += 1
+                if row is None:
+                    row = safe_arm_home[local_idx].clone()
+                teacher_rows.append(row)
+            if teacher_rows:
+                reset_arm_joint_pos = torch.stack(teacher_rows, dim=0)
+            if self.task_cfg.debug_resets and teacher_used:
+                print(
+                    f"[RESET] Applied trajectory metadata arm reset for "
+                    f"{teacher_used}/{len(env_ids)} env(s)"
+                )
         if self.task_cfg.randomize_initial_joint_positions:
             arm_joint_noise = torch.randn(
                 len(env_ids), 6, device=self.device

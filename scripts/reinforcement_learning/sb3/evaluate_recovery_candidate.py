@@ -220,6 +220,8 @@ def _load_stage_reset_config(args: argparse.Namespace) -> dict[str, object]:
         out["reset_base_x_offset"] = float(raw["reset_base_x_offset"])
     if "reset_base_y_offset" in raw:
         out["reset_base_y_offset"] = float(raw["reset_base_y_offset"])
+    if "reset_arm_to_trajectory_metadata" in raw:
+        out["reset_arm_to_trajectory_metadata"] = bool(raw["reset_arm_to_trajectory_metadata"])
     raw_reward_overrides = raw.get("reward_overrides", {})
     if isinstance(raw_reward_overrides, dict):
         out["reward_overrides"] = {
@@ -492,6 +494,7 @@ def main() -> int:
             reset_anchor_target_blend=args.reset_anchor_target_blend,
             reset_base_x_offset=reset_config.get("reset_base_x_offset", 0.4415),
             reset_base_y_offset=reset_config.get("reset_base_y_offset", 0.2405),
+            reset_arm_to_trajectory_metadata=reset_config.get("reset_arm_to_trajectory_metadata", False),
         )
 
         assist_cfg = env_cfg.task_config.base_assist

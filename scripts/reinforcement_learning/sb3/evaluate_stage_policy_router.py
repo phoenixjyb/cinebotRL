@@ -92,6 +92,8 @@ def load_stage_reset_config(stage: str) -> dict[str, object]:
         out["reset_base_x_offset"] = float(data["reset_base_x_offset"])
     if "reset_base_y_offset" in data:
         out["reset_base_y_offset"] = float(data["reset_base_y_offset"])
+    if "reset_arm_to_trajectory_metadata" in data:
+        out["reset_arm_to_trajectory_metadata"] = bool(data["reset_arm_to_trajectory_metadata"])
     raw_reward_overrides = data.get("reward_overrides", {})
     if isinstance(raw_reward_overrides, dict):
         out["reward_overrides"] = {
@@ -189,6 +191,7 @@ def main() -> int:
             reset_anchor_target_blend=0.0,
             reset_base_x_offset=reset_config.get("reset_base_x_offset", 0.4415),
             reset_base_y_offset=reset_config.get("reset_base_y_offset", 0.2405),
+            reset_arm_to_trajectory_metadata=reset_config.get("reset_arm_to_trajectory_metadata", False),
         )
 
         print("[gate] creating env", flush=True)

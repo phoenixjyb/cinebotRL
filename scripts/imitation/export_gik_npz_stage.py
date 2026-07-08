@@ -186,6 +186,7 @@ def main() -> int:
                 "waypoint_dt": args.waypoint_dt,
                 "source_pose_count": int(target_pos.shape[0]),
                 "resampled_pose_count": int(len(poses)),
+                "initial_arm_joint_pos": safe_float_list(q_current[0, 3:9]),
                 "scenario": (item.get("teacher_metadata") or {}).get("scenario"),
                 "video_id": (item.get("teacher_metadata") or {}).get("video_id"),
                 "quality_status": (item.get("teacher_metadata") or {}).get("quality_status"),
@@ -215,6 +216,7 @@ def main() -> int:
     reset_config = {
         "reset_base_x_offset": float(np.median(offsets[:, 0])),
         "reset_base_y_offset": float(np.median(offsets[:, 1])),
+        "reset_arm_to_trajectory_metadata": True,
         "notes": "Use with --reset_base_to_trajectory_start for the accepted GIK/ARCore nominal stage.",
     }
     write_text_lf(stage_dir / "reset_config.json", json.dumps(reset_config, ensure_ascii=False, indent=2) + "\n")

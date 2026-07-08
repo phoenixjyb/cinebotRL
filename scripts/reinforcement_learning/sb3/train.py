@@ -2237,6 +2237,10 @@ def main():
                         trajectory_config["reset_base_x_offset"] = float(reset_config["reset_base_x_offset"])
                     if "reset_base_y_offset" in reset_config:
                         trajectory_config["reset_base_y_offset"] = float(reset_config["reset_base_y_offset"])
+                    if "reset_arm_to_trajectory_metadata" in reset_config:
+                        trajectory_config["reset_arm_to_trajectory_metadata"] = bool(
+                            reset_config["reset_arm_to_trajectory_metadata"]
+                        )
                     raw_reward_overrides = reset_config.get("reward_overrides", {})
                     if isinstance(raw_reward_overrides, dict):
                         stage_reward_overrides = {
@@ -2472,6 +2476,7 @@ def main():
             reset_anchor_target_blend_decay_steps=max(int(args.reset_anchor_target_blend_decay_steps), 0),
             reset_base_x_offset=trajectory_config.get("reset_base_x_offset", 0.4415),
             reset_base_y_offset=trajectory_config.get("reset_base_y_offset", 0.2405),
+            reset_arm_to_trajectory_metadata=trajectory_config.get("reset_arm_to_trajectory_metadata", False),
             debug_sampling=args.debug_trajectory_sampling,
         )
         

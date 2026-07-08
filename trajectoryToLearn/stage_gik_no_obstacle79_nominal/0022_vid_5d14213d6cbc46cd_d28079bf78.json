@@ -1985,6 +1985,14 @@
     "waypoint_dt": 0.1,
     "source_pose_count": 33,
     "resampled_pose_count": 152,
+    "initial_arm_joint_pos": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
     "scenario": "no_obstacle",
     "video_id": "vid_5d14213d6cbc46cd",
     "quality_status": "accepted"

@@ -153,10 +153,15 @@ class MultiTrajectoryLoader:
                     # Convert xyzw → wxyz
                     orientations.append([ori[3], ori[0], ori[1], ori[2]])
                 
+                metadata = data.get("metadata", {})
+                if not isinstance(metadata, dict):
+                    metadata = {}
+
                 # Convert to tensors
                 self.trajectories.append({
                     "file": traj_file.name,
                     "category": traj_file.parent.name,
+                    "metadata": metadata,
                     "positions": torch.tensor(positions, dtype=torch.float32, device=self.device),
                     "orientations": torch.tensor(orientations, dtype=torch.float32, device=self.device),
                     "length": len(poses),
@@ -222,6 +227,7 @@ class MultiTrajectoryLoader:
                 "file": traj.get("file", "unknown"),
                 "category": traj.get("category", "unknown"),
                 "length": traj.get("length", 0),
+                "metadata": traj.get("metadata", {}),
             }
             for traj in sampled
         ]

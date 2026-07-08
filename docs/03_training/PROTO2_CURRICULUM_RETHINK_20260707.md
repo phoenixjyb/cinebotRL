@@ -1666,3 +1666,37 @@ This stage is a valid 79-live-trajectory routing/evaluation stage, not a solved 
 Next useful update:
 
 Use this stage to build the nominal 79 curriculum, but do not call it solved until we add either a teacher-state reset path or a BC/offline warm-start path that initializes the arm/gimbal consistently with the GIK teacher state. For RL-only training on this stage, start with short bounded runs and judge them against the stage gate metrics above rather than against `stage1_recovery` cinematic metrics.
+
+## 79 Teacher-State Reset And Masked BC Smoke - 2026-07-08
+
+Implementation:
+
+- `TrajectoryConfig.reset_arm_to_trajectory_metadata` now gates optional arm reset from per-trajectory JSON metadata.
+- `MultiTrajectoryLoader` now preserves each trajectory JSON's `metadata` in `current_trajectory_metadata`.
+- `export_gik_npz_stage.py` now writes `metadata.initial_arm_joint_pos` and enables `reset_arm_to_trajectory_metadata` in the generated stage `reset_config.json`.
+- The train/stage-eval/diagnostic helpers now pass the stage reset flag into `TrajectoryConfig`.
+
+Teacher-reset gate:
+
+- command family: `evaluate_stage_rollout_gate.py --trajectory_stage stage_gik_no_obstacle79_nominal --reset_base_to_trajectory_start`
+- old stage smoke before teacher arm reset: initial mean EE position error `1.433 m`
+- 2-step smoke after teacher arm reset: initial mean EE position error `0.00316 m`, mean rollout EE error `0.0533 m`, `0` dones
+- 40-step old yaw-assist policy after teacher arm reset: mean EE error `0.6373 m`, p95 `1.6802 m`, `4` dones
+- 40-step masked-BC actor after teacher arm reset: mean EE error `0.1347 m`, p95 `0.3775 m`, `0` dones
+
+Masked BC smoke:
+
+- dataset: `data/gik_offline_teacher_obs/obs_dataset_no_obstacle79_full_masked.npz`
+- policy: `logs/bc/gik_no_obstacle79_masked9_smoke_20260708/bc_policy.zip`
+- offline eval: `evaluation_results/bc/gik_no_obstacle79_masked9_in_distribution_20260708.json`
+- stage eval: `evaluation_results/stage_gik_no_obstacle79_nominal/stage_loader_teacherreset_40step_masked9bc_20260708.json`
+- BC validation MSE after 10 epochs: `0.005042`
+- offline masked RMSE/MAE/max: `0.0727 / 0.0449 / 0.7118`
+
+Important boundary:
+
+This is a sim-stage nominal tracking result, not a deployable DJI gimbal policy. The gimbal/action-contract issue still applies: row 3 has sparse/weak fit (`rmse=0.1677`, `956` labels), row 1 is only `514` valid labels, and the current action contract is still `sim_6joint_gimbal_v1`. Treat the masked-BC actor as a useful Isaac curriculum/warm-start artifact, not as proof that full 9D deployment semantics are solved.
+
+Next useful update:
+
+Use the teacher-reset stage and masked-BC actor as the nominal Stage-79 gate. The next training run should warm-start PPO from this BC actor on `stage_gik_no_obstacle79_nominal`, with short bounded steps first, raw-observation BC warm start, and no generated cinematic trajectories mixed in. Only after this gate stays stable should we add obstacle curricula or transfer back toward recovery/cinematic stages.

@@ -258,6 +258,38 @@ New Stage A promotion target:
 - `workspace_hard_exceed_pct.mean = 0`
 - raw-policy eval only
 
+## 2026-07-08 Stage1 Accepted Obstacle Teacher Dataset
+
+The GIK handoff was updated after the raw RL-only rethink above. The current
+teacher-data curriculum is:
+
+- Stage 0 no obstacle: `79/79` accepted.
+- Stage 1 one obstacle exact-box at 55% path progress: `63/79` accepted.
+- Stage 1 holdout: 16 failed/debug episodes excluded from positive BC.
+- Stage 2 two-obstacle: candidate only; not all79-proven.
+
+The accepted Stage1 export is now synced on `.98`:
+
+```text
+data/gik_stage1_one_obstacle_accepted63_20260708/accepted_npz
+data/gik_offline_teacher_obs/obs_dataset_stage1_one_obstacle_accepted63_full_masked_20260708.npz
+```
+
+Remote validation:
+
+- exported trajectories: `63`
+- exported action samples: `1665`
+- export failures: `0`
+- observation dataset: `observations=(1665,85)`, `actions=(1665,9)`
+- source trajectories in obs dataset: `63`
+- action range: `[-1.0, 1.0]`
+- finite observations/actions: yes
+- q mapping from GIK Proto2-PnC 13D logs: selected `[0,1,2,3,4,5,6,7,8]`; excluded virtual `[9,10,11,12]`
+
+Use this as a bounded teacher-data gate before any long training run. It does
+not override the earlier lesson that PPO reward alone is not enough; validate
+tracking/reachability and obstacle metrics explicitly before promoting a policy.
+
 ## Offset-Follow Tail Recovery Probe - 2026-07-08
 
 Question:

@@ -94,6 +94,23 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--min_trajectory_duration", type=float, default=5.0)
     parser.add_argument(
+        "--enable_obstacles",
+        action="store_true",
+        help="Enable obstacle spawning and obstacle-safety metrics during the rollout gate.",
+    )
+    parser.add_argument("--obstacle_x", type=float, default=0.0)
+    parser.add_argument("--obstacle_y", type=float, default=0.5)
+    parser.add_argument("--obstacle_radius", type=float, default=None)
+    parser.add_argument("--obstacle_height", type=float, default=None)
+    parser.add_argument(
+        "--disable_obstacle_randomization",
+        action="store_true",
+        help="Keep the obstacle at --obstacle_x/--obstacle_y instead of randomizing per reset.",
+    )
+    parser.add_argument("--obstacle_x_range", type=float, nargs=2, default=(-0.35, 0.35))
+    parser.add_argument("--obstacle_y_range", type=float, nargs=2, default=(0.45, 1.0))
+    parser.add_argument("--min_obstacle_start_clearance", type=float, default=0.10)
+    parser.add_argument(
         "--random_start_waypoint",
         action="store_true",
         help="Start each recorded trajectory from a random waypoint during reset.",
@@ -262,7 +279,30 @@ def main() -> int:
         env_cfg.num_envs = args.num_envs
         env_cfg.scene.num_envs = args.num_envs
         env_cfg.seed = args.seed
-        env_cfg.task_config.obstacles.enable_obstacles = False
+        env_cfg.task_config.obstacles.enable_obstacles = bool(args.enable_obstacles)
+        env_cfg.task_config.obstacles.disc_position_xy = (float(args.obstacle_x), float(args.obstacle_y))
+        if args.obstacle_radius is not None:
+            env_cfg.task_config.obstacles.disc_radius = float(args.obstacle_radius)
+        if args.obstacle_height is not None:
+            env_cfg.task_config.obstacles.disc_height = float(args.obstacle_height)
+        env_cfg.task_config.obstacles.randomize_per_reset = not bool(args.disable_obstacle_randomization)
+        env_cfg.task_config.obstacles.disc_position_x_range = tuple(float(x) for x in args.obstacle_x_range)
+        env_cfg.task_config.obstacles.disc_position_y_range = tuple(float(y) for y in args.obstacle_y_range)
+        env_cfg.task_config.obstacles.min_start_clearance = float(args.min_obstacle_start_clearance)
+        if args.enable_obstacles:
+            env_cfg.scene = env_cfg._create_scene_config()
+            env_cfg.scene.num_envs = args.num_envs
+            obstacle_cfg = env_cfg.task_config.obstacles
+            print(
+                "[gate] obstacles enabled "
+                f"pos=({args.obstacle_x:.2f},{args.obstacle_y:.2f}) "
+                f"radius={obstacle_cfg.disc_radius:.2f}m "
+                f"height={obstacle_cfg.disc_height:.2f}m "
+                f"randomized={obstacle_cfg.randomize_per_reset} "
+                f"x_range=({args.obstacle_x_range[0]:.2f},{args.obstacle_x_range[1]:.2f}) "
+                f"y_range=({args.obstacle_y_range[0]:.2f},{args.obstacle_y_range[1]:.2f})",
+                flush=True,
+            )
         env_cfg.task_config.base_assist.enable = False
         env_cfg.task_config.randomize_initial_joint_positions = bool(args.enable_initial_joint_randomization)
         reward_overrides = reset_config.get("reward_overrides", {})
@@ -516,6 +556,7 @@ def main() -> int:
         pos_errors: list[np.ndarray] = []
         ori_errors: list[np.ndarray] = []
         rewards: list[np.ndarray] = []
+        obstacle_clearances: list[np.ndarray] = []
         route_counts: list[int] = []
         latched_route_mask = np.zeros((args.num_envs,), dtype=bool)
         route_waypoint_fractions: list[np.ndarray] = []
@@ -585,6 +626,8 @@ def main() -> int:
             pos_errors.append(tensor_np(torch.linalg.norm(target_pos - ee_pos, dim=-1)))
             quat_dot = torch.abs(torch.sum(target_quat * ee_quat, dim=-1)).clamp(max=1.0)
             ori_errors.append(tensor_np(2.0 * torch.acos(quat_dot)))
+            if getattr(raw_env, "obstacles_enabled", False) and hasattr(raw_env, "_obstacle_clearance_buf"):
+                obstacle_clearances.append(tensor_np(raw_env._obstacle_clearance_buf).reshape(-1))
             if step % 50 == 0:
                 if recovery_model is not None and route_counts:
                     print(
@@ -639,6 +682,7 @@ def main() -> int:
             "trajectory_stage": args.trajectory_stage,
             "num_envs": args.num_envs,
             "steps": args.steps,
+            "enable_obstacles": bool(args.enable_obstacles),
             "samples": int(pos.size),
             "freeze_base_actions": bool(args.freeze_base_actions),
             "base_action_scale": float(args.base_action_scale),
@@ -657,6 +701,29 @@ def main() -> int:
             "reward_p50": float(np.percentile(rew, 50)),
             "dones_count": int(dones_count),
         }
+        if obstacle_clearances:
+            clearance = np.concatenate([x.reshape(-1) for x in obstacle_clearances]).astype(np.float64)
+            safety_radius = float(getattr(raw_env, "reward_weights", {}).get("safety_radius", 0.2))
+            metrics.update(
+                {
+                    "obstacle_safety_radius_m": safety_radius,
+                    "obstacle_clearance_mean_m": float(np.mean(clearance)),
+                    "obstacle_clearance_p05_m": float(np.percentile(clearance, 5)),
+                    "obstacle_clearance_min_m": float(np.min(clearance)),
+                    "obstacle_unsafe_pct": float(np.mean(clearance < safety_radius) * 100.0),
+                    "obstacle_collision_pct": float(np.mean(clearance < 0.0) * 100.0),
+                }
+            )
+            if hasattr(raw_env, "obstacle_disc_xy_local"):
+                obstacle_xy = tensor_np(raw_env.obstacle_disc_xy_local).astype(np.float64)
+                metrics.update(
+                    {
+                        "obstacle_x_mean": float(np.mean(obstacle_xy[:, 0])),
+                        "obstacle_x_std": float(np.std(obstacle_xy[:, 0])),
+                        "obstacle_y_mean": float(np.mean(obstacle_xy[:, 1])),
+                        "obstacle_y_std": float(np.std(obstacle_xy[:, 1])),
+                    }
+                )
         if args.assign_loaded_trajectories_once:
             waypoint_end = tensor_np(getattr(raw_env.trajectory_manager, "current_waypoint_idx", None))
             per_env = []

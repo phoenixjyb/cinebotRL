@@ -1823,3 +1823,35 @@ Do not promote either BC80 candidate as the nominal policy. BC80 weighted is rej
 Next useful update:
 
 Use this all-79 deterministic gate as the promotion gate. For policy improvement, do not use global action weighting. Train a hybrid/imitation candidate that keeps BC10-style position tracking while borrowing the BC80-unweighted orientation improvement, then only promote if it beats BC10 on p95/final position without losing the orientation gain.
+
+## 79 Row-Blend Hybrid Diagnostics - 2026-07-08
+
+Implementation update:
+
+- `evaluate_stage_rollout_gate.py` now supports `--row_blend_checkpoint`, `--row_blend_action_indices`, and `--row_blend_weight`.
+- This is evaluator-only. It does not create a new policy artifact.
+- Purpose: test whether rows from one BC policy can improve another before spending time on a new training objective.
+
+Hybrid tests:
+
+- primary: BC10 smoke, `logs/bc/gik_no_obstacle79_masked9_smoke_20260708/bc_policy.zip`
+- secondary: BC80 unweighted, `logs/bc/gik_no_obstacle79_masked9_unweighted80_20260708/bc_policy.zip`
+- protocol: same all-79 sequential 60-step gate
+- output summary: `evaluation_results/stage_gik_no_obstacle79_nominal/all79_seq60_bc_policy_and_hybrid_comparison_20260708.json`
+
+Aggregate results:
+
+| policy | mean m | p50 m | p95 m | max m | final mean m | ori mean deg | reward mean |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| BC10 smoke | 0.24184 | 0.21236 | 0.54709 | 0.66708 | 0.49540 | 68.86 | -35.78 |
+| BC80 unweighted | 0.24354 | 0.18846 | 0.64923 | 0.81585 | 0.59110 | 65.67 | -56.21 |
+| hybrid rows 3,4,5 | 0.27059 | 0.24674 | 0.60437 | 0.73971 | 0.54937 | 65.62 | -40.39 |
+| hybrid rows 0..5 | 0.24725 | 0.22485 | 0.54145 | 0.66857 | 0.46794 | 67.91 | -36.40 |
+
+Decision:
+
+The row `3,4,5` hybrid is rejected: it improves orientation but damages position tracking too much. The row `0..5` hybrid is a useful diagnostic candidate: keeping BC10 base rows while using BC80-unweighted arm/gimbal rows slightly improves p95 and final position error and modestly improves orientation, but it worsens mean and p50 position error.
+
+Next useful update:
+
+Do not promote the hybrid directly yet. Train a real hybrid/distillation candidate with BC10 as the anchor for position/base behavior and BC80-unweighted as a weak orientation/arm prior, then pass it through the all-79 sequential gate. Promotion target: beat BC10 on p95/final position, keep max error no worse, and improve orientation without regressing mean position materially.

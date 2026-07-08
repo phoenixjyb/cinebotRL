@@ -54,6 +54,25 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Once an env meets the recovery route condition, keep routing it for the rest of the rollout.",
     )
+    parser.add_argument(
+        "--row_blend_checkpoint",
+        default=None,
+        help=(
+            "Optional second policy whose selected action rows are blended into "
+            "the primary policy for diagnostic hybrid gates."
+        ),
+    )
+    parser.add_argument(
+        "--row_blend_action_indices",
+        default=None,
+        help="Comma-separated action rows to blend from --row_blend_checkpoint, e.g. '3,4,5'.",
+    )
+    parser.add_argument(
+        "--row_blend_weight",
+        type=float,
+        default=1.0,
+        help="Blend weight for selected rows: 1.0 fully uses row_blend_checkpoint rows.",
+    )
     parser.add_argument("--vec_normalize", required=True)
     parser.add_argument(
         "--disable_vec_normalize",
@@ -129,6 +148,18 @@ def tensor_np(value):
     return np.asarray(value)
 
 
+def parse_action_indices(raw: str | None) -> list[int]:
+    if raw is None or not raw.strip():
+        return []
+    out: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        out.append(int(part))
+    return out
+
+
 def load_stage_reset_config(stage: str) -> dict[str, object]:
     path = PROJECT_ROOT / "trajectoryToLearn" / stage / "reset_config.json"
     if not path.exists():
@@ -156,10 +187,18 @@ def main() -> int:
         raise ValueError("--base_action_scale must be in [0, 1]")
     checkpoint = Path(args.checkpoint)
     recovery_checkpoint = Path(args.recovery_checkpoint) if args.recovery_checkpoint else None
+    row_blend_checkpoint = Path(args.row_blend_checkpoint) if args.row_blend_checkpoint else None
+    row_blend_action_indices = parse_action_indices(args.row_blend_action_indices)
     vec_normalize = Path(args.vec_normalize)
     require(checkpoint.exists(), f"checkpoint not found: {checkpoint}")
     if recovery_checkpoint is not None:
         require(recovery_checkpoint.exists(), f"recovery checkpoint not found: {recovery_checkpoint}")
+    if row_blend_checkpoint is not None:
+        require(row_blend_checkpoint.exists(), f"row blend checkpoint not found: {row_blend_checkpoint}")
+        require(row_blend_action_indices, "--row_blend_action_indices is required with --row_blend_checkpoint")
+        require(0.0 <= args.row_blend_weight <= 1.0, "--row_blend_weight must be in [0, 1]")
+        invalid = [idx for idx in row_blend_action_indices if idx < 0 or idx >= 9]
+        require(not invalid, f"invalid row blend action indices: {invalid}")
     if not args.disable_vec_normalize:
         require(vec_normalize.exists(), f"vec_normalize not found: {vec_normalize}")
     require(args.num_envs > 0, "--num_envs must be positive")
@@ -419,6 +458,15 @@ def main() -> int:
             env.norm_reward = False
         obs = env.reset()
         model = PPO.load(str(checkpoint), env=env, device="cuda:0")
+        row_blend_model = None
+        if row_blend_checkpoint is not None:
+            row_blend_model = PPO.load(str(row_blend_checkpoint), env=env, device="cuda:0")
+            print(
+                "[gate row-blend] enabled "
+                f"checkpoint={row_blend_checkpoint} rows={row_blend_action_indices} "
+                f"weight={args.row_blend_weight:.3f}",
+                flush=True,
+            )
         recovery_model = None
         if recovery_checkpoint is not None:
             recovery_model = PPO.load(str(recovery_checkpoint), env=env, device="cuda:0")
@@ -494,6 +542,15 @@ def main() -> int:
         for step in range(args.steps):
             if open_loop_actions is None:
                 action, _ = model.predict(obs, deterministic=True)
+                if row_blend_model is not None:
+                    blend_action, _ = row_blend_model.predict(obs, deterministic=True)
+                    action = np.asarray(action, dtype=np.float32).copy()
+                    blend_action = np.asarray(blend_action, dtype=np.float32)
+                    rows = np.asarray(row_blend_action_indices, dtype=np.int64)
+                    action[:, rows] = (
+                        (1.0 - float(args.row_blend_weight)) * action[:, rows]
+                        + float(args.row_blend_weight) * blend_action[:, rows]
+                    )
                 if recovery_model is not None:
                     target_pos_pre, _ = raw_env.trajectory_manager.get_target_pose()
                     ee_pos_pre = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
@@ -570,6 +627,9 @@ def main() -> int:
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "checkpoint": str(checkpoint),
             "recovery_checkpoint": str(recovery_checkpoint) if recovery_checkpoint is not None else None,
+            "row_blend_checkpoint": str(row_blend_checkpoint) if row_blend_checkpoint is not None else None,
+            "row_blend_action_indices": row_blend_action_indices,
+            "row_blend_weight": float(args.row_blend_weight),
             "recovery_route_min_waypoint_fraction": float(args.recovery_route_min_waypoint_fraction),
             "recovery_route_min_pos_error": float(args.recovery_route_min_pos_error),
             "recovery_route_min_base_target_distance": float(args.recovery_route_min_base_target_distance),

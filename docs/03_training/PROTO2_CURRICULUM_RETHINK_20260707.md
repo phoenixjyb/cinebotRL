@@ -2050,3 +2050,55 @@ The row `3,4,5` hybrid is rejected: it improves orientation but damages position
 Next useful update:
 
 Do not promote the hybrid directly yet. Train a real hybrid/distillation candidate with BC10 as the anchor for position/base behavior and BC80-unweighted as a weak orientation/arm prior, then pass it through the all-79 sequential gate. Promotion target: beat BC10 on p95/final position, keep max error no worse, and improve orientation without regressing mean position materially.
+
+## Stage1 One-Obstacle 63-Case Gate and PPO Probe - 2026-07-08
+
+Implementation update:
+
+- `train.py` now accepts `stage_gik_one_obstacle63_accepted` as a named `--trajectory_stage`.
+- `train.py` now supports `--obstacles_from_trajectory_metadata` so training resets can place each obstacle from `metadata.obstacle.center_xy`, matching the evaluator and the GIK-exported one-obstacle teacher set.
+- `train.py` now supports obstacle reward overrides via `--min_obstacle_distance_weight` and `--safety_radius`.
+- The one-obstacle source teacher payload is tracked under `data/gik_stage1_one_obstacle_accepted63_20260708/accepted_npz`.
+- Earlier obstacle-gate metrics were not trustworthy until the local-frame clearance fix; the current numbers below use the corrected local base XY versus local obstacle XY clearance calculation.
+
+Gate protocol:
+
+- stage: `stage_gik_one_obstacle63_accepted`
+- envs: `63`
+- steps: `80`
+- reset: `--reset_base_to_trajectory_start`
+- trajectory assignment: `--assign_loaded_trajectories_once`
+- obstacle placement: `--enable_obstacles --disable_obstacle_randomization --obstacles_from_trajectory_metadata`
+- obstacle geometry: radius `0.318198055 m`, height `0.50 m`
+- normalization: disabled, raw-observation policies
+
+Full 63-case aggregate results:
+
+| policy/probe | mean m | final mean m | p95 m | ori mean deg | reward mean | clearance mean m | clearance min m | unsafe % | collision % |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| BC10 baseline | 0.51891 | 0.77999 | 1.01089 | 54.60 | -50.38 | 0.31412 | 0.02738 | 33.18 | 0.00 |
+| BC10 + base-row 0.25 blend | 0.48557 | 0.72801 | 0.93319 | 53.35 | -42.27 | 0.31939 | 0.02091 | 28.30 | 0.00 |
+| PPO 32k checkpoint | 0.53860 | 0.81263 | 1.04691 | 54.12 | -48.12 | 0.30183 | 0.03271 | 35.16 | 0.00 |
+| PPO final, 80.6k actual steps | 0.55519 | 0.84043 | 1.06941 | 53.60 | -45.80 | 0.29020 | 0.03363 | 34.74 | 0.00 |
+
+PPO run:
+
+- warm start: `logs/bc/gik_no_obstacle79_masked9_smoke_20260708/bc_policy.zip`
+- output: `logs/sb3/recomoproto2trackee_v0/stage1_obstacle_meta_bc10warm_64k_20260708`
+- requested timesteps: `65536`; actual final rollout reached `80640`
+- optimizer: `learning_rate=5e-5`, `target_kl=0.04`, `n_epochs=4`, `policy_log_std_override=-2.0`
+- obstacle reward overrides: `min_obstacle_distance_weight=12.0`, `safety_radius=0.25`
+- base assist disabled
+- training did not crash, and metadata obstacle placement applied to `63/63` envs, but training-time reachability stayed poor; final monitor showed `82.5%` of envs in the unreachable base-target zone.
+
+Decision:
+
+Reject the reward-only obstacle PPO continuation. Both the `32k` checkpoint and final checkpoint regress tracking and unsafe clearance versus the simple BC10 baseline and versus the evaluator-only `0.25` base-row blend. The PPO reward is currently encouraging some obstacle clearance motion, but it is not preserving the base/EE reachability relationship required for trajectory tracking.
+
+Current best obstacle diagnostic:
+
+The BC10 + base-row `0.25` blend is the best measured obstacle diagnostic so far. It reduces mean EE error from `0.51891 m` to `0.48557 m`, p95 from `1.01089 m` to `0.93319 m`, and unsafe percentage from `33.18%` to `28.30%`, with zero collisions. It is still not pass-ready because unsafe time remains high and minimum clearance remains near the obstacle.
+
+Next useful update:
+
+Do not run another broad reward-only PPO loop on the obstacle stage. Build a real obstacle-aware imitation/distillation target from the useful base-row behavior instead: keep BC10 as the anchor, distill the small base correction into rows `6,7,8`, and add explicit reachability preservation or terminal/tail recovery labels. Promotion should require beating the `0.25` blend on both tracking and unsafe rate, not merely improving collision count.

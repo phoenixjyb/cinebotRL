@@ -488,6 +488,7 @@ def parse_args():
             "stage0_policy_envelope_fk_mix_large08_base025",
             "stage0_fixedbase_micro",
             "stage_gik_no_obstacle79_nominal",
+            "stage_gik_one_obstacle63_accepted",
             "stage0_easy",
             "stage1_recovery",
             "stage2_moderate",
@@ -504,6 +505,7 @@ def parse_args():
             "stage0_policy_envelope_fk_mix_large08_base025=mixed fixed/base-required FK targets, "
             "stage0_fixedbase_micro=fixed-base reachable micro paths, "
             "stage_gik_no_obstacle79_nominal=accepted live GIK/ARCore nominal trajectories, "
+            "stage_gik_one_obstacle63_accepted=accepted GIK one-obstacle trajectories, "
             "stage0_easy=short cinematic paths, stage1=recovery, stage2=moderate, "
             "stage3=full)"
         ),
@@ -604,6 +606,18 @@ def parse_args():
         type=float,
         default=None,
         help="Override penalty for actual chassis motion that increases base-target distance.",
+    )
+    parser.add_argument(
+        "--min_obstacle_distance_weight",
+        type=float,
+        default=None,
+        help="Override obstacle clearance reward/penalty weight.",
+    )
+    parser.add_argument(
+        "--safety_radius",
+        type=float,
+        default=None,
+        help="Override desired signed clearance beyond robot footprint + obstacle radius.",
     )
     parser.add_argument(
         "--debug_resets",
@@ -739,6 +753,14 @@ def parse_args():
         "--enable_obstacles",
         action="store_true",
         help="Enable the ground-disc obstacle avoidance task.",
+    )
+    parser.add_argument(
+        "--obstacles_from_trajectory_metadata",
+        action="store_true",
+        help=(
+            "Place each env's obstacle from trajectory metadata.obstacle.center_xy "
+            "during reset. Use with exported GIK one-obstacle stages."
+        ),
     )
     parser.add_argument("--obstacle_x", type=float, default=0.0, help="Static obstacle disc X in each env local frame.")
     parser.add_argument("--obstacle_y", type=float, default=0.5, help="Static obstacle disc Y in each env local frame.")
@@ -885,6 +907,47 @@ def _copy_pretrained_actor(model, bc_model, action_indices: list[int] | None) ->
     return f"flat actor feature weights and action head rows {action_indices}; zeroed non-selected rows"
 
 
+def _install_metadata_obstacle_randomizer(raw_env) -> None:
+    """Use per-trajectory obstacle metadata for obstacle reset placement."""
+    import torch
+
+    if not getattr(raw_env, "obstacles_enabled", False):
+        raise RuntimeError("--obstacles_from_trajectory_metadata requires an obstacle-enabled env")
+
+    original_randomize_obstacles = raw_env._randomize_obstacles
+
+    def metadata_randomize_obstacles(env_ids, base_xy_local):
+        original_randomize_obstacles(env_ids, base_xy_local)
+        metadata = getattr(raw_env.trajectory_manager, "current_trajectory_metadata", []) or []
+        rows = []
+        used = 0
+        for env_id in env_ids.detach().cpu().tolist():
+            row = raw_env.obstacle_disc_xy_local[env_id].clone()
+            if env_id < len(metadata) and isinstance(metadata[env_id], dict):
+                raw_meta = metadata[env_id].get("metadata", {})
+                obstacle_meta = raw_meta.get("obstacle") if isinstance(raw_meta, dict) else None
+                center_xy = obstacle_meta.get("center_xy") if isinstance(obstacle_meta, dict) else None
+                if isinstance(center_xy, (list, tuple)) and len(center_xy) == 2:
+                    candidate = torch.tensor(center_xy, dtype=row.dtype, device=row.device)
+                    if torch.isfinite(candidate).all():
+                        row = candidate
+                        used += 1
+            rows.append(row)
+        if rows:
+            raw_env.obstacle_disc_xy_local[env_ids] = torch.stack(rows, dim=0)
+            raw_env._obstacle_xy_buf = raw_env.obstacle_disc_xy_local.clone()
+            raw_env._write_obstacle_poses_to_sim(env_ids)
+        if not hasattr(raw_env, "_metadata_obstacle_randomizer_logged"):
+            print(
+                "[train] metadata obstacle placement active: "
+                f"applied {used}/{int(env_ids.numel())} env(s) on first reset",
+                flush=True,
+            )
+            raw_env._metadata_obstacle_randomizer_logged = True
+
+    raw_env._randomize_obstacles = metadata_randomize_obstacles
+
+
 def resolve_render_experience(args) -> str | None:
     """Pick the Isaac rendering app that works on the Windows/Blackwell host."""
     if args.render_experience:
@@ -934,6 +997,8 @@ def main():
         args.trajectory_type = "multi_recorded"
     if args.base_action_scale < 0.0 or args.base_action_scale > 1.0:
         raise ValueError("--base_action_scale must be in [0, 1]")
+    if args.obstacles_from_trajectory_metadata and not args.enable_obstacles:
+        raise ValueError("--obstacles_from_trajectory_metadata requires --enable_obstacles")
 
     auto_recovery_stability = (
         args.trajectory_stage == "stage1_recovery"
@@ -2380,6 +2445,8 @@ def main():
             "base_target_far_penalty": args.base_target_far_penalty,
             "base_target_command_tracking_penalty": args.base_target_command_tracking_penalty,
             "base_target_regression_penalty": args.base_target_regression_penalty,
+            "min_obstacle_distance_weight": args.min_obstacle_distance_weight,
+            "safety_radius": args.safety_radius,
         }
         applied_reward_overrides = {
             name: value for name, value in reward_overrides.items() if value is not None
@@ -2485,6 +2552,10 @@ def main():
         # Create environment directly with config
         from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnv
         env = MobileMMTrackEEEnv(cfg=env_cfg, render_mode="rgb_array" if args.video else None)
+        if args.obstacles_from_trajectory_metadata:
+            raw_env = env.unwrapped if hasattr(env, "unwrapped") else env
+            _install_metadata_obstacle_randomizer(raw_env)
+            print("    [OK] Trajectory-metadata obstacle placement enabled")
 
         if args.video:
             video_dir = os.path.join(args.log_dir, "videos", "train")

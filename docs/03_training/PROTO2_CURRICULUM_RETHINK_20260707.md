@@ -239,6 +239,71 @@ Interpretation:
 
 RL-only is runnable, but the first Stage A design is still too loose. At reset the easy trajectories are reachable, but the freely explored base motion quickly moves the robot away from the target. Training reward/value metrics improved, while raw-policy reachability remained poor. This is another example where PPO scalar health is not enough.
 
+## Stage1 Obstacle Teacher Gate - 2026-07-08
+
+Source teacher data:
+
+- GIK Stage1 one-obstacle accepted subset: `data/gik_stage1_one_obstacle_accepted63_20260708/accepted_npz/manifest.json`
+- Observation/action dataset: `data/gik_offline_teacher_obs/obs_dataset_stage1_one_obstacle_accepted63_full_masked_20260708.npz`
+- Dataset shape: `obs=(1665,85)`, `actions=(1665,9)`, `sources=63`
+- Obstacle contract: 40 cm diameter, 50 cm height exact-box obstacle metadata preserved from GIK
+
+Base-only BC candidate:
+
+- Policy: `logs/bc/gik_stage1_obstacle63_baseonly80_20260708/bc_policy.zip`
+- Eval: `evaluation_results/bc/gik_stage1_obstacle63_baseonly80_20260708.json`
+- Validation MSE: `0.001023`
+- Base RMSE: `0.015518`
+- Base MAE: `0.006399`
+- Base max abs error: `0.541529`
+- Labels used: `4913`
+
+Interpretation:
+
+The base-only BC head is good in offline teacher-label space, but that does not prove it is useful when inserted into the closed-loop sim policy.
+
+### Row-Blend Closed-Loop Gate
+
+Gate setup:
+
+- Primary tracking checkpoint: `logs/bc/gik_no_obstacle79_masked9_smoke_20260708/bc_policy.zip`
+- Base-head checkpoint: `logs/bc/gik_stage1_obstacle63_baseonly80_20260708/bc_policy.zip`
+- Stage: `stage_gik_no_obstacle79_nominal`
+- Env count/steps: `8 envs x 80 steps`
+- Observation normalization disabled because both checkpoints are raw-observation BC policies
+- Static obstacle: `radius=0.20 m`, `height=0.50 m`, `x=0.0`, `y=0.5`
+
+Results:
+
+| Candidate | Base blend | EE mean | EE final mean | EE p95 | Ori mean | Reward mean | Min obstacle clearance | Verdict |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Primary BC only | 0.00 | 0.2590 m | 0.4766 m | 0.5283 m | 53.11 deg | -32.60 | 1.6994 m | baseline |
+| Hybrid base head | 0.25 | 0.2402 m | 0.3523 m | 0.5076 m | 54.57 deg | -26.30 | 1.7560 m | candidate, small tracking gain |
+| Hybrid base head | 0.50 | 0.3223 m | 0.4066 m | 0.6340 m | 57.65 deg | -26.51 | 1.7642 m | regressed tracking |
+| Hybrid base head | 1.00 | 0.5130 m | 0.8252 m | 0.9582 m | 67.00 deg | -36.32 | 1.6533 m | reject |
+
+Obstacle metrics were all collision-free and unsafe-free, but this is not evidence of obstacle avoidance. The fixed obstacle was more than `1.6 m` away from the active base path in this small gate, so the obstacle did not meaningfully challenge the policy.
+
+Decision:
+
+- Reject full Stage1 base-head replacement. It strongly worsens tracking and drives the chassis in a mismatched direction.
+- Keep `0.25` row-blend only as a candidate for a representative Stage1 gate. It showed a small tracking improvement in this narrow no-obstacle-like closed-loop test.
+- Do not run more row-blend sweeps on `stage_gik_no_obstacle79_nominal` with the fixed obstacle at `(0.0, 0.5)`. That setup cannot answer the avoidance question.
+
+Next required gate:
+
+Build a representative Stage1 obstacle evaluation before training or promoting any policy. Either:
+
+- export the accepted Stage1 GIK trajectories into a sim-loadable `trajectoryToLearn/stage_gik_one_obstacle63_accepted` stage, or
+- add evaluator support to place the obstacle along each loaded trajectory's base path or progress fraction using the GIK obstacle metadata.
+
+The next promotion gate must measure both tracking and obstacle proximity on the same episodes:
+
+- no obstacle collision
+- near-obstacle unsafe percentage close to `0%`
+- no tracking regression versus the primary BC baseline
+- meaningful obstacle clearance, not a clearance floor above `1.5 m`
+
 Updated Stage A requirement:
 
 Before training arm/gimbal tracking, the base must be controlled:

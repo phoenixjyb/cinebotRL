@@ -156,6 +156,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--action_sequence_index", type=int, default=0)
     parser.add_argument("--output_json", default=None)
+    parser.add_argument(
+        "--output_dataset_npz",
+        default=None,
+        help=(
+            "Optional .npz dataset of pre-step rollout observations and actions. "
+            "Useful for closed-loop DAgger/distillation from the actual gate state distribution."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -615,6 +623,9 @@ def main() -> int:
         route_waypoint_fractions: list[np.ndarray] = []
         route_pos_errors: list[np.ndarray] = []
         route_base_target_distances: list[np.ndarray] = []
+        dataset_observations: list[np.ndarray] = []
+        dataset_actions: list[np.ndarray] = []
+        dataset_policy_actions: list[np.ndarray] = []
         dones_count = 0
         done_counts_per_env = np.zeros((args.num_envs,), dtype=np.int64)
         target_pos0, target_quat0 = raw_env.trajectory_manager.get_target_pose()
@@ -640,8 +651,11 @@ def main() -> int:
         )
         print("[gate] rollout start", flush=True)
         for step in range(args.steps):
+            obs_before_step = np.asarray(obs, dtype=np.float32).copy()
+            primary_action_for_dataset = None
             if open_loop_actions is None:
                 action, _ = model.predict(obs, deterministic=True)
+                primary_action_for_dataset = np.asarray(action, dtype=np.float32).copy()
                 if row_blend_model is not None:
                     blend_action, _ = row_blend_model.predict(obs, deterministic=True)
                     action = np.asarray(action, dtype=np.float32).copy()
@@ -673,6 +687,11 @@ def main() -> int:
                     route_base_target_distances.append(base_target_distance)
             else:
                 action = np.repeat(open_loop_actions[step : step + 1], args.num_envs, axis=0)
+                primary_action_for_dataset = np.asarray(action, dtype=np.float32).copy()
+            if args.output_dataset_npz:
+                dataset_observations.append(obs_before_step)
+                dataset_actions.append(np.asarray(action, dtype=np.float32).copy())
+                dataset_policy_actions.append(np.asarray(primary_action_for_dataset, dtype=np.float32).copy())
             obs, reward, done, _ = env.step(action)
             rewards.append(np.asarray(reward, dtype=np.float64))
             done_arr = np.asarray(done, dtype=bool)
@@ -855,6 +874,38 @@ def main() -> int:
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
             print(f"[gate] wrote {output}", flush=True)
+        if args.output_dataset_npz:
+            dataset_obs = np.concatenate(dataset_observations, axis=0).astype(np.float32)
+            dataset_actions_arr = np.concatenate(dataset_actions, axis=0).astype(np.float32)
+            dataset_policy_actions_arr = np.concatenate(dataset_policy_actions, axis=0).astype(np.float32)
+            dataset_mask = np.ones_like(dataset_actions_arr, dtype=np.float32)
+            if row_blend_action_indices:
+                dataset_mask[:] = 0.0
+                dataset_mask[:, np.asarray(row_blend_action_indices, dtype=np.int64)] = 1.0
+            dataset_metadata = {
+                "created_at": metrics["created_at"],
+                "checkpoint": str(checkpoint),
+                "row_blend_checkpoint": str(row_blend_checkpoint) if row_blend_checkpoint is not None else None,
+                "row_blend_action_indices": row_blend_action_indices,
+                "row_blend_weight": float(args.row_blend_weight),
+                "trajectory_stage": args.trajectory_stage,
+                "num_envs": int(args.num_envs),
+                "steps": int(args.steps),
+                "samples": int(dataset_obs.shape[0]),
+                "enable_obstacles": bool(args.enable_obstacles),
+                "obstacles_from_trajectory_metadata": bool(args.obstacles_from_trajectory_metadata),
+            }
+            output_dataset = Path(args.output_dataset_npz)
+            output_dataset.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(
+                output_dataset,
+                observations=dataset_obs,
+                actions=dataset_actions_arr,
+                action_valid_mask=dataset_mask,
+                policy_actions=dataset_policy_actions_arr,
+                metadata=json.dumps(dataset_metadata, sort_keys=True),
+            )
+            print(f"[gate] wrote dataset {output_dataset} rows={dataset_obs.shape[0]}", flush=True)
         env.close()
     finally:
         simulation_app.close()

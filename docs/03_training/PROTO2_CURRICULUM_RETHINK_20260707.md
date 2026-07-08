@@ -2102,3 +2102,52 @@ The BC10 + base-row `0.25` blend is the best measured obstacle diagnostic so far
 Next useful update:
 
 Do not run another broad reward-only PPO loop on the obstacle stage. Build a real obstacle-aware imitation/distillation target from the useful base-row behavior instead: keep BC10 as the anchor, distill the small base correction into rows `6,7,8`, and add explicit reachability preservation or terminal/tail recovery labels. Promotion should require beating the `0.25` blend on both tracking and unsafe rate, not merely improving collision count.
+
+## Stage1 Obstacle Row-Blend Distillation - 2026-07-08
+
+Implementation update:
+
+- `evaluate_stage_rollout_gate.py` now supports `--output_dataset_npz`.
+- The dataset export stores pre-step rollout `observations`, executed `actions`, `policy_actions`, and `action_valid_mask`.
+- When row blending is active, the exported mask is restricted to the blended rows. This makes the captured file directly usable by `distill_base_assist_head.py` for row-limited closed-loop distillation.
+- Added `scripts/imitation/build_policy_row_blend_dataset.py` for offline policy-output row-blend datasets. This is useful for diagnostics, but the first offline attempt below showed it is not enough by itself.
+
+Experiment:
+
+- anchor policy: `logs/bc/gik_no_obstacle79_masked9_smoke_20260708/bc_policy.zip`
+- obstacle base-row source: `logs/bc/gik_stage1_obstacle63_baseonly80_20260708/bc_policy.zip`
+- target rows: base rows `6,7,8`
+- diagnostic blend: `0.75 * BC10 + 0.25 * obstacle-base`
+- closed-loop rollout dataset: `data/gik_offline_teacher_obs/rollout_stage1_obstacle63_hybrid025_rows678_63x80_20260708.npz`
+- selected candidate: `logs/bc/gik_stage1_obstacle63_rollout_hybrid025_distill_rows678_anchor4_20260708/bc_policy.zip`
+- training: row-limited action-net distillation from BC10, datasets `[no_obstacle79 anchor, closed-loop obstacle hybrid]`, dataset scales `4,1`, `40` epochs, `lr=3e-4`
+
+Obstacle 63-case gate:
+
+| policy/probe | mean m | final mean m | p95 m | ori mean deg | reward mean | clearance mean m | clearance min m | unsafe % | collision % |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| BC10 baseline | 0.51891 | 0.77999 | 1.01089 | 54.60 | -50.38 | 0.31412 | 0.02738 | 33.18 | 0.00 |
+| evaluator-only 0.25 blend | 0.48557 | 0.72801 | 0.93319 | 53.35 | -42.27 | 0.31939 | 0.02091 | 28.30 | 0.00 |
+| offline-observation distill | 0.61561 | 0.95114 | 1.21067 | 52.83 | -51.69 | 0.26740 | 0.01501 | 36.90 | 0.00 |
+| rollout-state distill | 0.48099 | 0.72818 | 0.93811 | 53.33 | -43.13 | 0.32659 | 0.00569 | 25.44 | 0.00 |
+| rollout-state distill, anchor4 | 0.48138 | 0.72992 | 0.94231 | 53.52 | -43.53 | 0.32777 | 0.00278 | 25.36 | 0.00 |
+
+Nominal no-obstacle 79-case regression:
+
+| policy | mean m | final mean m | p95 m | ori mean deg | reward mean | dones |
+|---|---:|---:|---:|---:|---:|---:|
+| BC10 baseline | 0.24184 | 0.49540 | 0.54709 | 68.86 | -35.78 | 0 |
+| rollout-state distill | 0.26572 | 0.53122 | 0.59480 | 71.06 | -43.55 | 0 |
+| rollout-state distill, anchor4 | 0.26391 | 0.52492 | 0.59149 | 70.91 | -42.72 | 0 |
+
+Decision:
+
+Keep `gik_stage1_obstacle63_rollout_hybrid025_distill_rows678_anchor4_20260708` as the best obstacle-stage candidate so far, but do not promote it as the global/default policy. It improves obstacle unsafe time from `33.18%` to `25.36%` and improves obstacle mean tracking from `0.51891 m` to `0.48138 m`, but it regresses the nominal no-obstacle all-79 gate versus BC10.
+
+Key lesson:
+
+Offline distillation from teacher observations failed badly because it missed the actual closed-loop state distribution. Rollout-state distillation is the correct direction for this class of update. However, obstacle behavior and nominal tracking now need either explicit policy routing or a broader multi-condition distillation dataset; a single base-row checkpoint is not yet a safe universal replacement.
+
+Next useful update:
+
+Implement/evaluate a simple stage-aware policy router: use BC10 for no-obstacle nominal stages and route to the anchor4 rollout-distilled policy only when obstacle mode is active. Then train the next candidate from a mixed closed-loop dataset that includes both no-obstacle rollout states and obstacle rollout states, not just offline no-obstacle anchors.

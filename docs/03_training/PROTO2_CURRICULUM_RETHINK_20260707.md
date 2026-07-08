@@ -1546,3 +1546,47 @@ Next useful update:
 
 Build the next curriculum around long-horizon base/EE coordination, not around another scalar base-speed change. Use this stage as the acceptance gate, but train on an easier ladder first: 2-3s long-motion snippets, then 5-6s, then 12s cinematic paths. Keep `base_action_scale=0.25` as the safety contract until a trained policy beats the corrected `0.25` baseline on mean, p95, final error, and done count.
 
+## Correction: Use The 79 Live ARCore/GIK Trajectories, Not The 1000 Generated Cinematic Set - 2026-07-08
+
+User correction:
+
+Do not train the next curriculum from the initialized/generated 1000 cinematic trajectories. Use the 79 live ARCore/GIK trajectories instead.
+
+Data audit:
+
+- `data/gik_offline_teachers_20260701_142322/no_obstacle_all79_20260701_123049/work_json` contains 79 JSON files, but they are `first80` trimmed variants.
+- The `first80` JSONs are all too short for the current curriculum rule: duration min/p50/mean/max is `1.42 / 1.50 / 1.50 / 1.58 s`, so `dur>=5s` count is `0/79`.
+- The valid learning material is the accepted GIK teacher export under `data/gik_offline_teachers_20260701_142322/accepted_npz/manifest.json`.
+- Filtering that manifest to `teacher_metadata.scenario == no_obstacle` gives the intended 79 accepted live trajectories: duration min/p50/mean/max is `5.98 / 13.76 / 17.65 / 58.65 s`, with `2803` action samples.
+
+Artifacts created on `.98`:
+
+- filtered manifest: `data/gik_offline_teachers_20260701_142322/accepted_npz/manifest_no_obstacle79.json`
+- 79-only base dataset: `data/gik_offline_teacher_obs/obs_dataset_no_obstacle79_base_only.npz`
+- BC smoke policy: `logs/bc/gik_no_obstacle79_base_smoke_20260708/bc_policy.zip`
+- in-distribution eval: `evaluation_results/bc/gik_no_obstacle79_base_in_distribution_20260708.json`
+
+79-only dataset check:
+
+- trajectories: `79`
+- samples: `2803`
+- observation dimension: `85`
+- action dimension: `9`
+- base label mask mean: `[1.0, 1.0, 1.0]`
+- arm/gimbal labels are masked out: `[0, 0, 0, 0, 0, 0]`
+
+BC smoke result:
+
+- training split: `2523 / 280`
+- best validation MSE: `0.001325`
+- in-distribution base RMSE/MAE/max: `0.04157 / 0.02430 / 0.56226`
+- per-base RMSE: `vx=0.05371`, `vy=0.03948`, `wz=0.02724`
+
+Decision:
+
+The generated 1000 cinematic set is now diagnostic/evaluation-only unless explicitly requested. The next learning step should use the 79-only accepted GIK/ARCore teacher dataset above as the nominal source. Keep the `>=5s` rejection rule by filtering at the manifest/teacher level; do not use the `first80` work JSONs as training trajectories.
+
+Next useful update:
+
+Use the 79-only base teacher as a supervised base-head auxiliary/warm-start for the real RL policy, then evaluate on a 79-derived Isaac stage or on held-out teacher observations before any broad PPO run. Do not mix in one-obstacle or generated cinematic data until the nominal 79-case transfer is measured cleanly.
+

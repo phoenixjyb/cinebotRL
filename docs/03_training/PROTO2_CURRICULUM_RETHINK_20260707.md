@@ -1724,3 +1724,28 @@ Do not continue this PPO configuration. The BC actor is currently better than th
 Next useful update:
 
 Keep the masked-BC actor as the current nominal Stage-79 policy artifact. If we do RL after BC, use a more conservative imitation-preserving update: lower learning rate, fewer PPO epochs, stronger KL/behavior regularization or an auxiliary BC loss on the same 79 dataset, and promote only if the 40-step teacher-reset gate beats the raw BC actor's `0.1347 m` mean / `0.3775 m` p95 / `0` dones baseline.
+
+## 79 Masked-BC Aux-PPO Smoke - 2026-07-08
+
+Attempted a more conservative PPO continuation after the plain PPO rejection:
+
+- run: `logs/sb3/recomoproto2trackee_v0/stage_gik_noobs79_teacherreset_masked9bc_aux8k_20260708`
+- warm start: `logs/bc/gik_no_obstacle79_masked9_smoke_20260708/bc_policy.zip`
+- stage: `stage_gik_no_obstacle79_nominal`, 79 accepted live GIK/ARCore trajectories only
+- PPO limits: `lr=1e-5`, `n_epochs=1`, `clip_range=0.03`, `target_kl=0.003`, `ent_coef=0`, `std=exp(-3)`
+- aux BC stabilizer: `data/gik_offline_teacher_obs/obs_dataset_no_obstacle79_full_masked.npz`, action rows `0..8`, 8 supervised minibatches per rollout
+
+Observed result before manual stop at `4096` timesteps:
+
+- aux BC loss stayed around `0.0051-0.0055`, so the supervised head correction was active
+- KL stayed tiny (`~5e-5` to `3e-4`), so this was not a large policy-update explosion
+- rollout behavior still degraded: reachability was usually `7-8/8` unreachable and base-target distance ranged roughly `0.96-1.47 m`
+- value loss remained very large (`~1.5e7-2.5e7`), suggesting the current PPO reward/value setup is not a good continuation target for this narrow nominal imitation stage
+
+Decision:
+
+Reject Aux-PPO continuation for the nominal 79 stage. The issue is not simply PPO learning rate, clipping, or missing BC regularization. The current RL objective is pulling against the BC behavior in ways that hurt trajectory tracking almost immediately.
+
+Next useful update:
+
+Do not run more nominal 79 PPO continuations until the RL objective is reworked. The safer next path is either (1) improve the 79 imitation policy directly with better labels/architecture/evaluation, or (2) build a separate teacher-forced or DAgger-style rollout collector where the policy is corrected against the live 79 teacher state distribution before any reward-only PPO is attempted. Obstacle curricula should wait until the no-obstacle 79 policy can track full trajectories, not just short local motion.

@@ -386,6 +386,64 @@ promotion, run broader routed gates across the existing stage mix and confirm
 that the full-start p95 increase does not show up as a visible trajectory
 quality regression.
 
+## Broader W4 Routed Validation - 2026-07-08
+
+Question:
+
+Does the `1,4` mixed-preservation checkpoint generalize beyond the two `base040`
+gates, or is it overfit to the recovery probe?
+
+Candidate:
+
+`logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_offsetfollow_mixed_preserve_w4_20260708/final_model.zip`
+
+Validation artifact:
+
+`evaluation_results/stage_rollout_gate/broader_w4_validation_20260708/summary.json`
+
+Compact gate settings:
+
+- source and `w4` candidate
+- `num_envs=8`
+- `steps=60`
+- `max_trajectories=8`
+- `base_action_scale=0.25`
+- full-start and late-start for each stage
+- late-start range: `0.65-0.95`
+
+Gate comparison:
+
+| Stage | Mode | Source EE mean/p95/max | W4 EE mean/p95/max | Verdict |
+| --- | --- | ---: | ---: | --- |
+| `base025` | full | `0.0462 / 0.0682 / 0.0835 m` | `0.0384 / 0.0696 / 0.0749 m` | mean/max better, p95 flat |
+| `base025` | late | `0.0569 / 0.0926 / 0.1144 m` | `0.0429 / 0.0743 / 0.1026 m` | better |
+| `base040` | full | `0.0505 / 0.0749 / 0.1056 m` | `0.0472 / 0.0831 / 0.1026 m` | mean/max better, p95 worse |
+| `base040` | late | `0.0904 / 0.1609 / 0.1940 m` | `0.0604 / 0.1136 / 0.1648 m` | much better |
+| `large08` | full | `0.0452 / 0.0707 / 0.0902 m` | `0.0384 / 0.0706 / 0.0873 m` | better/flat |
+| `large08` | late | `0.0471 / 0.0697 / 0.0829 m` | `0.0423 / 0.0731 / 0.0862 m` | mean better, p95/max slightly worse |
+| `mix_large08_base025` | full | `0.0507 / 0.0754 / 0.0827 m` | `0.0440 / 0.0731 / 0.0857 m` | mean/p95 better, max slightly worse |
+| `mix_large08_base025` | late | `0.0548 / 0.0816 / 0.1050 m` | `0.0389 / 0.0642 / 0.0715 m` | much better |
+
+Interpretation:
+
+The `w4` checkpoint passes broader validation as a recovery candidate. It is
+not a clean global replacement because two small tail-risk regressions remain:
+
+- `base040` full-start p95 worsens from `0.0749 m` to `0.0831 m`.
+- `large08` late-start p95/max worsen slightly, despite a better mean.
+
+Decision:
+
+Keep source as the default safe policy. Use `w4` as the preferred conditional
+recovery route when the robot is in late-start or base-under-following states.
+
+Next engineering step:
+
+Implement conditional routing rather than global replacement. The route should
+prefer `w4` only when recovery evidence is present, such as late waypoint
+fraction, larger base-target offset, or increasing EE position error. Then run a
+rendered rollout check to see whether the remaining p95 tradeoff is visible.
+
 ## Stage A Freeze-Base Implementation
 
 Implementation:

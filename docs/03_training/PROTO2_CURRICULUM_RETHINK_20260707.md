@@ -1631,3 +1631,38 @@ Do not continue this exact transfer path. The position mean is not enough to jus
 Next useful update:
 
 Build a 79-derived Isaac replay/gate whose reset distribution, observation normalization, and trajectory source match the accepted GIK/ARCore teacher data, then test base-head learning in that nominal distribution before trying to transfer into `stage1_recovery`. If we need recovery behavior, generate teacher labels for the recovery reset distribution itself; do not assume nominal 79-only base labels are valid under random recovery starts.
+
+## 79-Derived Nominal Isaac Stage - 2026-07-08
+
+Implementation:
+
+- added exporter: `scripts/imitation/export_gik_npz_stage.py`
+- generated stage: `trajectoryToLearn/stage_gik_no_obstacle79_nominal`
+- source manifest: `data/gik_offline_teachers_20260701_142322/accepted_npz/manifest_no_obstacle79.json`
+- generated files: `79` trajectory JSONs plus `manifest.txt`, `reset_config.json`, and `export_summary.json`
+- generated stage size: about `21M`
+
+Exporter behavior:
+
+- reads accepted GIK/ARCore NPZ teacher targets, not the `first80` work JSONs and not the generated cinematic corpus
+- filters by `teacher_metadata.scenario == no_obstacle`
+- keeps the `duration_s >= 5.0` rule at the manifest level
+- resamples sparse NPZ target poses to the manifest duration at `0.1s` waypoint dt, because the raw NPZ rows alone would make many clips look shorter than 5s to Isaac
+- converts stored `target_quat_wxyz` into JSON `xyzw`, matching `MultiTrajectoryLoader` expectations
+- writes reset offsets from the teacher frame: `reset_base_x_offset=-0.000003`, `reset_base_y_offset=0.036461`
+
+Validation:
+
+- CPU loader smoke loaded all `79` trajectories after the `>=5s` filter
+- loader lengths: min/mean/max `61 / 178.1 / 588` waypoints
+- loader durations: min/mean/max `6.10 / 17.81 / 58.80 s`
+- Isaac smoke command used `--trajectory_stage stage_gik_no_obstacle79_nominal --reset_base_to_trajectory_start --max_trajectories 4 --num_envs 4 --steps 40`
+- smoke output: `evaluation_results/stage_gik_no_obstacle79_nominal/stage_loader_smoke_yaw_assist_20260708.json`
+
+Important boundary:
+
+This stage is a valid 79-live-trajectory routing/evaluation stage, not a solved policy result. The short smoke used the old yaw-assist policy and still had high tracking error: initial mean EE position error `1.433 m`, rollout mean `1.571 m`, p95 `1.921 m`, and `6` dones over `160` samples. The main reason is that the current Isaac reset can place the base using the GIK frame offset, but it does not reset the arm/gimbal to the per-trajectory GIK teacher joint state.
+
+Next useful update:
+
+Use this stage to build the nominal 79 curriculum, but do not call it solved until we add either a teacher-state reset path or a BC/offline warm-start path that initializes the arm/gimbal consistently with the GIK teacher state. For RL-only training on this stage, start with short bounded runs and judge them against the stage gate metrics above rather than against `stage1_recovery` cinematic metrics.

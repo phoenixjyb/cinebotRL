@@ -656,10 +656,11 @@ def parse_args():
         "--base_assist_mode",
         type=str,
         default="target_direction",
-        choices=["target_direction", "target_velocity"],
+        choices=["target_direction", "target_velocity", "target_offset_follow"],
         help=(
             "Expert source for base assist. target_direction chases the target center; "
-            "target_velocity follows the lookahead target displacement."
+            "target_velocity follows the lookahead target displacement; "
+            "target_offset_follow preserves the generated FK base-target offset."
         ),
     )
     parser.add_argument(

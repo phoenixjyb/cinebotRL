@@ -1153,3 +1153,54 @@ Do not promote any tail-start recovery candidate from this pass. Keep the late-s
 Next useful update:
 
 Implement an offset-preserving base-follow teacher rather than either existing target-direction assist or raw target-velocity assist. The expert should preserve the generated FK base-target offset while following target motion, then be tested first with the late-start diagnostic before any PPO continuation. A good smoke target is to raise base XY motion toward the target XY motion without pushing base-target distance outside the `base040` working band.
+
+## Stage B Offset-Follow Teacher Probe
+
+Goal:
+
+Test an offset-preserving base-follow teacher that commands the base toward:
+
+`desired_base_xy = target_xy - [reset_base_x_offset, reset_base_y_offset]`
+
+This differs from the failed `target_direction` and `target_velocity` teachers:
+
+- `target_direction` chases the target center and does not preserve the generated base-target offset
+- `target_velocity` follows target displacement directly and overdrives the base
+- `target_offset_follow` follows target motion while preserving the FK-generated base-target working offset
+
+Tooling changes:
+
+- added `target_offset_follow` to `BaseAssistConfig.mode`
+- added `target_offset_follow` to `--base_assist_mode`
+- extended `diagnose_stage_tracking.py` so base assist can be enabled during no-training diagnostics
+- diagnostic output now records `base_target_distance_m`, `base_assist_coeff_mean`, and `base_assist_active_pct`
+
+No-training teacher smoke:
+
+- checkpoint: `stage0_policy_envelope_fk_mix_contract_zpenalty80_lowstd_resume_32k_20260707/final_model.zip`
+- diagnostic: `base040`, random start `0.65-0.95`, no base-start anchor, `base_action_scale=0.25`
+- assist: `target_offset_follow`, blend `0.70`, activation/full-speed `0.010-0.080 m`, max action `0.60`
+- output: `evaluation_results/stage_diagnostics/stage0_policy_envelope_fk_base040_tailstart_offsetassist_diag_20260708.json`
+- EE position error improved from baseline `0.0904 / 0.1609 / 0.1940 m` to `0.0555 / 0.0908 / 0.2045 m`
+- base XY motion improved from `0.0155 m` to `0.1240 m`, matching target XY motion `0.1178 m`
+- base-target distance stayed in-band: mean/p95/max `0.8407 / 0.8536 / 0.9811 m`
+- assist was active `78.1%` of samples
+
+Interpretation:
+
+The teacher is directionally correct. It fixes the core base-under-following behavior without breaking the base-target working distance. The one max-error outlier means it is not perfect, but it is much better than the previous teachers as an executable controller.
+
+PPO transfer probe:
+
+- run: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_tailreset_offsetassist_32k_20260708`
+- setup: random start `0.65-0.95`, `target_offset_follow`, blend `0.70->0.00`, activation/full-speed `0.010-0.080 m`, max action `0.60`, imitation weight `30`
+- training health: reachability stayed `64/64`; final PPO `approx_kl=0.00333`
+- unassisted late-start gate: `0.0896 / 0.1603 / 0.1936 m`
+
+Decision:
+
+Do not promote the PPO checkpoint. The offset-follow teacher works when executed, but the current PPO reward-imitation path did not transfer the teacher into the raw policy at `32k` timesteps.
+
+Next useful update:
+
+Stop trying to transfer this teacher through weak PPO reward shaping alone. Build a supervised offset-follow teacher dataset from visited late-start states, then train the base action head with a direct supervised/auxiliary loss while preserving the arm/gimbal heads. The acceptance test should be the unassisted late-start gate, not the assisted diagnostic.

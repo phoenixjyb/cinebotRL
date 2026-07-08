@@ -100,7 +100,7 @@ class BaseAssistConfig:
     """Optional curriculum assist for learning recovery base commands."""
 
     enable: bool = False
-    mode: str = "target_direction"  # target_direction or target_velocity
+    mode: str = "target_direction"  # target_direction, target_velocity, or target_offset_follow
     initial_blend: float = 0.0  # 0=policy only, 1=expert base command only
     final_blend: float = 0.0
     decay_steps: int = 2_000_000  # Vectorized env steps over which the assist decays

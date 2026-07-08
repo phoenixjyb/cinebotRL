@@ -37,6 +37,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=20260707)
     parser.add_argument("--freeze_base_actions", action="store_true")
     parser.add_argument("--base_action_scale", type=float, default=1.0)
+    parser.add_argument("--enable_base_assist", action="store_true")
+    parser.add_argument(
+        "--base_assist_mode",
+        type=str,
+        default="target_direction",
+        choices=["target_direction", "target_velocity", "target_offset_follow"],
+    )
+    parser.add_argument("--base_assist_blend", type=float, default=0.0)
+    parser.add_argument("--base_assist_activation_distance", type=float, default=0.7)
+    parser.add_argument("--base_assist_full_speed_distance", type=float, default=1.4)
+    parser.add_argument("--base_assist_max_action", type=float, default=0.8)
+    parser.add_argument("--base_assist_lookahead_steps", type=int, default=0)
     parser.add_argument("--time_bins", type=int, default=6)
     parser.add_argument("--top_k", type=int, default=8)
     parser.add_argument("--output_json", required=True)
@@ -145,6 +157,16 @@ def main() -> int:
         raise ValueError("--start_waypoint_max_fraction must be in [0, 1]")
     if args.reset_anchor_target_blend < 0.0 or args.reset_anchor_target_blend > 1.0:
         raise ValueError("--reset_anchor_target_blend must be in [0, 1]")
+    if args.base_assist_blend < 0.0 or args.base_assist_blend > 1.0:
+        raise ValueError("--base_assist_blend must be in [0, 1]")
+    if args.base_assist_activation_distance < 0.0:
+        raise ValueError("--base_assist_activation_distance must be non-negative")
+    if args.base_assist_full_speed_distance < args.base_assist_activation_distance:
+        raise ValueError("--base_assist_full_speed_distance must be >= activation distance")
+    if args.base_assist_max_action < 0.0 or args.base_assist_max_action > 1.0:
+        raise ValueError("--base_assist_max_action must be in [0, 1]")
+    if args.base_assist_lookahead_steps < 0:
+        raise ValueError("--base_assist_lookahead_steps must be non-negative")
     require(args.time_bins > 0, "--time_bins must be positive")
     checkpoint = Path(args.checkpoint)
     vec_normalize = Path(args.vec_normalize)
@@ -184,7 +206,6 @@ def main() -> int:
         env_cfg.scene.num_envs = args.num_envs
         env_cfg.seed = args.seed
         env_cfg.task_config.obstacles.enable_obstacles = False
-        env_cfg.task_config.base_assist.enable = False
         env_cfg.task_config.randomize_initial_joint_positions = False
         reward_overrides = reset_config.get("reward_overrides", {})
         if isinstance(reward_overrides, dict):
@@ -218,6 +239,25 @@ def main() -> int:
             reset_base_x_offset=reset_config.get("reset_base_x_offset", 0.4415),
             reset_base_y_offset=reset_config.get("reset_base_y_offset", 0.2405),
         )
+        assist_cfg = env_cfg.task_config.base_assist
+        assist_cfg.enable = bool(args.enable_base_assist)
+        assist_cfg.mode = args.base_assist_mode
+        assist_cfg.initial_blend = args.base_assist_blend
+        assist_cfg.final_blend = args.base_assist_blend
+        assist_cfg.decay_steps = 1
+        assist_cfg.activation_distance = args.base_assist_activation_distance
+        assist_cfg.full_speed_distance = args.base_assist_full_speed_distance
+        assist_cfg.max_action = args.base_assist_max_action
+        assist_cfg.imitation_weight = 0.0
+        assist_cfg.lookahead_steps = max(int(args.base_assist_lookahead_steps), 0)
+        if assist_cfg.enable:
+            print(
+                "[diag] base assist "
+                f"mode={assist_cfg.mode}, blend={assist_cfg.initial_blend:.2f}, "
+                f"distance={assist_cfg.activation_distance:.3f}-{assist_cfg.full_speed_distance:.3f}m, "
+                f"max_action={assist_cfg.max_action:.2f}, lookahead={assist_cfg.lookahead_steps}",
+                flush=True,
+            )
 
         base_env = MobileMMTrackEEEnv(cfg=env_cfg)
 
@@ -319,6 +359,8 @@ def main() -> int:
         base_xy = np.zeros((args.steps, args.num_envs, 2), dtype=np.float64)
         target_xy = np.zeros((args.steps, args.num_envs, 2), dtype=np.float64)
         ee_xyz_error = np.zeros((args.steps, args.num_envs, 3), dtype=np.float64)
+        base_target_distance = np.zeros((args.steps, args.num_envs), dtype=np.float64)
+        assist_coeff = np.zeros((args.steps, args.num_envs), dtype=np.float64)
         dones_count = 0
 
         for step in range(args.steps):
@@ -341,6 +383,8 @@ def main() -> int:
             arm_lag[step] = tensor_np(torch.linalg.norm(arm_target - arm_joint_pos, dim=-1))
             base_xy[step] = tensor_np(raw_env.robot.data.root_pos_w[:, :2])
             target_xy[step] = tensor_np(target_pos[:, :2])
+            base_target_distance[step] = tensor_np(getattr(raw_env, "_base_target_distance_buf", torch.zeros(args.num_envs, device=raw_env.device)))
+            assist_coeff[step] = tensor_np(getattr(raw_env, "_base_assist_coeff", torch.zeros(args.num_envs, device=raw_env.device)))
             if step % 20 == 0:
                 print(f"[diag] step={step}/{args.steps}", flush=True)
 
@@ -361,6 +405,9 @@ def main() -> int:
                 "arm_action_abs_mean": float(np.mean(action_abs[:, env_idx, 0:6])),
                 "base_xy_motion_mean_m": float(np.mean(np.linalg.norm(base_xy[-1, env_idx] - base_xy[0, env_idx], axis=1))),
                 "target_xy_motion_mean_m": float(np.mean(np.linalg.norm(target_xy[-1, env_idx] - target_xy[0, env_idx], axis=1))),
+                "base_target_distance_m": summarize(base_target_distance[:, env_idx]),
+                "base_assist_coeff_mean": float(np.mean(assist_coeff[:, env_idx])),
+                "base_assist_active_pct": float(np.mean(assist_coeff[:, env_idx] > 0.0) * 100.0),
             }
 
         by_time_bin = []
@@ -399,6 +446,9 @@ def main() -> int:
                     "arm_target_lag_p95_rad": percentile(env_lag, 95),
                     "base_xy_motion_m": env_base_motion,
                     "target_xy_motion_m": env_target_motion,
+                    "base_target_distance_mean_m": float(np.mean(base_target_distance[:, env_id])),
+                    "base_target_distance_max_m": float(np.max(base_target_distance[:, env_id])),
+                    "base_assist_coeff_mean": float(np.mean(assist_coeff[:, env_id])),
                     "base_action_abs_mean": float(np.mean(action_abs[:, env_id, 6:9])),
                     "arm_action_abs_mean": float(np.mean(action_abs[:, env_id, 0:6])),
                     "reward_mean": float(np.mean(rewards[:, env_id])),
@@ -415,6 +465,13 @@ def main() -> int:
             "samples": int(args.num_envs * args.steps),
             "freeze_base_actions": bool(args.freeze_base_actions),
             "base_action_scale": float(args.base_action_scale),
+            "enable_base_assist": bool(args.enable_base_assist),
+            "base_assist_mode": str(args.base_assist_mode),
+            "base_assist_blend": float(args.base_assist_blend),
+            "base_assist_activation_distance": float(args.base_assist_activation_distance),
+            "base_assist_full_speed_distance": float(args.base_assist_full_speed_distance),
+            "base_assist_max_action": float(args.base_assist_max_action),
+            "base_assist_lookahead_steps": int(args.base_assist_lookahead_steps),
             "random_start_waypoint": bool(args.random_start_waypoint),
             "start_waypoint_min_fraction": float(args.start_waypoint_min_fraction),
             "start_waypoint_max_fraction": float(args.start_waypoint_max_fraction),
@@ -431,6 +488,9 @@ def main() -> int:
                 "arm_action_abs_mean": float(np.mean(action_abs[:, :, 0:6])),
                 "base_xy_motion_mean_m": float(np.mean(np.linalg.norm(base_xy[-1] - base_xy[0], axis=1))),
                 "target_xy_motion_mean_m": float(np.mean(np.linalg.norm(target_xy[-1] - target_xy[0], axis=1))),
+                "base_target_distance_m": summarize(base_target_distance),
+                "base_assist_coeff_mean": float(np.mean(assist_coeff)),
+                "base_assist_active_pct": float(np.mean(assist_coeff > 0.0) * 100.0),
             },
             "by_source": by_source,
             "by_time_bin": by_time_bin,

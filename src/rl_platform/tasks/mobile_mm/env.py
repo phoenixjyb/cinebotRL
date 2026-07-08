@@ -1679,7 +1679,20 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         base_to_target = target_xy - base_xy
         dist = torch.norm(base_to_target, dim=-1)
         assist_mode = str(getattr(assist_cfg, "mode", "target_direction"))
-        if assist_mode == "target_velocity" and lead_steps > 0:
+        if assist_mode == "target_offset_follow":
+            traj_cfg = self.task_cfg.trajectory
+            desired_offset = torch.tensor(
+                [
+                    float(getattr(traj_cfg, "reset_base_x_offset", 0.4415)),
+                    float(getattr(traj_cfg, "reset_base_y_offset", 0.2405)),
+                ],
+                dtype=target_xy.dtype,
+                device=target_xy.device,
+            )
+            desired_base_xy = target_xy - desired_offset.unsqueeze(0)
+            expert_vector_world = desired_base_xy - base_xy
+            expert_distance = torch.norm(expert_vector_world, dim=-1)
+        elif assist_mode == "target_velocity" and lead_steps > 0:
             expert_vector_world = target_xy - current_target_pos[:, :2]
             expert_distance = torch.norm(expert_vector_world, dim=-1)
         else:

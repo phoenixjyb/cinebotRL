@@ -508,6 +508,57 @@ Record rendered rollouts for routed `base040` late-start and `large08` late-star
 to inspect whether the remaining p95/max tradeoff is visible as jerk, drift, or
 unnatural base motion.
 
+## Routed W4 Rendered Rollouts - 2026-07-08
+
+Implementation:
+
+`scripts/reinforcement_learning/sb3/record_rendered_recovery_rollout.py` now
+supports the same routed policy contract as the gate evaluator:
+
+- `--recovery_checkpoint`
+- `--recovery_route_min_waypoint_fraction`
+- `--recovery_route_min_pos_error`
+- `--recovery_route_min_base_target_distance`
+- `--recovery_route_latch_once`
+- `--disable_vec_normalize`
+- `--base_action_scale`
+- stage-specific reset offsets from `reset_config.json`
+
+Rendered artifacts:
+
+- `evaluation_results/videos_rendered/routed_w4_validation_20260708/base040_late_routed_w4_120/rl-video-step-0.mp4`
+- `evaluation_results/videos_rendered/routed_w4_validation_20260708/large08_late_routed_w4_120/rl-video-step-0.mp4`
+
+Local copies for review:
+
+- `/Users/yanbo/Downloads/cinebotRL_routed_w4_20260708/base040_late_routed_w4_120.mp4`
+- `/Users/yanbo/Downloads/cinebotRL_routed_w4_20260708/large08_late_routed_w4_120.mp4`
+
+Render contract:
+
+- 120 steps
+- 20 FPS
+- 1280x720 output
+- raw observation policy path with `--disable_vec_normalize`
+- `--base_action_scale 0.25`
+- `--recovery_route_min_waypoint_fraction 0.65`
+- `--recovery_route_latch_once`
+- no obstacles
+- late-start waypoint range `0.65-0.95`
+
+Metadata:
+
+- `base040_late_routed_w4_120`: `recovery_route_fraction=1.0`,
+  `steps_executed=120`, `done_count=0`
+- `large08_late_routed_w4_120`: `recovery_route_fraction=1.0`,
+  `steps_executed=120`, `done_count=0`
+
+Visual note:
+
+Contact-sheet inspection shows stable robot rendering with no obvious detached
+arm/gimbal or tip-over. The material is lighter/whiter than the earlier dark
+polished renders, but the video is usable for motion validation.
+
 ## Stage A Freeze-Base Implementation
 
 Implementation:

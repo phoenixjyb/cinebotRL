@@ -25,7 +25,18 @@ from evaluate_recovery_candidate import _resolve_trajectory_manifest, tensor_np
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Record a real Isaac-rendered Proto2 recovery rollout.")
     parser.add_argument("--checkpoint", required=True, help="PPO checkpoint/final_model.zip.")
+    parser.add_argument(
+        "--recovery_checkpoint",
+        default=None,
+        help="Optional PPO checkpoint used when conditional recovery routing is active.",
+    )
+    parser.add_argument("--recovery_route_min_waypoint_fraction", type=float, default=0.65)
+    parser.add_argument("--recovery_route_min_pos_error", type=float, default=0.0)
+    parser.add_argument("--recovery_route_min_base_target_distance", type=float, default=0.0)
+    parser.add_argument("--recovery_route_latch_once", action="store_true")
     parser.add_argument("--vec_normalize", default=None, help="VecNormalize pkl. Defaults to checkpoint parent.")
+    parser.add_argument("--disable_vec_normalize", action="store_true")
+    parser.add_argument("--base_action_scale", type=float, default=1.0)
     parser.add_argument("--task", default="RecomoProto2TrackEE-v0")
     parser.add_argument("--steps", type=int, default=400)
     parser.add_argument("--fps", type=int, default=20)
@@ -111,6 +122,19 @@ def resolve_render_experience(args: argparse.Namespace) -> str | None:
         if candidate.exists():
             return str(candidate)
     return None
+
+
+def load_stage_reset_config(stage: str) -> dict[str, object]:
+    path = PROJECT_ROOT / "trajectoryToLearn" / stage / "reset_config.json"
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    out: dict[str, object] = {}
+    if "reset_base_x_offset" in data:
+        out["reset_base_x_offset"] = float(data["reset_base_x_offset"])
+    if "reset_base_y_offset" in data:
+        out["reset_base_y_offset"] = float(data["reset_base_y_offset"])
+    return out
 
 
 def attach_record_video_vecenv_passthrough(video_env, raw_env):
@@ -260,13 +284,15 @@ def _convert_obs(obs):
 class IsaacLabToSB3VecEnvWrapper:
     """Small VecEnv adapter matching the project evaluation scripts."""
 
-    def __init__(self, venv):
+    def __init__(self, venv, *, base_action_scale: float = 1.0):
         from gymnasium import spaces
         from stable_baselines3.common.vec_env import VecEnvWrapper
 
         class _Wrapper(VecEnvWrapper):
-            def __init__(self, wrapped):
+            def __init__(self, wrapped, scale: float):
                 super().__init__(wrapped)
+                self.base_action_scale = float(scale)
+                self._base_adapter_logged = False
                 if hasattr(wrapped.action_space, "shape") and len(wrapped.action_space.shape) > 1:
                     action_dim = wrapped.action_space.shape[-1]
                     self.action_space = spaces.Box(
@@ -288,6 +314,17 @@ class IsaacLabToSB3VecEnvWrapper:
                 if isinstance(actions, np.ndarray):
                     device = self.venv.unwrapped.device if hasattr(self.venv.unwrapped, "device") else "cuda:0"
                     actions = torch.from_numpy(actions).float().to(device)
+                if abs(self.base_action_scale - 1.0) >= 1e-9:
+                    if actions.shape[-1] < 9:
+                        raise ValueError(f"base action scaling requires at least 9 dims, got {actions.shape[-1]}")
+                    actions = actions.clone()
+                    if not self._base_adapter_logged:
+                        print(
+                            f"[render action-adapter] Scaling base action rows [6,7,8] by {self.base_action_scale:.3f}",
+                            flush=True,
+                        )
+                        self._base_adapter_logged = True
+                    actions[..., 6:9] *= self.base_action_scale
                 self._actions = actions
 
             def step_wait(self):
@@ -306,18 +343,30 @@ class IsaacLabToSB3VecEnvWrapper:
                     infos = [{} for _ in range(len(rewards))]
                 return obs, rewards, dones, infos
 
-        self.env = _Wrapper(venv)
+        self.env = _Wrapper(venv, base_action_scale)
 
 
 def main() -> int:
     args = parse_args()
+    if args.base_action_scale < 0.0 or args.base_action_scale > 1.0:
+        raise ValueError("--base_action_scale must be in [0, 1]")
+    if args.recovery_route_min_waypoint_fraction < 0.0 or args.recovery_route_min_waypoint_fraction > 1.0:
+        raise ValueError("--recovery_route_min_waypoint_fraction must be in [0, 1]")
+    if args.recovery_route_min_pos_error < 0.0:
+        raise ValueError("--recovery_route_min_pos_error must be non-negative")
+    if args.recovery_route_min_base_target_distance < 0.0:
+        raise ValueError("--recovery_route_min_base_target_distance must be non-negative")
     checkpoint = Path(args.checkpoint)
     if not checkpoint.exists():
         print(f"checkpoint not found: {checkpoint}")
         return 1
+    recovery_checkpoint = Path(args.recovery_checkpoint) if args.recovery_checkpoint else None
+    if recovery_checkpoint is not None and not recovery_checkpoint.exists():
+        print(f"recovery checkpoint not found: {recovery_checkpoint}")
+        return 1
 
     vec_path = Path(args.vec_normalize) if args.vec_normalize else checkpoint.parent / "vec_normalize.pkl"
-    if not vec_path.exists():
+    if not args.disable_vec_normalize and not vec_path.exists():
         print(f"VecNormalize stats not found: {vec_path}")
         return 1
 
@@ -356,6 +405,14 @@ def main() -> int:
         np.random.seed(args.seed)
 
         trajectory_dir, manifest, selected_trajectories = _resolve_trajectory_manifest(args, output_dir)
+        reset_config = load_stage_reset_config(args.trajectory_stage)
+        if reset_config:
+            print(
+                "Using stage reset offset "
+                f"x={reset_config.get('reset_base_x_offset', 0.4415):.4f} "
+                f"y={reset_config.get('reset_base_y_offset', 0.2405):.4f}",
+                flush=True,
+            )
 
         env_cfg = MobileMMTrackEEEnvCfg()
         env_cfg.num_envs = 1
@@ -387,6 +444,8 @@ def main() -> int:
             start_waypoint_max_fraction=args.start_waypoint_max_fraction,
             reset_base_to_trajectory_start=bool(args.reset_base_to_trajectory_start),
             reset_anchor_target_blend=args.reset_anchor_target_blend,
+            reset_base_x_offset=reset_config.get("reset_base_x_offset", 0.4415),
+            reset_base_y_offset=reset_config.get("reset_base_y_offset", 0.2405),
         )
 
         base_env = gym.make(args.task, cfg=env_cfg, render_mode="rgb_array")
@@ -401,17 +460,69 @@ def main() -> int:
             disable_logger=True,
         ), base_env)
 
-        env = IsaacLabToSB3VecEnvWrapper(base_env).env
-        env = VecNormalize.load(str(vec_path), env)
-        env.training = False
-        env.norm_reward = False
+        env = IsaacLabToSB3VecEnvWrapper(base_env, base_action_scale=args.base_action_scale).env
+        if not args.disable_vec_normalize:
+            env = VecNormalize.load(str(vec_path), env)
+            env.training = False
+            env.norm_reward = False
         model = PPO.load(str(checkpoint), env=env, device="cuda" if torch.cuda.is_available() else "cpu")
+        recovery_model = None
+        if recovery_checkpoint is not None:
+            recovery_model = PPO.load(
+                str(recovery_checkpoint),
+                env=env,
+                device="cuda" if torch.cuda.is_available() else "cpu",
+            )
+            print(
+                "[render router] conditional recovery enabled "
+                f"checkpoint={recovery_checkpoint} "
+                f"min_waypoint_fraction={args.recovery_route_min_waypoint_fraction:.3f} "
+                f"min_pos_error={args.recovery_route_min_pos_error:.4f} "
+                f"min_base_target_distance={args.recovery_route_min_base_target_distance:.4f} "
+                f"latch={args.recovery_route_latch_once}",
+                flush=True,
+            )
+
+        raw_env = getattr(base_env, "unwrapped", base_env)
+        latched_route_mask = np.zeros((1,), dtype=bool)
+        route_counts: list[int] = []
+
+        def route_recovery_mask():
+            trajectory_manager = raw_env.trajectory_manager
+            waypoint_idx = tensor_np(trajectory_manager.current_waypoint_idx).astype(np.float32)
+            lengths = getattr(trajectory_manager, "recorded_lengths", None)
+            if lengths is None:
+                waypoint_fraction = np.zeros_like(waypoint_idx, dtype=np.float32)
+            else:
+                lengths_np = np.maximum(tensor_np(lengths).astype(np.float32) - 1.0, 1.0)
+                waypoint_fraction = np.clip(waypoint_idx / lengths_np, 0.0, 1.0)
+            target_pos, _ = trajectory_manager.get_target_pose()
+            ee_pos = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
+            base_pos = raw_env.robot.data.root_pos_w
+            pos_error = tensor_np(torch.linalg.norm(target_pos - ee_pos, dim=-1)).astype(np.float32)
+            base_target_distance = tensor_np(torch.linalg.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)).astype(np.float32)
+            route = waypoint_fraction >= float(args.recovery_route_min_waypoint_fraction)
+            if args.recovery_route_min_pos_error > 0.0:
+                route &= pos_error >= float(args.recovery_route_min_pos_error)
+            if args.recovery_route_min_base_target_distance > 0.0:
+                route &= base_target_distance >= float(args.recovery_route_min_base_target_distance)
+            return route
 
         obs = env.reset()
         steps_executed = 0
         done_count = 0
         for _ in range(args.steps):
             action, _ = model.predict(obs, deterministic=args.deterministic)
+            if recovery_model is not None:
+                route_mask = route_recovery_mask()
+                if args.recovery_route_latch_once:
+                    latched_route_mask |= route_mask
+                    route_mask = latched_route_mask.copy()
+                recovery_action, _ = recovery_model.predict(obs, deterministic=args.deterministic)
+                if np.any(route_mask):
+                    action = np.asarray(action, dtype=np.float32).copy()
+                    action[route_mask] = recovery_action[route_mask]
+                route_counts.append(int(np.count_nonzero(route_mask)))
             obs, _, dones, _ = env.step(action)
             steps_executed += 1
             if bool(np.any(dones)):
@@ -419,7 +530,17 @@ def main() -> int:
 
         summary = {
             "checkpoint": str(checkpoint),
+            "recovery_checkpoint": str(recovery_checkpoint) if recovery_checkpoint is not None else None,
             "vec_normalize": str(vec_path),
+            "disable_vec_normalize": bool(args.disable_vec_normalize),
+            "base_action_scale": float(args.base_action_scale),
+            "recovery_route_min_waypoint_fraction": float(args.recovery_route_min_waypoint_fraction),
+            "recovery_route_min_pos_error": float(args.recovery_route_min_pos_error),
+            "recovery_route_min_base_target_distance": float(args.recovery_route_min_base_target_distance),
+            "recovery_route_latch_once": bool(args.recovery_route_latch_once),
+            "recovery_route_fraction": (
+                float(np.sum(route_counts) / max(len(route_counts), 1)) if route_counts else 0.0
+            ),
             "video_dir": str(video_dir),
             "steps_requested": args.steps,
             "steps_executed": steps_executed,

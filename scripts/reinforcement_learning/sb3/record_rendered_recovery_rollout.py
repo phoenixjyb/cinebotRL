@@ -284,14 +284,15 @@ def _convert_obs(obs):
 class IsaacLabToSB3VecEnvWrapper:
     """Small VecEnv adapter matching the project evaluation scripts."""
 
-    def __init__(self, venv, *, base_action_scale: float = 1.0):
+    def __init__(self, venv, *, base_action_scale: float = 1.0, expected_obs_dim: int | None = None):
         from gymnasium import spaces
         from stable_baselines3.common.vec_env import VecEnvWrapper
 
         class _Wrapper(VecEnvWrapper):
-            def __init__(self, wrapped, scale: float):
+            def __init__(self, wrapped, scale: float, expected_dim: int | None):
                 super().__init__(wrapped)
                 self.base_action_scale = float(scale)
+                self.expected_obs_dim = expected_dim
                 self._base_adapter_logged = False
                 if hasattr(wrapped.action_space, "shape") and len(wrapped.action_space.shape) > 1:
                     action_dim = wrapped.action_space.shape[-1]
@@ -302,11 +303,21 @@ class IsaacLabToSB3VecEnvWrapper:
                         dtype=wrapped.action_space.dtype,
                     )
                 dummy_obs = _convert_obs(wrapped.reset())
+                dummy_obs = self._adapt_obs_dim(dummy_obs)
                 obs_shape = (dummy_obs.shape[1],) if len(dummy_obs.shape) > 1 else dummy_obs.shape
                 self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape, dtype=np.float32)
 
+            def _adapt_obs_dim(self, obs: np.ndarray) -> np.ndarray:
+                if self.expected_obs_dim is None or obs.shape[-1] == self.expected_obs_dim:
+                    return obs
+                if obs.ndim == 2 and obs.shape[1] == self.expected_obs_dim - 1:
+                    return np.concatenate([obs, np.zeros((obs.shape[0], 1), dtype=np.float32)], axis=1)
+                if obs.ndim == 2 and obs.shape[1] == self.expected_obs_dim + 1:
+                    return obs[:, : self.expected_obs_dim]
+                return obs
+
             def reset(self):
-                return _convert_obs(self.venv.reset())
+                return self._adapt_obs_dim(_convert_obs(self.venv.reset()))
 
             def step_async(self, actions):
                 import torch
@@ -334,7 +345,7 @@ class IsaacLabToSB3VecEnvWrapper:
                     dones = terminated | truncated
                 else:
                     obs, rewards, dones, infos = result
-                obs = _convert_obs(obs)
+                obs = self._adapt_obs_dim(_convert_obs(obs))
                 rewards = tensor_np(rewards).astype(np.float32)
                 dones = tensor_np(dones).astype(bool)
                 if isinstance(infos, dict):
@@ -343,7 +354,7 @@ class IsaacLabToSB3VecEnvWrapper:
                     infos = [{} for _ in range(len(rewards))]
                 return obs, rewards, dones, infos
 
-        self.env = _Wrapper(venv, base_action_scale)
+        self.env = _Wrapper(venv, base_action_scale, expected_obs_dim)
 
 
 def main() -> int:
@@ -460,7 +471,12 @@ def main() -> int:
             disable_logger=True,
         ), base_env)
 
-        env = IsaacLabToSB3VecEnvWrapper(base_env, base_action_scale=args.base_action_scale).env
+        expected_obs_dim = int(np.prod(PPO.load(str(checkpoint), device="cpu").observation_space.shape))
+        env = IsaacLabToSB3VecEnvWrapper(
+            base_env,
+            base_action_scale=args.base_action_scale,
+            expected_obs_dim=expected_obs_dim,
+        ).env
         if not args.disable_vec_normalize:
             env = VecNormalize.load(str(vec_path), env)
             env.training = False

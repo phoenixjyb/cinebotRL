@@ -1,8 +1,9 @@
 """Distill base-assist teacher labels into selected PPO action-head rows.
 
 This updates an existing PPO checkpoint in place conceptually, but writes a new
-checkpoint.  The actor feature extractor, critic, and unselected action rows are
-preserved.  Only selected rows of ``policy.action_net`` are trained.
+checkpoint.  The actor feature extractor and critic are preserved.  For grouped
+policies, unselected rows that share a selected action head can be constrained
+to the original policy output so the shared head does not drift unconstrained.
 """
 
 from __future__ import annotations
@@ -18,6 +19,12 @@ import torch
 from stable_baselines3 import PPO
 from torch.utils.data import DataLoader, Dataset, random_split
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.reinforcement_learning.sb3.grouped_policy import GroupedActionMlpExtractor
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Distill selected PPO action-head rows.")
@@ -30,6 +37,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch_size", type=int, default=2048)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--val_fraction", type=float, default=0.1)
+    parser.add_argument(
+        "--use_sample_weight",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Use optional sample_weight from the dataset when present.",
+    )
+    parser.add_argument(
+        "--sample_weight_power",
+        type=float,
+        default=1.0,
+        help="Exponent applied to dataset sample_weight before loss weighting.",
+    )
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--seed", type=int, default=20260703)
     parser.add_argument(
@@ -37,6 +56,15 @@ def parse_args() -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Reset SB3 policy optimizer state before saving so PPO continuation starts cleanly.",
+    )
+    parser.add_argument(
+        "--preserve_group_policy_rows",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "For grouped policies, add original-policy labels for unselected rows "
+            "inside any trained action head. Requires policy_actions in the dataset."
+        ),
     )
     return parser.parse_args()
 
@@ -49,15 +77,28 @@ def parse_indices(raw: str) -> list[int]:
 
 
 class MaskedActionDataset(Dataset):
-    def __init__(self, observations: np.ndarray, actions: np.ndarray, mask: np.ndarray, action_indices: list[int]):
+    def __init__(
+        self,
+        observations: np.ndarray,
+        actions: np.ndarray,
+        mask: np.ndarray,
+        action_indices: list[int],
+        sample_weight: np.ndarray | None = None,
+    ):
         self.obs = torch.tensor(observations, dtype=torch.float32)
         self.actions = torch.tensor(actions[:, action_indices], dtype=torch.float32)
         self.mask = torch.tensor(mask[:, action_indices], dtype=torch.float32)
+        self.sample_weight = (
+            torch.ones((observations.shape[0],), dtype=torch.float32)
+            if sample_weight is None
+            else torch.tensor(sample_weight, dtype=torch.float32)
+        )
 
         keep = self.mask.sum(dim=1) > 0
         self.obs = self.obs[keep]
         self.actions = self.actions[keep]
         self.mask = self.mask[keep]
+        self.sample_weight = self.sample_weight[keep]
         if len(self.obs) == 0:
             raise ValueError("dataset has no valid labels for requested action indices")
 
@@ -65,7 +106,7 @@ class MaskedActionDataset(Dataset):
         return self.obs.shape[0]
 
     def __getitem__(self, index: int):
-        return self.obs[index], self.actions[index], self.mask[index]
+        return self.obs[index], self.actions[index], self.mask[index], self.sample_weight[index]
 
 
 def output_zip_path(path: str) -> Path:
@@ -94,13 +135,53 @@ def main() -> int:
     else:
         device = args.device
     action_indices = parse_indices(args.action_indices)
+    action_index_set = set(action_indices)
 
     data = np.load(dataset_path, allow_pickle=False)
     observations = data["observations"].astype(np.float32)
     actions = data["actions"].astype(np.float32)
     mask = data["action_valid_mask"].astype(np.float32)
     metadata = data["metadata"].item() if "metadata" in data else "{}"
-    dataset = MaskedActionDataset(observations, actions, mask, action_indices)
+    sample_weight = None
+    if args.use_sample_weight and "sample_weight" in data:
+        sample_weight = data["sample_weight"].astype(np.float32)
+        if sample_weight.ndim != 1 or sample_weight.shape[0] != observations.shape[0]:
+            raise ValueError(
+                "sample_weight must be 1D and match observations: "
+                f"sample_weight={sample_weight.shape}, observations={observations.shape}"
+            )
+        if not np.isfinite(sample_weight).all() or np.any(sample_weight < 0.0):
+            raise ValueError("sample_weight must contain finite non-negative values")
+        sample_weight = np.power(sample_weight, float(args.sample_weight_power)).astype(np.float32)
+    model = PPO.load(str(checkpoint), device=device)
+    policy = model.policy
+    policy.set_training_mode(True)
+
+    for param in policy.parameters():
+        param.requires_grad_(False)
+
+    is_grouped = isinstance(policy.mlp_extractor, GroupedActionMlpExtractor)
+    preserve_rows: list[int] = []
+    distill_indices = list(action_indices)
+    target_actions = actions.copy()
+    target_mask = mask.copy()
+    if is_grouped and args.preserve_group_policy_rows:
+        if "policy_actions" not in data:
+            raise ValueError("--preserve_group_policy_rows requires policy_actions in the dataset")
+        policy_actions = data["policy_actions"].astype(np.float32)
+        if policy_actions.shape != actions.shape:
+            raise ValueError(f"policy_actions shape {policy_actions.shape} does not match actions {actions.shape}")
+        for indices in policy.mlp_extractor.action_groups.values():
+            group = [int(index) for index in indices]
+            if action_index_set.intersection(group):
+                preserve_rows.extend(index for index in group if index not in action_index_set)
+        preserve_rows = sorted(set(preserve_rows))
+        if preserve_rows:
+            target_actions[:, preserve_rows] = policy_actions[:, preserve_rows]
+            target_mask[:, preserve_rows] = 1.0
+            distill_indices = sorted(set(distill_indices).union(preserve_rows))
+
+    dataset = MaskedActionDataset(observations, target_actions, target_mask, distill_indices, sample_weight)
 
     val_size = max(1, int(len(dataset) * args.val_fraction))
     train_size = len(dataset) - val_size
@@ -112,20 +193,36 @@ def main() -> int:
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, drop_last=False)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, drop_last=False)
 
-    model = PPO.load(str(checkpoint), device=device)
-    policy = model.policy
-    policy.set_training_mode(True)
-
-    for param in policy.parameters():
-        param.requires_grad_(False)
-    policy.action_net.weight.requires_grad_(True)
-    policy.action_net.bias.requires_grad_(True)
-
-    # Preserve unselected rows exactly even with optimizer state updates.
-    selected = torch.tensor(action_indices, dtype=torch.long, device=device)
-    original_weight = policy.action_net.weight.detach().clone()
-    original_bias = policy.action_net.bias.detach().clone()
-    optimizer = torch.optim.Adam([policy.action_net.weight, policy.action_net.bias], lr=args.lr)
+    # Preserve unselected rows exactly for flat policies; grouped policies train
+    # whole selected heads and optionally constrain in-head rows with labels.
+    selected = torch.tensor(distill_indices, dtype=torch.long, device=device)
+    original_weight = None
+    original_bias = None
+    if is_grouped:
+        selected_set = set(int(index) for index in distill_indices)
+        grouped_head_names = [
+            name
+            for name, indices in policy.mlp_extractor.action_groups.items()
+            if selected_set.intersection(indices)
+        ]
+        if not grouped_head_names:
+            raise ValueError(f"no grouped action heads selected for rows {action_indices}")
+        params = []
+        for name in grouped_head_names:
+            head = policy.mlp_extractor.action_heads[name]
+            for param in head.parameters():
+                param.requires_grad_(True)
+            params.extend(head.parameters())
+        optimizer = torch.optim.Adam(params, lr=args.lr)
+    else:
+        if not hasattr(policy.action_net, "weight") or not hasattr(policy.action_net, "bias"):
+            raise TypeError("flat distillation requires policy.action_net weight/bias or grouped policy support")
+        policy.action_net.weight.requires_grad_(True)
+        policy.action_net.bias.requires_grad_(True)
+        original_weight = policy.action_net.weight.detach().clone()
+        original_bias = policy.action_net.bias.detach().clone()
+        optimizer = torch.optim.Adam([policy.action_net.weight, policy.action_net.bias], lr=args.lr)
+        grouped_head_names = []
 
     def predict_selected(obs_batch: torch.Tensor) -> torch.Tensor:
         features = policy.extract_features(obs_batch)
@@ -133,8 +230,14 @@ def main() -> int:
         mean_actions = policy.action_net(latent_pi)
         return mean_actions.index_select(dim=1, index=selected)
 
-    def masked_mse(pred: torch.Tensor, target: torch.Tensor, valid: torch.Tensor) -> torch.Tensor:
-        sq = (pred - target).pow(2) * valid
+    def masked_mse(
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        valid: torch.Tensor,
+        sample_weight_b: torch.Tensor,
+    ) -> torch.Tensor:
+        weight = sample_weight_b.reshape(-1, 1).to(pred.dtype)
+        sq = (pred - target).pow(2) * valid * weight
         denom = torch.clamp(valid.sum(), min=1.0)
         return sq.sum() / denom
 
@@ -148,7 +251,11 @@ def main() -> int:
     print(f"checkpoint       : {checkpoint}")
     print(f"dataset          : {dataset_path}")
     print(f"dataset metadata : {metadata}")
-    print(f"rows             : {action_indices}")
+    print(f"teacher rows     : {action_indices}")
+    print(f"preserve rows    : {preserve_rows}")
+    print(f"distill rows     : {distill_indices}")
+    print(f"grouped heads    : {grouped_head_names if is_grouped else 'flat action_net'}")
+    print(f"sample weights   : {'yes' if sample_weight is not None else 'no'}")
     print(f"samples train/val: {train_size:,}/{val_size:,}")
     print(f"device           : {device}")
     print("-" * 72)
@@ -158,19 +265,22 @@ def main() -> int:
         policy.set_training_mode(True)
         train_total = 0.0
         train_count = 0
-        for obs_b, act_b, mask_b in train_loader:
+        for obs_b, act_b, mask_b, weight_b in train_loader:
             obs_b = obs_b.to(device)
             act_b = act_b.to(device)
             mask_b = mask_b.to(device)
+            weight_b = weight_b.to(device)
             optimizer.zero_grad()
-            loss = masked_mse(predict_selected(obs_b), act_b, mask_b)
+            loss = masked_mse(predict_selected(obs_b), act_b, mask_b, weight_b)
             loss.backward()
             optimizer.step()
-            with torch.no_grad():
-                unselected = torch.ones(policy.action_net.out_features, dtype=torch.bool, device=device)
-                unselected[selected] = False
-                policy.action_net.weight[unselected] = original_weight[unselected]
-                policy.action_net.bias[unselected] = original_bias[unselected]
+            if not is_grouped:
+                with torch.no_grad():
+                    assert original_weight is not None and original_bias is not None
+                    unselected = torch.ones(policy.action_net.out_features, dtype=torch.bool, device=device)
+                    unselected[selected] = False
+                    policy.action_net.weight[unselected] = original_weight[unselected]
+                    policy.action_net.bias[unselected] = original_bias[unselected]
             train_total += loss.item() * obs_b.shape[0]
             train_count += obs_b.shape[0]
 
@@ -178,11 +288,12 @@ def main() -> int:
         val_total = 0.0
         val_count = 0
         with torch.no_grad():
-            for obs_b, act_b, mask_b in val_loader:
+            for obs_b, act_b, mask_b, weight_b in val_loader:
                 obs_b = obs_b.to(device)
                 act_b = act_b.to(device)
                 mask_b = mask_b.to(device)
-                loss = masked_mse(predict_selected(obs_b), act_b, mask_b)
+                weight_b = weight_b.to(device)
+                loss = masked_mse(predict_selected(obs_b), act_b, mask_b, weight_b)
                 val_total += loss.item() * obs_b.shape[0]
                 val_count += obs_b.shape[0]
         train_loss = train_total / max(train_count, 1)
@@ -191,17 +302,30 @@ def main() -> int:
 
         if val_loss < best_val:
             best_val = val_loss
-            best_weight = policy.action_net.weight.detach().clone()
-            best_bias = policy.action_net.bias.detach().clone()
+            if is_grouped:
+                best_weight = {
+                    name: policy.mlp_extractor.action_heads[name].state_dict()
+                    for name in grouped_head_names
+                }
+                best_bias = None
+            else:
+                best_weight = policy.action_net.weight.detach().clone()
+                best_bias = policy.action_net.bias.detach().clone()
 
-    if best_weight is not None and best_bias is not None:
+    if best_weight is not None:
         with torch.no_grad():
-            policy.action_net.weight.copy_(best_weight)
-            policy.action_net.bias.copy_(best_bias)
-            unselected = torch.ones(policy.action_net.out_features, dtype=torch.bool, device=device)
-            unselected[selected] = False
-            policy.action_net.weight[unselected] = original_weight[unselected]
-            policy.action_net.bias[unselected] = original_bias[unselected]
+            if is_grouped:
+                assert isinstance(best_weight, dict)
+                for name, state in best_weight.items():
+                    policy.mlp_extractor.action_heads[name].load_state_dict(state)
+            else:
+                assert best_bias is not None and original_weight is not None and original_bias is not None
+                policy.action_net.weight.copy_(best_weight)
+                policy.action_net.bias.copy_(best_bias)
+                unselected = torch.ones(policy.action_net.out_features, dtype=torch.bool, device=device)
+                unselected[selected] = False
+                policy.action_net.weight[unselected] = original_weight[unselected]
+                policy.action_net.bias[unselected] = original_bias[unselected]
 
     for param in policy.parameters():
         param.requires_grad_(True)

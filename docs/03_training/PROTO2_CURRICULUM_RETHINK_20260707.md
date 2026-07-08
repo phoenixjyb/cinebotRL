@@ -258,6 +258,74 @@ New Stage A promotion target:
 - `workspace_hard_exceed_pct.mean = 0`
 - raw-policy eval only
 
+## Offset-Follow Tail Recovery Probe - 2026-07-08
+
+Question:
+
+Can we teach the policy to move the chassis laterally in late-start `base040`
+states by distilling a target-offset-follow teacher into base rows `[6,7]`?
+
+Dataset:
+
+`data/policy_envelope_fk_base040/offset_follow_tail_base025_20260708.npz`
+
+Dataset facts:
+
+- source checkpoint: `stage0_policy_envelope_fk_mix_contract_zpenalty80_lowstd_resume_32k_20260707/final_model.zip`
+- stage: `stage0_policy_envelope_fk_base040`
+- late-start range: `0.65-0.95`
+- samples: `3383`
+- observation dim: `84`
+- action dim: `9`
+- valid label rows: `[6,7]`
+- teacher env action cap: `0.25`
+- base action scale: `0.25`
+- raw label clip fraction: `0.0`
+- label space: raw policy action before base scaling
+
+Teacher diagnostic:
+
+The capped offset-follow teacher is learnable under the current
+`base_action_scale=0.25` contract and still moves the base enough:
+
+- assisted EE error: `0.0589 / 0.1108 / 0.2067 m`
+- base XY motion: `0.1201 m`
+- target XY motion: `0.1178 m`
+- assist active: `90.4%`
+
+Training probes:
+
+| Candidate | Late-start EE mean/p95/max | Full-start EE mean/p95/max | Verdict |
+| --- | ---: | ---: | --- |
+| source checkpoint | `0.0904 / 0.1609 / 0.1940 m` | `0.0505 / 0.0749 / 0.1056 m` | current baseline |
+| PPO aux rows `[6,7]` | `0.0929 / 0.1726 / 0.2019 m` | not run | reject; worse late-start |
+| direct grouped-head distill rows `[6,7]` | `0.0706 / 0.1591 / 0.2165 m` | `0.0664 / 0.1244 / 0.1387 m` | reject; full-start regression and worse max |
+| preserve-row grouped-head distill rows `[6,7]`, preserve `[8]` | `0.0634 / 0.1447 / 0.2048 m` | `0.0583 / 0.1060 / 0.1203 m` | diagnostic only; improves late-start mean/p95 but regresses full-start |
+
+Artifacts:
+
+- collector: `scripts/imitation/collect_offset_follow_tail_dataset.py`
+- distill tool: `scripts/reinforcement_learning/sb3/distill_base_assist_head.py`
+- best diagnostic checkpoint: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_offsetfollow_distill_preserve_20260708/final_model.zip`
+- late-start gate: `evaluation_results/stage_rollout_gate/stage0_policy_envelope_fk_base040_offsetfollow_distill_preserve_tailstart_60step_20260708.json`
+- full-start gate: `evaluation_results/stage_rollout_gate/stage0_policy_envelope_fk_base040_offsetfollow_distill_preserve_fullstart_60step_20260708.json`
+
+Conclusion:
+
+The offset-follow teacher is a valid diagnostic signal: it confirms the previous
+failure mode that late-start tracking is dominated by base under-following.
+However, directly distilling that signal into the grouped base head is not yet a
+safe policy update. Even with row `[8]` preserved, the checkpoint regresses the
+normal full-start `base040` gate and leaves a worse late-start max error.
+
+Next rule:
+
+Do not promote this checkpoint as the default `base040` policy. Use it only as a
+recovery-teacher artifact. The next attempt should mix recovery labels with
+normal-start preservation data, train a narrower final-layer/base-row adapter,
+or route the recovery behavior conditionally instead of replacing the whole base
+head.
+
 ## Stage A Freeze-Base Implementation
 
 Implementation:

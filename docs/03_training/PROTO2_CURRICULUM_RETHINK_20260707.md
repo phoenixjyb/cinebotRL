@@ -1505,3 +1505,44 @@ Do not promote the PPO checkpoint. The offset-follow teacher works when executed
 Next useful update:
 
 Stop trying to transfer this teacher through weak PPO reward shaping alone. Build a supervised offset-follow teacher dataset from visited late-start states, then train the base action head with a direct supervised/auxiliary loss while preserving the arm/gimbal heads. The acceptance test should be the unassisted late-start gate, not the assisted diagnostic.
+
+## Long Cinematic Whole-Trajectory Probe - 2026-07-08
+
+Goal:
+
+Answer the visual concern that the rendered validation clips only showed small movements and did not prove whole-trajectory tracking.
+
+Stage:
+
+- added `trajectoryToLearn/stage_long_cinematic_probe_20260708/manifest.txt`
+- selected 8 long cinematic trajectories from `trajectoryToLearn/world_json/cinematic_db`
+- all selected trajectories are at least 12s long; the first 4-way gate used 4 trajectories with 240 control steps at 20 Hz
+- copied the FK/base040 reset contract into `trajectoryToLearn/stage_long_cinematic_probe_20260708/reset_config.json`
+
+Critical reset lesson:
+
+The first run was invalid because the new probe stage had no `reset_config.json`, so the evaluator fell back to the historical default reset offset `[0.4415, 0.2405]`. That started the camera about `1.30 m` away from the target before the policy acted. With the FK reset config, initial error dropped to `0.136 m`, so future long-trajectory probes must include the FK reset config or the result is not meaningful.
+
+Corrected gate results:
+
+| Mode | Base scale | Initial mean | EE mean / p50 / p95 | Final mean | Dones | Verdict |
+| --- | ---: | ---: | --- | ---: | ---: | --- |
+| source | `0.25` | `0.1361 m` | `0.7046 / 0.4788 / 1.9187 m` | `0.6351 m` | `3` | starts correctly, degrades over 12s |
+| routed W4 | `0.25` | `0.1361 m` | `0.6236 / 0.5101 / 1.6116 m` | `0.6575 m` | `5` | better mean/p95, not a solved long tracker |
+| source | `0.50` | `0.1361 m` | `0.9483 / 0.9988 / 1.7472 m` | `0.3133 m` | `4` | more base motion but worse average tracking |
+| source | `1.00` | `0.1361 m` | `0.8363 / 0.7763 / 1.8507 m` | `0.2685 m` | `52` | unsafe/runaway, do not use as a shortcut |
+
+Rendered evidence:
+
+- remote: `evaluation_results/videos_rendered/long_cinematic_probe_20260708/orbit_left_078_routed_w4_fkreset_240/rl-video-step-0.mp4`
+- local copy: `/Users/yanbo/Downloads/cinebotRL_long_probe_20260708/orbit_left_078_routed_w4_fkreset_240.mp4`
+- render metadata: 240 frames, 20 FPS, 12.0s, selected `orbit_left_078.json`, `recovery_route_fraction=0.3542`
+
+Interpretation:
+
+The policy is not yet a whole-cinematic-trajectory tracker. The corrected reset proves the robot can start on the trajectory, but the current curriculum only solves short FK envelope and base-required recovery cases. Increasing `base_action_scale` is not the cure: `0.5` and `1.0` both destabilize average tracking, and `1.0` creates many terminations.
+
+Next useful update:
+
+Build the next curriculum around long-horizon base/EE coordination, not around another scalar base-speed change. Use this stage as the acceptance gate, but train on an easier ladder first: 2-3s long-motion snippets, then 5-6s, then 12s cinematic paths. Keep `base_action_scale=0.25` as the safety contract until a trained policy beats the corrected `0.25` baseline on mean, p95, final error, and done count.
+

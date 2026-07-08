@@ -1,0 +1,8 @@
+trajectoryToLearn/world_json/cinematic_db/orbit_left/orbit_left_078.json
+trajectoryToLearn/world_json/cinematic_db/orbit_right/orbit_right_056.json
+trajectoryToLearn/world_json/cinematic_db/handheld_subtle/handheld_subtle_060.json
+trajectoryToLearn/world_json/cinematic_db/arc_left_push/arc_left_push_050.json
+trajectoryToLearn/world_json/cinematic_db/arc_right_pull/arc_right_pull_050.json
+trajectoryToLearn/world_json/cinematic_db/orbit_left/orbit_left_007.json
+trajectoryToLearn/world_json/cinematic_db/orbit_right/orbit_right_043.json
+trajectoryToLearn/world_json/cinematic_db/handheld_subtle/handheld_subtle_046.json

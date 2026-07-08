@@ -41,6 +41,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base_action_scale", type=float, default=0.25)
     parser.add_argument("--start_waypoint_min_fraction", type=float, default=0.65)
     parser.add_argument("--start_waypoint_max_fraction", type=float, default=0.95)
+    parser.add_argument(
+        "--random_start_waypoint",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Randomize the reset waypoint. Disable to collect normal full-start preservation states.",
+    )
     parser.add_argument("--base_assist_activation_distance", type=float, default=0.010)
     parser.add_argument("--base_assist_full_speed_distance", type=float, default=0.080)
     parser.add_argument("--base_assist_max_action", type=float, default=0.60)
@@ -63,6 +69,17 @@ def parse_args() -> argparse.Namespace:
         default="expert_norm",
     )
     parser.add_argument("--sample_weight_max", type=float, default=4.0)
+    parser.add_argument("--sample_weight_scale", type=float, default=1.0)
+    parser.add_argument(
+        "--policy_preserve_rows",
+        default="",
+        help="Comma-separated rows to label from the current policy action, e.g. 6,7,8.",
+    )
+    parser.add_argument(
+        "--policy_preserve_only",
+        action="store_true",
+        help="Do not add offset-follow teacher labels; emit only policy-preservation labels.",
+    )
     parser.add_argument("--seed", type=int, default=20260708)
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--output_npz", required=True)
@@ -73,6 +90,15 @@ def parse_args() -> argparse.Namespace:
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise RuntimeError(message)
+
+
+def parse_rows(raw: str) -> list[int]:
+    if not raw.strip():
+        return []
+    rows = [int(item.strip()) for item in raw.split(",") if item.strip()]
+    if any(row < 0 for row in rows):
+        raise ValueError(f"row indices must be non-negative, got {rows}")
+    return sorted(set(rows))
 
 
 def tensor_np(value):
@@ -125,6 +151,9 @@ def main() -> int:
     require(0.0 <= args.teacher_blend <= 1.0, "--teacher_blend must be in [0, 1]")
     require(args.base_assist_full_speed_distance >= args.base_assist_activation_distance, "full speed distance must be >= activation distance")
     require(args.sample_weight_max >= 1.0, "--sample_weight_max must be >= 1")
+    require(args.sample_weight_scale > 0.0, "--sample_weight_scale must be positive")
+    policy_preserve_rows = parse_rows(args.policy_preserve_rows)
+    require(bool(policy_preserve_rows) or not args.policy_preserve_only, "--policy_preserve_only requires --policy_preserve_rows")
 
     checkpoint = Path(args.checkpoint)
     vec_normalize = Path(args.vec_normalize)
@@ -177,7 +206,7 @@ def main() -> int:
             trajectory_manifest_file=str(manifest),
             max_trajectories=args.max_trajectories,
             min_duration_seconds=args.min_trajectory_duration,
-            randomize_start_waypoint=True,
+            randomize_start_waypoint=bool(args.random_start_waypoint),
             start_waypoint_min_fraction=args.start_waypoint_min_fraction,
             start_waypoint_max_fraction=args.start_waypoint_max_fraction,
             reset_base_to_trajectory_start=False,
@@ -313,14 +342,25 @@ def main() -> int:
             require(base_dist is not None, "env did not produce _base_target_distance_buf")
             expert_norm = np.linalg.norm(expert_env[:, :2], axis=1).astype(np.float32)
             active = expert_norm >= float(args.min_expert_env_action_norm)
-            keep = np.ones((args.num_envs,), dtype=bool) if args.keep_inactive else active
+            keep = (
+                np.ones((args.num_envs,), dtype=bool)
+                if args.keep_inactive or args.policy_preserve_only
+                else active
+            )
 
             raw_label = np.zeros((args.num_envs, action_dim), dtype=np.float32)
             env_label = np.zeros((args.num_envs, action_dim), dtype=np.float32)
             valid = np.zeros((args.num_envs, action_dim), dtype=bool)
-            env_label[:, 6:8] = expert_env[:, :2]
-            raw_label[:, 6:8] = np.clip(expert_env[:, :2] / float(args.base_action_scale), -1.0, 1.0)
-            valid[:, 6:8] = active[:, None]
+            if not args.policy_preserve_only:
+                env_label[:, 6:8] = expert_env[:, :2]
+                raw_label[:, 6:8] = np.clip(expert_env[:, :2] / float(args.base_action_scale), -1.0, 1.0)
+                valid[:, 6:8] = active[:, None]
+            if policy_preserve_rows:
+                max_row = max(policy_preserve_rows)
+                require(max_row < action_dim, f"policy preserve row {max_row} outside action dim {action_dim}")
+                raw_label[:, policy_preserve_rows] = action[:, policy_preserve_rows]
+                env_label[:, policy_preserve_rows] = action[:, policy_preserve_rows]
+                valid[:, policy_preserve_rows] = True
 
             if args.sample_weight_mode == "expert_norm":
                 denom = max(float(args.base_assist_max_action), 1e-6)
@@ -331,6 +371,7 @@ def main() -> int:
                 weights = 1.0 + (float(args.sample_weight_max) - 1.0) * normalized
             else:
                 weights = np.ones((args.num_envs,), dtype=np.float32)
+            weights = weights * float(args.sample_weight_scale)
 
             observations.append(obs_before[keep])
             labels.append(raw_label[keep])
@@ -384,6 +425,9 @@ def main() -> int:
             "label_space": "raw_policy_pre_base_action_scale",
             "teacher_env_action_rows": [6, 7],
             "teacher_env_action": "target_offset_follow",
+            "policy_preserve_rows": policy_preserve_rows,
+            "policy_preserve_only": bool(args.policy_preserve_only),
+            "random_start_waypoint": bool(args.random_start_waypoint),
             "teacher_blend": float(args.teacher_blend),
             "base_assist_activation_distance": float(args.base_assist_activation_distance),
             "base_assist_full_speed_distance": float(args.base_assist_full_speed_distance),
@@ -392,6 +436,7 @@ def main() -> int:
             "keep_inactive": bool(args.keep_inactive),
             "sample_weight_mode": args.sample_weight_mode,
             "sample_weight_max": float(args.sample_weight_max),
+            "sample_weight_scale": float(args.sample_weight_scale),
             "start_waypoint_min_fraction": float(args.start_waypoint_min_fraction),
             "start_waypoint_max_fraction": float(args.start_waypoint_max_fraction),
             "pos_error_m": summarize(pos_arr),

@@ -29,7 +29,12 @@ from scripts.reinforcement_learning.sb3.grouped_policy import GroupedActionMlpEx
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Distill selected PPO action-head rows.")
     parser.add_argument("--checkpoint", required=True, help="Input PPO checkpoint/final_model.zip.")
-    parser.add_argument("--dataset", required=True, help=".npz with observations/actions/action_valid_mask.")
+    parser.add_argument(
+        "--dataset",
+        required=True,
+        nargs="+",
+        help="One or more .npz files with observations/actions/action_valid_mask.",
+    )
     parser.add_argument("--output", required=True, help="Output PPO checkpoint path, with or without .zip.")
     parser.add_argument("--copy_vec_normalize", default=None, help="Optional VecNormalize pkl to copy beside output.")
     parser.add_argument("--action_indices", default="6,7", help="Comma-separated action rows to train.")
@@ -48,6 +53,11 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=1.0,
         help="Exponent applied to dataset sample_weight before loss weighting.",
+    )
+    parser.add_argument(
+        "--dataset_weight_scales",
+        default="",
+        help="Optional comma-separated multipliers, one per dataset, applied after sample_weight_power.",
     )
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--seed", type=int, default=20260703)
@@ -116,19 +126,100 @@ def output_zip_path(path: str) -> Path:
     return out
 
 
+def parse_weight_scales(raw: str, count: int) -> list[float]:
+    if not raw.strip():
+        return [1.0] * count
+    scales = [float(item.strip()) for item in raw.split(",") if item.strip()]
+    if len(scales) != count:
+        raise ValueError(f"expected {count} dataset weight scales, got {len(scales)}")
+    if any(scale <= 0.0 for scale in scales):
+        raise ValueError(f"dataset weight scales must be positive, got {scales}")
+    return scales
+
+
+def load_datasets(
+    paths: list[Path],
+    use_sample_weight: bool,
+    sample_weight_power: float,
+    dataset_weight_scales: list[float],
+):
+    obs_chunks: list[np.ndarray] = []
+    action_chunks: list[np.ndarray] = []
+    mask_chunks: list[np.ndarray] = []
+    weight_chunks: list[np.ndarray] = []
+    policy_action_chunks: list[np.ndarray] = []
+    metadata: list[dict[str, str]] = []
+
+    for path, dataset_weight_scale in zip(paths, dataset_weight_scales, strict=True):
+        data = np.load(path, allow_pickle=False)
+        observations = data["observations"].astype(np.float32)
+        actions = data["actions"].astype(np.float32)
+        mask = data["action_valid_mask"].astype(np.float32)
+        if observations.shape[0] != actions.shape[0] or observations.shape[0] != mask.shape[0]:
+            raise ValueError(
+                f"row count mismatch in {path}: "
+                f"obs={observations.shape}, actions={actions.shape}, mask={mask.shape}"
+            )
+        if actions.shape != mask.shape:
+            raise ValueError(f"actions/mask shape mismatch in {path}: {actions.shape} vs {mask.shape}")
+
+        obs_chunks.append(observations)
+        action_chunks.append(actions)
+        mask_chunks.append(mask)
+        if use_sample_weight and "sample_weight" in data:
+            sample_weight = data["sample_weight"].astype(np.float32)
+            if sample_weight.ndim != 1 or sample_weight.shape[0] != observations.shape[0]:
+                raise ValueError(
+                    f"sample_weight must be 1D and match observations in {path}: "
+                    f"sample_weight={sample_weight.shape}, observations={observations.shape}"
+                )
+            if not np.isfinite(sample_weight).all() or np.any(sample_weight < 0.0):
+                raise ValueError(f"sample_weight must contain finite non-negative values in {path}")
+            sample_weight = np.power(sample_weight, float(sample_weight_power)).astype(np.float32)
+        else:
+            sample_weight = np.ones((observations.shape[0],), dtype=np.float32)
+        sample_weight = sample_weight * float(dataset_weight_scale)
+        weight_chunks.append(sample_weight)
+
+        if "policy_actions" in data:
+            policy_actions = data["policy_actions"].astype(np.float32)
+            if policy_actions.shape != actions.shape:
+                raise ValueError(f"policy_actions shape {policy_actions.shape} does not match actions {actions.shape} in {path}")
+            policy_action_chunks.append(policy_actions)
+        else:
+            policy_action_chunks.append(actions.copy())
+
+        metadata.append(
+            {
+                "path": str(path),
+                "rows": str(observations.shape[0]),
+                "dataset_weight_scale": str(dataset_weight_scale),
+                "metadata": data["metadata"].item() if "metadata" in data else "{}",
+            }
+        )
+
+    observations = np.concatenate(obs_chunks, axis=0)
+    actions = np.concatenate(action_chunks, axis=0)
+    mask = np.concatenate(mask_chunks, axis=0)
+    sample_weight = np.concatenate(weight_chunks, axis=0)
+    policy_actions = np.concatenate(policy_action_chunks, axis=0)
+    return observations, actions, mask, sample_weight, policy_actions, metadata
+
+
 def main() -> int:
     args = parse_args()
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
     checkpoint = Path(args.checkpoint)
-    dataset_path = Path(args.dataset)
+    dataset_paths = [Path(path) for path in args.dataset]
     if not checkpoint.exists():
         print(f"checkpoint not found: {checkpoint}")
         return 1
-    if not dataset_path.exists():
-        print(f"dataset not found: {dataset_path}")
-        return 1
+    for dataset_path in dataset_paths:
+        if not dataset_path.exists():
+            print(f"dataset not found: {dataset_path}")
+            return 1
 
     if args.device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -136,23 +227,14 @@ def main() -> int:
         device = args.device
     action_indices = parse_indices(args.action_indices)
     action_index_set = set(action_indices)
+    dataset_weight_scales = parse_weight_scales(args.dataset_weight_scales, len(dataset_paths))
 
-    data = np.load(dataset_path, allow_pickle=False)
-    observations = data["observations"].astype(np.float32)
-    actions = data["actions"].astype(np.float32)
-    mask = data["action_valid_mask"].astype(np.float32)
-    metadata = data["metadata"].item() if "metadata" in data else "{}"
-    sample_weight = None
-    if args.use_sample_weight and "sample_weight" in data:
-        sample_weight = data["sample_weight"].astype(np.float32)
-        if sample_weight.ndim != 1 or sample_weight.shape[0] != observations.shape[0]:
-            raise ValueError(
-                "sample_weight must be 1D and match observations: "
-                f"sample_weight={sample_weight.shape}, observations={observations.shape}"
-            )
-        if not np.isfinite(sample_weight).all() or np.any(sample_weight < 0.0):
-            raise ValueError("sample_weight must contain finite non-negative values")
-        sample_weight = np.power(sample_weight, float(args.sample_weight_power)).astype(np.float32)
+    observations, actions, mask, sample_weight, policy_actions, metadata = load_datasets(
+        dataset_paths,
+        use_sample_weight=bool(args.use_sample_weight),
+        sample_weight_power=float(args.sample_weight_power),
+        dataset_weight_scales=dataset_weight_scales,
+    )
     model = PPO.load(str(checkpoint), device=device)
     policy = model.policy
     policy.set_training_mode(True)
@@ -166,11 +248,6 @@ def main() -> int:
     target_actions = actions.copy()
     target_mask = mask.copy()
     if is_grouped and args.preserve_group_policy_rows:
-        if "policy_actions" not in data:
-            raise ValueError("--preserve_group_policy_rows requires policy_actions in the dataset")
-        policy_actions = data["policy_actions"].astype(np.float32)
-        if policy_actions.shape != actions.shape:
-            raise ValueError(f"policy_actions shape {policy_actions.shape} does not match actions {actions.shape}")
         for indices in policy.mlp_extractor.action_groups.values():
             group = [int(index) for index in indices]
             if action_index_set.intersection(group):
@@ -249,7 +326,7 @@ def main() -> int:
     print("Base-Assist Action-Head Distillation")
     print("=" * 72)
     print(f"checkpoint       : {checkpoint}")
-    print(f"dataset          : {dataset_path}")
+    print(f"dataset          : {[str(path) for path in dataset_paths]}")
     print(f"dataset metadata : {metadata}")
     print(f"teacher rows     : {action_indices}")
     print(f"preserve rows    : {preserve_rows}")

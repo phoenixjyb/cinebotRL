@@ -326,6 +326,66 @@ normal-start preservation data, train a narrower final-layer/base-row adapter,
 or route the recovery behavior conditionally instead of replacing the whole base
 head.
 
+## Mixed Recovery + Full-Start Preservation Probe - 2026-07-08
+
+Question:
+
+Can we keep the late-start recovery gains while preserving normal `base040`
+behavior by mixing two datasets in the same grouped-head distill?
+
+Added preservation dataset:
+
+`data/policy_envelope_fk_base040/policy_preserve_fullstart_base040_20260708.npz`
+
+Dataset facts:
+
+- source checkpoint: `stage0_policy_envelope_fk_mix_contract_zpenalty80_lowstd_resume_32k_20260707/final_model.zip`
+- stage: `stage0_policy_envelope_fk_base040`
+- reset mode: full-start, no random start waypoint
+- samples: `3840`
+- valid label rows: `[6,7,8]`
+- labels: current policy actions, not offset-follow teacher actions
+- sample weight: uniform `1.5`
+- source-state EE error: `0.0542 / 0.0913 / 0.1183 m`
+
+Tooling update:
+
+- `collect_offset_follow_tail_dataset.py` now supports `--policy_preserve_only`,
+  `--policy_preserve_rows`, `--no-random_start_waypoint`, and
+  `--sample_weight_scale`.
+- `distill_base_assist_head.py` now supports multiple `--dataset` inputs and
+  per-dataset `--dataset_weight_scales`.
+
+Gate comparison:
+
+| Candidate | Dataset scales | Late-start EE mean/p95/max | Full-start EE mean/p95/max | Verdict |
+| --- | ---: | ---: | ---: | --- |
+| source checkpoint | n/a | `0.0904 / 0.1609 / 0.1940 m` | `0.0505 / 0.0749 / 0.1056 m` | baseline |
+| mixed preserve | `1,1` | `0.0533 / 0.1172 / 0.1765 m` | `0.0499 / 0.0997 / 0.1069 m` | good recovery, full-start p95 regression |
+| mixed preserve | `1,2` | `0.0554 / 0.1128 / 0.1751 m` | `0.0465 / 0.0932 / 0.0986 m` | better full-start mean/max, p95 still high |
+| mixed preserve | `1,4` | `0.0604 / 0.1136 / 0.1648 m` | `0.0472 / 0.0831 / 0.1026 m` | best compromise |
+| mixed preserve | `1,8` | `0.0661 / 0.1132 / 0.1654 m` | `0.0485 / 0.0836 / 0.1094 m` | no better than `1,4` |
+
+Current best checkpoint:
+
+`logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_offsetfollow_mixed_preserve_w4_20260708/final_model.zip`
+
+Interpretation:
+
+The mixed-preservation approach is the first candidate that beats the source
+checkpoint on all late-start metrics while also avoiding the earlier full-start
+mean/max regression. The `1,4` preservation weighting is the best current
+tradeoff: it improves late-start mean, p95, and max, and improves full-start
+mean/max, but full-start p95 remains slightly worse than the source baseline.
+
+Promotion rule:
+
+Do not replace the default policy solely from this two-gate result. Treat the
+`1,4` checkpoint as the current best `base040` recovery candidate. Before
+promotion, run broader routed gates across the existing stage mix and confirm
+that the full-start p95 increase does not show up as a visible trajectory
+quality regression.
+
 ## Stage A Freeze-Base Implementation
 
 Implementation:

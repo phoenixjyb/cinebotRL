@@ -1087,3 +1087,69 @@ Do not promote either weak auxiliary candidate. Both reduce mean error slightly 
 Lesson:
 
 The collected tail-state dataset is diagnostically useful, but simply adding an auxiliary imitation loss around the tail states is not enough. The next update should stop increasing auxiliary weight and instead target the failure mode directly: terminal/tail recovery, trajectory-specific end-segment correction, or a small corrective controller/teacher that is evaluated on the visited closed-loop tail states before being mixed back into PPO.
+
+## Stage B Tail-Start Recovery Probe
+
+Goal:
+
+Stop judging the terminal failure only through full-start rollouts. Add late-start gates and diagnostics so the final `65%-95%` of `base040` trajectories can be measured directly.
+
+Tooling changes:
+
+- `evaluate_stage_rollout_gate.py` now supports `--random_start_waypoint`, `--start_waypoint_min_fraction`, `--start_waypoint_max_fraction`, `--reset_base_to_trajectory_start`, and `--reset_anchor_target_blend`
+- `diagnose_stage_tracking.py` supports the same late-start reset controls and records them in the output JSON
+- `BaseAssistConfig` and `train.py` now support `--base_assist_mode target_direction|target_velocity`
+- `target_direction` preserves the old base-assist behavior
+- `target_velocity` uses the lookahead target displacement as the expert base direction, so it is opt-in and experimental
+
+Tail-start baseline:
+
+- checkpoint: `stage0_policy_envelope_fk_mix_contract_zpenalty80_lowstd_resume_32k_20260707/final_model.zip`
+- gate: `base040`, random start `0.65-0.95`, no base-start anchor, `base_action_scale=0.25`
+- result: `0.0904 / 0.1609 / 0.1940 m`
+- this is far worse than the full-start `base040` gate, so the tail segment is a real standalone weakness
+
+Diagnosis:
+
+- output: `evaluation_results/stage_diagnostics/stage0_policy_envelope_fk_base040_tailstart_baseline_diag_20260708.json`
+- target XY motion mean: `0.1178 m`
+- base XY motion mean: `0.0155 m`
+- base action abs mean: `0.0277`
+- arm target lag is modest: mean/p95/max `0.0305 / 0.0660 / 0.0870 rad`
+- average XYZ error is biased mostly in `y/z`: `[-0.0007, -0.0305, -0.0376] m`
+
+Interpretation:
+
+The tail-start failure is not primarily an arm-label imitation problem. The base under-moves while the target continues moving in XY, leaving the arm to absorb too much residual error.
+
+Candidate A: tail-reset PPO only
+
+- run: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_tailreset_65_95_lowstd_32k_20260708`
+- setup: random start `0.65-0.95`, no auxiliary loss, no base assist
+- training health: reachability stayed clean; final PPO `approx_kl=0.00503`
+- late-start gate: `0.0905 / 0.1609 / 0.1951 m`
+- decision: do not promote; changing reset distribution alone did not create enough learning signal at this budget
+
+Candidate B: existing target-direction base assist
+
+- run: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_tailreset_baseassist_lk5_32k_20260708`
+- setup: random start `0.65-0.95`, base assist `target_direction`, blend `0.70->0.00`, lookahead `5`, imitation weight `30`
+- training health: stable reachability, but expert commands chase the target center rather than preserving the intended base-target offset
+- late-start gate: `0.0898 / 0.1604 / 0.1940 m`
+- decision: do not promote; effectively unchanged from baseline
+
+Candidate C: target-velocity base assist
+
+- run: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_tailreset_velassist_lk5_32k_20260708`
+- setup: random start `0.65-0.95`, base assist `target_velocity`, blend `0.70->0.00`, lookahead `5`, activation/full-speed displacement `0.005-0.030 m`
+- training health: failed as a teacher; reachability dropped to `10/64` at step 100 and only recovered to `38/64` by step 500
+- late-start gate: `0.0902 / 0.1621 / 0.1951 m`
+- decision: do not promote; raw target-velocity following overdrives the base and breaks the base-target working offset
+
+Decision:
+
+Do not promote any tail-start recovery candidate from this pass. Keep the late-start gate/diagnostic tooling and the opt-in `target_velocity` assist mode because they are useful for controlled experiments, but do not use the generated checkpoints as routed policies.
+
+Next useful update:
+
+Implement an offset-preserving base-follow teacher rather than either existing target-direction assist or raw target-velocity assist. The expert should preserve the generated FK base-target offset while following target motion, then be tested first with the late-start diagnostic before any PPO continuation. A good smoke target is to raise base XY motion toward the target XY motion without pushing base-target distance outside the `base040` working band.

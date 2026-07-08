@@ -37,6 +37,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=160)
     parser.add_argument("--max_trajectories", type=int, default=None)
     parser.add_argument("--min_trajectory_duration", type=float, default=5.0)
+    parser.add_argument(
+        "--random_start_waypoint",
+        action="store_true",
+        help="Start each recorded trajectory from a random waypoint during reset.",
+    )
+    parser.add_argument("--start_waypoint_min_fraction", type=float, default=0.0)
+    parser.add_argument("--start_waypoint_max_fraction", type=float, default=0.0)
+    parser.add_argument(
+        "--reset_base_to_trajectory_start",
+        action="store_true",
+        help="Anchor the base near waypoint zero even when target playback starts later.",
+    )
+    parser.add_argument("--reset_anchor_target_blend", type=float, default=0.0)
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--seed", type=int, default=20260707)
     parser.add_argument("--freeze_base_actions", action="store_true")
@@ -109,6 +122,12 @@ def main() -> int:
         require(vec_normalize.exists(), f"vec_normalize not found: {vec_normalize}")
     require(args.num_envs > 0, "--num_envs must be positive")
     require(args.steps > 0, "--steps must be positive")
+    if args.start_waypoint_min_fraction < 0.0 or args.start_waypoint_min_fraction > 1.0:
+        raise ValueError("--start_waypoint_min_fraction must be in [0, 1]")
+    if args.start_waypoint_max_fraction < 0.0 or args.start_waypoint_max_fraction > 1.0:
+        raise ValueError("--start_waypoint_max_fraction must be in [0, 1]")
+    if args.reset_anchor_target_blend < 0.0 or args.reset_anchor_target_blend > 1.0:
+        raise ValueError("--reset_anchor_target_blend must be in [0, 1]")
 
     from isaaclab.app import AppLauncher
 
@@ -143,6 +162,14 @@ def main() -> int:
                 f"y={reset_config.get('reset_base_y_offset', 0.2405):.4f}",
                 flush=True,
             )
+        if args.random_start_waypoint:
+            print(
+                "[gate] random start waypoint "
+                f"{args.start_waypoint_min_fraction:.2f}-{args.start_waypoint_max_fraction:.2f}, "
+                f"reset_base_to_trajectory_start={args.reset_base_to_trajectory_start}, "
+                f"anchor_blend={args.reset_anchor_target_blend:.2f}",
+                flush=True,
+            )
 
         env_cfg = MobileMMTrackEEEnvCfg()
         env_cfg.num_envs = args.num_envs
@@ -167,9 +194,11 @@ def main() -> int:
             trajectory_manifest_file=str(manifest),
             max_trajectories=args.max_trajectories,
             min_duration_seconds=args.min_trajectory_duration,
-            randomize_start_waypoint=False,
-            reset_base_to_trajectory_start=False,
-            reset_anchor_target_blend=0.0,
+            randomize_start_waypoint=bool(args.random_start_waypoint),
+            start_waypoint_min_fraction=args.start_waypoint_min_fraction,
+            start_waypoint_max_fraction=args.start_waypoint_max_fraction,
+            reset_base_to_trajectory_start=bool(args.reset_base_to_trajectory_start),
+            reset_anchor_target_blend=args.reset_anchor_target_blend,
             reset_base_x_offset=reset_config.get("reset_base_x_offset", 0.4415),
             reset_base_y_offset=reset_config.get("reset_base_y_offset", 0.2405),
         )

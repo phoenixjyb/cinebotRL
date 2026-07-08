@@ -1666,6 +1666,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         blend = max(0.0, min(1.0, blend))
 
         target_pos, _ = self.trajectory_manager.get_target_pose()
+        current_target_pos = target_pos
         lead_steps = max(int(getattr(assist_cfg, "lookahead_steps", 0)), 0)
         if lead_steps > 0:
             lead_pos, _ = self.trajectory_manager.get_lookahead(
@@ -1677,7 +1678,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         target_xy = target_pos[:, :2]
         base_to_target = target_xy - base_xy
         dist = torch.norm(base_to_target, dim=-1)
-        target_dir_world = base_to_target / (dist.unsqueeze(-1) + 1e-6)
+        assist_mode = str(getattr(assist_cfg, "mode", "target_direction"))
+        if assist_mode == "target_velocity" and lead_steps > 0:
+            expert_vector_world = target_xy - current_target_pos[:, :2]
+            expert_distance = torch.norm(expert_vector_world, dim=-1)
+        else:
+            expert_vector_world = base_to_target
+            expert_distance = dist
+        target_dir_world = expert_vector_world / (expert_distance.unsqueeze(-1) + 1e-6)
 
         cos_theta = torch.cos(theta)
         sin_theta = torch.sin(theta)
@@ -1692,7 +1700,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         activation_distance = max(float(assist_cfg.activation_distance), 1e-6)
         full_speed_distance = max(float(assist_cfg.full_speed_distance), activation_distance + 1e-6)
         speed_fraction = torch.clamp(
-            (dist - activation_distance) / (full_speed_distance - activation_distance),
+            (expert_distance - activation_distance) / (full_speed_distance - activation_distance),
             min=0.0,
             max=1.0,
         )
@@ -1701,7 +1709,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         expert_action = torch.clamp(expert_action, -1.0, 1.0)
 
         coeff = torch.full((self.num_envs,), blend, dtype=base_vx.dtype, device=self.device)
-        far_gate = (dist > activation_distance).to(base_vx.dtype)
+        far_gate = (expert_distance > activation_distance).to(base_vx.dtype)
         coeff = coeff * far_gate
         self._base_assist_coeff = coeff
         self._base_assist_expert_action = expert_action

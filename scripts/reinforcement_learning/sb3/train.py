@@ -653,6 +653,16 @@ def parse_args():
         help="Initial executed-command blend toward expert base command.",
     )
     parser.add_argument(
+        "--base_assist_mode",
+        type=str,
+        default="target_direction",
+        choices=["target_direction", "target_velocity"],
+        help=(
+            "Expert source for base assist. target_direction chases the target center; "
+            "target_velocity follows the lookahead target displacement."
+        ),
+    )
+    parser.add_argument(
         "--base_assist_final_blend",
         type=float,
         default=0.0,
@@ -2415,6 +2425,7 @@ def main():
                 )
             )
         env_cfg.task_config.base_assist.enable = enable_base_assist
+        env_cfg.task_config.base_assist.mode = args.base_assist_mode
         env_cfg.task_config.base_assist.initial_blend = args.base_assist_initial_blend
         env_cfg.task_config.base_assist.final_blend = args.base_assist_final_blend
         env_cfg.task_config.base_assist.decay_steps = args.base_assist_decay_steps
@@ -2430,6 +2441,7 @@ def main():
         if enable_base_assist:
             print(
                 "    Base assist: enabled "
+                f"mode={args.base_assist_mode}, "
                 f"blend={args.base_assist_initial_blend:.2f}->{args.base_assist_final_blend:.2f} "
                 f"over {args.base_assist_decay_steps:,} steps, "
                 f"distance={args.base_assist_activation_distance:.2f}-{args.base_assist_full_speed_distance:.2f}m, "

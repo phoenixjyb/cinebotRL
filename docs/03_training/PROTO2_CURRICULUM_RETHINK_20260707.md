@@ -1700,3 +1700,27 @@ This is a sim-stage nominal tracking result, not a deployable DJI gimbal policy.
 Next useful update:
 
 Use the teacher-reset stage and masked-BC actor as the nominal Stage-79 gate. The next training run should warm-start PPO from this BC actor on `stage_gik_no_obstacle79_nominal`, with short bounded steps first, raw-observation BC warm start, and no generated cinematic trajectories mixed in. Only after this gate stays stable should we add obstacle curricula or transfer back toward recovery/cinematic stages.
+
+## 79 Masked-BC PPO Continuation Attempt - 2026-07-08
+
+Implementation fix:
+
+- `train.py` now accepts `stage_gik_no_obstacle79_nominal` as a named `--trajectory_stage`.
+- when no `--checkpoint` is supplied, `train.py` now inspects `--pretrained_policy` observation space and passes that expected dimension into the IsaacLab-to-SB3 wrapper.
+- this lets raw 84D env observations append the trajectory-progress column to match the 85D BC actor, the same way the stage gate already worked.
+
+Rejected run:
+
+- run: `logs/sb3/recomoproto2trackee_v0/stage_gik_noobs79_teacherreset_masked9bc_8k2_20260708`
+- command intent: PPO continuation from `logs/bc/gik_no_obstacle79_masked9_smoke_20260708/bc_policy.zip` on `stage_gik_no_obstacle79_nominal`
+- correct warm-start was confirmed: actor copied successfully and wrapper logged `84 -> 85`
+- the run was manually stopped at about `4096` timesteps because it was degrading the BC prior
+- rollout symptoms: by `2048-4096` steps, reachability was usually `7-8/8` unreachable and base-target distance was around `0.88-1.37 m`
+
+Decision:
+
+Do not continue this PPO configuration. The BC actor is currently better than the PPO continuation. The likely issue is that ordinary PPO rewards/critic initialization are too blunt for this nominal imitation stage, especially with sparse/weak arm-gimbal labels and large value losses.
+
+Next useful update:
+
+Keep the masked-BC actor as the current nominal Stage-79 policy artifact. If we do RL after BC, use a more conservative imitation-preserving update: lower learning rate, fewer PPO epochs, stronger KL/behavior regularization or an auxiliary BC loss on the same 79 dataset, and promote only if the 40-step teacher-reset gate beats the raw BC actor's `0.1347 m` mean / `0.3775 m` p95 / `0` dones baseline.

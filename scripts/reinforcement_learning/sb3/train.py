@@ -487,6 +487,7 @@ def parse_args():
             "stage0_policy_envelope_fk_base040",
             "stage0_policy_envelope_fk_mix_large08_base025",
             "stage0_fixedbase_micro",
+            "stage_gik_no_obstacle79_nominal",
             "stage0_easy",
             "stage1_recovery",
             "stage2_moderate",
@@ -502,6 +503,7 @@ def parse_args():
             "stage0_policy_envelope_fk_base040=larger base-required FK targets, "
             "stage0_policy_envelope_fk_mix_large08_base025=mixed fixed/base-required FK targets, "
             "stage0_fixedbase_micro=fixed-base reachable micro paths, "
+            "stage_gik_no_obstacle79_nominal=accepted live GIK/ARCore nominal trajectories, "
             "stage0_easy=short cinematic paths, stage1=recovery, stage2=moderate, "
             "stage3=full)"
         ),
@@ -2521,6 +2523,13 @@ def main():
                 print(f"    [OK] Checkpoint observation dim detected: {expected_obs_dim}")
             except Exception as exc:
                 print(f"    [WARN] Could not inspect checkpoint observation dim: {exc}")
+        elif args.pretrained_policy:
+            try:
+                pretrained_model = PPO.load(args.pretrained_policy, device="cpu", print_system_info=False)
+                expected_obs_dim = int(np.prod(pretrained_model.observation_space.shape))
+                print(f"    [OK] Pretrained policy observation dim detected: {expected_obs_dim}")
+            except Exception as exc:
+                print(f"    [WARN] Could not inspect pretrained policy observation dim: {exc}")
         env = IsaacLabToSB3VecEnvWrapper(
             env,
             expected_obs_dim=expected_obs_dim,

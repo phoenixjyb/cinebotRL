@@ -1590,3 +1590,44 @@ Next useful update:
 
 Use the 79-only base teacher as a supervised base-head auxiliary/warm-start for the real RL policy, then evaluate on a 79-derived Isaac stage or on held-out teacher observations before any broad PPO run. Do not mix in one-obstacle or generated cinematic data until the nominal 79-case transfer is measured cleanly.
 
+## 79-Only Base Auxiliary Transfer Smoke - 2026-07-08
+
+Experiment:
+
+- source checkpoint: `logs/sb3/recomoproto2trackee_v0/stage1_recovery_yaw_assist_gate_20260702_1508/final_model.zip`
+- transfer run: `logs/sb3/recomoproto2trackee_v0/yaw_assist_noobs79_baseaux_lowp_8k_20260708`
+- auxiliary dataset: `data/gik_offline_teacher_obs/obs_dataset_no_obstacle79_base_only_yawassist_vecnorm.npz`
+- dataset normalization: observations were transformed with the source checkpoint sibling `vec_normalize.pkl`
+- policy update: low-pressure PPO continuation, `8192` extra requested steps, `learning_rate=1e-5`, `target_kl=0.01`, one base-aux gradient step per rollout, base action rows `[6,7,8]`
+
+Training signal:
+
+- base auxiliary loss stayed high, around `0.54-0.59`
+- rollout reachability stayed poor, often `75-100%` unreachable
+- base assist was disabled during policy rollout; this was testing whether the policy itself absorbed the 79-only base labels
+
+Raw-policy evaluation:
+
+- output: `evaluation_results/recovery_candidate/yaw_assist_noobs79_baseaux_lowp_8k_20260708/recovery_eval_raw-policy_20260708_145554.json`
+- stage: `stage1_recovery`, `20` selected trajectories, `64` completed episodes
+- mean EE position error: `1.1224 m`
+- p95 EE position error: `1.6544 m`
+- mean EE orientation error: `138.73 deg`
+- unreachable-zone mean: `96.72%`
+- workspace hard-exceed mean: `30.66%`
+- obstacle collision mean: `0.0%`
+
+Comparison against the current yaw-assist baseline:
+
+| candidate | mean pos err | mean ori err | unreachable | hard exceed | decision |
+| --- | ---: | ---: | ---: | ---: | --- |
+| yaw_assist_baseline | `1.1442 m` | `132.17 deg` | `47.42%` | `3.73%` | keep as baseline |
+| 79-only baseaux low-pressure transfer | `1.1224 m` | `138.73 deg` | `96.72%` | `30.66%` | reject |
+
+Decision:
+
+Do not continue this exact transfer path. The position mean is not enough to justify the run because the policy becomes much less reachable and much less workspace-safe than the source baseline. The 79 accepted GIK/ARCore trajectories remain useful learning material, but not as a direct base-only auxiliary injected into the current `stage1_recovery` distribution.
+
+Next useful update:
+
+Build a 79-derived Isaac replay/gate whose reset distribution, observation normalization, and trajectory source match the accepted GIK/ARCore teacher data, then test base-head learning in that nominal distribution before trying to transfer into `stage1_recovery`. If we need recovery behavior, generate teacher labels for the recovery reset distribution itself; do not assume nominal 79-only base labels are valid under random recovery starts.

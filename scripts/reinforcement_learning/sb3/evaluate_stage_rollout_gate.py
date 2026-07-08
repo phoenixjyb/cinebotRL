@@ -64,6 +64,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num_envs", type=int, default=8)
     parser.add_argument("--steps", type=int, default=160)
     parser.add_argument("--max_trajectories", type=int, default=None)
+    parser.add_argument(
+        "--assign_loaded_trajectories_once",
+        action="store_true",
+        help=(
+            "Assign loaded trajectories sequentially to envs on reset instead of "
+            "sampling with replacement. Use with num_envs equal to the loaded "
+            "trajectory count for one-pass per-trajectory gates."
+        ),
+    )
     parser.add_argument("--min_trajectory_duration", type=float, default=5.0)
     parser.add_argument(
         "--random_start_waypoint",
@@ -246,6 +255,67 @@ def main() -> int:
         print("[gate] creating env", flush=True)
         base_env = MobileMMTrackEEEnv(cfg=env_cfg)
         print("[gate] env created", flush=True)
+        raw_env = base_env.unwrapped if hasattr(base_env, "unwrapped") else base_env
+
+        def install_sequential_trajectory_sampler() -> None:
+            manager = raw_env.trajectory_manager
+            loader = getattr(manager, "multi_loader", None)
+            require(loader is not None, "--assign_loaded_trajectories_once requires multi-recorded trajectories")
+            trajectories = list(getattr(loader, "trajectories", []))
+            require(trajectories, "trajectory loader has no loaded trajectories")
+            require(
+                args.num_envs <= len(trajectories),
+                f"--num_envs {args.num_envs} exceeds loaded trajectories {len(trajectories)}",
+            )
+
+            selected = trajectories[: args.num_envs]
+            max_length = int(getattr(loader, "max_length", 0) or max(t["length"] for t in selected))
+
+            def sequential_sample_trajectories_with_lengths(num_envs: int):
+                require(
+                    num_envs <= len(selected),
+                    f"sequential gate requested {num_envs} envs but only {len(selected)} selected",
+                )
+                sampled = selected[:num_envs]
+                loader.last_sampled_metadata = [
+                    {
+                        "file": traj.get("file", "unknown"),
+                        "category": traj.get("category", "unknown"),
+                        "length": traj.get("length", 0),
+                        "metadata": traj.get("metadata", {}),
+                    }
+                    for traj in sampled
+                ]
+                positions_list = []
+                orientations_list = []
+                lengths_list = []
+                for traj in sampled:
+                    pos = traj["positions"]
+                    ori = traj["orientations"]
+                    length = int(traj["length"])
+                    lengths_list.append(length)
+                    if length < max_length:
+                        pad_length = max_length - length
+                        pos = torch.cat([pos, pos[-1:].repeat(pad_length, 1)], dim=0)
+                        ori = torch.cat([ori, ori[-1:].repeat(pad_length, 1)], dim=0)
+                    positions_list.append(pos)
+                    orientations_list.append(ori)
+                return (
+                    torch.stack(positions_list, dim=0),
+                    torch.stack(orientations_list, dim=0),
+                    torch.tensor(lengths_list, dtype=torch.long, device=loader.device),
+                )
+
+            loader.sample_trajectories_with_lengths = sequential_sample_trajectories_with_lengths
+            print(
+                "[gate] sequential trajectory assignment enabled: "
+                f"{len(selected)} envs/files, first={selected[0].get('file')}, "
+                f"last={selected[-1].get('file')}",
+                flush=True,
+            )
+
+        if args.assign_loaded_trajectories_once:
+            install_sequential_trajectory_sampler()
 
         class IsaacLabToSB3VecEnvWrapper(VecEnvWrapper):
             def __init__(
@@ -373,8 +443,6 @@ def main() -> int:
                 f"rows={start}:{end}",
                 flush=True,
             )
-        raw_env = base_env.unwrapped if hasattr(base_env, "unwrapped") else base_env
-
         def route_recovery_mask(target_pos, ee_pos, base_pos):
             trajectory_manager = raw_env.trajectory_manager
             if not hasattr(trajectory_manager, "current_waypoint_idx"):
@@ -406,10 +474,14 @@ def main() -> int:
         route_pos_errors: list[np.ndarray] = []
         route_base_target_distances: list[np.ndarray] = []
         dones_count = 0
+        done_counts_per_env = np.zeros((args.num_envs,), dtype=np.int64)
         target_pos0, target_quat0 = raw_env.trajectory_manager.get_target_pose()
         ee_pos0 = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
         base_pos0 = raw_env.robot.data.root_pos_w
         initial_pos_error = tensor_np(torch.linalg.norm(target_pos0 - ee_pos0, dim=-1))
+        metadata0 = list(getattr(raw_env.trajectory_manager, "current_trajectory_metadata", []) or [])
+        lengths0 = tensor_np(getattr(raw_env.trajectory_manager, "recorded_lengths", None))
+        start_waypoint0 = tensor_np(getattr(raw_env.trajectory_manager, "current_waypoint_idx", None))
         print(
             "[gate] initial env0 "
             f"base={tensor_np(base_pos0[0]).round(4).tolist()} "
@@ -446,7 +518,9 @@ def main() -> int:
                 action = np.repeat(open_loop_actions[step : step + 1], args.num_envs, axis=0)
             obs, reward, done, _ = env.step(action)
             rewards.append(np.asarray(reward, dtype=np.float64))
-            dones_count += int(np.count_nonzero(done))
+            done_arr = np.asarray(done, dtype=bool)
+            dones_count += int(np.count_nonzero(done_arr))
+            done_counts_per_env += done_arr.astype(np.int64)
 
             target_pos, target_quat = raw_env.trajectory_manager.get_target_pose()
             ee_pos = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
@@ -465,6 +539,9 @@ def main() -> int:
         pos = np.concatenate([x.reshape(-1) for x in pos_errors]).astype(np.float64)
         ori = np.concatenate([x.reshape(-1) for x in ori_errors]).astype(np.float64)
         rew = np.concatenate([x.reshape(-1) for x in rewards]).astype(np.float64)
+        pos_by_step = np.stack(pos_errors, axis=0).astype(np.float64)
+        ori_by_step = np.stack(ori_errors, axis=0).astype(np.float64)
+        rew_by_step = np.stack(rewards, axis=0).astype(np.float64)
         target_pos_end, _ = raw_env.trajectory_manager.get_target_pose()
         ee_pos_end = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
         base_pos_end = raw_env.robot.data.root_pos_w
@@ -520,6 +597,31 @@ def main() -> int:
             "reward_p50": float(np.percentile(rew, 50)),
             "dones_count": int(dones_count),
         }
+        if args.assign_loaded_trajectories_once:
+            waypoint_end = tensor_np(getattr(raw_env.trajectory_manager, "current_waypoint_idx", None))
+            per_env = []
+            for env_id in range(args.num_envs):
+                metadata = metadata0[env_id] if env_id < len(metadata0) and isinstance(metadata0[env_id], dict) else {}
+                per_env.append(
+                    {
+                        "env_id": int(env_id),
+                        "trajectory_file": str(metadata.get("file", "unknown")),
+                        "trajectory_category": str(metadata.get("category", "unknown")),
+                        "trajectory_length": int(lengths0[env_id]) if lengths0 is not None and env_id < len(lengths0) else None,
+                        "start_waypoint_idx": int(start_waypoint0[env_id]) if start_waypoint0 is not None and env_id < len(start_waypoint0) else None,
+                        "end_waypoint_idx": int(waypoint_end[env_id]) if waypoint_end is not None and env_id < len(waypoint_end) else None,
+                        "initial_ee_pos_error_m": float(initial_pos_error[env_id]),
+                        "final_ee_pos_error_m": float(final_pos_error[env_id]),
+                        "ee_pos_error_mean_m": float(np.mean(pos_by_step[:, env_id])),
+                        "ee_pos_error_p50_m": float(np.percentile(pos_by_step[:, env_id], 50)),
+                        "ee_pos_error_p95_m": float(np.percentile(pos_by_step[:, env_id], 95)),
+                        "ee_pos_error_max_m": float(np.max(pos_by_step[:, env_id])),
+                        "ee_ori_error_mean_deg": float(np.degrees(np.mean(ori_by_step[:, env_id]))),
+                        "reward_mean": float(np.mean(rew_by_step[:, env_id])),
+                        "dones_count": int(done_counts_per_env[env_id]),
+                    }
+                )
+            metrics["per_env"] = per_env
         if route_counts:
             route_count_arr = np.asarray(route_counts, dtype=np.float64)
             route_fraction_arr = np.concatenate([x.reshape(-1) for x in route_waypoint_fractions]).astype(np.float64)

@@ -1780,3 +1780,46 @@ Keep this as a candidate, not a clean replacement. It is better on tail/final/wo
 Next useful update:
 
 Add a longer rollout gate over more of the 79 trajectories and inspect per-trajectory failure cases. If the weighted BC candidate mainly improves tails but hurts early tracking, train/evaluate a hybrid BC objective rather than moving to PPO: preserve BC10-style early behavior while adding tail/final weighting only where the old policy drifts.
+
+## 79 Sequential All-Trajectory Gate - 2026-07-08
+
+Implementation update:
+
+- `evaluate_stage_rollout_gate.py` now supports `--assign_loaded_trajectories_once`.
+- This replaces reset-time random sampling-with-replacement with deterministic sequential assignment of loaded trajectory files to envs.
+- With `--num_envs 79 --max_trajectories 79`, one rollout now evaluates each accepted live GIK/ARCore trajectory exactly once.
+- The evaluator also writes a `per_env` block with trajectory file, length, waypoint indices, per-env position/orientation error, reward, and done counts.
+
+Gate protocol:
+
+- stage: `stage_gik_no_obstacle79_nominal`
+- envs: `79`
+- steps: `60`
+- reset: `--reset_base_to_trajectory_start`
+- normalization: disabled, raw-observation BC policies
+- output summary: `evaluation_results/stage_gik_no_obstacle79_nominal/all79_seq60_bc_policy_comparison_20260708.json`
+
+Aggregate results:
+
+| policy | mean m | p50 m | p95 m | max m | final mean m | ori mean deg | reward mean | dones |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| BC10 smoke | 0.24184 | 0.21236 | 0.54709 | 0.66708 | 0.49540 | 68.86 | -35.78 | 0 |
+| BC80 weighted | 0.26580 | 0.16707 | 0.77909 | 1.11905 | 0.76414 | 74.93 | -82.58 | 0 |
+| BC80 unweighted | 0.24354 | 0.18846 | 0.64923 | 0.81585 | 0.59110 | 65.67 | -56.21 | 0 |
+
+Per-trajectory winner counts:
+
+| metric | BC10 | BC80 weighted | BC80 unweighted |
+|---|---:|---:|---:|
+| mean position error | 43 | 9 | 27 |
+| p95 position error | 56 | 2 | 21 |
+| final position error | 63 | 2 | 14 |
+| mean orientation error | 26 | 0 | 53 |
+
+Decision:
+
+Do not promote either BC80 candidate as the nominal policy. BC80 weighted is rejected. BC80 unweighted is a useful diagnostic: it improves orientation and p50 position error, but it regresses p95/final tracking. The current best position-tracking baseline remains BC10 smoke for the no-obstacle 79 stage.
+
+Next useful update:
+
+Use this all-79 deterministic gate as the promotion gate. For policy improvement, do not use global action weighting. Train a hybrid/imitation candidate that keeps BC10-style position tracking while borrowing the BC80-unweighted orientation improvement, then only promote if it beats BC10 on p95/final position without losing the orientation gain.

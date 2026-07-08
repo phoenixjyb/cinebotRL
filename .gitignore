@@ -25,6 +25,15 @@ data/base_assist_distill/
 data/gik_stage2_parity_progress_*/
 data/gik_offline_teachers_*/
 data/gik_offline_teacher_obs/
+data/fixedbase_micro_diffik_teacher/
+data/fixedbase_micro_zero_teacher/
+data/policy_envelope_fk/ppo_stage0_policy_envelope_fk_64k_eval.json
+data/policy_envelope_fk_base040/offset_follow_tail_base025_20260708.npz
+data/policy_envelope_fk_base040/offset_follow_tail_smoke_20260708.npz
+data/policy_envelope_fk_base040/policy_preserve_fullstart_base040_20260708.npz
+data/policy_envelope_fk_base040/tail_dagger_contractz_p80_20260707.npz
+data/policy_envelope_fk_large/
+trajectoryToLearn/stage0_policy_envelope_fk_large/
 wandb/
 .idea/
 .vscode/

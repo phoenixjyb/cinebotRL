@@ -290,6 +290,58 @@ Use this as a bounded teacher-data gate before any long training run. It does
 not override the earlier lesson that PPO reward alone is not enough; validate
 tracking/reachability and obstacle metrics explicitly before promoting a policy.
 
+## 2026-07-08 Stage1 Accepted Base-Only BC Gate
+
+Ran a bounded base-only BC gate on the Stage1 accepted one-obstacle dataset.
+Arm/gimbal labels were deliberately excluded from the loss with:
+
+```text
+--use_action_mask
+--action_loss_weights 0,0,0,0,0,0,1,1,1
+```
+
+Artifacts on `.98`:
+
+```text
+logs/bc/gik_stage1_obstacle63_baseonly_smoke_20260708/bc_policy.zip
+evaluation_results/bc/gik_stage1_obstacle63_baseonly_smoke_20260708.json
+logs/bc/gik_stage1_obstacle63_baseonly80_20260708/bc_policy.zip
+evaluation_results/bc/gik_stage1_obstacle63_baseonly80_20260708.json
+```
+
+Results:
+
+| Candidate | Epochs | Best val MSE | Base RMSE | Base MAE | Base max abs | Verdict |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `gik_stage1_obstacle63_baseonly_smoke_20260708` | 20 | `0.003876` | `0.052080` | `0.023596` | `0.692640` | undertrained |
+| `gik_stage1_obstacle63_baseonly80_20260708` | 80 | `0.001023` | `0.015518` | `0.006399` | `0.541529` | useful base-head candidate |
+
+Per-action RMSE for the 80-epoch checkpoint:
+
+```text
+base_vx/action[6]: 0.018625
+base_vy/action[7]: 0.017514
+base_wz/action[8]: 0.008507
+```
+
+Worst source for the 80-epoch checkpoint:
+
+```text
+source_index=30
+source_name=60cd58a5e9_one_obstacle_055_exact_box_0041_vid_d728a8e2741d416b.npz
+rmse=0.066708
+max_abs=0.541529
+```
+
+Interpretation:
+
+- The accepted Stage1 obstacle dataset is learnable for base-motion imitation.
+- The 80-epoch base-only checkpoint is worth using as a bounded warm-start or
+  distillation candidate.
+- This is not proof that full 9D arm/gimbal imitation is ready; keep full-mask
+  imitation diagnostic until arm/gimbal label quality is re-audited.
+- Next gate should evaluate policy behavior in simulation, not only offline MSE.
+
 ## Offset-Follow Tail Recovery Probe - 2026-07-08
 
 Question:

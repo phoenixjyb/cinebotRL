@@ -26,6 +26,34 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", required=True)
+    parser.add_argument(
+        "--recovery_checkpoint",
+        default=None,
+        help="Optional second PPO checkpoint used only when conditional recovery routing is active.",
+    )
+    parser.add_argument(
+        "--recovery_route_min_waypoint_fraction",
+        type=float,
+        default=0.65,
+        help="Route envs to recovery checkpoint only after this recorded trajectory fraction.",
+    )
+    parser.add_argument(
+        "--recovery_route_min_pos_error",
+        type=float,
+        default=0.0,
+        help="Optional minimum EE position error in meters required for recovery routing.",
+    )
+    parser.add_argument(
+        "--recovery_route_min_base_target_distance",
+        type=float,
+        default=0.0,
+        help="Optional minimum base-target XY distance in meters required for recovery routing.",
+    )
+    parser.add_argument(
+        "--recovery_route_latch_once",
+        action="store_true",
+        help="Once an env meets the recovery route condition, keep routing it for the rest of the rollout.",
+    )
     parser.add_argument("--vec_normalize", required=True)
     parser.add_argument(
         "--disable_vec_normalize",
@@ -116,8 +144,11 @@ def main() -> int:
     if args.base_action_scale < 0.0 or args.base_action_scale > 1.0:
         raise ValueError("--base_action_scale must be in [0, 1]")
     checkpoint = Path(args.checkpoint)
+    recovery_checkpoint = Path(args.recovery_checkpoint) if args.recovery_checkpoint else None
     vec_normalize = Path(args.vec_normalize)
     require(checkpoint.exists(), f"checkpoint not found: {checkpoint}")
+    if recovery_checkpoint is not None:
+        require(recovery_checkpoint.exists(), f"recovery checkpoint not found: {recovery_checkpoint}")
     if not args.disable_vec_normalize:
         require(vec_normalize.exists(), f"vec_normalize not found: {vec_normalize}")
     require(args.num_envs > 0, "--num_envs must be positive")
@@ -128,6 +159,12 @@ def main() -> int:
         raise ValueError("--start_waypoint_max_fraction must be in [0, 1]")
     if args.reset_anchor_target_blend < 0.0 or args.reset_anchor_target_blend > 1.0:
         raise ValueError("--reset_anchor_target_blend must be in [0, 1]")
+    if args.recovery_route_min_waypoint_fraction < 0.0 or args.recovery_route_min_waypoint_fraction > 1.0:
+        raise ValueError("--recovery_route_min_waypoint_fraction must be in [0, 1]")
+    if args.recovery_route_min_pos_error < 0.0:
+        raise ValueError("--recovery_route_min_pos_error must be non-negative")
+    if args.recovery_route_min_base_target_distance < 0.0:
+        raise ValueError("--recovery_route_min_base_target_distance must be non-negative")
 
     from isaaclab.app import AppLauncher
 
@@ -309,6 +346,17 @@ def main() -> int:
             env.norm_reward = False
         obs = env.reset()
         model = PPO.load(str(checkpoint), env=env, device="cuda:0")
+        recovery_model = None
+        if recovery_checkpoint is not None:
+            recovery_model = PPO.load(str(recovery_checkpoint), env=env, device="cuda:0")
+            print(
+                "[gate router] conditional recovery enabled "
+                f"checkpoint={recovery_checkpoint} "
+                f"min_waypoint_fraction={args.recovery_route_min_waypoint_fraction:.3f} "
+                f"min_pos_error={args.recovery_route_min_pos_error:.4f} "
+                f"min_base_target_distance={args.recovery_route_min_base_target_distance:.4f}",
+                flush=True,
+            )
         open_loop_actions = None
         if args.open_loop_actions_npz:
             with np.load(args.open_loop_actions_npz, allow_pickle=False) as data:
@@ -324,9 +372,36 @@ def main() -> int:
             )
         raw_env = base_env.unwrapped if hasattr(base_env, "unwrapped") else base_env
 
+        def route_recovery_mask(target_pos, ee_pos, base_pos):
+            trajectory_manager = raw_env.trajectory_manager
+            if not hasattr(trajectory_manager, "current_waypoint_idx"):
+                return np.zeros((args.num_envs,), dtype=bool), np.zeros((args.num_envs,), dtype=np.float32), np.zeros((args.num_envs,), dtype=np.float32), np.zeros((args.num_envs,), dtype=np.float32)
+
+            waypoint_idx = tensor_np(trajectory_manager.current_waypoint_idx).astype(np.float32)
+            lengths = getattr(trajectory_manager, "recorded_lengths", None)
+            if lengths is None:
+                waypoint_fraction = np.zeros_like(waypoint_idx, dtype=np.float32)
+            else:
+                lengths_np = np.maximum(tensor_np(lengths).astype(np.float32) - 1.0, 1.0)
+                waypoint_fraction = np.clip(waypoint_idx / lengths_np, 0.0, 1.0)
+
+            pos_error = tensor_np(torch.linalg.norm(target_pos - ee_pos, dim=-1)).astype(np.float32)
+            base_target_distance = tensor_np(torch.linalg.norm(target_pos[:, :2] - base_pos[:, :2], dim=-1)).astype(np.float32)
+            route = waypoint_fraction >= float(args.recovery_route_min_waypoint_fraction)
+            if args.recovery_route_min_pos_error > 0.0:
+                route &= pos_error >= float(args.recovery_route_min_pos_error)
+            if args.recovery_route_min_base_target_distance > 0.0:
+                route &= base_target_distance >= float(args.recovery_route_min_base_target_distance)
+            return route, waypoint_fraction, pos_error, base_target_distance
+
         pos_errors: list[np.ndarray] = []
         ori_errors: list[np.ndarray] = []
         rewards: list[np.ndarray] = []
+        route_counts: list[int] = []
+        latched_route_mask = np.zeros((args.num_envs,), dtype=bool)
+        route_waypoint_fractions: list[np.ndarray] = []
+        route_pos_errors: list[np.ndarray] = []
+        route_base_target_distances: list[np.ndarray] = []
         dones_count = 0
         target_pos0, target_quat0 = raw_env.trajectory_manager.get_target_pose()
         ee_pos0 = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
@@ -344,6 +419,26 @@ def main() -> int:
         for step in range(args.steps):
             if open_loop_actions is None:
                 action, _ = model.predict(obs, deterministic=True)
+                if recovery_model is not None:
+                    target_pos_pre, _ = raw_env.trajectory_manager.get_target_pose()
+                    ee_pos_pre = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
+                    base_pos_pre = raw_env.robot.data.root_pos_w
+                    route_mask, waypoint_fraction, pre_pos_error, base_target_distance = route_recovery_mask(
+                        target_pos_pre,
+                        ee_pos_pre,
+                        base_pos_pre,
+                    )
+                    if args.recovery_route_latch_once:
+                        latched_route_mask |= route_mask
+                        route_mask = latched_route_mask.copy()
+                    recovery_action, _ = recovery_model.predict(obs, deterministic=True)
+                    if np.any(route_mask):
+                        action = np.asarray(action, dtype=np.float32).copy()
+                        action[route_mask] = recovery_action[route_mask]
+                    route_counts.append(int(np.count_nonzero(route_mask)))
+                    route_waypoint_fractions.append(waypoint_fraction)
+                    route_pos_errors.append(pre_pos_error)
+                    route_base_target_distances.append(base_target_distance)
             else:
                 action = np.repeat(open_loop_actions[step : step + 1], args.num_envs, axis=0)
             obs, reward, done, _ = env.step(action)
@@ -357,6 +452,11 @@ def main() -> int:
             quat_dot = torch.abs(torch.sum(target_quat * ee_quat, dim=-1)).clamp(max=1.0)
             ori_errors.append(tensor_np(2.0 * torch.acos(quat_dot)))
             if step % 50 == 0:
+                if recovery_model is not None and route_counts:
+                    print(
+                        f"[gate router] step={step} routed={route_counts[-1]}/{args.num_envs}",
+                        flush=True,
+                    )
                 print(f"[gate] step={step}/{args.steps}", flush=True)
 
         pos = np.concatenate([x.reshape(-1) for x in pos_errors]).astype(np.float64)
@@ -389,6 +489,11 @@ def main() -> int:
         metrics = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "checkpoint": str(checkpoint),
+            "recovery_checkpoint": str(recovery_checkpoint) if recovery_checkpoint is not None else None,
+            "recovery_route_min_waypoint_fraction": float(args.recovery_route_min_waypoint_fraction),
+            "recovery_route_min_pos_error": float(args.recovery_route_min_pos_error),
+            "recovery_route_min_base_target_distance": float(args.recovery_route_min_base_target_distance),
+            "recovery_route_latch_once": bool(args.recovery_route_latch_once),
             "vec_normalize": str(vec_normalize),
             "disable_vec_normalize": bool(args.disable_vec_normalize),
             "trajectory_stage": args.trajectory_stage,
@@ -412,6 +517,23 @@ def main() -> int:
             "reward_p50": float(np.percentile(rew, 50)),
             "dones_count": int(dones_count),
         }
+        if route_counts:
+            route_count_arr = np.asarray(route_counts, dtype=np.float64)
+            route_fraction_arr = np.concatenate([x.reshape(-1) for x in route_waypoint_fractions]).astype(np.float64)
+            route_pos_arr = np.concatenate([x.reshape(-1) for x in route_pos_errors]).astype(np.float64)
+            route_base_arr = np.concatenate([x.reshape(-1) for x in route_base_target_distances]).astype(np.float64)
+            metrics.update(
+                {
+                    "recovery_route_steps": int(len(route_counts)),
+                    "recovery_route_env_selections": int(np.sum(route_count_arr)),
+                    "recovery_route_fraction": float(np.sum(route_count_arr) / (len(route_counts) * args.num_envs)),
+                    "recovery_route_count_mean": float(np.mean(route_count_arr)),
+                    "recovery_route_waypoint_fraction_mean": float(np.mean(route_fraction_arr)),
+                    "recovery_route_waypoint_fraction_p95": float(np.percentile(route_fraction_arr, 95)),
+                    "recovery_route_pos_error_mean_m": float(np.mean(route_pos_arr)),
+                    "recovery_route_base_target_distance_mean_m": float(np.mean(route_base_arr)),
+                }
+            )
         print(json.dumps(metrics, indent=2), flush=True)
         if args.output_json:
             output = Path(args.output_json)

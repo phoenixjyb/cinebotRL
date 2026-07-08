@@ -444,6 +444,70 @@ prefer `w4` only when recovery evidence is present, such as late waypoint
 fraction, larger base-target offset, or increasing EE position error. Then run a
 rendered rollout check to see whether the remaining p95 tradeoff is visible.
 
+## Conditional W4 Route Implementation - 2026-07-08
+
+Implementation:
+
+`scripts/reinforcement_learning/sb3/evaluate_stage_rollout_gate.py` now supports
+an opt-in recovery checkpoint:
+
+- `--recovery_checkpoint`
+- `--recovery_route_min_waypoint_fraction`
+- `--recovery_route_min_pos_error`
+- `--recovery_route_min_base_target_distance`
+- `--recovery_route_latch_once`
+
+Runtime contract:
+
+- Source checkpoint remains the default action source.
+- Recovery checkpoint is evaluated only for envs that meet the route condition.
+- With `--recovery_route_latch_once`, once an env enters recovery mode it stays
+  routed for the rest of that rollout.
+- The evaluator records route usage through `recovery_route_fraction` and related
+  route diagnostics.
+
+Validated route:
+
+```bash
+--checkpoint stage0_policy_envelope_fk_mix_contract_zpenalty80_lowstd_resume_32k_20260707/final_model.zip
+--recovery_checkpoint stage0_policy_envelope_fk_base040_offsetfollow_mixed_preserve_w4_20260708/final_model.zip
+--recovery_route_min_waypoint_fraction 0.65
+--recovery_route_latch_once
+--base_action_scale 0.25
+```
+
+Validation artifact:
+
+`evaluation_results/stage_rollout_gate/routed_w4_latch_validation_20260708/summary.json`
+
+Route result:
+
+| Stage | Mode | Routed fraction | Routed EE mean/p95/max | Meaning |
+| --- | --- | ---: | ---: | --- |
+| `base025` | full | `0.0%` | `0.0462 / 0.0682 / 0.0835 m` | source preserved |
+| `base025` | late | `99.8%` | `0.0428 / 0.0743 / 0.1026 m` | recovery route active |
+| `base040` | full | `0.0%` | `0.0505 / 0.0749 / 0.1056 m` | source preserved |
+| `base040` | late | `99.8%` | `0.0604 / 0.1139 / 0.1648 m` | recovery route active |
+| `large08` | full | `0.0%` | `0.0452 / 0.0707 / 0.0902 m` | source preserved |
+| `large08` | late | `99.8%` | `0.0426 / 0.0731 / 0.0862 m` | mean better, p95/max slightly worse than source |
+| `mix_large08_base025` | full | `0.0%` | `0.0507 / 0.0754 / 0.0827 m` | source preserved |
+| `mix_large08_base025` | late | `99.8%` | `0.0389 / 0.0638 / 0.0715 m` | recovery route active |
+
+Decision:
+
+The conditional route fixes the main blocker from global `w4` replacement:
+normal/full-start gates remain exactly on the source policy and no longer inherit
+the `w4` p95 tradeoff. Late-start gates get the recovery behavior. The remaining
+caveat is `large08` late-start p95/max, where `w4` improves mean but slightly
+worsens tail error. That is acceptable for the next visual check, but should not
+be ignored.
+
+Next step:
+
+Record rendered rollouts for routed `base040` late-start and `large08` late-start
+to inspect whether the remaining p95/max tradeoff is visible as jerk, drift, or
+unnatural base motion.
+
 ## Stage A Freeze-Base Implementation
 
 Implementation:

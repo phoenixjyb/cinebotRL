@@ -1749,3 +1749,34 @@ Reject Aux-PPO continuation for the nominal 79 stage. The issue is not simply PP
 Next useful update:
 
 Do not run more nominal 79 PPO continuations until the RL objective is reworked. The safer next path is either (1) improve the 79 imitation policy directly with better labels/architecture/evaluation, or (2) build a separate teacher-forced or DAgger-style rollout collector where the policy is corrected against the live 79 teacher state distribution before any reward-only PPO is attempted. Obstacle curricula should wait until the no-obstacle 79 policy can track full trajectories, not just short local motion.
+
+## 79 Weighted Masked-BC Candidate - 2026-07-08
+
+Trained a stronger offline imitation candidate instead of continuing PPO:
+
+- policy: `logs/bc/gik_no_obstacle79_masked9_weighted80_20260708/bc_policy.zip`
+- dataset: `data/gik_offline_teacher_obs/obs_dataset_no_obstacle79_full_masked.npz`
+- training: 80 epochs, `lr=2e-4`, masked action loss
+- action weights: `1,2,1.25,2,1.25,1.25,1.5,1.5,1.25`
+- offline validation MSE: `0.000171`
+- offline full-dataset RMSE: `0.01243`, improved from the earlier 10-epoch masked-BC smoke RMSE `0.07273`
+
+40-step teacher-reset Isaac gate on the same 4-trajectory protocol:
+
+- output: `evaluation_results/stage_gik_no_obstacle79_nominal/stage_loader_teacherreset_40step_masked9bc_weighted80_20260708.json`
+- initial EE error: `0.00316 m`
+- mean EE error: `0.14694 m` versus previous BC10 `0.13472 m`
+- p50 EE error: `0.13427 m` versus previous BC10 `0.08459 m`
+- p95 EE error: `0.29419 m` versus previous BC10 `0.37746 m`
+- max EE error: `0.36248 m` versus previous BC10 `0.44162 m`
+- final EE error: `0.29756 m` versus previous BC10 `0.36056 m`
+- orientation mean: `77.34 deg` versus previous BC10 `84.09 deg`
+- dones: `0`
+
+Decision:
+
+Keep this as a candidate, not a clean replacement. It is better on tail/final/worst-case metrics and offline imitation, but worse on mean and median short-rollout tracking. This confirms that lower offline action MSE alone is not enough; the gate must measure closed-loop trajectory tracking.
+
+Next useful update:
+
+Add a longer rollout gate over more of the 79 trajectories and inspect per-trajectory failure cases. If the weighted BC candidate mainly improves tails but hurts early tracking, train/evaluate a hybrid BC objective rather than moving to PPO: preserve BC10-style early behavior while adding tail/final weighting only where the old policy drifts.

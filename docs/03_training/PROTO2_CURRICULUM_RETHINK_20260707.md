@@ -1036,3 +1036,54 @@ Do not promote the base-head auxiliary candidate. It improves neither `base040` 
 Next useful update:
 
 If continuing this line, test a much weaker auxiliary path or a coordinated full action-head auxiliary loss with a very small learning rate and fewer steps. Do not reuse the base-only aux settings above as a promotion candidate.
+
+## Stage B Weak Tail Auxiliary A/B Probe
+
+Goal:
+
+Compare two bounded low-gain uses of the collected `base040` tail-state DAgger dataset:
+
+- weak base-only auxiliary loss on rows `[6, 7, 8]`
+- weak coordinated full-action auxiliary loss on rows `[0, 1, 2, 3, 4, 5, 6, 7, 8]`
+
+Common setup:
+
+- source checkpoint: `stage0_policy_envelope_fk_mix_contract_zpenalty80_lowstd_resume_32k_20260707/final_model.zip`
+- stage: `stage0_policy_envelope_fk_base040`
+- aux dataset: `data/policy_envelope_fk_base040/tail_dagger_contractz_p80_20260707.npz`
+- PPO: `32k` continuation, `learning_rate=3e-6`, `policy_log_std=-4.0`, `base_action_scale=0.25`
+- gate: 60-step Isaac rollout, 8 envs, `max_trajectories=8`
+
+Weak base-only candidate:
+
+- run: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_taildagger_baseaux_weak_from_contractz_lowstd_32k_20260708`
+- aux rows: `[6, 7, 8]`
+- aux schedule: `2` supervised steps per PPO rollout, batch `64`, lr `2e-6`, grad clip `0.10`
+- training health: aux loss `0.007267 -> 0.006554`, final PPO `approx_kl=0.00463`
+- direct `base040`: `0.0503 / 0.0773 / 0.1063 m`
+- routed `base025`: `0.0450 / 0.0698 / 0.0923 m`
+- routed fixed-base `large08`: `0.0374 / 0.0659 / 0.0801 m`, unchanged because fixed-base still routes to the promoted default checkpoint
+
+Weak full-action candidate:
+
+- run: `logs/sb3/recomoproto2trackee_v0/stage0_policy_envelope_fk_base040_taildagger_fullaux_weak_from_contractz_lowstd_32k_20260708`
+- aux rows: `[0, 1, 2, 3, 4, 5, 6, 7, 8]`
+- aux schedule: `1` supervised step per PPO rollout, batch `64`, lr `1e-6`, grad clip `0.05`
+- training health: aux loss `0.004044 -> 0.004009`, final PPO `approx_kl=0.00503`
+- direct `base040`: `0.0495 / 0.0807 / 0.1139 m`
+- routed `base025`: `0.0443 / 0.0739 / 0.0993 m`
+- routed fixed-base `large08`: `0.0374 / 0.0659 / 0.0801 m`, unchanged because fixed-base still routes to the promoted default checkpoint
+
+Reference metrics:
+
+- existing routed `base040` baseline: `0.0505 / 0.0749 / 0.1056 m`
+- existing routed `base025` baseline: `0.0462 / 0.0682 / 0.0835 m`
+- existing routed fixed-base `large08`: `0.0374 / 0.0659 / 0.0801 m`
+
+Decision:
+
+Do not promote either weak auxiliary candidate. Both reduce mean error slightly on some routed checks, but both worsen p95/max tail behavior versus the existing routed baseline. The weak full-action variant is better coordinated than the prior strong base-head auxiliary probe, but it still does not solve the terminal tail error.
+
+Lesson:
+
+The collected tail-state dataset is diagnostically useful, but simply adding an auxiliary imitation loss around the tail states is not enough. The next update should stop increasing auxiliary weight and instead target the failure mode directly: terminal/tail recovery, trajectory-specific end-segment correction, or a small corrective controller/teacher that is evaluated on the visited closed-loop tail states before being mixed back into PPO.

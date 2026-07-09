@@ -523,6 +523,12 @@ def parse_args():
         help="Reject recorded trajectories shorter than this many seconds.",
     )
     parser.add_argument(
+        "--episode_length_s",
+        type=float,
+        default=0.0,
+        help="Optional env episode length override in seconds. Keep 0 to use the task default.",
+    )
+    parser.add_argument(
         "--random_start_waypoint",
         action="store_true",
         help="Start recorded trajectories from a random waypoint on reset.",
@@ -2388,6 +2394,9 @@ def main():
         env_cfg = MobileMMTrackEEEnvCfg()
         env_cfg.num_envs = args.num_envs
         env_cfg.scene.num_envs = args.num_envs
+        if args.episode_length_s > 0.0:
+            env_cfg.episode_length_s = float(args.episode_length_s)
+            print(f"    Episode length override: {env_cfg.episode_length_s:.2f}s")
         if args.seed is not None:
             env_cfg.seed = args.seed
             env_cfg.task_config.obstacles.seed = args.seed

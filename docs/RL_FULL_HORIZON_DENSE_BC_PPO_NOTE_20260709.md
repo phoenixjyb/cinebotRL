@@ -206,8 +206,58 @@ without losing the teacher baseline.
 The next useful experiment should build on imitation-preservation instead of
 plain PPO fine-tuning:
 
-1. Add a start-to-end gate callback or post-iteration gate so regressions on
-   known good cases like `0028` stop the run early.
+## Automated Five-Case Gate
+
+Added:
+
+```text
+scripts/reinforcement_learning/sb3/five_case_full_horizon_gate.py
+```
+
+Purpose: run or summarize the five fixed no-obstacle full-start proof cases
+(`0001`, `0020`, `0028`, `0050`, `0079`) and compare candidate coverage against
+the dense-BC baseline. The default verdict rule allows only small regression
+versus dense BC, with a stricter hard gate on `0028`.
+
+Validated behavior:
+
+```text
+imitation-preserve raw smoke -> PASS
+base-slew start-only smoke   -> FAIL
+```
+
+Useful summary-only commands:
+
+```bash
+/mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 scripts/reinforcement_learning/sb3/five_case_full_horizon_gate.py \
+  --summary_only \
+  --existing_output_dir evaluation_results/videos_rendered/no_obstacle79_dense01_ppo_imitation_preserve_raw_full_5cases_20260709 \
+  --name_prefix ppo_imitation_preserve_raw_noobs
+
+/mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 scripts/reinforcement_learning/sb3/five_case_full_horizon_gate.py \
+  --summary_only \
+  --existing_output_dir evaluation_results/videos_rendered/no_obstacle79_dense01_ppo_base_slew_startonly_full_5cases_20260709 \
+  --name_prefix ppo_base_slew_noobs
+```
+
+For a fresh raw-observation candidate:
+
+```bash
+/mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 scripts/reinforcement_learning/sb3/five_case_full_horizon_gate.py \
+  --checkpoint logs/sb3/<run>/final_model.zip \
+  --disable_vec_normalize \
+  --headless \
+  --name_prefix <candidate_name> \
+  --output_dir evaluation_results/videos_rendered/<candidate_name>_full_5cases
+```
+
+## Next Recommended Change
+
+The next useful experiment should build on imitation-preservation and make the
+five-case gate mandatory after each candidate:
+
+1. Use the automated gate after every short PPO segment so regressions on known
+   good cases like `0028` stop the run immediately.
 2. Increase learning signal cautiously from the raw imitation-preserve baseline:
    keep full 9D preservation active, but raise PPO timesteps and/or add
    case-targeted replay only when the five-case gate does not regress.

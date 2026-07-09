@@ -82,6 +82,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--trajectory_stage", default="stage0_policy_envelope_fk")
     parser.add_argument("--num_envs", type=int, default=8)
     parser.add_argument("--steps", type=int, default=160)
+    parser.add_argument(
+        "--episode_length_s",
+        type=float,
+        default=0.0,
+        help="Optional env episode length override in seconds. Keep 0 to use the task default.",
+    )
     parser.add_argument("--max_trajectories", type=int, default=None)
     parser.add_argument(
         "--assign_loaded_trajectories_once",
@@ -298,6 +304,9 @@ def main() -> int:
         env_cfg.num_envs = args.num_envs
         env_cfg.scene.num_envs = args.num_envs
         env_cfg.seed = args.seed
+        if args.episode_length_s > 0.0:
+            env_cfg.episode_length_s = float(args.episode_length_s)
+            print(f"[gate] episode_length_s override={env_cfg.episode_length_s:g}", flush=True)
         env_cfg.task_config.obstacles.enable_obstacles = bool(args.enable_obstacles)
         env_cfg.task_config.obstacles.disc_position_xy = (float(args.obstacle_x), float(args.obstacle_y))
         if args.obstacle_radius is not None:
@@ -628,6 +637,7 @@ def main() -> int:
         dataset_policy_actions: list[np.ndarray] = []
         dones_count = 0
         done_counts_per_env = np.zeros((args.num_envs,), dtype=np.int64)
+        first_done_step_per_env = np.full((args.num_envs,), -1, dtype=np.int64)
         target_pos0, target_quat0 = raw_env.trajectory_manager.get_target_pose()
         ee_pos0 = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
         base_pos0 = raw_env.robot.data.root_pos_w
@@ -697,6 +707,8 @@ def main() -> int:
             done_arr = np.asarray(done, dtype=bool)
             dones_count += int(np.count_nonzero(done_arr))
             done_counts_per_env += done_arr.astype(np.int64)
+            first_done_mask = done_arr & (first_done_step_per_env < 0)
+            first_done_step_per_env[first_done_mask] = step
 
             target_pos, target_quat = raw_env.trajectory_manager.get_target_pose()
             ee_pos = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
@@ -720,6 +732,41 @@ def main() -> int:
         pos_by_step = np.stack(pos_errors, axis=0).astype(np.float64)
         ori_by_step = np.stack(ori_errors, axis=0).astype(np.float64)
         rew_by_step = np.stack(rewards, axis=0).astype(np.float64)
+        first_episode_pos_chunks: list[np.ndarray] = []
+        first_episode_ori_chunks: list[np.ndarray] = []
+        first_episode_rew_chunks: list[np.ndarray] = []
+        first_episode_final_pos_error = np.zeros((args.num_envs,), dtype=np.float64)
+        first_episode_steps = np.zeros((args.num_envs,), dtype=np.int64)
+        for env_id in range(args.num_envs):
+            stop = int(first_done_step_per_env[env_id])
+            if stop < 0:
+                stop = int(args.steps)
+            # Exclude the terminal sample because the vectorized env may already
+            # have reset that environment for the next episode on the done step.
+            stop = max(0, min(stop, int(args.steps)))
+            first_episode_steps[env_id] = stop
+            if stop > 0:
+                first_episode_pos_chunks.append(pos_by_step[:stop, env_id])
+                first_episode_ori_chunks.append(ori_by_step[:stop, env_id])
+                first_episode_rew_chunks.append(rew_by_step[:stop, env_id])
+                first_episode_final_pos_error[env_id] = float(pos_by_step[stop - 1, env_id])
+            else:
+                first_episode_final_pos_error[env_id] = float(initial_pos_error[env_id])
+        first_episode_pos = (
+            np.concatenate(first_episode_pos_chunks).astype(np.float64)
+            if first_episode_pos_chunks
+            else np.asarray([], dtype=np.float64)
+        )
+        first_episode_ori = (
+            np.concatenate(first_episode_ori_chunks).astype(np.float64)
+            if first_episode_ori_chunks
+            else np.asarray([], dtype=np.float64)
+        )
+        first_episode_rew = (
+            np.concatenate(first_episode_rew_chunks).astype(np.float64)
+            if first_episode_rew_chunks
+            else np.asarray([], dtype=np.float64)
+        )
         target_pos_end, _ = raw_env.trajectory_manager.get_target_pose()
         ee_pos_end = raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]
         base_pos_end = raw_env.robot.data.root_pos_w
@@ -765,6 +812,7 @@ def main() -> int:
             "trajectory_stage": args.trajectory_stage,
             "num_envs": args.num_envs,
             "steps": args.steps,
+            "episode_length_s": float(args.episode_length_s) if args.episode_length_s > 0.0 else None,
             "enable_obstacles": bool(args.enable_obstacles),
             "obstacles_from_trajectory_metadata": bool(args.obstacles_from_trajectory_metadata),
             "samples": int(pos.size),
@@ -784,6 +832,14 @@ def main() -> int:
             "reward_mean": float(np.mean(rew)),
             "reward_p50": float(np.percentile(rew, 50)),
             "dones_count": int(dones_count),
+            "first_episode_samples": int(first_episode_pos.size),
+            "first_episode_ee_pos_error_mean_m": float(np.mean(first_episode_pos)) if first_episode_pos.size else None,
+            "first_episode_ee_pos_error_p50_m": float(np.percentile(first_episode_pos, 50)) if first_episode_pos.size else None,
+            "first_episode_ee_pos_error_p95_m": float(np.percentile(first_episode_pos, 95)) if first_episode_pos.size else None,
+            "first_episode_ee_pos_error_max_m": float(np.max(first_episode_pos)) if first_episode_pos.size else None,
+            "first_episode_ee_ori_error_mean_deg": float(np.degrees(np.mean(first_episode_ori))) if first_episode_ori.size else None,
+            "first_episode_reward_mean": float(np.mean(first_episode_rew)) if first_episode_rew.size else None,
+            "first_episode_done_envs": int(np.count_nonzero(first_done_step_per_env >= 0)),
         }
         if obstacle_clearances:
             clearance = np.concatenate([x.reshape(-1) for x in obstacle_clearances]).astype(np.float64)
@@ -834,6 +890,39 @@ def main() -> int:
                         "ee_ori_error_mean_deg": float(np.degrees(np.mean(ori_by_step[:, env_id]))),
                         "reward_mean": float(np.mean(rew_by_step[:, env_id])),
                         "dones_count": int(done_counts_per_env[env_id]),
+                        "first_done_step": int(first_done_step_per_env[env_id]),
+                        "first_episode_steps": int(first_episode_steps[env_id]),
+                        "first_episode_final_ee_pos_error_m": float(first_episode_final_pos_error[env_id]),
+                        "first_episode_ee_pos_error_mean_m": (
+                            float(np.mean(pos_by_step[: first_episode_steps[env_id], env_id]))
+                            if first_episode_steps[env_id] > 0
+                            else None
+                        ),
+                        "first_episode_ee_pos_error_p50_m": (
+                            float(np.percentile(pos_by_step[: first_episode_steps[env_id], env_id], 50))
+                            if first_episode_steps[env_id] > 0
+                            else None
+                        ),
+                        "first_episode_ee_pos_error_p95_m": (
+                            float(np.percentile(pos_by_step[: first_episode_steps[env_id], env_id], 95))
+                            if first_episode_steps[env_id] > 0
+                            else None
+                        ),
+                        "first_episode_ee_pos_error_max_m": (
+                            float(np.max(pos_by_step[: first_episode_steps[env_id], env_id]))
+                            if first_episode_steps[env_id] > 0
+                            else None
+                        ),
+                        "first_episode_ee_ori_error_mean_deg": (
+                            float(np.degrees(np.mean(ori_by_step[: first_episode_steps[env_id], env_id])))
+                            if first_episode_steps[env_id] > 0
+                            else None
+                        ),
+                        "first_episode_reward_mean": (
+                            float(np.mean(rew_by_step[: first_episode_steps[env_id], env_id]))
+                            if first_episode_steps[env_id] > 0
+                            else None
+                        ),
                     }
                 )
                 if initial_obstacle_clearance is not None and env_id < len(initial_obstacle_clearance):

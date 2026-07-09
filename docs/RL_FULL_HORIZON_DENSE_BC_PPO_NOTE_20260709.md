@@ -140,17 +140,84 @@ worse on four of five cases and severely regresses the previously solved `0028`.
 
 ## Next Recommended Change
 
-The next useful experiment should avoid plain PPO fine-tuning that is allowed
-to drift away from the dense BC teacher:
+## PPO Smoke 4: Raw-Observation Imitation-Preservation PPO
+
+Code support:
+
+```text
+scripts/reinforcement_learning/sb3/train.py
+--imitation_preserve_dataset
+--imitation_preserve_action_indices
+--imitation_preserve_gradient_steps
+--imitation_preserve_batch_size
+--imitation_preserve_lr
+--imitation_preserve_normalize_obs / --no-imitation_preserve_normalize_obs
+```
+
+This reuses the masked-action auxiliary supervised update path, but makes it
+explicitly usable for dense BC/GIK teacher preservation rather than only
+base-assist labels. It can also normalize teacher observations through
+`VecNormalize` when the PPO run uses normalized observations. For the dense BC
+teacher smoke below, normalization was disabled because the BC actor and dense
+teacher dataset are raw-observation artifacts.
+
+Training:
+
+```text
+logs/sb3/fullhorizon_dense01_ppo_imitation_preserve_raw_smoke_20260709
+warm start: dense BC policy
+timesteps: 65,536
+num_envs: 128
+episode_length_s: 60
+VecNormalize: disabled
+PPO learning_rate: 3e-6
+PPO n_epochs: 1
+PPO target_kl: 0.003
+PPO clip_range: 0.05
+imitation_preserve_dataset: data/gik_offline_teacher_obs/obs_dataset_no_obstacle79_dense01_full_masked_20260709.npz
+imitation_preserve_action_indices: 0,1,2,3,4,5,6,7,8
+imitation_preserve_gradient_steps: 64 per rollout
+imitation_preserve_lr: 1e-5
+```
+
+The auxiliary loss stayed stable around `2e-5`, and PPO KL stayed small
+(`< 0.001`). This confirms the preservation callback is doing its job: PPO did
+not erase the dense BC actor during this bounded smoke.
+
+Rendered five-case coverage:
+
+```text
+case  dense_bc  random_ppo  base_slew_ppo  imitation_preserve  delta_vs_bc
+0001  48.8%     35.0%       31.6%          49.0%               +0.2%
+0020  25.7%     28.8%       11.8%          25.4%               -0.3%
+0028 100.3%     42.6%       19.2%         100.3%                0.0%
+0050  15.3%     40.1%       20.4%          15.0%               -0.3%
+0079  62.5%     72.6%       54.5%          61.7%               -0.8%
+```
+
+Conclusion: keep this infrastructure. It is not yet an improved model, but it
+solves the key failure from the earlier PPO runs: PPO no longer destroys the
+full-start dense-BC behavior, including the `0028` regression gate. This is the
+right base for the next curriculum, because we can now add reward/DAgger signal
+without losing the teacher baseline.
+
+## Next Recommended Change
+
+The next useful experiment should build on imitation-preservation instead of
+plain PPO fine-tuning:
 
 1. Add a start-to-end gate callback or post-iteration gate so regressions on
    known good cases like `0028` stop the run early.
-2. Train with an auxiliary imitation loss or a staged BC-refresh step so PPO
-   cannot destroy the dense-BC trajectory-following behavior.
-3. Train a two-head or router curriculum:
+2. Increase learning signal cautiously from the raw imitation-preserve baseline:
+   keep full 9D preservation active, but raise PPO timesteps and/or add
+   case-targeted replay only when the five-case gate does not regress.
+3. Add DAgger-style teacher refresh for cases where dense BC terminates early
+   (`0001`, `0020`, `0050`, `0079`) instead of hoping PPO discovers the missing
+   continuation alone.
+4. Train a two-head or router curriculum:
    - Stage A: preserve dense-BC full-start tracking with very low LR and minimal
      exploration.
    - Stage B: introduce random mid-trajectory starts only after Stage A passes
      the five-case full-start gate.
-4. Only after no-obstacle full trajectories pass should obstacle cases be mixed
+5. Only after no-obstacle full trajectories pass should obstacle cases be mixed
    back in.

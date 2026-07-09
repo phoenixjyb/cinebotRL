@@ -458,6 +458,69 @@ def parse_args():
             "Use values below 1.0 to soften hard-state oversampling."
         ),
     )
+    parser.add_argument(
+        "--imitation_preserve_dataset",
+        type=str,
+        default=None,
+        help=(
+            "Optional masked action .npz teacher dataset used for supervised policy "
+            "preservation between PPO rollouts. This is intended for dense BC/GIK "
+            "teacher preservation, not only base-assist labels."
+        ),
+    )
+    parser.add_argument(
+        "--imitation_preserve_action_indices",
+        type=str,
+        default="0,1,2,3,4,5,6,7,8",
+        help=(
+            "Comma-separated action rows to preserve from --imitation_preserve_dataset. "
+            "Use all rows for full 9D preservation, or a subset for masked teachers."
+        ),
+    )
+    parser.add_argument(
+        "--imitation_preserve_gradient_steps",
+        type=int,
+        default=0,
+        help="Number of supervised preservation minibatch updates before each PPO rollout.",
+    )
+    parser.add_argument(
+        "--imitation_preserve_batch_size",
+        type=int,
+        default=2048,
+        help="Minibatch size for supervised preservation updates.",
+    )
+    parser.add_argument(
+        "--imitation_preserve_lr",
+        type=float,
+        default=3e-5,
+        help="Learning rate for supervised preservation updates.",
+    )
+    parser.add_argument(
+        "--imitation_preserve_max_grad_norm",
+        type=float,
+        default=0.5,
+        help="Gradient clipping norm for supervised preservation updates.",
+    )
+    parser.add_argument(
+        "--imitation_preserve_ignore_sample_weight",
+        action="store_true",
+        help="Ignore optional sample_weight in the preservation dataset.",
+    )
+    parser.add_argument(
+        "--imitation_preserve_sample_weight_power",
+        type=float,
+        default=1.0,
+        help="Exponent applied to optional preservation sample_weight before sampling.",
+    )
+    parser.add_argument(
+        "--imitation_preserve_normalize_obs",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Normalize preservation dataset observations through VecNormalize when "
+            "the PPO env uses VecNormalize. Disable for raw-observation runs."
+        ),
+    )
     
     # Device selection
     parser.add_argument(
@@ -1338,6 +1401,8 @@ def main():
             max_grad_norm: float,
             use_sample_weight: bool = True,
             sample_weight_power: float = 1.0,
+            normalize_obs_with_env: bool = False,
+            label: str = "BaseAssistAux",
             log_freq: int = 1,
             verbose: int = 1,
         ):
@@ -1350,6 +1415,8 @@ def main():
             self.max_grad_norm = max_grad_norm
             self.use_sample_weight = use_sample_weight
             self.sample_weight_power = sample_weight_power
+            self.normalize_obs_with_env = normalize_obs_with_env
+            self.label = label
             self.log_freq = log_freq
             self.rollout_count = 0
             self.obs_tensor = None
@@ -1366,11 +1433,11 @@ def main():
             from scripts.reinforcement_learning.sb3.grouped_policy import GroupedActionMlpExtractor
 
             if self.gradient_steps <= 0:
-                raise ValueError("--base_assist_aux_gradient_steps must be positive when aux dataset is enabled")
+                raise ValueError(f"{self.label}: gradient_steps must be positive when aux dataset is enabled")
             if self.sample_weight_power <= 0.0:
-                raise ValueError("--base_assist_aux_sample_weight_power must be positive")
+                raise ValueError(f"{self.label}: sample_weight_power must be positive")
             if not self.dataset_path.exists():
-                raise FileNotFoundError(f"base assist aux dataset not found: {self.dataset_path}")
+                raise FileNotFoundError(f"{self.label}: aux dataset not found: {self.dataset_path}")
 
             data = np.load(self.dataset_path, allow_pickle=False)
             required = ["observations", "actions", "action_valid_mask"]
@@ -1403,7 +1470,19 @@ def main():
                 raise ValueError("aux dataset has no valid labels for requested action indices")
 
             device = self.model.device
-            self.obs_tensor = torch.as_tensor(observations[keep], dtype=torch.float32, device=device)
+            kept_observations = observations[keep]
+            normalized_by_env = False
+            if self.normalize_obs_with_env:
+                normalize_obs = getattr(self.model.env, "normalize_obs", None)
+                if callable(normalize_obs):
+                    kept_observations = normalize_obs(kept_observations.copy()).astype(np.float32)
+                    normalized_by_env = True
+                elif self.verbose > 0:
+                    print(
+                        f"[{self.label}] observation normalization requested but env has no normalize_obs(); "
+                        "using dataset observations as-is"
+                    )
+            self.obs_tensor = torch.as_tensor(kept_observations, dtype=torch.float32, device=device)
             self.action_tensor = torch.as_tensor(actions[keep][:, self.action_indices], dtype=torch.float32, device=device)
             self.mask_tensor = torch.as_tensor(selected_mask[keep], dtype=torch.float32, device=device)
             if self.use_sample_weight and "sample_weight" in data:
@@ -1451,7 +1530,7 @@ def main():
 
             if self.verbose > 0:
                 valid_counts = mask.sum(axis=0).astype(float).tolist()
-                print("[BaseAssistAux] enabled")
+                print(f"[{self.label}] enabled")
                 print(f"  dataset: {self.dataset_path}")
                 print(f"  samples: {self.obs_tensor.shape[0]:,}/{observations.shape[0]:,} usable")
                 print(f"  action rows: {self.action_indices}")
@@ -1468,6 +1547,10 @@ def main():
                     print("  sampling: uniform (sample_weight ignored)")
                 else:
                     print("  sampling: uniform")
+                print(
+                    "  observation contract: "
+                    + ("VecNormalize-normalized" if normalized_by_env else "dataset/raw")
+                )
 
         def _predict_selected(self, obs_batch):
             policy = self.model.policy
@@ -1523,8 +1606,11 @@ def main():
                         policy.action_net.bias[unselected] = before_bias[unselected]
 
             self.logger.record("train/base_assist_aux_loss", last_loss)
+            if self.label != "BaseAssistAux":
+                safe_label = self.label.lower().replace(" ", "_")
+                self.logger.record(f"train/{safe_label}_loss", last_loss)
             if self.verbose > 0 and self.rollout_count % self.log_freq == 0:
-                print(f"[BaseAssistAux] rollout={self.rollout_count} loss={last_loss:.6f}")
+                print(f"[{self.label}] rollout={self.rollout_count} loss={last_loss:.6f}")
 
         def _on_step(self) -> bool:
             return True
@@ -2768,6 +2854,8 @@ def main():
             max_grad_norm=args.base_assist_aux_max_grad_norm,
             use_sample_weight=not args.base_assist_aux_ignore_sample_weight,
             sample_weight_power=args.base_assist_aux_sample_weight_power,
+            normalize_obs_with_env=False,
+            label="BaseAssistAux",
             verbose=1,
         )
         callbacks.append(base_assist_aux_callback)
@@ -2776,6 +2864,32 @@ def main():
         print(
             f"      rows: {aux_action_indices}, steps/rollout: {args.base_assist_aux_gradient_steps}, "
             f"batch: {args.base_assist_aux_batch_size}, lr: {args.base_assist_aux_lr:g}"
+        )
+
+    if args.imitation_preserve_dataset:
+        imitation_action_indices = _parse_int_list(args.imitation_preserve_action_indices)
+        if not imitation_action_indices:
+            raise ValueError("--imitation_preserve_action_indices must contain at least one index")
+        imitation_preserve_callback = MaskedActionAuxCallback(
+            dataset_path=args.imitation_preserve_dataset,
+            action_indices=imitation_action_indices,
+            gradient_steps=args.imitation_preserve_gradient_steps,
+            batch_size=args.imitation_preserve_batch_size,
+            lr=args.imitation_preserve_lr,
+            max_grad_norm=args.imitation_preserve_max_grad_norm,
+            use_sample_weight=not args.imitation_preserve_ignore_sample_weight,
+            sample_weight_power=args.imitation_preserve_sample_weight_power,
+            normalize_obs_with_env=args.imitation_preserve_normalize_obs,
+            label="ImitationPreserveAux",
+            verbose=1,
+        )
+        callbacks.append(imitation_preserve_callback)
+        print("    [OK] Imitation-preservation supervised callback enabled:")
+        print(f"      dataset: {args.imitation_preserve_dataset}")
+        print(
+            f"      rows: {imitation_action_indices}, steps/rollout: {args.imitation_preserve_gradient_steps}, "
+            f"batch: {args.imitation_preserve_batch_size}, lr: {args.imitation_preserve_lr:g}, "
+            f"normalize_obs={args.imitation_preserve_normalize_obs}"
         )
 
     if args.enable_obstacles and args.enable_obstacle_curriculum:
@@ -3125,6 +3239,11 @@ def main():
         print(f"Base assist aux:   {args.base_assist_aux_dataset}")
         print(f"  -> Rows:         {args.base_assist_aux_action_indices}")
         print(f"  -> Steps/rollout:{args.base_assist_aux_gradient_steps}")
+    if args.imitation_preserve_dataset:
+        print(f"Imitation preserve:{args.imitation_preserve_dataset}")
+        print(f"  -> Rows:         {args.imitation_preserve_action_indices}")
+        print(f"  -> Steps/rollout:{args.imitation_preserve_gradient_steps}")
+        print(f"  -> Normalize obs:{args.imitation_preserve_normalize_obs}")
     print("=" * 70 + "\n")
     
     # Train

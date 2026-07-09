@@ -39,6 +39,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base_action_scale", type=float, default=1.0)
     parser.add_argument("--task", default="RecomoProto2TrackEE-v0")
     parser.add_argument("--steps", type=int, default=400)
+    parser.add_argument(
+        "--stop_on_done",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Stop recording as soon as any environment reports done. Useful for full trajectory proof clips.",
+    )
     parser.add_argument("--fps", type=int, default=20)
     parser.add_argument("--seed", type=int, default=20260706)
     parser.add_argument("--headless", action="store_true", help="Use headless offscreen rendering.")
@@ -543,6 +549,8 @@ def main() -> int:
             steps_executed += 1
             if bool(np.any(dones)):
                 done_count += 1
+                if args.stop_on_done:
+                    break
 
         summary = {
             "checkpoint": str(checkpoint),
@@ -560,6 +568,7 @@ def main() -> int:
             "video_dir": str(video_dir),
             "steps_requested": args.steps,
             "steps_executed": steps_executed,
+            "stop_on_done": bool(args.stop_on_done),
             "done_count": done_count,
             "fps": args.fps,
             "render_polish": render_polish_meta,

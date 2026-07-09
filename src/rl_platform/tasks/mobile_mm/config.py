@@ -226,6 +226,7 @@ The groups below mirror the structure used in rewards.compute_combined_reward().
     action_magnitude: float = 0.002  # Penalises high torque commands
     action_rate: float = 0.005  # Penalises rapid action changes
     action_smoothness: float = 0.05  # Penalises jerk-like behaviour in the control sequence
+    base_action_delta: float = 0.0  # Optional penalty for rapid base_vx/base_vy/base_wz command changes
 
     # ========================================
     # CONSTRAINT VIOLATIONS (Much gentler)
@@ -317,3 +318,4 @@ class MobileMMTrackConfig:
     terminate_on_collision: bool = False  # External collisions (not used)
     terminate_on_tracking_error: bool = True
     max_tracking_error: float = 2.0  # meters
+    base_action_slew_limit: float = 0.0  # Optional normalized per-step clamp for base action deltas; 0 disables

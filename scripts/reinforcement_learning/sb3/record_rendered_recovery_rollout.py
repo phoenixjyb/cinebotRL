@@ -46,6 +46,12 @@ def parse_args() -> argparse.Namespace:
         help="Optional env episode length override in seconds. Keep 0 to use the task default.",
     )
     parser.add_argument(
+        "--base_action_slew_limit",
+        type=float,
+        default=0.0,
+        help="Optional env-level normalized per-step slew limit for base action rows [6,7,8].",
+    )
+    parser.add_argument(
         "--stop_on_done",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -442,6 +448,8 @@ def main() -> int:
         env_cfg.scene.num_envs = 1
         if args.episode_length_s > 0.0:
             env_cfg.episode_length_s = float(args.episode_length_s)
+        if args.base_action_slew_limit > 0.0:
+            env_cfg.task_config.base_action_slew_limit = float(args.base_action_slew_limit)
         env_cfg.task_config.obstacles.enable_obstacles = bool(args.enable_obstacles)
         env_cfg.task_config.obstacles.randomize_per_reset = True
         env_cfg.task_config.obstacles.disc_radius = 0.20
@@ -577,6 +585,9 @@ def main() -> int:
             "steps_requested": args.steps,
             "steps_executed": steps_executed,
             "episode_length_s": float(args.episode_length_s) if args.episode_length_s > 0.0 else None,
+            "base_action_slew_limit": (
+                float(args.base_action_slew_limit) if args.base_action_slew_limit > 0.0 else None
+            ),
             "stop_on_done": bool(args.stop_on_done),
             "done_count": done_count,
             "fps": args.fps,

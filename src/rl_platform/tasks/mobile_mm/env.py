@@ -536,6 +536,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             "action_magnitude": self.task_cfg.rewards.action_magnitude,
             "action_rate": self.task_cfg.rewards.action_rate,
             "action_smoothness": self.task_cfg.rewards.action_smoothness,
+            "base_action_delta": self.task_cfg.rewards.base_action_delta,
             "velocity_limit_penalty": self.task_cfg.rewards.velocity_limit_penalty,
             "acceleration_limit_penalty": self.task_cfg.rewards.acceleration_limit_penalty,
             "jerk_limit_penalty": self.task_cfg.rewards.jerk_limit_penalty,
@@ -1447,6 +1448,18 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             actions = actions.unsqueeze(0)
         actions = torch.nan_to_num(actions, nan=0.0, posinf=1.0, neginf=-1.0)
         actions = torch.clamp(actions, -1.0, 1.0)
+
+        base_action_slew_limit = float(getattr(self.task_cfg, "base_action_slew_limit", 0.0))
+        if base_action_slew_limit > 0.0:
+            base_slice = slice(POLICY_BASE_VX_ACTION_INDEX, POLICY_BASE_WZ_ACTION_INDEX + 1)
+            previous_base_actions = self.prev_actions[:, base_slice]
+            base_delta = torch.clamp(
+                actions[:, base_slice] - previous_base_actions,
+                min=-base_action_slew_limit,
+                max=base_action_slew_limit,
+            )
+            actions = actions.clone()
+            actions[:, base_slice] = previous_base_actions + base_delta
 
         # Update action history for derivative calculations (jerk/smoothness)
         # Store 3 timesteps: current, t-1, t-2
@@ -2743,6 +2756,16 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             rewards = rewards - base_assist_yaw_imitation_penalty
         self.reward_components["base_assist_imitation_penalty"] = base_assist_imitation_penalty
         self.reward_components["base_assist_yaw_imitation_penalty"] = base_assist_yaw_imitation_penalty
+        base_action_delta_penalty = torch.zeros_like(rewards)
+        base_action_delta_weight = float(self.reward_weights.get("base_action_delta", 0.0))
+        if base_action_delta_weight > 0.0:
+            base_action_delta = (
+                self.prev_actions[:, POLICY_BASE_VX_ACTION_INDEX:POLICY_BASE_WZ_ACTION_INDEX + 1]
+                - self.prev_prev_actions[:, POLICY_BASE_VX_ACTION_INDEX:POLICY_BASE_WZ_ACTION_INDEX + 1]
+            )
+            base_action_delta_penalty = base_action_delta_weight * torch.sum(base_action_delta.square(), dim=-1)
+            rewards = rewards - base_action_delta_penalty
+        self.reward_components["base_action_delta_penalty"] = base_action_delta_penalty
 
         if workspace_distance is None:
             workspace_distance_log = torch.zeros_like(base_target_distance)
@@ -2809,6 +2832,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             ),
             "base_assist_imitation_penalty": base_assist_imitation_penalty.mean().item(),
             "base_assist_yaw_imitation_penalty": base_assist_yaw_imitation_penalty.mean().item(),
+            "base_action_delta_penalty": base_action_delta_penalty.mean().item(),
         }
         if self.obstacles_enabled:
             self.extras["obstacle_diagnostics"] = {

@@ -100,17 +100,57 @@ pushes the target outside the reachable envelope too often.
 
 ## Next Recommended Change
 
-The next useful experiment should constrain base-action changes rather than
-only changing BC density or random-start curriculum:
+## PPO Smoke 3: Base-Slew Start-Only Full-Trajectory Mix
 
-1. Add an explicit base action slew / acceleration penalty or clamp during PPO.
-2. Add a start-to-end gate callback or post-iteration gate so regressions on
+Training:
+
+```text
+logs/sb3/fullhorizon_dense01_ppo_base_slew_startonly_smoke_20260709
+warm start: dense BC policy
+timesteps: 65,536
+num_envs: 128
+episode_length_s: 60
+random_start_waypoint: disabled
+reset_anchor_target_blend: 0.0
+base_action_delta_limit: 0.06 normalized/action step in SB3 wrapper
+base_action_slew_limit: 0.06 normalized/action step in env
+base_action_delta_penalty: 3.0
+```
+
+Training reached the planned timestep budget and saved both `final_model.zip`
+and `vec_normalize.pkl`. The clamp worked mechanically: early rollout debug
+showed normalized base actions ramping by about `0.06` per step instead of
+instant saturation.
+
+Rendered five-case coverage:
+
+```text
+case  dense_bc  ppo_smoke_random  ppo_base_slew  delta_vs_bc
+0001  48.8%     35.0%             31.6%          -17.2%
+0020  25.7%     28.8%             11.8%          -13.9%
+0028 100.3%     42.6%             19.2%          -81.1%
+0050  15.3%     40.1%             20.4%           +5.1%
+0079  62.5%     72.6%             54.5%           -8.0%
+```
+
+Conclusion: keep the base clamp and penalty code as useful control primitives,
+but reject this training recipe. The action slew limit prevents abrupt command
+jumps, but it does not solve the policy collapse; it makes the full-start gate
+worse on four of five cases and severely regresses the previously solved `0028`.
+
+## Next Recommended Change
+
+The next useful experiment should avoid plain PPO fine-tuning that is allowed
+to drift away from the dense BC teacher:
+
+1. Add a start-to-end gate callback or post-iteration gate so regressions on
    known good cases like `0028` stop the run early.
-3. Train a two-head curriculum:
+2. Train with an auxiliary imitation loss or a staged BC-refresh step so PPO
+   cannot destroy the dense-BC trajectory-following behavior.
+3. Train a two-head or router curriculum:
    - Stage A: preserve dense-BC full-start tracking with very low LR and minimal
      exploration.
    - Stage B: introduce random mid-trajectory starts only after Stage A passes
      the five-case full-start gate.
 4. Only after no-obstacle full trajectories pass should obstacle cases be mixed
    back in.
-

@@ -344,6 +344,24 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--base_action_delta_limit",
+        type=float,
+        default=0.0,
+        help=(
+            "Optional PPO-side normalized per-step slew limit for base action rows [6,7,8]. "
+            "0 disables the clamp."
+        ),
+    )
+    parser.add_argument(
+        "--base_action_slew_limit",
+        type=float,
+        default=0.0,
+        help=(
+            "Optional env-level normalized per-step slew limit for base action rows [6,7,8]. "
+            "This is saved in the task config and should be reused for rendered gates."
+        ),
+    )
+    parser.add_argument(
         "--freeze_base_actions_for_non_base_required",
         action="store_true",
         help=(
@@ -612,6 +630,12 @@ def parse_args():
         type=float,
         default=None,
         help="Override penalty for actual chassis motion that increases base-target distance.",
+    )
+    parser.add_argument(
+        "--base_action_delta_penalty",
+        type=float,
+        default=None,
+        help="Override reward penalty for rapid normalized base_vx/base_vy/base_wz changes.",
     )
     parser.add_argument(
         "--min_obstacle_distance_weight",
@@ -1003,6 +1027,10 @@ def main():
         args.trajectory_type = "multi_recorded"
     if args.base_action_scale < 0.0 or args.base_action_scale > 1.0:
         raise ValueError("--base_action_scale must be in [0, 1]")
+    if args.base_action_delta_limit < 0.0:
+        raise ValueError("--base_action_delta_limit must be >= 0")
+    if args.base_action_slew_limit < 0.0:
+        raise ValueError("--base_action_slew_limit must be >= 0")
     if args.obstacles_from_trajectory_metadata and not args.enable_obstacles:
         raise ValueError("--obstacles_from_trajectory_metadata requires --enable_obstacles")
 
@@ -2027,6 +2055,7 @@ def main():
             expected_obs_dim: int | None = None,
             freeze_base_actions: bool = False,
             base_action_scale: float = 1.0,
+            base_action_delta_limit: float = 0.0,
             freeze_base_actions_for_non_base_required: bool = False,
         ):
             # Isaac Lab env is already a VecEnv
@@ -2039,6 +2068,8 @@ def main():
             self.freeze_base_actions_for_non_base_required = bool(freeze_base_actions_for_non_base_required)
             self._freeze_base_logged = False
             self.base_action_scale = float(base_action_scale)
+            self.base_action_delta_limit = float(base_action_delta_limit)
+            self._prev_adapted_actions = None
             self._base_scale_logged = False
             
             # FIX: Isaac Lab's action_space includes batch dimension [num_envs, action_dim]
@@ -2063,6 +2094,7 @@ def main():
                 not self.freeze_base_actions
                 and not self.freeze_base_actions_for_non_base_required
                 and abs(self.base_action_scale - 1.0) < 1e-9
+                and self.base_action_delta_limit <= 0.0
             ):
                 return actions
             actions = actions.clone()
@@ -2078,6 +2110,11 @@ def main():
                     print(
                         "[IsaacLabToSB3VecEnvWrapper] Scaling base action rows [6,7,8] "
                         f"by {self.base_action_scale:.3f}"
+                    )
+                if self.base_action_delta_limit > 0.0:
+                    print(
+                        "[IsaacLabToSB3VecEnvWrapper] Limiting base action delta rows [6,7,8] "
+                        f"to {self.base_action_delta_limit:.3f}/step"
                     )
                 self._freeze_base_logged = True
             if self.freeze_base_actions:
@@ -2102,6 +2139,16 @@ def main():
                     actions[..., 6:9] = 0.0
             else:
                 actions[..., 6:9] *= self.base_action_scale
+            if self.base_action_delta_limit > 0.0:
+                if self._prev_adapted_actions is None or self._prev_adapted_actions.shape != actions.shape:
+                    self._prev_adapted_actions = torch.zeros_like(actions)
+                base_delta = torch.clamp(
+                    actions[..., 6:9] - self._prev_adapted_actions[..., 6:9],
+                    min=-self.base_action_delta_limit,
+                    max=self.base_action_delta_limit,
+                )
+                actions[..., 6:9] = self._prev_adapted_actions[..., 6:9] + base_delta
+                self._prev_adapted_actions = actions.detach().clone()
             return actions
 
         def _trajectory_progress_column(self, obs: np.ndarray) -> np.ndarray:
@@ -2164,6 +2211,7 @@ def main():
 
         def reset(self):
             obs = self.venv.reset()
+            self._prev_adapted_actions = None
             
             # Handle new Gymnasium API: reset() returns (obs, info)
             if isinstance(obs, tuple):
@@ -2234,6 +2282,18 @@ def main():
             rewards = np.nan_to_num(rewards, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32, copy=False)
             if hasattr(dones, 'cpu'):
                 dones = dones.cpu().numpy()
+            done_arr = np.asarray(dones, dtype=bool).reshape(-1)
+            if (
+                self._prev_adapted_actions is not None
+                and done_arr.size > 0
+                and done_arr.size == self._prev_adapted_actions.shape[0]
+            ):
+                done_tensor = torch.as_tensor(
+                    done_arr,
+                    dtype=torch.bool,
+                    device=self._prev_adapted_actions.device,
+                )
+                self._prev_adapted_actions[done_tensor] = 0.0
             
             # Ensure infos is a list of dicts (SB3 expects this format)
             # Isaac Lab sometimes returns infos as a dict or other format
@@ -2397,6 +2457,9 @@ def main():
         if args.episode_length_s > 0.0:
             env_cfg.episode_length_s = float(args.episode_length_s)
             print(f"    Episode length override: {env_cfg.episode_length_s:.2f}s")
+        if args.base_action_slew_limit > 0.0:
+            env_cfg.task_config.base_action_slew_limit = float(args.base_action_slew_limit)
+            print(f"    Base action env slew limit: {env_cfg.task_config.base_action_slew_limit:.3f}/step")
         if args.seed is not None:
             env_cfg.seed = args.seed
             env_cfg.task_config.obstacles.seed = args.seed
@@ -2454,6 +2517,7 @@ def main():
             "base_target_far_penalty": args.base_target_far_penalty,
             "base_target_command_tracking_penalty": args.base_target_command_tracking_penalty,
             "base_target_regression_penalty": args.base_target_regression_penalty,
+            "base_action_delta": args.base_action_delta_penalty,
             "min_obstacle_distance_weight": args.min_obstacle_distance_weight,
             "safety_radius": args.safety_radius,
         }
@@ -2615,6 +2679,7 @@ def main():
             expected_obs_dim=expected_obs_dim,
             freeze_base_actions=args.freeze_base_actions,
             base_action_scale=args.base_action_scale,
+            base_action_delta_limit=args.base_action_delta_limit,
             freeze_base_actions_for_non_base_required=args.freeze_base_actions_for_non_base_required,
         )
         
@@ -3046,6 +3111,12 @@ def main():
     )
     if not args.freeze_base_actions:
         print(f"Base action scale: {args.base_action_scale}")
+        if args.base_action_delta_limit > 0.0:
+            print(f"Base delta limit:  {args.base_action_delta_limit}")
+        if args.base_action_slew_limit > 0.0:
+            print(f"Base env slew:     {args.base_action_slew_limit}")
+    if args.base_action_delta_penalty is not None:
+        print(f"Base delta penalty:{args.base_action_delta_penalty}")
     if args.pretrained_policy:
         print(f"Pretrained policy: {args.pretrained_policy}")
     if args.policy_log_std_override is not None:

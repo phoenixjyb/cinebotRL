@@ -43,6 +43,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-contacts", type=int, default=1)
     parser.add_argument("--safety-radius", type=float, default=0.2)
     parser.add_argument("--batch-size", type=int, default=4096)
+    parser.add_argument(
+        "--resample-dt",
+        type=float,
+        default=0.0,
+        help=(
+            "If positive, stretch each accepted sparse GIK teacher over its "
+            "manifest duration and resample rows at this fixed dt. This aligns "
+            "BC labels with the dense trajectory stage used by Isaac playback."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -108,6 +118,89 @@ def angular_velocity_from_quats(quat: np.ndarray, dt: np.ndarray) -> np.ndarray:
     return out
 
 
+def normalize_quat_wxyz(quat: np.ndarray) -> np.ndarray:
+    quat = quat.astype(np.float64, copy=True)
+    norm = np.linalg.norm(quat, axis=-1, keepdims=True)
+    quat = quat / np.maximum(norm, 1e-12)
+    sign = np.where(quat[:, :1] < 0.0, -1.0, 1.0)
+    return (quat * sign).astype(np.float32)
+
+
+def interp_rows(values: np.ndarray, src_t: np.ndarray, dst_t: np.ndarray) -> np.ndarray:
+    values = np.asarray(values, dtype=np.float32)
+    return np.stack(
+        [np.interp(dst_t, src_t, values[:, axis]) for axis in range(values.shape[1])],
+        axis=1,
+    ).astype(np.float32)
+
+
+def interp_quats_wxyz(quat: np.ndarray, src_t: np.ndarray, dst_t: np.ndarray) -> np.ndarray:
+    quat = normalize_quat_wxyz(quat)
+    for idx in range(1, quat.shape[0]):
+        if float(np.dot(quat[idx - 1], quat[idx])) < 0.0:
+            quat[idx] *= -1.0
+    return normalize_quat_wxyz(interp_rows(quat, src_t, dst_t))
+
+
+def nearest_rows(values: np.ndarray, src_t: np.ndarray, dst_t: np.ndarray) -> np.ndarray:
+    values = np.asarray(values)
+    right = np.searchsorted(src_t, dst_t, side="left")
+    right = np.clip(right, 0, len(src_t) - 1)
+    left = np.clip(right - 1, 0, len(src_t) - 1)
+    use_left = np.abs(dst_t - src_t[left]) <= np.abs(src_t[right] - dst_t)
+    indices = np.where(use_left, left, right)
+    return values[indices]
+
+
+def resample_components(
+    components: dict[str, np.ndarray],
+    duration_s: float,
+    resample_dt: float,
+) -> dict[str, np.ndarray]:
+    count = components["actions"].shape[0]
+    require(count >= 2, "resampling requires at least two source action rows")
+    require(duration_s > 0.0, "resampling requires a positive manifest duration")
+    require(resample_dt > 0.0, "--resample-dt must be positive")
+
+    dst_count = max(2, int(math.ceil(duration_s / resample_dt)) + 1)
+    src_t = np.linspace(0.0, duration_s, count, dtype=np.float64)
+    dst_t = np.linspace(0.0, duration_s, dst_count, dtype=np.float64)
+
+    out: dict[str, np.ndarray] = {}
+    linear_keys = {
+        "actions",
+        "base_pos",
+        "base_lin_vel",
+        "base_ang_vel",
+        "joint_pos",
+        "ee_pos",
+        "ee_lin_vel",
+        "ee_ang_vel",
+        "target_pos",
+        "min_obstacle_dist",
+    }
+    quat_keys = {"base_quat", "ee_quat", "target_quat"}
+    nearest_keys = {"action_valid_mask", "contact_forces"}
+
+    for key, value in components.items():
+        if key in linear_keys:
+            out[key] = interp_rows(value, src_t, dst_t)
+        elif key in quat_keys:
+            out[key] = interp_quats_wxyz(value, src_t, dst_t)
+        elif key in nearest_keys:
+            out[key] = nearest_rows(value, src_t, dst_t)
+        else:
+            out[key] = value
+
+    dt = np.full((dst_count,), float(resample_dt), dtype=np.float32)
+    joint_pos = out["joint_pos"].astype(np.float32)
+    joint_next = np.empty_like(joint_pos)
+    joint_next[:-1] = joint_pos[1:]
+    joint_next[-1] = joint_pos[-1]
+    out["joint_vel"] = ((joint_next - joint_pos) / dt[:, None]).astype(np.float32)
+    return out
+
+
 def build_lookahead(target_pos: np.ndarray, steps: int) -> np.ndarray:
     idx = np.arange(target_pos.shape[0])[:, None] + np.arange(1, steps + 1)[None, :]
     idx = np.clip(idx, 0, target_pos.shape[0] - 1)
@@ -133,7 +226,11 @@ def resolve_npz_path(item: dict, demo_dir: Path) -> Path:
     return fallback
 
 
-def build_components(data: np.lib.npyio.NpzFile, args: argparse.Namespace) -> dict[str, np.ndarray]:
+def build_components(
+    data: np.lib.npyio.NpzFile,
+    args: argparse.Namespace,
+    duration_s: float | None = None,
+) -> dict[str, np.ndarray]:
     actions = data["actions"].astype(np.float32)
     q_current = data["q_current"].astype(np.float32)
     q_next = data["q_next"].astype(np.float32)
@@ -173,7 +270,7 @@ def build_components(data: np.lib.npyio.NpzFile, args: argparse.Namespace) -> di
         clearance = np.nan_to_num(clearance, nan=5.0 * args.safety_radius)
         obstacle = np.clip(clearance / max(args.safety_radius, 1e-6), -2.0, 5.0)[:, None].astype(np.float32)
 
-    return {
+    components = {
         "actions": actions,
         "action_valid_mask": data["action_valid_mask"].astype(bool),
         "base_pos": base_pos,
@@ -193,6 +290,15 @@ def build_components(data: np.lib.npyio.NpzFile, args: argparse.Namespace) -> di
         "contact_forces": contact,
         "min_obstacle_dist": obstacle,
     }
+    if args.resample_dt > 0.0:
+        require(duration_s is not None, "--resample-dt requires manifest items with duration_s")
+        components = resample_components(components, float(duration_s), float(args.resample_dt))
+        components["lookahead_pos"] = build_lookahead(components["target_pos"], args.lookahead_steps).astype(np.float32)
+        components["action_history"] = build_action_history(
+            components["actions"],
+            args.action_history_length,
+        ).astype(np.float32)
+    return components
 
 
 def compose_batches(components: dict[str, np.ndarray], batch_size: int) -> np.ndarray:
@@ -229,7 +335,7 @@ def main() -> int:
     for idx, item in enumerate(items):
         npz_path = resolve_npz_path(item, demo_dir)
         with np.load(npz_path) as data:
-            components = build_components(data, args)
+            components = build_components(data, args, duration_s=item.get("duration_s"))
             obs = compose_batches(components, args.batch_size)
             actions = components["actions"]
             mask = components["action_valid_mask"].copy()
@@ -271,12 +377,15 @@ def main() -> int:
         manifest=str(manifest_path),
         base_only=np.asarray(args.base_only),
         observation_dim=np.asarray(observations.shape[1]),
+        resample_dt=np.asarray(float(args.resample_dt), dtype=np.float32),
     )
     print(f"Manifest:      {manifest_path}")
     print(f"Output:        {args.output}")
     print(f"Trajectories:  {len(items)}")
     print(f"Samples:       {observations.shape[0]}")
     print(f"Obs dim:       {observations.shape[1]}")
+    if args.resample_dt > 0.0:
+        print(f"Resample dt:   {args.resample_dt:.4f}s")
     print(f"Base labels:   {action_valid_mask[:, 6:].mean(axis=0)}")
     print(f"Arm labels:    {action_valid_mask[:, :6].mean(axis=0)}")
     return 0

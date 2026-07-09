@@ -40,6 +40,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--task", default="RecomoProto2TrackEE-v0")
     parser.add_argument("--steps", type=int, default=400)
     parser.add_argument(
+        "--episode_length_s",
+        type=float,
+        default=0.0,
+        help="Optional env episode length override in seconds. Keep 0 to use the task default.",
+    )
+    parser.add_argument(
         "--stop_on_done",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -434,6 +440,8 @@ def main() -> int:
         env_cfg = MobileMMTrackEEEnvCfg()
         env_cfg.num_envs = 1
         env_cfg.scene.num_envs = 1
+        if args.episode_length_s > 0.0:
+            env_cfg.episode_length_s = float(args.episode_length_s)
         env_cfg.task_config.obstacles.enable_obstacles = bool(args.enable_obstacles)
         env_cfg.task_config.obstacles.randomize_per_reset = True
         env_cfg.task_config.obstacles.disc_radius = 0.20
@@ -568,6 +576,7 @@ def main() -> int:
             "video_dir": str(video_dir),
             "steps_requested": args.steps,
             "steps_executed": steps_executed,
+            "episode_length_s": float(args.episode_length_s) if args.episode_length_s > 0.0 else None,
             "stop_on_done": bool(args.stop_on_done),
             "done_count": done_count,
             "fps": args.fps,

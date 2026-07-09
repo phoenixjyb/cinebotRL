@@ -251,6 +251,63 @@ For a fresh raw-observation candidate:
   --output_dir evaluation_results/videos_rendered/<candidate_name>_full_5cases
 ```
 
+Implementation note: the gate must launch renderer subprocesses with `-X utf8`
+and `PYTHONUTF8=1`. Without this, Windows can fall back to GBK and crash on the
+Unicode info marker printed by the Isaac env.
+
+## PPO Smoke 5: 262k Raw Imitation-Preservation PPO
+
+Training:
+
+```text
+logs/sb3/fullhorizon_dense01_ppo_imitation_preserve_raw262k_20260709
+warm start: dense BC policy
+timesteps: 262,144
+num_envs: 128
+episode_length_s: 60
+VecNormalize: disabled
+PPO learning_rate: 3e-6
+PPO n_epochs: 1
+PPO target_kl: 0.003
+PPO clip_range: 0.05
+imitation_preserve_dataset: data/gik_offline_teacher_obs/obs_dataset_no_obstacle79_dense01_full_masked_20260709.npz
+imitation_preserve_action_indices: 0,1,2,3,4,5,6,7,8
+imitation_preserve_gradient_steps: 64 per rollout
+imitation_preserve_lr: 1e-5
+```
+
+Training observations:
+
+```text
+imitation preservation loss stayed near 2e-5
+PPO KL stayed very small, around 2e-4 to 5e-4
+unreachable-zone diagnostics stayed poor, roughly 79% to 86% at monitor points
+```
+
+Five-case gate:
+
+```text
+evaluation_results/videos_rendered/no_obstacle79_dense01_ppo_imitation_preserve_raw262k_full_5cases_utf8_20260709
+gate verdict: PASS
+```
+
+Rendered five-case coverage:
+
+```text
+case  dense_bc  raw262k_preserve  delta_vs_bc
+0001  48.8%     49.0%             +0.2%
+0020  25.7%     25.4%             -0.3%
+0028 100.3%    100.3%              0.0%
+0050  15.3%     15.0%             -0.3%
+0079  62.5%     61.7%             -0.8%
+```
+
+Conclusion: accept this as another preservation proof, but do not scale this
+recipe further as an improvement path. It passes the gate because it keeps the
+dense-BC behavior intact, not because it improves the weak early-ending cases.
+The next useful work is teacher refresh / DAgger-style data collection around
+the early termination states for `0001`, `0020`, `0050`, and `0079`.
+
 ## Next Recommended Change
 
 The next useful experiment should build on imitation-preservation and make the

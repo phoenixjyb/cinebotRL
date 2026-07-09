@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -139,6 +140,8 @@ def run_case(args: argparse.Namespace, output_dir: Path, gate_case: GateCase) ->
 
     cmd = [
         sys.executable,
+        "-X",
+        "utf8",
         str(RENDER_SCRIPT),
         "--checkpoint",
         str(resolve_project_path(args.checkpoint)),
@@ -187,8 +190,11 @@ def run_case(args: argparse.Namespace, output_dir: Path, gate_case: GateCase) ->
     if args.base_action_slew_limit > 0.0:
         cmd.extend(["--base_action_slew_limit", str(args.base_action_slew_limit)])
 
+    env = os.environ.copy()
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
     print(f"[five-case-gate] running case {gate_case.case_id}: {' '.join(cmd)}", flush=True)
-    subprocess.run(cmd, cwd=PROJECT_ROOT, check=True)
+    subprocess.run(cmd, cwd=PROJECT_ROOT, env=env, check=True)
 
 
 def evaluate_rows(

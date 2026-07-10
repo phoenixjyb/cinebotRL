@@ -4,9 +4,10 @@
 
 The accepted GIK teachers now produce a trajectory-disjoint, fixed-clock
 94-dimensional BC dataset for the experimental `rs4_attitude_rate_v1` action
-contract.  This artifact is suitable for offline BC experiments, but it is not
-yet promoted for PPO or deployment because the live Isaac process currently
-exits during baseline scene initialization before any rollout step.
+contract. The offline dataset and BC gates pass. On 2026-07-11, the baseline
+Isaac scene and the RS4/two-obstacle scene were restored and verified on the
+RTX PRO 4000 Blackwell host. This removes the scene-health blocker, but does
+not by itself promote the BC policy for PPO or deployment.
 
 ## Contract Changes
 
@@ -72,14 +73,47 @@ The main no/one/two-obstacle holdout families are between `0.00014` and
 `0.00023` masked MSE.  The single WB-MPC/SQP recovery holdout remains a clear
 outlier at about `0.0154` MSE and must not be hidden inside the aggregate.
 
-## Remaining Gate
+## Isaac Scene Health Restoration - 2026-07-11
 
-The experimental open-loop RS4 replay and a one-step legacy checkpoint both
-exit at the same Isaac scene-initialization point, before environment creation
-finishes.  Therefore:
+The earlier apparent stop at the `/World/Ground/SphereLight` warning was not a
+scene-construction failure. The host was first cleared of stale Isaac process
+trees, and the gates were rerun with unbuffered Python output (`python.exe -u`)
+so reset and rollout progress could be observed directly.
 
-- dataset and offline BC gates pass;
-- live Isaac execution remains unproven;
-- DJI hardware frame/sign behavior remains unproven;
-- PPO must not start until baseline Isaac scene health is restored and the
-  open-loop RS4 replay writes a complete gate JSON.
+Legacy no-obstacle checkpoint gate:
+
+```text
+artifact: artifacts/baseline_scene_health_20260711.json
+environments / steps: 1 / 1
+environment created: yes
+reset and physics step: yes
+initial EE position error: 0.00549 m
+episode terminations: 0
+```
+
+Experimental RS4/two-obstacle open-loop gate:
+
+```text
+artifact: artifacts/rs4_two_obstacle_scene_health_clear_20260711.json
+environments / steps: 1 / 5
+action contract: rs4_attitude_rate_v1
+observation mode: relative_two_v2 (94D)
+obstacle centers: y=0.80 m and y=1.25 m
+initial/final minimum clearance: 0.250 / 0.249 m
+obstacle collision / unsafe: 0% / 0%
+episode terminations: 0
+```
+
+The older `y=0.50 m` deterministic fixture was rejected as a health test: with
+a `0.35 m` robot footprint radius and `0.20 m` obstacle radius it begins with
+`-0.05 m` signed clearance. That result indicates fixture overlap, not broken
+physics.
+
+## Remaining Gates
+
+- Run a longer multi-source RS4 rollout; the five-step replay proves scene and
+  action-contract execution only, not trajectory tracking quality.
+- Keep the grouped holdout outlier visible when judging BC promotion.
+- Validate DJI hardware frame/sign behavior before deployment.
+- Start PPO only after a bounded closed-loop BC gate passes the tracking and
+  safety thresholds; scene health alone is not sufficient.

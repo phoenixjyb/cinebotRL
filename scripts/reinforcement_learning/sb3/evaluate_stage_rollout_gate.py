@@ -177,6 +177,32 @@ def parse_args() -> argparse.Namespace:
             "Useful for closed-loop DAgger/distillation from the actual gate state distribution."
         ),
     )
+    parser.add_argument(
+        "--output_base_teacher_npz",
+        default=None,
+        help="Optional masked-action dataset with direct base-correction labels from pre-step rollout states.",
+    )
+    parser.add_argument(
+        "--base_teacher_mode",
+        choices=["target_direction", "target_offset_follow"],
+        default="target_offset_follow",
+    )
+    parser.add_argument("--base_teacher_activation_distance", type=float, default=0.25)
+    parser.add_argument("--base_teacher_full_speed_distance", type=float, default=0.90)
+    parser.add_argument("--base_teacher_max_action", type=float, default=1.0)
+    parser.add_argument("--base_teacher_lookahead_steps", type=int, default=0)
+    parser.add_argument("--base_teacher_include_yaw", action="store_true")
+    parser.add_argument("--base_teacher_yaw_max_action", type=float, default=0.5)
+    parser.add_argument("--base_teacher_yaw_full_error", type=float, default=1.2)
+    parser.add_argument(
+        "--base_teacher_active_only",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Only save rows where the direct teacher is active.",
+    )
+    parser.add_argument("--base_teacher_sample_weight_distance_threshold", type=float, default=0.55)
+    parser.add_argument("--base_teacher_sample_weight_full_distance", type=float, default=1.20)
+    parser.add_argument("--base_teacher_sample_weight_max", type=float, default=4.0)
     return parser.parse_args()
 
 
@@ -226,6 +252,81 @@ def load_stage_reset_config(stage: str) -> dict[str, object]:
             for name, value in raw_reward_overrides.items()
         }
     return out
+
+
+def quat_to_yaw_torch(quat):
+    import torch
+
+    w, x, y, z = quat[..., 0], quat[..., 1], quat[..., 2], quat[..., 3]
+    return torch.atan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2))
+
+
+def compute_direct_base_teacher(raw_env, args):
+    import torch
+
+    target_pos, _ = raw_env.trajectory_manager.get_target_pose()
+    target_xy = target_pos[:, :2]
+    lead_steps = max(int(args.base_teacher_lookahead_steps), 0)
+    if lead_steps > 0:
+        lead_pos, _ = raw_env.trajectory_manager.get_lookahead(
+            steps=lead_steps,
+            lookahead_dt=float(raw_env.task_cfg.lookahead_dt),
+        )
+        target_xy = lead_pos[:, -1, :2]
+
+    base_xy = raw_env.robot.data.root_pos_w[:, :2]
+    base_to_target = target_xy - base_xy
+    if args.base_teacher_mode == "target_offset_follow":
+        traj_cfg = raw_env.task_cfg.trajectory
+        desired_offset = torch.tensor(
+            [
+                float(getattr(traj_cfg, "reset_base_x_offset", 0.4415)),
+                float(getattr(traj_cfg, "reset_base_y_offset", 0.2405)),
+            ],
+            dtype=target_xy.dtype,
+            device=target_xy.device,
+        )
+        expert_vector_world = target_xy - desired_offset.unsqueeze(0) - base_xy
+        expert_distance = torch.norm(expert_vector_world, dim=-1)
+    else:
+        expert_vector_world = base_to_target
+        expert_distance = torch.norm(expert_vector_world, dim=-1)
+
+    target_dir_world = expert_vector_world / (expert_distance.unsqueeze(-1) + 1e-6)
+    theta = quat_to_yaw_torch(raw_env.robot.data.root_quat_w)
+    cos_theta = torch.cos(theta)
+    sin_theta = torch.sin(theta)
+    expert_body = torch.stack(
+        (
+            cos_theta * target_dir_world[:, 0] + sin_theta * target_dir_world[:, 1],
+            -sin_theta * target_dir_world[:, 0] + cos_theta * target_dir_world[:, 1],
+        ),
+        dim=-1,
+    )
+
+    activation_distance = max(float(args.base_teacher_activation_distance), 1e-6)
+    full_speed_distance = max(float(args.base_teacher_full_speed_distance), activation_distance + 1e-6)
+    speed_fraction = torch.clamp(
+        (expert_distance - activation_distance) / (full_speed_distance - activation_distance),
+        min=0.0,
+        max=1.0,
+    )
+    expert_xy = expert_body * (float(args.base_teacher_max_action) * speed_fraction).unsqueeze(-1)
+    expert_xy = torch.nan_to_num(expert_xy, nan=0.0, posinf=0.0, neginf=0.0)
+    expert_xy = torch.clamp(expert_xy, -1.0, 1.0)
+    active = expert_distance > activation_distance
+
+    expert_wz = torch.zeros((raw_env.num_envs, 1), dtype=expert_xy.dtype, device=expert_xy.device)
+    if bool(args.base_teacher_include_yaw):
+        target_heading = torch.atan2(base_to_target[:, 1], base_to_target[:, 0])
+        yaw_error = torch.atan2(torch.sin(target_heading - theta), torch.cos(target_heading - theta))
+        yaw_full_error = max(float(args.base_teacher_yaw_full_error), 1e-6)
+        expert_wz[:, 0] = torch.clamp(yaw_error / yaw_full_error, -1.0, 1.0) * float(
+            args.base_teacher_yaw_max_action
+        )
+        expert_wz = torch.nan_to_num(expert_wz, nan=0.0, posinf=0.0, neginf=0.0)
+        expert_wz = torch.clamp(expert_wz, -1.0, 1.0)
+    return expert_xy, expert_wz, active, expert_distance
 
 
 def main() -> int:
@@ -644,6 +745,11 @@ def main() -> int:
         dataset_observations: list[np.ndarray] = []
         dataset_actions: list[np.ndarray] = []
         dataset_policy_actions: list[np.ndarray] = []
+        base_teacher_observations: list[np.ndarray] = []
+        base_teacher_actions: list[np.ndarray] = []
+        base_teacher_masks: list[np.ndarray] = []
+        base_teacher_weights: list[np.ndarray] = []
+        base_teacher_distances: list[np.ndarray] = []
         dones_count = 0
         done_counts_per_env = np.zeros((args.num_envs,), dtype=np.int64)
         first_done_step_per_env = np.full((args.num_envs,), -1, dtype=np.int64)
@@ -711,6 +817,44 @@ def main() -> int:
                 dataset_observations.append(obs_before_step)
                 dataset_actions.append(np.asarray(action, dtype=np.float32).copy())
                 dataset_policy_actions.append(np.asarray(primary_action_for_dataset, dtype=np.float32).copy())
+            if args.output_base_teacher_npz:
+                expert_xy, expert_wz, active, expert_distance = compute_direct_base_teacher(raw_env, args)
+                expert_xy_np = tensor_np(expert_xy).astype(np.float32)
+                expert_wz_np = tensor_np(expert_wz).astype(np.float32)
+                active_np = tensor_np(active).astype(bool)
+                distance_np = tensor_np(expert_distance).astype(np.float32)
+                labels = np.zeros_like(np.asarray(action, dtype=np.float32))
+                mask = np.zeros_like(labels, dtype=np.float32)
+                labels[:, 6:8] = expert_xy_np[:, 0:2]
+                mask[:, 6:8] = active_np[:, None].astype(np.float32)
+                if args.base_teacher_include_yaw:
+                    labels[:, 8] = expert_wz_np[:, 0]
+                    mask[:, 8] = active_np.astype(np.float32)
+                denom = max(
+                    float(args.base_teacher_sample_weight_full_distance)
+                    - float(args.base_teacher_sample_weight_distance_threshold),
+                    1e-6,
+                )
+                excess = np.clip(
+                    (distance_np - float(args.base_teacher_sample_weight_distance_threshold)) / denom,
+                    0.0,
+                    1.0,
+                )
+                weights = 1.0 + (float(args.base_teacher_sample_weight_max) - 1.0) * excess
+                if args.base_teacher_active_only:
+                    keep = active_np
+                    if np.any(keep):
+                        base_teacher_observations.append(obs_before_step[keep])
+                        base_teacher_actions.append(labels[keep])
+                        base_teacher_masks.append(mask[keep])
+                        base_teacher_weights.append(weights[keep].astype(np.float32))
+                        base_teacher_distances.append(distance_np[keep])
+                else:
+                    base_teacher_observations.append(obs_before_step)
+                    base_teacher_actions.append(labels)
+                    base_teacher_masks.append(mask)
+                    base_teacher_weights.append(weights.astype(np.float32))
+                    base_teacher_distances.append(distance_np)
             obs, reward, done, _ = env.step(action)
             rewards.append(np.asarray(reward, dtype=np.float64))
             done_arr = np.asarray(done, dtype=bool)
@@ -1005,6 +1149,49 @@ def main() -> int:
                 metadata=json.dumps(dataset_metadata, sort_keys=True),
             )
             print(f"[gate] wrote dataset {output_dataset} rows={dataset_obs.shape[0]}", flush=True)
+        if args.output_base_teacher_npz:
+            require(base_teacher_observations, "base teacher produced no active rows")
+            teacher_obs = np.concatenate(base_teacher_observations, axis=0).astype(np.float32)
+            teacher_actions = np.concatenate(base_teacher_actions, axis=0).astype(np.float32)
+            teacher_mask = np.concatenate(base_teacher_masks, axis=0).astype(np.float32)
+            teacher_weights = np.concatenate(base_teacher_weights, axis=0).astype(np.float32)
+            teacher_distances = np.concatenate(base_teacher_distances, axis=0).astype(np.float32)
+            require(float(teacher_mask.sum()) > 0.0, "base teacher produced no valid labels")
+            teacher_metadata = {
+                "created_at": metrics["created_at"],
+                "schema": "direct_base_teacher_dataset_v1",
+                "checkpoint": str(checkpoint),
+                "trajectory_stage": args.trajectory_stage,
+                "num_envs": int(args.num_envs),
+                "steps": int(args.steps),
+                "samples": int(teacher_obs.shape[0]),
+                "mode": args.base_teacher_mode,
+                "activation_distance": float(args.base_teacher_activation_distance),
+                "full_speed_distance": float(args.base_teacher_full_speed_distance),
+                "max_action": float(args.base_teacher_max_action),
+                "lookahead_steps": int(args.base_teacher_lookahead_steps),
+                "include_yaw": bool(args.base_teacher_include_yaw),
+                "active_only": bool(args.base_teacher_active_only),
+                "distance_mean_m": float(np.mean(teacher_distances)),
+                "distance_p95_m": float(np.percentile(teacher_distances, 95)),
+                "valid_action_counts": teacher_mask.sum(axis=0).astype(float).tolist(),
+            }
+            output_teacher = Path(args.output_base_teacher_npz)
+            output_teacher.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(
+                output_teacher,
+                observations=teacher_obs,
+                actions=teacher_actions,
+                action_valid_mask=teacher_mask,
+                sample_weight=teacher_weights,
+                source_base_target_distance_m=teacher_distances,
+                metadata=json.dumps(teacher_metadata, indent=2),
+            )
+            print(
+                f"[gate] wrote base teacher dataset {output_teacher} "
+                f"rows={teacher_obs.shape[0]} valid={teacher_metadata['valid_action_counts']}",
+                flush=True,
+            )
         env.close()
     finally:
         simulation_app.close()

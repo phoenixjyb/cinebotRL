@@ -38,6 +38,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max_trajectories", type=int, default=8)
     parser.add_argument("--min_trajectory_duration", type=float, default=5.0)
     parser.add_argument("--base_action_scale", type=float, default=0.25)
+    parser.add_argument(
+        "--arm_action_envelope_profile",
+        choices=["proto2_safe_v1", "teacher_wide_v1"],
+        default="proto2_safe_v1",
+        help="Arm action envelope used by the rollout env. Must match the checkpoint/gate contract.",
+    )
     parser.add_argument("--tail_start_fraction", type=float, default=0.65)
     parser.add_argument("--error_percentile", type=float, default=80.0)
     parser.add_argument("--min_selected", type=int, default=64)
@@ -89,6 +95,26 @@ def trajectory_index_from_file(path_text: str) -> int:
     return int(name[: -len(suffix)])
 
 
+def trajectory_lookup_key(path_text: str) -> str:
+    """Return an order-insensitive key for paired stage JSON and source NPZ names."""
+    stem = Path(path_text.replace("\\", "/")).stem
+    tokens = [token for token in stem.split("_") if token]
+    return "_".join(sorted(tokens))
+
+
+def build_expert_row_lookup(source_index: np.ndarray | None, source_files: np.ndarray | None) -> dict[str, tuple[int, int, int]]:
+    if source_index is None or source_files is None:
+        return {}
+    lookup: dict[str, tuple[int, int, int]] = {}
+    source_index = np.asarray(source_index, dtype=np.int64)
+    for traj_idx, source_file in enumerate(source_files.tolist()):
+        rows = np.flatnonzero(source_index == traj_idx)
+        if rows.size == 0:
+            continue
+        lookup[trajectory_lookup_key(str(source_file))] = (int(traj_idx), int(rows[0]), int(rows.size))
+    return lookup
+
+
 def summarize(values: np.ndarray) -> dict[str, float]:
     values = np.asarray(values, dtype=np.float64).reshape(-1)
     if values.size == 0:
@@ -125,10 +151,22 @@ def main() -> int:
 
     with np.load(expert_dataset, allow_pickle=False) as data:
         expert_actions = data["actions"].astype(np.float32)
+        expert_masks = (
+            data["action_valid_mask"].astype(bool)
+            if "action_valid_mask" in data
+            else np.ones_like(expert_actions, dtype=bool)
+        )
         expert_obs_dim = int(data["observations"].shape[1])
         expert_metadata = json.loads(str(data["metadata"])) if "metadata" in data else {}
-    num_waypoints = int(expert_metadata.get("num_waypoints", args.steps))
-    require(num_waypoints > 0, "expert metadata has invalid num_waypoints")
+        source_index = data["source_index"].astype(np.int64) if "source_index" in data else None
+        source_files = data["source_files"] if "source_files" in data else None
+    expert_row_lookup = build_expert_row_lookup(source_index, source_files)
+    if expert_row_lookup:
+        num_waypoints = 0
+        print(f"[dagger] loaded variable-length expert row lookup for {len(expert_row_lookup)} trajectories", flush=True)
+    else:
+        num_waypoints = int(expert_metadata.get("num_waypoints", args.steps))
+        require(num_waypoints > 0, "expert metadata has invalid num_waypoints")
 
     from isaaclab.app import AppLauncher
 
@@ -162,6 +200,7 @@ def main() -> int:
         env_cfg.task_config.obstacles.enable_obstacles = False
         env_cfg.task_config.base_assist.enable = False
         env_cfg.task_config.randomize_initial_joint_positions = False
+        env_cfg.task_config.arm_action_envelope_profile = args.arm_action_envelope_profile
         reward_overrides = reset_config.get("reward_overrides", {})
         if isinstance(reward_overrides, dict):
             for name, value in reward_overrides.items():
@@ -177,6 +216,7 @@ def main() -> int:
             reset_anchor_target_blend=0.0,
             reset_base_x_offset=reset_config.get("reset_base_x_offset", 0.4415),
             reset_base_y_offset=reset_config.get("reset_base_y_offset", 0.2405),
+            reset_arm_to_trajectory_metadata=reset_config.get("reset_arm_to_trajectory_metadata", False),
         )
 
         print("[dagger] creating env", flush=True)
@@ -288,14 +328,21 @@ def main() -> int:
             for env_id in range(args.num_envs):
                 item = metadata[env_id] if env_id < len(metadata) and isinstance(metadata[env_id], dict) else {}
                 traj_file = str(item.get("file", ""))
-                traj_idx = trajectory_index_from_file(traj_file)
                 wp_idx = int(waypoint_idx[env_id]) if waypoint_idx is not None else step
-                wp_idx = max(0, min(wp_idx, num_waypoints - 1))
-                dataset_row = traj_idx * num_waypoints + wp_idx
+                if expert_row_lookup:
+                    key = trajectory_lookup_key(traj_file)
+                    require(key in expert_row_lookup, f"trajectory not found in expert lookup: {traj_file}")
+                    traj_idx, row_start, row_count = expert_row_lookup[key]
+                    wp_idx = max(0, min(wp_idx, row_count - 1))
+                    dataset_row = row_start + wp_idx
+                else:
+                    traj_idx = trajectory_index_from_file(traj_file)
+                    wp_idx = max(0, min(wp_idx, num_waypoints - 1))
+                    dataset_row = traj_idx * num_waypoints + wp_idx
                 require(dataset_row < expert_actions.shape[0], f"expert row out of range: {dataset_row}")
                 obs_rows.append(obs[env_id].astype(np.float32, copy=True))
                 action_rows.append(expert_actions[dataset_row].astype(np.float32, copy=True))
-                mask_rows.append(np.ones((expert_actions.shape[1],), dtype=bool))
+                mask_rows.append(expert_masks[dataset_row].astype(bool, copy=True))
                 pos_errors.append(float(pos_error[env_id]))
                 step_rows.append(step)
                 waypoint_rows.append(wp_idx)
@@ -355,7 +402,9 @@ def main() -> int:
             "source_error_m": summarize(all_errors),
             "selected_error_m": summarize(selected_errors),
             "num_waypoints": int(num_waypoints),
+            "expert_lookup": "source_index/source_files" if expert_row_lookup else "fixed_num_waypoints",
             "base_action_scale": float(args.base_action_scale),
+            "arm_action_envelope_profile": args.arm_action_envelope_profile,
         }
         np.savez_compressed(
             output_npz,
@@ -368,7 +417,7 @@ def main() -> int:
             source_trajectory_idx=selected_trajectories,
             policy_actions=selected_policy_actions,
             metadata=json.dumps(metadata, indent=2),
-            action_contract=np.asarray("sim_6joint_gimbal_base_v1"),
+            action_contract=np.asarray("sim_6joint_gimbal_v1"),
             observation_dim=np.asarray(selected_obs.shape[1], dtype=np.int32),
         )
         print(json.dumps(metadata, indent=2), flush=True)

@@ -59,6 +59,7 @@ class ObstacleConfig:
     # Obstacle placement
     enable_obstacles: bool = False
     num_obstacles: int = 1
+    observation_mode: str = "scalar_clearance_v1"
     disc_position_xy: tuple[float, float] = (0.0, 0.5)  # Local env-frame XY, on the default circle trajectory
     disc_radius: float = 0.20
     disc_height: float = 0.50

@@ -18,6 +18,10 @@ from rl_platform.tasks.mobile_mm.rs4_adapter import (
     normalized_policy_rates_to_deg_s,
     policy_order_to_local_gimbal_order,
     policy_rates_to_rs4_command_deg_s,
+    quaternion_feedforward_policy_rates_deg_s,
+    quaternion_residual_policy_rates_deg_s,
+    quaternion_tracking_policy_rates_deg_s,
+    slew_limit_policy_rate_sequence_deg_s,
 )
 
 
@@ -92,6 +96,85 @@ def test_integrate_policy_attitude_wraps_yaw_only():
     np.testing.assert_allclose(out, np.array([-179.0, 9.0, -4.5], dtype=np.float32))
 
 
+def test_quaternion_residual_is_bounded_near_euler_pitch_singularity():
+    # Same near-vertical camera attitude with a small local yaw correction.
+    pitch = np.deg2rad(-89.999)
+    current = np.array([[np.cos(pitch / 2), 0.0, np.sin(pitch / 2), 0.0]])
+    yaw_delta = np.deg2rad(5.0)
+    local_delta = np.array([[np.cos(yaw_delta / 2), 0.0, 0.0, np.sin(yaw_delta / 2)]])
+
+    def multiply(lhs, rhs):
+        w1, x1, y1, z1 = lhs[0]
+        w2, x2, y2, z2 = rhs[0]
+        return np.array([[
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ]])
+
+    target = multiply(current, local_delta)
+    rates, residual = quaternion_residual_policy_rates_deg_s(
+        current,
+        target,
+        response_horizon_s=0.5,
+        config=Rs4RateAdapterConfig(enable_roll=True),
+    )
+    np.testing.assert_allclose(residual, np.array([[5.0, 0.0, 0.0]]), atol=1e-3)
+    np.testing.assert_allclose(rates, np.array([[10.0, 0.0, 0.0]]), atol=1e-3)
+
+
+def test_rate_sequence_matches_runtime_acceleration_limit():
+    config = Rs4RateAdapterConfig(
+        max_yaw_accel_deg_s2=100.0,
+        max_pitch_accel_deg_s2=50.0,
+        enable_roll=False,
+    )
+    desired = np.array([[90.0, -90.0, 0.0]] * 3, dtype=np.float32)
+    limited = slew_limit_policy_rate_sequence_deg_s(desired, 0.1, config)
+    np.testing.assert_allclose(
+        limited,
+        np.array([[10.0, -5.0, 0.0], [20.0, -10.0, 0.0], [30.0, -15.0, 0.0]]),
+    )
+
+
+def test_quaternion_feedforward_preserves_small_target_motion_at_vertical_pitch():
+    pitch = np.deg2rad(-90.0)
+    base = np.array([np.cos(pitch / 2), 0.0, np.sin(pitch / 2), 0.0])
+    quats = []
+    for yaw_deg in (0.0, 1.0, 2.0):
+        yaw = np.deg2rad(yaw_deg)
+        delta = np.array([np.cos(yaw / 2), 0.0, 0.0, np.sin(yaw / 2)])
+        w1, x1, y1, z1 = base
+        w2, x2, y2, z2 = delta
+        quats.append([
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ])
+    rates = quaternion_feedforward_policy_rates_deg_s(np.asarray(quats), 0.1)
+    np.testing.assert_allclose(rates[:, 0], np.array([10.0, 10.0, 10.0]), atol=1e-3)
+    np.testing.assert_allclose(rates[:, 1:], 0.0, atol=1e-3)
+
+
+def test_tracking_rate_combines_feedforward_and_feedback():
+    target = np.array([
+        [1.0, 0.0, 0.0, 0.0],
+        [np.cos(np.deg2rad(1.0) / 2), 0.0, 0.0, np.sin(np.deg2rad(1.0) / 2)],
+    ])
+    current = np.array([[1.0, 0.0, 0.0, 0.0]] * 2)
+    desired, feedforward, residual = quaternion_tracking_policy_rates_deg_s(
+        current,
+        target,
+        dt_s=0.1,
+        response_horizon_s=0.5,
+    )
+    np.testing.assert_allclose(feedforward[:, 0], np.array([10.0, 10.0]), atol=1e-3)
+    np.testing.assert_allclose(residual[:, 0], np.array([0.0, 1.0]), atol=1e-3)
+    np.testing.assert_allclose(desired[:, 0], np.array([10.0, 12.0]), atol=1e-3)
+
+
 def test_adapter_validates_shape_and_dt():
     if pytest is None:
         return
@@ -111,6 +194,10 @@ if __name__ == "__main__":
     test_full_policy_to_rs4_mapping_with_roll_disabled()
     test_clamp_policy_rate_delta_respects_acceleration_and_roll_mask()
     test_integrate_policy_attitude_wraps_yaw_only()
+    test_quaternion_residual_is_bounded_near_euler_pitch_singularity()
+    test_rate_sequence_matches_runtime_acceleration_limit()
+    test_quaternion_feedforward_preserves_small_target_motion_at_vertical_pitch()
+    test_tracking_rate_combines_feedforward_and_feedback()
     # Manual equivalent for pytest.raises checks.
     for fn in (
         lambda: normalized_policy_rates_to_deg_s(np.array([1.0, 2.0])),

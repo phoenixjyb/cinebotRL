@@ -31,6 +31,7 @@ ARM_LOWER_SAFE = np.array([-1.0, 0.55, -2.0, -1.0, -0.8, -0.8], dtype=np.float32
 ARM_UPPER_SAFE = np.array([1.0, 1.45, -0.4, 1.0, 0.8, 0.8], dtype=np.float32)
 MAX_LINEAR_VELOCITY = 1.5
 MAX_ANGULAR_VELOCITY = 2.0
+ROBOT_FOOTPRINT_RADIUS = 0.35
 Q13_TO_SIM9_INDICES = np.asarray([0, 1, 2, 3, 4, 5, 10, 11, 12], dtype=np.int64)
 
 
@@ -45,6 +46,7 @@ class ExportStats:
     obstacle_case: str
     obstacle_fractions: Any
     qa_pass: bool
+    quality_status: str
     max_position_error_m: float
     max_orientation_error_rad: float
     footprint_margin_m: float
@@ -63,6 +65,7 @@ class ExportStats:
     max_abs_base_action: float
     max_abs_arm_action: float
     min_obstacle_clearance_m: float | None
+    obstacle_count: int
 
 
 def read_dataset(group: h5py.Group, path: str) -> np.ndarray | None:
@@ -218,12 +221,73 @@ def read_vec2(group: h5py.Group, path: str) -> np.ndarray | None:
         return flat[:2].astype(np.float32) if flat.size >= 2 else None
 
 
-def compute_obstacle_clearance(q: np.ndarray, center_xy: np.ndarray | None, radius: float | None, safety_margin: float | None) -> np.ndarray | None:
-    if center_xy is None or radius is None:
+def read_numeric_entries(group: h5py.Group, path: str) -> list[np.ndarray]:
+    """Read numeric MATLAB arrays or cell arrays stored as HDF5 references."""
+
+    if path not in group:
+        return []
+    dataset = group[path]
+    arr = np.array(dataset)
+    if arr.dtype.kind != "O":
+        return [np.asarray(arr, dtype=np.float64)]
+
+    entries: list[np.ndarray] = []
+    for ref in arr.reshape(-1):
+        if not isinstance(ref, h5py.Reference) or not ref:
+            continue
+        target = np.array(group.file[ref])
+        if target.dtype.kind == "O":
+            continue
+        entries.append(np.asarray(target, dtype=np.float64))
+    return entries
+
+
+def read_obstacle_geometry(group: h5py.Group) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    prefix = "log/floorDiscs" if "log/floorDiscs/Center" in group else "floorDiscs"
+    center_entries = read_numeric_entries(group, f"{prefix}/Center")
+    radius_entries = read_numeric_entries(group, f"{prefix}/Radius")
+    margin_entries = read_numeric_entries(group, f"{prefix}/SafetyMargin")
+
+    centers: list[np.ndarray] = []
+    if len(center_entries) == 1:
+        raw = np.asarray(center_entries[0], dtype=np.float64)
+        if raw.ndim == 2 and 2 in raw.shape:
+            oriented = raw if raw.shape[1] == 2 else raw.T
+            centers.extend(row[:2] for row in oriented)
+        elif raw.size >= 2:
+            centers.append(raw.reshape(-1)[:2])
+    else:
+        centers.extend(entry.reshape(-1)[:2] for entry in center_entries if entry.size >= 2)
+
+    count = len(centers)
+
+    def scalar_values(entries: list[np.ndarray], default: float) -> np.ndarray:
+        if not entries:
+            return np.full(count, default, dtype=np.float32)
+        if len(entries) == 1 and entries[0].size >= count:
+            values = entries[0].reshape(-1)[:count]
+        else:
+            values = np.asarray([entry.reshape(-1)[0] for entry in entries if entry.size], dtype=np.float64)
+        if values.size < count:
+            values = np.pad(values, (0, count - values.size), constant_values=default)
+        return values[:count].astype(np.float32)
+
+    center_array = np.asarray(centers, dtype=np.float32).reshape(count, 2) if count else np.zeros((0, 2), dtype=np.float32)
+    return center_array, scalar_values(radius_entries, np.nan), scalar_values(margin_entries, 0.0)
+
+
+def compute_obstacle_clearance(
+    q: np.ndarray,
+    centers_xy: np.ndarray,
+    radii: np.ndarray,
+    safety_margins: np.ndarray,
+) -> np.ndarray | None:
+    if centers_xy.size == 0:
         return None
-    margin = float(safety_margin or 0.0)
     xy = q[:-1, :2]
-    clearance = np.linalg.norm(xy - center_xy[None, :2], axis=1) - float(radius) - margin
+    clearance = np.linalg.norm(xy[:, None, :] - centers_xy[None, :, :], axis=2)
+    clearance -= radii[None, :]
+    clearance -= ROBOT_FOOTPRINT_RADIUS
     return clearance.astype(np.float32)
 
 
@@ -294,15 +358,7 @@ def load_log(path: Path) -> dict[str, Any]:
         ramp_poses_raw = read_dataset(f, "log/ramp/Poses")
         ramp_poses = as_pose_samples(ramp_poses_raw) if ramp_poses_raw is not None else None
         display_positions_raw = read_dataset(f, "log/referenceTrajectory/DisplayEndEffectorPositions")
-        obstacle_center_xy = read_vec2(f, "log/floorDiscs/Center")
-        if obstacle_center_xy is None:
-            obstacle_center_xy = read_vec2(f, "floorDiscs/Center")
-        obstacle_radius = read_scalar(f, "log/floorDiscs/Radius")
-        if obstacle_radius is None:
-            obstacle_radius = read_scalar(f, "floorDiscs/Radius")
-        obstacle_safety_margin = read_scalar(f, "log/floorDiscs/SafetyMargin")
-        if obstacle_safety_margin is None:
-            obstacle_safety_margin = read_scalar(f, "floorDiscs/SafetyMargin")
+        obstacle_centers_xy, obstacle_radii, obstacle_safety_margins = read_obstacle_geometry(f)
 
         return {
             "q": q,
@@ -326,9 +382,9 @@ def load_log(path: Path) -> dict[str, Any]:
             "profile": read_matlab_string(f, "cfg/meta/profile"),
             "variant": read_matlab_string(f, "cfg/robot/variant"),
             "frame_mode": read_matlab_string(f, "cfg/trajectory/frame_mode"),
-            "obstacle_center_xy": obstacle_center_xy,
-            "obstacle_radius": obstacle_radius,
-            "obstacle_safety_margin": obstacle_safety_margin,
+            "obstacle_centers_xy": obstacle_centers_xy,
+            "obstacle_radii": obstacle_radii,
+            "obstacle_safety_margins": obstacle_safety_margins,
         }
 
 
@@ -400,6 +456,7 @@ def export_one(
     source_path_replacement: Path | None,
     min_duration_s: float,
     copy_mat_dir: Path | None,
+    skipped: list[dict[str, Any]],
 ) -> ExportStats | None:
     source_mat = remap_source_path(
         str(item["mat"]),
@@ -417,13 +474,38 @@ def export_one(
     time = np.asarray(log["time"], dtype=np.float64)
     duration = float(time[-1] - time[0]) if time.size else 0.0
     if q.shape[0] < 2 or duration < min_duration_s:
+        skipped.append(
+            {
+                "index": int(item["index"]),
+                "source_mat": str(source_mat),
+                "duration_s": duration,
+                "num_q_samples": int(q.shape[0]),
+                "reason": "duration_below_minimum" if duration < min_duration_s else "insufficient_q_samples",
+            }
+        )
         return None
 
     arm_actions, arm_raw = normalize_arm_targets(q[1:, 3:9])
     base_actions, base_meta = finite_difference_base_actions(q, time)
     actions = np.concatenate([arm_actions, base_actions], axis=1).astype(np.float32)
     ee_samples = aligned_ee_samples(log, actions.shape[0])
-    obstacle_clearance = compute_obstacle_clearance(q, log["obstacle_center_xy"], log["obstacle_radius"], log["obstacle_safety_margin"])
+    obstacle_centers_xy = np.asarray(log["obstacle_centers_xy"], dtype=np.float32)
+    obstacle_radii = np.asarray(log["obstacle_radii"], dtype=np.float32)
+    obstacle_safety_margins = np.asarray(log["obstacle_safety_margins"], dtype=np.float32)
+    declared_obstacle_count = (item.get("teacher_metadata") or {}).get("obstacle_count")
+    if declared_obstacle_count is not None:
+        obstacle_count = max(0, int(declared_obstacle_count))
+        obstacle_centers_xy = obstacle_centers_xy[:obstacle_count]
+        obstacle_radii = obstacle_radii[:obstacle_count]
+        obstacle_safety_margins = obstacle_safety_margins[:obstacle_count]
+    obstacle_clearance = compute_obstacle_clearance(
+        q,
+        obstacle_centers_xy,
+        obstacle_radii,
+        obstacle_safety_margins,
+    )
+    quality_status = str((item.get("teacher_metadata") or {}).get("quality_status") or "accepted")
+    strict_qa_pass = quality_status == "accepted"
 
     arm_clip_mask = np.abs(arm_raw) > 1.0
     arm_valid_mask = ~arm_clip_mask
@@ -459,10 +541,20 @@ def export_one(
         gimbal_attitude_target_quat_wxyz=ee_samples["gimbal_attitude_target_quat_wxyz"],
         actual_ee_pos=ee_samples["actual_ee_pos"],
         actual_ee_quat_wxyz=ee_samples["actual_ee_quat_wxyz"],
-        obstacle_center_xy=np.asarray(log["obstacle_center_xy"] if log["obstacle_center_xy"] is not None else [np.nan, np.nan], dtype=np.float32),
-        obstacle_radius=np.float32(log["obstacle_radius"] if log["obstacle_radius"] is not None else np.nan),
-        obstacle_safety_margin=np.float32(log["obstacle_safety_margin"] if log["obstacle_safety_margin"] is not None else np.nan),
-        min_obstacle_dist=np.full(actions.shape[0], np.nan, dtype=np.float32) if obstacle_clearance is None else obstacle_clearance,
+        obstacle_centers_xy=obstacle_centers_xy,
+        obstacle_radii=obstacle_radii,
+        obstacle_safety_margins=obstacle_safety_margins,
+        robot_footprint_radius=np.float32(ROBOT_FOOTPRINT_RADIUS),
+        obstacle_valid_mask=np.ones(obstacle_centers_xy.shape[0], dtype=bool),
+        obstacle_center_xy=obstacle_centers_xy[0] if obstacle_centers_xy.size else np.asarray([np.nan, np.nan], dtype=np.float32),
+        obstacle_radius=np.float32(obstacle_radii[0] if obstacle_radii.size else np.nan),
+        obstacle_safety_margin=np.float32(obstacle_safety_margins[0] if obstacle_safety_margins.size else np.nan),
+        obstacle_clearance_m=np.empty((actions.shape[0], 0), dtype=np.float32) if obstacle_clearance is None else obstacle_clearance,
+        min_obstacle_dist=(
+            np.full(actions.shape[0], np.nan, dtype=np.float32)
+            if obstacle_clearance is None
+            else np.min(obstacle_clearance, axis=1)
+        ),
         q_current=q[:-1],
         q_next=q[1:],
         q=q,
@@ -480,7 +572,9 @@ def export_one(
         teacher_method=str(item["method"]),
         teacher_metadata=json.dumps(item.get("teacher_metadata") or {}),
         teacher_index=np.asarray(int(item["index"])),
-        qa_pass=np.asarray(True),
+        qa_pass=np.asarray(strict_qa_pass),
+        strict_qa_pass=np.asarray(strict_qa_pass),
+        quality_status=np.asarray(quality_status),
         max_position_error_m=np.asarray(float(item["max_position_error_m"]), dtype=np.float32),
         max_orientation_error_rad=np.asarray(float(item["max_orientation_error_rad"]), dtype=np.float32),
         footprint_margin_m=np.asarray(float(item["footprint_margin_m"]), dtype=np.float32),
@@ -502,7 +596,8 @@ def export_one(
         video_id=str(item.get("video_id") or ""),
         obstacle_case=str(item.get("obstacle_case") or ""),
         obstacle_fractions=item.get("obstacle_fractions"),
-        qa_pass=True,
+        qa_pass=strict_qa_pass,
+        quality_status=quality_status,
         max_position_error_m=float(item["max_position_error_m"]),
         max_orientation_error_rad=float(item["max_orientation_error_rad"]),
         footprint_margin_m=float(item["footprint_margin_m"]),
@@ -521,6 +616,7 @@ def export_one(
         max_abs_base_action=float(np.max(np.abs(base_actions))) if base_actions.size else 0.0,
         max_abs_arm_action=float(np.max(np.abs(arm_actions))) if arm_actions.size else 0.0,
         min_obstacle_clearance_m=None if obstacle_clearance is None else float(np.min(obstacle_clearance)),
+        obstacle_count=int(obstacle_centers_xy.shape[0]),
     )
 
 
@@ -702,6 +798,7 @@ def main() -> int:
     copy_mat_dir = output_dir / "source_mats" if args.copy_mats else None
     stats: list[ExportStats] = []
     failures: list[dict[str, str]] = []
+    skipped: list[dict[str, Any]] = []
     for item in items:
         try:
             exported = export_one(
@@ -712,6 +809,7 @@ def main() -> int:
                 source_path_replacement=source_path_replacement,
                 min_duration_s=args.min_duration_s,
                 copy_mat_dir=copy_mat_dir,
+                skipped=skipped,
             )
             if exported is not None:
                 stats.append(exported)
@@ -733,9 +831,11 @@ def main() -> int:
         "num_manifest_items": len(items),
         "num_logs": len(stats),
         "num_failures": len(failures),
+        "num_skipped": len(skipped),
         "total_action_samples": total_samples,
         "items": [asdict(item) for item in stats],
         "failures": failures,
+        "skipped": skipped,
     }
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     (output_dir / "source_manifest.json").write_text(json.dumps(items, indent=2), encoding="utf-8")
@@ -745,6 +845,7 @@ def main() -> int:
     print(f"Exported logs:  {len(stats)} / {len(items)}")
     print(f"Action samples: {total_samples}")
     print(f"Failures:       {len(failures)}")
+    print(f"Skipped:        {len(skipped)}")
     if stats:
         print("Arm valid:      " + " ".join(f"{1.0 - v:.3f}" for v in np.mean([s.arm_clip_fraction_by_joint for s in stats], axis=0)))
         print("Base valid:     " + " ".join(f"{1.0 - v:.3f}" for v in np.mean([s.base_clip_fraction_by_axis for s in stats], axis=0)))

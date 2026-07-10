@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
 import torch
 
 from rl_platform.tasks.mobile_mm.observations import (
+    build_directional_obstacle_features,
     compose_observation,
     get_observation_dimensions,
 )
@@ -75,6 +75,15 @@ class TestGetObservationDimensions:
         dim_ob = get_observation_dimensions(num_joints=6, use_obstacles=True)
         assert dim_ob == dim_no + 1
 
+    def test_with_directional_obstacles(self):
+        dim_no = get_observation_dimensions(num_joints=6, use_obstacles=False)
+        dim_ob = get_observation_dimensions(
+            num_joints=6,
+            use_obstacles=True,
+            obstacle_feature_dim=10,
+        )
+        assert dim_ob == dim_no + 10
+
     def test_all_features(self):
         dim = get_observation_dimensions(
             num_joints=6,
@@ -112,6 +121,17 @@ class TestComposeObservationShape:
         kwargs["min_obstacle_dist"] = torch.ones(N, 1) * 2.0
         obs = compose_observation(**kwargs)
         expected_dim = get_observation_dimensions(num_joints=6, use_obstacles=True)
+        assert obs.shape == (N, expected_dim)
+
+    def test_with_directional_obstacle_features(self):
+        kwargs = _base_obs_kwargs()
+        kwargs["obstacle_features"] = torch.zeros(N, 2, 5)
+        obs = compose_observation(**kwargs)
+        expected_dim = get_observation_dimensions(
+            num_joints=6,
+            use_obstacles=True,
+            obstacle_feature_dim=10,
+        )
         assert obs.shape == (N, expected_dim)
 
     def test_with_lookahead(self):
@@ -166,3 +186,18 @@ class TestComposeObservationContent:
         obs = compose_observation(**kwargs)
         expected_dim = get_observation_dimensions(num_joints=6, use_obstacles=True)
         assert obs.shape == (N, expected_dim)
+
+    def test_directional_obstacle_features_rotate_into_body_frame(self):
+        base_pos = torch.zeros(1, 3)
+        yaw = torch.tensor(torch.pi / 2)
+        base_quat = torch.tensor([[torch.cos(yaw / 2), 0.0, 0.0, torch.sin(yaw / 2)]])
+        features = build_directional_obstacle_features(
+            base_pos,
+            base_quat,
+            obstacle_centers_xy=torch.tensor([[[1.0, 0.0], [0.0, 0.0]]]),
+            obstacle_radii=torch.tensor([[0.2, 0.0]]),
+            obstacle_clearance=torch.tensor([[0.5, 0.0]]),
+            obstacle_valid_mask=torch.tensor([[True, False]]),
+        )
+        torch.testing.assert_close(features[0, 0], torch.tensor([0.0, -1.0, 0.2, 0.5, 1.0]), atol=1e-6, rtol=0.0)
+        torch.testing.assert_close(features[0, 1], torch.zeros(5))

@@ -41,7 +41,12 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from rl_platform.tasks.mobile_mm.observations import compose_observation, get_observation_dimensions  # noqa: E402
-from rl_platform.tasks.mobile_mm.rs4_adapter import Rs4RateAdapterConfig  # noqa: E402
+from rl_platform.tasks.mobile_mm.action_envelopes import normalize_arm_targets as normalize_arm_targets_for_profile  # noqa: E402
+from rl_platform.tasks.mobile_mm.rs4_adapter import (  # noqa: E402
+    Rs4RateAdapterConfig,
+    quaternion_tracking_policy_rates_deg_s,
+    slew_limit_policy_rate_sequence_deg_s,
+)
 
 
 ACTION_DIM = 9
@@ -57,10 +62,6 @@ ARM_ACTION_NAMES = [
     "joint2_gimbal_roll",
     "joint1_gimbal_pitch",
 ]
-ARM_SAFE_HOME = np.array([0.0, 1.0, -1.2, 0.0, 0.0, 0.0], dtype=np.float32)
-ARM_ACTION_RADIUS = np.array([1.0, 0.45, 0.8, 1.0, 0.8, 0.8], dtype=np.float32)
-ARM_SAFE_LOWER = ARM_SAFE_HOME - ARM_ACTION_RADIUS
-ARM_SAFE_UPPER = ARM_SAFE_HOME + ARM_ACTION_RADIUS
 RS4_ACTION_NAMES = [
     "arm_yaw",
     "arm_pitch",
@@ -104,9 +105,26 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--arm-envelope-profile",
+        choices=["proto2_safe_v1", "teacher_wide_v1"],
+        default="proto2_safe_v1",
+    )
+    parser.add_argument(
         "--enable-roll",
         action="store_true",
         help="Include RS4 roll-rate labels. Default masks roll for the current DJI path.",
+    )
+    parser.add_argument(
+        "--attitude-response-horizon-s",
+        type=float,
+        default=0.5,
+        help="Time horizon used to convert camera-attitude residual into a corrective rate.",
+    )
+    parser.add_argument(
+        "--control-dt-s",
+        type=float,
+        default=0.05,
+        help="Fixed runtime control period used for RS4 acceleration slew limiting.",
     )
     parser.add_argument(
         "--allow-desired-pose-gimbal-fallback",
@@ -209,38 +227,16 @@ def build_action_history(actions: np.ndarray, history_len: int) -> np.ndarray:
     return history
 
 
-def normalize_arm_targets(q_arm: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    raw = 2.0 * (q_arm - ARM_SAFE_LOWER[None, :]) / (ARM_SAFE_UPPER[None, :] - ARM_SAFE_LOWER[None, :]) - 1.0
-    valid = np.isfinite(raw) & (np.abs(raw) <= 1.0)
-    return np.clip(raw, -1.0, 1.0).astype(np.float32), valid
+def normalize_arm_targets(q_arm: np.ndarray, profile: str) -> tuple[np.ndarray, np.ndarray]:
+    actions, _, valid = normalize_arm_targets_for_profile(q_arm, profile=profile)
+    return actions, valid
 
 
-def normalize_real_arm_targets(q_arm: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    lower = ARM_SAFE_LOWER[:3]
-    upper = ARM_SAFE_UPPER[:3]
-    raw = 2.0 * (q_arm - lower[None, :]) / (upper[None, :] - lower[None, :]) - 1.0
-    valid = np.isfinite(raw) & (np.abs(raw) <= 1.0)
-    return np.clip(raw, -1.0, 1.0).astype(np.float32), valid
-
-
-def quat_wxyz_to_euler_zyx_deg(quat: np.ndarray) -> np.ndarray:
-    q = np.asarray(quat, dtype=np.float64).copy()
-    q /= np.maximum(np.linalg.norm(q, axis=1, keepdims=True), 1e-12)
-    w, x, y, z = q.T
-    yaw = np.arctan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
-    pitch = np.arcsin(np.clip(2.0 * (w * y - z * x), -1.0, 1.0))
-    roll = np.arctan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x * x + y * y))
-    return np.rad2deg(np.stack([yaw, pitch, roll], axis=1)).astype(np.float32)
-
-
-def finite_difference_euler_rates_deg_s(euler_deg: np.ndarray, dt: float) -> np.ndarray:
-    if euler_deg.shape[0] == 1:
-        return np.zeros_like(euler_deg, dtype=np.float32)
-    unwrapped = np.rad2deg(np.unwrap(np.deg2rad(euler_deg), axis=0)).astype(np.float32)
-    rates = np.zeros_like(unwrapped, dtype=np.float32)
-    rates[:-1] = (unwrapped[1:] - unwrapped[:-1]) / float(dt)
-    rates[-1] = rates[-2]
-    return rates
+def normalize_real_arm_targets(q_arm: np.ndarray, profile: str) -> tuple[np.ndarray, np.ndarray]:
+    padded = np.zeros((q_arm.shape[0], 6), dtype=np.float32)
+    padded[:, :3] = q_arm
+    actions, valid = normalize_arm_targets(padded, profile)
+    return actions[:, :3], valid[:, :3]
 
 
 def read_quat_columns(rows: list[dict[str, str]], prefix: str) -> np.ndarray | None:
@@ -276,23 +272,36 @@ def build_rs4_attitude_rate_actions(
     *,
     enable_roll: bool,
     allow_desired_pose_fallback: bool,
+    arm_envelope_profile: str,
+    response_horizon_s: float,
+    control_dt_s: float,
 ) -> dict[str, np.ndarray]:
-    arm_actions, arm_valid = normalize_real_arm_targets(q_arm_full[:, :3])
+    arm_actions, arm_valid = normalize_real_arm_targets(q_arm_full[:, :3], arm_envelope_profile)
     target_quat, attitude_source = read_rs4_target_quat(
         rows,
         allow_desired_pose_fallback=allow_desired_pose_fallback,
     )
-    target_attitude_deg = quat_wxyz_to_euler_zyx_deg(target_quat)
-    attitude_rates = finite_difference_euler_rates_deg_s(target_attitude_deg, sample_time)
+    current_quat = read_quat_columns(rows, "actual")
+    require(current_quat is not None, "missing actual_q* columns required for closed-loop RS4 labels")
 
     adapter_cfg = Rs4RateAdapterConfig(enable_roll=enable_roll)
-    rate_unclipped = attitude_rates / adapter_cfg.max_policy_order_rates[None, :]
-    rate_actions = np.clip(rate_unclipped, -1.0, 1.0).astype(np.float32)
-    rate_valid = np.isfinite(rate_unclipped) & (np.abs(rate_unclipped) <= 1.0)
+    desired_rates, feedforward_rates, attitude_residual_deg = quaternion_tracking_policy_rates_deg_s(
+        current_quat,
+        target_quat,
+        dt_s=sample_time,
+        response_horizon_s=response_horizon_s,
+        config=adapter_cfg,
+    )
+    attitude_rates = slew_limit_policy_rate_sequence_deg_s(
+        desired_rates,
+        control_dt_s,
+        adapter_cfg,
+    )
+    rate_actions = (attitude_rates / adapter_cfg.max_policy_order_rates[None, :]).astype(np.float32)
+    rate_valid = np.isfinite(rate_actions)
     if not enable_roll:
         rate_actions[:, 2] = 0.0
         rate_valid[:, 2] = False
-        rate_unclipped[:, 2] = 0.0
 
     actions = np.zeros((q_arm_full.shape[0], ACTION_DIM), dtype=np.float32)
     actions[:, 0:3] = arm_actions
@@ -308,9 +317,9 @@ def build_rs4_attitude_rate_actions(
         "actions": actions,
         "action_valid_mask": mask,
         "gimbal_attitude_target_quat_wxyz": target_quat.astype(np.float32),
-        "target_camera_attitude_deg": target_attitude_deg.astype(np.float32),
+        "camera_attitude_residual_deg": attitude_residual_deg.astype(np.float32),
+        "camera_attitude_feedforward_rate_deg_s": feedforward_rates.astype(np.float32),
         "camera_attitude_rate_deg_s": attitude_rates.astype(np.float32),
-        "rs4_rate_unclipped": rate_unclipped.astype(np.float32),
         "max_rs4_rate_deg_s": adapter_cfg.max_policy_order_rates.astype(np.float32),
         "rs4_attitude_label_source": np.asarray(attitude_source),
     }
@@ -421,13 +430,16 @@ def arrays_from_rows(rows: list[dict[str, str]], sample_time: float, args: argpa
             sample_time,
             enable_roll=args.enable_roll,
             allow_desired_pose_fallback=args.allow_desired_pose_gimbal_fallback,
+            arm_envelope_profile=args.arm_envelope_profile,
+            response_horizon_s=args.attitude_response_horizon_s,
+            control_dt_s=args.control_dt_s,
         )
         actions = rs4.pop("actions")
         action_valid_mask = rs4.pop("action_valid_mask")
         extra.update(rs4)
     else:
         actions = np.zeros((n, ACTION_DIM), dtype=np.float32)
-        arm_actions, arm_valid = normalize_arm_targets(q_arm_full)
+        arm_actions, arm_valid = normalize_arm_targets(q_arm_full, args.arm_envelope_profile)
         actions[:, 0:6] = arm_actions
         actions[:, 6:9] = base_actions
 
@@ -509,8 +521,9 @@ def main() -> int:
     all_masks: list[np.ndarray] = []
     all_progress: list[np.ndarray] = []
     all_gimbal_target_quat: list[np.ndarray] = []
-    all_target_attitude: list[np.ndarray] = []
+    all_attitude_residual: list[np.ndarray] = []
     all_attitude_rates: list[np.ndarray] = []
+    all_feedforward_rates: list[np.ndarray] = []
     rs4_attitude_label_sources: set[str] = set()
     source_index: list[np.ndarray] = []
     source_cases: list[str] = []
@@ -531,8 +544,9 @@ def main() -> int:
         all_progress.append(components["progress"])
         if args.action_contract == "rs4_attitude_rate_v1":
             all_gimbal_target_quat.append(components["gimbal_attitude_target_quat_wxyz"])
-            all_target_attitude.append(components["target_camera_attitude_deg"])
+            all_attitude_residual.append(components["camera_attitude_residual_deg"])
             all_attitude_rates.append(components["camera_attitude_rate_deg_s"])
+            all_feedforward_rates.append(components["camera_attitude_feedforward_rate_deg_s"])
             rs4_attitude_label_sources.add(str(components["rs4_attitude_label_source"]))
         source_index.append(np.full(actions.shape[0], idx, dtype=np.int32))
         source_cases.append(case["case_name"])
@@ -552,10 +566,14 @@ def main() -> int:
         label_source = ",".join(sorted(rs4_attitude_label_sources))
         extra_outputs = {
             "gimbal_attitude_target_quat_wxyz": np.concatenate(all_gimbal_target_quat, axis=0),
-            "target_camera_attitude_deg": np.concatenate(all_target_attitude, axis=0),
+            "camera_attitude_residual_deg": np.concatenate(all_attitude_residual, axis=0),
             "camera_attitude_rate_deg_s": np.concatenate(all_attitude_rates, axis=0),
+            "camera_attitude_feedforward_rate_deg_s": np.concatenate(all_feedforward_rates, axis=0),
             "max_rs4_rate_deg_s": Rs4RateAdapterConfig(enable_roll=args.enable_roll).max_policy_order_rates,
-            "attitude_frame_convention": np.asarray(f"world/map ZYX yaw_pitch_roll from {label_source}"),
+            "attitude_frame_convention": np.asarray(f"local_camera_rotation_vector_zyx from {label_source}"),
+            "attitude_label_mode": np.asarray("quaternion_tracking_slew_limited_v1"),
+            "attitude_response_horizon_s": np.asarray(args.attitude_response_horizon_s, dtype=np.float32),
+            "control_dt_s": np.asarray(args.control_dt_s, dtype=np.float32),
             "rs4_attitude_label_source": np.asarray(label_source),
         }
 
@@ -592,7 +610,7 @@ def main() -> int:
         action_contract=np.asarray(args.action_contract),
         action_names=np.asarray(action_names),
         gimbal_label_contract=np.asarray(
-            "gimbal_attitude_target_q*_finite_difference"
+            "gimbal_attitude_target_q*_closed_loop_quaternion_residual"
             if args.action_contract == "rs4_attitude_rate_v1"
             else "physical_sim_urdf_gimbal_joint_targets"
         ),
@@ -600,6 +618,7 @@ def main() -> int:
         base_only=np.asarray(args.base_only),
         append_progress=np.asarray(args.append_progress),
         observation_dim=np.asarray(observations.shape[1]),
+        arm_envelope_profile=np.asarray(args.arm_envelope_profile),
         **extra_outputs,
     )
 

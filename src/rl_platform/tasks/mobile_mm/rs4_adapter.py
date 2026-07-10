@@ -70,6 +70,167 @@ def _as_rate_array(values: np.ndarray | list[float] | tuple[float, ...], *, name
     return arr
 
 
+def _as_quaternion_array(values: np.ndarray, *, name: str) -> np.ndarray:
+    arr = np.asarray(values, dtype=np.float64)
+    if arr.shape[-1] != 4:
+        raise ValueError(f"{name} must have last dimension 4 in wxyz order, got shape {arr.shape}")
+    norms = np.linalg.norm(arr, axis=-1, keepdims=True)
+    if not np.isfinite(arr).all() or np.any(norms <= 1e-12):
+        raise ValueError(f"{name} contains non-finite or zero-length quaternion values")
+    return arr / norms
+
+
+def _quat_conjugate_wxyz(quat: np.ndarray) -> np.ndarray:
+    out = quat.copy()
+    out[..., 1:] *= -1.0
+    return out
+
+
+def _quat_multiply_wxyz(lhs: np.ndarray, rhs: np.ndarray) -> np.ndarray:
+    w1, x1, y1, z1 = np.moveaxis(lhs, -1, 0)
+    w2, x2, y2, z2 = np.moveaxis(rhs, -1, 0)
+    return np.stack(
+        [
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ],
+        axis=-1,
+    )
+
+
+def _relative_quaternion_policy_rotvec_deg(current: np.ndarray, target: np.ndarray) -> np.ndarray:
+    relative = _quat_multiply_wxyz(_quat_conjugate_wxyz(current), target)
+    relative *= np.where(relative[..., :1] < 0.0, -1.0, 1.0)
+    vector = relative[..., 1:]
+    vector_norm = np.linalg.norm(vector, axis=-1, keepdims=True)
+    angle = 2.0 * np.arctan2(vector_norm, np.clip(relative[..., :1], -1.0, 1.0))
+    axis = vector / np.maximum(vector_norm, 1e-12)
+    rotvec_local_deg = np.rad2deg(axis * angle)
+    return rotvec_local_deg[..., [2, 1, 0]]
+
+
+def quaternion_residual_policy_rates_deg_s(
+    current_quat_wxyz: np.ndarray,
+    target_quat_wxyz: np.ndarray,
+    *,
+    response_horizon_s: float,
+    config: Rs4RateAdapterConfig = Rs4RateAdapterConfig(),
+) -> tuple[np.ndarray, np.ndarray]:
+    """Convert camera-attitude error into bounded local yaw/pitch/roll rates.
+
+    The relative rotation is computed in the current camera frame as
+    ``q_current^-1 * q_target``.  Its rotation vector is singularity-free and
+    ordered into policy channels as local ``[yaw, pitch, roll] = [z, y, x]``.
+    The returned tuple is ``(bounded_rates_deg_s, residual_rotvec_deg)``.
+    """
+
+    if response_horizon_s <= 0.0:
+        raise ValueError(f"response_horizon_s must be positive, got {response_horizon_s}")
+    current = _as_quaternion_array(current_quat_wxyz, name="current_quat_wxyz")
+    target = _as_quaternion_array(target_quat_wxyz, name="target_quat_wxyz")
+    if current.shape != target.shape:
+        raise ValueError(f"current and target quaternion shapes differ: {current.shape} vs {target.shape}")
+
+    policy_residual_deg = _relative_quaternion_policy_rotvec_deg(current, target)
+    desired_rates = policy_residual_deg / float(response_horizon_s)
+    bounded = np.clip(
+        desired_rates,
+        -config.max_policy_order_rates,
+        config.max_policy_order_rates,
+    )
+    if not config.enable_roll:
+        bounded = bounded.copy()
+        bounded[..., 2] = 0.0
+    return bounded.astype(np.float32), policy_residual_deg.astype(np.float32)
+
+
+def quaternion_feedforward_policy_rates_deg_s(
+    target_quat_wxyz: np.ndarray,
+    dt_s: np.ndarray | float,
+) -> np.ndarray:
+    """Compute singularity-free local target angular velocity in policy order."""
+
+    target = _as_quaternion_array(target_quat_wxyz, name="target_quat_wxyz")
+    if target.ndim != 2:
+        raise ValueError(f"target_quat_wxyz must be [N,4], got shape {target.shape}")
+    if target.shape[0] == 1:
+        return np.zeros((1, 3), dtype=np.float32)
+    dt = np.asarray(dt_s, dtype=np.float32)
+    if dt.ndim == 0:
+        dt = np.full(target.shape[0], float(dt), dtype=np.float32)
+    if dt.shape != (target.shape[0],):
+        raise ValueError(f"dt_s must be scalar or shape {(target.shape[0],)}, got {dt.shape}")
+    if not np.isfinite(dt).all() or np.any(dt <= 0.0):
+        raise ValueError("dt_s must contain finite positive values")
+
+    rates = np.zeros((target.shape[0], 3), dtype=np.float32)
+    rotvec = _relative_quaternion_policy_rotvec_deg(target[:-1], target[1:])
+    rates[:-1] = rotvec / dt[:-1, None]
+    rates[-1] = rates[-2]
+    return rates
+
+
+def quaternion_tracking_policy_rates_deg_s(
+    current_quat_wxyz: np.ndarray,
+    target_quat_wxyz: np.ndarray,
+    *,
+    dt_s: np.ndarray | float,
+    response_horizon_s: float,
+    config: Rs4RateAdapterConfig = Rs4RateAdapterConfig(),
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Build bounded feed-forward plus attitude-residual teacher rates.
+
+    Returns ``(desired_rates, feedforward_rates, residual_rotvec_deg)`` before
+    acceleration slew limiting.  All rate arrays use policy order
+    ``[yaw, pitch, roll]``.
+    """
+
+    feedback, residual = quaternion_residual_policy_rates_deg_s(
+        current_quat_wxyz,
+        target_quat_wxyz,
+        response_horizon_s=response_horizon_s,
+        config=config,
+    )
+    feedforward = quaternion_feedforward_policy_rates_deg_s(target_quat_wxyz, dt_s)
+    desired = np.clip(
+        feedforward + feedback,
+        -config.max_policy_order_rates,
+        config.max_policy_order_rates,
+    )
+    if not config.enable_roll:
+        desired[..., 2] = 0.0
+        feedforward[..., 2] = 0.0
+    return desired.astype(np.float32), feedforward.astype(np.float32), residual.astype(np.float32)
+
+
+def slew_limit_policy_rate_sequence_deg_s(
+    desired_rates_deg_s: np.ndarray,
+    dt_s: np.ndarray | float,
+    config: Rs4RateAdapterConfig = Rs4RateAdapterConfig(),
+) -> np.ndarray:
+    """Apply the runtime acceleration limits to a complete teacher sequence."""
+
+    desired = _as_rate_array(desired_rates_deg_s, name="desired_rates_deg_s")
+    if desired.ndim != 2:
+        raise ValueError(f"desired_rates_deg_s must be [N,3], got shape {desired.shape}")
+    dt = np.asarray(dt_s, dtype=np.float32)
+    if dt.ndim == 0:
+        dt = np.full(desired.shape[0], float(dt), dtype=np.float32)
+    if dt.shape != (desired.shape[0],):
+        raise ValueError(f"dt_s must be scalar or shape {(desired.shape[0],)}, got {dt.shape}")
+    if not np.isfinite(dt).all() or np.any(dt <= 0.0):
+        raise ValueError("dt_s must contain finite positive values")
+
+    output = np.zeros_like(desired, dtype=np.float32)
+    previous = np.zeros(3, dtype=np.float32)
+    for index in range(desired.shape[0]):
+        previous = clamp_policy_rate_delta(desired[index], previous, float(dt[index]), config)
+        output[index] = previous
+    return output
+
+
 def normalized_policy_rates_to_deg_s(
     normalized_rates: np.ndarray | list[float] | tuple[float, ...],
     config: Rs4RateAdapterConfig = Rs4RateAdapterConfig(),
@@ -165,4 +326,3 @@ def integrate_policy_attitude_deg(
     out = out.astype(np.float32)
     out[..., 0] = (out[..., 0] + 180.0) % 360.0 - 180.0
     return out
-

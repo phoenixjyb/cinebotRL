@@ -25,7 +25,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoint", required=True)
+    parser.add_argument("--checkpoint", default=None)
     parser.add_argument(
         "--recovery_checkpoint",
         default=None,
@@ -73,7 +73,7 @@ def parse_args() -> argparse.Namespace:
         default=1.0,
         help="Blend weight for selected rows: 1.0 fully uses row_blend_checkpoint rows.",
     )
-    parser.add_argument("--vec_normalize", required=True)
+    parser.add_argument("--vec_normalize", default="")
     parser.add_argument(
         "--disable_vec_normalize",
         action="store_true",
@@ -103,6 +103,12 @@ def parse_args() -> argparse.Namespace:
         "--enable_obstacles",
         action="store_true",
         help="Enable obstacle spawning and obstacle-safety metrics during the rollout gate.",
+    )
+    parser.add_argument("--num_obstacles", type=int, choices=[1, 2], default=1)
+    parser.add_argument(
+        "--obstacle_observation_mode",
+        choices=["scalar_clearance_v1", "relative_two_v2"],
+        default="scalar_clearance_v1",
     )
     parser.add_argument(
         "--obstacles_from_trajectory_metadata",
@@ -149,6 +155,12 @@ def parse_args() -> argparse.Namespace:
         help="Physical scaling envelope used for normalized arm action rows [0:6].",
     )
     parser.add_argument(
+        "--action_contract",
+        choices=["sim_6joint_gimbal_v1", "rs4_attitude_rate_v1"],
+        default="sim_6joint_gimbal_v1",
+    )
+    parser.add_argument("--experimental_rs4_adapter", action="store_true")
+    parser.add_argument(
         "--base_action_scale",
         type=float,
         default=1.0,
@@ -168,6 +180,12 @@ def parse_args() -> argparse.Namespace:
         help="Optional .npz dataset whose actions are replayed instead of model predictions.",
     )
     parser.add_argument("--action_sequence_index", type=int, default=0)
+    parser.add_argument(
+        "--action_source_index",
+        type=int,
+        default=None,
+        help="Select one whole source_index sequence from --open_loop_actions_npz.",
+    )
     parser.add_argument("--output_json", default=None)
     parser.add_argument(
         "--output_dataset_npz",
@@ -333,12 +351,14 @@ def main() -> int:
     args = parse_args()
     if args.base_action_scale < 0.0 or args.base_action_scale > 1.0:
         raise ValueError("--base_action_scale must be in [0, 1]")
-    checkpoint = Path(args.checkpoint)
+    checkpoint = Path(args.checkpoint) if args.checkpoint else None
     recovery_checkpoint = Path(args.recovery_checkpoint) if args.recovery_checkpoint else None
     row_blend_checkpoint = Path(args.row_blend_checkpoint) if args.row_blend_checkpoint else None
     row_blend_action_indices = parse_action_indices(args.row_blend_action_indices)
-    vec_normalize = Path(args.vec_normalize)
-    require(checkpoint.exists(), f"checkpoint not found: {checkpoint}")
+    vec_normalize = Path(args.vec_normalize) if args.vec_normalize else None
+    require(checkpoint is not None or args.open_loop_actions_npz, "provide --checkpoint or --open_loop_actions_npz")
+    if checkpoint is not None:
+        require(checkpoint.exists(), f"checkpoint not found: {checkpoint}")
     if recovery_checkpoint is not None:
         require(recovery_checkpoint.exists(), f"recovery checkpoint not found: {recovery_checkpoint}")
     if row_blend_checkpoint is not None:
@@ -347,8 +367,10 @@ def main() -> int:
         require(0.0 <= args.row_blend_weight <= 1.0, "--row_blend_weight must be in [0, 1]")
         invalid = [idx for idx in row_blend_action_indices if idx < 0 or idx >= 9]
         require(not invalid, f"invalid row blend action indices: {invalid}")
+    if checkpoint is None:
+        args.disable_vec_normalize = True
     if not args.disable_vec_normalize:
-        require(vec_normalize.exists(), f"vec_normalize not found: {vec_normalize}")
+        require(vec_normalize is not None and vec_normalize.exists(), f"vec_normalize not found: {vec_normalize}")
     require(args.num_envs > 0, "--num_envs must be positive")
     require(args.steps > 0, "--steps must be positive")
     if args.start_waypoint_min_fraction < 0.0 or args.start_waypoint_min_fraction > 1.0:
@@ -416,6 +438,8 @@ def main() -> int:
             env_cfg.episode_length_s = float(args.episode_length_s)
             print(f"[gate] episode_length_s override={env_cfg.episode_length_s:g}", flush=True)
         env_cfg.task_config.obstacles.enable_obstacles = bool(args.enable_obstacles)
+        env_cfg.task_config.obstacles.num_obstacles = int(args.num_obstacles)
+        env_cfg.task_config.obstacles.observation_mode = args.obstacle_observation_mode
         env_cfg.task_config.obstacles.disc_position_xy = (float(args.obstacle_x), float(args.obstacle_y))
         if args.obstacle_radius is not None:
             env_cfg.task_config.obstacles.disc_radius = float(args.obstacle_radius)
@@ -425,6 +449,9 @@ def main() -> int:
         env_cfg.task_config.obstacles.disc_position_x_range = tuple(float(x) for x in args.obstacle_x_range)
         env_cfg.task_config.obstacles.disc_position_y_range = tuple(float(y) for y in args.obstacle_y_range)
         env_cfg.task_config.obstacles.min_start_clearance = float(args.min_obstacle_start_clearance)
+        env_cfg.task_config.action_contract_name = args.action_contract
+        env_cfg.task_config.experimental_rs4_adapter = bool(args.experimental_rs4_adapter)
+        env_cfg.task_config.arm_action_envelope_profile = args.arm_action_envelope_profile
         if args.enable_obstacles:
             env_cfg.scene = env_cfg._create_scene_config()
             env_cfg.scene.num_envs = args.num_envs
@@ -433,6 +460,7 @@ def main() -> int:
                 "[gate] obstacles enabled "
                 f"pos=({args.obstacle_x:.2f},{args.obstacle_y:.2f}) "
                 f"radius={obstacle_cfg.disc_radius:.2f}m "
+                f"count={obstacle_cfg.num_obstacles} observation={obstacle_cfg.observation_mode} "
                 f"height={obstacle_cfg.disc_height:.2f}m "
                 f"randomized={obstacle_cfg.randomize_per_reset} "
                 f"x_range=({args.obstacle_x_range[0]:.2f},{args.obstacle_x_range[1]:.2f}) "
@@ -664,7 +692,11 @@ def main() -> int:
                     infos = [{} for _ in range(len(rewards))]
                 return obs, rewards, dones, infos
 
-        expected_obs_dim = int(np.prod(PPO.load(str(checkpoint), device="cpu").observation_space.shape))
+        expected_obs_dim = (
+            int(np.prod(PPO.load(str(checkpoint), device="cpu").observation_space.shape))
+            if checkpoint is not None
+            else int(env_cfg.num_observations)
+        )
         env = IsaacLabToSB3VecEnvWrapper(
             base_env,
             expected_obs_dim,
@@ -677,7 +709,7 @@ def main() -> int:
             env.training = False
             env.norm_reward = False
         obs = env.reset()
-        model = PPO.load(str(checkpoint), env=env, device="cuda:0")
+        model = PPO.load(str(checkpoint), env=env, device="cuda:0") if checkpoint is not None else None
         row_blend_model = None
         if row_blend_checkpoint is not None:
             row_blend_model = PPO.load(str(row_blend_checkpoint), env=env, device="cuda:0")
@@ -702,10 +734,19 @@ def main() -> int:
         if args.open_loop_actions_npz:
             with np.load(args.open_loop_actions_npz, allow_pickle=False) as data:
                 actions = data["actions"].astype(np.float32)
-            start = args.action_sequence_index * args.steps
-            end = start + args.steps
-            require(end <= actions.shape[0], f"action sequence slice {start}:{end} exceeds {actions.shape[0]}")
-            open_loop_actions = actions[start:end]
+                source_index = data["source_index"].astype(np.int64) if "source_index" in data else None
+            if args.action_source_index is not None:
+                require(source_index is not None, "--action_source_index requires source_index in the dataset")
+                open_loop_actions = actions[source_index == args.action_source_index]
+                require(open_loop_actions.shape[0] >= args.steps, f"source {args.action_source_index} has only {open_loop_actions.shape[0]} rows")
+                open_loop_actions = open_loop_actions[: args.steps]
+                start = int(np.flatnonzero(source_index == args.action_source_index)[0])
+                end = start + args.steps
+            else:
+                start = args.action_sequence_index * args.steps
+                end = start + args.steps
+                require(end <= actions.shape[0], f"action sequence slice {start}:{end} exceeds {actions.shape[0]}")
+                open_loop_actions = actions[start:end]
             print(
                 f"[gate] using open-loop actions {args.open_loop_actions_npz} "
                 f"rows={start}:{end}",
@@ -951,7 +992,7 @@ def main() -> int:
         )
         metrics = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
-            "checkpoint": str(checkpoint),
+            "checkpoint": str(checkpoint) if checkpoint is not None else None,
             "recovery_checkpoint": str(recovery_checkpoint) if recovery_checkpoint is not None else None,
             "row_blend_checkpoint": str(row_blend_checkpoint) if row_blend_checkpoint is not None else None,
             "row_blend_action_indices": row_blend_action_indices,
@@ -960,7 +1001,7 @@ def main() -> int:
             "recovery_route_min_pos_error": float(args.recovery_route_min_pos_error),
             "recovery_route_min_base_target_distance": float(args.recovery_route_min_base_target_distance),
             "recovery_route_latch_once": bool(args.recovery_route_latch_once),
-            "vec_normalize": str(vec_normalize),
+            "vec_normalize": str(vec_normalize) if vec_normalize is not None else None,
             "disable_vec_normalize": bool(args.disable_vec_normalize),
             "trajectory_stage": args.trajectory_stage,
             "num_envs": args.num_envs,
@@ -1127,7 +1168,7 @@ def main() -> int:
                 dataset_mask[:, np.asarray(row_blend_action_indices, dtype=np.int64)] = 1.0
             dataset_metadata = {
                 "created_at": metrics["created_at"],
-                "checkpoint": str(checkpoint),
+                "checkpoint": str(checkpoint) if checkpoint is not None else None,
                 "row_blend_checkpoint": str(row_blend_checkpoint) if row_blend_checkpoint is not None else None,
                 "row_blend_action_indices": row_blend_action_indices,
                 "row_blend_weight": float(args.row_blend_weight),
@@ -1160,7 +1201,7 @@ def main() -> int:
             teacher_metadata = {
                 "created_at": metrics["created_at"],
                 "schema": "direct_base_teacher_dataset_v1",
-                "checkpoint": str(checkpoint),
+                "checkpoint": str(checkpoint) if checkpoint is not None else None,
                 "trajectory_stage": args.trajectory_stage,
                 "num_envs": int(args.num_envs),
                 "steps": int(args.steps),

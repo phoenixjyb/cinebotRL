@@ -29,7 +29,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader, Dataset, Subset, random_split
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +56,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr",       type=float, default=3e-4)
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--val_fraction", type=float, default=0.1)
+    parser.add_argument("--holdout_fraction", type=float, default=0.1)
+    parser.add_argument(
+        "--split_mode",
+        choices=["row_random", "source_grouped"],
+        default="row_random",
+        help="Use source_grouped for trajectory-disjoint validation and holdout sets.",
+    )
+    parser.add_argument("--split_seed", type=int, default=20260710)
     parser.add_argument(
         "--hidden_sizes",
         type=str,
@@ -258,6 +266,7 @@ def train_bc(
     action_mask: np.ndarray | None,
     sample_weights: np.ndarray,
     args: argparse.Namespace,
+    split_labels: np.ndarray | None = None,
 ) -> nn.Module:
     """Train a BC policy via MSE regression and return the trained network."""
 
@@ -281,9 +290,19 @@ def train_bc(
 
     # Split train / val
     dataset     = BCDataset(obs, acts, action_mask, sample_weights)
-    val_size    = max(1, int(len(dataset) * args.val_fraction))
-    train_size  = len(dataset) - val_size
-    train_ds, val_ds = random_split(dataset, [train_size, val_size])
+    if split_labels is None:
+        val_size = max(1, int(len(dataset) * args.val_fraction))
+        train_size = len(dataset) - val_size
+        train_ds, val_ds = random_split(dataset, [train_size, val_size])
+    else:
+        train_indices = np.flatnonzero(split_labels == 0).tolist()
+        val_indices = np.flatnonzero(split_labels == 1).tolist()
+        if not train_indices or not val_indices:
+            raise ValueError("source-grouped split must contain non-empty train and validation rows")
+        train_ds = Subset(dataset, train_indices)
+        val_ds = Subset(dataset, val_indices)
+        train_size = len(train_indices)
+        val_size = len(val_indices)
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,  drop_last=True)
     val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, shuffle=False)
@@ -362,6 +381,43 @@ def train_bc(
         net.load_state_dict(best_state)
     net.eval()
     return net
+
+
+def build_source_grouped_split(
+    source_index: np.ndarray,
+    *,
+    val_fraction: float,
+    holdout_fraction: float,
+    seed: int,
+) -> tuple[np.ndarray, dict[str, list[int]]]:
+    """Return row labels 0=train, 1=validation, 2=holdout by whole source."""
+
+    source_index = np.asarray(source_index, dtype=np.int64)
+    if source_index.ndim != 1:
+        raise ValueError(f"source_index must be 1D, got {source_index.shape}")
+    if val_fraction <= 0.0 or holdout_fraction <= 0.0 or val_fraction + holdout_fraction >= 1.0:
+        raise ValueError("val_fraction and holdout_fraction must be positive and sum to less than 1")
+    groups = np.unique(source_index)
+    if groups.size < 3:
+        raise ValueError("source-grouped split requires at least three trajectories")
+    rng = np.random.default_rng(seed)
+    shuffled = groups.copy()
+    rng.shuffle(shuffled)
+    holdout_count = max(1, int(round(groups.size * holdout_fraction)))
+    val_count = max(1, int(round(groups.size * val_fraction)))
+    if holdout_count + val_count >= groups.size:
+        raise ValueError("split fractions leave no training trajectories")
+    holdout_groups = shuffled[:holdout_count]
+    val_groups = shuffled[holdout_count : holdout_count + val_count]
+    train_groups = shuffled[holdout_count + val_count :]
+    labels = np.zeros(source_index.shape[0], dtype=np.int8)
+    labels[np.isin(source_index, val_groups)] = 1
+    labels[np.isin(source_index, holdout_groups)] = 2
+    return labels, {
+        "train": sorted(int(x) for x in train_groups),
+        "validation": sorted(int(x) for x in val_groups),
+        "holdout": sorted(int(x) for x in holdout_groups),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -537,8 +593,33 @@ def main() -> None:
     grouped_shared_hidden_dims = [int(x) for x in args.grouped_shared_hidden_dims.split(",") if x.strip()]
     grouped_value_hidden_dims = [int(x) for x in args.grouped_value_hidden_dims.split(",") if x.strip()]
 
+    split_labels = None
+    split_groups = None
+    if args.split_mode == "source_grouped":
+        if "source_index" not in data:
+            print("[ERROR] --split_mode source_grouped requires source_index in the demo file")
+            sys.exit(1)
+        split_labels, split_groups = build_source_grouped_split(
+            data["source_index"],
+            val_fraction=args.val_fraction,
+            holdout_fraction=args.holdout_fraction,
+            seed=args.split_seed,
+        )
+        print(
+            "       Grouped split     : "
+            f"train={len(split_groups['train'])}, validation={len(split_groups['validation'])}, "
+            f"holdout={len(split_groups['holdout'])} trajectories"
+        )
+
     # Train
-    trained_net = train_bc(observations, actions, action_mask, sample_weights, args)
+    trained_net = train_bc(
+        observations,
+        actions,
+        action_mask,
+        sample_weights,
+        args,
+        split_labels=split_labels,
+    )
 
     # Save as SB3 policy
     output_path = str(PROJECT_ROOT / args.output_path)
@@ -555,15 +636,42 @@ def main() -> None:
         grouped_head_hidden_dim=args.grouped_head_hidden_dim,
         grouped_value_hidden_dims=grouped_value_hidden_dims,
     )
+    if split_labels is not None and split_groups is not None:
+        source_files = data["source_files"].astype(str).tolist() if "source_files" in data else []
+        split_manifest = {
+            "schema": "cinebotrl_source_grouped_split_v1",
+            "seed": args.split_seed,
+            "val_fraction": args.val_fraction,
+            "holdout_fraction": args.holdout_fraction,
+            "row_counts": {
+                "train": int(np.sum(split_labels == 0)),
+                "validation": int(np.sum(split_labels == 1)),
+                "holdout": int(np.sum(split_labels == 2)),
+            },
+            "source_indices": split_groups,
+            "source_files": {
+                split: [source_files[index] for index in indices] if source_files else []
+                for split, indices in split_groups.items()
+            },
+        }
+        Path(output_path + ".split.json").write_text(json.dumps(split_manifest, indent=2), encoding="utf-8")
 
     # Summary
-    val_size   = max(1, int(total_transitions * args.val_fraction))
-    train_size = total_transitions - val_size
+    if split_labels is None:
+        val_size = max(1, int(total_transitions * args.val_fraction))
+        train_size = total_transitions - val_size
+        holdout_size = 0
+    else:
+        train_size = int(np.sum(split_labels == 0))
+        val_size = int(np.sum(split_labels == 1))
+        holdout_size = int(np.sum(split_labels == 2))
     print(f"\n{'='*60}")
     print("BEHAVIOURAL CLONING — SUMMARY")
     print(f"{'='*60}")
     print(f"  Total transitions : {total_transitions:,}")
     print(f"  Train / val split : {train_size:,} / {val_size:,}")
+    if holdout_size:
+        print(f"  Holdout rows       : {holdout_size:,}")
     print(f"  Epochs trained    : {args.epochs}")
     if args.policy_arch == "grouped":
         print(

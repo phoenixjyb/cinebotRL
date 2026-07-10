@@ -27,6 +27,7 @@ def compose_observation(
     action_history: torch.Tensor | None = None,
     contact_forces: torch.Tensor | None = None,
     min_obstacle_dist: torch.Tensor | None = None,
+    obstacle_features: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Compose full observation vector from components.
 
@@ -46,7 +47,8 @@ def compose_observation(
         lookahead_pos: Lookahead positions [num_envs, steps, 3] or None
         action_history: Previous actions [num_envs, history_len, action_dim] or None
         contact_forces: Contact forces [num_envs, num_bodies] or None
-        min_obstacle_dist: Signed obstacle clearance [num_envs, 1] or None
+        min_obstacle_dist: Legacy signed obstacle clearance [num_envs, 1] or None
+        obstacle_features: Directional obstacle slots [num_envs, obstacles, features] or None
 
     Returns:
         observations: Flattened observation tensor [num_envs, obs_dim]
@@ -141,7 +143,9 @@ def compose_observation(
         components.append(contact_forces)
 
     # Optional: Obstacle distance
-    if min_obstacle_dist is not None:
+    if obstacle_features is not None:
+        components.append(obstacle_features.reshape(obstacle_features.shape[0], -1))
+    elif min_obstacle_dist is not None:
         # Ensure it's 2D [num_envs, 1]
         if min_obstacle_dist.ndim == 1:
             min_obstacle_dist = min_obstacle_dist.unsqueeze(-1)
@@ -151,6 +155,47 @@ def compose_observation(
     observations = torch.cat(components, dim=-1)
 
     return observations
+
+
+def build_directional_obstacle_features(
+    base_pos: torch.Tensor,
+    base_quat: torch.Tensor,
+    obstacle_centers_xy: torch.Tensor,
+    obstacle_radii: torch.Tensor,
+    obstacle_clearance: torch.Tensor,
+    obstacle_valid_mask: torch.Tensor,
+) -> torch.Tensor:
+    """Build body-frame ``[dx, dy, radius, clearance, valid]`` obstacle slots."""
+
+    if obstacle_centers_xy.ndim != 3 or obstacle_centers_xy.shape[-1] != 2:
+        raise ValueError(f"obstacle_centers_xy must be [N,K,2], got {obstacle_centers_xy.shape}")
+    expected = obstacle_centers_xy.shape[:2]
+    for name, value in (
+        ("obstacle_radii", obstacle_radii),
+        ("obstacle_clearance", obstacle_clearance),
+        ("obstacle_valid_mask", obstacle_valid_mask),
+    ):
+        if value.shape != expected:
+            raise ValueError(f"{name} must have shape {expected}, got {value.shape}")
+
+    delta_world = obstacle_centers_xy - base_pos[:, None, :2]
+    w, x, y, z = base_quat.unbind(dim=-1)
+    yaw = torch.atan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2))
+    c = torch.cos(yaw)[:, None]
+    s = torch.sin(yaw)[:, None]
+    dx_body = c * delta_world[..., 0] + s * delta_world[..., 1]
+    dy_body = -s * delta_world[..., 0] + c * delta_world[..., 1]
+    valid = obstacle_valid_mask.to(dtype=base_pos.dtype)
+    return torch.stack(
+        [
+            torch.clamp(dx_body, -5.0, 5.0) * valid,
+            torch.clamp(dy_body, -5.0, 5.0) * valid,
+            torch.clamp(obstacle_radii, 0.0, 2.0) * valid,
+            torch.clamp(obstacle_clearance, -2.0, 5.0) * valid,
+            valid,
+        ],
+        dim=-1,
+    )
 
 
 def quat_diff(q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
@@ -238,6 +283,7 @@ def get_observation_dimensions(
     action_history_length: int = 2,
     action_dim: int = 9,
     use_obstacles: bool = False,
+    obstacle_feature_dim: int = 1,
 ) -> int:
     """Calculate total observation dimension.
 
@@ -249,7 +295,8 @@ def get_observation_dimensions(
         use_action_history: Whether to include action history
         action_history_length: Length of action history
         action_dim: Dimension of action space
-        use_obstacles: Whether obstacle distance is included
+        use_obstacles: Whether obstacle information is included
+        obstacle_feature_dim: Number of appended obstacle features
 
     Returns:
         Total observation dimension
@@ -288,6 +335,6 @@ def get_observation_dimensions(
 
     # Optional: Obstacle distance
     if use_obstacles:
-        dim += 1
+        dim += obstacle_feature_dim
 
     return dim

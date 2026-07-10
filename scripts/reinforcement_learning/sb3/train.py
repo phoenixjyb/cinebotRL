@@ -857,6 +857,12 @@ def parse_args():
         action="store_true",
         help="Enable the ground-disc obstacle avoidance task.",
     )
+    parser.add_argument("--num_obstacles", type=int, choices=[1, 2], default=1)
+    parser.add_argument(
+        "--obstacle_observation_mode",
+        choices=["scalar_clearance_v1", "relative_two_v2"],
+        default="scalar_clearance_v1",
+    )
     parser.add_argument(
         "--obstacles_from_trajectory_metadata",
         action="store_true",
@@ -2583,6 +2589,8 @@ def main():
                 print(f"    Resolved relative path to: {trajectory_dir}")
         
         env_cfg.task_config.obstacles.enable_obstacles = args.enable_obstacles
+        env_cfg.task_config.obstacles.num_obstacles = args.num_obstacles
+        env_cfg.task_config.obstacles.observation_mode = args.obstacle_observation_mode
         env_cfg.task_config.obstacles.disc_position_xy = (args.obstacle_x, args.obstacle_y)
         if args.obstacle_radius is not None:
             env_cfg.task_config.obstacles.disc_radius = args.obstacle_radius
@@ -2599,6 +2607,7 @@ def main():
             print(
                 f"    Obstacle disc: pos=({args.obstacle_x:.2f}, {args.obstacle_y:.2f}), "
                 f"radius={obstacle_cfg.disc_radius:.2f}m, "
+                f"count={obstacle_cfg.num_obstacles}, observation={obstacle_cfg.observation_mode}, "
                 f"height={obstacle_cfg.disc_height:.2f}m, "
                 f"randomized={not args.disable_obstacle_randomization}, "
                 f"x_range=({args.obstacle_x_range[0]:.2f}, {args.obstacle_x_range[1]:.2f}), "

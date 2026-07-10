@@ -142,6 +142,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=20260707)
     parser.add_argument("--freeze_base_actions", action="store_true")
     parser.add_argument(
+        "--arm_action_envelope_profile",
+        type=str,
+        default="proto2_safe_v1",
+        choices=["proto2_safe_v1", "teacher_wide_v1"],
+        help="Physical scaling envelope used for normalized arm action rows [0:6].",
+    )
+    parser.add_argument(
         "--base_action_scale",
         type=float,
         default=1.0,
@@ -332,7 +339,9 @@ def main() -> int:
                 flush=True,
             )
         env_cfg.task_config.base_assist.enable = False
+        env_cfg.task_config.arm_action_envelope_profile = args.arm_action_envelope_profile
         env_cfg.task_config.randomize_initial_joint_positions = bool(args.enable_initial_joint_randomization)
+        print(f"[gate] arm action envelope={env_cfg.task_config.arm_action_envelope_profile}", flush=True)
         reward_overrides = reset_config.get("reward_overrides", {})
         if isinstance(reward_overrides, dict):
             for name, value in reward_overrides.items():
@@ -818,6 +827,7 @@ def main() -> int:
             "samples": int(pos.size),
             "freeze_base_actions": bool(args.freeze_base_actions),
             "base_action_scale": float(args.base_action_scale),
+            "arm_action_envelope_profile": str(args.arm_action_envelope_profile),
             "initial_joint_randomization": bool(args.enable_initial_joint_randomization),
             "initial_ee_pos_error_mean_m": float(np.mean(initial_pos_error)),
             "final_ee_pos_error_mean_m": float(np.mean(final_pos_error)),

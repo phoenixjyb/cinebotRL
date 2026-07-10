@@ -37,6 +37,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--vec_normalize", default=None, help="VecNormalize pkl. Defaults to checkpoint parent.")
     parser.add_argument("--disable_vec_normalize", action="store_true")
     parser.add_argument("--base_action_scale", type=float, default=1.0)
+    parser.add_argument(
+        "--arm_action_envelope_profile",
+        type=str,
+        default="proto2_safe_v1",
+        choices=["proto2_safe_v1", "teacher_wide_v1"],
+        help="Physical scaling envelope used for normalized arm action rows [0:6].",
+    )
     parser.add_argument("--task", default="RecomoProto2TrackEE-v0")
     parser.add_argument("--steps", type=int, default=400)
     parser.add_argument(
@@ -450,6 +457,7 @@ def main() -> int:
             env_cfg.episode_length_s = float(args.episode_length_s)
         if args.base_action_slew_limit > 0.0:
             env_cfg.task_config.base_action_slew_limit = float(args.base_action_slew_limit)
+        env_cfg.task_config.arm_action_envelope_profile = args.arm_action_envelope_profile
         env_cfg.task_config.obstacles.enable_obstacles = bool(args.enable_obstacles)
         env_cfg.task_config.obstacles.randomize_per_reset = True
         env_cfg.task_config.obstacles.disc_radius = 0.20
@@ -584,6 +592,7 @@ def main() -> int:
             "video_dir": str(video_dir),
             "steps_requested": args.steps,
             "steps_executed": steps_executed,
+            "arm_action_envelope_profile": str(args.arm_action_envelope_profile),
             "episode_length_s": float(args.episode_length_s) if args.episode_length_s > 0.0 else None,
             "base_action_slew_limit": (
                 float(args.base_action_slew_limit) if args.base_action_slew_limit > 0.0 else None

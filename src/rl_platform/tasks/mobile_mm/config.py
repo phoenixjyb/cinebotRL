@@ -291,6 +291,7 @@ class MobileMMTrackConfig:
     # RS4-aware simulator adapter and dataset schema are fully wired.
     action_contract_name: str = DEFAULT_ACTION_CONTRACT_NAME
     experimental_rs4_adapter: bool = False
+    arm_action_envelope_profile: str = "proto2_safe_v1"
 
     # Episode settings
     episode_length_s: float = 20.0

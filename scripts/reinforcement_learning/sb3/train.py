@@ -362,6 +362,16 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--arm_action_envelope_profile",
+        type=str,
+        default="proto2_safe_v1",
+        choices=["proto2_safe_v1", "teacher_wide_v1"],
+        help=(
+            "Physical scaling envelope for normalized arm action rows [0:6]. "
+            "Use teacher_wide_v1 only for bounded GIK-teacher experiments."
+        ),
+    )
+    parser.add_argument(
         "--freeze_base_actions_for_non_base_required",
         action="store_true",
         help=(
@@ -2553,11 +2563,13 @@ def main():
         env_cfg.task_config.debug_resets = args.debug_resets
         env_cfg.task_config.action_contract_name = args.action_contract
         env_cfg.task_config.experimental_rs4_adapter = args.experimental_rs4_adapter
+        env_cfg.task_config.arm_action_envelope_profile = args.arm_action_envelope_profile
         print(
             "    Action contract: "
             f"{env_cfg.task_config.action_contract_name} "
             f"(experimental_rs4_adapter={env_cfg.task_config.experimental_rs4_adapter})"
         )
+        print(f"    Arm action envelope: {env_cfg.task_config.arm_action_envelope_profile}")
         
         # Convert trajectory_dir to absolute path if it's relative
         # Session 8h: Use stage_dir if trajectory curriculum is active
@@ -3216,6 +3228,7 @@ def main():
     print(f"Device:            {device}")
     print("Seed:              {}".format(args.seed if args.seed is not None else "None"))
     print(f"Freeze base acts:  {'yes (rows [6,7,8] zeroed before env step)' if args.freeze_base_actions else 'no'}")
+    print(f"Arm envelope:      {args.arm_action_envelope_profile}")
     print(
         "Mixed FK base mask: {}".format(
             "yes (non-base-required trajectories freeze rows [6,7,8])"

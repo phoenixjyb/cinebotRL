@@ -62,6 +62,13 @@ except ImportError as e:
 from rl_platform.robots import assets_root
 from rl_platform.robots.mobile_mm import get_mobile_mm_usd_path
 from .config import MobileMMTrackConfig, RewardWeights
+from .action_envelopes import (
+    ARM_ACTION_RADIUS_PROTO2_SAFE,
+    ARM_ENVELOPE_PROTO2_SAFE_V1,
+    ARM_ENVELOPE_TEACHER_WIDE_V1,
+    ARM_SAFE_HOME,
+    validate_arm_envelope_profile,
+)
 from .trajectories import TrajectoryManager
 from .observations import compose_observation, get_observation_dimensions
 from .rewards import compute_combined_reward
@@ -662,13 +669,12 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         # Conservative command filters keep random early policies from slamming the arm
         # into full-range position targets between adjacent 20 Hz control steps.
-        self.arm_safe_home = torch.tensor(
-            [0.0, 1.0, -1.2, 0.0, 0.0, 0.0],
-            device=self.device,
-            dtype=torch.float32,
+        self.arm_action_envelope_profile = validate_arm_envelope_profile(
+            self.task_cfg.arm_action_envelope_profile
         )
+        self.arm_safe_home = torch.tensor(ARM_SAFE_HOME, device=self.device, dtype=torch.float32)
         self.arm_action_radius = torch.tensor(
-            [1.0, 0.45, 0.8, 1.0, 0.8, 0.8],
+            ARM_ACTION_RADIUS_PROTO2_SAFE,
             device=self.device,
             dtype=torch.float32,
         )
@@ -681,7 +687,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         )
         print(
             f"[MobileMMTrackEE] Proto2 policy safety: arm target slew <= "
-            f"{self.max_arm_target_delta:.4f} rad/control-step, action radius={self.arm_action_radius.tolist()}"
+            f"{self.max_arm_target_delta:.4f} rad/control-step, "
+            f"arm_envelope={self.arm_action_envelope_profile}"
         )
         self.rs4_rate_adapter_config = Rs4RateAdapterConfig()
         self.rs4_max_policy_rates_rad_s = torch.tensor(
@@ -2056,23 +2063,30 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         upper = self.joint_upper_limits[joint_start:joint_end]
         margin = self.robot_limits["joint_limit_margin"]
 
-        # Proto2 v2 safety profile: keep early PPO exploration in a conservative
-        # envelope around a known stable home pose. The external policy remains normalized
-        # normalized actions; only the physical target envelope is narrowed.
-        lower_safe = torch.maximum(
-            lower + margin,
-            self.arm_safe_home[joint_start:joint_end] - self.arm_action_radius[joint_start:joint_end],
-        )
-        upper_safe = torch.minimum(
-            upper - margin,
-            self.arm_safe_home[joint_start:joint_end] + self.arm_action_radius[joint_start:joint_end],
-        )
+        if self.arm_action_envelope_profile == ARM_ENVELOPE_PROTO2_SAFE_V1:
+            # Current production profile: keep early PPO exploration in a
+            # conservative envelope around a known stable home pose.
+            lower_safe = torch.maximum(
+                lower + margin,
+                self.arm_safe_home[joint_start:joint_end] - self.arm_action_radius[joint_start:joint_end],
+            )
+            upper_safe = torch.minimum(
+                upper - margin,
+                self.arm_safe_home[joint_start:joint_end] + self.arm_action_radius[joint_start:joint_end],
+            )
+        elif self.arm_action_envelope_profile == ARM_ENVELOPE_TEACHER_WIDE_V1:
+            # Experimental GIK-teacher profile: use the full USD limits minus
+            # margin so labels are not clipped by the legacy safe radius.
+            lower_safe = lower + margin
+            upper_safe = upper - margin
+        else:
+            raise ValueError(f"unknown arm action envelope profile: {self.arm_action_envelope_profile}")
 
         actions_normalized = (actions + 1.0) * 0.5  # Convert [-1, 1] to [0, 1]
         scaled_actions = actions_normalized * (upper_safe - lower_safe) + lower_safe
 
         if not hasattr(self, "_arm_action_envelope_printed"):
-            print("[MobileMMTrackEE] Proto2 arm action envelope:")
+            print(f"[MobileMMTrackEE] Proto2 arm action envelope ({self.arm_action_envelope_profile}):")
             print(f"  Lower: {lower_safe}")
             print(f"  Upper: {upper_safe}")
             self._arm_action_envelope_printed = True

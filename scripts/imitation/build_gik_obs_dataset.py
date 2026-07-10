@@ -25,6 +25,10 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from rl_platform.tasks.mobile_mm.observations import compose_observation, get_observation_dimensions  # noqa: E402
+from rl_platform.tasks.mobile_mm.action_envelopes import (  # noqa: E402
+    ARM_ENVELOPE_PROFILES,
+    normalize_arm_targets,
+)
 
 
 ACTION_DIM = 9
@@ -43,6 +47,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-contacts", type=int, default=1)
     parser.add_argument("--safety-radius", type=float, default=0.2)
     parser.add_argument("--batch-size", type=int, default=4096)
+    parser.add_argument(
+        "--arm-envelope-profile",
+        type=str,
+        default="stored",
+        choices=("stored",) + ARM_ENVELOPE_PROFILES,
+        help=(
+            "Arm label source. 'stored' preserves exported clipped labels. "
+            "Named profiles rebuild rows [0:6] from q_next[:,3:9] using that "
+            "physical action envelope."
+        ),
+    )
     parser.add_argument(
         "--resample-dt",
         type=float,
@@ -217,6 +232,22 @@ def build_action_history(actions: np.ndarray, history_len: int) -> np.ndarray:
     return history
 
 
+def apply_arm_envelope_profile(
+    actions: np.ndarray,
+    mask: np.ndarray,
+    q_next: np.ndarray,
+    profile: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    if profile == "stored":
+        return actions, mask
+    rebuilt_actions, _, arm_valid = normalize_arm_targets(q_next[:, 3:9], profile=profile)
+    actions = actions.copy()
+    mask = mask.copy()
+    actions[:, :6] = rebuilt_actions
+    mask[:, :6] = arm_valid
+    return actions, mask
+
+
 def resolve_npz_path(item: dict, demo_dir: Path) -> Path:
     npz_path = Path(item["output_npz"])
     if npz_path.exists():
@@ -234,6 +265,13 @@ def build_components(
     actions = data["actions"].astype(np.float32)
     q_current = data["q_current"].astype(np.float32)
     q_next = data["q_next"].astype(np.float32)
+    action_valid_mask = data["action_valid_mask"].astype(bool)
+    actions, action_valid_mask = apply_arm_envelope_profile(
+        actions,
+        action_valid_mask,
+        q_next,
+        args.arm_envelope_profile,
+    )
     dt = data["dt"].astype(np.float32)
     target_pos = data["target_pos"].astype(np.float32)
     target_quat = data["target_quat_wxyz"].astype(np.float32)
@@ -272,7 +310,7 @@ def build_components(
 
     components = {
         "actions": actions,
-        "action_valid_mask": data["action_valid_mask"].astype(bool),
+        "action_valid_mask": action_valid_mask,
         "base_pos": base_pos,
         "base_quat": base_quat,
         "base_lin_vel": base_lin_vel,
@@ -378,6 +416,7 @@ def main() -> int:
         base_only=np.asarray(args.base_only),
         observation_dim=np.asarray(observations.shape[1]),
         resample_dt=np.asarray(float(args.resample_dt), dtype=np.float32),
+        arm_envelope_profile=np.asarray(args.arm_envelope_profile),
     )
     print(f"Manifest:      {manifest_path}")
     print(f"Output:        {args.output}")
@@ -386,6 +425,7 @@ def main() -> int:
     print(f"Obs dim:       {observations.shape[1]}")
     if args.resample_dt > 0.0:
         print(f"Resample dt:   {args.resample_dt:.4f}s")
+    print(f"Arm envelope:  {args.arm_envelope_profile}")
     print(f"Base labels:   {action_valid_mask[:, 6:].mean(axis=0)}")
     print(f"Arm labels:    {action_valid_mask[:, :6].mean(axis=0)}")
     return 0

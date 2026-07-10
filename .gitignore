@@ -25,6 +25,9 @@ data/gik_teacher_obs/
 data/base_assist_distill/
 data/gik_stage2_parity_progress_*/
 data/gik_offline_teacher_manifests_*/
+data/gik_offline_teacher_mats_*/
+data/gik_offline_accepted*_rs4_npz_*/
+data/gik_offline_accepted*_rs4_obs_*/
 data/gik_offline_teachers_*/
 data/gik_offline_teacher_obs/
 data/fixedbase_micro_diffik_teacher/

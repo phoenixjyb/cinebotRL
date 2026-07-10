@@ -9,9 +9,10 @@ contract:
      rs4_yaw_rate, rs4_pitch_rate, rs4_roll_rate,
      base_vx, base_vy, base_wz]
 
-The RS4 attitude-rate labels are experimental.  They are currently derived by
-finite-differencing the exported actual EE quaternion as SciPy ZYX Euler angles
-in degrees.  This is a simulator/dataset bridge, not hardware-equivalence proof.
+The RS4 attitude-rate labels are experimental.  They are derived from the
+deployment-style target camera/gimbal attitude quaternion when available, then
+finite-differenced as SciPy ZYX Euler angles in degrees.  This is a
+simulator/dataset bridge, not hardware-equivalence proof.
 """
 
 from __future__ import annotations
@@ -60,6 +61,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--safety-radius", type=float, default=0.2)
     parser.add_argument("--batch-size", type=int, default=4096)
     parser.add_argument("--enable-roll", action="store_true", help="Include roll-rate labels. Default masks roll.")
+    parser.set_defaults(
+        arm_envelope_profile="stored",
+        ee_state_source="stored",
+        velocity_source="action",
+        target_shift_steps=0,
+        use_obstacles=True,
+        resample_dt=0.0,
+    )
     return parser.parse_args()
 
 
@@ -94,8 +103,9 @@ def build_rs4_actions(data: np.lib.npyio.NpzFile, *, enable_roll: bool) -> dict[
     arm_actions, arm_unclipped, arm_valid = normalize_arm_targets(q_next[:, 3:6])
 
     current_attitude_deg = quat_wxyz_to_euler_zyx_deg(data["actual_ee_quat_wxyz"].astype(np.float32))
-    target_attitude_deg = quat_wxyz_to_euler_zyx_deg(data["target_quat_wxyz"].astype(np.float32))
-    attitude_rate_deg_s = finite_difference_euler_rates_deg_s(current_attitude_deg, dt)
+    target_quat_key = "gimbal_attitude_target_quat_wxyz" if "gimbal_attitude_target_quat_wxyz" in data.files else "target_quat_wxyz"
+    target_attitude_deg = quat_wxyz_to_euler_zyx_deg(data[target_quat_key].astype(np.float32))
+    attitude_rate_deg_s = finite_difference_euler_rates_deg_s(target_attitude_deg, dt)
 
     adapter_cfg = Rs4RateAdapterConfig(enable_roll=enable_roll)
     max_rates = adapter_cfg.max_policy_order_rates
@@ -126,6 +136,7 @@ def build_rs4_actions(data: np.lib.npyio.NpzFile, *, enable_roll: bool) -> dict[
         "target_camera_attitude_deg": target_attitude_deg.astype(np.float32),
         "camera_attitude_rate_deg_s": attitude_rate_deg_s.astype(np.float32),
         "max_rs4_rate_deg_s": max_rates.astype(np.float32),
+        "attitude_label_source": np.asarray(target_quat_key),
     }
 
 
@@ -145,6 +156,7 @@ def main() -> int:
     all_current_attitude: list[np.ndarray] = []
     all_target_attitude: list[np.ndarray] = []
     all_attitude_rates: list[np.ndarray] = []
+    attitude_label_sources: set[str] = set()
     source_files: list[str] = []
 
     for idx, item in enumerate(items):
@@ -165,6 +177,7 @@ def main() -> int:
         all_current_attitude.append(rs4["current_camera_attitude_deg"])
         all_target_attitude.append(rs4["target_camera_attitude_deg"])
         all_attitude_rates.append(rs4["camera_attitude_rate_deg_s"])
+        attitude_label_sources.add(str(rs4["attitude_label_source"]))
         source_files.append(npz_path.name)
 
     observations = np.concatenate(all_obs, axis=0)
@@ -215,7 +228,10 @@ def main() -> int:
         current_camera_attitude_deg=current_attitude,
         target_camera_attitude_deg=target_attitude,
         camera_attitude_rate_deg_s=attitude_rates,
-        attitude_frame_convention=np.asarray("experimental_scipy_zyx_from_actual_ee_quat_wxyz"),
+        attitude_frame_convention=np.asarray(
+            "experimental_scipy_zyx_from_" + ",".join(sorted(attitude_label_sources))
+        ),
+        attitude_label_source=np.asarray(",".join(sorted(attitude_label_sources))),
         rs4_axis_order=np.asarray("[yaw, roll, pitch] via local [roll, pitch, yaw] map [2,0,1]"),
         roll_enabled=np.asarray(args.enable_roll),
         max_rs4_rate_deg_s=Rs4RateAdapterConfig(enable_roll=args.enable_roll).max_policy_order_rates,

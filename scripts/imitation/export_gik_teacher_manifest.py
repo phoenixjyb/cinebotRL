@@ -31,6 +31,7 @@ ARM_LOWER_SAFE = np.array([-1.0, 0.55, -2.0, -1.0, -0.8, -0.8], dtype=np.float32
 ARM_UPPER_SAFE = np.array([1.0, 1.45, -0.4, 1.0, 0.8, 0.8], dtype=np.float32)
 MAX_LINEAR_VELOCITY = 1.5
 MAX_ANGULAR_VELOCITY = 2.0
+Q13_TO_SIM9_INDICES = np.asarray([0, 1, 2, 3, 4, 5, 10, 11, 12], dtype=np.int64)
 
 
 @dataclass
@@ -74,7 +75,12 @@ def read_scalar(group: h5py.Group, path: str) -> float | None:
     arr = read_dataset(group, path)
     if arr is None or arr.size == 0:
         return None
-    return float(np.ravel(arr)[0])
+    if getattr(arr, "dtype", None) is not None and arr.dtype.kind == "O":
+        return None
+    try:
+        return float(np.ravel(arr)[0])
+    except (TypeError, ValueError):
+        return None
 
 
 def read_matlab_string(group: h5py.Group, path: str) -> str | None:
@@ -97,6 +103,23 @@ def as_samples_by_dim(arr: np.ndarray, dim: int) -> np.ndarray:
     if arr.shape[0] == dim:
         return arr.T
     raise ValueError(f"cannot orient array with shape {arr.shape} as [N,{dim}]")
+
+
+def as_qtraj_sim9(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Return the CineBotRL 9D sim state and the original MATLAB qTraj."""
+
+    arr = np.asarray(arr, dtype=np.float64)
+    if arr.ndim != 2:
+        raise ValueError(f"expected 2D qTraj array, got shape {arr.shape}")
+    if arr.shape[1] in (9, 13):
+        q_full = arr
+    elif arr.shape[0] in (9, 13):
+        q_full = arr.T
+    else:
+        raise ValueError(f"cannot orient qTraj with shape {arr.shape} as [N,9] or [N,13]")
+    if q_full.shape[1] == 9:
+        return q_full, q_full
+    return q_full[:, Q13_TO_SIM9_INDICES], q_full
 
 
 def as_pose_samples(arr: np.ndarray) -> np.ndarray:
@@ -183,10 +206,15 @@ def read_vec2(group: h5py.Group, path: str) -> np.ndarray | None:
     arr = read_dataset(group, path)
     if arr is None:
         return None
+    if getattr(arr, "dtype", None) is not None and arr.dtype.kind == "O":
+        return None
     try:
         return np.ravel(as_samples_by_dim(arr, 2)[0]).astype(np.float32)
     except Exception:
-        flat = np.ravel(np.asarray(arr, dtype=np.float64))
+        try:
+            flat = np.ravel(np.asarray(arr, dtype=np.float64))
+        except (TypeError, ValueError):
+            return None
         return flat[:2].astype(np.float32) if flat.size >= 2 else None
 
 
@@ -247,7 +275,7 @@ def load_log(path: Path) -> dict[str, Any]:
             raise ValueError("missing log/qTraj")
         if t_raw is None:
             raise ValueError("missing log/time")
-        q = as_samples_by_dim(q_raw, 9)
+        q, q_full = as_qtraj_sim9(q_raw)
         time = np.ravel(np.asarray(t_raw, dtype=np.float64))
         if time.size != q.shape[0]:
             if time.size == q.shape[0] - 1:
@@ -258,6 +286,9 @@ def load_log(path: Path) -> dict[str, Any]:
 
         target_positions = read_dataset(f, "log/targetPositions")
         target_orientations = read_dataset(f, "log/targetOrientations")
+        gimbal_attitude_target_orientations = read_dataset(f, "log/targetLinkDiagnostics/poseTargetOrientations")
+        if gimbal_attitude_target_orientations is None:
+            gimbal_attitude_target_orientations = target_orientations
         ee_positions = read_dataset(f, "log/eePositions")
         ee_orientations = read_dataset(f, "log/eeOrientations")
         ramp_poses_raw = read_dataset(f, "log/ramp/Poses")
@@ -275,9 +306,15 @@ def load_log(path: Path) -> dict[str, Any]:
 
         return {
             "q": q,
+            "q_full": q_full,
             "time": time,
             "target_positions": None if target_positions is None else as_samples_by_dim(target_positions, 3),
             "target_orientations": None if target_orientations is None else normalize_quat_wxyz(as_samples_by_dim(target_orientations, 4)),
+            "gimbal_attitude_target_orientations": (
+                None
+                if gimbal_attitude_target_orientations is None
+                else normalize_quat_wxyz(as_samples_by_dim(gimbal_attitude_target_orientations, 4))
+            ),
             "target_display_positions": None if display_positions_raw is None else as_samples_by_dim(display_positions_raw, 3),
             "ee_positions": None if ee_positions is None else as_samples_by_dim(ee_positions, 3),
             "ee_orientations": None if ee_orientations is None else normalize_quat_wxyz(as_samples_by_dim(ee_orientations, 4)),
@@ -298,6 +335,7 @@ def load_log(path: Path) -> dict[str, Any]:
 def aligned_ee_samples(log: dict[str, Any], num_actions: int) -> dict[str, np.ndarray]:
     target_pos_tail = log["target_positions"]
     target_quat_tail = log["target_orientations"]
+    gimbal_attitude_tail = log["gimbal_attitude_target_orientations"]
     actual_pos_tail = log["ee_positions"]
     actual_quat_tail = log["ee_orientations"]
     if target_pos_tail is None or target_quat_tail is None:
@@ -312,12 +350,19 @@ def aligned_ee_samples(log: dict[str, Any], num_actions: int) -> dict[str, np.nd
     if display_pos is not None and display_pos.shape[0] == num_actions:
         target_pos = display_pos
     target_quat = concat_prefix(ramp_quat, target_quat_tail, num_actions, "target_quat")
+    gimbal_attitude_quat = concat_prefix(
+        ramp_quat,
+        gimbal_attitude_tail if gimbal_attitude_tail is not None else target_quat_tail,
+        num_actions,
+        "gimbal_attitude_target_quat",
+    )
     actual_pos = concat_prefix(ramp_pos, actual_pos_tail, num_actions, "actual_ee_pos")
     actual_quat = concat_prefix(ramp_quat, actual_quat_tail, num_actions, "actual_ee_quat")
 
     for label, value, dim in (
         ("target_pos", target_pos, 3),
         ("target_quat_wxyz", target_quat, 4),
+        ("gimbal_attitude_target_quat_wxyz", gimbal_attitude_quat, 4),
         ("actual_ee_pos", actual_pos, 3),
         ("actual_ee_quat_wxyz", actual_quat, 4),
     ):
@@ -329,13 +374,38 @@ def aligned_ee_samples(log: dict[str, Any], num_actions: int) -> dict[str, np.nd
     return {
         "target_pos": target_pos.astype(np.float32),
         "target_quat_wxyz": normalize_quat_wxyz(target_quat).astype(np.float32),
+        "gimbal_attitude_target_quat_wxyz": normalize_quat_wxyz(gimbal_attitude_quat).astype(np.float32),
         "actual_ee_pos": actual_pos.astype(np.float32),
         "actual_ee_quat_wxyz": normalize_quat_wxyz(actual_quat).astype(np.float32),
     }
 
 
-def export_one(item: dict[str, Any], out_dir: Path, *, mat_root: Path | None, min_duration_s: float, copy_mat_dir: Path | None) -> ExportStats | None:
-    source_mat = Path(item["mat"])
+def remap_source_path(raw_path: str, *, source_path_prefix: str, source_path_replacement: Path | None) -> Path:
+    if not source_path_prefix or source_path_replacement is None:
+        return Path(raw_path)
+    raw = str(raw_path).replace("\\", "/")
+    prefix = source_path_prefix.replace("\\", "/").rstrip("/")
+    if raw.startswith(prefix):
+        suffix = raw[len(prefix) :].lstrip("/\\")
+        return source_path_replacement / suffix
+    return Path(raw_path)
+
+
+def export_one(
+    item: dict[str, Any],
+    out_dir: Path,
+    *,
+    mat_root: Path | None,
+    source_path_prefix: str,
+    source_path_replacement: Path | None,
+    min_duration_s: float,
+    copy_mat_dir: Path | None,
+) -> ExportStats | None:
+    source_mat = remap_source_path(
+        str(item["mat"]),
+        source_path_prefix=source_path_prefix,
+        source_path_replacement=source_path_replacement,
+    )
     if mat_root is not None and not source_mat.is_absolute():
         source_mat = mat_root / source_mat
     if not source_mat.exists():
@@ -343,6 +413,7 @@ def export_one(item: dict[str, Any], out_dir: Path, *, mat_root: Path | None, mi
 
     log = load_log(source_mat)
     q = np.asarray(log["q"], dtype=np.float32)
+    q_full = np.asarray(log.get("q_full", q), dtype=np.float32)
     time = np.asarray(log["time"], dtype=np.float64)
     duration = float(time[-1] - time[0]) if time.size else 0.0
     if q.shape[0] < 2 or duration < min_duration_s:
@@ -385,6 +456,7 @@ def export_one(item: dict[str, Any], out_dir: Path, *, mat_root: Path | None, mi
         base_action_valid_mask=base_valid_mask.astype(bool),
         target_pos=ee_samples["target_pos"],
         target_quat_wxyz=ee_samples["target_quat_wxyz"],
+        gimbal_attitude_target_quat_wxyz=ee_samples["gimbal_attitude_target_quat_wxyz"],
         actual_ee_pos=ee_samples["actual_ee_pos"],
         actual_ee_quat_wxyz=ee_samples["actual_ee_quat_wxyz"],
         obstacle_center_xy=np.asarray(log["obstacle_center_xy"] if log["obstacle_center_xy"] is not None else [np.nan, np.nan], dtype=np.float32),
@@ -394,6 +466,9 @@ def export_one(item: dict[str, Any], out_dir: Path, *, mat_root: Path | None, mi
         q_current=q[:-1],
         q_next=q[1:],
         q=q,
+        q_full=q_full,
+        q_full_dim=np.asarray(q_full.shape[1], dtype=np.int32),
+        q_sim9_source_indices=Q13_TO_SIM9_INDICES if q_full.shape[1] == 13 else np.arange(9, dtype=np.int64),
         time=time.astype(np.float64),
         dt=dt.astype(np.float32),
         source_mat=str(source_mat),
@@ -558,6 +633,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--manifest", type=Path, required=True, help="QA-passing teacher manifest JSON.")
     parser.add_argument("--output-dir", type=Path, default=Path("data/gik_teacher_one_obstacle_pass"))
     parser.add_argument("--mat-root", type=Path, default=None, help="Optional root for relative manifest mat paths.")
+    parser.add_argument(
+        "--source-path-prefix",
+        default="",
+        help="Optional source path prefix to replace before opening manifest .mat paths.",
+    )
+    parser.add_argument(
+        "--source-path-replacement",
+        type=Path,
+        default=None,
+        help="Replacement root used with --source-path-prefix.",
+    )
     parser.add_argument("--min-duration-s", type=float, default=5.0)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--copy-mats", action="store_true", help="Copy source .mat files into output-dir/source_mats.")
@@ -587,6 +673,11 @@ def main() -> int:
     if not output_dir.is_absolute():
         output_dir = (Path.cwd() / output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    source_path_replacement = args.source_path_replacement
+    if source_path_replacement is not None:
+        source_path_replacement = source_path_replacement.expanduser()
+        if not source_path_replacement.is_absolute():
+            source_path_replacement = (Path.cwd() / source_path_replacement).resolve()
 
     items, source_meta = load_manifest_items(args)
     if args.limit > 0:
@@ -613,7 +704,15 @@ def main() -> int:
     failures: list[dict[str, str]] = []
     for item in items:
         try:
-            exported = export_one(item, output_dir, mat_root=args.mat_root, min_duration_s=args.min_duration_s, copy_mat_dir=copy_mat_dir)
+            exported = export_one(
+                item,
+                output_dir,
+                mat_root=args.mat_root,
+                source_path_prefix=args.source_path_prefix,
+                source_path_replacement=source_path_replacement,
+                min_duration_s=args.min_duration_s,
+                copy_mat_dir=copy_mat_dir,
+            )
             if exported is not None:
                 stats.append(exported)
         except Exception as exc:

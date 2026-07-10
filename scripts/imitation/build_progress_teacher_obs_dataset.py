@@ -7,10 +7,15 @@ The input schema is produced by gikWBC9DOF's progress teacher exporter:
     case_*/teacher_samples.csv
 
 Rows are keyed by normalized path progress, not by MoveIt execution time. This
-script converts those labels into the current CineBotRL sim_6joint_gimbal_v1
-policy contract:
+script converts those labels into one of the named CineBotRL policy contracts:
 
     [joint6, joint5, joint4, joint3, joint2, joint1, base_vx, base_vy, base_wz]
+
+or the DJI/RS4-oriented experimental contract:
+
+    [arm_yaw, arm_pitch, arm_elbow,
+     rs4_yaw_rate, rs4_pitch_rate, rs4_roll_rate,
+     base_vx, base_vy, base_wz]
 
 The output .npz follows the existing BC trainer contract:
 
@@ -36,6 +41,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from rl_platform.tasks.mobile_mm.observations import compose_observation, get_observation_dimensions  # noqa: E402
+from rl_platform.tasks.mobile_mm.rs4_adapter import Rs4RateAdapterConfig  # noqa: E402
 
 
 ACTION_DIM = 9
@@ -55,6 +61,14 @@ ARM_SAFE_HOME = np.array([0.0, 1.0, -1.2, 0.0, 0.0, 0.0], dtype=np.float32)
 ARM_ACTION_RADIUS = np.array([1.0, 0.45, 0.8, 1.0, 0.8, 0.8], dtype=np.float32)
 ARM_SAFE_LOWER = ARM_SAFE_HOME - ARM_ACTION_RADIUS
 ARM_SAFE_UPPER = ARM_SAFE_HOME + ARM_ACTION_RADIUS
+RS4_ACTION_NAMES = [
+    "arm_yaw",
+    "arm_pitch",
+    "arm_elbow",
+    "rs4_yaw_rate",
+    "rs4_pitch_rate",
+    "rs4_roll_rate",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -79,6 +93,28 @@ def parse_args() -> argparse.Namespace:
         "--base-only",
         action="store_true",
         help="Mask non-base action labels. Useful for initial base-head BC smoke.",
+    )
+    parser.add_argument(
+        "--action-contract",
+        choices=["sim_6joint_gimbal_v1", "rs4_attitude_rate_v1"],
+        default="sim_6joint_gimbal_v1",
+        help=(
+            "Output action semantics. rs4_attitude_rate_v1 uses explicit "
+            "gimbal_attitude_target_q* labels instead of physical gimbal q_* joints."
+        ),
+    )
+    parser.add_argument(
+        "--enable-roll",
+        action="store_true",
+        help="Include RS4 roll-rate labels. Default masks roll for the current DJI path.",
+    )
+    parser.add_argument(
+        "--allow-desired-pose-gimbal-fallback",
+        action="store_true",
+        help=(
+            "For older progress exports only: derive RS4 attitude labels from desired_q* "
+            "if explicit gimbal_attitude_target_q* columns are missing."
+        ),
     )
     parser.add_argument(
         "--append-progress",
@@ -179,6 +215,107 @@ def normalize_arm_targets(q_arm: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return np.clip(raw, -1.0, 1.0).astype(np.float32), valid
 
 
+def normalize_real_arm_targets(q_arm: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    lower = ARM_SAFE_LOWER[:3]
+    upper = ARM_SAFE_UPPER[:3]
+    raw = 2.0 * (q_arm - lower[None, :]) / (upper[None, :] - lower[None, :]) - 1.0
+    valid = np.isfinite(raw) & (np.abs(raw) <= 1.0)
+    return np.clip(raw, -1.0, 1.0).astype(np.float32), valid
+
+
+def quat_wxyz_to_euler_zyx_deg(quat: np.ndarray) -> np.ndarray:
+    q = np.asarray(quat, dtype=np.float64).copy()
+    q /= np.maximum(np.linalg.norm(q, axis=1, keepdims=True), 1e-12)
+    w, x, y, z = q.T
+    yaw = np.arctan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+    pitch = np.arcsin(np.clip(2.0 * (w * y - z * x), -1.0, 1.0))
+    roll = np.arctan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x * x + y * y))
+    return np.rad2deg(np.stack([yaw, pitch, roll], axis=1)).astype(np.float32)
+
+
+def finite_difference_euler_rates_deg_s(euler_deg: np.ndarray, dt: float) -> np.ndarray:
+    if euler_deg.shape[0] == 1:
+        return np.zeros_like(euler_deg, dtype=np.float32)
+    unwrapped = np.rad2deg(np.unwrap(np.deg2rad(euler_deg), axis=0)).astype(np.float32)
+    rates = np.zeros_like(unwrapped, dtype=np.float32)
+    rates[:-1] = (unwrapped[1:] - unwrapped[:-1]) / float(dt)
+    rates[-1] = rates[-2]
+    return rates
+
+
+def read_quat_columns(rows: list[dict[str, str]], prefix: str) -> np.ndarray | None:
+    keys = [f"{prefix}_qw", f"{prefix}_qx", f"{prefix}_qy", f"{prefix}_qz"]
+    missing = [key for key in keys if key not in rows[0]]
+    if missing:
+        return None
+    quat = np.asarray([[parse_float(r, key) for key in keys] for r in rows], dtype=np.float32)
+    require(np.isfinite(quat).all(), f"{prefix} contains non-finite values")
+    return quat
+
+
+def read_rs4_target_quat(rows: list[dict[str, str]], *, allow_desired_pose_fallback: bool) -> tuple[np.ndarray, str]:
+    target_quat = read_quat_columns(rows, "gimbal_attitude_target")
+    if target_quat is not None:
+        return target_quat, "gimbal_attitude_target_qwxyz"
+    require(
+        allow_desired_pose_fallback,
+        "missing gimbal_attitude_target_q* columns; rerun the updated GIK exporter or pass "
+        "--allow-desired-pose-gimbal-fallback for legacy progress exports",
+    )
+    fallback = read_quat_columns(rows, "desired")
+    require(fallback is not None, "legacy fallback requested but desired_q* columns are missing")
+    return fallback, "desired_qwxyz_legacy_fallback"
+
+
+def build_rs4_attitude_rate_actions(
+    q_arm_full: np.ndarray,
+    base_actions: np.ndarray,
+    base_valid: np.ndarray,
+    rows: list[dict[str, str]],
+    sample_time: float,
+    *,
+    enable_roll: bool,
+    allow_desired_pose_fallback: bool,
+) -> dict[str, np.ndarray]:
+    arm_actions, arm_valid = normalize_real_arm_targets(q_arm_full[:, :3])
+    target_quat, attitude_source = read_rs4_target_quat(
+        rows,
+        allow_desired_pose_fallback=allow_desired_pose_fallback,
+    )
+    target_attitude_deg = quat_wxyz_to_euler_zyx_deg(target_quat)
+    attitude_rates = finite_difference_euler_rates_deg_s(target_attitude_deg, sample_time)
+
+    adapter_cfg = Rs4RateAdapterConfig(enable_roll=enable_roll)
+    rate_unclipped = attitude_rates / adapter_cfg.max_policy_order_rates[None, :]
+    rate_actions = np.clip(rate_unclipped, -1.0, 1.0).astype(np.float32)
+    rate_valid = np.isfinite(rate_unclipped) & (np.abs(rate_unclipped) <= 1.0)
+    if not enable_roll:
+        rate_actions[:, 2] = 0.0
+        rate_valid[:, 2] = False
+        rate_unclipped[:, 2] = 0.0
+
+    actions = np.zeros((q_arm_full.shape[0], ACTION_DIM), dtype=np.float32)
+    actions[:, 0:3] = arm_actions
+    actions[:, 3:6] = rate_actions
+    actions[:, 6:9] = base_actions
+
+    mask = np.zeros_like(actions, dtype=bool)
+    mask[:, 0:3] = arm_valid
+    mask[:, 3:6] = rate_valid
+    mask[:, 6:9] = base_valid
+
+    return {
+        "actions": actions,
+        "action_valid_mask": mask,
+        "gimbal_attitude_target_quat_wxyz": target_quat.astype(np.float32),
+        "target_camera_attitude_deg": target_attitude_deg.astype(np.float32),
+        "camera_attitude_rate_deg_s": attitude_rates.astype(np.float32),
+        "rs4_rate_unclipped": rate_unclipped.astype(np.float32),
+        "max_rs4_rate_deg_s": adapter_cfg.max_policy_order_rates.astype(np.float32),
+        "rs4_attitude_label_source": np.asarray(attitude_source),
+    }
+
+
 def read_case_csv(csv_path: Path) -> list[dict[str, str]]:
     with csv_path.open("r", encoding="utf-8", newline="") as f:
         return list(csv.DictReader(f))
@@ -202,7 +339,7 @@ def case_sample_time(csv_path: Path) -> float:
     return float(limits.get("SampleTime", DEFAULT_SAMPLE_TIME))
 
 
-def arrays_from_rows(rows: list[dict[str, str]], sample_time: float) -> dict[str, np.ndarray]:
+def arrays_from_rows(rows: list[dict[str, str]], sample_time: float, args: argparse.Namespace) -> dict[str, np.ndarray]:
     n = len(rows)
     require(n > 0, "case has no teacher samples")
 
@@ -239,8 +376,8 @@ def arrays_from_rows(rows: list[dict[str, str]], sample_time: float) -> dict[str
         ],
         dtype=np.float32,
     )
-    q_arm = np.asarray([[parse_float(r, f"q_{name}") for name in ARM_ACTION_NAMES] for r in rows], dtype=np.float32)
-    joint_pos = np.concatenate([q_base, q_arm], axis=1).astype(np.float32)
+    q_arm_full = np.asarray([[parse_float(r, f"q_{name}") for name in ARM_ACTION_NAMES] for r in rows], dtype=np.float32)
+    joint_pos = np.concatenate([q_base, q_arm_full], axis=1).astype(np.float32)
 
     dq_base = np.asarray(
         [
@@ -263,15 +400,6 @@ def arrays_from_rows(rows: list[dict[str, str]], sample_time: float) -> dict[str
     base_vy_body = -sin_yaw * base_vel_world[:, 0] + cos_yaw * base_vel_world[:, 1]
     base_wz = dq_base[:, 2] / sample_time
 
-    actions = np.zeros((n, ACTION_DIM), dtype=np.float32)
-    arm_actions, arm_valid = normalize_arm_targets(q_arm)
-    actions[:, 0:6] = arm_actions
-    actions[:, 6] = np.clip(base_vx_body / MAX_LINEAR_VELOCITY, -1.0, 1.0)
-    actions[:, 7] = np.clip(base_vy_body / MAX_LINEAR_VELOCITY, -1.0, 1.0)
-    actions[:, 8] = np.clip(base_wz / MAX_ANGULAR_VELOCITY, -1.0, 1.0)
-
-    action_valid_mask = np.zeros_like(actions, dtype=bool)
-    action_valid_mask[:, 0:6] = arm_valid
     base_raw = np.stack(
         [
             base_vx_body / MAX_LINEAR_VELOCITY,
@@ -280,7 +408,32 @@ def arrays_from_rows(rows: list[dict[str, str]], sample_time: float) -> dict[str
         ],
         axis=1,
     )
-    action_valid_mask[:, 6:9] = np.isfinite(base_raw) & (np.abs(base_raw) <= 1.0)
+    base_actions = np.clip(base_raw, -1.0, 1.0).astype(np.float32)
+    base_valid = np.isfinite(base_raw) & (np.abs(base_raw) <= 1.0)
+
+    extra: dict[str, np.ndarray] = {}
+    if args.action_contract == "rs4_attitude_rate_v1":
+        rs4 = build_rs4_attitude_rate_actions(
+            q_arm_full,
+            base_actions,
+            base_valid,
+            rows,
+            sample_time,
+            enable_roll=args.enable_roll,
+            allow_desired_pose_fallback=args.allow_desired_pose_gimbal_fallback,
+        )
+        actions = rs4.pop("actions")
+        action_valid_mask = rs4.pop("action_valid_mask")
+        extra.update(rs4)
+    else:
+        actions = np.zeros((n, ACTION_DIM), dtype=np.float32)
+        arm_actions, arm_valid = normalize_arm_targets(q_arm_full)
+        actions[:, 0:6] = arm_actions
+        actions[:, 6:9] = base_actions
+
+        action_valid_mask = np.zeros_like(actions, dtype=bool)
+        action_valid_mask[:, 0:6] = arm_valid
+        action_valid_mask[:, 6:9] = base_valid
 
     base_lin_vel = np.zeros((n, 3), dtype=np.float32)
     base_lin_vel[:, 0] = base_vel_world[:, 0] / MAX_LINEAR_VELOCITY
@@ -304,6 +457,7 @@ def arrays_from_rows(rows: list[dict[str, str]], sample_time: float) -> dict[str
         "ee_ang_vel": angular_velocity_from_quats(ee_quat, sample_time),
         "target_pos": target_pos,
         "target_quat": target_quat,
+        **extra,
     }
 
 
@@ -354,13 +508,17 @@ def main() -> int:
     all_actions: list[np.ndarray] = []
     all_masks: list[np.ndarray] = []
     all_progress: list[np.ndarray] = []
+    all_gimbal_target_quat: list[np.ndarray] = []
+    all_target_attitude: list[np.ndarray] = []
+    all_attitude_rates: list[np.ndarray] = []
+    rs4_attitude_label_sources: set[str] = set()
     source_index: list[np.ndarray] = []
     source_cases: list[str] = []
 
     for idx, case in enumerate(cases):
         csv_path = resolve_case_csv(export_dir, case)
         sample_time = case_sample_time(csv_path)
-        components = arrays_from_rows(read_case_csv(csv_path), sample_time)
+        components = arrays_from_rows(read_case_csv(csv_path), sample_time, args)
         obs = compose_batches(components, args)
         actions = components["actions"]
         mask = components["action_valid_mask"].copy()
@@ -371,14 +529,35 @@ def main() -> int:
         all_actions.append(actions)
         all_masks.append(mask)
         all_progress.append(components["progress"])
+        if args.action_contract == "rs4_attitude_rate_v1":
+            all_gimbal_target_quat.append(components["gimbal_attitude_target_quat_wxyz"])
+            all_target_attitude.append(components["target_camera_attitude_deg"])
+            all_attitude_rates.append(components["camera_attitude_rate_deg_s"])
+            rs4_attitude_label_sources.add(str(components["rs4_attitude_label_source"]))
         source_index.append(np.full(actions.shape[0], idx, dtype=np.int32))
         source_cases.append(case["case_name"])
+
+    if args.action_contract == "rs4_attitude_rate_v1":
+        action_names = RS4_ACTION_NAMES + ["base_vx", "base_vy", "base_wz"]
+    else:
+        action_names = ARM_ACTION_NAMES + ["base_vx", "base_vy", "base_wz"]
 
     observations = np.concatenate(all_obs, axis=0)
     actions = np.concatenate(all_actions, axis=0)
     action_valid_mask = np.concatenate(all_masks, axis=0)
     progress = np.concatenate(all_progress, axis=0)
     source_index_arr = np.concatenate(source_index, axis=0)
+    extra_outputs = {}
+    if args.action_contract == "rs4_attitude_rate_v1":
+        label_source = ",".join(sorted(rs4_attitude_label_sources))
+        extra_outputs = {
+            "gimbal_attitude_target_quat_wxyz": np.concatenate(all_gimbal_target_quat, axis=0),
+            "target_camera_attitude_deg": np.concatenate(all_target_attitude, axis=0),
+            "camera_attitude_rate_deg_s": np.concatenate(all_attitude_rates, axis=0),
+            "max_rs4_rate_deg_s": Rs4RateAdapterConfig(enable_roll=args.enable_roll).max_policy_order_rates,
+            "attitude_frame_convention": np.asarray(f"world/map ZYX yaw_pitch_roll from {label_source}"),
+            "rs4_attitude_label_source": np.asarray(label_source),
+        }
 
     if args.append_progress:
         observations = np.concatenate([observations, progress[:, None].astype(np.float32)], axis=1)
@@ -410,11 +589,18 @@ def main() -> int:
         source_cases=np.asarray(source_cases),
         manifest=str(manifest_path),
         schema=np.asarray("cinebotrl_progress_teacher_obs_dataset_v1"),
-        action_contract=np.asarray("sim_6joint_gimbal_v1"),
-        action_names=np.asarray(ARM_ACTION_NAMES + ["base_vx", "base_vy", "base_wz"]),
+        action_contract=np.asarray(args.action_contract),
+        action_names=np.asarray(action_names),
+        gimbal_label_contract=np.asarray(
+            "gimbal_attitude_target_q*_finite_difference"
+            if args.action_contract == "rs4_attitude_rate_v1"
+            else "physical_sim_urdf_gimbal_joint_targets"
+        ),
+        roll_enabled=np.asarray(args.enable_roll),
         base_only=np.asarray(args.base_only),
         append_progress=np.asarray(args.append_progress),
         observation_dim=np.asarray(observations.shape[1]),
+        **extra_outputs,
     )
 
     print(f"Manifest:      {manifest_path}")

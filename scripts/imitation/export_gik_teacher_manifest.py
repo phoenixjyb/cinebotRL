@@ -5,11 +5,17 @@ The input manifest is produced by the MATLAB GIK benchmark pipeline and contains
 one accepted teacher episode per trajectory.  This converter intentionally uses
 only manifest entries that pass QA and preserves the QA metadata in the output
 manifest so failed episodes can stay reserved for RL curriculum/evaluation.
+
+The newer ``gik_offline_teacher_manifest_v1`` schema separates strict
+``accepted`` rows from ``near_pass`` and ``contact_near_pass`` rows.  This
+script defaults to accepted-only export; non-strict tiers require explicit
+opt-in flags.
 """
 
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import math
 import shutil
@@ -397,6 +403,7 @@ def export_one(item: dict[str, Any], out_dir: Path, *, mat_root: Path | None, mi
         variant=log["variant"] or "",
         frame_mode=str(item.get("frame_mode") or log["frame_mode"] or ""),
         teacher_method=str(item["method"]),
+        teacher_metadata=json.dumps(item.get("teacher_metadata") or {}),
         teacher_index=np.asarray(int(item["index"])),
         qa_pass=np.asarray(True),
         max_position_error_m=np.asarray(float(item["max_position_error_m"]), dtype=np.float32),
@@ -444,10 +451,106 @@ def export_one(item: dict[str, Any], out_dir: Path, *, mat_root: Path | None, mi
 
 def validate_manifest_items(items: list[dict[str, Any]]) -> None:
     for item in items:
-        if float(item.get("max_position_error_m", math.inf)) > 0.10:
-            raise ValueError(f"index {item.get('index')} exceeds position QA threshold")
-        if float(item.get("footprint_margin_m", -math.inf)) < 0.0:
-            raise ValueError(f"index {item.get('index')} has negative footprint margin")
+        metadata = item.get("teacher_metadata") or {}
+        quality_status = str(metadata.get("quality_status") or "accepted")
+        max_position = float(item.get("max_position_error_m", math.inf))
+        max_orientation = float(item.get("max_orientation_error_rad", math.inf))
+        p95_position_raw = item.get("p95_position_error_m")
+        p95_position = math.inf if p95_position_raw is None else float(p95_position_raw)
+        footprint_margin = float(item.get("footprint_margin_m", -math.inf))
+        if quality_status == "near_pass":
+            if max_position > 0.12 or p95_position > 0.09 or max_orientation > 0.25 or footprint_margin < 0.0:
+                raise ValueError(f"index {item.get('index')} violates near_pass thresholds")
+        elif quality_status == "contact_near_pass":
+            if max_position > 0.10 or max_orientation > 0.25 or footprint_margin < -0.001:
+                raise ValueError(f"index {item.get('index')} violates contact_near_pass thresholds")
+        else:
+            if max_position > 0.10:
+                raise ValueError(f"index {item.get('index')} exceeds position QA threshold")
+            if footprint_margin < 0.0:
+                raise ValueError(f"index {item.get('index')} has negative footprint margin")
+
+
+def normalize_offline_manifest_item(item: dict[str, Any], source_index: int) -> dict[str, Any]:
+    """Map gik_offline_teacher_manifest_v1 rows to the legacy exporter shape."""
+
+    quality_status = str(item.get("quality_status") or "")
+    scenario = str(item.get("scenario") or "")
+    obstacle_case = str(item.get("obstacle_case") or "")
+    episode_index = int(item.get("episode_index") or source_index + 1)
+    method = str(item.get("teacher_method") or "gik_teacher")
+    min_clearance = item.get("min_footprint_clearance_m")
+    if min_clearance is None:
+        min_clearance = item.get("footprint_margin_m")
+    if min_clearance is None and int(item.get("obstacle_count") or 0) == 0:
+        min_clearance = math.inf
+    normalized = {
+        "mat": item.get("mat"),
+        "source_file": item.get("source_json"),
+        "index": source_index + 1,
+        "episode_index": episode_index,
+        "method": method,
+        "video_id": item.get("video_id") or "",
+        "obstacle_case": obstacle_case,
+        "obstacle_fractions": item.get("obstacle_fractions", []),
+        "max_position_error_m": item.get("max_position_error_m"),
+        "max_orientation_error_rad": item.get("max_orientation_error_rad"),
+        "p95_position_error_m": item.get("p95_position_error_m"),
+        "footprint_margin_m": min_clearance,
+        "solve_elapsed_s": item.get("solve_elapsed_s"),
+        "profile": item.get("profile") or "",
+        "frame_mode": item.get("frame_mode") or "",
+        "teacher_metadata": {
+            "quality_status": quality_status,
+            "policy_role": item.get("policy_role"),
+            "scenario": scenario,
+            "obstacle_count": item.get("obstacle_count"),
+            "obstacle_case": obstacle_case,
+            "episode_index": episode_index,
+            "teacher_method": method,
+            "quality_source": item.get("quality_source"),
+            "p95_position_error_m": item.get("p95_position_error_m"),
+            "video_id": item.get("video_id") or "",
+            "notes": item.get("notes") or "",
+            "source_json": item.get("source_json") or "",
+            "source_mat": item.get("mat") or "",
+        },
+    }
+    missing = [key for key in ("mat", "max_position_error_m", "max_orientation_error_rad", "footprint_margin_m") if normalized.get(key) is None]
+    if missing:
+        raise ValueError(f"manifest item {source_index + 1} missing required fields after normalization: {missing}")
+    return normalized
+
+
+def load_manifest_items(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    raw = json.loads(args.manifest.read_text(encoding="utf-8"))
+    source_meta: dict[str, Any] = {"source_schema": "legacy_list"}
+    if isinstance(raw, dict):
+        source_meta = {
+            "source_schema": raw.get("schema", "dict_manifest"),
+            "source_num_items": raw.get("num_items"),
+            "source_num_accepted": raw.get("num_accepted"),
+            "source_num_near_pass": raw.get("num_near_pass"),
+            "source_num_contact_near_pass": raw.get("num_contact_near_pass"),
+        }
+        raw_items = raw.get("items", [])
+        if raw.get("schema") == "gik_offline_teacher_manifest_v1":
+            allowed_statuses = {"accepted"}
+            if args.include_near_pass:
+                allowed_statuses.add("near_pass")
+            if args.include_contact_near_pass:
+                allowed_statuses.add("contact_near_pass")
+            selected = [
+                normalize_offline_manifest_item(item, idx)
+                for idx, item in enumerate(raw_items)
+                if str(item.get("quality_status") or "") in allowed_statuses
+            ]
+            source_meta["selected_quality_statuses"] = sorted(allowed_statuses)
+            return selected, source_meta
+        return raw_items, source_meta
+    if isinstance(raw, list):
+        return raw, source_meta
+    raise TypeError(f"unsupported manifest root type: {type(raw).__name__}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -458,23 +561,52 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-duration-s", type=float, default=5.0)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--copy-mats", action="store_true", help="Copy source .mat files into output-dir/source_mats.")
+    parser.add_argument(
+        "--dry-run-manifest",
+        action="store_true",
+        help="Validate manifest filtering/QA thresholds without opening source .mat files.",
+    )
+    parser.add_argument(
+        "--include-near-pass",
+        action="store_true",
+        help="Opt in to two-obstacle near_pass rows from gik_offline_teacher_manifest_v1.",
+    )
+    parser.add_argument(
+        "--include-contact-near-pass",
+        action="store_true",
+        help="Opt in to contact_near_pass rows from gik_offline_teacher_manifest_v1.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     manifest_path = args.manifest.expanduser().resolve()
+    args.manifest = manifest_path
     output_dir = args.output_dir.expanduser()
     if not output_dir.is_absolute():
         output_dir = (Path.cwd() / output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    items = json.loads(manifest_path.read_text(encoding="utf-8"))
+    items, source_meta = load_manifest_items(args)
     if args.limit > 0:
         items = items[: args.limit]
     if not isinstance(items, list) or not items:
         raise SystemExit(f"manifest contains no teacher items: {manifest_path}")
     validate_manifest_items(items)
+    if args.dry_run_manifest:
+        statuses = collections.Counter(
+            str((item.get("teacher_metadata") or {}).get("quality_status") or "accepted") for item in items
+        )
+        scenarios = collections.Counter(
+            str((item.get("teacher_metadata") or {}).get("scenario") or item.get("obstacle_case") or "") for item in items
+        )
+        print(f"Manifest:       {manifest_path}")
+        print(f"Selected items: {len(items)}")
+        print(f"Statuses:       {dict(statuses)}")
+        print(f"Scenarios:      {dict(scenarios)}")
+        print("Dry run:        true")
+        return 0
 
     copy_mat_dir = output_dir / "source_mats" if args.copy_mats else None
     stats: list[ExportStats] = []
@@ -491,6 +623,7 @@ def main() -> int:
     manifest = {
         "schema": "cinebotrl_gik_teacher_manifest_v1",
         "source_manifest": str(manifest_path),
+        **source_meta,
         "action_contract": "[arm6 normalized absolute targets, base_vx, base_vy, base_wz]",
         "qa_contract": "qa_pass && max_position_error_m <= 0.10 && footprint_margin_m >= 0",
         "arm_lower_safe": ARM_LOWER_SAFE.tolist(),

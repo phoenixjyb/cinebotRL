@@ -27,6 +27,17 @@ ACTION_DIM = 9
 BASE_ACTION_SLICE = slice(6, 9)
 GIMBAL_ACTION_INDICES = [3, 4, 5]
 DEFAULT_WAYPOINT_DT = 0.1
+ACTION_CHANNEL_NAMES = [
+    "joint6_arm_yaw",
+    "joint5_arm_pitch",
+    "joint4_elbow_pitch",
+    "joint3_gimbal_yaw",
+    "joint2_gimbal_roll",
+    "joint1_gimbal_pitch",
+    "base_vx",
+    "base_vy",
+    "base_wz",
+]
 
 CSV_FIELDS = [
     "trajectory_id",
@@ -98,6 +109,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--report_gimbal_saturation", action="store_true")
     parser.add_argument("--report_timing", action="store_true")
     parser.add_argument("--report_frame_invariance", action="store_true")
+    parser.add_argument("--report_markdown", action="store_true", help="Also write report.md with compact rankings.")
     return parser.parse_args()
 
 
@@ -202,6 +214,39 @@ def pct(mask: np.ndarray) -> float | None:
     if mask.size == 0:
         return None
     return float(np.mean(mask.astype(np.float64)) * 100.0)
+
+
+def channel_stats(actions: np.ndarray, valid_mask: np.ndarray | None = None) -> list[dict[str, Any]]:
+    if actions.size == 0:
+        return []
+    if valid_mask is None or valid_mask.size == 0:
+        valid_mask = np.abs(actions) <= 1.0
+    rows: list[dict[str, Any]] = []
+    for idx, name in enumerate(ACTION_CHANNEL_NAMES[: actions.shape[1]]):
+        values = actions[:, idx].astype(np.float64)
+        valid = valid_mask[:, idx].astype(bool)
+        rows.append(
+            {
+                "index": idx,
+                "name": name,
+                "min": float(np.min(values)),
+                "max": float(np.max(values)),
+                "mean": float(np.mean(values)),
+                "abs_mean": float(np.mean(np.abs(values))),
+                "abs_max": float(np.max(np.abs(values))),
+                "saturation_pct": float(np.mean(~valid) * 100.0),
+                "clip_pct": float(np.mean(np.abs(values) >= 0.999) * 100.0),
+            }
+        )
+    return rows
+
+
+def worst_channels(channels: list[dict[str, Any]], limit: int = 3) -> list[str]:
+    ranked = sorted(channels, key=lambda item: (float(item["saturation_pct"]), float(item["abs_max"])), reverse=True)
+    return [
+        f"{item['name']}:{item['saturation_pct']:.1f}%/absmax={item['abs_max']:.2f}"
+        for item in ranked[:limit]
+    ]
 
 
 def compute_spikes(positions: np.ndarray, dt: np.ndarray, velocity_threshold: float, acceleration_threshold: float) -> tuple[int, int]:
@@ -349,6 +394,11 @@ def audit_one(trajectory_path: Path, demo_dir: Path, thresholds: AuditThresholds
         acc_vio, jerk_vio = base_motion_stats(base_action_unclipped, dt, thresholds)
         row["base_acceleration_violation_pct"] = acc_vio
         row["base_jerk_violation_pct"] = jerk_vio
+        row["channel_stats"] = channel_stats(actions, action_valid_mask)
+        row["arm_unclipped_channel_stats"] = channel_stats(arm_action_unclipped, arm_valid_mask)
+        row["base_unclipped_channel_stats"] = channel_stats(base_action_unclipped, base_valid_mask)
+        row["worst_action_channels"] = worst_channels(row["channel_stats"])
+        row["worst_arm_unclipped_channels"] = worst_channels(row["arm_unclipped_channel_stats"])
     else:
         notes.append("missing_actions")
 
@@ -441,6 +491,50 @@ def write_tagged_manifests(out_dir: Path, rows: list[dict[str, Any]]) -> None:
         )
 
 
+def write_markdown(path: Path, summary: dict[str, Any]) -> None:
+    rows = summary["rows"]
+    lines = [
+        "# GIK Teacher Feasibility Audit",
+        "",
+        f"- Stage: `{summary['stage']}`",
+        f"- Trajectories: `{summary['num_trajectories']}`",
+        f"- Tag counts: `{summary['tag_counts']}`",
+        "",
+        "## Worst Action Channels By Trajectory",
+        "",
+        "| case | tag | reason | FK mean | FK p95 | joint sat | gimbal sat | worst channels | worst arm unclipped |",
+        "|---|---|---|---:|---:|---:|---:|---|---|",
+    ]
+    for row in sorted(rows, key=lambda item: (item.get("tag") != "repairable", item.get("trajectory_id", ""))):
+        lines.append(
+            "| {case} | {tag} | {reason} | {fk_mean:.3f} | {fk_p95:.3f} | {joint:.1f}% | {gimbal:.1f}% | {worst} | {worst_arm} |".format(
+                case=row["trajectory_id"],
+                tag=row["tag"],
+                reason=row["tag_reason"],
+                fk_mean=finite_float(row.get("fk_replay_ee_pos_mean_m")) or 0.0,
+                fk_p95=finite_float(row.get("fk_replay_ee_pos_p95_m")) or 0.0,
+                joint=finite_float(row.get("joint_limit_saturation_pct")) or 0.0,
+                gimbal=finite_float(row.get("gimbal_saturation_pct")) or 0.0,
+                worst=", ".join(row.get("worst_action_channels", [])),
+                worst_arm=", ".join(row.get("worst_arm_unclipped_channels", [])),
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Aggregate Channel Saturation",
+            "",
+            "| channel | mean saturation | max saturation | mean absmax |",
+            "|---|---:|---:|---:|",
+        ]
+    )
+    for item in summary.get("channel_aggregate", []):
+        lines.append(
+            f"| {item['name']} | {item['saturation_pct_mean']:.1f}% | {item['saturation_pct_max']:.1f}% | {item['abs_max_mean']:.2f} |"
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def summarize(rows: list[dict[str, Any]], args: argparse.Namespace, thresholds: AuditThresholds) -> dict[str, Any]:
     counts = Counter(str(row["tag"]) for row in rows)
     numeric_fields = [
@@ -463,12 +557,33 @@ def summarize(rows: list[dict[str, Any]], args: argparse.Namespace, thresholds: 
                 "p50": statistics.median(values),
                 "max": max(values),
             }
+    channel_aggregate: list[dict[str, Any]] = []
+    for idx, name in enumerate(ACTION_CHANNEL_NAMES):
+        channel_rows = []
+        for row in rows:
+            for channel in row.get("channel_stats", []):
+                if channel["index"] == idx:
+                    channel_rows.append(channel)
+        if not channel_rows:
+            continue
+        channel_aggregate.append(
+            {
+                "index": idx,
+                "name": name,
+                "saturation_pct_mean": statistics.fmean(float(item["saturation_pct"]) for item in channel_rows),
+                "saturation_pct_max": max(float(item["saturation_pct"]) for item in channel_rows),
+                "clip_pct_mean": statistics.fmean(float(item["clip_pct"]) for item in channel_rows),
+                "abs_max_mean": statistics.fmean(float(item["abs_max"]) for item in channel_rows),
+                "abs_max_max": max(float(item["abs_max"]) for item in channel_rows),
+            }
+        )
     return {
         "stage": args.stage,
         "num_trajectories": len(rows),
         "tag_counts": dict(counts),
         "thresholds": asdict(thresholds),
         "metrics": metrics,
+        "channel_aggregate": channel_aggregate,
         "unsupported_layers": {
             "action_replay": "not implemented in offline audit; reserved output fields are null",
             "closed_loop_teacher": "not implemented in offline audit; reserved output fields are null",
@@ -496,12 +611,16 @@ def main() -> int:
         json.dumps(summary, indent=2, default=jsonable) + "\n",
         encoding="utf-8",
     )
+    if args.report_markdown:
+        write_markdown(args.out_dir / "report.md", summary)
 
     print(f"[audit] stage={args.stage}")
     print(f"[audit] trajectories={len(rows)}")
     print(f"[audit] tags={summary['tag_counts']}")
     print(f"[audit] wrote {args.out_dir / 'summary.json'}")
     print(f"[audit] wrote {args.out_dir / 'per_trajectory.csv'}")
+    if args.report_markdown:
+        print(f"[audit] wrote {args.out_dir / 'report.md'}")
     return 0
 
 

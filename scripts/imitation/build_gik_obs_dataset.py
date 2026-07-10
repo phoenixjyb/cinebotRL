@@ -13,10 +13,13 @@ import argparse
 import json
 import math
 import sys
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import torch
+from scipy.spatial.transform import Rotation as R
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +37,26 @@ from rl_platform.tasks.mobile_mm.action_envelopes import (  # noqa: E402
 ACTION_DIM = 9
 MAX_LINEAR_VELOCITY = 1.5
 MAX_ANGULAR_VELOCITY = 2.0
+ARM_JOINT_NAMES = [
+    "joint6_arm_yaw",
+    "joint5_arm_pitch",
+    "joint4_elbow_pitch",
+    "joint3_gimbal_yaw",
+    "joint2_gimbal_roll",
+    "joint1_gimbal_pitch",
+]
+EE_VIRTUAL_JOINT_NAMES = ["ee1_rot_z", "ee1_rot_y", "ee1_rot_x"]
+EE_LINK_NAME = "cam_link"
+
+
+@dataclass
+class Joint:
+    name: str
+    joint_type: str
+    parent: str
+    child: str
+    origin: np.ndarray
+    axis: np.ndarray
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,6 +68,36 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lookahead-steps", type=int, default=3)
     parser.add_argument("--action-history-length", type=int, default=2)
     parser.add_argument("--num-contacts", type=int, default=1)
+    parser.add_argument("--urdf", type=Path, default=Path("assets_own/recomoProto2-1190_moveit.urdf"))
+    parser.add_argument(
+        "--ee-state-source",
+        choices=["stored", "fk_current"],
+        default="stored",
+        help="Source for observation EE pose. fk_current recomputes cam_link pose from q_current.",
+    )
+    parser.add_argument(
+        "--velocity-source",
+        choices=["action", "lagged_q"],
+        default="action",
+        help="Source for observation velocities. lagged_q uses previous-current q deltas to avoid label leakage.",
+    )
+    parser.add_argument(
+        "--target-shift-steps",
+        type=int,
+        default=0,
+        help="Shift target pose rows forward to match env reset/step timing.",
+    )
+    parser.add_argument(
+        "--flip-fk-ee-quat",
+        action="store_true",
+        help="Flip FK EE quaternion sign to match Isaac cam_link convention for this USD.",
+    )
+    parser.add_argument(
+        "--use-obstacles",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include obstacle-clearance observations. Disable for no-obstacle stages to keep obs dim aligned with env.",
+    )
     parser.add_argument("--safety-radius", type=float, default=0.2)
     parser.add_argument("--batch-size", type=int, default=4096)
     parser.add_argument(
@@ -122,6 +175,14 @@ def finite_difference(values: np.ndarray, dt: np.ndarray) -> np.ndarray:
     return diff
 
 
+def backward_difference(values: np.ndarray, dt: np.ndarray) -> np.ndarray:
+    diff = np.zeros_like(values, dtype=np.float32)
+    if values.shape[0] <= 1:
+        return diff
+    diff[1:] = (values[1:] - values[:-1]) / dt[1:, None]
+    return diff.astype(np.float32)
+
+
 def angular_velocity_from_quats(quat: np.ndarray, dt: np.ndarray) -> np.ndarray:
     if quat.shape[0] == 1:
         return np.zeros((1, 3), dtype=np.float32)
@@ -133,12 +194,127 @@ def angular_velocity_from_quats(quat: np.ndarray, dt: np.ndarray) -> np.ndarray:
     return out
 
 
+def backward_angular_velocity_from_quats(quat: np.ndarray, dt: np.ndarray) -> np.ndarray:
+    if quat.shape[0] == 1:
+        return np.zeros((1, 3), dtype=np.float32)
+    rel = quat_multiply(quat[1:], quat_conj(quat[:-1]))
+    axis_angle = quat_to_axis_angle(rel)
+    out = np.zeros((quat.shape[0], 3), dtype=np.float32)
+    out[1:] = axis_angle / dt[1:, None]
+    return out
+
+
 def normalize_quat_wxyz(quat: np.ndarray) -> np.ndarray:
     quat = quat.astype(np.float64, copy=True)
     norm = np.linalg.norm(quat, axis=-1, keepdims=True)
     quat = quat / np.maximum(norm, 1e-12)
     sign = np.where(quat[:, :1] < 0.0, -1.0, 1.0)
     return (quat * sign).astype(np.float32)
+
+
+def parse_vec(text: str | None, default: tuple[float, ...]) -> np.ndarray:
+    if not text:
+        return np.asarray(default, dtype=np.float64)
+    return np.asarray([float(x) for x in text.split()], dtype=np.float64)
+
+
+def transform_from_xyz_rpy(xyz: np.ndarray, rpy: np.ndarray) -> np.ndarray:
+    t = np.eye(4, dtype=np.float64)
+    t[:3, :3] = R.from_euler("xyz", rpy).as_matrix()
+    t[:3, 3] = xyz
+    return t
+
+
+def motion_transform(joint_type: str, axis: np.ndarray, value: float) -> np.ndarray:
+    t = np.eye(4, dtype=np.float64)
+    if joint_type == "fixed":
+        return t
+    if joint_type == "prismatic":
+        t[:3, 3] = axis * value
+        return t
+    if joint_type in {"revolute", "continuous"}:
+        t[:3, :3] = R.from_rotvec(axis * value).as_matrix()
+        return t
+    raise ValueError(f"unsupported joint type: {joint_type}")
+
+
+def parse_urdf(path: Path) -> dict[str, Joint]:
+    root = ET.parse(path).getroot()
+    joints: dict[str, Joint] = {}
+    for elem in root.findall("joint"):
+        name = elem.get("name") or ""
+        parent = elem.find("parent").get("link")
+        child = elem.find("child").get("link")
+        origin_elem = elem.find("origin")
+        axis_elem = elem.find("axis")
+        xyz = parse_vec(origin_elem.get("xyz") if origin_elem is not None else None, (0.0, 0.0, 0.0))
+        rpy = parse_vec(origin_elem.get("rpy") if origin_elem is not None else None, (0.0, 0.0, 0.0))
+        axis = parse_vec(axis_elem.get("xyz") if axis_elem is not None else None, (0.0, 0.0, 1.0))
+        axis_norm = np.linalg.norm(axis)
+        if axis_norm > 1e-12:
+            axis = axis / axis_norm
+        joints[name] = Joint(
+            name=name,
+            joint_type=elem.get("type") or "fixed",
+            parent=parent,
+            child=child,
+            origin=transform_from_xyz_rpy(xyz, rpy),
+            axis=axis,
+        )
+    return joints
+
+
+def chain_to_link(joints: dict[str, Joint], root_link: str, target_link: str) -> list[Joint]:
+    by_child = {joint.child: joint for joint in joints.values()}
+    chain: list[Joint] = []
+    link = target_link
+    while link != root_link:
+        if link not in by_child:
+            raise ValueError(f"no parent joint found for link {link!r} while resolving {target_link!r}")
+        joint = by_child[link]
+        chain.append(joint)
+        link = joint.parent
+    chain.reverse()
+    return chain
+
+
+def fk(chain: list[Joint], values: dict[str, float]) -> np.ndarray:
+    t = np.eye(4, dtype=np.float64)
+    for joint in chain:
+        value = values.get(joint.name, 0.0)
+        t = t @ joint.origin @ motion_transform(joint.joint_type, joint.axis, value)
+    return t
+
+
+def matrix_to_quat_wxyz(mat: np.ndarray) -> np.ndarray:
+    q = R.from_matrix(mat).as_quat()
+    return np.asarray([q[3], q[0], q[1], q[2]], dtype=np.float64)
+
+
+def fk_ee_from_q(q_state: np.ndarray, chain: list[Joint]) -> tuple[np.ndarray, np.ndarray]:
+    ee_pos = np.zeros((q_state.shape[0], 3), dtype=np.float32)
+    ee_quat = np.zeros((q_state.shape[0], 4), dtype=np.float32)
+    for i, row in enumerate(q_state):
+        values = {
+            "base_joint_vx": float(row[0]),
+            "base_joint_vy": float(row[1]),
+            "base_joint_wz": float(row[2]),
+        }
+        values.update({name: float(row[3 + j]) for j, name in enumerate(ARM_JOINT_NAMES)})
+        values.update({name: 0.0 for name in EE_VIRTUAL_JOINT_NAMES})
+        t = fk(chain, values)
+        ee_pos[i] = t[:3, 3].astype(np.float32)
+        ee_quat[i] = matrix_to_quat_wxyz(t[:3, :3]).astype(np.float32)
+    return ee_pos, ee_quat.astype(np.float32)
+
+
+def shift_target_rows(components: dict[str, np.ndarray], steps: int) -> None:
+    if steps <= 0:
+        return
+    count = components["actions"].shape[0]
+    idx = np.clip(np.arange(count, dtype=np.int64) + int(steps), 0, count - 1)
+    components["target_pos"] = components["target_pos"][idx].astype(np.float32)
+    components["target_quat"] = components["target_quat"][idx].astype(np.float32)
 
 
 def interp_rows(values: np.ndarray, src_t: np.ndarray, dst_t: np.ndarray) -> np.ndarray:
@@ -232,6 +408,37 @@ def build_action_history(actions: np.ndarray, history_len: int) -> np.ndarray:
     return history
 
 
+def apply_env_state_observation_sources(
+    components: dict[str, np.ndarray],
+    args: argparse.Namespace,
+    dt_value: float,
+) -> None:
+    dt = np.full((components["actions"].shape[0],), float(dt_value), dtype=np.float32)
+    joint_pos = components["joint_pos"].astype(np.float32)
+    if args.velocity_source == "lagged_q":
+        q_delta = backward_difference(joint_pos, dt)
+        yaw = joint_pos[:, 2]
+        cos_yaw = np.cos(yaw)
+        sin_yaw = np.sin(yaw)
+        base_lin_vel = np.zeros((joint_pos.shape[0], 3), dtype=np.float32)
+        base_lin_vel[:, 0] = (cos_yaw * q_delta[:, 0] - sin_yaw * q_delta[:, 1]) / MAX_LINEAR_VELOCITY
+        base_lin_vel[:, 1] = (sin_yaw * q_delta[:, 0] + cos_yaw * q_delta[:, 1]) / MAX_LINEAR_VELOCITY
+        base_ang_vel = np.zeros((joint_pos.shape[0], 3), dtype=np.float32)
+        base_ang_vel[:, 2] = q_delta[:, 2] / MAX_ANGULAR_VELOCITY
+        components["base_lin_vel"] = base_lin_vel
+        components["base_ang_vel"] = base_ang_vel
+        components["joint_vel"] = q_delta
+
+    if args.ee_state_source == "fk_current":
+        ee_pos, ee_quat = fk_ee_from_q(joint_pos, args.fk_chain)
+        if args.flip_fk_ee_quat:
+            ee_quat = -ee_quat
+        components["ee_pos"] = ee_pos
+        components["ee_quat"] = ee_quat
+        components["ee_lin_vel"] = backward_difference(ee_pos, dt)
+        components["ee_ang_vel"] = backward_angular_velocity_from_quats(ee_quat, dt)
+
+
 def apply_arm_envelope_profile(
     actions: np.ndarray,
     mask: np.ndarray,
@@ -301,13 +508,6 @@ def build_components(
     action_history = build_action_history(actions, args.action_history_length).astype(np.float32)
     contact = np.zeros((actions.shape[0], args.num_contacts), dtype=np.float32)
 
-    clearance = data["min_obstacle_dist"].astype(np.float32) if "min_obstacle_dist" in data else None
-    if clearance is None or not np.isfinite(clearance).any():
-        obstacle = np.full((actions.shape[0], 1), 5.0, dtype=np.float32)
-    else:
-        clearance = np.nan_to_num(clearance, nan=5.0 * args.safety_radius)
-        obstacle = np.clip(clearance / max(args.safety_radius, 1e-6), -2.0, 5.0)[:, None].astype(np.float32)
-
     components = {
         "actions": actions,
         "action_valid_mask": action_valid_mask,
@@ -326,16 +526,27 @@ def build_components(
         "lookahead_pos": lookahead,
         "action_history": action_history,
         "contact_forces": contact,
-        "min_obstacle_dist": obstacle,
     }
+    if args.use_obstacles:
+        clearance = data["min_obstacle_dist"].astype(np.float32) if "min_obstacle_dist" in data else None
+        if clearance is None or not np.isfinite(clearance).any():
+            obstacle = np.full((actions.shape[0], 1), 5.0, dtype=np.float32)
+        else:
+            clearance = np.nan_to_num(clearance, nan=5.0 * args.safety_radius)
+            obstacle = np.clip(clearance / max(args.safety_radius, 1e-6), -2.0, 5.0)[:, None].astype(np.float32)
+        components["min_obstacle_dist"] = obstacle
     if args.resample_dt > 0.0:
         require(duration_s is not None, "--resample-dt requires manifest items with duration_s")
         components = resample_components(components, float(duration_s), float(args.resample_dt))
-        components["lookahead_pos"] = build_lookahead(components["target_pos"], args.lookahead_steps).astype(np.float32)
         components["action_history"] = build_action_history(
             components["actions"],
             args.action_history_length,
         ).astype(np.float32)
+        apply_env_state_observation_sources(components, args, float(args.resample_dt))
+    else:
+        apply_env_state_observation_sources(components, args, float(np.median(dt)))
+    shift_target_rows(components, args.target_shift_steps)
+    components["lookahead_pos"] = build_lookahead(components["target_pos"], args.lookahead_steps).astype(np.float32)
     return components
 
 
@@ -363,6 +574,10 @@ def main() -> int:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     items = manifest.get("items", [])
     require(items, "manifest contains no items")
+    if args.ee_state_source == "fk_current":
+        urdf_path = args.urdf.resolve()
+        joints = parse_urdf(urdf_path)
+        args.fk_chain = chain_to_link(joints, "base_root", EE_LINK_NAME)
 
     all_obs: list[np.ndarray] = []
     all_actions: list[np.ndarray] = []
@@ -398,7 +613,7 @@ def main() -> int:
         use_action_history=True,
         action_history_length=args.action_history_length,
         action_dim=ACTION_DIM,
-        use_obstacles=True,
+        use_obstacles=args.use_obstacles,
     )
     require(observations.shape[1] == expected_dim, f"obs dim {observations.shape[1]} != expected {expected_dim}")
     require(np.isfinite(observations).all(), "observations contain non-finite values")
@@ -415,14 +630,24 @@ def main() -> int:
         manifest=str(manifest_path),
         base_only=np.asarray(args.base_only),
         observation_dim=np.asarray(observations.shape[1]),
+        use_obstacles=np.asarray(bool(args.use_obstacles)),
         resample_dt=np.asarray(float(args.resample_dt), dtype=np.float32),
         arm_envelope_profile=np.asarray(args.arm_envelope_profile),
+        ee_state_source=np.asarray(args.ee_state_source),
+        velocity_source=np.asarray(args.velocity_source),
+        target_shift_steps=np.asarray(int(args.target_shift_steps), dtype=np.int32),
+        flip_fk_ee_quat=np.asarray(bool(args.flip_fk_ee_quat)),
     )
     print(f"Manifest:      {manifest_path}")
     print(f"Output:        {args.output}")
     print(f"Trajectories:  {len(items)}")
     print(f"Samples:       {observations.shape[0]}")
     print(f"Obs dim:       {observations.shape[1]}")
+    print(f"Use obstacles: {args.use_obstacles}")
+    print(f"EE source:     {args.ee_state_source}")
+    print(f"Velocity src:  {args.velocity_source}")
+    print(f"Target shift:  {args.target_shift_steps}")
+    print(f"Flip FK quat:  {args.flip_fk_ee_quat}")
     if args.resample_dt > 0.0:
         print(f"Resample dt:   {args.resample_dt:.4f}s")
     print(f"Arm envelope:  {args.arm_envelope_profile}")

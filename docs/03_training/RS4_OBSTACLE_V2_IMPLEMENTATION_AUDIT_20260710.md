@@ -211,3 +211,69 @@ This proves differential IK is numerically viable near the initial pose. It
 does not resolve which GIK camera-attitude frame should be tracked. Do not wire
 the Jacobian controller into the environment until that target frame is made
 explicit; otherwise the controller would accurately track the wrong frame.
+
+## Option-B Frame Contract and Corrected Export Smoke - 2026-07-11
+
+The GIK frame audit defines the semantic-to-physical target conversion as:
+
+```text
+R_world_cam = R_world_DFR * Rz(+pi/2)
+```
+
+CineBotRL now applies this conversion at the trajectory target boundary under
+`semantic_dfr_to_physical_cam_v1`. Observations and rewards continue to use the
+physical Isaac `cam_link`. The RS4 dataset builder also:
+
+- rejects legacy NPZs without `q_selection_meta`;
+- requires the 13D selection `[0,1,2,3,4,5,10,11,12]`;
+- recomputes physical `cam_link` state through URDF FK;
+- excludes ramp-prefix poses before treating targets as semantic DFR poses;
+- blocks retiming until ramp-aware joint/target interpolation exists;
+- records physical-gimbal solve residual and success for every row.
+
+Three corrected source exports were used for a native-row smoke. The old
+export tree is rejected before output creation. The corrected smoke is finite
+and 94D, but it is not training eligible because only `52/84` post-ramp rows
+can be reproduced by the three physical gimbal joints within `2 deg` while
+holding the exported base/arm state fixed.
+
+### Contradiction in the MATLAB physical-only evidence
+
+The supplied GIK response reports 15/15 physical-gimbal-only solves, but a
+direct replay of its first no-obstacle sample shows that the solver changes the
+supposedly fixed base and arm joints:
+
+```text
+seed first six:
+[0.7669, 0.1015, 0.06395, 0.07946, 0.44133, -0.89672]
+
+returned first six:
+[0.7669, 0.1015, -0.2211, -0.2056, 0.7631, -1.2185]
+```
+
+The returned pose translation also differs strongly from the target because
+that audit solve is orientation-only. Therefore its `15/15` result does not
+prove three-gimbal-only reachability with base/arm fixed. PPO and full export
+remain blocked. The next teacher must either:
+
+1. regenerate coordinated physical arm plus gimbal states under the option-B
+   target contract; or
+2. prove a corrected three-gimbal-only solve whose base/arm deltas are checked
+   numerically and remain below tolerance.
+
+The retained smoke is diagnostic-only:
+
+```text
+corrected input: artifacts/gik_corrected_frame_smoke_20260711/
+option-B output: artifacts/gik_corrected_option_b_obs_smoke_20260711/
+rows: 84 post-ramp native rows
+physical-gimbal rows <= 2 deg: 52/84
+training_eligible: false
+incomplete gimbal rows: 32 (gimbal action mask cleared)
+```
+
+A five-step Isaac open-loop contract smoke writes
+`artifacts/option_b_runtime_smoke_20260711.json`, selects
+`semantic_dfr_to_physical_cam_v1`, and completes without termination. Its mean
+orientation error is `174.38 deg`; this is expected negative evidence from an
+uncoordinated source, not a tracking pass. No PPO or BC training was started.

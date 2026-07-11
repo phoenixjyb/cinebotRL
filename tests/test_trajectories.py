@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import torch
 
-from rl_platform.tasks.mobile_mm.trajectories import TrajectoryManager
+from rl_platform.tasks.mobile_mm.trajectories import (
+    TrajectoryManager,
+    semantic_dfr_to_physical_cam_quat_wxyz,
+)
 
 
 def _unit_orientations(num_envs: int, num_steps: int) -> torch.Tensor:
@@ -56,3 +59,24 @@ def test_recorded_lookahead_and_step_wrap_use_real_lengths():
     manager.step()
     assert manager.current_waypoint_idx.tolist() == [0, 0]
 
+
+def test_semantic_dfr_to_physical_cam_is_right_multiply_rz_90():
+    identity = torch.tensor([[1.0, 0.0, 0.0, 0.0]])
+    converted = semantic_dfr_to_physical_cam_quat_wxyz(identity)
+    expected = torch.tensor([[2.0**-0.5, 0.0, 0.0, 2.0**-0.5]])
+    torch.testing.assert_close(converted, expected)
+
+
+def test_trajectory_manager_applies_option_b_at_target_boundary():
+    manager = TrajectoryManager(
+        "recorded",
+        num_envs=1,
+        device="cpu",
+        target_orientation_contract="semantic_dfr_to_physical_cam_v1",
+    )
+    manager.recorded_positions = torch.zeros(1, 2, 3)
+    manager.recorded_orientations = _unit_orientations(1, 2)
+    manager.recorded_lengths = torch.tensor([2])
+    _, orientation = manager.get_target_pose()
+    expected = torch.tensor([[2.0**-0.5, 0.0, 0.0, 2.0**-0.5]])
+    torch.testing.assert_close(orientation, expected)

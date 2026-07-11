@@ -100,6 +100,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--min_trajectory_duration", type=float, default=5.0)
     parser.add_argument(
+        "--target_orientation_contract",
+        choices=["as_recorded", "semantic_dfr_to_physical_cam_v1"],
+        default=None,
+        help="Defaults to option B for rs4_attitude_rate_v1 and as-recorded otherwise.",
+    )
+    parser.add_argument(
         "--enable_obstacles",
         action="store_true",
         help="Enable obstacle spawning and obstacle-safety metrics during the rollout gate.",
@@ -464,6 +470,11 @@ def main() -> int:
         env_cfg.task_config.action_contract_name = args.action_contract
         env_cfg.task_config.experimental_rs4_adapter = bool(args.experimental_rs4_adapter)
         env_cfg.task_config.arm_action_envelope_profile = args.arm_action_envelope_profile
+        target_orientation_contract = args.target_orientation_contract or (
+            "semantic_dfr_to_physical_cam_v1"
+            if args.action_contract == "rs4_attitude_rate_v1"
+            else "as_recorded"
+        )
         if args.enable_obstacles:
             env_cfg.scene = env_cfg._create_scene_config()
             env_cfg.scene.num_envs = args.num_envs
@@ -509,7 +520,9 @@ def main() -> int:
             reset_base_x_offset=reset_config.get("reset_base_x_offset", 0.4415),
             reset_base_y_offset=reset_config.get("reset_base_y_offset", 0.2405),
             reset_arm_to_trajectory_metadata=reset_config.get("reset_arm_to_trajectory_metadata", False),
+            target_orientation_contract=target_orientation_contract,
         )
+        print(f"[gate] target orientation contract={target_orientation_contract}", flush=True)
 
         print("[gate] creating env", flush=True)
         base_env = MobileMMTrackEEEnv(cfg=env_cfg)
@@ -1031,6 +1044,7 @@ def main() -> int:
             "freeze_base_actions": bool(args.freeze_base_actions),
             "base_action_scale": float(args.base_action_scale),
             "arm_action_envelope_profile": str(args.arm_action_envelope_profile),
+            "target_orientation_contract": target_orientation_contract,
             "initial_joint_randomization": bool(args.enable_initial_joint_randomization),
             "initial_ee_pos_error_mean_m": float(np.mean(initial_pos_error)),
             "final_ee_pos_error_mean_m": float(np.mean(final_pos_error)),

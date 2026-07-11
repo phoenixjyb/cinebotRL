@@ -668,6 +668,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             start_waypoint_min_fraction=self.task_cfg.trajectory.start_waypoint_min_fraction,
             start_waypoint_max_fraction=self.task_cfg.trajectory.start_waypoint_max_fraction,
             debug_sampling=self.task_cfg.trajectory.debug_sampling,
+            target_orientation_contract=self.task_cfg.trajectory.target_orientation_contract,
         )
 
         # Load reachability map for intelligent base planning

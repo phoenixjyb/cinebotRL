@@ -9,6 +9,29 @@ from pathlib import Path
 from typing import Literal
 
 
+TARGET_ORIENTATION_AS_RECORDED = "as_recorded"
+TARGET_ORIENTATION_DFR_TO_PHYSICAL_CAM = "semantic_dfr_to_physical_cam_v1"
+
+
+def semantic_dfr_to_physical_cam_quat_wxyz(quat: torch.Tensor) -> torch.Tensor:
+    """Apply ``R_world_cam = R_world_DFR * Rz(+pi/2)`` in wxyz order."""
+
+    if quat.shape[-1] != 4:
+        raise ValueError(f"expected wxyz quaternion with last dimension 4, got {tuple(quat.shape)}")
+    half_sqrt = float(2.0**-0.5)
+    w, x, y, z = quat.unbind(dim=-1)
+    converted = torch.stack(
+        [
+            half_sqrt * (w - z),
+            half_sqrt * (x + y),
+            half_sqrt * (y - x),
+            half_sqrt * (w + z),
+        ],
+        dim=-1,
+    )
+    return converted / torch.linalg.norm(converted, dim=-1, keepdim=True).clamp_min(1e-12)
+
+
 class TrajectoryManager:
     """Manages reference trajectories for end-effector tracking."""
     
@@ -33,6 +56,7 @@ class TrajectoryManager:
         start_waypoint_min_fraction: float = 0.0,
         start_waypoint_max_fraction: float = 0.0,
         debug_sampling: bool = False,
+        target_orientation_contract: str = TARGET_ORIENTATION_AS_RECORDED,
     ):
         """Initialize trajectory manager.
         
@@ -68,6 +92,12 @@ class TrajectoryManager:
         self.start_waypoint_min_fraction = start_waypoint_min_fraction
         self.start_waypoint_max_fraction = start_waypoint_max_fraction
         self.debug_sampling = debug_sampling
+        if target_orientation_contract not in {
+            TARGET_ORIENTATION_AS_RECORDED,
+            TARGET_ORIENTATION_DFR_TO_PHYSICAL_CAM,
+        }:
+            raise ValueError(f"unknown target orientation contract: {target_orientation_contract}")
+        self.target_orientation_contract = target_orientation_contract
         
         # Phase tracking (one per environment)
         self.phase = torch.zeros(num_envs, device=device)
@@ -183,15 +213,21 @@ class TrajectoryManager:
             orientation: Target orientations as quaternions [num_envs, 4] (wxyz)
         """
         if self.traj_type == "circle":
-            return self._circle_trajectory()
+            position, orientation = self._circle_trajectory()
         elif self.traj_type == "line":
-            return self._line_trajectory()
+            position, orientation = self._line_trajectory()
         elif self.traj_type == "figure_eight":
-            return self._figure_eight_trajectory()
+            position, orientation = self._figure_eight_trajectory()
         elif self.traj_type in ["recorded", "multi_recorded"]:
-            return self._recorded_trajectory()
+            position, orientation = self._recorded_trajectory()
         else:
             raise NotImplementedError(f"Trajectory type {self.traj_type} not implemented")
+        return position, self._adapt_target_orientation(orientation)
+
+    def _adapt_target_orientation(self, orientation: torch.Tensor) -> torch.Tensor:
+        if self.target_orientation_contract == TARGET_ORIENTATION_AS_RECORDED:
+            return orientation
+        return semantic_dfr_to_physical_cam_quat_wxyz(orientation)
     
     def get_lookahead(self, steps: int, lookahead_dt: float) -> tuple[torch.Tensor, torch.Tensor]:
         """Get lookahead target positions.
@@ -271,7 +307,8 @@ class TrajectoryManager:
             quat_next = self.recorded_orientations[batch_indices, next_idx]
             orientations.append(self._slerp_quaternions(quat_current, quat_next, alpha))
 
-        return torch.stack(positions, dim=1), torch.stack(orientations, dim=1)
+        orientation_tensor = torch.stack(orientations, dim=1)
+        return torch.stack(positions, dim=1), self._adapt_target_orientation(orientation_tensor)
     
     def step(self) -> None:
         """Advance trajectory by one timestep."""

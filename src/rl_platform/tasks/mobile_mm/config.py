@@ -23,6 +23,10 @@ class TrajectoryConfig:
     # Recorded trajectory settings
     waypoint_file: str | None = None
     loop_trajectory: bool = True
+    target_orientation_contract: Literal[
+        "as_recorded",
+        "semantic_dfr_to_physical_cam_v1",
+    ] = "as_recorded"
 
     # Multi-recorded trajectory settings
     trajectory_dir: str = "trajectoryToLearn/world_json"

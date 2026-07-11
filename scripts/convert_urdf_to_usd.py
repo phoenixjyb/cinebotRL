@@ -36,6 +36,12 @@ parser.add_argument(
     default=0.001,
     help="Scale factor for mesh geometry (default: 0.001 for mm→m conversion)",
 )
+parser.add_argument(
+    "--default-drive-type",
+    choices=("position", "none"),
+    default="position",
+    help="Importer joint drive target. Use 'none' for externally effort-controlled joints.",
+)
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -96,6 +102,7 @@ def main():
     print(f"Input URDF:  {urdf_path}")
     print(f"Output USD:  {usd_path}")
     print(f"Mesh scale:  {args_cli.mesh_scale}")
+    print(f"Drive type:  {args_cli.default_drive_type}")
     print()
     
     # Validate input file exists
@@ -120,9 +127,16 @@ def main():
         set_if_available(import_config, "fix_base", False)  # Mobile base, not fixed
         set_if_available(import_config, "self_collision", False)  # Disable for now
         if hasattr(_urdf, "UrdfJointTargetType"):
-            set_if_available(import_config, "default_drive_type", _urdf.UrdfJointTargetType.JOINT_DRIVE_POSITION)
-        set_if_available(import_config, "default_position_drive_damping", 1000.0)
-        set_if_available(import_config, "default_position_drive_stiffness", 10000.0)
+            target_type = (
+                _urdf.UrdfJointTargetType.JOINT_DRIVE_NONE
+                if args_cli.default_drive_type == "none"
+                else _urdf.UrdfJointTargetType.JOINT_DRIVE_POSITION
+            )
+            set_if_available(import_config, "default_drive_type", target_type)
+        drive_damping = 0.0 if args_cli.default_drive_type == "none" else 1000.0
+        drive_stiffness = 0.0 if args_cli.default_drive_type == "none" else 10000.0
+        set_if_available(import_config, "default_position_drive_damping", drive_damping)
+        set_if_available(import_config, "default_position_drive_stiffness", drive_stiffness)
         set_if_available(import_config, "distance_scale", args_cli.mesh_scale)  # Convert mm->m
         
         # Import URDF to USD

@@ -248,6 +248,14 @@ def register_isaac_lab_tasks():
         )
         print("[task_spec] Registered Isaac Lab task: RecomoProto1TrackEE-v0")
 
+        # Independent low-level balance task. It intentionally does not alias
+        # or modify the mobile-manipulator tracking environment.
+        register_once(
+            "RecomoTwoWheelBalance-v0",
+            "rl_platform.tasks.two_wheel_balance:RecomoTwoWheelBalanceEnv",
+        )
+        print("[task_spec] Registered Isaac Lab task: RecomoTwoWheelBalance-v0")
+
     except ImportError as e:
         print(f"[task_spec] Could not register Isaac Lab tasks: {e}")
         print("[task_spec] This is expected if running outside Isaac Lab environment")

@@ -1,0 +1,13 @@
+{
+  "schema": "recomo_two_wheel_gate1_determinism_v1",
+  "seed": 20260711,
+  "num_envs": 32,
+  "steps": 2048,
+  "run1": "smoke_32x2048_run1.json",
+  "run2": "smoke_32x2048_run2.json",
+  "exact_aggregate_match": true,
+  "terminated_total": 267,
+  "nonfinite_count": 0,
+  "reset_reasons_accounted": true,
+  "passed": true
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "recomo_two_wheel_ppo_gate_v1",
+  "seed": 20260711,
+  "num_envs": 32,
+  "total_timesteps": 65536,
+  "reset_pitch_deg": 2.0,
+  "random_baseline": {
+    "episodes": 128,
+    "episode_length_mean": 125.1640625,
+    "episode_length_p50": 122.0,
+    "episode_length_p95": 152.29999999999998,
+    "fall_rate": 1.0,
+    "timeout_rate": 0.0,
+    "abs_pitch_mean_deg": 5.604811191558838,
+    "abs_pitch_p95_deg": 13.874094446891013,
+    "abs_pitch_max_deg": 15.66422176361084
+  },
+  "deterministic_policy": {
+    "episodes": 128,
+    "episode_length_mean": 90.0,
+    "episode_length_p50": 90.0,
+    "episode_length_p95": 90.0,
+    "fall_rate": 1.0,
+    "timeout_rate": 0.0,
+    "abs_pitch_mean_deg": 6.727315902709961,
+    "abs_pitch_p95_deg": 14.408848654654165,
+    "abs_pitch_max_deg": 15.43835735321045
+  },
+  "finite_training_metrics": true,
+  "learning_signal": false,
+  "passed": false,
+  "checkpoint": "G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\gate3_65536\\ppo_balance_gate.zip"
+}

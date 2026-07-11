@@ -1,0 +1,74 @@
+[
+  {
+    "timesteps": 8192,
+    "episode_length_mean": 130.46511627906978,
+    "episode_reward_mean": 185.56195467225342,
+    "approx_kl": 0.0,
+    "clip_fraction": 0.0,
+    "entropy_loss": 0.0,
+    "explained_variance": 0.0
+  },
+  {
+    "timesteps": 16384,
+    "episode_length_mean": 137.8,
+    "episode_reward_mean": 198.50500548005104,
+    "approx_kl": 0.002729610074311495,
+    "clip_fraction": 0.012353515625,
+    "entropy_loss": 0.1643310606479645,
+    "explained_variance": -0.0060231685638427734
+  },
+  {
+    "timesteps": 24576,
+    "episode_length_mean": 128.18,
+    "episode_reward_mean": 183.09386602044106,
+    "approx_kl": 0.002651999704539776,
+    "clip_fraction": 0.011376953125,
+    "entropy_loss": 0.16789588928222657,
+    "explained_variance": -0.12349772453308105
+  },
+  {
+    "timesteps": 32768,
+    "episode_length_mean": 125.38,
+    "episode_reward_mean": 178.87809041678906,
+    "approx_kl": 0.0019234800711274147,
+    "clip_fraction": 0.00703125,
+    "entropy_loss": 0.16863178908824922,
+    "explained_variance": -0.37174105644226074
+  },
+  {
+    "timesteps": 40960,
+    "episode_length_mean": 124.58,
+    "episode_reward_mean": 177.90417822420596,
+    "approx_kl": 0.002743649296462536,
+    "clip_fraction": 0.0201171875,
+    "entropy_loss": 0.1642782509326935,
+    "explained_variance": -0.8013026714324951
+  },
+  {
+    "timesteps": 49152,
+    "episode_length_mean": 114.65,
+    "episode_reward_mean": 162.40715341359376,
+    "approx_kl": 0.0032440023496747017,
+    "clip_fraction": 0.011572265625,
+    "entropy_loss": 0.15830835849046707,
+    "explained_variance": -1.0692219734191895
+  },
+  {
+    "timesteps": 57344,
+    "episode_length_mean": 108.19,
+    "episode_reward_mean": 151.71243498623372,
+    "approx_kl": 0.0038564251735806465,
+    "clip_fraction": 0.0231201171875,
+    "entropy_loss": 0.1521801695227623,
+    "explained_variance": -1.0316364765167236
+  },
+  {
+    "timesteps": 65536,
+    "episode_length_mean": 99.93,
+    "episode_reward_mean": 138.4096203684807,
+    "approx_kl": 0.003264402272179723,
+    "clip_fraction": 0.0207275390625,
+    "entropy_loss": 0.14504733085632324,
+    "explained_variance": -0.7843881845474243
+  }
+]

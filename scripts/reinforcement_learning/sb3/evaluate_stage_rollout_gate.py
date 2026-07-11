@@ -106,6 +106,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--num_obstacles", type=int, choices=[1, 2], default=1)
     parser.add_argument(
+        "--active_obstacles",
+        type=int,
+        choices=[0, 1, 2],
+        default=None,
+        help="Active obstacle slots; defaults to every configured --num_obstacles slot.",
+    )
+    parser.add_argument(
         "--obstacle_observation_mode",
         choices=["scalar_clearance_v1", "relative_two_v2"],
         default="scalar_clearance_v1",
@@ -387,6 +394,10 @@ def main() -> int:
         raise ValueError("--recovery_route_min_base_target_distance must be non-negative")
     if args.obstacles_from_trajectory_metadata and not args.enable_obstacles:
         raise ValueError("--obstacles_from_trajectory_metadata requires --enable_obstacles")
+    if args.active_obstacles is not None and args.active_obstacles > args.num_obstacles:
+        raise ValueError("--active_obstacles cannot exceed --num_obstacles")
+    if not args.enable_obstacles and args.active_obstacles not in (None, 0):
+        raise ValueError("positive --active_obstacles requires --enable_obstacles")
 
     from isaaclab.app import AppLauncher
 
@@ -439,6 +450,7 @@ def main() -> int:
             print(f"[gate] episode_length_s override={env_cfg.episode_length_s:g}", flush=True)
         env_cfg.task_config.obstacles.enable_obstacles = bool(args.enable_obstacles)
         env_cfg.task_config.obstacles.num_obstacles = int(args.num_obstacles)
+        env_cfg.task_config.obstacles.active_obstacles = args.active_obstacles
         env_cfg.task_config.obstacles.observation_mode = args.obstacle_observation_mode
         env_cfg.task_config.obstacles.disc_position_xy = (float(args.obstacle_x), float(args.obstacle_y))
         if args.obstacle_radius is not None:
@@ -460,7 +472,9 @@ def main() -> int:
                 "[gate] obstacles enabled "
                 f"pos=({args.obstacle_x:.2f},{args.obstacle_y:.2f}) "
                 f"radius={obstacle_cfg.disc_radius:.2f}m "
-                f"count={obstacle_cfg.num_obstacles} observation={obstacle_cfg.observation_mode} "
+                f"slots={obstacle_cfg.num_obstacles} "
+                f"active={obstacle_cfg.active_obstacles if obstacle_cfg.active_obstacles is not None else obstacle_cfg.num_obstacles} "
+                f"observation={obstacle_cfg.observation_mode} "
                 f"height={obstacle_cfg.disc_height:.2f}m "
                 f"randomized={obstacle_cfg.randomize_per_reset} "
                 f"x_range=({args.obstacle_x_range[0]:.2f},{args.obstacle_x_range[1]:.2f}) "
@@ -1008,6 +1022,10 @@ def main() -> int:
             "steps": args.steps,
             "episode_length_s": float(args.episode_length_s) if args.episode_length_s > 0.0 else None,
             "enable_obstacles": bool(args.enable_obstacles),
+            "num_obstacle_slots": int(args.num_obstacles),
+            "active_obstacles": int(args.active_obstacles) if args.active_obstacles is not None else (
+                int(args.num_obstacles) if args.enable_obstacles else 0
+            ),
             "obstacles_from_trajectory_metadata": bool(args.obstacles_from_trajectory_metadata),
             "samples": int(pos.size),
             "freeze_base_actions": bool(args.freeze_base_actions),

@@ -117,3 +117,97 @@ physics.
 - Validate DJI hardware frame/sign behavior before deployment.
 - Start PPO only after a bounded closed-loop BC gate passes the tracking and
   safety thresholds; scene health alone is not sufficient.
+
+## Closed-Loop BC Gate and Contract Audit - 2026-07-11
+
+The first bounded closed-loop evaluation exposed an observation contract bug:
+the 94D policy could only receive its two obstacle feature slots when physical
+obstacles were spawned, and one-obstacle episodes marked both slots valid. The
+environment and rollout gate now separate fixed slot capacity from active
+obstacle count. The validated combinations are:
+
+```text
+nominal:       2 slots, 0 active, no obstacle prims, 94D observation
+one obstacle: 2 slots, 1 active, second prim moved out of the scene
+two obstacle: 2 slots, 2 active
+```
+
+After that fix, the grouped BC checkpoint was evaluated without PPO:
+
+```text
+checkpoint: logs/bc/rs4_v2_grouped_smoke_20260710/bc_policy.zip
+
+no-obstacle, 8 envs x 80 steps:
+  mean / p95 / max position error: 0.689 / 1.637 / 1.983 m
+  final mean position error:       1.257 m
+  first-episode terminated envs:   1 / 8
+
+one-obstacle, 8 envs x 80 steps:
+  mean / p95 / max position error: 0.718 / 1.512 / 1.610 m
+  final mean position error:       1.506 m
+  collision / unsafe:              0% / 3.09%
+  first-episode terminated envs:   0 / 8
+```
+
+Decision: reject this checkpoint as a closed-loop promotion candidate and do
+not start PPO from it.
+
+### Teacher-distribution diagnosis
+
+The early nominal rollout was exported and compared with the 79 no-obstacle
+teacher sources using `scripts/imitation/diagnose_rollout_teacher_shift.py`.
+The nearest-teacher standardized RMS distance was already `6.37` in the first
+half and increased to `6.48` in the second half. The largest shifts include
+quaternion/axis-angle error channels `41-47` and action-history channels.
+
+The source data explains the mismatch:
+
+- `actual_ee_pos` in the accepted teacher NPZ is all zeros, while URDF FK and
+  Isaac agree on the physical `cam_link` position.
+- `actual_ee_quat_wxyz` carries the GIK camera-attitude frame rather than the
+  physical `cam_link` FK quaternion.
+- The offline BC loss is therefore low in a synthetic observation space that
+  does not match the closed-loop simulator state.
+
+### Camera-frame alignment audit
+
+`scripts/imitation/audit_rs4_camera_frame_alignment.py` tested whether a single
+fixed quaternion transform could map GIK camera attitude to URDF `cam_link` on
+32 accepted sources. Both left- and right-multiplied transforms fail:
+
+```text
+fixed-transform attitude residual mean / p95 / max:
+  110.79 / 164.70 / 179.92 deg
+
+URDF FK versus target position mean / p95 / max:
+  0.0125 / 0.0365 / 0.0400 m
+```
+
+This is evidence that the GIK virtual attitude branch contributes a
+trajectory-dependent rotation. It cannot be repaired by a sign flip or a
+constant camera-frame offset.
+
+### Required next stage
+
+Replace the experimental simulator's direct `[yaw, pitch, roll]` to
+`[joint3, joint2, joint1]` axis permutation with a bounded differential-IK
+adapter. The adapter must map semantic camera angular velocity to physical
+gimbal joint velocity through the live `cam_link` rotational Jacobian, respect
+joint/rate limits, and expose residual/singularity diagnostics. Validate it on
+one trajectory before regenerating the 94D teacher dataset or training again.
+
+The initial Jacobian audit passes and removes one implementation risk:
+
+```text
+artifact: artifacts/rs4_gimbal_jacobian_initial_20260711.json
+cam_link Jacobian body index: 19 (body offset 0)
+gimbal Jacobian columns:      joint ids + 6 floating-base columns
+singular values:              1.2601 / 1.0000 / 0.6420
+condition number:             1.963
+10 deg/s axis probe residual: 0.00005 / 0.00007 / 0.00017 rad/s
+```
+
+This proves differential IK is numerically viable near the initial pose. It
+does not resolve which GIK camera-attitude frame should be tracked. Do not wire
+the Jacobian controller into the environment until that target frame is made
+explicit; otherwise the controller would accurately track the wrong frame.

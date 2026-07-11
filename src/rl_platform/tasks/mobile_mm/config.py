@@ -58,7 +58,12 @@ class ObstacleConfig:
 
     # Obstacle placement
     enable_obstacles: bool = False
+    # Number of fixed observation/scene slots. Keep this at two for the 94D
+    # RS4 policy even when an episode has zero or one active obstacle.
     num_obstacles: int = 1
+    # None activates every slot. An explicit value lets nominal and
+    # one-obstacle episodes preserve a fixed observation shape.
+    active_obstacles: int | None = None
     observation_mode: str = "scalar_clearance_v1"
     disc_position_xy: tuple[float, float] = (0.0, 0.5)  # Local env-frame XY, on the default circle trajectory
     disc_radius: float = 0.20

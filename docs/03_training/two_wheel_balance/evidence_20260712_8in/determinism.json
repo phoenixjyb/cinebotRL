@@ -1,0 +1,12 @@
+{
+  "schema": "recomo_two_wheel_8in_determinism_v1",
+  "seed": 20260712,
+  "num_envs": 32,
+  "steps": 2048,
+  "run1": "smoke_run1.json",
+  "run2": "smoke_run2.json",
+  "byte_identical": true,
+  "terminated_total": 295,
+  "nonfinite_count": 0,
+  "passed": true
+}

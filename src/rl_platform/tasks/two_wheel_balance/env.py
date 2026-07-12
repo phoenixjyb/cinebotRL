@@ -117,8 +117,8 @@ class RecomoTwoWheelBalanceEnv(DirectRLEnv):
             raise ValueError(f"unsupported control_mode: {self.cfg.control_mode}")
         common = self.actions[:, 0]
         yaw = self.actions[:, 1]
-        self.wheel_efforts[:, 0] = common + yaw
-        self.wheel_efforts[:, 1] = common - yaw
+        self.wheel_efforts[:, 0] = common - yaw
+        self.wheel_efforts[:, 1] = common + yaw
         self.wheel_efforts.clamp_(-1.0, 1.0).mul_(self.cfg.torque_limit_nm)
 
     def _apply_action(self) -> None:

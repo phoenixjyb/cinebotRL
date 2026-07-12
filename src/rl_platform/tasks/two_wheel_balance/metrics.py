@@ -29,9 +29,9 @@ def mix_common_yaw_effort(actions: np.ndarray, torque_limit: float) -> np.ndarra
         raise ValueError(f"expected action shape (..., 2), got {clipped.shape}")
     common = clipped[..., 0]
     yaw = clipped[..., 1]
-    # With both positive wheel velocities driving +X and left wheel at +Y,
-    # positive body +Z yaw requires left-forward/right-backward effort.
-    wheel = np.stack((common + yaw, common - yaw), axis=-1)
+    # With both +Y wheel axes, positive velocity drives +X. Positive body +Z
+    # yaw therefore requires the right wheel forward and left wheel backward.
+    wheel = np.stack((common - yaw, common + yaw), axis=-1)
     return np.clip(wheel, -1.0, 1.0) * float(torque_limit)
 
 
@@ -40,8 +40,8 @@ def compose_pd_residual_action(
     pitch_rate: np.ndarray,
     residual_actions: np.ndarray,
     *,
-    kp: float = -1.0,
-    kd: float = -0.2,
+    kp: float = 1.0,
+    kd: float = 0.2,
     pd_limit: float = 0.5,
     residual_scale: float = 0.15,
 ) -> np.ndarray:

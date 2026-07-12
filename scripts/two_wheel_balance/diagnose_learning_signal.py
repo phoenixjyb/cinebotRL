@@ -66,7 +66,12 @@ def summarize_mode(
 
     for _ in range(steps):
         obs_np = policy_obs.detach().cpu().numpy()
-        pd_common = np.clip(-obs_np[:, 0] - 0.2 * obs_np[:, 1], -0.5, 0.5)
+        pd_common = np.clip(
+            env.unwrapped.cfg.pd_common_kp * obs_np[:, 0]
+            + env.unwrapped.cfg.pd_common_kd * obs_np[:, 1],
+            -env.unwrapped.cfg.pd_common_action_limit,
+            env.unwrapped.cfg.pd_common_action_limit,
+        )
         if mode == "zero":
             action_np = np.zeros((1, 2), dtype=np.float32)
         elif mode == "random":
@@ -169,7 +174,10 @@ def main() -> int:
         "canonical_pitch_sweep": {
             "pitch_deg": pitch_grid_deg.tolist(),
             "ppo_common_action": np.asarray(canonical_actions)[:, 0].tolist(),
-            "pd_common_action": (-canonical_obs[:, 0]).tolist(),
+            "pd_common_action": (
+                cfg.pd_common_kp * canonical_obs[:, 0]
+                + cfg.pd_common_kd * canonical_obs[:, 1]
+            ).tolist(),
         },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)

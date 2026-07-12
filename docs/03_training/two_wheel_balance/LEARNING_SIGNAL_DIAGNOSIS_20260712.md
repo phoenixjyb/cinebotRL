@@ -2,6 +2,8 @@
 
 Date: 2026-07-12
 
+> **Superseded physical model:** This diagnosis was produced with 6-inch wheels and wheel axes `[0,-1,0]`. The confirmed model now uses 8-inch wheels and axes `[0,+1,0]`. The old policy/sign conclusions are retained for provenance but are not valid training evidence for the corrected plant. No PPO was run as part of the geometry correction.
+
 ## Conclusion
 
 The original 65,536-step direct PPO run did not merely learn too slowly. It learned common-wheel action with the opposite sign to the stabilizing controller. The plant, action direction, contact termination, deterministic vectorization, and scripted controllability gates remain healthy.

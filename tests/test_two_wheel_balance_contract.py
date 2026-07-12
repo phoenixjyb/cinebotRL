@@ -27,12 +27,12 @@ def test_common_effort_drives_both_wheels_equally() -> None:
 
 def test_yaw_effort_is_antisymmetric() -> None:
     effort = mix_common_yaw_effort(np.array([[0.0, 0.25]]), 20.0)
-    np.testing.assert_allclose(effort, [[5.0, -5.0]])
+    np.testing.assert_allclose(effort, [[-5.0, 5.0]])
 
 
 def test_mixer_clips_each_wheel() -> None:
     effort = mix_common_yaw_effort(np.array([[1.0, 1.0]]), 20.0)
-    np.testing.assert_allclose(effort, [[20.0, 0.0]])
+    np.testing.assert_allclose(effort, [[0.0, 20.0]])
 
 
 def test_pd_residual_zero_matches_proven_feedback() -> None:
@@ -41,7 +41,7 @@ def test_pd_residual_zero_matches_proven_feedback() -> None:
         np.array([0.2]),
         np.zeros((1, 2)),
     )
-    np.testing.assert_allclose(action, [[-0.14, 0.0]])
+    np.testing.assert_allclose(action, [[0.14, 0.0]])
 
 
 def test_pd_residual_is_bounded_and_scaled() -> None:

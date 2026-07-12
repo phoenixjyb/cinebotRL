@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+from xml.etree import ElementTree
 
 os.environ.setdefault("ACCEPT_EULA", "YES")
 os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "yes")
@@ -17,6 +18,7 @@ from isaaclab.app import AppLauncher
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--usd", type=Path, required=True)
+parser.add_argument("--urdf", type=Path, help="Optional source URDF for geometry contract checks")
 parser.add_argument("--output", type=Path, required=True)
 AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
@@ -57,6 +59,33 @@ def main() -> int:
             "damping": float(drive.GetDampingAttr().Get() or 0.0) if drive else 0.0,
         }
 
+    urdf_geometry = None
+    if args.urdf is not None:
+        robot = ElementTree.parse(args.urdf.resolve()).getroot()
+        joint_origins = {}
+        joint_axes = {}
+        wheel_radii = {}
+        for side in ("left", "right"):
+            joint = robot.find(f"./joint[@name='{side}_wheel_joint']")
+            link = robot.find(f"./link[@name='{side}_wheel_link']")
+            if joint is None or link is None:
+                raise RuntimeError(f"missing {side} wheel link/joint in {args.urdf}")
+            origin = joint.find("origin")
+            axis = joint.find("axis")
+            cylinder = link.find("./collision/geometry/cylinder")
+            if origin is None or axis is None or cylinder is None:
+                raise RuntimeError(f"missing {side} wheel origin/cylinder in {args.urdf}")
+            joint_origins[side] = [float(value) for value in origin.attrib["xyz"].split()]
+            joint_axes[side] = [float(value) for value in axis.attrib["xyz"].split()]
+            wheel_radii[side] = float(cylinder.attrib["radius"])
+        urdf_geometry = {
+            "wheel_joint_origins_m": joint_origins,
+            "wheel_joint_axes": joint_axes,
+            "wheel_radii_m": wheel_radii,
+            "wheel_track_m": joint_origins["left"][1] - joint_origins["right"][1],
+            "wheel_diameter_m": 2.0 * wheel_radii["left"],
+        }
+
     layer_text = "\n".join(layer.ExportToString() for layer in stage.GetLayerStack())
     checks = {
         "default_prim": bool(stage.GetDefaultPrim()),
@@ -71,6 +100,21 @@ def main() -> int:
         "positive_inertia": inertia_positive,
         "wheel_position_drives_disabled": all(v["stiffness"] == 0.0 for v in drives.values()),
     }
+    if urdf_geometry is not None:
+        checks.update(
+            {
+                "wheel_track_620mm": abs(urdf_geometry["wheel_track_m"] - 0.620) < 1e-9,
+                "wheel_diameter_8in": abs(urdf_geometry["wheel_diameter_m"] - 0.2032) < 1e-9,
+                "wheel_centers_at_radius": all(
+                    abs(urdf_geometry["wheel_joint_origins_m"][side][2] - 0.1016) < 1e-9
+                    for side in ("left", "right")
+                ),
+                "wheel_axes_positive_y": all(
+                    urdf_geometry["wheel_joint_axes"][side] == [0.0, 1.0, 0.0]
+                    for side in ("left", "right")
+                ),
+            }
+        )
     result = {
         "schema": "recomo_two_wheel_asset_audit_v1",
         "usd": str(args.usd.resolve()),
@@ -79,6 +123,7 @@ def main() -> int:
         "joints": [p.GetName() for p in joints],
         "revolute_joints": [p.GetName() for p in revolute_joints],
         "wheel_drives": drives,
+        "urdf_geometry": urdf_geometry,
         "total_mass_kg": sum(masses),
         "checks": checks,
         "passed": all(checks.values()),

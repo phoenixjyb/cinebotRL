@@ -1,0 +1,83 @@
+{
+  "schema": "recomo_two_wheel_asset_audit_v1",
+  "usd": "G:\\wSpace\\cinebotRL-two-wheel-balance\\assets_own\\recomoProto2_two_wheel_balance\\recomoProto2_two_wheel_balance.usd",
+  "default_prim": "/recomoProto2_two_wheel_balance",
+  "articulation_roots": [
+    "/recomoProto2_two_wheel_balance/base_link/base_link"
+  ],
+  "joints": [
+    "arm_mount_joint",
+    "imu_joint",
+    "laser_joint",
+    "upper_imu_joint",
+    "left_wheel_joint",
+    "right_wheel_joint"
+  ],
+  "revolute_joints": [
+    "left_wheel_joint",
+    "right_wheel_joint"
+  ],
+  "wheel_drives": {
+    "left_wheel_joint": {
+      "present": true,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "right_wheel_joint": {
+      "present": true,
+      "stiffness": 0.0,
+      "damping": 0.0
+    }
+  },
+  "urdf_geometry": {
+    "wheel_joint_origins_m": {
+      "left": [
+        0.0,
+        0.31,
+        0.1016
+      ],
+      "right": [
+        0.0,
+        -0.31,
+        0.1016
+      ]
+    },
+    "wheel_joint_axes": {
+      "left": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "right": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "wheel_radii_m": {
+      "left": 0.1016,
+      "right": 0.1016
+    },
+    "wheel_track_m": 0.62,
+    "wheel_diameter_m": 0.2032
+  },
+  "total_mass_kg": 26.0,
+  "checks": {
+    "default_prim": true,
+    "articulation_root": true,
+    "floating_no_world_fixed_joint": true,
+    "two_wheel_joints": true,
+    "only_two_revolute_joints": true,
+    "no_planar_virtual_joints": true,
+    "no_caster": true,
+    "no_legacy_stl": true,
+    "mass_near_26kg": true,
+    "positive_inertia": true,
+    "wheel_position_drives_disabled": true,
+    "wheel_track_620mm": true,
+    "wheel_diameter_8in": true,
+    "wheel_centers_at_radius": true,
+    "wheel_axes_positive_y": true
+  },
+  "passed": true
+}

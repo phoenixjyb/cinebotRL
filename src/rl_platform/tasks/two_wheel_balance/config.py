@@ -61,8 +61,8 @@ class RecomoTwoWheelBalanceEnvCfg(DirectRLEnvCfg):
     # Direct mode preserves the original action contract. PD-residual mode is
     # an explicit safety/learning scaffold, not a silent change in semantics.
     control_mode = "direct"
-    pd_common_kp = -1.0
-    pd_common_kd = -0.2
+    pd_common_kp = 1.0
+    pd_common_kd = 0.2
     pd_common_action_limit = 0.5
     policy_residual_scale = 0.15
     enable_reward_term_telemetry = False

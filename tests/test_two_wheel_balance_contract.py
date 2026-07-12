@@ -6,6 +6,7 @@ from rl_platform.tasks.two_wheel_balance.metrics import (
     ACTION_NAMES,
     OBSERVATION_NAMES,
     BalanceContract,
+    compose_pd_residual_action,
     mix_common_yaw_effort,
 )
 
@@ -32,3 +33,21 @@ def test_yaw_effort_is_antisymmetric() -> None:
 def test_mixer_clips_each_wheel() -> None:
     effort = mix_common_yaw_effort(np.array([[1.0, 1.0]]), 20.0)
     np.testing.assert_allclose(effort, [[20.0, 0.0]])
+
+
+def test_pd_residual_zero_matches_proven_feedback() -> None:
+    action = compose_pd_residual_action(
+        np.array([0.1]),
+        np.array([0.2]),
+        np.zeros((1, 2)),
+    )
+    np.testing.assert_allclose(action, [[-0.14, 0.0]])
+
+
+def test_pd_residual_is_bounded_and_scaled() -> None:
+    action = compose_pd_residual_action(
+        np.array([0.0]),
+        np.array([0.0]),
+        np.array([[1.0, -1.0]]),
+    )
+    np.testing.assert_allclose(action, [[0.15, -0.15]])

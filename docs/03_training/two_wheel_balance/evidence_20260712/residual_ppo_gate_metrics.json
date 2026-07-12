@@ -1,0 +1,48 @@
+{
+  "schema": "recomo_two_wheel_ppo_gate_v1",
+  "seed": 20260711,
+  "num_envs": 32,
+  "total_timesteps": 8192,
+  "reset_pitch_deg": 2.0,
+  "control_mode": "pd_residual",
+  "policy_residual_scale": 0.15,
+  "random_baseline": {
+    "episodes": 128,
+    "episode_length_mean": 362.484375,
+    "episode_length_p50": 361.0,
+    "episode_length_p95": 379.29999999999995,
+    "fall_rate": 1.0,
+    "timeout_rate": 0.0,
+    "abs_pitch_mean_deg": 4.0383405685424805,
+    "abs_pitch_p95_deg": 12.73853669336417,
+    "abs_pitch_max_deg": 15.666033744812012
+  },
+  "pd_prior_baseline": {
+    "episodes": 128,
+    "episode_length_mean": 364.0,
+    "episode_length_p50": 364.0,
+    "episode_length_p95": 364.0,
+    "fall_rate": 1.0,
+    "timeout_rate": 0.0,
+    "abs_pitch_mean_deg": 4.115082740783691,
+    "abs_pitch_p95_deg": 12.826872426362275,
+    "abs_pitch_max_deg": 15.660161018371582
+  },
+  "deterministic_policy": {
+    "episodes": 128,
+    "episode_length_mean": 353.0,
+    "episode_length_p50": 353.0,
+    "episode_length_p95": 353.0,
+    "fall_rate": 1.0,
+    "timeout_rate": 0.0,
+    "abs_pitch_mean_deg": 4.1784234046936035,
+    "abs_pitch_p95_deg": 12.93610029930493,
+    "abs_pitch_max_deg": 15.645247459411621
+  },
+  "finite_training_metrics": true,
+  "learning_signal": false,
+  "prior_preserved": true,
+  "direct_baseline_improved": true,
+  "passed": false,
+  "checkpoint": "G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\residual_v1_gate8192\\ppo_balance_gate.zip"
+}

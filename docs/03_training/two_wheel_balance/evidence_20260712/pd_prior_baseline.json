@@ -1,0 +1,11 @@
+{
+  "episodes": 128,
+  "episode_length_mean": 364.0,
+  "episode_length_p50": 364.0,
+  "episode_length_p95": 364.0,
+  "fall_rate": 1.0,
+  "timeout_rate": 0.0,
+  "abs_pitch_mean_deg": 4.115082740783691,
+  "abs_pitch_p95_deg": 12.826872426362275,
+  "abs_pitch_max_deg": 15.660161018371582
+}

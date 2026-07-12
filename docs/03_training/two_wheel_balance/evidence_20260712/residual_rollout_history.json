@@ -1,0 +1,11 @@
+[
+  {
+    "timesteps": 8192,
+    "episode_length_mean": 0.0,
+    "episode_reward_mean": 0.0,
+    "approx_kl": 0.0,
+    "clip_fraction": 0.0,
+    "entropy_loss": 0.0,
+    "explained_variance": 0.0
+  }
+]

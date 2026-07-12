@@ -37,6 +37,8 @@ parser.add_argument("--pd-kd", type=float, default=0.2)
 parser.add_argument("--pd-action-limit", type=float, default=0.5)
 parser.add_argument("--progress-every", type=int, default=0)
 parser.add_argument("--reset-pitch-deg", type=float, default=0.0)
+parser.add_argument("--control-mode", choices=("direct", "pd_residual"), default="direct")
+parser.add_argument("--policy-residual-scale", type=float, default=0.15)
 parser.add_argument("--output", type=Path, required=True)
 AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
@@ -57,6 +59,8 @@ def main() -> int:
     cfg.seed = args.seed
     cfg.scene.num_envs = args.num_envs
     cfg.reset_pitch_rad = np.deg2rad(args.reset_pitch_deg)
+    cfg.control_mode = args.control_mode
+    cfg.policy_residual_scale = args.policy_residual_scale
     env = gym.make("RecomoTwoWheelBalance-v0", cfg=cfg, render_mode=None)
     obs, _ = env.reset(seed=args.seed)
     policy_obs = obs["policy"]
@@ -142,9 +146,14 @@ def main() -> int:
         "zero_steps": args.zero_steps,
         "action_mode": args.action_mode,
         "action_value": args.action_value,
-        "pd_kp": args.pd_kp,
-        "pd_kd": args.pd_kd,
-        "pd_action_limit": args.pd_action_limit,
+        "control_mode": args.control_mode,
+        "policy_residual_scale": args.policy_residual_scale,
+        "scripted_pd_kp": args.pd_kp,
+        "scripted_pd_kd": args.pd_kd,
+        "scripted_pd_action_limit": args.pd_action_limit,
+        "control_pd_kp": env.unwrapped.cfg.pd_common_kp,
+        "control_pd_kd": env.unwrapped.cfg.pd_common_kd,
+        "control_pd_action_limit": env.unwrapped.cfg.pd_common_action_limit,
         "observation_shape": list(policy_obs.shape),
         "action_shape": [args.num_envs, 2],
         "terminated_total": terminated_total,

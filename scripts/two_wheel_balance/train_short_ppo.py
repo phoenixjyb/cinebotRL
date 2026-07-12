@@ -27,6 +27,10 @@ parser.add_argument("--total-timesteps", type=int, default=65_536)
 parser.add_argument("--eval-episodes", type=int, default=128)
 parser.add_argument("--seed", type=int, default=20260711)
 parser.add_argument("--reset-pitch-deg", type=float, default=2.0)
+parser.add_argument("--control-mode", choices=("direct", "pd_residual"), default="direct")
+parser.add_argument("--policy-residual-scale", type=float, default=0.15)
+parser.add_argument("--reference-direct-episode-length", type=float, default=125.1640625)
+parser.add_argument("--reference-direct-pitch-p95-deg", type=float, default=13.874094446891013)
 parser.add_argument("--output-dir", type=Path, required=True)
 AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
@@ -72,6 +76,8 @@ def make_env() -> Sb3VecEnvWrapper:
     cfg.seed = args.seed
     cfg.scene.num_envs = args.num_envs
     cfg.reset_pitch_rad = float(np.deg2rad(args.reset_pitch_deg))
+    cfg.control_mode = args.control_mode
+    cfg.policy_residual_scale = args.policy_residual_scale
     env = gym.make("RecomoTwoWheelBalance-v0", cfg=cfg, render_mode=None)
     return Sb3VecEnvWrapper(env, fast_variant=True)
 
@@ -82,6 +88,7 @@ def evaluate_actions(
     episodes: int,
     model: PPO | None,
     seed: int,
+    random_actions: bool = True,
 ) -> dict[str, float | int]:
     obs = env.reset()
     rng = np.random.default_rng(seed)
@@ -92,8 +99,10 @@ def evaluate_actions(
     terminated_count = 0
     max_steps = max(10_000, int(np.ceil(episodes / env.num_envs)) * 4_000)
     for _ in range(max_steps):
-        if model is None:
+        if model is None and random_actions:
             actions = rng.uniform(-0.15, 0.15, size=(env.num_envs, 2)).astype(np.float32)
+        elif model is None:
+            actions = np.zeros((env.num_envs, 2), dtype=np.float32)
         else:
             actions, _ = model.predict(obs, deterministic=True)
         obs, _, dones, infos = env.step(actions)
@@ -144,6 +153,19 @@ def main() -> int:
         json.dumps(baseline, indent=2), encoding="utf-8"
     )
     print(f"random baseline: {baseline}", flush=True)
+    pd_prior = None
+    if args.control_mode == "pd_residual":
+        pd_prior = evaluate_actions(
+            env,
+            episodes=args.eval_episodes,
+            model=None,
+            seed=args.seed + 2,
+            random_actions=False,
+        )
+        (args.output_dir / "pd_prior_baseline.json").write_text(
+            json.dumps(pd_prior, indent=2), encoding="utf-8"
+        )
+        print(f"PD prior baseline: {pd_prior}", flush=True)
 
     model = PPO(
         "MlpPolicy",
@@ -193,17 +215,37 @@ def main() -> int:
         and evaluation["fall_rate"] < baseline["fall_rate"]
         and evaluation["abs_pitch_p95_deg"] < baseline["abs_pitch_p95_deg"]
     )
+    prior_preserved = (
+        pd_prior is None
+        or (
+            evaluation["episode_length_mean"] >= pd_prior["episode_length_mean"] * 0.90
+            and evaluation["abs_pitch_p95_deg"] <= pd_prior["abs_pitch_p95_deg"] * 1.10
+        )
+    )
+    direct_baseline_improved = (
+        evaluation["episode_length_mean"] > args.reference_direct_episode_length * 1.50
+        and evaluation["abs_pitch_p95_deg"] < args.reference_direct_pitch_p95_deg
+    )
     result = {
         "schema": "recomo_two_wheel_ppo_gate_v1",
         "seed": args.seed,
         "num_envs": args.num_envs,
         "total_timesteps": args.total_timesteps,
         "reset_pitch_deg": args.reset_pitch_deg,
+        "control_mode": args.control_mode,
+        "policy_residual_scale": args.policy_residual_scale,
+        "reference_direct_baseline": {
+            "episode_length_mean": args.reference_direct_episode_length,
+            "abs_pitch_p95_deg": args.reference_direct_pitch_p95_deg,
+        },
         "random_baseline": baseline,
+        "pd_prior_baseline": pd_prior,
         "deterministic_policy": evaluation,
         "finite_training_metrics": finite_training,
         "learning_signal": learning_signal,
-        "passed": finite_training and learning_signal,
+        "prior_preserved": prior_preserved,
+        "direct_baseline_improved": direct_baseline_improved,
+        "passed": finite_training and learning_signal and prior_preserved and direct_baseline_improved,
         "checkpoint": str(checkpoint.with_suffix(".zip")),
     }
     (args.output_dir / "ppo_gate_metrics.json").write_text(

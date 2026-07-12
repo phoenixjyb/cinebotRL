@@ -47,6 +47,7 @@ class RecomoTwoWheelBalanceEnv(DirectRLEnv):
             raise RuntimeError("two-wheel contract requires exactly one base_link body")
 
         self.actions = torch.zeros((self.num_envs, 2), device=self.device)
+        self.policy_actions = torch.zeros_like(self.actions)
         self.previous_actions = torch.zeros_like(self.actions)
         self.wheel_efforts = torch.zeros((self.num_envs, 2), device=self.device)
         self.vx_ref = torch.full((self.num_envs,), self.cfg.command_vx, device=self.device)
@@ -73,6 +74,7 @@ class RecomoTwoWheelBalanceEnv(DirectRLEnv):
                 "termination",
             )
         }
+        self.last_reward_terms: dict[str, torch.Tensor] = {}
 
     def _setup_scene(self) -> None:
         self.robot = Articulation(self.cfg.robot_cfg)
@@ -97,7 +99,22 @@ class RecomoTwoWheelBalanceEnv(DirectRLEnv):
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         self.previous_actions.copy_(self.actions)
-        self.actions.copy_(torch.clamp(actions, -1.0, 1.0))
+        self.policy_actions.copy_(torch.clamp(actions, -1.0, 1.0))
+        if self.cfg.control_mode == "pd_residual":
+            state = self._state_terms()
+            pd_common = torch.clamp(
+                self.cfg.pd_common_kp * state["pitch"]
+                + self.cfg.pd_common_kd * state["pitch_rate"],
+                -self.cfg.pd_common_action_limit,
+                self.cfg.pd_common_action_limit,
+            )
+            self.actions.copy_(self.cfg.policy_residual_scale * self.policy_actions)
+            self.actions[:, 0].add_(pd_common)
+            self.actions.clamp_(-1.0, 1.0)
+        elif self.cfg.control_mode == "direct":
+            self.actions.copy_(self.policy_actions)
+        else:
+            raise ValueError(f"unsupported control_mode: {self.cfg.control_mode}")
         common = self.actions[:, 0]
         yaw = self.actions[:, 1]
         self.wheel_efforts[:, 0] = common + yaw
@@ -167,6 +184,10 @@ class RecomoTwoWheelBalanceEnv(DirectRLEnv):
             "alive": self.cfg.alive_scale * (~self.reset_terminated).float(),
             "termination": self.cfg.termination_scale * self.reset_terminated.float(),
         }
+        if self.cfg.enable_reward_term_telemetry:
+            self.last_reward_terms = {
+                key: value.detach().clone() for key, value in rewards.items()
+            }
         for key, value in rewards.items():
             self._episode_sums[key] += value
         return torch.stack(tuple(rewards.values()), dim=0).sum(dim=0)
@@ -236,6 +257,7 @@ class RecomoTwoWheelBalanceEnv(DirectRLEnv):
         self.robot.write_root_velocity_to_sim(root_state[:, 7:], env_ids)
         self.robot.write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
         self.actions[env_ids] = 0.0
+        self.policy_actions[env_ids] = 0.0
         self.previous_actions[env_ids] = 0.0
         self.wheel_efforts[env_ids] = 0.0
 
@@ -255,4 +277,6 @@ class RecomoTwoWheelBalanceEnv(DirectRLEnv):
             "effort_saturation_ratio": (self.wheel_efforts.abs() >= self.cfg.torque_limit_nm).float().mean().item(),
             "nonfinite_count": int(self.nonfinite_count.item()),
             "reset_reason_counts": dict(self.reset_reason_counts),
+            "control_mode": self.cfg.control_mode,
+            "policy_residual_scale": self.cfg.policy_residual_scale,
         }

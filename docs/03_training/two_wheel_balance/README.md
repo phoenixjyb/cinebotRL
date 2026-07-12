@@ -23,6 +23,34 @@ Task: `RecomoTwoWheelBalance-v0`
 
 Do not resume or extend PPO from the failed checkpoint. The next task is an environment/reward/normalization diagnosis, not more timesteps.
 
+### 2026-07-12 diagnosis and residual gate
+
+The diagnosis is complete. The failed direct PPO policy learned the wrong stabilizing sign:
+
+- `corr(a_common, pitch) = +0.941`
+- `corr(a_common, pitch_rate) = +0.998`
+- meaningful action sign agreement with the proven PD controller: `0%`
+- direct PPO common action at `+10 deg`: `+0.058`, while the PD action is `-0.175`
+
+Observation magnitudes were moderate during the failed rollout; no channel-scale explosion was found. A new opt-in `pd_residual` mode therefore preserves the direct default while composing:
+
+```text
+pd_common = clip(-pitch - 0.2 * pitch_rate, -0.5, 0.5)
+applied_common = clip(pd_common + 0.15 * policy_residual_common)
+applied_yaw = 0.15 * policy_residual_yaw
+```
+
+Zero residual exactly reproduces the 364-step PD baseline. The bounded 8,192-step residual PPO gate preserved the prior and remained much safer than direct PPO, but it did not learn an improvement:
+
+| Evaluation | Mean episode length | Pitch p95 | Fall rate |
+| --- | ---: | ---: | ---: |
+| Frozen direct random baseline | 125.16 | 13.87 deg | 1.0 |
+| Residual random baseline | 362.48 | 12.74 deg | 1.0 |
+| Zero-residual PD prior | 364.00 | 12.83 deg | 1.0 |
+| Learned residual after 8,192 steps | 353.00 | 12.94 deg | 1.0 |
+
+`prior_preserved=true` and `direct_baseline_improved=true`, but `learning_signal=false`; the gate remains failed and PPO remains stopped. See `LEARNING_SIGNAL_DIAGNOSIS_20260712.md` and `evidence_20260712/`.
+
 ## Runtime contract
 
 Physics runs at 1,000 Hz with decimation 5, giving a 200 Hz policy rate.
@@ -109,3 +137,5 @@ Before another optimizer run:
 3. Compare a normalized-observation PPO smoke against a residual policy around the proven PD controller.
 4. Require critic explained variance and deterministic episode length to improve in a smaller 8,192-step gate before allowing another 65,536-step run.
 5. Replace provisional mass/COM/torque values when measured hardware data is available.
+
+The July 12 evidence narrows the next optimizer experiment further: use more than one optimizer update inside the small gate (the current `n_steps=256` with 32 environments yields only one update at 8,192 timesteps), and add a directly testable pitch-energy/progress signal or supervised PD initialization. Do not increase total timesteps first.

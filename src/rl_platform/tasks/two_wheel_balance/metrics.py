@@ -35,6 +35,30 @@ def mix_common_yaw_effort(actions: np.ndarray, torque_limit: float) -> np.ndarra
     return np.clip(wheel, -1.0, 1.0) * float(torque_limit)
 
 
+def compose_pd_residual_action(
+    pitch: np.ndarray,
+    pitch_rate: np.ndarray,
+    residual_actions: np.ndarray,
+    *,
+    kp: float = -1.0,
+    kd: float = -0.2,
+    pd_limit: float = 0.5,
+    residual_scale: float = 0.15,
+) -> np.ndarray:
+    """Compose a bounded PD common action with learned common/yaw residuals."""
+    residual = np.clip(np.asarray(residual_actions, dtype=np.float64), -1.0, 1.0)
+    if residual.shape[-1] != 2:
+        raise ValueError(f"expected residual shape (..., 2), got {residual.shape}")
+    pd_common = np.clip(
+        kp * np.asarray(pitch) + kd * np.asarray(pitch_rate),
+        -pd_limit,
+        pd_limit,
+    )
+    applied = residual_scale * residual
+    applied[..., 0] += pd_common
+    return np.clip(applied, -1.0, 1.0)
+
+
 @dataclass(frozen=True)
 class BalanceContract:
     physics_dt: float = 0.001

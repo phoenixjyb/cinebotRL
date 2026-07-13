@@ -18,11 +18,12 @@ Task: `RecomoTwoWheelBalance-v0`
 | Deterministic `32 x 2048` smoke | Passed | Two byte-equivalent metric runs |
 | Corrected-plant scripted PD controllability | Passed | Mean upright duration 113 -> 409 steps |
 | Nominal scripted LQR recovery | Passed | 32/32 signed pitch/yaw scenarios reached 10 s |
+| Upright-start LQR push recovery | Passed | 32/32 recovered from up to 6 N s at 0.5 m application height |
 | PPO learning signal at 65,536 steps | Failed; stop rule active | PPO gate metrics |
 | Product stand policy | Not achieved | Blocked by failed Gate 3 |
 | Velocity tracking, obstacles, arm, sim-to-real | Not started | Out of scope |
 
-Do not resume or extend PPO from the failed checkpoint. The nominal LQR is now the controller baseline; the next gate is robustness around provisional plant assumptions, not more PPO timesteps.
+Do not resume or extend PPO from the failed checkpoint. The nominal LQR is now the controller baseline; the next gate is low-speed chassis tracking followed by robustness around provisional plant assumptions, not more PPO timesteps.
 
 ### 2026-07-12 geometry correction
 
@@ -138,6 +139,13 @@ Run from `/mnt/g/wSpace/cinebotRL-two-wheel-balance` on `.98`.
   --gain-scales 0.4,0.5,0.6 \
   --output-dir G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\lqr_final_20260713 \
   --headless
+
+# Deterministic upright-start push-recovery gate. This does not train a policy.
+/mnt/g/isaaclab_venv/Scripts/python.exe -u -X utf8 \
+  G:\\wSpace\\cinebotRL-two-wheel-balance\\scripts\\two_wheel_balance\\evaluate_lqr_push.py \
+  --gains G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260713_lqr_nominal\\lqr_gains.json \
+  --output G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\lqr_push\\push_gate.json \
+  --headless
 ```
 
 The bounded PPO command is retained in `scripts/two_wheel_balance/train_short_ppo.py` for reproducibility, but must not be rerun until the failed-gate diagnosis is addressed.
@@ -151,6 +159,8 @@ Use `scripts/two_wheel_balance/evaluate_policy.py` to reevaluate an existing che
 - Corrected PD sanity: 409 policy steps mean upright duration and two contacts per 1,000 steps.
 - Nominal LQR: 32/32 signed `2/5/8 deg` pitch and `-0.3/0/+0.3 rad/s` yaw-rate scenarios reached the 10-second timeout.
 - Selected LQR scale `0.6`: pitch p95 `2.765 deg`, pitch max `7.993 deg`, action p95 `0.586`, and zero saturation.
+- LQR push gate: 32/32 survived and recovered from signed `2/4/6 N s` impulses applied at an equivalent `0.5 m` height; worst recovery `0.415 s`, worst pitch `2.084 deg`, and aggregate saturation `0.0382%`.
+- The seeded push-gate repeat was exactly equal on all recorded scenario metrics.
 - No PPO checkpoint is valid for the corrected 8-inch/`+Y`-axis model.
 
 The rendered file under `evidence_20260711/` shows the obsolete 6-inch/pre-axis-fix asset and is retained only for provenance.
@@ -159,10 +169,11 @@ The rendered file under `evidence_20260711/` shows the obsolete 6-inch/pre-axis-
 
 Before another optimizer run or hardware claim:
 
-1. Sweep bounded mass, COM, inertia, friction, torque, and delay ranges around the nominal plant once credible ranges are agreed.
-2. Add push recovery and low-speed `vx/wz` command tests around the LQR baseline.
-3. Lift or augment the identified model for a 200 Hz controller; the current contact-aware LQR uses a four-step zero-order hold at 50 Hz.
-4. Repair the existing `arm_mount_link` and `upper_imu_link` visual-reference warnings before rendered evidence.
-5. Only then compare a normalized residual policy against the frozen LQR prior in a small stop-rule gate.
+1. Add low-speed signed `vx/wz` command and transition tests around the frozen LQR baseline.
+2. Sweep bounded mass, COM, inertia, friction, torque, and delay ranges around the nominal plant once credible ranges are agreed.
+3. Add combined disturbances only after the single-angle and single-push gates remain passing.
+4. Lift or augment the identified model for a 200 Hz controller; the current contact-aware LQR uses a four-step zero-order hold at 50 Hz.
+5. Repair the existing `arm_mount_link` and `upper_imu_link` visual-reference warnings before rendered evidence.
+6. Reintroduce arm/end-effector tracking before obstacle avoidance, and only then evaluate whether a bounded residual policy adds value over the frozen controller.
 
-See `LQR_NOMINAL_GATE_20260713.md` and `evidence_20260713_lqr_nominal/`. The gains remain simulation-only because mass, COM, inertia, friction, actuator torque, and delay are provisional.
+See `LQR_NOMINAL_GATE_20260713.md`, `LQR_PUSH_GATE_20260713.md`, and their evidence directories. The gains remain simulation-only because mass, COM, inertia, friction, actuator torque, and delay are provisional. The current simplified asset is `26.0 kg`, not the approximately `40 kg` complete-robot target.

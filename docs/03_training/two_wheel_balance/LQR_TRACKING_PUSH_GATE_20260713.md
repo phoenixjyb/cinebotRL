@@ -91,8 +91,9 @@ pitch of `6.440 deg`.
 
 ## Scope boundary
 
-This is a simulation-only result for the current simplified `26.0 kg` nominal
-plant, not the approximately `40 kg` complete robot. It does not establish
+This is a simulation-only result for the `30.0 kg` PhysX-resolved plant. The
+URDF explicitly authors `26.0 kg`, but four fixed links without inertials resolve
+to `1.0 kg` each. It is not the approximately `40 kg` complete robot and does not establish
 robustness to mass, COM, inertia, wheel friction, motor torque, sensor noise,
 control delay, slopes, arm motion, end-effector tracking, obstacles, or hardware.
 No PPO was started.

@@ -1,0 +1,130 @@
+{
+  "schema": "recomo_two_wheel_cascaded_lqr_tracking_push_gate_v2",
+  "seed": 20260713,
+  "gains": "G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260713_lqr_nominal\\lqr_gains.json",
+  "selected_gain_scale": 0.6,
+  "controller": {
+    "vx_kp": 0.6,
+    "wz_kp": 0.25,
+    "wz_feedforward": 0.6,
+    "pitch_reference_limit_deg": 6.000000000000001,
+    "action_limit": 0.8,
+    "controller_hz": 50.0
+  },
+  "command": {
+    "start_step": 200,
+    "vx_m_s": [
+      0.2
+    ],
+    "wz_rad_s": [
+      -0.4
+    ]
+  },
+  "push": {
+    "start_step": 800,
+    "duration_steps": 20,
+    "duration_s": 0.1,
+    "forces_x_n": [
+      -60.0
+    ],
+    "application_height_above_base_com_m": 0.5,
+    "application": "global_x_force_plus_equivalent_global_y_pitch_torque"
+  },
+  "plant_uncertainty": {
+    "profile": "nominal",
+    "variation_count": 1,
+    "runtime": null,
+    "mass_interpretation": "uniform scale of all current rigid-body masses; the 40 kg case is a stress test, not a validated full-robot mass distribution",
+    "inertia_interpretation": "default inertia scaled by mass scale and independent inertia scale",
+    "com_interpretation": "local base_link COM offset",
+    "torque_interpretation": "per-environment reduction of the requested normalized action",
+    "delay_interpretation": "whole policy steps at 200 Hz"
+  },
+  "thresholds": {
+    "minimum_success_rate": 0.95,
+    "maximum_recovery_s": 2.0,
+    "recovery_tilt_deg": 2.0,
+    "recovery_angular_rate": 0.2,
+    "balance_tilt_margin_deg": 0.5,
+    "balance_angular_rate_margin": 0.05,
+    "recovery_vx_error": 0.1,
+    "recovery_wz_error": 0.15,
+    "maximum_tilt_deg": 12.0,
+    "maximum_post_vx_rmse": 0.1,
+    "maximum_post_wz_rmse": 0.15,
+    "maximum_saturation_ratio": 0.1
+  },
+  "summary": {
+    "scenarios": 1,
+    "success_rate": 1.0,
+    "survival_rate": 1.0,
+    "balance_recovery_rate": 1.0,
+    "tracking_recovery_rate": 1.0,
+    "balance_recovery_s_max": 0.0,
+    "tracking_recovery_s_max": 1.08,
+    "peak_pitch_deg_max": 6.427064418792725,
+    "peak_roll_deg_max": 2.9404473025351763e-05,
+    "peak_wheel_speed_rad_s_max": 2.3969154357910156,
+    "post_vx_rmse": 0.07373061652153251,
+    "post_wz_rmse": 0.1421550090670582,
+    "action_saturation_ratio": 0.0
+  },
+  "scenarios": [
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 1.08,
+      "peak_pitch_deg": 6.427064418792725,
+      "peak_roll_deg": 2.9404473025351763e-05,
+      "peak_wheel_speed_rad_s": 2.3969154357910156,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.031564712524414,
+        "roll_deg": 3.2623789593344554e-05,
+        "pitch_rate": 0.002387351356446743,
+        "roll_rate": 0.027231082320213318
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.531564712524414,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07373061652153251,
+      "post_wz_rmse": 0.1421550090670582,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    }
+  ],
+  "controller_observations": [
+    "pitch",
+    "pitch_rate",
+    "mean_wheel_position",
+    "mean_wheel_velocity",
+    "wheel_velocity_difference",
+    "yaw_rate",
+    "vx_ref",
+    "wz_ref"
+  ],
+  "evaluation_only_truth": [
+    "base_vx",
+    "base_roll"
+  ],
+  "training_started": false,
+  "passed": true
+}

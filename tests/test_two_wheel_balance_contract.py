@@ -8,9 +8,11 @@ from rl_platform.tasks.two_wheel_balance.metrics import (
     OBSERVATION_NAMES,
     BalanceContract,
     CascadedLQRConfig,
+    PlantVariation,
     cascaded_lqr_action,
     compose_pd_residual_action,
     controllability_matrix,
+    diagnostic_plant_variations,
     lqr_action,
     mix_common_yaw_effort,
     solve_discrete_lqr,
@@ -186,3 +188,37 @@ def test_cascaded_lqr_defaults_match_selected_tracking_gate() -> None:
     assert config.wheel_difference_kp == 0.0
     assert np.isclose(np.degrees(config.pitch_reference_limit_rad), 6.0)
     assert config.action_limit == 0.8
+
+
+def test_diagnostic_plant_variations_are_bounded_and_unique() -> None:
+    variations = diagnostic_plant_variations()
+    assert len(variations) == 16
+    assert len({item.name for item in variations}) == len(variations)
+    assert variations[0] == PlantVariation("nominal")
+    assert any(item.target_total_mass_kg == 40.0 for item in variations)
+    assert max(item.action_delay_steps for item in variations) == 4
+    assert min(item.torque_scale for item in variations) == 0.8
+    assert all(
+        item.static_friction is None
+        or item.dynamic_friction <= item.static_friction
+        for item in variations
+    )
+
+
+def test_plant_variation_rejects_nonphysical_values() -> None:
+    for kwargs in (
+        {"mass_scale": 0.0},
+        {"target_total_mass_kg": -1.0},
+        {"mass_scale": 1.1, "target_total_mass_kg": 40.0},
+        {"inertia_scale": -1.0},
+        {"static_friction": 0.5, "dynamic_friction": 0.6},
+        {"static_friction": 0.5},
+        {"torque_scale": 1.1},
+        {"action_delay_steps": -1},
+    ):
+        try:
+            PlantVariation("invalid", **kwargs)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"accepted invalid variation: {kwargs}")

@@ -19,14 +19,15 @@ The selected candidate also records `7.993 deg` maximum pitch and `0.586` action
 ```text
 wheel diameter: 0.2032 m
 wheel track:    0.620 m
-model mass:     26.0 kg
+URDF-authored mass: 26.0 kg
+PhysX-resolved mass: 30.0 kg
 torque limit:   20.0 Nm per wheel
 physics rate:   1000 Hz
 policy rate:    200 Hz
 LQR update:      50 Hz, four policy steps per zero-order hold
 ```
 
-Mass distribution, COM, inertia, friction, actuator torque, and delay remain provisional. The selected gain must not be copied to hardware without a measured-plant review.
+Four fixed links have no authored URDF inertial and resolve to `1.0 kg` each in PhysX. The accepted run therefore used a `30.0 kg` runtime plant, despite the older static audit reporting `26.0 kg`. Mass distribution, COM, inertia, friction, actuator torque, and delay remain provisional. The selected gain must not be copied to hardware without a measured-plant review.
 
 ## Identification and synthesis
 

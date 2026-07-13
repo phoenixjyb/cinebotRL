@@ -429,12 +429,16 @@ def main() -> int:
         ],
         "closed_loop_spectral_radius": spectral_radius,
     }
+    resolved_model_mass_kg = float(
+        env.unwrapped.robot.data.default_mass[0].sum().item()
+    )
     gate = {
         "schema": "recomo_two_wheel_lqr_nominal_gate_v1",
         "nominal_assumptions": {
             "wheel_diameter_m": 0.2032,
             "wheel_track_m": 0.620,
-            "model_mass_kg": 26.0,
+            "urdf_authored_mass_kg": 26.0,
+            "resolved_runtime_mass_kg": resolved_model_mass_kg,
             "torque_limit_nm": cfg.torque_limit_nm,
             "status": "provisional_simulation_only",
         },

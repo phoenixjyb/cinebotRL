@@ -21,6 +21,8 @@ Task: `RecomoTwoWheelBalance-v0`
 | Upright-start LQR push recovery | Passed | 32/32 recovered from up to 6 N s at 0.5 m application height |
 | Cascaded low-speed `vx/wz` tracking | Passed | 32/32 survived signed commands and reversals |
 | Combined `vx/wz` tracking plus push recovery | Passed | 36/36 survived and recovered across signed 2/4/6 N s impulses |
+| Deterministic plant-uncertainty smoke | Failed | 15/16 survived, but only 7/16 met tracking recovery and RMSE limits |
+| URDF-to-PhysX mass contract | Failed | 26.0 kg authored resolves to 30.0 kg because four links lack inertials |
 | PPO learning signal at 65,536 steps | Failed; stop rule active | PPO gate metrics |
 | Product stand policy | Not achieved | Blocked by failed Gate 3 |
 | Plant uncertainty, obstacles, arm, sim-to-real | Not started | Out of scope |
@@ -170,7 +172,8 @@ Use `scripts/two_wheel_balance/evaluate_policy.py` to reevaluate an existing che
 
 ## Evidence summary
 
-- Current asset audit: 0.620 m track, 0.2032 m diameter, `+Y` wheel axes, 26.0 kg, and zero wheel-drive stiffness/damping.
+- Current static asset audit: 0.620 m track, 0.2032 m diameter, `+Y` wheel axes, `26.0 kg` explicitly authored, and zero wheel-drive stiffness/damping.
+- Runtime mass audit: PhysX resolves the plant to `30.0 kg`; `arm_mount_link`, `imu_link`, `laser_link`, and `upper_imu_link` have no URDF inertials and each receive a `1.0 kg` fallback.
 - Current Gate 1 run 1 and run 2: byte-identical metrics, 295 accounted body-contact resets, zero non-finite values.
 - Corrected passive baseline from 2 degrees: 113 policy steps mean upright duration.
 - Corrected PD sanity: 409 policy steps mean upright duration and two contacts per 1,000 steps.
@@ -190,10 +193,11 @@ The rendered file under `evidence_20260711/` shows the obsolete 6-inch/pre-axis-
 
 Before another optimizer run or hardware claim:
 
-1. Sweep bounded mass, COM, inertia, friction, torque, and delay ranges around the nominal plant once credible ranges are agreed.
-2. Add slopes, sensor noise, and command-rate limits after the plant-uncertainty gate passes.
-3. Lift or augment the identified model for a 200 Hz controller; the current contact-aware LQR uses a four-step zero-order hold at 50 Hz.
-4. Repair the existing `arm_mount_link` and `upper_imu_link` visual-reference warnings before further rendered evidence.
-5. Reintroduce arm/end-effector tracking before obstacle avoidance, and only then evaluate whether a bounded residual policy adds value over the frozen controller.
+1. Author physically credible inertials for all fixed links, regenerate the USD, and require static and resolved runtime mass to agree.
+2. Rerun the nominal, push, tracking, and combined regressions against that corrected plant.
+3. Repeat the deterministic uncertainty matrix, then tune bounded `vx/wz` outer-loop integral action only if steady-state tracking remains the dominant failure.
+4. Add slopes, sensor noise, and command-rate limits after the plant-uncertainty gate passes.
+5. Repair the existing `arm_mount_link` and `upper_imu_link` visual-reference warnings before further rendered evidence.
+6. Reintroduce arm/end-effector tracking before obstacle avoidance, and only then evaluate whether a bounded residual policy adds value over the frozen controller.
 
-See `LQR_NOMINAL_GATE_20260713.md`, `LQR_PUSH_GATE_20260713.md`, `LQR_TRACKING_GATE_20260713.md`, `LQR_TRACKING_PUSH_GATE_20260713.md`, and their evidence directories. The gains remain simulation-only because mass, COM, inertia, friction, actuator torque, and delay are provisional. The current simplified asset is `26.0 kg`, not the approximately `40 kg` complete-robot target.
+See `LQR_NOMINAL_GATE_20260713.md`, `LQR_PUSH_GATE_20260713.md`, `LQR_TRACKING_GATE_20260713.md`, `LQR_TRACKING_PUSH_GATE_20260713.md`, `LQR_PLANT_UNCERTAINTY_SMOKE_20260713.md`, and their evidence directories. The gains remain simulation-only because mass, COM, inertia, friction, actuator torque, and delay are provisional. The current runtime plant resolves to `30.0 kg`, not the approximately `40 kg` complete-robot target.

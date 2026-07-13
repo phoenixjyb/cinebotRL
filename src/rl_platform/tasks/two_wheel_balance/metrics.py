@@ -99,6 +99,89 @@ class CascadedLQRConfig:
     action_limit: float = 0.8
 
 
+@dataclass(frozen=True)
+class PlantVariation:
+    """Deterministic simulation variation for controller robustness gates."""
+
+    name: str
+    mass_scale: float = 1.0
+    target_total_mass_kg: float | None = None
+    inertia_scale: float = 1.0
+    com_offset_x_m: float = 0.0
+    com_offset_z_m: float = 0.0
+    static_friction: float | None = None
+    dynamic_friction: float | None = None
+    torque_scale: float = 1.0
+    action_delay_steps: int = 0
+
+    def __post_init__(self) -> None:
+        values = [
+            self.mass_scale,
+            self.inertia_scale,
+            self.com_offset_x_m,
+            self.com_offset_z_m,
+            self.torque_scale,
+        ]
+        values.extend(
+            value
+            for value in (
+                self.target_total_mass_kg,
+                self.static_friction,
+                self.dynamic_friction,
+            )
+            if value is not None
+        )
+        if not self.name or not all(math.isfinite(value) for value in values):
+            raise ValueError("plant variation must have a name and finite values")
+        if self.mass_scale <= 0.0 or self.inertia_scale <= 0.0:
+            raise ValueError("mass and inertia scales must be positive")
+        if self.target_total_mass_kg is not None and self.target_total_mass_kg <= 0.0:
+            raise ValueError("target total mass must be positive")
+        if self.target_total_mass_kg is not None and self.mass_scale != 1.0:
+            raise ValueError("set either mass scale or target total mass, not both")
+        if (self.static_friction is None) != (self.dynamic_friction is None):
+            raise ValueError("static and dynamic friction must both be set or both be preserved")
+        if self.static_friction is not None and not (
+            0.0 < self.dynamic_friction <= self.static_friction
+        ):
+            raise ValueError("friction must satisfy 0 < dynamic <= static")
+        if not 0.0 < self.torque_scale <= 1.0:
+            raise ValueError("torque scale must be in (0, 1]")
+        if self.action_delay_steps < 0:
+            raise ValueError("action delay must be non-negative")
+
+
+def diagnostic_plant_variations() -> tuple[PlantVariation, ...]:
+    """Return the bounded v1 matrix used before any randomized training."""
+    return (
+        PlantVariation("nominal"),
+        PlantVariation("mass_0p85", mass_scale=0.85),
+        PlantVariation("mass_1p15", mass_scale=1.15),
+        PlantVariation("mass_40kg_uniform", target_total_mass_kg=40.0),
+        PlantVariation("com_x_minus_0p03", com_offset_x_m=-0.03),
+        PlantVariation("com_x_plus_0p03", com_offset_x_m=0.03),
+        PlantVariation("com_z_minus_0p05", com_offset_z_m=-0.05),
+        PlantVariation("com_z_plus_0p05", com_offset_z_m=0.05),
+        PlantVariation("inertia_0p8", inertia_scale=0.8),
+        PlantVariation("inertia_1p2", inertia_scale=1.2),
+        PlantVariation("friction_low", static_friction=0.65, dynamic_friction=0.55),
+        PlantVariation("friction_high", static_friction=1.1, dynamic_friction=1.0),
+        PlantVariation("torque_0p8", torque_scale=0.8),
+        PlantVariation("delay_10ms", action_delay_steps=2),
+        PlantVariation("delay_20ms", action_delay_steps=4),
+        PlantVariation(
+            "corner_40kg_high_com_low_grip_low_torque_delay",
+            target_total_mass_kg=40.0,
+            inertia_scale=1.2,
+            com_offset_z_m=0.05,
+            static_friction=0.65,
+            dynamic_friction=0.55,
+            torque_scale=0.8,
+            action_delay_steps=4,
+        ),
+    )
+
+
 def cascaded_lqr_action(
     states: np.ndarray,
     vx_ref: np.ndarray,

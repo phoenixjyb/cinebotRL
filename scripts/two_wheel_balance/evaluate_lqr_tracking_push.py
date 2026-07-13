@@ -8,6 +8,7 @@ import itertools
 import json
 import os
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -47,6 +48,11 @@ parser.add_argument("--maximum-post-vx-rmse", type=float, default=0.10)
 parser.add_argument("--maximum-post-wz-rmse", type=float, default=0.15)
 parser.add_argument("--maximum-saturation-ratio", type=float, default=0.10)
 parser.add_argument("--minimum-success-rate", type=float, default=0.95)
+parser.add_argument(
+    "--plant-uncertainty-profile",
+    choices=("nominal", "diagnostic_v1"),
+    default="nominal",
+)
 parser.add_argument("--seed", type=int, default=20260713)
 parser.add_argument("--output", type=Path, required=True)
 AppLauncher.add_app_launcher_args(parser)
@@ -61,7 +67,9 @@ from rl_platform.tasks.two_wheel_balance.metrics import (
     ACTION_NAMES,
     LQR_STATE_NAMES,
     CascadedLQRConfig,
+    PlantVariation,
     cascaded_lqr_action,
+    diagnostic_plant_variations,
 )
 from task_spec import register_isaac_lab_tasks
 
@@ -81,8 +89,11 @@ def build_scenarios(
     vx_commands: np.ndarray,
     wz_commands: np.ndarray,
     push_forces_n: np.ndarray,
-) -> list[dict[str, float]]:
-    combinations = list(itertools.product(vx_commands, wz_commands, push_forces_n))
+    plant_variations: tuple[PlantVariation, ...],
+) -> list[dict[str, object]]:
+    combinations = list(
+        itertools.product(vx_commands, wz_commands, push_forces_n, plant_variations)
+    )
     return [
         {
             "vx_ref_m_s": float(combinations[index % len(combinations)][0]),
@@ -93,9 +104,85 @@ def build_scenarios(
                 * args.push_duration_steps
                 / POLICY_HZ
             ),
+            "plant": asdict(combinations[index % len(combinations)][3]),
         }
         for index in range(num_envs)
     ]
+
+
+def apply_plant_variations(env, variations: list[PlantVariation]) -> dict[str, object]:
+    """Apply deterministic per-environment PhysX properties at initialization."""
+    if len(variations) != env.num_envs:
+        raise ValueError("plant variation count must match the environment count")
+    env_ids = torch.arange(env.num_envs, dtype=torch.long, device="cpu")
+    view = env.robot.root_physx_view
+    default_masses = env.robot.data.default_mass.cpu()
+    nominal_total_mass_kg = default_masses.sum(dim=1)
+    resolved_mass_scale = torch.tensor(
+        [
+            item.target_total_mass_kg / float(nominal_total_mass_kg[index])
+            if item.target_total_mass_kg is not None
+            else item.mass_scale
+            for index, item in enumerate(variations)
+        ],
+        device="cpu",
+    )
+    inertia_scale = torch.tensor([item.inertia_scale for item in variations], device="cpu")
+
+    masses = view.get_masses().clone()
+    masses[env_ids] = default_masses[env_ids] * resolved_mass_scale[:, None]
+    view.set_masses(masses, env_ids)
+
+    inertias = view.get_inertias().clone()
+    inertias[env_ids] = (
+        env.robot.data.default_inertia.cpu()[env_ids]
+        * resolved_mass_scale[:, None, None]
+        * inertia_scale[:, None, None]
+    )
+    view.set_inertias(inertias, env_ids)
+
+    base_body_id = int(env._base_body_idx[0])
+    coms = view.get_coms().clone()
+    coms[env_ids, base_body_id, 0] += torch.tensor(
+        [item.com_offset_x_m for item in variations], device="cpu"
+    )
+    coms[env_ids, base_body_id, 2] += torch.tensor(
+        [item.com_offset_z_m for item in variations], device="cpu"
+    )
+    view.set_coms(coms, env_ids)
+
+    materials = view.get_material_properties().clone()
+    material_before = materials[:, 0, :].tolist()
+    friction_env_ids = [
+        index for index, item in enumerate(variations) if item.static_friction is not None
+    ]
+    if friction_env_ids:
+        friction_indices = torch.tensor(friction_env_ids, dtype=torch.long, device="cpu")
+        materials[friction_indices, :, 0] = torch.tensor(
+            [variations[index].static_friction for index in friction_env_ids],
+            device="cpu",
+        )[:, None]
+        materials[friction_indices, :, 1] = torch.tensor(
+            [variations[index].dynamic_friction for index in friction_env_ids],
+            device="cpu",
+        )[:, None]
+        materials[friction_indices, :, 2] = 0.0
+        view.set_material_properties(materials, friction_indices)
+
+    applied_masses = view.get_masses()
+    return {
+        "body_names": list(env.robot.body_names),
+        "nominal_total_mass_kg": float(nominal_total_mass_kg[0]),
+        "nominal_body_masses_kg": default_masses[0].tolist(),
+        "resolved_mass_scale": resolved_mass_scale.tolist(),
+        "applied_total_mass_kg": applied_masses.sum(dim=1).tolist(),
+        "com_shift_body": env.robot.body_names[base_body_id],
+        "first_shape_material_before_variation": material_before,
+        "friction_application": (
+            "explicit friction cases override all robot collision shapes against the nominal ground; "
+            "other cases preserve the loaded material"
+        ),
+    }
 
 
 def set_push_wrench(env, force_x_n: np.ndarray) -> None:
@@ -140,10 +227,42 @@ def main() -> int:
     vx_commands = parse_csv(args.vx_commands)
     wz_commands = parse_csv(args.wz_commands)
     push_forces_n = parse_csv(args.push_forces_n)
-    scenarios = build_scenarios(args.num_envs, vx_commands, wz_commands, push_forces_n)
+    plant_variations = (
+        diagnostic_plant_variations()
+        if args.plant_uncertainty_profile == "diagnostic_v1"
+        else (PlantVariation("nominal"),)
+    )
+    expected_scenarios = (
+        len(vx_commands)
+        * len(wz_commands)
+        * len(push_forces_n)
+        * len(plant_variations)
+    )
+    if (
+        args.plant_uncertainty_profile != "nominal"
+        and args.num_envs != expected_scenarios
+    ):
+        raise ValueError(
+            "diagnostic plant profile requires complete Cartesian coverage: "
+            f"set --num-envs {expected_scenarios}"
+        )
+    scenarios = build_scenarios(
+        args.num_envs,
+        vx_commands,
+        wz_commands,
+        push_forces_n,
+        plant_variations,
+    )
     vx_ref = np.asarray([item["vx_ref_m_s"] for item in scenarios], dtype=np.float64)
     wz_ref = np.asarray([item["wz_ref_rad_s"] for item in scenarios], dtype=np.float64)
     push_force = np.asarray([item["push_force_x_n"] for item in scenarios], dtype=np.float64)
+    scenario_plants = [PlantVariation(**item["plant"]) for item in scenarios]
+    torque_scale = np.asarray(
+        [item.torque_scale for item in scenario_plants], dtype=np.float32
+    )
+    action_delay_steps = np.asarray(
+        [item.action_delay_steps for item in scenario_plants], dtype=np.int64
+    )
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -161,13 +280,23 @@ def main() -> int:
     )
     obs, _ = env.reset(seed=args.seed)
     unwrapped = env.unwrapped
+    plant_runtime = None
+    if args.plant_uncertainty_profile != "nominal":
+        plant_runtime = apply_plant_variations(unwrapped, scenario_plants)
     set_push_wrench(unwrapped, np.zeros(args.num_envs))
     current_states = obs["policy"][:, : len(LQR_STATE_NAMES)].detach().cpu().numpy()
     active = np.ones(args.num_envs, dtype=bool)
     survived = np.zeros(args.num_envs, dtype=bool)
     duration_steps = np.full(args.num_envs, args.horizon_steps, dtype=np.int64)
     integrals = np.zeros((args.num_envs, 2), dtype=np.float64)
-    action_np = np.zeros((args.num_envs, len(ACTION_NAMES)), dtype=np.float32)
+    requested_action_np = np.zeros(
+        (args.num_envs, len(ACTION_NAMES)), dtype=np.float32
+    )
+    action_np = np.zeros_like(requested_action_np)
+    action_history = np.zeros(
+        (int(np.max(action_delay_steps)) + 1, args.num_envs, len(ACTION_NAMES)),
+        dtype=np.float32,
+    )
     config = CascadedLQRConfig(action_limit=action_limit)
 
     balance_hold = np.zeros(args.num_envs, dtype=np.int64)
@@ -203,7 +332,7 @@ def main() -> int:
             set_push_wrench(unwrapped, np.zeros(args.num_envs))
 
         if step % control_interval == 0:
-            action_np, integrals, _ = cascaded_lqr_action(
+            requested_action_np, integrals, _ = cascaded_lqr_action(
                 current_states,
                 step_vx_ref,
                 step_wz_ref,
@@ -212,7 +341,16 @@ def main() -> int:
                 control_dt=control_interval / POLICY_HZ,
                 config=config,
             )
-            action_np = action_np.astype(np.float32)
+            requested_action_np = requested_action_np.astype(np.float32)
+        history_index = step % len(action_history)
+        action_history[history_index] = requested_action_np
+        for env_index, delay_steps in enumerate(action_delay_steps):
+            if step >= delay_steps:
+                delayed_index = (step - delay_steps) % len(action_history)
+                action_np[env_index] = action_history[delayed_index, env_index]
+            else:
+                action_np[env_index] = 0.0
+        action_np *= torque_scale[:, None]
         action_np[~active] = 0.0
         obs, _, terminated, truncated, _ = env.step(
             torch.as_tensor(action_np, device=unwrapped.device)
@@ -245,7 +383,7 @@ def main() -> int:
             peak_wheel_speed[active] = np.maximum(peak_wheel_speed[active], wheel_speed[active])
         if command_active:
             saturated_actions[active] += np.count_nonzero(
-                np.abs(action_np[active]) >= action_limit - 1e-6,
+                np.abs(requested_action_np[active]) >= action_limit - 1e-6,
                 axis=1,
             )
             action_samples[active] += len(ACTION_NAMES)
@@ -425,7 +563,7 @@ def main() -> int:
         / max(int(np.sum(action_samples)), 1),
     }
     result = {
-        "schema": "recomo_two_wheel_cascaded_lqr_tracking_push_gate_v1",
+        "schema": "recomo_two_wheel_cascaded_lqr_tracking_push_gate_v2",
         "seed": args.seed,
         "gains": str(args.gains.resolve()),
         "selected_gain_scale": gain_data["selected_gain_scale"],
@@ -451,6 +589,19 @@ def main() -> int:
             "forces_x_n": push_forces_n.tolist(),
             "application_height_above_base_com_m": args.push_height_m,
             "application": "global_x_force_plus_equivalent_global_y_pitch_torque",
+        },
+        "plant_uncertainty": {
+            "profile": args.plant_uncertainty_profile,
+            "variation_count": len(plant_variations),
+            "runtime": plant_runtime,
+            "mass_interpretation": (
+                "uniform scale of all current rigid-body masses; the 40 kg case is a stress test, "
+                "not a validated full-robot mass distribution"
+            ),
+            "inertia_interpretation": "default inertia scaled by mass scale and independent inertia scale",
+            "com_interpretation": "local base_link COM offset",
+            "torque_interpretation": "per-environment reduction of the requested normalized action",
+            "delay_interpretation": "whole policy steps at 200 Hz",
         },
         "thresholds": {
             "minimum_success_rate": args.minimum_success_rate,

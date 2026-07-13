@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -78,6 +79,108 @@ class BalanceContract:
     @property
     def observation_dim(self) -> int:
         return len(OBSERVATION_NAMES)
+
+
+@dataclass(frozen=True)
+class CascadedLQRConfig:
+    """Deployable outer-loop contract around the frozen balance LQR."""
+
+    wheel_radius_m: float = 0.1016
+    wheel_track_m: float = 0.620
+    vx_kp: float = 0.6
+    vx_ki: float = 0.0
+    wz_kp: float = 0.25
+    wz_ki: float = 0.0
+    wz_feedforward: float = 0.6
+    wheel_difference_kp: float = 0.0
+    pitch_reference_limit_rad: float = math.radians(6.0)
+    vx_integral_limit: float = 0.5
+    wz_integral_limit: float = 1.0
+    action_limit: float = 0.8
+
+
+def cascaded_lqr_action(
+    states: np.ndarray,
+    vx_ref: np.ndarray,
+    wz_ref: np.ndarray,
+    gain: np.ndarray,
+    integrals: np.ndarray,
+    *,
+    control_dt: float,
+    config: CascadedLQRConfig,
+) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]:
+    """Track chassis commands with bounded outer loops and a frozen inner LQR."""
+    states = np.asarray(states, dtype=np.float64)
+    gain = np.asarray(gain, dtype=np.float64)
+    vx_ref = np.asarray(vx_ref, dtype=np.float64).reshape(-1)
+    wz_ref = np.asarray(wz_ref, dtype=np.float64).reshape(-1)
+    integrals = np.asarray(integrals, dtype=np.float64)
+    if states.ndim != 2 or states.shape[1] != len(LQR_STATE_NAMES):
+        raise ValueError(f"expected states shape (N, {len(LQR_STATE_NAMES)}), got {states.shape}")
+    batch = states.shape[0]
+    if gain.shape != (len(ACTION_NAMES), len(LQR_STATE_NAMES)):
+        raise ValueError(f"invalid gain shape: {gain.shape}")
+    if vx_ref.shape != (batch,) or wz_ref.shape != (batch,):
+        raise ValueError("command arrays must match the state batch")
+    if integrals.shape != (batch, 2):
+        raise ValueError(f"expected integral shape {(batch, 2)}, got {integrals.shape}")
+    if control_dt <= 0.0:
+        raise ValueError("control_dt must be positive")
+    if config.wheel_radius_m <= 0.0 or config.wheel_track_m <= 0.0:
+        raise ValueError("wheel geometry must be positive")
+
+    vx_estimate = config.wheel_radius_m * states[:, 3]
+    vx_error = vx_ref - vx_estimate
+    wz_error = wz_ref - states[:, 5]
+    next_integrals = integrals.copy()
+    next_integrals[:, 0] = np.clip(
+        next_integrals[:, 0] + control_dt * vx_error,
+        -config.vx_integral_limit,
+        config.vx_integral_limit,
+    )
+    next_integrals[:, 1] = np.clip(
+        next_integrals[:, 1] + control_dt * wz_error,
+        -config.wz_integral_limit,
+        config.wz_integral_limit,
+    )
+
+    # A forward command first pulls the wheels back to create a forward lean;
+    # the frozen balance LQR then drives the wheels under the falling body.
+    pitch_reference = np.clip(
+        config.vx_kp * vx_error + config.vx_ki * next_integrals[:, 0],
+        -config.pitch_reference_limit_rad,
+        config.pitch_reference_limit_rad,
+    )
+    tracking_states = states.copy()
+    tracking_states[:, 0] -= pitch_reference
+    tracking_states[:, 3] -= vx_ref / config.wheel_radius_m
+    tracking_states[:, 4] -= (
+        config.wheel_track_m / config.wheel_radius_m
+    ) * wz_ref
+    actions = lqr_action(
+        tracking_states,
+        gain,
+        action_limit=config.action_limit,
+    )
+    wheel_difference_target = (
+        config.wheel_track_m / config.wheel_radius_m
+    ) * wz_ref
+    wheel_difference_error = wheel_difference_target - states[:, 4]
+    actions[:, 1] += (
+        config.wz_kp * wz_error
+        + config.wz_ki * next_integrals[:, 1]
+        + config.wz_feedforward * wz_ref
+        + config.wheel_difference_kp * wheel_difference_error
+    )
+    actions = np.clip(actions, -config.action_limit, config.action_limit)
+    diagnostics = {
+        "vx_estimate": vx_estimate,
+        "vx_error": vx_error,
+        "wz_error": wz_error,
+        "wheel_difference_error": wheel_difference_error,
+        "pitch_reference": pitch_reference,
+    }
+    return actions, next_integrals, diagnostics
 
 
 @dataclass(frozen=True)

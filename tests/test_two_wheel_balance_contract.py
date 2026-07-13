@@ -7,6 +7,8 @@ from rl_platform.tasks.two_wheel_balance.metrics import (
     LQR_STATE_NAMES,
     OBSERVATION_NAMES,
     BalanceContract,
+    CascadedLQRConfig,
+    cascaded_lqr_action,
     compose_pd_residual_action,
     controllability_matrix,
     lqr_action,
@@ -72,3 +74,101 @@ def test_lqr_action_uses_negative_feedback_and_clips() -> None:
     gain = np.array([[-2.0, 1.0], [0.5, -3.0]])
     action = lqr_action(np.array([[1.0, -1.0]]), gain, action_limit=0.8)
     np.testing.assert_allclose(action, [[0.8, -0.8]])
+
+
+def test_cascaded_lqr_zero_command_matches_inner_lqr() -> None:
+    gain = np.array(
+        [[-4.0, -2.0, 0.0, 0.00025, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0065, 0.0]]
+    )
+    states = np.array([[0.01, -0.02, 0.0, 0.1, -0.1, 0.03]])
+    action, integrals, diagnostics = cascaded_lqr_action(
+        states,
+        np.zeros(1),
+        np.zeros(1),
+        gain,
+        np.zeros((1, 2)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(vx_kp=0.0, vx_ki=0.0, wz_kp=0.0, wz_ki=0.0),
+    )
+    np.testing.assert_allclose(action, lqr_action(states, gain, action_limit=0.8))
+    assert integrals.shape == (1, 2)
+    assert diagnostics["pitch_reference"].shape == (1,)
+
+
+def test_cascaded_lqr_signed_commands_produce_signed_actions() -> None:
+    gain = np.array(
+        [[-4.0, -2.0, 0.0, 0.00025, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0065, 0.0]]
+    )
+    actions, _, diagnostics = cascaded_lqr_action(
+        np.zeros((2, len(LQR_STATE_NAMES))),
+        np.array([0.2, -0.2]),
+        np.array([0.4, -0.4]),
+        gain,
+        np.zeros((2, 2)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(),
+    )
+    assert actions[0, 0] < 0.0
+    assert actions[1, 0] > 0.0
+    assert actions[0, 1] > 0.0
+    assert actions[1, 1] < 0.0
+    assert diagnostics["pitch_reference"][0] > 0.0
+    assert diagnostics["pitch_reference"][1] < 0.0
+
+
+def test_cascaded_lqr_enforces_integral_reference_and_action_limits() -> None:
+    gain = np.array(
+        [[-20.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 1.0, 0.0]]
+    )
+    config = CascadedLQRConfig(vx_kp=10.0, vx_ki=10.0, wz_kp=10.0, wz_ki=10.0)
+    actions, integrals, diagnostics = cascaded_lqr_action(
+        np.zeros((1, len(LQR_STATE_NAMES))),
+        np.array([10.0]),
+        np.array([10.0]),
+        gain,
+        np.zeros((1, 2)),
+        control_dt=10.0,
+        config=config,
+    )
+    assert abs(integrals[0, 0]) <= config.vx_integral_limit
+    assert abs(integrals[0, 1]) <= config.wz_integral_limit
+    assert abs(diagnostics["pitch_reference"][0]) <= config.pitch_reference_limit_rad
+    assert np.max(np.abs(actions)) <= config.action_limit
+
+
+def test_cascaded_lqr_wheel_difference_feedback_is_damping() -> None:
+    gain = np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES)))
+    states = np.zeros((2, len(LQR_STATE_NAMES)))
+    target_difference = 0.620 / 0.1016 * 0.4
+    states[1, 4] = 2.0 * target_difference
+    actions, _, diagnostics = cascaded_lqr_action(
+        states,
+        np.zeros(2),
+        np.full(2, 0.4),
+        gain,
+        np.zeros((2, 2)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(vx_kp=0.0, wz_kp=0.0, wheel_difference_kp=0.1),
+    )
+    assert actions[0, 1] > 0.0
+    assert actions[1, 1] < 0.0
+    assert diagnostics["wheel_difference_error"][0] > 0.0
+    assert diagnostics["wheel_difference_error"][1] < 0.0
+
+
+def test_cascaded_lqr_yaw_feedforward_follows_command_sign() -> None:
+    actions, _, _ = cascaded_lqr_action(
+        np.zeros((2, len(LQR_STATE_NAMES))),
+        np.zeros(2),
+        np.array([0.4, -0.4]),
+        np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES))),
+        np.zeros((2, 2)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(
+            vx_kp=0.0,
+            wz_kp=0.0,
+            wheel_difference_kp=0.0,
+            wz_feedforward=0.5,
+        ),
+    )
+    np.testing.assert_allclose(actions[:, 1], [0.2, -0.2])

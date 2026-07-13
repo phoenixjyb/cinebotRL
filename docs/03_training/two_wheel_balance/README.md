@@ -20,11 +20,12 @@ Task: `RecomoTwoWheelBalance-v0`
 | Nominal scripted LQR recovery | Passed | 32/32 signed pitch/yaw scenarios reached 10 s |
 | Upright-start LQR push recovery | Passed | 32/32 recovered from up to 6 N s at 0.5 m application height |
 | Cascaded low-speed `vx/wz` tracking | Passed | 32/32 survived signed commands and reversals |
+| Combined `vx/wz` tracking plus push recovery | Passed | 36/36 survived and recovered across signed 2/4/6 N s impulses |
 | PPO learning signal at 65,536 steps | Failed; stop rule active | PPO gate metrics |
 | Product stand policy | Not achieved | Blocked by failed Gate 3 |
-| Velocity tracking, obstacles, arm, sim-to-real | Not started | Out of scope |
+| Plant uncertainty, obstacles, arm, sim-to-real | Not started | Out of scope |
 
-Do not resume or extend PPO from the failed checkpoint. The nominal LQR plus the accepted chassis outer loop is now the scripted controller baseline; the next gate is combined command-plus-disturbance robustness, not more PPO timesteps.
+Do not resume or extend PPO from the failed checkpoint. The nominal LQR plus the accepted chassis outer loop is now the scripted controller baseline. Combined command-plus-disturbance robustness has passed; the next gate is bounded plant-parameter uncertainty, not more PPO timesteps.
 
 ### 2026-07-12 geometry correction
 
@@ -154,6 +155,14 @@ Run from `/mnt/g/wSpace/cinebotRL-two-wheel-balance` on `.98`.
   --gains G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260713_lqr_nominal\\lqr_gains.json \
   --output G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\lqr_tracking\\tracking_gate.json \
   --headless
+
+# Combined signed vx/wz tracking plus 2/4/6 N s push gate. No policy is trained.
+/mnt/g/isaaclab_venv/Scripts/python.exe -u -X utf8 \
+  G:\\wSpace\\cinebotRL-two-wheel-balance\\scripts\\two_wheel_balance\\evaluate_lqr_tracking_push.py \
+  --gains G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260713_lqr_nominal\\lqr_gains.json \
+  --num-envs 36 --push-forces-n=-60,-40,-20,20,40,60 \
+  --output G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\lqr_tracking_push\\combined_gate.json \
+  --headless
 ```
 
 The bounded PPO command is retained in `scripts/two_wheel_balance/train_short_ppo.py` for reproducibility, but must not be rerun until the failed-gate diagnosis is addressed.
@@ -171,6 +180,8 @@ Use `scripts/two_wheel_balance/evaluate_policy.py` to reevaluate an existing che
 - The seeded push-gate repeat was exactly equal on all recorded scenario metrics.
 - Cascaded LQR tracking: 32/32 survived signed `+/-0.2 m/s` and `+/-0.4 rad/s` commands plus reversals; selected `vx` RMSE `0.0743 m/s`, `wz` RMSE `0.1055 rad/s`, peak pitch `6.096 deg`, and zero saturation.
 - The selected tracking repeat was exactly equal on all aggregate metrics, and the unchanged push regression exactly matched its accepted summary.
+- Combined tracking plus push: 36/36 scenarios passed across signed `2/4/6 N s` impulses while tracking `vx=+/-0.2 m/s` and `wz=-0.4/0/+0.4 rad/s`; worst balance recovery was `0.81 s`, worst tracking recovery was `1.07 s`, peak pitch was `7.825 deg`, and saturation was `0.1297%`.
+- The combined-gate repeat was exactly equal on all aggregate and per-scenario metrics. The rendered `-6 N s` case also survived without termination while tracking `vx=+0.2 m/s`, `wz=-0.4 rad/s`.
 - No PPO checkpoint is valid for the corrected 8-inch/`+Y`-axis model.
 
 The rendered file under `evidence_20260711/` shows the obsolete 6-inch/pre-axis-fix asset and is retained only for provenance.
@@ -179,11 +190,10 @@ The rendered file under `evidence_20260711/` shows the obsolete 6-inch/pre-axis-
 
 Before another optimizer run or hardware claim:
 
-1. Combine the accepted low-speed commands with bounded pushes and confirm balance priority during tracking.
-2. Sweep bounded mass, COM, inertia, friction, torque, and delay ranges around the nominal plant once credible ranges are agreed.
-3. Add slopes and command-rate limits after the combined command-plus-push gate passes.
-4. Lift or augment the identified model for a 200 Hz controller; the current contact-aware LQR uses a four-step zero-order hold at 50 Hz.
-5. Repair the existing `arm_mount_link` and `upper_imu_link` visual-reference warnings before rendered evidence.
-6. Reintroduce arm/end-effector tracking before obstacle avoidance, and only then evaluate whether a bounded residual policy adds value over the frozen controller.
+1. Sweep bounded mass, COM, inertia, friction, torque, and delay ranges around the nominal plant once credible ranges are agreed.
+2. Add slopes, sensor noise, and command-rate limits after the plant-uncertainty gate passes.
+3. Lift or augment the identified model for a 200 Hz controller; the current contact-aware LQR uses a four-step zero-order hold at 50 Hz.
+4. Repair the existing `arm_mount_link` and `upper_imu_link` visual-reference warnings before further rendered evidence.
+5. Reintroduce arm/end-effector tracking before obstacle avoidance, and only then evaluate whether a bounded residual policy adds value over the frozen controller.
 
-See `LQR_NOMINAL_GATE_20260713.md`, `LQR_PUSH_GATE_20260713.md`, `LQR_TRACKING_GATE_20260713.md`, and their evidence directories. The gains remain simulation-only because mass, COM, inertia, friction, actuator torque, and delay are provisional. The current simplified asset is `26.0 kg`, not the approximately `40 kg` complete-robot target.
+See `LQR_NOMINAL_GATE_20260713.md`, `LQR_PUSH_GATE_20260713.md`, `LQR_TRACKING_GATE_20260713.md`, `LQR_TRACKING_PUSH_GATE_20260713.md`, and their evidence directories. The gains remain simulation-only because mass, COM, inertia, friction, actuator torque, and delay are provisional. The current simplified asset is `26.0 kg`, not the approximately `40 kg` complete-robot target.

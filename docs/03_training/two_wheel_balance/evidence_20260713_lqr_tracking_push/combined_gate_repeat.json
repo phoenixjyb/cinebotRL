@@ -1,0 +1,1132 @@
+{
+  "schema": "recomo_two_wheel_cascaded_lqr_tracking_push_gate_v1",
+  "seed": 20260713,
+  "gains": "G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260713_lqr_nominal\\lqr_gains.json",
+  "selected_gain_scale": 0.6,
+  "controller": {
+    "vx_kp": 0.6,
+    "wz_kp": 0.25,
+    "wz_feedforward": 0.6,
+    "pitch_reference_limit_deg": 6.000000000000001,
+    "action_limit": 0.8,
+    "controller_hz": 50.0
+  },
+  "command": {
+    "start_step": 200,
+    "vx_m_s": [
+      -0.2,
+      0.2
+    ],
+    "wz_rad_s": [
+      -0.4,
+      0.0,
+      0.4
+    ]
+  },
+  "push": {
+    "start_step": 800,
+    "duration_steps": 20,
+    "duration_s": 0.1,
+    "forces_x_n": [
+      -60.0,
+      -40.0,
+      -20.0,
+      20.0,
+      40.0,
+      60.0
+    ],
+    "application_height_above_base_com_m": 0.5,
+    "application": "global_x_force_plus_equivalent_global_y_pitch_torque"
+  },
+  "thresholds": {
+    "minimum_success_rate": 0.95,
+    "maximum_recovery_s": 2.0,
+    "recovery_tilt_deg": 2.0,
+    "recovery_angular_rate": 0.2,
+    "balance_tilt_margin_deg": 0.5,
+    "balance_angular_rate_margin": 0.05,
+    "recovery_vx_error": 0.1,
+    "recovery_wz_error": 0.15,
+    "maximum_tilt_deg": 12.0,
+    "maximum_post_vx_rmse": 0.1,
+    "maximum_post_wz_rmse": 0.15,
+    "maximum_saturation_ratio": 0.1
+  },
+  "summary": {
+    "scenarios": 36,
+    "success_rate": 1.0,
+    "survival_rate": 1.0,
+    "balance_recovery_rate": 1.0,
+    "tracking_recovery_rate": 1.0,
+    "balance_recovery_s_max": 0.81,
+    "tracking_recovery_s_max": 1.07,
+    "peak_pitch_deg_max": 7.825334548950195,
+    "peak_roll_deg_max": 6.152538844617084e-05,
+    "peak_wheel_speed_rad_s_max": 3.6428799629211426,
+    "post_vx_rmse": 0.07105781882505208,
+    "post_wz_rmse": 0.11386371715107509,
+    "action_saturation_ratio": 0.0012970168612191958
+  },
+  "scenarios": [
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.45,
+      "tracking_recovery_s": 0.755,
+      "peak_pitch_deg": 7.811774730682373,
+      "peak_roll_deg": 3.412375008338131e-05,
+      "peak_wheel_speed_rad_s": 3.6019089221954346,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 5.998388290405273,
+        "roll_deg": 2.2963766241446137e-05,
+        "pitch_rate": 0.0031092800199985504,
+        "roll_rate": 0.02811373956501484
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.498388290405273,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.076568492628707,
+      "post_wz_rmse": 0.1369025613273946,
+      "action_saturation_ratio": 0.007782101167315175,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.025,
+      "tracking_recovery_s": 0.46,
+      "peak_pitch_deg": 6.499682903289795,
+      "peak_roll_deg": 2.4036955437622964e-05,
+      "peak_wheel_speed_rad_s": 3.629439353942871,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 5.993210315704346,
+        "roll_deg": 2.4036668037297204e-05,
+        "pitch_rate": 0.003252829425036907,
+        "roll_rate": 0.02811577171087265
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.493210315704346,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07654951441817791,
+      "post_wz_rmse": 0.13693858376219487,
+      "action_saturation_ratio": 0.0011117287381878821,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.345,
+      "peak_pitch_deg": 6.14892053604126,
+      "peak_roll_deg": 2.8973081498406827e-05,
+      "peak_wheel_speed_rad_s": 3.045517921447754,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 5.998378753662109,
+        "roll_deg": 2.1890975403948687e-05,
+        "pitch_rate": 0.0027081863954663277,
+        "roll_rate": 0.028024520725011826
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.498378753662109,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07653728093329762,
+      "post_wz_rmse": 0.1367695333655621,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.5,
+      "tracking_recovery_s": 0.88,
+      "peak_pitch_deg": 6.719269275665283,
+      "peak_roll_deg": 2.7041502107749693e-05,
+      "peak_wheel_speed_rad_s": 2.194058656692505,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 5.992640972137451,
+        "roll_deg": 2.2534510208060965e-05,
+        "pitch_rate": 0.005845667794346809,
+        "roll_rate": 0.028194114565849304
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.492640972137451,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07659540126412837,
+      "post_wz_rmse": 0.13686486638933335,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.96,
+      "peak_pitch_deg": 6.588967323303223,
+      "peak_roll_deg": 3.1738549296278507e-05,
+      "peak_wheel_speed_rad_s": 2.2859466075897217,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 5.996043682098389,
+        "roll_deg": 2.167621278204024e-05,
+        "pitch_rate": 0.0036573465913534164,
+        "roll_rate": 0.028095001354813576
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.496043682098389,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07656744070461995,
+      "post_wz_rmse": 0.13695108974430834,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.51,
+      "peak_pitch_deg": 6.436075687408447,
+      "peak_roll_deg": 2.747064718278125e-05,
+      "peak_wheel_speed_rad_s": 2.523088216781616,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 5.995964050292969,
+        "roll_deg": 3.090449536102824e-05,
+        "pitch_rate": 0.002824741415679455,
+        "roll_rate": 0.028107788413763046
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.495964050292969,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07660105897949962,
+      "post_wz_rmse": 0.13690703645922128,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.81,
+      "tracking_recovery_s": 0.08,
+      "peak_pitch_deg": 6.296731948852539,
+      "peak_roll_deg": 4.227493627695367e-05,
+      "peak_wheel_speed_rad_s": 3.195161819458008,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.776219844818115,
+        "roll_deg": 3.0010387490619905e-05,
+        "pitch_rate": 0.002454157453030348,
+        "roll_rate": 0.0008711643749848008
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.276219844818115,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.06196882498328373,
+      "post_wz_rmse": 0.00029392127002813846,
+      "action_saturation_ratio": 0.005558643690939411,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.245,
+      "tracking_recovery_s": 0.02,
+      "peak_pitch_deg": 5.4028472900390625,
+      "peak_roll_deg": 4.3595751776592806e-05,
+      "peak_wheel_speed_rad_s": 3.1353261470794678,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.778350353240967,
+        "roll_deg": 4.499514034250751e-05,
+        "pitch_rate": 0.0025989306159317493,
+        "roll_rate": 0.002981886500492692
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.278350353240967,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.06195466379153386,
+      "post_wz_rmse": 0.00024177218363073298,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.0,
+      "peak_pitch_deg": 5.092988967895508,
+      "peak_roll_deg": 4.4939006329514086e-05,
+      "peak_wheel_speed_rad_s": 2.2463583946228027,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.777915000915527,
+        "roll_deg": 3.401204230613075e-05,
+        "pitch_rate": 0.002425652462989092,
+        "roll_rate": 0.004080250393599272
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.277915000915527,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.06195541320905035,
+      "post_wz_rmse": 0.00028373082550753787,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.115,
+      "peak_pitch_deg": 4.890069961547852,
+      "peak_roll_deg": 5.316543683875352e-05,
+      "peak_wheel_speed_rad_s": 1.4606812000274658,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.777061462402344,
+        "roll_deg": 3.902261232724413e-05,
+        "pitch_rate": 0.0024772416800260544,
+        "roll_rate": 0.003792939241975546
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.277061462402344,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.06196222633314161,
+      "post_wz_rmse": 0.00022709246844523117,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.295,
+      "peak_pitch_deg": 5.150433540344238,
+      "peak_roll_deg": 6.152538844617084e-05,
+      "peak_wheel_speed_rad_s": 1.6907113790512085,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.778047561645508,
+        "roll_deg": 3.300768730696291e-05,
+        "pitch_rate": 0.0024711957667022943,
+        "roll_rate": 0.0012735476484522223
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.278047561645508,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.061957441325099546,
+      "post_wz_rmse": 0.00028481181029560253,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.41,
+      "peak_pitch_deg": 5.130095481872559,
+      "peak_roll_deg": 3.953904160880484e-05,
+      "peak_wheel_speed_rad_s": 1.8718622922897339,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.776602268218994,
+        "roll_deg": 3.3011179766617715e-05,
+        "pitch_rate": 0.002440195996314287,
+        "roll_rate": 0.002257363637909293
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.276602268218994,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.06197559667969181,
+      "post_wz_rmse": 0.00034742920703537177,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.445,
+      "tracking_recovery_s": 0.81,
+      "peak_pitch_deg": 7.825334548950195,
+      "peak_roll_deg": 3.722663313965313e-05,
+      "peak_wheel_speed_rad_s": 3.6420135498046875,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.028420448303223,
+        "roll_deg": 3.8847647374495864e-05,
+        "pitch_rate": 0.0024479934945702553,
+        "roll_rate": 0.027365362271666527
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.528420448303223,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07378181926449917,
+      "post_wz_rmse": 0.14200285562967926,
+      "action_saturation_ratio": 0.007782101167315175,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.03,
+      "tracking_recovery_s": 0.48,
+      "peak_pitch_deg": 6.535019874572754,
+      "peak_roll_deg": 3.8407190004363656e-05,
+      "peak_wheel_speed_rad_s": 3.5825130939483643,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.025465965270996,
+        "roll_deg": 3.69160516129341e-05,
+        "pitch_rate": 0.002760997973382473,
+        "roll_rate": 0.027249179780483246
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.525465965270996,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07377781458224372,
+      "post_wz_rmse": 0.14199641556762027,
+      "action_saturation_ratio": 0.0011117287381878821,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.38,
+      "peak_pitch_deg": 6.191961765289307,
+      "peak_roll_deg": 4.290819924790412e-05,
+      "peak_wheel_speed_rad_s": 3.0023162364959717,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.0319037437438965,
+        "roll_deg": 3.476981510175392e-05,
+        "pitch_rate": 0.0025433264672756195,
+        "roll_rate": 0.027344835922122
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.5319037437438965,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07375739020142462,
+      "post_wz_rmse": 0.14201771315234815,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.46,
+      "tracking_recovery_s": 0.895,
+      "peak_pitch_deg": 6.725414276123047,
+      "peak_roll_deg": 4.2496099922573194e-05,
+      "peak_wheel_speed_rad_s": 2.2052929401397705,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.033707141876221,
+        "roll_deg": 3.7345089367590845e-05,
+        "pitch_rate": 0.0030364179983735085,
+        "roll_rate": 0.027289506047964096
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.533707141876221,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07386379493968716,
+      "post_wz_rmse": 0.14184318657281023,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 1.0,
+      "peak_pitch_deg": 6.597621440887451,
+      "peak_roll_deg": 4.6788838517386466e-05,
+      "peak_wheel_speed_rad_s": 2.3010802268981934,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.030031681060791,
+        "roll_deg": 3.7989364500390366e-05,
+        "pitch_rate": 0.002889835275709629,
+        "roll_rate": 0.027307821437716484
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.530031681060791,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07381769656151883,
+      "post_wz_rmse": 0.14194154057309377,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 1.05,
+      "peak_pitch_deg": 6.432973861694336,
+      "peak_roll_deg": 4.9579586629988626e-05,
+      "peak_wheel_speed_rad_s": 2.4031102657318115,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.030814170837402,
+        "roll_deg": 3.090636892011389e-05,
+        "pitch_rate": 0.0028588445857167244,
+        "roll_rate": 0.027328070253133774
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.530814170837402,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07381418513873207,
+      "post_wz_rmse": 0.1418960177673112,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 1.07,
+      "peak_pitch_deg": 6.425263404846191,
+      "peak_roll_deg": 2.9189501219661906e-05,
+      "peak_wheel_speed_rad_s": 2.401301860809326,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.024583339691162,
+        "roll_deg": 2.0389652490848675e-05,
+        "pitch_rate": 0.0016547488048672676,
+        "roll_rate": 0.027257490903139114
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.524583339691162,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07380740824147496,
+      "post_wz_rmse": 0.1419237566152435,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 1.01,
+      "peak_pitch_deg": 6.608185291290283,
+      "peak_roll_deg": 2.9403339794953354e-05,
+      "peak_wheel_speed_rad_s": 2.290849447250366,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.0266594886779785,
+        "roll_deg": 2.4038386982283555e-05,
+        "pitch_rate": 0.0020163822919130325,
+        "roll_rate": 0.027306247502565384
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.5266594886779785,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.0738037449717252,
+      "post_wz_rmse": 0.1419616234175683,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.465,
+      "tracking_recovery_s": 0.865,
+      "peak_pitch_deg": 6.741020202636719,
+      "peak_roll_deg": 2.9191225621616468e-05,
+      "peak_wheel_speed_rad_s": 2.1989455223083496,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.025921821594238,
+        "roll_deg": 2.4896973627619445e-05,
+        "pitch_rate": 0.0014032917097210884,
+        "roll_rate": 0.027248192578554153
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.525921821594238,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07380854687812227,
+      "post_wz_rmse": 0.1419680294754867,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.38,
+      "peak_pitch_deg": 6.196615219116211,
+      "peak_roll_deg": 3.15504839818459e-05,
+      "peak_wheel_speed_rad_s": 3.0162625312805176,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.029036998748779,
+        "roll_deg": 2.532619510020595e-05,
+        "pitch_rate": 0.002095022238790989,
+        "roll_rate": 0.02730245515704155
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.529036998748779,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07372741131920638,
+      "post_wz_rmse": 0.14210062481739064,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.03,
+      "tracking_recovery_s": 0.49,
+      "peak_pitch_deg": 6.53915548324585,
+      "peak_roll_deg": 2.9645501854247414e-05,
+      "peak_wheel_speed_rad_s": 3.577422618865967,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.028176307678223,
+        "roll_deg": 2.4682183720869943e-05,
+        "pitch_rate": 0.0018482254818081856,
+        "roll_rate": 0.027338305488228798
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.528176307678223,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07370497098684194,
+      "post_wz_rmse": 0.14215096276007558,
+      "action_saturation_ratio": 0.0011117287381878821,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.445,
+      "tracking_recovery_s": 0.825,
+      "peak_pitch_deg": 7.8179144859313965,
+      "peak_roll_deg": 3.369640398886986e-05,
+      "peak_wheel_speed_rad_s": 3.6428799629211426,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.028761386871338,
+        "roll_deg": 2.2321522919810377e-05,
+        "pitch_rate": 0.002071898430585861,
+        "roll_rate": 0.027285706251859665
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.528761386871338,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07377166457967947,
+      "post_wz_rmse": 0.14201465487060935,
+      "action_saturation_ratio": 0.007782101167315175,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.41,
+      "peak_pitch_deg": 5.125060558319092,
+      "peak_roll_deg": 3.8332000258378685e-05,
+      "peak_wheel_speed_rad_s": 1.844381332397461,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.776453495025635,
+        "roll_deg": 3.402000947971828e-05,
+        "pitch_rate": 0.002443264937028289,
+        "roll_rate": 0.001229522516950965
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.276453495025635,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.06197294703527858,
+      "post_wz_rmse": 0.00024046099479023026,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.1,
+      "tracking_recovery_s": 0.295,
+      "peak_pitch_deg": 5.166290283203125,
+      "peak_roll_deg": 4.3439638830022886e-05,
+      "peak_wheel_speed_rad_s": 1.6910107135772705,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.778800010681152,
+        "roll_deg": 4.540799272945151e-05,
+        "pitch_rate": 0.002519128378480673,
+        "roll_rate": 0.0019972685258835554
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.278800010681152,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.06195533153007144,
+      "post_wz_rmse": 0.00024398668782601448,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.115,
+      "peak_pitch_deg": 4.890449523925781,
+      "peak_roll_deg": 4.6750876208534464e-05,
+      "peak_wheel_speed_rad_s": 1.4617092609405518,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.777496337890625,
+        "roll_deg": 3.750717587536201e-05,
+        "pitch_rate": 0.0025822962634265423,
+        "roll_rate": 0.0036214070860296488
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.277496337890625,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.06196786028614422,
+      "post_wz_rmse": 0.00028297336304559446,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.0,
+      "peak_pitch_deg": 5.0924835205078125,
+      "peak_roll_deg": 4.2093823140021414e-05,
+      "peak_wheel_speed_rad_s": 2.2457191944122314,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.778578281402588,
+        "roll_deg": 4.051182258990593e-05,
+        "pitch_rate": 0.0030188809614628553,
+        "roll_rate": 0.003788675181567669
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.278578281402588,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.06195354277745151,
+      "post_wz_rmse": 0.0002447499135999168,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.245,
+      "tracking_recovery_s": 0.02,
+      "peak_pitch_deg": 5.401623725891113,
+      "peak_roll_deg": 4.77467619930394e-05,
+      "peak_wheel_speed_rad_s": 3.146207571029663,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.777796268463135,
+        "roll_deg": 3.705956260091625e-05,
+        "pitch_rate": 0.0024545304477214813,
+        "roll_rate": 0.0023320713080465794
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.277796268463135,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.06195369856392795,
+      "post_wz_rmse": 0.0002923937320627169,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.81,
+      "tracking_recovery_s": 0.08,
+      "peak_pitch_deg": 6.299178123474121,
+      "peak_roll_deg": 3.920282324543223e-05,
+      "peak_wheel_speed_rad_s": 3.2046899795532227,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.776932716369629,
+        "roll_deg": 3.1626306736143306e-05,
+        "pitch_rate": 0.002418417716398835,
+        "roll_rate": 0.000999567680992186
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.276932716369629,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.06196311861393527,
+      "post_wz_rmse": 0.0002894607876477521,
+      "action_saturation_ratio": 0.005558643690939411,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.515,
+      "peak_pitch_deg": 6.4461541175842285,
+      "peak_roll_deg": 4.1668343328638e-05,
+      "peak_wheel_speed_rad_s": 2.4707603454589844,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 5.997249126434326,
+        "roll_deg": 3.0261142455856316e-05,
+        "pitch_rate": 0.0035624532029032707,
+        "roll_rate": 0.027983009815216064
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.497249126434326,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07665392064781351,
+      "post_wz_rmse": 0.13682436115395702,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.945,
+      "peak_pitch_deg": 6.58746862411499,
+      "peak_roll_deg": 3.8416073948610574e-05,
+      "peak_wheel_speed_rad_s": 2.3563783168792725,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 5.993607044219971,
+        "roll_deg": 3.069013109779917e-05,
+        "pitch_rate": 0.0025191372260451317,
+        "roll_rate": 0.028042806312441826
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.493607044219971,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07665427714784315,
+      "post_wz_rmse": 0.13682814078447278,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.5,
+      "tracking_recovery_s": 0.825,
+      "peak_pitch_deg": 6.712625980377197,
+      "peak_roll_deg": 4.227950194035657e-05,
+      "peak_wheel_speed_rad_s": 2.197970390319824,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 5.995672225952148,
+        "roll_deg": 3.519693927955814e-05,
+        "pitch_rate": 0.0038814712315797806,
+        "roll_rate": 0.02813122421503067
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.495672225952148,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07653355079050012,
+      "post_wz_rmse": 0.13693296320495948,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.365,
+      "peak_pitch_deg": 6.175443172454834,
+      "peak_roll_deg": 3.7986912502674386e-05,
+      "peak_wheel_speed_rad_s": 3.052959442138672,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.000674247741699,
+        "roll_deg": 2.875876634789165e-05,
+        "pitch_rate": 0.00290597602725029,
+        "roll_rate": 0.027963787317276
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.500674247741699,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07658737702146276,
+      "post_wz_rmse": 0.13685834897988958,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.46,
+      "peak_pitch_deg": 6.485898017883301,
+      "peak_roll_deg": 4.292363882996142e-05,
+      "peak_wheel_speed_rad_s": 3.5945446491241455,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 5.997734546661377,
+        "roll_deg": 2.9831375286448747e-05,
+        "pitch_rate": 0.0038652876392006874,
+        "roll_rate": 0.02795095182955265
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.497734546661377,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07654818018503738,
+      "post_wz_rmse": 0.13683626506944935,
+      "action_saturation_ratio": 0.0011117287381878821,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.455,
+      "tracking_recovery_s": 0.775,
+      "peak_pitch_deg": 7.808060169219971,
+      "peak_roll_deg": 4.120644007343799e-05,
+      "peak_wheel_speed_rad_s": 3.6045730113983154,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 5.99478816986084,
+        "roll_deg": 3.176321115461178e-05,
+        "pitch_rate": 0.0036652181297540665,
+        "roll_rate": 0.027983516454696655
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 6.49478816986084,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.0765209947024759,
+      "post_wz_rmse": 0.13689982395396888,
+      "action_saturation_ratio": 0.007782101167315175,
+      "passed": true
+    }
+  ],
+  "controller_observations": [
+    "pitch",
+    "pitch_rate",
+    "mean_wheel_position",
+    "mean_wheel_velocity",
+    "wheel_velocity_difference",
+    "yaw_rate",
+    "vx_ref",
+    "wz_ref"
+  ],
+  "evaluation_only_truth": [
+    "base_vx",
+    "base_roll"
+  ],
+  "training_started": false,
+  "passed": true
+}

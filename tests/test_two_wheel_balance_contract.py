@@ -172,3 +172,17 @@ def test_cascaded_lqr_yaw_feedforward_follows_command_sign() -> None:
         ),
     )
     np.testing.assert_allclose(actions[:, 1], [0.2, -0.2])
+
+
+def test_cascaded_lqr_defaults_match_selected_tracking_gate() -> None:
+    config = CascadedLQRConfig()
+    assert config.wheel_radius_m == 0.1016
+    assert config.wheel_track_m == 0.620
+    assert config.vx_kp == 0.6
+    assert config.wz_kp == 0.25
+    assert config.wz_feedforward == 0.6
+    assert config.vx_ki == 0.0
+    assert config.wz_ki == 0.0
+    assert config.wheel_difference_kp == 0.0
+    assert np.isclose(np.degrees(config.pitch_reference_limit_rad), 6.0)
+    assert config.action_limit == 0.8

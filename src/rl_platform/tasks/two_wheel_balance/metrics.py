@@ -21,6 +21,8 @@ OBSERVATION_NAMES = (
     "previous_a_yaw",
 )
 
+LQR_STATE_NAMES = OBSERVATION_NAMES[:6]
+
 
 def mix_common_yaw_effort(actions: np.ndarray, torque_limit: float) -> np.ndarray:
     """Map normalized common/yaw actions to left/right wheel effort."""
@@ -76,3 +78,108 @@ class BalanceContract:
     @property
     def observation_dim(self) -> int:
         return len(OBSERVATION_NAMES)
+
+
+@dataclass(frozen=True)
+class DiscreteLQRResult:
+    gain: np.ndarray
+    riccati: np.ndarray
+    solver: str
+    iterations: int
+    residual_max_abs: float
+    closed_loop_eigenvalues: np.ndarray
+
+
+def controllability_matrix(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Return [B, AB, ..., A^(n-1)B] for a discrete linear system."""
+    a = np.asarray(a, dtype=np.float64)
+    b = np.asarray(b, dtype=np.float64)
+    if a.ndim != 2 or a.shape[0] != a.shape[1]:
+        raise ValueError(f"A must be square, got {a.shape}")
+    if b.ndim != 2 or b.shape[0] != a.shape[0]:
+        raise ValueError(f"B must have {a.shape[0]} rows, got {b.shape}")
+    blocks = [b]
+    for _ in range(1, a.shape[0]):
+        blocks.append(a @ blocks[-1])
+    return np.concatenate(blocks, axis=1)
+
+
+def solve_discrete_lqr(
+    a: np.ndarray,
+    b: np.ndarray,
+    q: np.ndarray,
+    r: np.ndarray,
+    *,
+    tolerance: float = 1e-11,
+    max_iterations: int = 20_000,
+) -> DiscreteLQRResult:
+    """Solve the infinite-horizon discrete LQR problem without SciPy."""
+    a = np.asarray(a, dtype=np.float64)
+    b = np.asarray(b, dtype=np.float64)
+    q = np.asarray(q, dtype=np.float64)
+    r = np.asarray(r, dtype=np.float64)
+    state_dim = a.shape[0] if a.ndim == 2 else 0
+    action_dim = b.shape[1] if b.ndim == 2 else 0
+    if a.shape != (state_dim, state_dim) or b.shape != (state_dim, action_dim):
+        raise ValueError(f"incompatible A/B shapes: {a.shape}, {b.shape}")
+    if q.shape != a.shape or r.shape != (action_dim, action_dim):
+        raise ValueError(f"incompatible Q/R shapes: {q.shape}, {r.shape}")
+    if not all(np.isfinite(value).all() for value in (a, b, q, r)):
+        raise ValueError("LQR matrices must be finite")
+    if not np.allclose(q, q.T) or not np.allclose(r, r.T):
+        raise ValueError("Q and R must be symmetric")
+    if np.linalg.eigvalsh(q).min() < -1e-10:
+        raise ValueError("Q must be positive semidefinite")
+    if np.linalg.eigvalsh(r).min() <= 0.0:
+        raise ValueError("R must be positive definite")
+
+    p = q.copy()
+    iterations = 0
+    solver = "fixed_point"
+    for iterations in range(1, max_iterations + 1):
+        regularized_r = r + b.T @ p @ b
+        gain = np.linalg.solve(regularized_r, b.T @ p @ a)
+        p_next = q + a.T @ p @ a - a.T @ p @ b @ gain
+        p_next = 0.5 * (p_next + p_next.T)
+        if np.max(np.abs(p_next - p)) <= tolerance:
+            p = p_next
+            break
+        p = p_next
+    else:
+        try:
+            from scipy.linalg import solve_discrete_are
+        except ImportError as exc:
+            raise RuntimeError(
+                f"discrete Riccati iteration did not converge in {max_iterations} steps"
+            ) from exc
+        p = solve_discrete_are(a, b, q, r)
+        solver = "scipy_solve_discrete_are"
+        iterations = 0
+
+    gain = np.linalg.solve(r + b.T @ p @ b, b.T @ p @ a)
+    residual = q + a.T @ p @ a - a.T @ p @ b @ gain - p
+    eigenvalues = np.linalg.eigvals(a - b @ gain)
+    return DiscreteLQRResult(
+        gain=gain,
+        riccati=p,
+        solver=solver,
+        iterations=iterations,
+        residual_max_abs=float(np.max(np.abs(residual))),
+        closed_loop_eigenvalues=eigenvalues,
+    )
+
+
+def lqr_action(
+    states: np.ndarray,
+    gain: np.ndarray,
+    *,
+    action_limit: float = 1.0,
+) -> np.ndarray:
+    """Apply u=-Kx and enforce the normalized two-wheel action contract."""
+    states = np.asarray(states, dtype=np.float64)
+    gain = np.asarray(gain, dtype=np.float64)
+    if states.shape[-1] != gain.shape[1]:
+        raise ValueError(f"state/gain mismatch: {states.shape}, {gain.shape}")
+    if not 0.0 < action_limit <= 1.0:
+        raise ValueError(f"action_limit must be in (0, 1], got {action_limit}")
+    return np.clip(-(states @ gain.T), -action_limit, action_limit)

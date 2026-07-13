@@ -1,6 +1,6 @@
 # Two-Wheel Balance DirectRLEnv Bring-Up
 
-Date: 2026-07-11
+Date: 2026-07-13
 
 Branch: `codex/two-wheel-balance-rl`
 
@@ -14,14 +14,15 @@ Task: `RecomoTwoWheelBalance-v0`
 | Floating articulation and effort drives | Passed | Asset audit |
 | Passive fall and forbidden body contact | Passed | Gate 0 logs/artifacts |
 | Common/yaw effort direction | Passed after 8-inch wheel-axis correction | 2026-07-12 8-inch evidence |
-| 10D observation / 2D action contract | Passed | Six pure contract tests |
+| 10D observation / 2D action contract | Passed | Eight pure contract tests |
 | Deterministic `32 x 2048` smoke | Passed | Two byte-equivalent metric runs |
-| Scripted PD controllability | Passed | Mean upright duration 125 -> 364 steps |
+| Corrected-plant scripted PD controllability | Passed | Mean upright duration 113 -> 409 steps |
+| Nominal scripted LQR recovery | Passed | 32/32 signed pitch/yaw scenarios reached 10 s |
 | PPO learning signal at 65,536 steps | Failed; stop rule active | PPO gate metrics |
 | Product stand policy | Not achieved | Blocked by failed Gate 3 |
 | Velocity tracking, obstacles, arm, sim-to-real | Not started | Out of scope |
 
-Do not resume or extend PPO from the failed checkpoint. The next task is an environment/reward/normalization diagnosis, not more timesteps.
+Do not resume or extend PPO from the failed checkpoint. The nominal LQR is now the controller baseline; the next gate is robustness around provisional plant assumptions, not more PPO timesteps.
 
 ### 2026-07-12 geometry correction
 
@@ -129,6 +130,14 @@ Run from `/mnt/g/wSpace/cinebotRL-two-wheel-balance` on `.98`.
   --action-mode pd --reset-pitch-deg 2.0 --pd-kp 1.0 --pd-kd 0.2 \
   --output G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\gate2\\pd.json \
   --headless
+
+# Nominal LQR identification and recovery gate. This does not train a policy.
+/mnt/g/isaaclab_venv/Scripts/python.exe -u -X utf8 \
+  G:\\wSpace\\cinebotRL-two-wheel-balance\\scripts\\two_wheel_balance\\tune_lqr.py \
+  --num-envs 32 --horizon-steps 2000 --control-interval-steps 4 \
+  --gain-scales 0.4,0.5,0.6 \
+  --output-dir G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\lqr_final_20260713 \
+  --headless
 ```
 
 The bounded PPO command is retained in `scripts/two_wheel_balance/train_short_ppo.py` for reproducibility, but must not be rerun until the failed-gate diagnosis is addressed.
@@ -140,18 +149,20 @@ Use `scripts/two_wheel_balance/evaluate_policy.py` to reevaluate an existing che
 - Current Gate 1 run 1 and run 2: byte-identical metrics, 295 accounted body-contact resets, zero non-finite values.
 - Corrected passive baseline from 2 degrees: 113 policy steps mean upright duration.
 - Corrected PD sanity: 409 policy steps mean upright duration and two contacts per 1,000 steps.
+- Nominal LQR: 32/32 signed `2/5/8 deg` pitch and `-0.3/0/+0.3 rad/s` yaw-rate scenarios reached the 10-second timeout.
+- Selected LQR scale `0.6`: pitch p95 `2.765 deg`, pitch max `7.993 deg`, action p95 `0.586`, and zero saturation.
 - No PPO checkpoint is valid for the corrected 8-inch/`+Y`-axis model.
 
 The rendered file under `evidence_20260711/` shows the obsolete 6-inch/pre-axis-fix asset and is retained only for provenance.
 
-## Next diagnosis
+## Next gate
 
-Before another optimizer run:
+Before another optimizer run or hardware claim:
 
-1. Audit observation scaling, especially unbounded wheel position versus small-radian attitude channels.
-2. Plot per-term reward around recovery and contact; verify the policy cannot improve reward by accelerating a fall.
-3. Compare a normalized-observation PPO smoke against a residual policy around the proven PD controller.
-4. Require critic explained variance and deterministic episode length to improve in a smaller 8,192-step gate before allowing another 65,536-step run.
-5. Replace provisional mass/COM/torque values when measured hardware data is available.
+1. Sweep bounded mass, COM, inertia, friction, torque, and delay ranges around the nominal plant once credible ranges are agreed.
+2. Add push recovery and low-speed `vx/wz` command tests around the LQR baseline.
+3. Lift or augment the identified model for a 200 Hz controller; the current contact-aware LQR uses a four-step zero-order hold at 50 Hz.
+4. Repair the existing `arm_mount_link` and `upper_imu_link` visual-reference warnings before rendered evidence.
+5. Only then compare a normalized residual policy against the frozen LQR prior in a small stop-rule gate.
 
-The July 12 evidence narrows the next optimizer experiment further: use more than one optimizer update inside the small gate (the current `n_steps=256` with 32 environments yields only one update at 8,192 timesteps), and add a directly testable pitch-energy/progress signal or supervised PD initialization. Do not increase total timesteps first.
+See `LQR_NOMINAL_GATE_20260713.md` and `evidence_20260713_lqr_nominal/`. The gains remain simulation-only because mass, COM, inertia, friction, actuator torque, and delay are provisional.

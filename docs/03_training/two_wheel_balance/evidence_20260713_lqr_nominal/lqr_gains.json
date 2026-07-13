@@ -1,0 +1,104 @@
+{
+  "schema": "recomo_two_wheel_lqr_gain_v1",
+  "state_names": [
+    "pitch",
+    "pitch_rate",
+    "mean_wheel_position",
+    "mean_wheel_velocity",
+    "wheel_velocity_difference",
+    "yaw_rate"
+  ],
+  "action_names": [
+    "a_common",
+    "a_yaw"
+  ],
+  "synthesis": "three_state_balance_plus_differential_wheel_velocity",
+  "regulated_state_names": {
+    "longitudinal": [
+      "pitch",
+      "pitch_rate",
+      "mean_wheel_velocity"
+    ],
+    "yaw": [
+      "wheel_velocity_difference"
+    ]
+  },
+  "nominal_gain": [
+    [
+      -6.66499530601045,
+      -3.390329964005594,
+      0.0,
+      0.00042453609824273344,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.010807088618589604,
+      0.0
+    ]
+  ],
+  "selected_gain_scale": 0.6,
+  "selected_gain": [
+    [
+      -3.99899718360627,
+      -2.0341979784033564,
+      0.0,
+      0.00025472165894564004,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.006484253171153763,
+      0.0
+    ]
+  ],
+  "action_limit": 0.8,
+  "control_interval_steps": 4,
+  "riccati_iterations": {
+    "longitudinal": 0,
+    "yaw": 2
+  },
+  "riccati_solver": {
+    "longitudinal": "scipy_solve_discrete_are",
+    "yaw": "fixed_point"
+  },
+  "riccati_residual_max_abs": {
+    "longitudinal": 6.624031811952591e-07,
+    "yaw": 2.220446049250313e-16
+  },
+  "closed_loop_eigenvalues": [
+    [
+      0.0004614841853395335,
+      0.0
+    ],
+    [
+      0.9620165089042457,
+      0.0
+    ],
+    [
+      0.9999999992830272,
+      0.0
+    ],
+    [
+      0.999000195449202,
+      0.0
+    ],
+    [
+      0.9992903694616203,
+      0.0
+    ],
+    [
+      0.00011691006893221889,
+      0.0
+    ]
+  ],
+  "closed_loop_spectral_radius": 0.9999999992830272
+}

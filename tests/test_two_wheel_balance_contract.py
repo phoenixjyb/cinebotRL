@@ -4,10 +4,14 @@ import numpy as np
 
 from rl_platform.tasks.two_wheel_balance.metrics import (
     ACTION_NAMES,
+    LQR_STATE_NAMES,
     OBSERVATION_NAMES,
     BalanceContract,
     compose_pd_residual_action,
+    controllability_matrix,
+    lqr_action,
     mix_common_yaw_effort,
+    solve_discrete_lqr,
 )
 
 
@@ -17,6 +21,7 @@ def test_contract_dimensions_and_rate() -> None:
     assert contract.observation_dim == 10
     assert contract.policy_hz == 200.0
     assert ACTION_NAMES == ("a_common", "a_yaw")
+    assert LQR_STATE_NAMES == OBSERVATION_NAMES[:6]
     assert "vx" not in OBSERVATION_NAMES
 
 
@@ -51,3 +56,19 @@ def test_pd_residual_is_bounded_and_scaled() -> None:
         np.array([[1.0, -1.0]]),
     )
     np.testing.assert_allclose(action, [[0.15, -0.15]])
+
+
+def test_discrete_lqr_stabilizes_double_integrator() -> None:
+    a = np.array([[1.0, 0.01], [0.0, 1.0]])
+    b = np.array([[0.00005], [0.01]])
+    result = solve_discrete_lqr(a, b, np.diag([10.0, 1.0]), np.diag([0.1]))
+    assert np.linalg.matrix_rank(controllability_matrix(a, b)) == 2
+    assert result.solver in {"fixed_point", "scipy_solve_discrete_are"}
+    assert np.max(np.abs(result.closed_loop_eigenvalues)) < 1.0
+    assert result.residual_max_abs < 1e-8
+
+
+def test_lqr_action_uses_negative_feedback_and_clips() -> None:
+    gain = np.array([[-2.0, 1.0], [0.5, -3.0]])
+    action = lqr_action(np.array([[1.0, -1.0]]), gain, action_limit=0.8)
+    np.testing.assert_allclose(action, [[0.8, -0.8]])

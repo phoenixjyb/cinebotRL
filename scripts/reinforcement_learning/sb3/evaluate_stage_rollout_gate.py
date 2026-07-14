@@ -225,6 +225,21 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--output_corrective_teacher_request_npz",
+        default=None,
+        help=(
+            "Optional corrective_teacher_request_v1 bundle with pre-step physical robot/cam_link "
+            "state and Option-B targets for an external GIK/WBC teacher. This is an evaluation "
+            "capture only; it does not create or consume teacher labels."
+        ),
+    )
+    parser.add_argument(
+        "--corrective_teacher_horizon_steps",
+        type=int,
+        default=10,
+        help="Number of future trajectory_dt targets included in a corrective teacher request.",
+    )
+    parser.add_argument(
         "--output_base_teacher_npz",
         default=None,
         help="Optional masked-action dataset with direct base-correction labels from pre-step rollout states.",
@@ -412,6 +427,11 @@ def main() -> int:
         require(vec_normalize is not None and vec_normalize.exists(), f"vec_normalize not found: {vec_normalize}")
     require(args.num_envs > 0, "--num_envs must be positive")
     require(args.steps > 0, "--steps must be positive")
+    if args.output_corrective_teacher_request_npz:
+        require(
+            args.corrective_teacher_horizon_steps > 0,
+            "--corrective_teacher_horizon_steps must be positive",
+        )
     if args.start_waypoint_min_fraction < 0.0 or args.start_waypoint_min_fraction > 1.0:
         raise ValueError("--start_waypoint_min_fraction must be in [0, 1]")
     if args.start_waypoint_max_fraction < 0.0 or args.start_waypoint_max_fraction > 1.0:
@@ -446,6 +466,10 @@ def main() -> int:
         from task_spec import register_isaac_lab_tasks
         from rl_platform.tasks.mobile_mm import MobileMMTrackEEEnv, MobileMMTrackEEEnvCfg
         from rl_platform.tasks.mobile_mm.config import TrajectoryConfig
+        from rl_platform.tasks.mobile_mm.joint_names import ARM_JOINT_NAMES
+        from rl_platform.tasks.mobile_mm.trajectories import (
+            physical_cam_to_semantic_dfr_quat_wxyz,
+        )
 
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
@@ -861,6 +885,38 @@ def main() -> int:
         dataset_waypoint_indices: list[np.ndarray] = []
         dataset_episode_indices: list[np.ndarray] = []
         dataset_first_episode_valid: list[np.ndarray] = []
+        corrective_observations: list[np.ndarray] = []
+        corrective_applied_actions: list[np.ndarray] = []
+        corrective_policy_actions: list[np.ndarray] = []
+        corrective_env_ids: list[np.ndarray] = []
+        corrective_steps: list[np.ndarray] = []
+        corrective_waypoint_indices: list[np.ndarray] = []
+        corrective_episode_indices: list[np.ndarray] = []
+        corrective_first_episode_valid: list[np.ndarray] = []
+        corrective_trajectory_metadata_json: list[np.ndarray] = []
+        corrective_progress: list[np.ndarray] = []
+        corrective_time_remaining_s: list[np.ndarray] = []
+        corrective_base_position_world_m: list[np.ndarray] = []
+        corrective_base_quaternion_world_wxyz: list[np.ndarray] = []
+        corrective_base_linear_velocity_world_mps: list[np.ndarray] = []
+        corrective_base_angular_velocity_world_radps: list[np.ndarray] = []
+        corrective_joint_position_rad: list[np.ndarray] = []
+        corrective_joint_velocity_radps: list[np.ndarray] = []
+        corrective_cam_position_world_m: list[np.ndarray] = []
+        corrective_cam_quaternion_world_wxyz: list[np.ndarray] = []
+        corrective_cam_linear_velocity_world_mps: list[np.ndarray] = []
+        corrective_cam_angular_velocity_world_radps: list[np.ndarray] = []
+        corrective_target_cam_position_world_m: list[np.ndarray] = []
+        corrective_target_cam_quaternion_world_wxyz: list[np.ndarray] = []
+        corrective_target_semantic_dfr_quaternion_world_wxyz: list[np.ndarray] = []
+        corrective_target_horizon_cam_position_world_m: list[np.ndarray] = []
+        corrective_target_horizon_cam_quaternion_world_wxyz: list[np.ndarray] = []
+        corrective_target_horizon_semantic_dfr_quaternion_world_wxyz: list[np.ndarray] = []
+        physical_joint_ids = None
+        if args.output_corrective_teacher_request_npz:
+            raw_env._initialize_ee_body_idx()
+            raw_env._verify_joint_mapping()
+            physical_joint_ids = raw_env._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
         base_teacher_observations: list[np.ndarray] = []
         base_teacher_actions: list[np.ndarray] = []
         base_teacher_masks: list[np.ndarray] = []
@@ -929,17 +985,25 @@ def main() -> int:
             else:
                 action = np.repeat(open_loop_actions[step : step + 1], args.num_envs, axis=0)
                 primary_action_for_dataset = np.asarray(action, dtype=np.float32).copy()
-            if args.output_dataset_npz:
+            if args.output_dataset_npz or args.output_corrective_teacher_request_npz:
                 waypoint_idx = tensor_np(raw_env.trajectory_manager.current_waypoint_idx).astype(np.int32)
                 trajectory_metadata = list(
                     getattr(raw_env.trajectory_manager, "current_trajectory_metadata", []) or []
                 )
                 episode_idx = np.full((args.num_envs,), -1, dtype=np.int32)
+                trajectory_metadata_json = np.empty((args.num_envs,), dtype=object)
                 for env_id in range(args.num_envs):
                     item = trajectory_metadata[env_id] if env_id < len(trajectory_metadata) else {}
                     raw_metadata = item.get("metadata", {}) if isinstance(item, dict) else {}
                     if isinstance(raw_metadata, dict) and "episode_index" in raw_metadata:
                         episode_idx[env_id] = int(raw_metadata["episode_index"])
+                    trajectory_metadata_json[env_id] = json.dumps(
+                        item,
+                        sort_keys=True,
+                        ensure_ascii=True,
+                        default=str,
+                    )
+            if args.output_dataset_npz:
                 dataset_observations.append(obs_before_step)
                 dataset_actions.append(np.asarray(action, dtype=np.float32).copy())
                 dataset_policy_actions.append(np.asarray(primary_action_for_dataset, dtype=np.float32).copy())
@@ -948,6 +1012,81 @@ def main() -> int:
                 dataset_waypoint_indices.append(waypoint_idx.copy())
                 dataset_episode_indices.append(episode_idx)
                 dataset_first_episode_valid.append((first_done_step_per_env < 0).copy())
+            if args.output_corrective_teacher_request_npz:
+                require(physical_joint_ids is not None, "physical joint IDs were not initialized")
+                target_cam_pos, target_cam_quat = raw_env.trajectory_manager.get_target_pose()
+                target_semantic_dfr_quat = physical_cam_to_semantic_dfr_quat_wxyz(target_cam_quat)
+                target_horizon_pos, target_horizon_quat = raw_env.trajectory_manager.get_lookahead(
+                    steps=int(args.corrective_teacher_horizon_steps),
+                    lookahead_dt=float(raw_env.task_cfg.trajectory_dt),
+                )
+                target_horizon_semantic_dfr_quat = physical_cam_to_semantic_dfr_quat_wxyz(
+                    target_horizon_quat
+                )
+                progress, time_remaining_s = raw_env.trajectory_manager.get_progress_and_time_remaining()
+                corrective_observations.append(obs_before_step)
+                corrective_applied_actions.append(np.asarray(action, dtype=np.float32).copy())
+                corrective_policy_actions.append(
+                    np.asarray(primary_action_for_dataset, dtype=np.float32).copy()
+                )
+                corrective_env_ids.append(np.arange(args.num_envs, dtype=np.int32))
+                corrective_steps.append(np.full((args.num_envs,), step, dtype=np.int32))
+                corrective_waypoint_indices.append(waypoint_idx.copy())
+                corrective_episode_indices.append(episode_idx.copy())
+                corrective_first_episode_valid.append((first_done_step_per_env < 0).copy())
+                corrective_trajectory_metadata_json.append(trajectory_metadata_json.copy())
+                corrective_progress.append(tensor_np(progress).astype(np.float32).reshape(-1))
+                corrective_time_remaining_s.append(
+                    tensor_np(time_remaining_s).astype(np.float32).reshape(-1)
+                )
+                corrective_base_position_world_m.append(
+                    tensor_np(raw_env.robot.data.root_pos_w).astype(np.float32)
+                )
+                corrective_base_quaternion_world_wxyz.append(
+                    tensor_np(raw_env.robot.data.root_quat_w).astype(np.float32)
+                )
+                corrective_base_linear_velocity_world_mps.append(
+                    tensor_np(raw_env.robot.data.root_lin_vel_w).astype(np.float32)
+                )
+                corrective_base_angular_velocity_world_radps.append(
+                    tensor_np(raw_env.robot.data.root_ang_vel_w).astype(np.float32)
+                )
+                corrective_joint_position_rad.append(
+                    tensor_np(raw_env.robot.data.joint_pos[:, physical_joint_ids]).astype(np.float32)
+                )
+                corrective_joint_velocity_radps.append(
+                    tensor_np(raw_env.robot.data.joint_vel[:, physical_joint_ids]).astype(np.float32)
+                )
+                corrective_cam_position_world_m.append(
+                    tensor_np(raw_env.robot.data.body_pos_w[:, raw_env._ee_body_idx, :]).astype(np.float32)
+                )
+                corrective_cam_quaternion_world_wxyz.append(
+                    tensor_np(raw_env.robot.data.body_quat_w[:, raw_env._ee_body_idx, :]).astype(np.float32)
+                )
+                corrective_cam_linear_velocity_world_mps.append(
+                    tensor_np(raw_env.robot.data.body_lin_vel_w[:, raw_env._ee_body_idx, :]).astype(np.float32)
+                )
+                corrective_cam_angular_velocity_world_radps.append(
+                    tensor_np(raw_env.robot.data.body_ang_vel_w[:, raw_env._ee_body_idx, :]).astype(np.float32)
+                )
+                corrective_target_cam_position_world_m.append(
+                    tensor_np(target_cam_pos).astype(np.float32)
+                )
+                corrective_target_cam_quaternion_world_wxyz.append(
+                    tensor_np(target_cam_quat).astype(np.float32)
+                )
+                corrective_target_semantic_dfr_quaternion_world_wxyz.append(
+                    tensor_np(target_semantic_dfr_quat).astype(np.float32)
+                )
+                corrective_target_horizon_cam_position_world_m.append(
+                    tensor_np(target_horizon_pos).astype(np.float32)
+                )
+                corrective_target_horizon_cam_quaternion_world_wxyz.append(
+                    tensor_np(target_horizon_quat).astype(np.float32)
+                )
+                corrective_target_horizon_semantic_dfr_quaternion_world_wxyz.append(
+                    tensor_np(target_horizon_semantic_dfr_quat).astype(np.float32)
+                )
             if args.output_base_teacher_npz:
                 expert_xy, expert_wz, active, expert_distance = compute_direct_base_teacher(raw_env, args)
                 expert_xy_np = tensor_np(expert_xy).astype(np.float32)
@@ -1296,6 +1435,98 @@ def main() -> int:
                 metadata=json.dumps(dataset_metadata, sort_keys=True),
             )
             print(f"[gate] wrote dataset {output_dataset} rows={dataset_obs.shape[0]}", flush=True)
+        if args.output_corrective_teacher_request_npz:
+            require(corrective_observations, "corrective teacher request captured no rows")
+
+            def concat_float(rows: list[np.ndarray]) -> np.ndarray:
+                return np.concatenate(rows, axis=0).astype(np.float32)
+
+            corrective_obs = concat_float(corrective_observations)
+            corrective_metadata = {
+                "schema": "corrective_teacher_request_v1",
+                "created_at": metrics["created_at"],
+                "checkpoint": str(checkpoint) if checkpoint is not None else None,
+                "trajectory_stage": args.trajectory_stage,
+                "samples": int(corrective_obs.shape[0]),
+                "num_envs": int(args.num_envs),
+                "steps": int(args.steps),
+                "target_horizon_steps": int(args.corrective_teacher_horizon_steps),
+                "target_horizon_dt_s": float(raw_env.task_cfg.trajectory_dt),
+                "action_contract": args.action_contract,
+                "observation_contract": env_cfg.task_config.observation_contract_name,
+                "target_orientation_contract": target_orientation_contract,
+                "camera_body": "cam_link",
+                "world_frame": "Isaac world frame",
+                "quaternion_order": "wxyz",
+                "physical_joint_names": list(ARM_JOINT_NAMES),
+                "physical_joint_roles": [
+                    "learned_arm",
+                    "learned_arm",
+                    "learned_arm",
+                    "diagnostic_dji_gimbal",
+                    "diagnostic_dji_gimbal",
+                    "diagnostic_dji_gimbal",
+                ],
+                "learned_action_indices": [0, 1, 2, 6, 7, 8],
+                "reserved_action_indices": [3, 4, 5],
+                "teacher_instruction": (
+                    "Solve corrective arm/base labels from each policy-visited state. Do not label "
+                    "physical DJI gimbal joints; runtime Option-B attitude DLS owns them."
+                ),
+                "enable_obstacles": bool(args.enable_obstacles),
+            }
+            output_corrective = Path(args.output_corrective_teacher_request_npz)
+            output_corrective.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(
+                output_corrective,
+                observations=corrective_obs,
+                applied_actions=concat_float(corrective_applied_actions),
+                policy_actions=concat_float(corrective_policy_actions),
+                action_label_mask=np.tile(
+                    np.asarray([[1, 1, 1, 0, 0, 0, 1, 1, 1]], dtype=np.float32),
+                    (corrective_obs.shape[0], 1),
+                ),
+                rollout_env_id=np.concatenate(corrective_env_ids, axis=0).astype(np.int32),
+                rollout_step=np.concatenate(corrective_steps, axis=0).astype(np.int32),
+                rollout_waypoint_idx=np.concatenate(corrective_waypoint_indices, axis=0).astype(np.int32),
+                source_episode_index=np.concatenate(corrective_episode_indices, axis=0).astype(np.int32),
+                first_episode_valid=np.concatenate(corrective_first_episode_valid, axis=0).astype(bool),
+                source_trajectory_metadata_json=np.concatenate(
+                    corrective_trajectory_metadata_json, axis=0
+                ).astype(str),
+                trajectory_progress=concat_float(corrective_progress),
+                trajectory_time_remaining_s=concat_float(corrective_time_remaining_s),
+                base_position_world_m=concat_float(corrective_base_position_world_m),
+                base_quaternion_world_wxyz=concat_float(corrective_base_quaternion_world_wxyz),
+                base_linear_velocity_world_mps=concat_float(corrective_base_linear_velocity_world_mps),
+                base_angular_velocity_world_radps=concat_float(corrective_base_angular_velocity_world_radps),
+                physical_joint_position_rad=concat_float(corrective_joint_position_rad),
+                physical_joint_velocity_radps=concat_float(corrective_joint_velocity_radps),
+                cam_position_world_m=concat_float(corrective_cam_position_world_m),
+                cam_quaternion_world_wxyz=concat_float(corrective_cam_quaternion_world_wxyz),
+                cam_linear_velocity_world_mps=concat_float(corrective_cam_linear_velocity_world_mps),
+                cam_angular_velocity_world_radps=concat_float(corrective_cam_angular_velocity_world_radps),
+                target_cam_position_world_m=concat_float(corrective_target_cam_position_world_m),
+                target_cam_quaternion_world_wxyz=concat_float(corrective_target_cam_quaternion_world_wxyz),
+                target_semantic_dfr_quaternion_world_wxyz=concat_float(
+                    corrective_target_semantic_dfr_quaternion_world_wxyz
+                ),
+                target_horizon_cam_position_world_m=concat_float(
+                    corrective_target_horizon_cam_position_world_m
+                ),
+                target_horizon_cam_quaternion_world_wxyz=concat_float(
+                    corrective_target_horizon_cam_quaternion_world_wxyz
+                ),
+                target_horizon_semantic_dfr_quaternion_world_wxyz=concat_float(
+                    corrective_target_horizon_semantic_dfr_quaternion_world_wxyz
+                ),
+                metadata=json.dumps(corrective_metadata, sort_keys=True),
+            )
+            print(
+                f"[gate] wrote corrective teacher request {output_corrective} "
+                f"rows={corrective_obs.shape[0]}",
+                flush=True,
+            )
         if args.output_base_teacher_npz:
             require(base_teacher_observations, "base teacher produced no active rows")
             teacher_obs = np.concatenate(base_teacher_observations, axis=0).astype(np.float32)

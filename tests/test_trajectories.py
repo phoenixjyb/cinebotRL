@@ -6,6 +6,7 @@ import torch
 
 from rl_platform.tasks.mobile_mm.trajectories import (
     TrajectoryManager,
+    physical_cam_to_semantic_dfr_quat_wxyz,
     semantic_dfr_to_physical_cam_quat_wxyz,
 )
 
@@ -65,6 +66,20 @@ def test_semantic_dfr_to_physical_cam_is_right_multiply_rz_90():
     converted = semantic_dfr_to_physical_cam_quat_wxyz(identity)
     expected = torch.tensor([[2.0**-0.5, 0.0, 0.0, 2.0**-0.5]])
     torch.testing.assert_close(converted, expected)
+
+
+def test_physical_cam_to_semantic_dfr_round_trip():
+    semantic = torch.tensor(
+        [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.5, 0.5, 0.5, 0.5],
+            [0.70710678, 0.70710678, 0.0, 0.0],
+        ],
+        dtype=torch.float32,
+    )
+    physical = semantic_dfr_to_physical_cam_quat_wxyz(semantic)
+    recovered = physical_cam_to_semantic_dfr_quat_wxyz(physical)
+    torch.testing.assert_close(recovered, semantic, atol=1e-6, rtol=1e-6)
 
 
 def test_recorded_progress_and_remaining_time_use_real_length_and_fractional_time():

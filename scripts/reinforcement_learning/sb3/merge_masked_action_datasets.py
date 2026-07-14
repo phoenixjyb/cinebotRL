@@ -49,12 +49,20 @@ def load_dataset(path: Path) -> dict[str, np.ndarray | str]:
             )
         if not np.isfinite(sample_weight).all() or np.any(sample_weight < 0.0):
             raise ValueError(f"{path} sample_weight contains invalid values")
+    source_index = data["source_index"].astype(np.int64) if "source_index" in data else None
+    if source_index is not None:
+        if source_index.ndim != 1 or source_index.shape[0] != observations.shape[0]:
+            raise ValueError(
+                f"{path} source_index must be 1D and match observations: "
+                f"source_index={source_index.shape}, observations={observations.shape}"
+            )
     return {
         "path": str(path),
         "observations": observations,
         "actions": actions,
         "action_valid_mask": mask,
         "sample_weight": sample_weight,
+        "source_index": source_index,
         "metadata": metadata,
     }
 
@@ -83,6 +91,18 @@ def main() -> int:
             axis=0,
         )
 
+    # Namespace each input's local groups into one collision-free global index.
+    remapped_sources: list[np.ndarray] = []
+    next_group = 0
+    for dataset in datasets:
+        local = dataset["source_index"]
+        if local is None:
+            local = np.zeros(dataset["observations"].shape[0], dtype=np.int64)  # type: ignore[index,union-attr]
+        unique, inverse = np.unique(local, return_inverse=True)
+        remapped_sources.append(inverse.astype(np.int64) + next_group)
+        next_group += int(unique.size)
+    source_index = np.concatenate(remapped_sources).astype(np.int32)
+
     if args.shuffle:
         rng = np.random.default_rng(args.seed)
         order = rng.permutation(observations.shape[0])
@@ -91,6 +111,7 @@ def main() -> int:
         mask = mask[order]
         if sample_weight is not None:
             sample_weight = sample_weight[order]
+        source_index = source_index[order]
 
     metadata = {
         "created_at": datetime.now().isoformat(timespec="seconds"),
@@ -107,6 +128,7 @@ def main() -> int:
         "seed": int(args.seed),
         "valid_action_counts": mask.sum(axis=0).astype(float).tolist(),
         "has_sample_weight": sample_weight is not None,
+        "source_group_count": int(next_group),
     }
 
     output = Path(args.output)
@@ -115,6 +137,7 @@ def main() -> int:
         "observations": observations,
         "actions": actions,
         "action_valid_mask": mask,
+        "source_index": source_index,
         "metadata": json.dumps(metadata, indent=2),
     }
     if sample_weight is not None:

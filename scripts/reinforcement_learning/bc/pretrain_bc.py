@@ -131,10 +131,10 @@ def parse_args() -> argparse.Namespace:
         "--sample_weight_mode",
         type=str,
         default="none",
-        choices=["none", "trajectory_tail"],
+        choices=["none", "dataset", "trajectory_tail"],
         help=(
-            "Optional per-sample weighting. 'trajectory_tail' upweights late "
-            "waypoints inside each trajectory so BC focuses on tail/final-step errors."
+            "Optional per-sample weighting. 'dataset' reads sample_weight from the NPZ; "
+            "'trajectory_tail' upweights late waypoints inside each trajectory."
         ),
     )
     parser.add_argument(
@@ -192,11 +192,27 @@ class BCDataset(Dataset):
         return self.obs[idx], self.acts[idx], mask, self.sample_weights[idx]
 
 
-def build_sample_weights(total_transitions: int, metadata: dict[str, object], args: argparse.Namespace) -> np.ndarray:
+def build_sample_weights(
+    total_transitions: int,
+    metadata: dict[str, object],
+    args: argparse.Namespace,
+    dataset_sample_weights: np.ndarray | None = None,
+) -> np.ndarray:
     """Build optional per-sample BC weights without changing default behavior."""
 
     weights = np.ones((total_transitions,), dtype=np.float32)
     if args.sample_weight_mode == "none":
+        return weights
+    if args.sample_weight_mode == "dataset":
+        if dataset_sample_weights is None:
+            raise ValueError("--sample_weight_mode dataset requires sample_weight in the demo file")
+        weights = np.asarray(dataset_sample_weights, dtype=np.float32)
+        if weights.shape != (total_transitions,):
+            raise ValueError(
+                f"dataset sample_weight shape {weights.shape} != ({total_transitions},)"
+            )
+        if not np.isfinite(weights).all() or np.any(weights <= 0.0):
+            raise ValueError("dataset sample_weight must contain finite positive values")
         return weights
     if args.sample_weight_mode != "trajectory_tail":
         raise ValueError(f"unsupported sample_weight_mode: {args.sample_weight_mode}")
@@ -655,7 +671,13 @@ def main() -> None:
     if action_mask is not None:
         print(f"       Masked action mean: {np.mean(action_mask, axis=0)}")
 
-    sample_weights = build_sample_weights(total_transitions, metadata, args)
+    dataset_sample_weights = data["sample_weight"] if "sample_weight" in data else None
+    sample_weights = build_sample_weights(
+        total_transitions,
+        metadata,
+        args,
+        dataset_sample_weights=dataset_sample_weights,
+    )
     print(
         "       Sample weights    : "
         f"mode={args.sample_weight_mode}, min={float(sample_weights.min()):.3f}, "

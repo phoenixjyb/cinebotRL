@@ -279,6 +279,7 @@ def cascaded_lqr_action(
     *,
     control_dt: float,
     config: CascadedLQRConfig,
+    pitch_bias_override_rad: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]:
     """Track chassis commands with bounded outer loops and a frozen inner LQR."""
     states = np.asarray(states, dtype=np.float64)
@@ -293,6 +294,15 @@ def cascaded_lqr_action(
         raise ValueError(f"invalid gain shape: {gain.shape}")
     if vx_ref.shape != (batch,) or wz_ref.shape != (batch,):
         raise ValueError("command arrays must match the state batch")
+    if pitch_bias_override_rad is not None:
+        pitch_bias_override_rad = np.asarray(
+            pitch_bias_override_rad, dtype=np.float64
+        ).reshape(-1)
+        if (
+            pitch_bias_override_rad.shape != (batch,)
+            or not np.isfinite(pitch_bias_override_rad).all()
+        ):
+            raise ValueError("pitch bias override must be finite and match the batch")
     valid_controller_state_shapes = ((batch, 2), (batch, 3), (batch, 4), (batch, 6))
     if integrals.shape not in valid_controller_state_shapes:
         raise ValueError(
@@ -421,6 +431,18 @@ def cascaded_lqr_action(
         if integrals.shape[1] >= 4:
             pitch_bias_calibrated |= ~zero_command
             next_integrals[:, 3] = pitch_bias_calibrated.astype(np.float64)
+    if pitch_bias_override_rad is not None:
+        pitch_bias = np.clip(
+            pitch_bias_override_rad,
+            -config.pitch_bias_limit_rad,
+            config.pitch_bias_limit_rad,
+        )
+        pitch_bias_adapting[:] = False
+        pitch_bias_calibrated[:] = True
+        if integrals.shape[1] >= 3:
+            next_integrals[:, 2] = pitch_bias
+        if integrals.shape[1] >= 4:
+            next_integrals[:, 3] = 1.0
     applied_pitch_bias = np.where(pitch_bias_adapting, 0.0, pitch_bias)
     pitch_reference = np.clip(
         config.vx_kp * vx_error + config.vx_ki * next_integrals[:, 0],

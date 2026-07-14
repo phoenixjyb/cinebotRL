@@ -1,0 +1,46 @@
+{
+  "schema": "recomo_two_wheel_whole_body_closed_loop_gate_summary_v1",
+  "date": "2026-07-14",
+  "decision": "accepted_representative_no_obstacle",
+  "training_started": false,
+  "ppo_allowed": false,
+  "all79_dynamic_complete": false,
+  "controller": {
+    "wheel_profile": "structural_robust_v1",
+    "task_space_feedback": true,
+    "com_pitch_feedforward": true,
+    "arm_gravity_feedforward": true,
+    "arm_stiffness": 400.0,
+    "arm_damping": 40.0,
+    "arm_effort_limit_nm": 30.0,
+    "phase_governor": false
+  },
+  "acceptance": {
+    "maximum_pitch_deg": 12.0,
+    "maximum_arm_error_deg": 10.0,
+    "maximum_tool_position_p95_m": 0.15,
+    "maximum_tool_position_error_m": 0.25,
+    "maximum_wheel_action_saturation_ratio": 0.2,
+    "maximum_arm_effort_saturation_ratio": 0.2
+  },
+  "passed_cases": 5,
+  "requested_cases": 5,
+  "cases": [
+    {"case": 1, "duration_s": 25.12368904166667, "peak_pitch_deg": 4.179975880531192, "peak_arm_error_deg": 2.012064446459036, "peak_arm_effort_nm": 22.619606018066406, "tool_position_p95_m": 0.03890216446122782, "tool_position_max_m": 0.062229152393154595, "passed": true},
+    {"case": 20, "duration_s": 50.83595604166666, "peak_pitch_deg": 5.677155054145279, "peak_arm_error_deg": 2.6333299156269336, "peak_arm_effort_nm": 23.243886947631836, "tool_position_p95_m": 0.07008671177795223, "tool_position_max_m": 0.08005934184461079, "passed": true},
+    {"case": 28, "duration_s": 37.193848625, "peak_pitch_deg": 9.755563460397443, "peak_arm_error_deg": 4.965236752992034, "peak_arm_effort_nm": 25.162172317504883, "tool_position_p95_m": 0.07749532594166464, "tool_position_max_m": 0.08900572691554613, "passed": true},
+    {"case": 50, "duration_s": 38.017315125, "peak_pitch_deg": 9.342757926019274, "peak_arm_error_deg": 3.890977770143259, "peak_arm_effort_nm": 25.547260284423828, "tool_position_p95_m": 0.07757954177661422, "tool_position_max_m": 0.09250289929300146, "passed": true},
+    {"case": 79, "duration_s": 17.436073833333335, "peak_pitch_deg": 4.239085191382129, "peak_arm_error_deg": 2.1712078541203335, "peak_arm_effort_nm": 23.009143829345703, "tool_position_p95_m": 0.03751057687396512, "tool_position_max_m": 0.05812723882076819, "passed": true}
+  ],
+  "saturation": {
+    "maximum_wheel_action_saturation_ratio": 0.0,
+    "maximum_arm_effort_saturation_ratio": 0.0
+  },
+  "full_artifacts": [
+    "evaluation_results/two_wheel_all79_playback/case1_promoted_defaults_v1.json",
+    "evaluation_results/two_wheel_all79_playback/case20_com_gravity_k400_d40_v1.json",
+    "evaluation_results/two_wheel_all79_playback/representative_remaining_com_gravity_k400_d40_v1.json",
+    "evaluation_results/two_wheel_all79_playback/arm_motion_joint4_gravity_ff.json"
+  ],
+  "next_gate": "all79_dynamic_no_obstacle_with_frozen_controller"
+}

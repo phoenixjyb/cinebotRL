@@ -368,6 +368,22 @@ def test_cascaded_lqr_yaw_feedforward_follows_command_sign() -> None:
     np.testing.assert_allclose(actions[:, 1], [0.2, -0.2])
 
 
+def test_cascaded_lqr_accepts_measured_pitch_bias_override() -> None:
+    _, controller_state, diagnostics = cascaded_lqr_action(
+        np.zeros((1, len(LQR_STATE_NAMES))),
+        np.zeros(1),
+        np.zeros(1),
+        np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES))),
+        np.zeros((1, 6)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(),
+        pitch_bias_override_rad=np.array([-0.05]),
+    )
+    np.testing.assert_allclose(diagnostics["applied_pitch_bias"], [-0.05])
+    np.testing.assert_allclose(controller_state[:, 2], [-0.05])
+    np.testing.assert_allclose(controller_state[:, 3], [1.0])
+
+
 def test_cascaded_lqr_defaults_match_selected_tracking_gate() -> None:
     config = CascadedLQRConfig()
     assert config.wheel_radius_m == 0.1016

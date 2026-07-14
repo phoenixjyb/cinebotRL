@@ -23,6 +23,8 @@ Task: `RecomoTwoWheelBalance-v0`
 | Corrected 28 kg combined tracking plus push | Passed | 36/36 passed; exact seeded repeat |
 | Provisional guessed-plant signed safety gate | Passed for balance | 112/112 survive and recover balance; 91/112 strict tracking |
 | USD visual-reference composition | Passed after empty-visual repair | Asset audit and warning-free stage open |
+| Representative no-obstacle whole-body playback | Passed 5/5 | Closed-loop cases 1, 20, 28, 50, 79 |
+| All-79 no-obstacle dynamic playback | Not yet run | Next frozen-controller breadth gate |
 | Robust fixed-gain tracking closure | Rejected; defaults unchanged | Best sweep result missed safety/95% acceptance |
 | Deterministic plant-uncertainty smoke | Failed | 16/16 survived, but only 7/16 met all tracking limits |
 | URDF-to-PhysX mass contract | Passed | 28.000 kg authored and 27.999998 kg resolved |
@@ -212,6 +214,8 @@ Use `scripts/two_wheel_balance/evaluate_policy.py` to reevaluate an existing che
 - The broad diagnostic stress boundary remains 11/16 strict, though eventual tracking recovery improved from 12/16 to 15/16. This is not a hardware-readiness claim.
 - The Stage 0 whole-body asset now exposes only two wheel and three physical arm DOFs; DJI gimbal and MoveIt virtual joints are fixed while `cam_link` remains the physical observation frame.
 - Static `home_v0` balance passed 1x2,000 and 16x2,000-step gates. The 16-environment gate had 3.260 degree peak pitch, 0.236 degree peak arm error, and no reset or non-finite state.
+- Closed-loop whole-body playback passed representative cases 1, 20, 28, 50, and 79 at their full source duration. Tool p95 was 0.0375-0.0776 m, peak pitch was 4.18-9.76 degrees, peak arm effort was 22.62-25.55 Nm, and wheel/arm saturation ratios were zero.
+- The promoted playback controller combines chassis pose feedback, three-joint DLS tool-position feedback, live COM equilibrium pitch, and full-URDF-tree arm gravity feed-forward. Arm drive stiffness/damping is 400/40 while the authored 30 Nm effort limit is unchanged. Phase retiming is diagnostic-only and disabled by default.
 - No PPO checkpoint is valid for the corrected 8-inch/`+Y`-axis model.
 
 The rendered file under `evidence_20260711/` shows the obsolete 6-inch/pre-axis-fix asset and is retained only for provenance.
@@ -222,9 +226,9 @@ Before another optimizer run or hardware claim:
 
 1. Measure or tightly bound aggregate COM, yaw inertia, available wheel torque, tire friction, and control delay.
 2. Replace broad assumed uncertainty ranges with credible hardware ranges.
-3. Add a low-amplitude no-obstacle `cam_link` tracking gate using conventional three-joint arm IK without weakening the balance safety layer.
+3. Run all 79 retargeted no-obstacle references dynamically with the frozen promoted whole-body controller and unchanged safety/tracking thresholds.
 4. Replace guessed plant values with measurements before tightening tracking claims; add slopes, sensor noise, and command-rate limits only after reacceptance.
 5. Keep the repaired empty-visual USD composition check in every regenerated-asset audit.
-6. Pass no-obstacle whole-body tracking before obstacle avoidance, and only then evaluate whether a bounded residual policy adds value over the frozen controller.
+6. Add obstacle avoidance only after all-79 no-obstacle acceptance, then evaluate whether a bounded residual policy adds value over the frozen controller.
 
-See `WHOLE_BODY_STAGE0_GATE_20260714.md`, `STRUCTURAL_TRACKING_DIAGNOSIS_20260714.md`, and `evidence_20260714_structural_tracking/summary.json` for the accepted boundaries. Earlier LQR documents remain provenance. The gains remain simulation-only because COM, inertia, friction, actuator torque, and delay are guessed rather than measured.
+See `WHOLE_BODY_STAGE0_GATE_20260714.md`, `WHOLE_BODY_CLOSED_LOOP_GATE_20260714.md`, `STRUCTURAL_TRACKING_DIAGNOSIS_20260714.md`, and `evidence_20260714_whole_body_closed_loop/summary.json` for the accepted boundaries. Earlier LQR documents remain provenance. The gains remain simulation-only because COM, inertia, friction, actuator torque, and delay are guessed rather than measured.

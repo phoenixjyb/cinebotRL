@@ -32,6 +32,8 @@ parser.add_argument("--push-start-step", type=int, default=300)
 parser.add_argument("--push-duration-steps", type=int, default=20)
 parser.add_argument("--push-force-n", type=float, default=-60.0)
 parser.add_argument("--push-height-m", type=float, default=0.5)
+parser.add_argument("--com-offset-x-m", type=float, default=0.0)
+parser.add_argument("--path-progress-governor", action="store_true")
 parser.add_argument("--seed", type=int, default=20260713)
 parser.add_argument("--output-dir", type=Path, required=True)
 AppLauncher.add_app_launcher_args(parser)
@@ -66,6 +68,16 @@ def set_push_wrench(env, force_x_n: float) -> None:
     )
 
 
+def apply_base_com_offset_x(env, offset_x_m: float) -> None:
+    if offset_x_m == 0.0:
+        return
+    env_ids = torch.tensor([0], dtype=torch.long, device="cpu")
+    base_body_id = int(env._base_body_idx[0])
+    coms = env.robot.root_physx_view.get_coms().clone()
+    coms[0, base_body_id, 0] += offset_x_m
+    env.robot.root_physx_view.set_coms(coms, env_ids)
+
+
 def main() -> int:
     push_end_step = args.push_start_step + args.push_duration_steps
     if args.steps < 1 or args.fps < 1 or args.push_duration_steps < 1:
@@ -79,7 +91,10 @@ def main() -> int:
     gain = np.asarray(gain_data["selected_gain"], dtype=np.float64)
     control_interval = int(gain_data["control_interval_steps"])
     action_limit = float(gain_data["action_limit"])
-    config = CascadedLQRConfig(action_limit=action_limit)
+    config = CascadedLQRConfig(
+        action_limit=action_limit,
+        path_progress_governor_enabled=args.path_progress_governor,
+    )
 
     register_isaac_lab_tasks()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -109,10 +124,22 @@ def main() -> int:
 
     obs, _ = env.reset(seed=args.seed)
     unwrapped = raw_env.unwrapped
+    apply_base_com_offset_x(unwrapped, args.com_offset_x_m)
     set_push_wrench(unwrapped, 0.0)
     current_states = obs["policy"][:, : len(LQR_STATE_NAMES)].detach().cpu().numpy()
     integrals = np.zeros((1, 6), dtype=np.float64)
     action_np = np.zeros((1, 2), dtype=np.float32)
+    admitted_vx_ref = 0.0
+    admitted_wz_ref = 0.0
+    path_progress_scale_min = 1.0
+    path_progress_scale_sum = 0.0
+    path_progress_scale_samples = 0
+    requested_vx_squared_error = 0.0
+    requested_wz_squared_error = 0.0
+    admitted_vx_squared_error = 0.0
+    admitted_wz_squared_error = 0.0
+    tracking_samples = 0
+    initial_xy = unwrapped.robot.data.root_pos_w[0, :2].detach().cpu().numpy().copy()
     peak_pitch_deg = 0.0
     peak_roll_deg = 0.0
     peak_wheel_speed = 0.0
@@ -130,7 +157,7 @@ def main() -> int:
         elif step == push_end_step:
             set_push_wrench(unwrapped, 0.0)
         if step % control_interval == 0:
-            action_np, integrals, _ = cascaded_lqr_action(
+            action_np, integrals, diagnostics = cascaded_lqr_action(
                 current_states,
                 vx_ref,
                 wz_ref,
@@ -139,6 +166,15 @@ def main() -> int:
                 control_dt=control_interval / POLICY_HZ,
                 config=config,
             )
+            admitted_vx_ref = float(diagnostics["governed_vx_ref"][0])
+            admitted_wz_ref = float(diagnostics["governed_wz_ref"][0])
+            if command_active:
+                path_progress_scale = float(diagnostics["path_progress_scale"][0])
+                path_progress_scale_min = min(
+                    path_progress_scale_min, path_progress_scale
+                )
+                path_progress_scale_sum += path_progress_scale
+                path_progress_scale_samples += 1
             action_np = action_np.astype(np.float32)
         obs, _, terminated_tensor, truncated_tensor, _ = env.step(
             torch.as_tensor(action_np, device=unwrapped.device)
@@ -156,24 +192,35 @@ def main() -> int:
             peak_wheel_speed,
             float(state["max_abs_wheel_velocity"][0].detach().cpu().item()),
         )
+        if command_active:
+            vx_truth = float(state["vx"][0].detach().cpu().item())
+            wz_truth = float(state["yaw_rate"][0].detach().cpu().item())
+            requested_vx_squared_error += (vx_truth - args.vx_ref) ** 2
+            requested_wz_squared_error += (wz_truth - args.wz_ref) ** 2
+            admitted_vx_squared_error += (vx_truth - admitted_vx_ref) ** 2
+            admitted_wz_squared_error += (wz_truth - admitted_wz_ref) ** 2
+            tracking_samples += 1
         terminated = bool(terminated_tensor[0])
         truncated = bool(truncated_tensor[0])
         if terminated or truncated:
             break
 
     set_push_wrench(unwrapped, 0.0)
+    final_xy = unwrapped.robot.data.root_pos_w[0, :2].detach().cpu().numpy().copy()
     env.close()
     videos = sorted(args.output_dir.glob("*.mp4"), key=lambda path: path.stat().st_mtime)
     if not videos:
         raise RuntimeError(f"RecordVideo did not produce an mp4 in {args.output_dir}")
     result = {
         "video": str(videos[-1].resolve()),
+        "seed": args.seed,
         "steps_requested": args.steps,
         "steps_recorded": step + 1,
         "fps": args.fps,
         "playback_slowdown": POLICY_HZ / args.fps,
         "vx_ref_m_s": args.vx_ref,
         "wz_ref_rad_s": args.wz_ref,
+        "com_offset_x_m": args.com_offset_x_m,
         "command_start_video_s": args.command_start_step / args.fps,
         "push_force_n": args.push_force_n,
         "push_impulse_ns": args.push_force_n * args.push_duration_steps / POLICY_HZ,
@@ -183,6 +230,23 @@ def main() -> int:
         "peak_pitch_deg": peak_pitch_deg,
         "peak_roll_deg": peak_roll_deg,
         "peak_wheel_speed_rad_s": peak_wheel_speed,
+        "planar_displacement_m": float(np.linalg.norm(final_xy - initial_xy)),
+        "requested_vx_rmse": float(
+            np.sqrt(requested_vx_squared_error / max(tracking_samples, 1))
+        ),
+        "requested_wz_rmse": float(
+            np.sqrt(requested_wz_squared_error / max(tracking_samples, 1))
+        ),
+        "admitted_vx_rmse": float(
+            np.sqrt(admitted_vx_squared_error / max(tracking_samples, 1))
+        ),
+        "admitted_wz_rmse": float(
+            np.sqrt(admitted_wz_squared_error / max(tracking_samples, 1))
+        ),
+        "path_progress_scale_min": path_progress_scale_min,
+        "path_progress_scale_mean": (
+            path_progress_scale_sum / max(path_progress_scale_samples, 1)
+        ),
         "terminated": terminated,
         "truncated": truncated,
         "selected_gain_scale": gain_data["selected_gain_scale"],
@@ -194,6 +258,16 @@ def main() -> int:
             "wz_feedforward": config.wz_feedforward,
             "pitch_bias_adaptation_rate": config.pitch_bias_adaptation_rate,
             "pitch_bias_limit_deg": float(np.degrees(config.pitch_bias_limit_rad)),
+            "path_progress_governor_enabled": config.path_progress_governor_enabled,
+            "governor_bias_start_deg": float(
+                np.degrees(config.governor_bias_start_rad)
+            ),
+            "governor_bias_full_deg": float(
+                np.degrees(config.governor_bias_full_rad)
+            ),
+            "governor_minimum_progress_scale": (
+                config.governor_minimum_progress_scale
+            ),
         },
         "training_started": False,
     }

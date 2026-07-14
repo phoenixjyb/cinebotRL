@@ -97,3 +97,8 @@ The resumable breadth gate is `scripts/two_wheel_balance/run_all79_dynamic_gate.
 It preflights all 79 retargeted NPZs, validates each result JSON independently,
 stops on the first failed case, and writes `summary.json` plus `COMPLETE` only
 after all cases pass. Windows/WSL process status alone is not accepted as proof.
+
+Case 7 later exposed an acquisition-prefix tracking failure and passed after a
+case-local `1.25x` acquisition retime. See
+`ALL79_DYNAMIC_CASE7_RECOVERY_20260715.md`; no controller or semantic-path timing
+was changed.

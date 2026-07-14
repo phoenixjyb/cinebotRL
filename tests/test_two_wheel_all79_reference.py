@@ -10,6 +10,7 @@ from rl_platform.tasks.two_wheel_balance.all79_reference import (
     load_full_reference,
     load_sparse_teacher,
     monotonic_pose_match,
+    parse_acquisition_time_scale_overrides,
     regenerate_acquisition_prefix,
     source_body_velocities,
 )
@@ -90,3 +91,20 @@ def test_regenerate_acquisition_preserves_semantic_path(tmp_path: Path) -> None:
     np.testing.assert_allclose(targets[0], [0.5, 0.5, 0.5])
     np.testing.assert_allclose(semantic_start, full.positions_m[1])
     np.testing.assert_allclose(targets[1:], full.positions_m[1:])
+
+
+def test_parse_acquisition_time_scale_overrides() -> None:
+    assert parse_acquisition_time_scale_overrides("") == {}
+    assert parse_acquisition_time_scale_overrides("7:1.25, 23:1.5") == {
+        7: 1.25,
+        23: 1.5,
+    }
+
+
+@pytest.mark.parametrize(
+    "value",
+    ("7", "0:1.25", "80:1.25", "7:0.99", "7:nan", "7:1.25,7:1.5"),
+)
+def test_reject_invalid_acquisition_time_scale_override(value: str) -> None:
+    with pytest.raises(ValueError):
+        parse_acquisition_time_scale_overrides(value)

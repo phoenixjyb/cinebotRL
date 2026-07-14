@@ -18,6 +18,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from rl_platform.tasks.two_wheel_balance.all79_reference import (  # noqa: E402
     discover_full_stage,
+    parse_acquisition_time_scale_overrides,
     regenerate_acquisition_prefix,
 )
 from rl_platform.tasks.two_wheel_balance.whole_body_kinematics import (  # noqa: E402
@@ -45,6 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--maximum-p95-error-m", type=float, default=0.10)
     parser.add_argument("--maximum-error-m", type=float, default=0.20)
     parser.add_argument("--maximum-acquisition-time-scale", type=float, default=2.0)
+    parser.add_argument("--acquisition-time-scale-overrides", default="")
     parser.add_argument("--save-case-arrays", action="store_true")
     return parser.parse_args()
 
@@ -233,13 +235,24 @@ def main() -> int:
     )
     if not cases or any(case not in references for case in cases):
         raise ValueError(f"invalid cases: {cases}")
+    acquisition_scale_overrides = parse_acquisition_time_scale_overrides(
+        args.acquisition_time_scale_overrides
+    )
+    unselected_overrides = set(acquisition_scale_overrides) - set(cases)
+    if unselected_overrides:
+        raise ValueError(
+            f"acquisition overrides target unselected cases: {sorted(unselected_overrides)}"
+        )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     rows = []
     for case in cases:
         attempts = []
-        for acquisition_time_scale in np.arange(
-            1.0, args.maximum_acquisition_time_scale + 0.001, 0.25
-        ):
+        acquisition_time_scales = (
+            [acquisition_scale_overrides[case]]
+            if case in acquisition_scale_overrides
+            else np.arange(1.0, args.maximum_acquisition_time_scale + 0.001, 0.25)
+        )
+        for acquisition_time_scale in acquisition_time_scales:
             summary, arrays = retarget_case(
                 references[case],
                 kinematics,
@@ -265,6 +278,9 @@ def main() -> int:
         "acquisition_contract": "regenerated_home_to_audited_semantic_start_v1",
         "orientation_tracking_included": False,
         "physical_gimbal_adapter_included": False,
+        "acquisition_time_scale_overrides": {
+            str(case): scale for case, scale in acquisition_scale_overrides.items()
+        },
         "cases": cases,
         "passed_case_count": sum(row["passed"] for row in rows),
         "retimed_cases": [row["case"] for row in rows if row["acquisition_retimed"]],

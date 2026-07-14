@@ -50,6 +50,25 @@ def require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def parse_acquisition_time_scale_overrides(value: str) -> dict[int, float]:
+    overrides: dict[int, float] = {}
+    if not value.strip():
+        return overrides
+    for item in value.split(","):
+        fields = item.strip().split(":")
+        require(len(fields) == 2, f"invalid acquisition scale override {item!r}")
+        try:
+            case = int(fields[0])
+            scale = float(fields[1])
+        except ValueError as exc:
+            raise ValueError(f"invalid acquisition scale override {item!r}") from exc
+        require(1 <= case <= 79, f"acquisition override case out of range: {case}")
+        require(math.isfinite(scale) and scale >= 1.0, f"invalid acquisition scale: {scale}")
+        require(case not in overrides, f"duplicate acquisition override case: {case}")
+        overrides[case] = scale
+    return overrides
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:

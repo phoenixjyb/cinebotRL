@@ -32,6 +32,25 @@ def semantic_dfr_to_physical_cam_quat_wxyz(quat: torch.Tensor) -> torch.Tensor:
     return converted / torch.linalg.norm(converted, dim=-1, keepdim=True).clamp_min(1e-12)
 
 
+def physical_cam_to_semantic_dfr_quat_wxyz(quat: torch.Tensor) -> torch.Tensor:
+    """Apply ``R_world_DFR = R_world_cam * Rz(-pi/2)`` in wxyz order."""
+
+    if quat.shape[-1] != 4:
+        raise ValueError(f"expected wxyz quaternion with last dimension 4, got {tuple(quat.shape)}")
+    half_sqrt = float(2.0**-0.5)
+    w, x, y, z = quat.unbind(dim=-1)
+    converted = torch.stack(
+        [
+            half_sqrt * (w + z),
+            half_sqrt * (x - y),
+            half_sqrt * (x + y),
+            half_sqrt * (z - w),
+        ],
+        dim=-1,
+    )
+    return converted / torch.linalg.norm(converted, dim=-1, keepdim=True).clamp_min(1e-12)
+
+
 class TrajectoryManager:
     """Manages reference trajectories for end-effector tracking."""
     

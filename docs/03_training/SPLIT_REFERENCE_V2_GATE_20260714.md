@@ -110,3 +110,6 @@ Acceptance gates for that export:
 3. Train, validation, and holdout remain trajectory-disjoint by source episode.
 4. One bounded BC gate must improve both position p95 and orientation mean over
    the primary 84D BC baseline before any PPO discussion.
+
+The executable request schema, MATLAB CSV handoff, and stop rules are defined
+in `docs/03_training/CORRECTIVE_GIK_TEACHER_REQUEST_20260714_CN.md`.

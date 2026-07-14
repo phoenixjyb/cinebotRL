@@ -205,6 +205,7 @@ Use `scripts/two_wheel_balance/evaluate_policy.py` to reevaluate an existing che
 - Provisional controller nominal gate: 36/36 passed with an exact repeat; peak pitch was `10.91 deg`, `vx/wz` RMSE was `0.0819/0.0520`, and saturation was `0.213%`.
 - Full signed guessed-plant gate at `+/-2 N s`: 112/112 survived and recovered balance, 91/112 met strict tracking, peak pitch was `11.47 deg`, and saturation was zero.
 - Broad 6 N s stress diagnostic: 16/16 survived and recovered balance while 11/16 met strict tracking; peak pitch was `10.28 deg` and saturation was zero.
+- The default-disabled path-progress governor activated in 12/112 bias-reinforcing provisional cases and improved strict admitted tracking from 91/112 to 99/112 while preserving 112/112 balance recovery and a 0.759 progress floor. It missed the 106/112 promotion target and is rejected; the governor-off 36-case regression remained bit-for-bit equal.
 - No PPO checkpoint is valid for the corrected 8-inch/`+Y`-axis model.
 
 The rendered file under `evidence_20260711/` shows the obsolete 6-inch/pre-axis-fix asset and is retained only for provenance.
@@ -215,9 +216,9 @@ Before another optimizer run or hardware claim:
 
 1. Measure or tightly bound aggregate COM, yaw inertia, available wheel torque, tire friction, and control delay.
 2. Replace broad assumed uncertainty ranges with credible hardware ranges.
-3. Add a separately reported path-progress governor; do not promote any rejected gain candidate.
+3. Diagnose the low-COM longitudinal and negative-velocity corner-yaw failure families without another scalar gain or governor-floor sweep; the first path-progress governor is implemented but rejected and default-disabled.
 4. Replace guessed plant values with measurements before tightening tracking claims; add slopes, sensor noise, and command-rate limits only after reacceptance.
 5. Keep the repaired empty-visual USD composition check in every regenerated-asset audit.
 6. Reintroduce arm/end-effector tracking before obstacle avoidance, and only then evaluate whether a bounded residual policy adds value over the frozen controller.
 
-See `PROVISIONAL_PLANT_PRIOR_AND_ROBUST_CONTROL_20260714.md`, `PLANT_PRIOR_PROVISIONAL_V1.json`, and `evidence_20260714_provisional_prior_v1/` for the current simulation baseline. Earlier LQR documents remain provenance. The gains remain simulation-only because COM, inertia, friction, actuator torque, and delay are guessed rather than measured.
+See `PROVISIONAL_PLANT_PRIOR_AND_ROBUST_CONTROL_20260714.md`, `PLANT_PRIOR_PROVISIONAL_V1.json`, `PATH_PROGRESS_GOVERNOR_GATE_20260714.md`, and their evidence directories for the current simulation baseline and rejected governor result. Earlier LQR documents remain provenance. The gains remain simulation-only because COM, inertia, friction, actuator torque, and delay are guessed rather than measured.

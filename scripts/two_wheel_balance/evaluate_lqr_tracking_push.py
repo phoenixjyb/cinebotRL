@@ -58,6 +58,16 @@ parser.add_argument("--wz-integral-limit", type=float)
 parser.add_argument("--pitch-reference-limit-deg", type=float)
 parser.add_argument("--vx-reference-slew-rate", type=float)
 parser.add_argument("--wz-reference-slew-rate", type=float)
+parser.add_argument("--path-progress-governor", action="store_true")
+parser.add_argument("--governor-bias-start-deg", type=float, default=0.5)
+parser.add_argument("--governor-bias-full-deg", type=float, default=2.5)
+parser.add_argument("--governor-minimum-progress-scale", type=float, default=0.75)
+parser.add_argument(
+    "--tracking-reference",
+    choices=("requested", "admitted"),
+    default="requested",
+)
+parser.add_argument("--minimum-path-progress-scale", type=float, default=0.0)
 parser.add_argument(
     "--plant-uncertainty-profile",
     choices=("nominal", "provisional_prior_v1", "diagnostic_v1"),
@@ -228,6 +238,8 @@ def main() -> int:
         raise ValueError("command must settle before the pre-push balance window")
     if args.push_height_m < 0.0:
         raise ValueError("--push-height-m must be non-negative")
+    if not 0.0 <= args.minimum_path_progress_scale <= 1.0:
+        raise ValueError("--minimum-path-progress-scale must be in [0, 1]")
 
     gain_data = json.loads(args.gains.resolve().read_text(encoding="utf-8"))
     gain = np.asarray(gain_data["selected_gain"], dtype=np.float64)
@@ -327,6 +339,10 @@ def main() -> int:
             "wz_integral_limit": args.wz_integral_limit,
             "vx_reference_slew_rate_m_s2": args.vx_reference_slew_rate,
             "wz_reference_slew_rate_rad_s2": args.wz_reference_slew_rate,
+            "path_progress_governor_enabled": args.path_progress_governor,
+            "governor_bias_start_rad": np.radians(args.governor_bias_start_deg),
+            "governor_bias_full_rad": np.radians(args.governor_bias_full_deg),
+            "governor_minimum_progress_scale": args.governor_minimum_progress_scale,
             "pitch_reference_limit_rad": (
                 np.radians(args.pitch_reference_limit_deg)
                 if args.pitch_reference_limit_deg is not None
@@ -350,7 +366,14 @@ def main() -> int:
     post_vx_com_squared_error = np.zeros(args.num_envs, dtype=np.float64)
     post_vx_odometry_squared_error = np.zeros(args.num_envs, dtype=np.float64)
     post_wz_squared_error = np.zeros(args.num_envs, dtype=np.float64)
+    post_admitted_vx_squared_error = np.zeros(args.num_envs, dtype=np.float64)
+    post_admitted_wz_squared_error = np.zeros(args.num_envs, dtype=np.float64)
     post_samples = np.zeros(args.num_envs, dtype=np.int64)
+    admitted_vx_ref = np.zeros(args.num_envs, dtype=np.float64)
+    admitted_wz_ref = np.zeros(args.num_envs, dtype=np.float64)
+    path_progress_scale_min = np.ones(args.num_envs, dtype=np.float64)
+    path_progress_scale_sum = np.zeros(args.num_envs, dtype=np.float64)
+    path_progress_scale_samples = np.zeros(args.num_envs, dtype=np.int64)
     pre_pitch_max = np.zeros(args.num_envs, dtype=np.float64)
     pre_roll_max = np.zeros(args.num_envs, dtype=np.float64)
     pre_pitch_rate_max = np.zeros(args.num_envs, dtype=np.float64)
@@ -375,7 +398,7 @@ def main() -> int:
             set_push_wrench(unwrapped, np.zeros(args.num_envs))
 
         if step % control_interval == 0:
-            requested_action_np, integrals, _ = cascaded_lqr_action(
+            requested_action_np, integrals, diagnostics = cascaded_lqr_action(
                 current_states,
                 step_vx_ref,
                 step_wz_ref,
@@ -384,6 +407,15 @@ def main() -> int:
                 control_dt=control_interval / POLICY_HZ,
                 config=config,
             )
+            admitted_vx_ref = diagnostics["governed_vx_ref"]
+            admitted_wz_ref = diagnostics["governed_wz_ref"]
+            if command_active:
+                progress_scale = diagnostics["path_progress_scale"]
+                path_progress_scale_min[active] = np.minimum(
+                    path_progress_scale_min[active], progress_scale[active]
+                )
+                path_progress_scale_sum[active] += progress_scale[active]
+                path_progress_scale_samples[active] += 1
             requested_action_np = requested_action_np.astype(np.float32)
         history_index = step % len(action_history)
         action_history[history_index] = requested_action_np
@@ -411,8 +443,16 @@ def main() -> int:
         vx_odometry = config.wheel_radius_m * current_states[:, 3]
         wz_truth = state["yaw_rate"].detach().cpu().numpy()
         wheel_speed = state["max_abs_wheel_velocity"].detach().cpu().numpy()
-        vx_error = np.abs(vx_truth - step_vx_ref)
-        wz_error = np.abs(wz_truth - step_wz_ref)
+        requested_vx_error = np.abs(vx_truth - step_vx_ref)
+        requested_wz_error = np.abs(wz_truth - step_wz_ref)
+        admitted_vx_error = np.abs(vx_truth - admitted_vx_ref)
+        admitted_wz_error = np.abs(wz_truth - admitted_wz_ref)
+        if args.tracking_reference == "admitted":
+            tracking_vx_error = admitted_vx_error
+            tracking_wz_error = admitted_wz_error
+        else:
+            tracking_vx_error = requested_vx_error
+            tracking_wz_error = requested_wz_error
 
         if step == args.command_start_step - 1:
             pre_command_pitch_deg[:] = np.degrees(current_states[:, 0])
@@ -465,8 +505,8 @@ def main() -> int:
                 & active
             )
             inside_tracking = (
-                (vx_error <= args.recovery_vx_error)
-                & (wz_error <= args.recovery_wz_error)
+                (tracking_vx_error <= args.recovery_vx_error)
+                & (tracking_wz_error <= args.recovery_wz_error)
                 & active
             )
             balance_hold[inside_balance] += 1
@@ -495,6 +535,12 @@ def main() -> int:
                 vx_odometry[active] - vx_ref[active]
             )
             post_wz_squared_error[active] += np.square(wz_truth[active] - wz_ref[active])
+            post_admitted_vx_squared_error[active] += np.square(
+                vx_truth[active] - admitted_vx_ref[active]
+            )
+            post_admitted_wz_squared_error[active] += np.square(
+                wz_truth[active] - admitted_wz_ref[active]
+            )
             post_samples[active] += 1
 
         terminated_np = terminated.detach().cpu().numpy().astype(bool)
@@ -536,6 +582,27 @@ def main() -> int:
         post_wz_rmse = safe_rmse(
             post_wz_squared_error[index], int(post_samples[index])
         )
+        post_admitted_vx_rmse = safe_rmse(
+            post_admitted_vx_squared_error[index], int(post_samples[index])
+        )
+        post_admitted_wz_rmse = safe_rmse(
+            post_admitted_wz_squared_error[index], int(post_samples[index])
+        )
+        selected_post_vx_rmse = (
+            post_admitted_vx_rmse
+            if args.tracking_reference == "admitted"
+            else post_vx_rmse
+        )
+        selected_post_wz_rmse = (
+            post_admitted_wz_rmse
+            if args.tracking_reference == "admitted"
+            else post_wz_rmse
+        )
+        progress_scale_mean = (
+            path_progress_scale_sum[index] / path_progress_scale_samples[index]
+            if path_progress_scale_samples[index]
+            else 1.0
+        )
         passed = bool(
             survived[index]
             and balance_recovery_s is not None
@@ -543,9 +610,10 @@ def main() -> int:
             and tracking_recovery_s is not None
             and tracking_recovery_s <= args.maximum_recovery_s
             and max(peak_pitch_deg[index], peak_roll_deg[index]) <= args.maximum_tilt_deg
-            and post_vx_rmse <= args.maximum_post_vx_rmse
-            and post_wz_rmse <= args.maximum_post_wz_rmse
+            and selected_post_vx_rmse <= args.maximum_post_vx_rmse
+            and selected_post_wz_rmse <= args.maximum_post_wz_rmse
             and saturation_ratio <= args.maximum_saturation_ratio
+            and path_progress_scale_min[index] >= args.minimum_path_progress_scale
         )
         scenario_results.append(
             {
@@ -602,6 +670,12 @@ def main() -> int:
                 "post_vx_com_rmse": post_vx_com_rmse,
                 "post_vx_odometry_rmse": post_vx_odometry_rmse,
                 "post_wz_rmse": post_wz_rmse,
+                "post_admitted_vx_rmse": post_admitted_vx_rmse,
+                "post_admitted_wz_rmse": post_admitted_wz_rmse,
+                "selected_post_vx_rmse": selected_post_vx_rmse,
+                "selected_post_wz_rmse": selected_post_wz_rmse,
+                "path_progress_scale_min": float(path_progress_scale_min[index]),
+                "path_progress_scale_mean": float(progress_scale_mean),
                 "action_saturation_ratio": float(saturation_ratio),
                 "passed": passed,
             }
@@ -609,6 +683,28 @@ def main() -> int:
 
     total_post_samples = int(np.sum(post_samples))
     success_rate = float(np.mean([item["passed"] for item in scenario_results]))
+    aggregate_requested_vx_rmse = safe_rmse(
+        float(np.sum(post_vx_squared_error)), total_post_samples
+    )
+    aggregate_requested_wz_rmse = safe_rmse(
+        float(np.sum(post_wz_squared_error)), total_post_samples
+    )
+    aggregate_admitted_vx_rmse = safe_rmse(
+        float(np.sum(post_admitted_vx_squared_error)), total_post_samples
+    )
+    aggregate_admitted_wz_rmse = safe_rmse(
+        float(np.sum(post_admitted_wz_squared_error)), total_post_samples
+    )
+    aggregate_selected_vx_rmse = (
+        aggregate_admitted_vx_rmse
+        if args.tracking_reference == "admitted"
+        else aggregate_requested_vx_rmse
+    )
+    aggregate_selected_wz_rmse = (
+        aggregate_admitted_wz_rmse
+        if args.tracking_reference == "admitted"
+        else aggregate_requested_wz_rmse
+    )
     summary = {
         "scenarios": len(scenario_results),
         "success_rate": success_rate,
@@ -630,20 +726,30 @@ def main() -> int:
         "peak_pitch_deg_max": float(np.max(peak_pitch_deg)),
         "peak_roll_deg_max": float(np.max(peak_roll_deg)),
         "peak_wheel_speed_rad_s_max": float(np.max(peak_wheel_speed)),
-        "post_vx_rmse": safe_rmse(float(np.sum(post_vx_squared_error)), total_post_samples),
+        "post_vx_rmse": aggregate_requested_vx_rmse,
         "post_vx_com_rmse": safe_rmse(
             float(np.sum(post_vx_com_squared_error)), total_post_samples
         ),
         "post_vx_odometry_rmse": safe_rmse(
             float(np.sum(post_vx_odometry_squared_error)), total_post_samples
         ),
-        "post_wz_rmse": safe_rmse(float(np.sum(post_wz_squared_error)), total_post_samples),
+        "post_wz_rmse": aggregate_requested_wz_rmse,
+        "post_admitted_vx_rmse": aggregate_admitted_vx_rmse,
+        "post_admitted_wz_rmse": aggregate_admitted_wz_rmse,
+        "selected_post_vx_rmse": aggregate_selected_vx_rmse,
+        "selected_post_wz_rmse": aggregate_selected_wz_rmse,
+        "path_progress_scale_min": float(np.min(path_progress_scale_min)),
+        "path_progress_scale_mean": float(
+            np.sum(path_progress_scale_sum)
+            / max(int(np.sum(path_progress_scale_samples)), 1)
+        ),
         "action_saturation_ratio": int(np.sum(saturated_actions))
         / max(int(np.sum(action_samples)), 1),
     }
     result = {
-        "schema": "recomo_two_wheel_cascaded_lqr_tracking_push_gate_v2",
+        "schema": "recomo_two_wheel_cascaded_lqr_tracking_push_gate_v3",
         "seed": args.seed,
+        "tracking_reference": args.tracking_reference,
         "gains": str(args.gains.resolve()),
         "selected_gain_scale": gain_data["selected_gain_scale"],
         "controller": {
@@ -658,6 +764,10 @@ def main() -> int:
             "pitch_bias_limit_deg": float(np.degrees(config.pitch_bias_limit_rad)),
             "vx_reference_slew_rate_m_s2": config.vx_reference_slew_rate_m_s2,
             "wz_reference_slew_rate_rad_s2": config.wz_reference_slew_rate_rad_s2,
+            "path_progress_governor_enabled": config.path_progress_governor_enabled,
+            "governor_bias_start_deg": float(np.degrees(config.governor_bias_start_rad)),
+            "governor_bias_full_deg": float(np.degrees(config.governor_bias_full_rad)),
+            "governor_minimum_progress_scale": config.governor_minimum_progress_scale,
             "pitch_reference_limit_deg": float(
                 np.degrees(config.pitch_reference_limit_rad)
             ),
@@ -691,6 +801,8 @@ def main() -> int:
             "delay_interpretation": "whole policy steps at 200 Hz",
         },
         "thresholds": {
+            "tracking_reference": args.tracking_reference,
+            "minimum_path_progress_scale": args.minimum_path_progress_scale,
             "minimum_success_rate": args.minimum_success_rate,
             "maximum_recovery_s": args.maximum_recovery_s,
             "recovery_tilt_deg": args.recovery_tilt_deg,
@@ -721,9 +833,10 @@ def main() -> int:
     }
     result["passed"] = bool(
         success_rate >= args.minimum_success_rate
-        and summary["post_vx_rmse"] <= args.maximum_post_vx_rmse
-        and summary["post_wz_rmse"] <= args.maximum_post_wz_rmse
+        and summary["selected_post_vx_rmse"] <= args.maximum_post_vx_rmse
+        and summary["selected_post_wz_rmse"] <= args.maximum_post_wz_rmse
         and summary["action_saturation_ratio"] <= args.maximum_saturation_ratio
+        and summary["path_progress_scale_min"] >= args.minimum_path_progress_scale
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2), encoding="utf-8")

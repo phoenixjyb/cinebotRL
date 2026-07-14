@@ -189,6 +189,43 @@ def test_cascaded_lqr_slews_references_and_persists_effective_commands() -> None
     np.testing.assert_allclose(controller_state[:, 4:], [[0.02, -0.04]])
 
 
+def test_cascaded_lqr_governor_retimes_only_bias_reinforcing_motion() -> None:
+    gain = np.zeros((2, len(LQR_STATE_NAMES)))
+    controller_state = np.zeros((3, 6))
+    controller_state[:, 2] = np.radians([3.0, 3.0, 0.25])
+    controller_state[:, 3] = 1.0
+    _, _, diagnostics = cascaded_lqr_action(
+        np.zeros((3, len(LQR_STATE_NAMES))),
+        np.array([0.2, -0.2, 0.2]),
+        np.array([0.4, -0.4, 0.4]),
+        gain,
+        controller_state,
+        control_dt=0.02,
+        config=CascadedLQRConfig(path_progress_governor_enabled=True),
+    )
+    np.testing.assert_allclose(diagnostics["path_progress_scale"], [0.75, 1.0, 1.0])
+    np.testing.assert_allclose(diagnostics["governed_vx_ref"], [0.15, -0.2, 0.2])
+    np.testing.assert_allclose(diagnostics["governed_wz_ref"], [0.3, -0.4, 0.4])
+    np.testing.assert_allclose(diagnostics["requested_vx_ref"], [0.2, -0.2, 0.2])
+
+
+def test_cascaded_lqr_governor_is_disabled_by_default() -> None:
+    controller_state = np.zeros((1, 6))
+    controller_state[0, 2:4] = [np.radians(4.0), 1.0]
+    _, _, diagnostics = cascaded_lqr_action(
+        np.zeros((1, len(LQR_STATE_NAMES))),
+        np.array([0.2]),
+        np.array([0.4]),
+        np.zeros((2, len(LQR_STATE_NAMES))),
+        controller_state,
+        control_dt=0.02,
+        config=CascadedLQRConfig(),
+    )
+    np.testing.assert_allclose(diagnostics["path_progress_scale"], [1.0])
+    np.testing.assert_allclose(diagnostics["governed_vx_ref"], [0.2])
+    np.testing.assert_allclose(diagnostics["governed_wz_ref"], [0.4])
+
+
 def test_cascaded_lqr_estimates_equilibrium_pitch_only_at_zero_command() -> None:
     gain = np.zeros((2, len(LQR_STATE_NAMES)))
     states = np.zeros((1, len(LQR_STATE_NAMES)))
@@ -311,6 +348,8 @@ def test_cascaded_lqr_defaults_match_selected_tracking_gate() -> None:
     assert config.wz_ki == 0.10
     assert config.wz_integral_limit == 2.0
     assert config.wheel_difference_kp == 0.0
+    assert not config.path_progress_governor_enabled
+    assert config.governor_minimum_progress_scale == 0.75
     assert np.isclose(np.degrees(config.pitch_reference_limit_rad), 6.0)
     assert config.action_limit == 0.8
 

@@ -1,0 +1,45 @@
+{
+  "schema": "recomo_two_wheel_path_progress_governor_gate_summary_v1",
+  "date": "2026-07-14",
+  "decision": "rejected_not_promoted",
+  "training_started": false,
+  "ppo_allowed": false,
+  "acceptance": {
+    "minimum_strict_admitted_tracking_cases": 106,
+    "required_balance_recovery_cases": 112,
+    "maximum_peak_tilt_deg": 12.0,
+    "minimum_path_progress_scale": 0.75
+  },
+  "provisional_112": {
+    "strict_admitted_tracking_cases": 99,
+    "survival_cases": 112,
+    "balance_recovery_cases": 112,
+    "tracking_recovery_cases": 104,
+    "peak_pitch_deg": 9.226696968078613,
+    "requested_vx_rmse": 0.09043735440489145,
+    "requested_wz_rmse": 0.0841452566129589,
+    "admitted_vx_rmse": 0.08500635328526891,
+    "admitted_wz_rmse": 0.07337435165847095,
+    "minimum_path_progress_scale": 0.758989083891059,
+    "mean_path_progress_scale": 0.9753133853194789,
+    "scaled_cases": 12,
+    "scaled_cases_passed": 12,
+    "remaining_failure_families": {
+      "com_z_minus_0p03_longitudinal": 8,
+      "negative_vx_corner_yaw": 4,
+      "inertia_1p15_recovery_2p05s": 1
+    }
+  },
+  "governor_off_nominal_36": {
+    "passed_cases": 36,
+    "peak_pitch_deg": 10.91089153289795,
+    "vx_rmse": 0.0818930801200202,
+    "wz_rmse": 0.05204797026867061,
+    "action_saturation_ratio": 0.0021308134148601073,
+    "legacy_aggregate_fields_exactly_equal": true
+  },
+  "full_artifacts": [
+    "artifacts/two_wheel_balance/path_progress_governor/provisional112.json",
+    "artifacts/two_wheel_balance/path_progress_governor/governor_off_nominal36.json"
+  ]
+}

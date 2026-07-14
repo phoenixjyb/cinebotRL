@@ -119,6 +119,10 @@ class CascadedLQRConfig:
     pitch_bias_pitch_rate_threshold: float = 0.05
     vx_reference_slew_rate_m_s2: float = 0.0
     wz_reference_slew_rate_rad_s2: float = 0.0
+    path_progress_governor_enabled: bool = False
+    governor_bias_start_rad: float = math.radians(0.5)
+    governor_bias_full_rad: float = math.radians(2.5)
+    governor_minimum_progress_scale: float = 0.75
     action_limit: float = 0.8
 
 
@@ -282,19 +286,45 @@ def cascaded_lqr_action(
         or config.wz_reference_slew_rate_rad_s2 < 0.0
     ):
         raise ValueError("adaptation and reference slew rates must be non-negative")
+    if not (
+        0.0 <= config.governor_bias_start_rad < config.governor_bias_full_rad
+        and 0.0 < config.governor_minimum_progress_scale <= 1.0
+    ):
+        raise ValueError("invalid path progress governor limits")
 
-    effective_vx_ref = vx_ref.copy()
-    effective_wz_ref = wz_ref.copy()
+    stored_pitch_bias = (
+        integrals[:, 2].copy()
+        if integrals.shape[1] >= 3
+        else np.zeros(batch, dtype=np.float64)
+    )
+    path_progress_scale = np.ones(batch, dtype=np.float64)
+    if config.path_progress_governor_enabled:
+        bias_severity = np.clip(
+            (np.abs(stored_pitch_bias) - config.governor_bias_start_rad)
+            / (config.governor_bias_full_rad - config.governor_bias_start_rad),
+            0.0,
+            1.0,
+        )
+        reinforces_equilibrium_bias = stored_pitch_bias * vx_ref > 0.0
+        path_progress_scale[reinforces_equilibrium_bias] -= (
+            bias_severity[reinforces_equilibrium_bias]
+            * (1.0 - config.governor_minimum_progress_scale)
+        )
+    governed_vx_ref = vx_ref * path_progress_scale
+    governed_wz_ref = wz_ref * path_progress_scale
+
+    effective_vx_ref = governed_vx_ref.copy()
+    effective_wz_ref = governed_wz_ref.copy()
     if integrals.shape[1] == 6:
         if config.vx_reference_slew_rate_m_s2 > 0.0:
             maximum_delta = config.vx_reference_slew_rate_m_s2 * control_dt
             effective_vx_ref = integrals[:, 4] + np.clip(
-                vx_ref - integrals[:, 4], -maximum_delta, maximum_delta
+                governed_vx_ref - integrals[:, 4], -maximum_delta, maximum_delta
             )
         if config.wz_reference_slew_rate_rad_s2 > 0.0:
             maximum_delta = config.wz_reference_slew_rate_rad_s2 * control_dt
             effective_wz_ref = integrals[:, 5] + np.clip(
-                wz_ref - integrals[:, 5], -maximum_delta, maximum_delta
+                governed_wz_ref - integrals[:, 5], -maximum_delta, maximum_delta
             )
     vx_estimate = config.wheel_radius_m * states[:, 3]
     vx_error = effective_vx_ref - vx_estimate
@@ -399,6 +429,11 @@ def cascaded_lqr_action(
     actions[:, 1] += yaw_correction
     actions = np.clip(actions, -config.action_limit, config.action_limit)
     diagnostics = {
+        "requested_vx_ref": vx_ref,
+        "requested_wz_ref": wz_ref,
+        "governed_vx_ref": governed_vx_ref,
+        "governed_wz_ref": governed_wz_ref,
+        "path_progress_scale": path_progress_scale,
         "vx_estimate": vx_estimate,
         "effective_vx_ref": effective_vx_ref,
         "effective_wz_ref": effective_wz_ref,

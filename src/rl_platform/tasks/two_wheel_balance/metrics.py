@@ -117,6 +117,8 @@ class CascadedLQRConfig:
     pitch_bias_limit_rad: float = math.radians(4.0)
     pitch_bias_command_threshold: float = 0.01
     pitch_bias_pitch_rate_threshold: float = 0.05
+    vx_reference_slew_rate_m_s2: float = 0.0
+    wz_reference_slew_rate_rad_s2: float = 0.0
     action_limit: float = 0.8
 
 
@@ -256,11 +258,11 @@ def cascaded_lqr_action(
         raise ValueError(f"invalid gain shape: {gain.shape}")
     if vx_ref.shape != (batch,) or wz_ref.shape != (batch,):
         raise ValueError("command arrays must match the state batch")
-    valid_controller_state_shapes = ((batch, 2), (batch, 3), (batch, 4))
+    valid_controller_state_shapes = ((batch, 2), (batch, 3), (batch, 4), (batch, 6))
     if integrals.shape not in valid_controller_state_shapes:
         raise ValueError(
             "expected controller state shape "
-            f"{(batch, 2)}, {(batch, 3)}, or {(batch, 4)}, got {integrals.shape}"
+            f"{(batch, 2)}, {(batch, 3)}, {(batch, 4)}, or {(batch, 6)}, got {integrals.shape}"
         )
     if control_dt <= 0.0:
         raise ValueError("control_dt must be positive")
@@ -274,12 +276,29 @@ def cascaded_lqr_action(
         or config.action_limit <= 0.0
     ):
         raise ValueError("controller limits must be positive")
-    if config.pitch_bias_adaptation_rate < 0.0:
-        raise ValueError("pitch bias adaptation rate must be non-negative")
+    if (
+        config.pitch_bias_adaptation_rate < 0.0
+        or config.vx_reference_slew_rate_m_s2 < 0.0
+        or config.wz_reference_slew_rate_rad_s2 < 0.0
+    ):
+        raise ValueError("adaptation and reference slew rates must be non-negative")
 
+    effective_vx_ref = vx_ref.copy()
+    effective_wz_ref = wz_ref.copy()
+    if integrals.shape[1] == 6:
+        if config.vx_reference_slew_rate_m_s2 > 0.0:
+            maximum_delta = config.vx_reference_slew_rate_m_s2 * control_dt
+            effective_vx_ref = integrals[:, 4] + np.clip(
+                vx_ref - integrals[:, 4], -maximum_delta, maximum_delta
+            )
+        if config.wz_reference_slew_rate_rad_s2 > 0.0:
+            maximum_delta = config.wz_reference_slew_rate_rad_s2 * control_dt
+            effective_wz_ref = integrals[:, 5] + np.clip(
+                wz_ref - integrals[:, 5], -maximum_delta, maximum_delta
+            )
     vx_estimate = config.wheel_radius_m * states[:, 3]
-    vx_error = vx_ref - vx_estimate
-    wz_error = wz_ref - states[:, 5]
+    vx_error = effective_vx_ref - vx_estimate
+    wz_error = effective_wz_ref - states[:, 5]
     candidate_integrals = integrals.copy()
     candidate_integrals[:, 0] = np.clip(
         candidate_integrals[:, 0] + control_dt * vx_error,
@@ -291,6 +310,9 @@ def cascaded_lqr_action(
         -config.wz_integral_limit,
         config.wz_integral_limit,
     )
+    if integrals.shape[1] == 6:
+        candidate_integrals[:, 4] = effective_vx_ref
+        candidate_integrals[:, 5] = effective_wz_ref
 
     # A forward command first pulls the wheels back to create a forward lean;
     # the frozen balance LQR then drives the wheels under the falling body.
@@ -315,7 +337,7 @@ def cascaded_lqr_action(
         )
         pitch_bias_calibrated = (
             integrals[:, 3] >= 0.5
-            if integrals.shape[1] == 4
+            if integrals.shape[1] >= 4
             else np.zeros(batch, dtype=bool)
         )
         pitch_bias_adapting = (
@@ -333,7 +355,7 @@ def cascaded_lqr_action(
             pitch_bias, -config.pitch_bias_limit_rad, config.pitch_bias_limit_rad
         )
         next_integrals[:, 2] = pitch_bias
-        if integrals.shape[1] == 4:
+        if integrals.shape[1] >= 4:
             pitch_bias_calibrated |= ~zero_command
             next_integrals[:, 3] = pitch_bias_calibrated.astype(np.float64)
     applied_pitch_bias = np.where(pitch_bias_adapting, 0.0, pitch_bias)
@@ -344,10 +366,10 @@ def cascaded_lqr_action(
     )
     tracking_states = states.copy()
     tracking_states[:, 0] -= applied_pitch_bias + pitch_reference
-    tracking_states[:, 3] -= vx_ref / config.wheel_radius_m
+    tracking_states[:, 3] -= effective_vx_ref / config.wheel_radius_m
     tracking_states[:, 4] -= (
         config.wheel_track_m / config.wheel_radius_m
-    ) * wz_ref
+    ) * effective_wz_ref
     actions = lqr_action(
         tracking_states,
         gain,
@@ -355,12 +377,12 @@ def cascaded_lqr_action(
     )
     wheel_difference_target = (
         config.wheel_track_m / config.wheel_radius_m
-    ) * wz_ref
+    ) * effective_wz_ref
     wheel_difference_error = wheel_difference_target - states[:, 4]
     yaw_correction = (
         config.wz_kp * wz_error
         + config.wz_ki * next_integrals[:, 1]
-        + config.wz_feedforward * wz_ref
+        + config.wz_feedforward * effective_wz_ref
         + config.wheel_difference_kp * wheel_difference_error
     )
     yaw_unclipped = actions[:, 1] + yaw_correction
@@ -371,13 +393,15 @@ def cascaded_lqr_action(
     yaw_correction = (
         config.wz_kp * wz_error
         + config.wz_ki * next_integrals[:, 1]
-        + config.wz_feedforward * wz_ref
+        + config.wz_feedforward * effective_wz_ref
         + config.wheel_difference_kp * wheel_difference_error
     )
     actions[:, 1] += yaw_correction
     actions = np.clip(actions, -config.action_limit, config.action_limit)
     diagnostics = {
         "vx_estimate": vx_estimate,
+        "effective_vx_ref": effective_vx_ref,
+        "effective_wz_ref": effective_wz_ref,
         "vx_error": vx_error,
         "wz_error": wz_error,
         "wheel_difference_error": wheel_difference_error,

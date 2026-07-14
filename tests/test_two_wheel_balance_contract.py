@@ -156,6 +156,39 @@ def test_cascaded_lqr_blocks_integrators_that_drive_further_into_limits() -> Non
     assert diagnostics["wz_integrator_blocked"][0]
 
 
+def test_cascaded_lqr_slews_references_and_persists_effective_commands() -> None:
+    gain = np.zeros((2, len(LQR_STATE_NAMES)))
+    config = CascadedLQRConfig(
+        vx_reference_slew_rate_m_s2=0.5,
+        wz_reference_slew_rate_rad_s2=1.0,
+    )
+    _, controller_state, diagnostics = cascaded_lqr_action(
+        np.zeros((1, len(LQR_STATE_NAMES))),
+        np.array([0.2]),
+        np.array([-0.4]),
+        gain,
+        np.zeros((1, 6)),
+        control_dt=0.02,
+        config=config,
+    )
+    np.testing.assert_allclose(diagnostics["effective_vx_ref"], [0.01])
+    np.testing.assert_allclose(diagnostics["effective_wz_ref"], [-0.02])
+    np.testing.assert_allclose(controller_state[:, 4:], [[0.01, -0.02]])
+
+    _, controller_state, diagnostics = cascaded_lqr_action(
+        np.zeros((1, len(LQR_STATE_NAMES))),
+        np.array([0.2]),
+        np.array([-0.4]),
+        gain,
+        controller_state,
+        control_dt=0.02,
+        config=config,
+    )
+    np.testing.assert_allclose(diagnostics["effective_vx_ref"], [0.02])
+    np.testing.assert_allclose(diagnostics["effective_wz_ref"], [-0.04])
+    np.testing.assert_allclose(controller_state[:, 4:], [[0.02, -0.04]])
+
+
 def test_cascaded_lqr_estimates_equilibrium_pitch_only_at_zero_command() -> None:
     gain = np.zeros((2, len(LQR_STATE_NAMES)))
     states = np.zeros((1, len(LQR_STATE_NAMES)))

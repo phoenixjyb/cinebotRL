@@ -111,7 +111,7 @@ def main() -> int:
     unwrapped = raw_env.unwrapped
     set_push_wrench(unwrapped, 0.0)
     current_states = obs["policy"][:, : len(LQR_STATE_NAMES)].detach().cpu().numpy()
-    integrals = np.zeros((1, 4), dtype=np.float64)
+    integrals = np.zeros((1, 6), dtype=np.float64)
     action_np = np.zeros((1, 2), dtype=np.float32)
     peak_pitch_deg = 0.0
     peak_roll_deg = 0.0

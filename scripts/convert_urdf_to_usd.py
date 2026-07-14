@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert URDF to USD using Isaac Sim's URDF importer.
+r"""Convert URDF to USD using Isaac Sim's URDF importer.
 
 This script must be run through Isaac Lab's launcher (isaaclab.bat) to access
 the Isaac Sim Python environment and URDF importer.
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 # Isaac Sim app launcher must be imported first
 from isaaclab.app import AppLauncher
@@ -78,7 +79,7 @@ except ImportError:
         spec = importlib.util.spec_from_file_location("_urdf", pyd_path)
         _urdf = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(_urdf)
-from pxr import Usd, UsdPhysics
+from pxr import Tf, Usd, UsdPhysics
 
 def set_if_available(obj, name: str, value) -> None:
     """Set an Isaac Sim importer option only if this version exposes it."""
@@ -86,6 +87,38 @@ def set_if_available(obj, name: str, value) -> None:
         setattr(obj, name, value)
     else:
         print(f"Skipping unsupported URDF importer option: {name}")
+
+
+def remove_empty_visual_references(urdf_path: Path, usd_path: Path) -> list[str]:
+    """Remove importer reference arcs for links that intentionally have no visual."""
+    urdf_root = ET.parse(urdf_path).getroot()
+    links_without_visuals = [
+        link.attrib["name"]
+        for link in urdf_root.findall("link")
+        if link.find("visual") is None
+    ]
+    base_layer_path = (
+        usd_path.parent / "configuration" / f"{usd_path.stem}_base.usd"
+    )
+    base_stage = Usd.Stage.Open(str(base_layer_path))
+    if not base_stage or not base_stage.GetDefaultPrim():
+        raise RuntimeError(f"failed to open generated base layer: {base_layer_path}")
+
+    root_path = base_stage.GetDefaultPrim().GetPath()
+    cleared: list[str] = []
+    for link_name in links_without_visuals:
+        visual_path = (
+            root_path.AppendChild(Tf.MakeValidIdentifier(link_name))
+            .AppendChild("visuals")
+        )
+        visual_prim = base_stage.GetPrimAtPath(visual_path)
+        if visual_prim and visual_prim.GetMetadata("references") is not None:
+            visual_prim.GetReferences().ClearReferences()
+            cleared.append(str(visual_path))
+
+    if cleared:
+        base_stage.GetRootLayer().Save()
+    return cleared
 
 
 def main():
@@ -153,6 +186,14 @@ def main():
             return 1
 
         print(f"URDF imported successfully to: {prim_path}")
+
+        cleared_visual_references = remove_empty_visual_references(
+            urdf_path, usd_path
+        )
+        if cleared_visual_references:
+            print("Removed empty visual references:")
+            for path in cleared_visual_references:
+                print(f"  {path}")
         
         # Open the stage to verify
         print("Opening USD stage for verification...")
@@ -182,7 +223,9 @@ def main():
         print(f"Total prims: {len(all_prims)}")
         
         # Count articulation links
-        articulation_prims = [p for p in stage.Traverse() if p.IsA(UsdPhysics.RigidBodyAPI)]
+        articulation_prims = [
+            p for p in stage.Traverse() if p.HasAPI(UsdPhysics.RigidBodyAPI)
+        ]
         print(f"Rigid bodies (links): {len(articulation_prims)}")
         
         # Count joints

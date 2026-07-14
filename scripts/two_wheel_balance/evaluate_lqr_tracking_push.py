@@ -56,6 +56,8 @@ parser.add_argument("--wz-feedforward", type=float)
 parser.add_argument("--vx-integral-limit", type=float)
 parser.add_argument("--wz-integral-limit", type=float)
 parser.add_argument("--pitch-reference-limit-deg", type=float)
+parser.add_argument("--vx-reference-slew-rate", type=float)
+parser.add_argument("--wz-reference-slew-rate", type=float)
 parser.add_argument(
     "--plant-uncertainty-profile",
     choices=("nominal", "provisional_prior_v1", "diagnostic_v1"),
@@ -304,7 +306,7 @@ def main() -> int:
     active = np.ones(args.num_envs, dtype=bool)
     survived = np.zeros(args.num_envs, dtype=bool)
     duration_steps = np.full(args.num_envs, args.horizon_steps, dtype=np.int64)
-    integrals = np.zeros((args.num_envs, 4), dtype=np.float64)
+    integrals = np.zeros((args.num_envs, 6), dtype=np.float64)
     requested_action_np = np.zeros(
         (args.num_envs, len(ACTION_NAMES)), dtype=np.float32
     )
@@ -323,6 +325,8 @@ def main() -> int:
             "wz_feedforward": args.wz_feedforward,
             "vx_integral_limit": args.vx_integral_limit,
             "wz_integral_limit": args.wz_integral_limit,
+            "vx_reference_slew_rate_m_s2": args.vx_reference_slew_rate,
+            "wz_reference_slew_rate_rad_s2": args.wz_reference_slew_rate,
             "pitch_reference_limit_rad": (
                 np.radians(args.pitch_reference_limit_deg)
                 if args.pitch_reference_limit_deg is not None
@@ -652,6 +656,8 @@ def main() -> int:
             "wz_integral_limit": config.wz_integral_limit,
             "pitch_bias_adaptation_rate": config.pitch_bias_adaptation_rate,
             "pitch_bias_limit_deg": float(np.degrees(config.pitch_bias_limit_rad)),
+            "vx_reference_slew_rate_m_s2": config.vx_reference_slew_rate_m_s2,
+            "wz_reference_slew_rate_rad_s2": config.wz_reference_slew_rate_rad_s2,
             "pitch_reference_limit_deg": float(
                 np.degrees(config.pitch_reference_limit_rad)
             ),

@@ -14,7 +14,7 @@ Task: `RecomoTwoWheelBalance-v0`
 | Floating articulation and effort drives | Passed | Asset audit |
 | Passive fall and forbidden body contact | Passed | Gate 0 logs/artifacts |
 | Common/yaw effort direction | Passed after 8-inch wheel-axis correction | 2026-07-12 8-inch evidence |
-| 10D observation / 2D action contract | Passed | 16 pure contract tests |
+| 10D observation / 2D action contract | Passed | 22 pure contract tests |
 | Deterministic `32 x 2048` smoke | Passed | Two byte-equivalent metric runs |
 | Corrected-plant scripted PD controllability | Passed | Mean upright duration 113 -> 409 steps |
 | Fresh 28 kg inner-LQR recovery | Passed | 6/6 signed `+/-2/5/8 deg` starts recovered |
@@ -22,6 +22,8 @@ Task: `RecomoTwoWheelBalance-v0`
 | Cascaded low-speed `vx/wz` tracking | Passed | 32/32 survived signed commands and reversals |
 | Corrected 28 kg combined tracking plus push | Passed | 36/36 passed; exact seeded repeat |
 | Provisional guessed-plant signed safety gate | Passed for balance | 112/112 survive and recover balance; 91/112 strict tracking |
+| USD visual-reference composition | Passed after empty-visual repair | Asset audit and warning-free stage open |
+| Robust fixed-gain tracking closure | Rejected; defaults unchanged | Best sweep result missed safety/95% acceptance |
 | Deterministic plant-uncertainty smoke | Failed | 16/16 survived, but only 7/16 met all tracking limits |
 | URDF-to-PhysX mass contract | Passed | 28.000 kg authored and 27.999998 kg resolved |
 | PPO learning signal at 65,536 steps | Failed; stop rule active | PPO gate metrics |
@@ -54,6 +56,7 @@ The prior accepted gates actually ran on an unintended `30 kg` plant and are ret
 
 See `LQR_28KG_MODEL_AND_OUTER_LOOP_GATE_20260714.md` for the mass allocation, corrected metrics, uncertainty boundary, and stop rule.
 See `PROVISIONAL_PLANT_PRIOR_AND_ROBUST_CONTROL_20260714.md` and `PLANT_PRIOR_PROVISIONAL_V1.json` for guessed parameters and their replacement procedure.
+See `ROBUST_TRACKING_CLOSURE_DIAGNOSIS_20260714.md` for the repaired USD composition, rejected gain sweep, and next structural controller boundary.
 
 ### Historical pre-correction diagnosis and residual gate
 
@@ -212,9 +215,9 @@ Before another optimizer run or hardware claim:
 
 1. Measure or tightly bound aggregate COM, yaw inertia, available wheel torque, tire friction, and control delay.
 2. Replace broad assumed uncertainty ranges with credible hardware ranges.
-3. Evaluate torque/inertia-normalized yaw feedforward, anti-windup, or gain scheduling; do not increase the accepted integral gains.
+3. Add a separately reported path-progress governor; do not promote any rejected gain candidate.
 4. Replace guessed plant values with measurements before tightening tracking claims; add slopes, sensor noise, and command-rate limits only after reacceptance.
-5. Repair the existing `arm_mount_link` and `upper_imu_link` visual-reference warnings before further rendered evidence.
+5. Keep the repaired empty-visual USD composition check in every regenerated-asset audit.
 6. Reintroduce arm/end-effector tracking before obstacle avoidance, and only then evaluate whether a bounded residual policy adds value over the frozen controller.
 
 See `PROVISIONAL_PLANT_PRIOR_AND_ROBUST_CONTROL_20260714.md`, `PLANT_PRIOR_PROVISIONAL_V1.json`, and `evidence_20260714_provisional_prior_v1/` for the current simulation baseline. Earlier LQR documents remain provenance. The gains remain simulation-only because COM, inertia, friction, actuator torque, and delay are guessed rather than measured.

@@ -1,0 +1,70 @@
+{
+  "schema": "recomo_two_wheel_robust_tracking_candidate_summary_v1",
+  "date": "2026-07-14",
+  "requested_gate": {
+    "scenarios": 112,
+    "minimum_success_rate": 0.95,
+    "required_balance_recovery_rate": 1.0,
+    "maximum_peak_pitch_deg": 12.0
+  },
+  "accepted_baseline": {
+    "vx_ki": 0.05,
+    "wz_ki": 0.1,
+    "wz_feedforward": 0.6,
+    "success_count": 91,
+    "balance_recovery_count": 112,
+    "peak_pitch_deg": 11.46527099609375
+  },
+  "candidates": [
+    {
+      "name": "vx_ki_0p06",
+      "success_count": 93,
+      "balance_recovery_count": 112,
+      "peak_pitch_deg": 11.684406280517578,
+      "accepted": false
+    },
+    {
+      "name": "vx_ki_0p075",
+      "success_count": 95,
+      "balance_recovery_count": 111,
+      "peak_pitch_deg": 11.994623184204102,
+      "accepted": false
+    },
+    {
+      "name": "vx_ki_0p075_slew_0p4_0p8",
+      "success_count": 96,
+      "balance_recovery_count": 112,
+      "peak_pitch_deg": 12.00316047668457,
+      "accepted": false
+    },
+    {
+      "name": "vx_ki_0p1_pitch_limit_5p5_slew_0p2_0p8",
+      "success_count": 98,
+      "balance_recovery_count": 110,
+      "peak_pitch_deg": 12.458642959594727,
+      "accepted": false
+    },
+    {
+      "name": "vx_ki_0p075_wz_ki_0p125_yaw_ff_0p7_slew",
+      "success_count": 97,
+      "balance_recovery_count": 112,
+      "peak_pitch_deg": 12.445775032043457,
+      "accepted": false
+    },
+    {
+      "name": "pitch_rate_gain_1p3",
+      "success_count": 96,
+      "balance_recovery_count": 110,
+      "peak_pitch_deg": 12.799253463745117,
+      "accepted": false
+    },
+    {
+      "name": "pitch_rate_gain_0p7",
+      "success_count": 0,
+      "balance_recovery_count": 112,
+      "peak_pitch_deg": 13.187670707702637,
+      "accepted": false
+    }
+  ],
+  "decision": "No candidate met all acceptance criteria. Keep the accepted controller defaults unchanged and keep PPO blocked."
+}

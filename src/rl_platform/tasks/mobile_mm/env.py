@@ -24,7 +24,10 @@ from rl_platform.tasks.mobile_mm.joint_names import (
     POLICY_BASE_WZ_ACTION_INDEX,
 )
 from rl_platform.tasks.mobile_mm.action_contracts import DEFAULT_ACTION_CONTRACT, get_action_contract
-from rl_platform.tasks.mobile_mm.rs4_adapter import Rs4RateAdapterConfig
+from rl_platform.tasks.mobile_mm.rs4_adapter import (
+    Rs4RateAdapterConfig,
+    quaternion_world_error_rotvec_rad_torch,
+)
 
 try:
     # Isaac Lab 2.2.0 pip package uses 'isaaclab' not 'omni.isaac.lab'
@@ -398,18 +401,29 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         self.action_contract = get_action_contract(cfg.task_config.action_contract_name)
         print(f"[MobileMMTrackEE] Active action contract: {self.action_contract.describe()}")
-        if self.action_contract.name == "rs4_attitude_rate_v1":
+        attitude_adapter_contracts = {"rs4_attitude_rate_v1", "split_base_arm_attitude_v1"}
+        if self.action_contract.name in attitude_adapter_contracts:
             if not cfg.task_config.experimental_rs4_adapter:
                 raise RuntimeError(
-                    "rs4_attitude_rate_v1 was requested, but the RS4 simulator adapter is not wired yet. "
-                    "This guard prevents silently executing RS4 policy outputs through the old "
-                    "sim_6joint_gimbal_v1 joint-target path. Re-run with the default "
-                    "sim_6joint_gimbal_v1 contract, or continue by explicitly wiring the experimental RS4 adapter."
+                    f"{self.action_contract.name} requires explicit --experimental_rs4_adapter opt-in."
                 )
+        if self.action_contract.name == "rs4_attitude_rate_v1":
             print(
                 "[MobileMMTrackEE] EXPERIMENTAL: rs4_attitude_rate_v1 will map "
                 "policy [yaw,pitch,roll] rates onto simulated gimbal joints "
                 "[joint3_yaw,joint2_roll,joint1_pitch]. This is not hardware-equivalence proof."
+            )
+        elif self.action_contract.name == "split_base_arm_attitude_v1":
+            required_orientation_contract = "semantic_dfr_to_physical_cam_v1"
+            actual_orientation_contract = cfg.task_config.trajectory.target_orientation_contract
+            if actual_orientation_contract != required_orientation_contract:
+                raise RuntimeError(
+                    "split_base_arm_attitude_v1 requires Option-B target conversion "
+                    f"{required_orientation_contract!r}, got {actual_orientation_contract!r}"
+                )
+            print(
+                "[MobileMMTrackEE] EXPERIMENTAL: split_base_arm_attitude_v1 ignores policy "
+                "channels 3:6 and drives the physical gimbal from Option-B cam_link attitude error."
             )
 
         scene_needs_rebuild = False
@@ -720,7 +734,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             f"{self.max_arm_target_delta:.4f} rad/control-step, "
             f"arm_envelope={self.arm_action_envelope_profile}"
         )
-        self.rs4_rate_adapter_config = Rs4RateAdapterConfig()
+        self.rs4_rate_adapter_config = Rs4RateAdapterConfig(
+            enable_roll=self.action_contract.name == "split_base_arm_attitude_v1"
+        )
         self.rs4_max_policy_rates_rad_s = torch.tensor(
             np.deg2rad(self.rs4_rate_adapter_config.max_policy_order_rates),
             device=self.device,
@@ -732,9 +748,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             dtype=torch.float32,
         )
         self.rs4_prev_policy_rates_rad_s = torch.zeros(self.num_envs, 3, device=self.device)
-        if self.action_contract.name == "rs4_attitude_rate_v1":
+        if self.action_contract.name in attitude_adapter_contracts:
             print(
-                "[MobileMMTrackEE] RS4 sim adapter: "
+                "[MobileMMTrackEE] attitude sim adapter: "
                 f"max_rates_deg_s={self.rs4_rate_adapter_config.max_policy_order_rates.tolist()}, "
                 f"max_accels_deg_s2={self.rs4_rate_adapter_config.max_policy_order_accels.tolist()}, "
                 f"enable_roll={self.rs4_rate_adapter_config.enable_roll}"
@@ -1525,6 +1541,10 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         actions = torch.nan_to_num(actions, nan=0.0, posinf=1.0, neginf=-1.0)
         actions = torch.clamp(actions, -1.0, 1.0)
 
+        if self.action_contract.name == "split_base_arm_attitude_v1":
+            actions = actions.clone()
+            actions[:, 3:6] = 0.0
+
         base_action_slew_limit = float(getattr(self.task_cfg, "base_action_slew_limit", 0.0))
         if base_action_slew_limit > 0.0:
             base_slice = slice(POLICY_BASE_VX_ACTION_INDEX, POLICY_BASE_WZ_ACTION_INDEX + 1)
@@ -1568,9 +1588,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Apply arm/gimbal targets according to the selected contract.
         self._verify_joint_mapping()
         self._arm_joint_ids = self._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
-        if self.action_contract.name == "rs4_attitude_rate_v1":
+        if self.action_contract.name in {"rs4_attitude_rate_v1", "split_base_arm_attitude_v1"}:
             arm_actions = actions[:, 0:3]
-            rs4_rate_actions = actions[:, 3:6]
             arm_actions_scaled = self._scale_actions_to_joint_limits(arm_actions, joint_start=0)
 
             if not self._arm_command_filter_initialized:
@@ -1581,31 +1600,66 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             target_all = self.filtered_arm_targets.clone()
             target_all[:, 0:3] = arm_actions_scaled
 
-            # Policy order is [yaw, pitch, roll]. Roll is masked by default in the
-            # config until RS4 mixed-mode roll behavior is validated.
-            desired_policy_rates = rs4_rate_actions * self.rs4_max_policy_rates_rad_s
-            if not self.rs4_rate_adapter_config.enable_roll:
-                desired_policy_rates[:, 2] = 0.0
+            if self.action_contract.name == "split_base_arm_attitude_v1":
+                self._initialize_ee_body_idx()
+                current_cam_quat = self.robot.data.body_quat_w[:, self._ee_body_idx, :]
+                _, target_cam_quat = self.trajectory_manager.get_target_pose()
+                self.split_attitude_residual_rad = quaternion_world_error_rotvec_rad_torch(
+                    current_cam_quat,
+                    target_cam_quat,
+                )
+                desired_world_angular_velocity = (
+                    self.split_attitude_residual_rad
+                    / float(self.task_cfg.split_attitude_response_horizon_s)
+                )
+                max_world_rate = torch.max(self.rs4_max_policy_rates_rad_s)
+                desired_world_angular_velocity = torch.clamp(
+                    desired_world_angular_velocity,
+                    -max_world_rate,
+                    max_world_rate,
+                )
+                angular_jacobian = self._get_split_gimbal_angular_jacobian()
+                damping = float(self.task_cfg.split_attitude_dls_damping)
+                identity = torch.eye(3, dtype=angular_jacobian.dtype, device=self.device)
+                normal = angular_jacobian @ angular_jacobian.transpose(1, 2)
+                solved = torch.linalg.solve(
+                    normal + damping * damping * identity.unsqueeze(0),
+                    desired_world_angular_velocity.unsqueeze(-1),
+                )
+                desired_control_rates = (
+                    angular_jacobian.transpose(1, 2) @ solved
+                ).squeeze(-1)
+                physical_rate_limits = self.rs4_max_policy_rates_rad_s[[0, 2, 1]]
+                desired_control_rates = torch.clamp(
+                    desired_control_rates,
+                    -physical_rate_limits,
+                    physical_rate_limits,
+                )
+                control_accel_limits = self.rs4_max_policy_accels_rad_s2[[0, 2, 1]]
+            else:
+                # Policy order is [yaw, pitch, roll]. Roll remains masked until
+                # the deployment mixed-mode behavior is validated.
+                desired_policy_rates = actions[:, 3:6] * self.rs4_max_policy_rates_rad_s
+                if not self.rs4_rate_adapter_config.enable_roll:
+                    desired_policy_rates[:, 2] = 0.0
+                desired_control_rates = desired_policy_rates
+                control_accel_limits = self.rs4_max_policy_accels_rad_s2
 
             dt = self.cfg.sim.dt * self.cfg.decimation
-            max_rate_delta = self.rs4_max_policy_accels_rad_s2 * dt
+            max_rate_delta = control_accel_limits * dt
             rate_delta = torch.clamp(
-                desired_policy_rates - self.rs4_prev_policy_rates_rad_s,
+                desired_control_rates - self.rs4_prev_policy_rates_rad_s,
                 -max_rate_delta,
                 max_rate_delta,
             )
             self.rs4_prev_policy_rates_rad_s = self.rs4_prev_policy_rates_rad_s + rate_delta
 
-            # Simulated URDF gimbal target order is [yaw, roll, pitch] for
-            # [joint3_gimbal_yaw, joint2_gimbal_roll, joint1_gimbal_pitch].
-            sim_gimbal_rates = torch.stack(
-                [
-                    self.rs4_prev_policy_rates_rad_s[:, 0],
-                    self.rs4_prev_policy_rates_rad_s[:, 2],
-                    self.rs4_prev_policy_rates_rad_s[:, 1],
-                ],
-                dim=1,
-            )
+            if self.action_contract.name == "split_base_arm_attitude_v1":
+                # DLS output is already physical [yaw, roll, pitch] joint order.
+                sim_gimbal_rates = self.rs4_prev_policy_rates_rad_s
+            else:
+                # Policy [yaw,pitch,roll] -> physical [yaw,roll,pitch].
+                sim_gimbal_rates = self.rs4_prev_policy_rates_rad_s[:, [0, 2, 1]]
             target_all[:, 3:6] = target_all[:, 3:6] + sim_gimbal_rates * dt
             self._initialize_joint_limits()
             margin = self.robot_limits["joint_limit_margin"]
@@ -1615,6 +1669,11 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 self.joint_upper_limits[3:6] - margin,
             )
             arm_actions_filtered = self._filter_arm_position_targets(target_all)
+            if self.action_contract.name == "split_base_arm_attitude_v1":
+                # target_all already obeys the gimbal rate, acceleration, and joint
+                # limits. Do not apply the slower Realman arm target slew a second time.
+                arm_actions_filtered[:, 3:6] = target_all[:, 3:6]
+                self.filtered_arm_targets[:, 3:6] = target_all[:, 3:6]
         else:
             # Existing sim_6joint_gimbal_v1 path: 6 normalized absolute joint targets.
             arm_actions = actions[:, POLICY_ARM_ACTION_SLICE]
@@ -1950,6 +2009,30 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         )
         self.filtered_arm_targets = self.filtered_arm_targets + target_delta
         return self.filtered_arm_targets
+
+    def _get_split_gimbal_angular_jacobian(self) -> torch.Tensor:
+        """Return the world-frame cam_link angular Jacobian for physical gimbal joints."""
+
+        jacobians = self.robot.root_physx_view.get_jacobians()
+        if jacobians.ndim != 4:
+            raise RuntimeError(f"expected 4D articulation Jacobian, got {tuple(jacobians.shape)}")
+        if not hasattr(self, "_split_ee_jacobian_index"):
+            body_offset = int(jacobians.shape[1]) - len(self.robot.body_names)
+            joint_offset = int(jacobians.shape[-1]) - len(self.robot.joint_names)
+            ee_index = int(self._ee_body_idx) + body_offset
+            gimbal_joint_ids = [
+                self.robot.joint_names.index(name)
+                for name in ARM_JOINT_NAMES[3:6]
+            ]
+            columns = [joint_offset + joint_id for joint_id in gimbal_joint_ids]
+            if not 0 <= ee_index < int(jacobians.shape[1]):
+                raise RuntimeError(f"cam_link Jacobian index {ee_index} is out of range")
+            if any(column < 0 or column >= int(jacobians.shape[-1]) for column in columns):
+                raise RuntimeError(f"physical gimbal Jacobian columns are out of range: {columns}")
+            self._split_ee_jacobian_index = ee_index
+            self._split_gimbal_jacobian_columns = columns
+        angular = jacobians[:, self._split_ee_jacobian_index, 3:6, :]
+        return angular[:, :, self._split_gimbal_jacobian_columns]
 
     def _sanitize_arm_joint_state(self, env_ids: torch.Tensor | None = None) -> None:
         """Project arm joint state back into a finite, safe envelope.
@@ -2357,6 +2440,22 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         # Base position controlled directly via root velocity commands (no joint accumulation)
         joint_pos = self.robot.data.joint_pos
         joint_vel = self.robot.data.joint_vel
+        if self.action_contract.name == "split_base_arm_attitude_v1":
+            physical_arm_ids = self._get_joint_ids(ARM_JOINT_NAMES, "_arm_joint_ids")
+            zero_base = torch.zeros(self.num_envs, 3, dtype=joint_pos.dtype, device=self.device)
+            joint_pos_for_observation = torch.cat(
+                [zero_base, joint_pos[:, physical_arm_ids]],
+                dim=1,
+            )
+            joint_vel_for_observation = torch.cat(
+                [zero_base, joint_vel[:, physical_arm_ids]],
+                dim=1,
+            )
+        else:
+            # Preserve legacy policy observations; those checkpoints were trained
+            # before the interleaved virtual-joint layout was corrected.
+            joint_pos_for_observation = joint_pos
+            joint_vel_for_observation = joint_vel
 
         # Base position from PhysX root (actual world position)
         base_pos = self.robot.data.root_pos_w.clone()
@@ -2431,8 +2530,8 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             base_quat=base_quat,
             base_lin_vel=base_lin_vel_obs,  # Pass normalized velocities
             base_ang_vel=base_ang_vel_obs,  # Pass normalized velocities
-            joint_pos=joint_pos,
-            joint_vel=joint_vel,
+            joint_pos=joint_pos_for_observation,
+            joint_vel=joint_vel_for_observation,
             ee_pos=ee_pos,
             ee_quat=ee_quat,
             ee_lin_vel=ee_lin_vel,
@@ -3090,6 +3189,28 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         new_root_state[:, 1] = reset_anchor_pos[env_ids, 1] - reset_base_y_offset
         new_root_state[:, 2] = 0.0  # Ground level (matches runtime clamping line 1162)
         # Keep orientation from default (facing forward)
+
+        if self.task_cfg.trajectory.reset_base_to_trajectory_metadata:
+            metadata = getattr(self.trajectory_manager, "current_trajectory_metadata", [])
+            base_used = 0
+            for local_idx, env_id in enumerate(env_ids.detach().cpu().tolist()):
+                if env_id >= len(metadata):
+                    continue
+                raw_meta = metadata[env_id].get("metadata", {})
+                raw_base = raw_meta.get("initial_base_pose_xyyaw") if isinstance(raw_meta, dict) else None
+                if not isinstance(raw_base, (list, tuple)) or len(raw_base) != 3:
+                    continue
+                candidate = torch.tensor(raw_base, dtype=new_root_state.dtype, device=self.device)
+                if not torch.isfinite(candidate).all():
+                    continue
+                yaw = candidate[2]
+                new_root_state[local_idx, 0:2] = candidate[0:2]
+                new_root_state[local_idx, 3:7] = torch.stack(
+                    [torch.cos(0.5 * yaw), yaw.new_zeros(()), yaw.new_zeros(()), torch.sin(0.5 * yaw)]
+                )
+                base_used += 1
+            if self.task_cfg.debug_resets and base_used:
+                print(f"[RESET] Applied trajectory metadata base reset for {base_used}/{len(env_ids)} env(s)")
 
         # Reset velocities to zero
         new_root_state[:, 7:10] = 0.0  # Linear velocity

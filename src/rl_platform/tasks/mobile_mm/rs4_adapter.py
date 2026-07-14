@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+import torch
 
 
 POLICY_ATTITUDE_RATE_ORDER = ("yaw", "pitch", "roll")
@@ -144,6 +145,89 @@ def quaternion_residual_policy_rates_deg_s(
         bounded = bounded.copy()
         bounded[..., 2] = 0.0
     return bounded.astype(np.float32), policy_residual_deg.astype(np.float32)
+
+
+def quaternion_residual_policy_rates_rad_s_torch(
+    current_quat_wxyz: torch.Tensor,
+    target_quat_wxyz: torch.Tensor,
+    *,
+    response_horizon_s: float,
+    max_policy_rates_rad_s: torch.Tensor,
+    enable_roll: bool = True,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Return bounded local camera-error rates for the live split adapter."""
+
+    if response_horizon_s <= 0.0:
+        raise ValueError(f"response_horizon_s must be positive, got {response_horizon_s}")
+    if current_quat_wxyz.shape != target_quat_wxyz.shape or current_quat_wxyz.shape[-1] != 4:
+        raise ValueError(
+            "current and target quaternions must have the same [...,4] shape, got "
+            f"{tuple(current_quat_wxyz.shape)} and {tuple(target_quat_wxyz.shape)}"
+        )
+    if max_policy_rates_rad_s.shape != (3,):
+        raise ValueError(f"max_policy_rates_rad_s must have shape (3,), got {tuple(max_policy_rates_rad_s.shape)}")
+
+    current = torch.nn.functional.normalize(current_quat_wxyz, dim=-1)
+    target = torch.nn.functional.normalize(target_quat_wxyz, dim=-1)
+    current_conjugate = current.clone()
+    current_conjugate[..., 1:] *= -1.0
+
+    w1, x1, y1, z1 = current_conjugate.unbind(dim=-1)
+    w2, x2, y2, z2 = target.unbind(dim=-1)
+    relative = torch.stack(
+        [
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ],
+        dim=-1,
+    )
+    relative = relative * torch.where(relative[..., :1] < 0.0, -1.0, 1.0)
+    vector = relative[..., 1:]
+    vector_norm = torch.linalg.vector_norm(vector, dim=-1, keepdim=True)
+    angle = 2.0 * torch.atan2(vector_norm, torch.clamp(relative[..., :1], -1.0, 1.0))
+    axis = vector / torch.clamp(vector_norm, min=1e-12)
+    policy_residual = (axis * angle)[..., [2, 1, 0]]
+    desired_rates = policy_residual / float(response_horizon_s)
+    desired_rates = torch.clamp(desired_rates, -max_policy_rates_rad_s, max_policy_rates_rad_s)
+    if not enable_roll:
+        desired_rates = desired_rates.clone()
+        desired_rates[..., 2] = 0.0
+    return desired_rates, policy_residual
+
+
+def quaternion_world_error_rotvec_rad_torch(
+    current_quat_wxyz: torch.Tensor,
+    target_quat_wxyz: torch.Tensor,
+) -> torch.Tensor:
+    """Return the shortest current-to-target rotation vector in world axes."""
+
+    if current_quat_wxyz.shape != target_quat_wxyz.shape or current_quat_wxyz.shape[-1] != 4:
+        raise ValueError(
+            "current and target quaternions must have the same [...,4] shape, got "
+            f"{tuple(current_quat_wxyz.shape)} and {tuple(target_quat_wxyz.shape)}"
+        )
+    current = torch.nn.functional.normalize(current_quat_wxyz, dim=-1)
+    target = torch.nn.functional.normalize(target_quat_wxyz, dim=-1)
+    current_conjugate = current.clone()
+    current_conjugate[..., 1:] *= -1.0
+    w1, x1, y1, z1 = target.unbind(dim=-1)
+    w2, x2, y2, z2 = current_conjugate.unbind(dim=-1)
+    relative = torch.stack(
+        [
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ],
+        dim=-1,
+    )
+    relative = relative * torch.where(relative[..., :1] < 0.0, -1.0, 1.0)
+    vector = relative[..., 1:]
+    vector_norm = torch.linalg.vector_norm(vector, dim=-1, keepdim=True)
+    angle = 2.0 * torch.atan2(vector_norm, torch.clamp(relative[..., :1], -1.0, 1.0))
+    return vector / torch.clamp(vector_norm, min=1e-12) * angle
 
 
 def quaternion_feedforward_policy_rates_deg_s(

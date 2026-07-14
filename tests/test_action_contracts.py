@@ -9,6 +9,7 @@ from rl_platform.tasks.mobile_mm.action_contracts import (
     DEFAULT_ACTION_CONTRACT,
     RS4_ATTITUDE_RATE_V1,
     SIM_6JOINT_GIMBAL_V1,
+    SPLIT_BASE_ARM_ATTITUDE_V1,
 )
 
 
@@ -56,13 +57,25 @@ def test_rs4_contract_is_named_but_not_default_or_deployment_ready():
 def test_contract_registry_contains_unique_names():
     assert ACTION_CONTRACTS[SIM_6JOINT_GIMBAL_V1.name] is SIM_6JOINT_GIMBAL_V1
     assert ACTION_CONTRACTS[RS4_ATTITUDE_RATE_V1.name] is RS4_ATTITUDE_RATE_V1
-    assert len(ACTION_CONTRACTS) == 2
+    assert ACTION_CONTRACTS[SPLIT_BASE_ARM_ATTITUDE_V1.name] is SPLIT_BASE_ARM_ATTITUDE_V1
+    assert len(ACTION_CONTRACTS) == 3
 
 
-@pytest.mark.parametrize("contract", [SIM_6JOINT_GIMBAL_V1, RS4_ATTITUDE_RATE_V1])
+def test_split_contract_preserves_9d_compatibility_but_separates_ownership():
+    assert SPLIT_BASE_ARM_ATTITUDE_V1.name == "split_base_arm_attitude_v1"
+    assert SPLIT_BASE_ARM_ATTITUDE_V1.action_dim == 9
+    assert SPLIT_BASE_ARM_ATTITUDE_V1.arm_indices == (0, 1, 2)
+    assert SPLIT_BASE_ARM_ATTITUDE_V1.gimbal_or_attitude_indices == (3, 4, 5)
+    assert SPLIT_BASE_ARM_ATTITUDE_V1.base_indices == (6, 7, 8)
+    assert all("reserved" in name for name in SPLIT_BASE_ARM_ATTITUDE_V1.channel_names[3:6])
+
+
+@pytest.mark.parametrize(
+    "contract",
+    [SIM_6JOINT_GIMBAL_V1, RS4_ATTITUDE_RATE_V1, SPLIT_BASE_ARM_ATTITUDE_V1],
+)
 def test_contract_indices_and_channels_are_consistent(contract):
     assert tuple(channel.index for channel in contract.channels) == tuple(range(contract.action_dim))
     assert len(set(contract.channel_names)) == contract.action_dim
     assert contract.base_indices == (6, 7, 8)
     assert contract.describe().startswith(f"{contract.name} (9D):")
-

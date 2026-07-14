@@ -102,6 +102,12 @@ def parse_args() -> argparse.Namespace:
         choices=["auto", "cpu", "cuda"],
     )
     parser.add_argument(
+        "--pretrained_policy",
+        type=str,
+        default=None,
+        help="Optional grouped SB3 policy whose actor weights initialize this bounded BC update.",
+    )
+    parser.add_argument(
         "--use_action_mask",
         action="store_true",
         help="Use action_valid_mask from the demo file and compute MSE only on valid labels.",
@@ -285,7 +291,20 @@ def train_bc(
             shared_hidden_dims=shared_hidden_dims,
             head_hidden_dim=args.grouped_head_hidden_dim,
         ).to(device)
+        if args.pretrained_policy:
+            from stable_baselines3 import PPO
+
+            pretrained_path = Path(args.pretrained_policy)
+            if not pretrained_path.is_absolute():
+                pretrained_path = PROJECT_ROOT / pretrained_path
+            if not pretrained_path.exists():
+                raise FileNotFoundError(f"pretrained policy not found: {pretrained_path}")
+            pretrained = PPO.load(str(pretrained_path), device=device)
+            net.extractor.load_state_dict(pretrained.policy.mlp_extractor.state_dict(), strict=True)
+            print(f"[INFO] Initialized grouped actor from: {pretrained_path}")
     else:
+        if args.pretrained_policy:
+            raise ValueError("--pretrained_policy currently requires --policy_arch grouped")
         net = build_mlp(args.obs_dim, hidden_sizes, args.act_dim).to(device)
 
     # Split train / val
@@ -536,6 +555,11 @@ def save_as_sb3_policy(
 
 def main() -> None:
     args = parse_args()
+
+    np.random.seed(args.split_seed)
+    torch.manual_seed(args.split_seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.split_seed)
 
     if args.device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"

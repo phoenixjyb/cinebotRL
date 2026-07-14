@@ -41,6 +41,7 @@ class TrajectoryConfig:
     start_waypoint_max_fraction_initial: float | None = None  # Optional curriculum start value
     start_waypoint_fraction_decay_steps: int = 0  # Timesteps to ramp initial max fraction to final max fraction
     reset_base_to_trajectory_start: bool = False  # Keep base near waypoint zero while target starts later
+    reset_base_to_trajectory_metadata: bool = False  # Use per-trajectory [x,y,yaw] when present
     reset_anchor_target_blend: float = 0.0  # 0=start anchor, 1=current target anchor
     reset_anchor_target_blend_initial: float | None = None  # Optional curriculum start value
     reset_anchor_target_blend_decay_steps: int = 0  # Timesteps to decay initial blend to final blend
@@ -301,6 +302,8 @@ class MobileMMTrackConfig:
     # RS4-aware simulator adapter and dataset schema are fully wired.
     action_contract_name: str = DEFAULT_ACTION_CONTRACT_NAME
     experimental_rs4_adapter: bool = False
+    split_attitude_response_horizon_s: float = 0.35
+    split_attitude_dls_damping: float = 0.04
     arm_action_envelope_profile: str = "proto2_safe_v1"
 
     # Episode settings

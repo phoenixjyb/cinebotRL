@@ -39,6 +39,7 @@ data/policy_envelope_fk_base040/policy_preserve_fullstart_base040_20260708.npz
 data/policy_envelope_fk_base040/tail_dagger_contractz_p80_20260707.npz
 data/policy_envelope_fk_large/
 trajectoryToLearn/stage0_policy_envelope_fk_large/
+trajectoryToLearn/stage_gik_split_teacher_accepted62*/
 wandb/
 .idea/
 .vscode/

@@ -145,6 +145,9 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
                 if self.task_config.obstacles.observation_mode == "relative_two_v2"
                 else 1
             ),
+            use_reference_conditioning=(
+                self.task_config.observation_contract_name == "split_reference_v2"
+            ),
         )
 
         # Define observation space (continuous, normalized)
@@ -426,6 +429,21 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 "channels 3:6 and drives the physical gimbal from Option-B cam_link attitude error."
             )
 
+        observation_contract = cfg.task_config.observation_contract_name
+        if observation_contract not in {"legacy_v1", "split_reference_v2"}:
+            raise ValueError(f"unsupported observation contract: {observation_contract}")
+        if observation_contract == "split_reference_v2":
+            if self.action_contract.name != "split_base_arm_attitude_v1":
+                raise RuntimeError("split_reference_v2 requires split_base_arm_attitude_v1")
+            if cfg.task_config.trajectory.type not in {"recorded", "multi_recorded"}:
+                raise RuntimeError("split_reference_v2 requires a recorded trajectory")
+            if cfg.task_config.lookahead_dt <= 0.0 or cfg.task_config.reference_time_scale_s <= 0.0:
+                raise ValueError("split_reference_v2 lookahead/time scales must be positive")
+            print(
+                "[MobileMMTrackEE] Observation contract split_reference_v2: "
+                "progress, remaining time, target velocity, and physical-camera attitude lookahead."
+            )
+
         scene_needs_rebuild = False
         obstacle_cfg = cfg.task_config.obstacles
         if enable_obstacles_override is not None:
@@ -501,6 +519,9 @@ class MobileMMTrackEEEnv(DirectRLEnv):
                 cfg.task_config.obstacles.num_obstacles * 5
                 if cfg.task_config.obstacles.observation_mode == "relative_two_v2"
                 else 1
+            ),
+            use_reference_conditioning=(
+                cfg.task_config.observation_contract_name == "split_reference_v2"
             ),
         )
         cfg.observation_space = gym.spaces.Box(
@@ -2487,10 +2508,33 @@ class MobileMMTrackEEEnv(DirectRLEnv):
 
         # Optional: Lookahead
         lookahead_pos = None
+        lookahead_quat = None
         if self.task_cfg.use_lookahead:
-            lookahead_pos, _ = self.trajectory_manager.get_lookahead(
+            lookahead_pos, lookahead_quat = self.trajectory_manager.get_lookahead(
                 steps=self.task_cfg.lookahead_steps,
                 lookahead_dt=self.task_cfg.lookahead_dt,
+            )
+        trajectory_progress = None
+        trajectory_time_remaining = None
+        target_lin_vel = None
+        if self.task_cfg.observation_contract_name == "split_reference_v2":
+            if lookahead_pos is None or lookahead_quat is None:
+                lookahead_pos, lookahead_quat = self.trajectory_manager.get_lookahead(
+                    steps=self.task_cfg.lookahead_steps,
+                    lookahead_dt=self.task_cfg.lookahead_dt,
+                )
+            trajectory_progress, remaining_s = self.trajectory_manager.get_progress_and_time_remaining()
+            trajectory_time_remaining = torch.clamp(
+                remaining_s / float(self.task_cfg.reference_time_scale_s),
+                0.0,
+                2.0,
+            )
+            target_lin_vel = torch.clamp(
+                (lookahead_pos[:, 0, :] - target_pos)
+                / float(self.task_cfg.lookahead_dt)
+                / float(self.robot_limits["max_linear_velocity"]),
+                -2.0,
+                2.0,
             )
 
         # Normalize base velocities for observations (to match policy's expected range [0,1])
@@ -2539,6 +2583,14 @@ class MobileMMTrackEEEnv(DirectRLEnv):
             target_pos=target_pos,
             target_quat=target_quat,
             lookahead_pos=lookahead_pos,
+            lookahead_quat=(
+                lookahead_quat
+                if self.task_cfg.observation_contract_name == "split_reference_v2"
+                else None
+            ),
+            trajectory_progress=trajectory_progress,
+            trajectory_time_remaining=trajectory_time_remaining,
+            target_lin_vel=target_lin_vel,
             action_history=self.action_history,
             contact_forces=contact_obs,   # Collision severity [num_envs, 1]: 0=clean, →1 at heavy collision
             min_obstacle_dist=obstacle_obs,

@@ -58,6 +58,30 @@ class TestGetObservationDimensions:
         dim_la = get_observation_dimensions(num_joints=6, use_lookahead=True, lookahead_steps=3)
         assert dim_la == dim_no + 3 * 3  # 3 steps × 3 (xyz)
 
+    def test_with_reference_conditioning(self):
+        legacy = get_observation_dimensions(
+            num_joints=6,
+            num_contacts=1,
+            use_lookahead=True,
+            lookahead_steps=3,
+            use_action_history=True,
+            action_history_length=2,
+            action_dim=9,
+        )
+        reference_v2 = get_observation_dimensions(
+            num_joints=6,
+            num_contacts=1,
+            use_lookahead=True,
+            lookahead_steps=3,
+            use_action_history=True,
+            action_history_length=2,
+            action_dim=9,
+            use_reference_conditioning=True,
+        )
+
+        assert legacy == 84
+        assert reference_v2 == 98
+
     def test_with_action_history(self):
         dim_no = get_observation_dimensions(num_joints=6, use_action_history=False)
         dim_ah = get_observation_dimensions(
@@ -140,6 +164,31 @@ class TestComposeObservationShape:
         obs = compose_observation(**kwargs)
         expected_dim = get_observation_dimensions(num_joints=6, use_lookahead=True, lookahead_steps=3)
         assert obs.shape == (N, expected_dim)
+
+    def test_with_reference_conditioning(self):
+        kwargs = _base_obs_kwargs()
+        kwargs.update(
+            lookahead_pos=torch.zeros(N, 3, 3),
+            lookahead_quat=_unit_quat(N)[:, None, :].repeat(1, 3, 1),
+            trajectory_progress=torch.full((N, 1), 0.25),
+            trajectory_time_remaining=torch.full((N, 1), 0.75),
+            target_lin_vel=torch.zeros(N, 3),
+            contact_forces=torch.zeros(N, 1),
+            action_history=torch.zeros(N, 2, 9),
+        )
+        obs = compose_observation(**kwargs)
+        expected_dim = get_observation_dimensions(
+            num_joints=6,
+            num_contacts=1,
+            use_lookahead=True,
+            lookahead_steps=3,
+            use_action_history=True,
+            action_history_length=2,
+            action_dim=9,
+            use_reference_conditioning=True,
+        )
+        assert obs.shape == (N, expected_dim)
+        assert torch.isfinite(obs).all()
 
     def test_with_action_history(self):
         kwargs = _base_obs_kwargs()

@@ -67,6 +67,26 @@ def test_semantic_dfr_to_physical_cam_is_right_multiply_rz_90():
     torch.testing.assert_close(converted, expected)
 
 
+def test_recorded_progress_and_remaining_time_use_real_length_and_fractional_time():
+    manager = TrajectoryManager(
+        "recorded",
+        num_envs=1,
+        device="cpu",
+        dt=0.05,
+        waypoint_dt=0.1,
+    )
+    manager.recorded_positions = torch.zeros(1, 6, 3)
+    manager.recorded_orientations = _unit_orientations(1, 6)
+    manager.recorded_lengths = torch.tensor([5], dtype=torch.long)
+    manager.current_waypoint_idx[:] = 1
+    manager._recorded_time_accum[:] = 0.05
+
+    progress, remaining_s = manager.get_progress_and_time_remaining()
+
+    torch.testing.assert_close(progress, torch.tensor([[0.375]]))
+    torch.testing.assert_close(remaining_s, torch.tensor([[0.25]]))
+
+
 def test_trajectory_manager_applies_option_b_at_target_boundary():
     manager = TrajectoryManager(
         "recorded",

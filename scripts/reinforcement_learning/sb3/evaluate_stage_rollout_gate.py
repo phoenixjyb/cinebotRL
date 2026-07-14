@@ -184,6 +184,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--experimental_rs4_adapter", action="store_true")
     parser.add_argument(
+        "--observation_contract",
+        choices=["legacy_v1", "split_reference_v2"],
+        default=None,
+        help="Defaults to the stage reset_config contract, then legacy_v1.",
+    )
+    parser.add_argument(
         "--base_action_scale",
         type=float,
         default=1.0,
@@ -290,6 +296,12 @@ def load_stage_reset_config(stage: str) -> dict[str, object]:
         out["reset_arm_to_trajectory_metadata"] = bool(data["reset_arm_to_trajectory_metadata"])
     if "trajectory_dt" in data:
         out["trajectory_dt"] = float(data["trajectory_dt"])
+    if "lookahead_dt" in data:
+        out["lookahead_dt"] = float(data["lookahead_dt"])
+    if "observation_contract" in data:
+        out["observation_contract"] = str(data["observation_contract"])
+    if "reference_time_scale_s" in data:
+        out["reference_time_scale_s"] = float(data["reference_time_scale_s"])
     raw_reward_overrides = data.get("reward_overrides", {})
     if isinstance(raw_reward_overrides, dict):
         out["reward_overrides"] = {
@@ -466,6 +478,19 @@ def main() -> int:
         if "trajectory_dt" in reset_config:
             env_cfg.task_config.trajectory_dt = float(reset_config["trajectory_dt"])
             print(f"[gate] trajectory dt={env_cfg.task_config.trajectory_dt:.4f}s", flush=True)
+        if "lookahead_dt" in reset_config:
+            env_cfg.task_config.lookahead_dt = float(reset_config["lookahead_dt"])
+        env_cfg.task_config.observation_contract_name = (
+            args.observation_contract
+            or str(reset_config.get("observation_contract", "legacy_v1"))
+        )
+        if "reference_time_scale_s" in reset_config:
+            env_cfg.task_config.reference_time_scale_s = float(reset_config["reference_time_scale_s"])
+        print(
+            f"[gate] observation contract={env_cfg.task_config.observation_contract_name} "
+            f"lookahead_dt={env_cfg.task_config.lookahead_dt:.4f}s",
+            flush=True,
+        )
         env_cfg.scene.num_envs = args.num_envs
         env_cfg.seed = args.seed
         if args.episode_length_s > 0.0:
@@ -1083,6 +1108,7 @@ def main() -> int:
             "base_action_scale": float(args.base_action_scale),
             "arm_action_envelope_profile": str(args.arm_action_envelope_profile),
             "target_orientation_contract": target_orientation_contract,
+            "observation_contract": env_cfg.task_config.observation_contract_name,
             "initial_joint_randomization": bool(args.enable_initial_joint_randomization),
             "initial_ee_pos_error_mean_m": float(np.mean(initial_pos_error)),
             "final_ee_pos_error_mean_m": float(np.mean(final_pos_error)),

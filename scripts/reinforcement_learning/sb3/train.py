@@ -755,6 +755,12 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--observation_contract",
+        choices=["legacy_v1", "split_reference_v2"],
+        default=None,
+        help="Defaults to trajectory stage reset_config, then legacy_v1.",
+    )
+    parser.add_argument(
         "--disable_recovery_stability_preset",
         action="store_true",
         help="Do not auto-apply lower LR / target_kl defaults for stage1_recovery.",
@@ -2486,6 +2492,14 @@ def main():
                         )
                     if "trajectory_dt" in reset_config:
                         trajectory_config["trajectory_dt"] = float(reset_config["trajectory_dt"])
+                    if "lookahead_dt" in reset_config:
+                        trajectory_config["lookahead_dt"] = float(reset_config["lookahead_dt"])
+                    if "observation_contract" in reset_config:
+                        trajectory_config["observation_contract"] = str(reset_config["observation_contract"])
+                    if "reference_time_scale_s" in reset_config:
+                        trajectory_config["reference_time_scale_s"] = float(
+                            reset_config["reference_time_scale_s"]
+                        )
                     raw_reward_overrides = reset_config.get("reward_overrides", {})
                     if isinstance(raw_reward_overrides, dict):
                         stage_reward_overrides = {
@@ -2582,10 +2596,25 @@ def main():
         env_cfg.task_config.arm_action_envelope_profile = args.arm_action_envelope_profile
         if "trajectory_dt" in trajectory_config:
             env_cfg.task_config.trajectory_dt = float(trajectory_config["trajectory_dt"])
+        if "lookahead_dt" in trajectory_config:
+            env_cfg.task_config.lookahead_dt = float(trajectory_config["lookahead_dt"])
+        env_cfg.task_config.observation_contract_name = (
+            args.observation_contract
+            or str(trajectory_config.get("observation_contract", "legacy_v1"))
+        )
+        if "reference_time_scale_s" in trajectory_config:
+            env_cfg.task_config.reference_time_scale_s = float(
+                trajectory_config["reference_time_scale_s"]
+            )
         print(
             "    Action contract: "
             f"{env_cfg.task_config.action_contract_name} "
             f"(experimental_rs4_adapter={env_cfg.task_config.experimental_rs4_adapter})"
+        )
+        print(
+            "    Observation contract: "
+            f"{env_cfg.task_config.observation_contract_name} "
+            f"(lookahead_dt={env_cfg.task_config.lookahead_dt:.3f}s)"
         )
         print(f"    Arm action envelope: {env_cfg.task_config.arm_action_envelope_profile}")
         

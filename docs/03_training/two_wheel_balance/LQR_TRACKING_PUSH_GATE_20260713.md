@@ -1,5 +1,9 @@
 # Cascaded LQR Tracking-Plus-Push Gate
 
+> **Superseded 2026-07-14:** this accepted result ran on the unintended 30 kg
+> PhysX plant. The corrected 28 kg evidence is in
+> `LQR_28KG_MODEL_AND_OUTER_LOOP_GATE_20260714.md`.
+
 Date: 2026-07-13
 
 Branch: `codex/two-wheel-balance-rl`
@@ -92,8 +96,8 @@ pitch of `6.440 deg`.
 ## Scope boundary
 
 This is a simulation-only result for the `30.0 kg` PhysX-resolved plant. The
-URDF explicitly authors `26.0 kg`, but four fixed links without inertials resolve
-to `1.0 kg` each. It is not the approximately `40 kg` complete robot and does not establish
+URDF explicitly authored `26.0 kg`, but four fixed links without inertials resolved
+to `1.0 kg` each. It is not the corrected `28.0 kg` model and does not establish
 robustness to mass, COM, inertia, wheel friction, motor torque, sensor noise,
 control delay, slopes, arm motion, end-effector tracking, obstacles, or hardware.
 No PPO was started.

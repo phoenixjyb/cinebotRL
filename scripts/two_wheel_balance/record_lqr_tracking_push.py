@@ -188,7 +188,9 @@ def main() -> int:
         "selected_gain_scale": gain_data["selected_gain_scale"],
         "controller": {
             "vx_kp": config.vx_kp,
+            "vx_ki": config.vx_ki,
             "wz_kp": config.wz_kp,
+            "wz_ki": config.wz_ki,
             "wz_feedforward": config.wz_feedforward,
         },
         "training_started": False,

@@ -1,5 +1,10 @@
 # LQR Plant-Uncertainty Smoke
 
+> **Superseded 2026-07-14:** this document describes the unintended 30 kg
+> runtime plant and obsolete 40 kg stress assumption. Use
+> `LQR_28KG_MODEL_AND_OUTER_LOOP_GATE_20260714.md` for the corrected 28 kg
+> model, controller, and uncertainty boundary.
+
 Date: 2026-07-13
 
 Branch: `codex/two-wheel-balance-rl`

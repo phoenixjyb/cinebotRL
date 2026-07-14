@@ -1,0 +1,29 @@
+{
+  "video": "G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\28kg_fresh_inner_tracking_push_video\\two-wheel-lqr-tracking-push-step-0.mp4",
+  "steps_requested": 600,
+  "steps_recorded": 600,
+  "fps": 50,
+  "playback_slowdown": 4.0,
+  "vx_ref_m_s": 0.2,
+  "wz_ref_rad_s": -0.4,
+  "command_start_video_s": 2.0,
+  "push_force_n": -60.0,
+  "push_impulse_ns": -6.0,
+  "push_height_m": 0.5,
+  "push_start_video_s": 6.0,
+  "push_end_video_s": 6.4,
+  "peak_pitch_deg": 7.502742767333984,
+  "peak_roll_deg": 0.00017166852082852046,
+  "peak_wheel_speed_rad_s": 2.9338932037353516,
+  "terminated": false,
+  "truncated": false,
+  "selected_gain_scale": 0.6,
+  "controller": {
+    "vx_kp": 0.6,
+    "vx_ki": 0.05,
+    "wz_kp": 0.25,
+    "wz_ki": 0.05,
+    "wz_feedforward": 0.6
+  },
+  "training_started": false
+}

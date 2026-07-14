@@ -48,7 +48,12 @@ import gymnasium as gym
 import torch
 
 from rl_platform.tasks.two_wheel_balance import RecomoTwoWheelBalanceEnvCfg
-from rl_platform.tasks.two_wheel_balance.metrics import ACTION_NAMES, LQR_STATE_NAMES, lqr_action
+from rl_platform.tasks.two_wheel_balance.metrics import (
+    ACTION_NAMES,
+    LQR_STATE_NAMES,
+    lqr_action,
+    recovery_window_steps,
+)
 from task_spec import register_isaac_lab_tasks
 
 
@@ -155,6 +160,9 @@ def main() -> int:
         args.push_duration_steps,
     )
     scenario_forces = np.asarray([item["push_force_x_n"] for item in scenarios])
+    initial_condition_only, evaluation_start_step, recovery_start_step = (
+        recovery_window_steps(scenario_forces, args.push_start_step, push_end_step)
+    )
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -182,7 +190,7 @@ def main() -> int:
     recovery_hold = np.zeros(args.num_envs, dtype=np.int64)
     recovery_steps = np.full(args.num_envs, -1, dtype=np.int64)
     duration_steps = np.full(args.num_envs, args.horizon_steps, dtype=np.int64)
-    peak_pitch_deg = np.zeros(args.num_envs, dtype=np.float64)
+    peak_pitch_deg = np.degrees(np.abs(initial_states[:, 0]))
     peak_pitch_rate = np.zeros(args.num_envs, dtype=np.float64)
     peak_wheel_speed = np.zeros(args.num_envs, dtype=np.float64)
     saturated_actions = np.zeros(args.num_envs, dtype=np.int64)
@@ -207,7 +215,7 @@ def main() -> int:
         pitch_deg = np.degrees(np.abs(current_states[:, 0]))
         pitch_rate = np.abs(current_states[:, 1])
         wheel_speed = state["max_abs_wheel_velocity"].detach().cpu().numpy()
-        if step >= args.push_start_step:
+        if step >= evaluation_start_step:
             peak_pitch_deg[active] = np.maximum(peak_pitch_deg[active], pitch_deg[active])
             peak_pitch_rate[active] = np.maximum(peak_pitch_rate[active], pitch_rate[active])
             peak_wheel_speed[active] = np.maximum(peak_wheel_speed[active], wheel_speed[active])
@@ -217,7 +225,7 @@ def main() -> int:
             )
             action_samples[active] += len(ACTION_NAMES)
 
-        if step >= push_end_step:
+        if step >= recovery_start_step:
             inside_recovery = (
                 (pitch_deg <= args.recovery_pitch_deg)
                 & (pitch_rate <= args.recovery_pitch_rate)
@@ -229,7 +237,7 @@ def main() -> int:
                 recovery_hold >= args.recovery_hold_steps
             )
             recovery_steps[newly_recovered] = (
-                step - push_end_step - args.recovery_hold_steps + 1
+                step - recovery_start_step - args.recovery_hold_steps + 1
             )
             recovered[newly_recovered] = True
 
@@ -290,11 +298,19 @@ def main() -> int:
         "control_interval_steps": control_interval,
         "controller_hz": POLICY_HZ / control_interval,
         "push": {
+            "disturbance_mode": (
+                "initial_pitch_only" if initial_condition_only else "external_push"
+            ),
             "start_step": args.push_start_step,
             "duration_steps": args.push_duration_steps,
             "duration_s": args.push_duration_steps / POLICY_HZ,
             "application_height_above_base_com_m": args.push_height_m,
             "application": "global_x_force_plus_equivalent_base_link_pitch_torque",
+        },
+        "measurement": {
+            "evaluation_start_step": evaluation_start_step,
+            "recovery_start_step": recovery_start_step,
+            "initial_pitch_included_in_peak": True,
         },
         "thresholds": {
             "minimum_success_rate": args.minimum_success_rate,

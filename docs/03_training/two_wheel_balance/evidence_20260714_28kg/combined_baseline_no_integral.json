@@ -1,0 +1,1596 @@
+{
+  "schema": "recomo_two_wheel_cascaded_lqr_tracking_push_gate_v2",
+  "seed": 20260713,
+  "gains": "G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\28kg_lqr_tune\\lqr_gains.json",
+  "selected_gain_scale": 0.6,
+  "controller": {
+    "vx_kp": 0.6,
+    "vx_ki": 0.0,
+    "wz_kp": 0.25,
+    "wz_ki": 0.0,
+    "wz_feedforward": 0.6,
+    "pitch_reference_limit_deg": 6.000000000000001,
+    "action_limit": 0.8,
+    "controller_hz": 50.0
+  },
+  "command": {
+    "start_step": 200,
+    "vx_m_s": [
+      -0.2,
+      0.2
+    ],
+    "wz_rad_s": [
+      -0.4,
+      0.0,
+      0.4
+    ]
+  },
+  "push": {
+    "start_step": 800,
+    "duration_steps": 20,
+    "duration_s": 0.1,
+    "forces_x_n": [
+      -60.0,
+      -40.0,
+      -20.0,
+      20.0,
+      40.0,
+      60.0
+    ],
+    "application_height_above_base_com_m": 0.5,
+    "application": "global_x_force_plus_equivalent_global_y_pitch_torque"
+  },
+  "plant_uncertainty": {
+    "profile": "nominal",
+    "variation_count": 1,
+    "runtime": {
+      "body_names": [
+        "base_link",
+        "arm_mount_link",
+        "imu_link",
+        "laser_link",
+        "left_wheel_link",
+        "right_wheel_link",
+        "upper_imu_link"
+      ],
+      "nominal_total_mass_kg": 27.999998092651367,
+      "nominal_body_masses_kg": [
+        24.996000289916992,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        1.5,
+        1.5,
+        0.0010000000474974513
+      ]
+    },
+    "mass_interpretation": "uniform scale of all current rigid-body masses; stress cases are diagnostic, not alternate validated mass distributions",
+    "inertia_interpretation": "default inertia scaled by mass scale and independent inertia scale",
+    "com_interpretation": "local base_link COM offset",
+    "torque_interpretation": "per-environment reduction of the requested normalized action",
+    "delay_interpretation": "whole policy steps at 200 Hz"
+  },
+  "thresholds": {
+    "minimum_success_rate": 0.95,
+    "maximum_recovery_s": 2.0,
+    "recovery_tilt_deg": 2.0,
+    "recovery_angular_rate": 0.2,
+    "balance_tilt_margin_deg": 0.5,
+    "balance_angular_rate_margin": 0.05,
+    "recovery_vx_error": 0.1,
+    "recovery_wz_error": 0.15,
+    "maximum_tilt_deg": 12.0,
+    "maximum_post_vx_rmse": 0.1,
+    "maximum_post_wz_rmse": 0.15,
+    "maximum_saturation_ratio": 0.1
+  },
+  "summary": {
+    "scenarios": 36,
+    "success_rate": 0.3333333333333333,
+    "survival_rate": 1.0,
+    "balance_recovery_rate": 1.0,
+    "tracking_recovery_rate": 0.3333333333333333,
+    "balance_recovery_s_max": 0.67,
+    "tracking_recovery_s_max": 0.45,
+    "peak_pitch_deg_max": 9.7808256149292,
+    "peak_roll_deg_max": 8.015420462470502e-05,
+    "peak_wheel_speed_rad_s_max": 3.7895827293395996,
+    "post_vx_rmse": 0.09839100151858941,
+    "post_wz_rmse": 0.05943183441165897,
+    "action_saturation_ratio": 0.0017293558149589277
+  },
+  "scenarios": [
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.33,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 9.7108736038208,
+      "peak_roll_deg": 3.1497929739998654e-05,
+      "peak_wheel_speed_rad_s": 3.778337001800537,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.899514198303223,
+        "roll_deg": 2.042500454990659e-05,
+        "pitch_rate": 0.00426073931157589,
+        "roll_rate": 0.040281280875205994
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.399514198303223,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10951770222629034,
+      "post_wz_rmse": 0.07347766721057816,
+      "action_saturation_ratio": 0.008893829905503057,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.06,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.653720855712891,
+      "peak_roll_deg": 2.923852480307687e-05,
+      "peak_wheel_speed_rad_s": 3.704753875732422,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.896613597869873,
+        "roll_deg": 2.321940155525226e-05,
+        "pitch_rate": 0.003362111747264862,
+        "roll_rate": 0.04008100554347038
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.396613597869873,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10954810793666617,
+      "post_wz_rmse": 0.07312734122426347,
+      "action_saturation_ratio": 0.0022234574763757642,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.122236728668213,
+      "peak_roll_deg": 4.637637539417483e-05,
+      "peak_wheel_speed_rad_s": 3.187814235687256,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.898166656494141,
+        "roll_deg": 2.4509941795258783e-05,
+        "pitch_rate": 0.0046519991010427475,
+        "roll_rate": 0.040244635194540024
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.398166656494141,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.1095672949702127,
+      "post_wz_rmse": 0.07281101732231882,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.258915424346924,
+      "peak_roll_deg": 3.477265272522345e-05,
+      "peak_wheel_speed_rad_s": 2.259695529937744,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.901721954345703,
+        "roll_deg": 2.4294178729178384e-05,
+        "pitch_rate": 0.007135406136512756,
+        "roll_rate": 0.04004935175180435
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.401721954345703,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10971160386471907,
+      "post_wz_rmse": 0.07315685392626047,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.002440929412842,
+      "peak_roll_deg": 3.3325104595860466e-05,
+      "peak_wheel_speed_rad_s": 2.3182437419891357,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.896537780761719,
+        "roll_deg": 2.2359805370797403e-05,
+        "pitch_rate": 0.004900024272501469,
+        "roll_rate": 0.04030371084809303
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.396537780761719,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10983278394811864,
+      "post_wz_rmse": 0.07293161451491836,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.005,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 6.987977027893066,
+      "peak_roll_deg": 3.052983447560109e-05,
+      "peak_wheel_speed_rad_s": 2.8456218242645264,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.901922225952148,
+        "roll_deg": 2.8810143703594804e-05,
+        "pitch_rate": 0.004232182167470455,
+        "roll_rate": 0.04023849964141846
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.401922225952148,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10961013175532167,
+      "post_wz_rmse": 0.07330580594416751,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.67,
+      "tracking_recovery_s": 0.08,
+      "peak_pitch_deg": 7.142104148864746,
+      "peak_roll_deg": 7.089702558005229e-05,
+      "peak_wheel_speed_rad_s": 3.2833073139190674,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.597573757171631,
+        "roll_deg": 3.035032204934396e-05,
+        "pitch_rate": 0.0018739736406132579,
+        "roll_rate": 0.000790982972830534
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.097573757171631,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07341200780556076,
+      "post_wz_rmse": 0.00023714077218262318,
+      "action_saturation_ratio": 0.006670372429127293,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.295,
+      "tracking_recovery_s": 0.025,
+      "peak_pitch_deg": 5.642780303955078,
+      "peak_roll_deg": 7.56360896048136e-05,
+      "peak_wheel_speed_rad_s": 3.2121028900146484,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.606750011444092,
+        "roll_deg": 3.896302587236278e-05,
+        "pitch_rate": 0.0015766889555379748,
+        "roll_rate": 0.0017116159433498979
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.106750011444092,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07337627211403988,
+      "post_wz_rmse": 0.00014703949229203218,
+      "action_saturation_ratio": 0.0011117287381878821,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.035,
+      "tracking_recovery_s": 0.0,
+      "peak_pitch_deg": 5.121959209442139,
+      "peak_roll_deg": 4.627926682587713e-05,
+      "peak_wheel_speed_rad_s": 2.2646894454956055,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.60884428024292,
+        "roll_deg": 4.458452531252988e-05,
+        "pitch_rate": 0.002485476667061448,
+        "roll_rate": 0.0015635578893125057
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.10884428024292,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07337252307318048,
+      "post_wz_rmse": 0.00023403321932466146,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.275,
+      "tracking_recovery_s": 0.185,
+      "peak_pitch_deg": 5.22465705871582,
+      "peak_roll_deg": 4.9139922339236364e-05,
+      "peak_wheel_speed_rad_s": 1.4115164279937744,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.608245849609375,
+        "roll_deg": 4.427445674082264e-05,
+        "pitch_rate": 0.002200415823608637,
+        "roll_rate": 0.004050074610859156
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.108245849609375,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07337517459616402,
+      "post_wz_rmse": 0.0001902175666670678,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.36,
+      "peak_pitch_deg": 5.388813495635986,
+      "peak_roll_deg": 8.015420462470502e-05,
+      "peak_wheel_speed_rad_s": 1.9237579107284546,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.607187747955322,
+        "roll_deg": 4.1462328226771206e-05,
+        "pitch_rate": 0.0015491180820390582,
+        "roll_rate": 0.0017315337900072336
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.107187747955322,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07337897311615059,
+      "post_wz_rmse": 0.0001547969453015376,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.45,
+      "peak_pitch_deg": 5.167395114898682,
+      "peak_roll_deg": 7.601316610816866e-05,
+      "peak_wheel_speed_rad_s": 2.27543306350708,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.5967254638671875,
+        "roll_deg": 2.4040633434196934e-05,
+        "pitch_rate": 0.0019057748140767217,
+        "roll_rate": 0.0003088459779974073
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.0967254638671875,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07343251850802528,
+      "post_wz_rmse": 0.00037095663342342073,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.33,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 9.7808256149292,
+      "peak_roll_deg": 4.444682417670265e-05,
+      "peak_wheel_speed_rad_s": 3.7895827293395996,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.937558174133301,
+        "roll_deg": 3.1603642128175125e-05,
+        "pitch_rate": 0.014485212042927742,
+        "roll_rate": 0.04060434177517891
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.437558174133301,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10792095607715424,
+      "post_wz_rmse": 0.07209597052833966,
+      "action_saturation_ratio": 0.011117287381878822,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.055,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.650063991546631,
+      "peak_roll_deg": 4.542218812275678e-05,
+      "peak_wheel_speed_rad_s": 3.725419044494629,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.934852123260498,
+        "roll_deg": 3.46172928402666e-05,
+        "pitch_rate": 0.01734972931444645,
+        "roll_rate": 0.04095569998025894
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.434852123260498,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10776136405349795,
+      "post_wz_rmse": 0.0723673751927617,
+      "action_saturation_ratio": 0.0022234574763757642,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.084886074066162,
+      "peak_roll_deg": 4.149030428379774e-05,
+      "peak_wheel_speed_rad_s": 3.123856782913208,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.948035717010498,
+        "roll_deg": 4.2998384742531925e-05,
+        "pitch_rate": 0.018523503094911575,
+        "roll_rate": 0.04066987708210945
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.448035717010498,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10781380931438381,
+      "post_wz_rmse": 0.07246793898219624,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.254141807556152,
+      "peak_roll_deg": 3.3544114558026195e-05,
+      "peak_wheel_speed_rad_s": 2.144695520401001,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.938806056976318,
+        "roll_deg": 3.2250256481347606e-05,
+        "pitch_rate": 0.017601074650883675,
+        "roll_rate": 0.04094076529145241
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.438806056976318,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10800527537959909,
+      "post_wz_rmse": 0.07209069948372397,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.025584697723389,
+      "peak_roll_deg": 3.756166552193463e-05,
+      "peak_wheel_speed_rad_s": 2.3193576335906982,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.924483776092529,
+        "roll_deg": 3.3754215110093355e-05,
+        "pitch_rate": 0.016933513805270195,
+        "roll_rate": 0.04082195833325386
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.424483776092529,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10779021216428923,
+      "post_wz_rmse": 0.07256116691943305,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": -0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.005,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 6.995617866516113,
+      "peak_roll_deg": 4.0290233300765976e-05,
+      "peak_wheel_speed_rad_s": 2.7844700813293457,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.9145917892456055,
+        "roll_deg": 4.278535925550386e-05,
+        "pitch_rate": 0.015892960131168365,
+        "roll_rate": 0.040911346673965454
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.4145917892456055,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.1079060213074273,
+      "post_wz_rmse": 0.07218547140401281,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.005,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 6.981649875640869,
+      "peak_roll_deg": 3.159944390063174e-05,
+      "peak_wheel_speed_rad_s": 2.7660622596740723,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.927553653717041,
+        "roll_deg": 2.7521304218680598e-05,
+        "pitch_rate": 0.015213677659630775,
+        "roll_rate": 0.04049772024154663
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.427553653717041,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.1077818390617323,
+      "post_wz_rmse": 0.07238841521861969,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 6.998706340789795,
+      "peak_roll_deg": 3.203593587386422e-05,
+      "peak_wheel_speed_rad_s": 2.306933641433716,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.901790142059326,
+        "roll_deg": 2.4294902686960995e-05,
+        "pitch_rate": 0.013025995343923569,
+        "roll_rate": 0.040210820734500885
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.401790142059326,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10780661842819714,
+      "post_wz_rmse": 0.07243149201090938,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.2595744132995605,
+      "peak_roll_deg": 3.246866981498897e-05,
+      "peak_wheel_speed_rad_s": 2.1520864963531494,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.934803485870361,
+        "roll_deg": 2.1282132365740836e-05,
+        "pitch_rate": 0.020782172679901123,
+        "roll_rate": 0.040858857333660126
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.434803485870361,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10802616580315381,
+      "post_wz_rmse": 0.07205835521183393,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.080925941467285,
+      "peak_roll_deg": 3.482843021629378e-05,
+      "peak_wheel_speed_rad_s": 3.1377336978912354,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.943107604980469,
+        "roll_deg": 2.3005697585176677e-05,
+        "pitch_rate": 0.014697758480906487,
+        "roll_rate": 0.040579941123723984
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.443107604980469,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.1078289434563099,
+      "post_wz_rmse": 0.07232817758035506,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.06,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.65241813659668,
+      "peak_roll_deg": 2.450902138662059e-05,
+      "peak_wheel_speed_rad_s": 3.707855224609375,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.919482707977295,
+        "roll_deg": 1.8705124603002332e-05,
+        "pitch_rate": 0.014443328604102135,
+        "roll_rate": 0.040520116686820984
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.419482707977295,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10785291887111802,
+      "post_wz_rmse": 0.0723366074277864,
+      "action_saturation_ratio": 0.0022234574763757642,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": -0.4,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.33,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 9.687482833862305,
+      "peak_roll_deg": 3.9558319258503616e-05,
+      "peak_wheel_speed_rad_s": 3.7760183811187744,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.911470890045166,
+        "roll_deg": 2.622835927468259e-05,
+        "pitch_rate": 0.011065071448683739,
+        "roll_rate": 0.04027705639600754
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.411470890045166,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10786654198457434,
+      "post_wz_rmse": 0.07215911078291906,
+      "action_saturation_ratio": 0.008893829905503057,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.45,
+      "peak_pitch_deg": 5.169923782348633,
+      "peak_roll_deg": 5.4806740081403404e-05,
+      "peak_wheel_speed_rad_s": 2.2825207710266113,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.601414680480957,
+        "roll_deg": 2.583046443760395e-05,
+        "pitch_rate": 0.0017264015041291714,
+        "roll_rate": 0.000832469726447016
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.101414680480957,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07340126072480616,
+      "post_wz_rmse": 0.00026530993652146273,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": 0.36,
+      "peak_pitch_deg": 5.390744686126709,
+      "peak_roll_deg": 6.324648711597547e-05,
+      "peak_wheel_speed_rad_s": 1.9255295991897583,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.607194900512695,
+        "roll_deg": 7.119976362446323e-05,
+        "pitch_rate": 0.0016789078945294023,
+        "roll_rate": 0.0017068233573809266
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.107194900512695,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07338091567822638,
+      "post_wz_rmse": 0.0001580084871393341,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.28,
+      "tracking_recovery_s": 0.185,
+      "peak_pitch_deg": 5.232019424438477,
+      "peak_roll_deg": 4.687379623646848e-05,
+      "peak_wheel_speed_rad_s": 1.4114115238189697,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.608163833618164,
+        "roll_deg": 4.0478935261489823e-05,
+        "pitch_rate": 0.001649424433708191,
+        "roll_rate": 0.004176633898168802
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.108163833618164,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.0733793362716226,
+      "post_wz_rmse": 0.00021534657246914728,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.035,
+      "tracking_recovery_s": 0.0,
+      "peak_pitch_deg": 5.122403144836426,
+      "peak_roll_deg": 5.179748040973209e-05,
+      "peak_wheel_speed_rad_s": 2.264619827270508,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.607644557952881,
+        "roll_deg": 4.289585922379047e-05,
+        "pitch_rate": 0.001611389103345573,
+        "roll_rate": 0.0031330266501754522
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.107644557952881,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07337228185723407,
+      "post_wz_rmse": 0.0001829669080104573,
+      "action_saturation_ratio": 0.0,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.295,
+      "tracking_recovery_s": 0.025,
+      "peak_pitch_deg": 5.6420512199401855,
+      "peak_roll_deg": 6.168572144815698e-05,
+      "peak_wheel_speed_rad_s": 3.2242379188537598,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.606924057006836,
+        "roll_deg": 3.6506186006590724e-05,
+        "pitch_rate": 0.0015996844740584493,
+        "roll_rate": 0.0017390403663739562
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.106924057006836,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07337630895769878,
+      "post_wz_rmse": 0.00015298025207328677,
+      "action_saturation_ratio": 0.0011117287381878821,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.0,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.665,
+      "tracking_recovery_s": 0.08,
+      "peak_pitch_deg": 7.146150588989258,
+      "peak_roll_deg": 4.082886880496517e-05,
+      "peak_wheel_speed_rad_s": 3.2893762588500977,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 4.603069305419922,
+        "roll_deg": 4.360651655588299e-05,
+        "pitch_rate": 0.0017665049526840448,
+        "roll_rate": 0.0015716013731434941
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 5.103069305419922,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.07340735471399476,
+      "post_wz_rmse": 0.0002826801899194143,
+      "action_saturation_ratio": 0.006670372429127293,
+      "passed": true
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -60.0,
+      "push_impulse_x_ns": -6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.005,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 6.959060192108154,
+      "peak_roll_deg": 3.9537717384519055e-05,
+      "peak_wheel_speed_rad_s": 2.8448920249938965,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.897878646850586,
+        "roll_deg": 2.429446976748295e-05,
+        "pitch_rate": 0.005354253575205803,
+        "roll_rate": 0.040234025567770004
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.397878646850586,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10953351071643148,
+      "post_wz_rmse": 0.07319080646840455,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -40.0,
+      "push_impulse_x_ns": -4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.010780334472656,
+      "peak_roll_deg": 4.859707769355737e-05,
+      "peak_wheel_speed_rad_s": 2.3043761253356934,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.90316915512085,
+        "roll_deg": 2.5369663489982486e-05,
+        "pitch_rate": 0.005765712819993496,
+        "roll_rate": 0.04051291570067406
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.40316915512085,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.1098478128887536,
+      "post_wz_rmse": 0.07323072497719604,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": -20.0,
+      "push_impulse_x_ns": -2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.2685322761535645,
+      "peak_roll_deg": 5.421353489509784e-05,
+      "peak_wheel_speed_rad_s": 2.154388427734375,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.9007344245910645,
+        "roll_deg": 2.4509892682544887e-05,
+        "pitch_rate": 0.0046169571578502655,
+        "roll_rate": 0.04039880633354187
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.4007344245910645,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.1095527994366562,
+      "post_wz_rmse": 0.07363362668053652,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 20.0,
+      "push_impulse_x_ns": 2.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.0,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.107470989227295,
+      "peak_roll_deg": 4.4496402551885694e-05,
+      "peak_wheel_speed_rad_s": 3.1804039478302,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.900686264038086,
+        "roll_deg": 2.515475898690056e-05,
+        "pitch_rate": 0.0047426987439394,
+        "roll_rate": 0.040115129202604294
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.400686264038086,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10979698921277999,
+      "post_wz_rmse": 0.07322917541155373,
+      "action_saturation_ratio": 0.0,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 40.0,
+      "push_impulse_x_ns": 4.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.06,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 7.635678291320801,
+      "peak_roll_deg": 4.106610867893323e-05,
+      "peak_wheel_speed_rad_s": 3.6901822090148926,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.897963523864746,
+        "roll_deg": 2.1714398826588877e-05,
+        "pitch_rate": 0.002739253453910351,
+        "roll_rate": 0.04008236899971962
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.397963523864746,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.1095480354631571,
+      "post_wz_rmse": 0.0734637914137194,
+      "action_saturation_ratio": 0.0022234574763757642,
+      "passed": false
+    },
+    {
+      "vx_ref_m_s": 0.2,
+      "wz_ref_rad_s": 0.4,
+      "push_force_x_n": 60.0,
+      "push_impulse_x_ns": 6.0,
+      "plant": {
+        "name": "nominal",
+        "mass_scale": 1.0,
+        "target_total_mass_kg": null,
+        "inertia_scale": 1.0,
+        "com_offset_x_m": 0.0,
+        "com_offset_z_m": 0.0,
+        "static_friction": null,
+        "dynamic_friction": null,
+        "torque_scale": 1.0,
+        "action_delay_steps": 0
+      },
+      "survived": true,
+      "duration_steps": 1999,
+      "balance_recovery_s": 0.335,
+      "tracking_recovery_s": null,
+      "peak_pitch_deg": 9.738390922546387,
+      "peak_roll_deg": 4.752128734253347e-05,
+      "peak_wheel_speed_rad_s": 3.7779700756073,
+      "pre_push_balance_envelope": {
+        "pitch_deg": 6.892446041107178,
+        "roll_deg": 2.7304611649014987e-05,
+        "pitch_rate": 0.00427588913589716,
+        "roll_rate": 0.04042166844010353
+      },
+      "balance_recovery_limits": {
+        "pitch_deg": 7.392446041107178,
+        "roll_deg": 2.0,
+        "pitch_rate": 0.2,
+        "roll_rate": 0.2
+      },
+      "post_vx_rmse": 0.10966786706493953,
+      "post_wz_rmse": 0.07384947805798181,
+      "action_saturation_ratio": 0.008893829905503057,
+      "passed": false
+    }
+  ],
+  "controller_observations": [
+    "pitch",
+    "pitch_rate",
+    "mean_wheel_position",
+    "mean_wheel_velocity",
+    "wheel_velocity_difference",
+    "yaw_rate",
+    "vx_ref",
+    "wz_ref"
+  ],
+  "evaluation_only_truth": [
+    "base_vx",
+    "base_roll"
+  ],
+  "training_started": false,
+  "passed": false
+}

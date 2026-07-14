@@ -1,0 +1,1484 @@
+[
+  {
+    "gain_scale": 0.4,
+    "episodes": 32,
+    "success_rate": 1.0,
+    "mean_duration_steps": 1999.0,
+    "minimum_duration_steps": 1999,
+    "abs_pitch_p95_deg": 2.4876347448989096,
+    "abs_pitch_max_deg": 7.993638038635254,
+    "action_abs_p95": 0.04157542809844017,
+    "action_saturation_ratio": 0.0,
+    "scenarios": [
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 8.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 8.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 8.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "gain_scale": 0.5,
+    "episodes": 32,
+    "success_rate": 1.0,
+    "mean_duration_steps": 1999.0,
+    "minimum_duration_steps": 1999,
+    "abs_pitch_p95_deg": 1.9289543524566912,
+    "abs_pitch_max_deg": 7.9919281005859375,
+    "action_abs_p95": 0.023278875276446342,
+    "action_saturation_ratio": 0.0,
+    "scenarios": [
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 8.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 8.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 8.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "gain_scale": 0.6,
+    "episodes": 32,
+    "success_rate": 1.0,
+    "mean_duration_steps": 1999.0,
+    "minimum_duration_steps": 1999,
+    "abs_pitch_p95_deg": 1.689934107599661,
+    "abs_pitch_max_deg": 7.990543842315674,
+    "action_abs_p95": 0.13385403156280518,
+    "action_saturation_ratio": 0.0,
+    "scenarios": [
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 8.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 8.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 8.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -8.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.13962634015954636,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -5.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": -2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          -0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 2.0,
+        "yaw_rate": 0.3,
+        "initial_state": [
+          0.03490658503988659,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": -0.3,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.3
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      },
+      {
+        "pitch_deg": 5.0,
+        "yaw_rate": 0.0,
+        "initial_state": [
+          0.08726646259971647,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "duration_steps": 1999,
+        "duration_s": 9.995,
+        "success": true
+      }
+    ],
+    "passed": true
+  }
+]

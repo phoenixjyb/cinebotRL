@@ -37,7 +37,10 @@ def main() -> int:
     wheel_joints = [p for p in joints if p.GetName() in {"left_wheel_joint", "right_wheel_joint"}]
     revolute_joints = [p for p in joints if p.IsA(UsdPhysics.RevoluteJoint)]
     articulation_roots = [p for p in prims if p.HasAPI(UsdPhysics.ArticulationRootAPI)]
+    rigid_bodies = [p for p in prims if p.HasAPI(UsdPhysics.RigidBodyAPI)]
     masses = []
+    rigid_body_masses = {}
+    rigid_bodies_without_mass = []
     inertia_positive = True
     for prim in prims:
         mass_api = UsdPhysics.MassAPI.Get(stage, prim.GetPath())
@@ -49,6 +52,13 @@ def main() -> int:
         inertia = mass_api.GetDiagonalInertiaAttr().Get()
         if inertia is not None:
             inertia_positive &= all(float(v) > 0.0 for v in inertia)
+    for prim in rigid_bodies:
+        mass_api = UsdPhysics.MassAPI.Get(stage, prim.GetPath())
+        mass = mass_api.GetMassAttr().Get() if mass_api else None
+        if mass is None or mass <= 0:
+            rigid_bodies_without_mass.append(str(prim.GetPath()))
+        else:
+            rigid_body_masses[str(prim.GetPath())] = float(mass)
 
     drives = {}
     for joint in wheel_joints:
@@ -96,7 +106,8 @@ def main() -> int:
         "no_planar_virtual_joints": all(token not in layer_text for token in ("base_joint_vx", "base_joint_vy", "base_joint_wz")),
         "no_caster": "caster" not in layer_text.lower(),
         "no_legacy_stl": "base_link.STL" not in layer_text,
-        "mass_near_26kg": abs(sum(masses) - 26.0) < 0.1,
+        "mass_near_28kg": abs(sum(masses) - 28.0) < 0.01,
+        "all_rigid_bodies_have_explicit_mass": not rigid_bodies_without_mass,
         "positive_inertia": inertia_positive,
         "wheel_position_drives_disabled": all(v["stiffness"] == 0.0 for v in drives.values()),
     }
@@ -125,6 +136,8 @@ def main() -> int:
         "wheel_drives": drives,
         "urdf_geometry": urdf_geometry,
         "total_mass_kg": sum(masses),
+        "rigid_body_masses_kg": rigid_body_masses,
+        "rigid_bodies_without_mass": rigid_bodies_without_mass,
         "checks": checks,
         "passed": all(checks.values()),
     }

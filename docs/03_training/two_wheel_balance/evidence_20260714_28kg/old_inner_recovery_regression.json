@@ -1,0 +1,126 @@
+{
+  "schema": "recomo_two_wheel_lqr_push_gate_v2",
+  "seed": 20260713,
+  "gains": "G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260713_lqr_nominal\\lqr_gains.json",
+  "selected_gain_scale": 0.6,
+  "policy_hz": 200.0,
+  "control_interval_steps": 4,
+  "controller_hz": 50.0,
+  "push": {
+    "disturbance_mode": "initial_pitch_only",
+    "start_step": 200,
+    "duration_steps": 20,
+    "duration_s": 0.1,
+    "application_height_above_base_com_m": 0.5,
+    "application": "global_x_force_plus_equivalent_base_link_pitch_torque"
+  },
+  "measurement": {
+    "evaluation_start_step": 0,
+    "recovery_start_step": 0,
+    "initial_pitch_included_in_peak": true
+  },
+  "thresholds": {
+    "minimum_success_rate": 0.95,
+    "maximum_recovery_s": 2.0,
+    "maximum_pitch_deg": 15.0,
+    "maximum_saturation_ratio": 0.1
+  },
+  "summary": {
+    "scenarios": 6,
+    "success_rate": 0.0,
+    "survival_rate": 1.0,
+    "recovery_rate": 0.0,
+    "recovery_s_max": null,
+    "peak_pitch_deg_max": 8.0,
+    "peak_wheel_speed_rad_s_max": 3.1035826206207275,
+    "action_saturation_ratio": 0.24670668667667167
+  },
+  "scenarios": [
+    {
+      "initial_pitch_deg": -8.0,
+      "push_force_x_n": 0.0,
+      "push_impulse_x_ns": 0.0,
+      "survived": true,
+      "recovered": false,
+      "recovery_s": null,
+      "duration_steps": 1999,
+      "peak_pitch_deg": 8.0,
+      "peak_pitch_rate": 0.5036993026733398,
+      "peak_wheel_speed_rad_s": 3.1035826206207275,
+      "action_saturation_ratio": 0.24687343671835918,
+      "passed": false
+    },
+    {
+      "initial_pitch_deg": -5.0,
+      "push_force_x_n": 0.0,
+      "push_impulse_x_ns": 0.0,
+      "survived": true,
+      "recovered": false,
+      "recovery_s": null,
+      "duration_steps": 1999,
+      "peak_pitch_deg": 5.0,
+      "peak_pitch_rate": 0.46077415347099304,
+      "peak_wheel_speed_rad_s": 3.0317625999450684,
+      "action_saturation_ratio": 0.24712356178089045,
+      "passed": false
+    },
+    {
+      "initial_pitch_deg": -2.0,
+      "push_force_x_n": 0.0,
+      "push_impulse_x_ns": 0.0,
+      "survived": true,
+      "recovered": false,
+      "recovery_s": null,
+      "duration_steps": 1999,
+      "peak_pitch_deg": 2.0,
+      "peak_pitch_rate": 0.43787968158721924,
+      "peak_wheel_speed_rad_s": 2.9361841678619385,
+      "action_saturation_ratio": 0.24612306153076538,
+      "passed": false
+    },
+    {
+      "initial_pitch_deg": 2.0,
+      "push_force_x_n": 0.0,
+      "push_impulse_x_ns": 0.0,
+      "survived": true,
+      "recovered": false,
+      "recovery_s": null,
+      "duration_steps": 1999,
+      "peak_pitch_deg": 2.0,
+      "peak_pitch_rate": 0.4277707040309906,
+      "peak_wheel_speed_rad_s": 2.902573823928833,
+      "action_saturation_ratio": 0.24612306153076538,
+      "passed": false
+    },
+    {
+      "initial_pitch_deg": 5.0,
+      "push_force_x_n": 0.0,
+      "push_impulse_x_ns": 0.0,
+      "survived": true,
+      "recovered": false,
+      "recovery_s": null,
+      "duration_steps": 1999,
+      "peak_pitch_deg": 5.0,
+      "peak_pitch_rate": 0.46118879318237305,
+      "peak_wheel_speed_rad_s": 3.024646282196045,
+      "action_saturation_ratio": 0.24712356178089045,
+      "passed": false
+    },
+    {
+      "initial_pitch_deg": 8.0,
+      "push_force_x_n": 0.0,
+      "push_impulse_x_ns": 0.0,
+      "survived": true,
+      "recovered": false,
+      "recovery_s": null,
+      "duration_steps": 1999,
+      "peak_pitch_deg": 8.0,
+      "peak_pitch_rate": 0.5009138584136963,
+      "peak_wheel_speed_rad_s": 3.0546627044677734,
+      "action_saturation_ratio": 0.24687343671835918,
+      "passed": false
+    }
+  ],
+  "training_started": false,
+  "passed": false
+}

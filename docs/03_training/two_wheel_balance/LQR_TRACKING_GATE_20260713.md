@@ -69,7 +69,7 @@ Simulator base `vx` is evaluation truth only. It is not part of the controller o
 - The selected repeat exactly matches the accepted tracking metrics.
 - The original upright push gate remains unchanged and exactly reproducible: 32/32 recovery, 0.415 s worst recovery, 2.084 deg peak pitch, and 0.0382% saturation.
 - Tracking and external push are not yet combined in the same rollout.
-- The run used the `30.0 kg` PhysX-resolved plant, not the `26.0 kg` authored-mass sum or the approximately `40 kg` complete robot.
+- The run used the unintended `30.0 kg` PhysX-resolved plant, not the corrected `28.0 kg` model.
 - Plant uncertainty, slope, rough terrain, arm motion, end-effector tracking, obstacles, sensor noise, delay, and hardware are not included.
 - PPO remains blocked until scripted-controller robustness and the articulated model boundary are established.
 

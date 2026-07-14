@@ -48,6 +48,11 @@ parser.add_argument("--maximum-post-vx-rmse", type=float, default=0.10)
 parser.add_argument("--maximum-post-wz-rmse", type=float, default=0.15)
 parser.add_argument("--maximum-saturation-ratio", type=float, default=0.10)
 parser.add_argument("--minimum-success-rate", type=float, default=0.95)
+parser.add_argument("--vx-kp", type=float)
+parser.add_argument("--vx-ki", type=float)
+parser.add_argument("--wz-kp", type=float)
+parser.add_argument("--wz-ki", type=float)
+parser.add_argument("--wz-feedforward", type=float)
 parser.add_argument(
     "--plant-uncertainty-profile",
     choices=("nominal", "diagnostic_v1"),
@@ -280,7 +285,13 @@ def main() -> int:
     )
     obs, _ = env.reset(seed=args.seed)
     unwrapped = env.unwrapped
-    plant_runtime = None
+    plant_runtime = {
+        "body_names": list(unwrapped.robot.body_names),
+        "nominal_total_mass_kg": float(
+            unwrapped.robot.data.default_mass[0].sum().item()
+        ),
+        "nominal_body_masses_kg": unwrapped.robot.data.default_mass[0].tolist(),
+    }
     if args.plant_uncertainty_profile != "nominal":
         plant_runtime = apply_plant_variations(unwrapped, scenario_plants)
     set_push_wrench(unwrapped, np.zeros(args.num_envs))
@@ -297,7 +308,18 @@ def main() -> int:
         (int(np.max(action_delay_steps)) + 1, args.num_envs, len(ACTION_NAMES)),
         dtype=np.float32,
     )
-    config = CascadedLQRConfig(action_limit=action_limit)
+    controller_overrides = {
+        name: value
+        for name, value in {
+            "vx_kp": args.vx_kp,
+            "vx_ki": args.vx_ki,
+            "wz_kp": args.wz_kp,
+            "wz_ki": args.wz_ki,
+            "wz_feedforward": args.wz_feedforward,
+        }.items()
+        if value is not None
+    }
+    config = CascadedLQRConfig(action_limit=action_limit, **controller_overrides)
 
     balance_hold = np.zeros(args.num_envs, dtype=np.int64)
     tracking_hold = np.zeros(args.num_envs, dtype=np.int64)
@@ -569,7 +591,9 @@ def main() -> int:
         "selected_gain_scale": gain_data["selected_gain_scale"],
         "controller": {
             "vx_kp": config.vx_kp,
+            "vx_ki": config.vx_ki,
             "wz_kp": config.wz_kp,
+            "wz_ki": config.wz_ki,
             "wz_feedforward": config.wz_feedforward,
             "pitch_reference_limit_deg": float(
                 np.degrees(config.pitch_reference_limit_rad)
@@ -595,8 +619,8 @@ def main() -> int:
             "variation_count": len(plant_variations),
             "runtime": plant_runtime,
             "mass_interpretation": (
-                "uniform scale of all current rigid-body masses; the 40 kg case is a stress test, "
-                "not a validated full-robot mass distribution"
+                "uniform scale of all current rigid-body masses; stress cases are diagnostic, "
+                "not alternate validated mass distributions"
             ),
             "inertia_interpretation": "default inertia scaled by mass scale and independent inertia scale",
             "com_interpretation": "local base_link COM offset",

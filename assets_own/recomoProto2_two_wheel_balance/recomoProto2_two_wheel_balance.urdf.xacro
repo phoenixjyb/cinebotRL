@@ -1,0 +1,198 @@
+<?xml version="1.0"?>
+<!--
+  Simplified two-wheel balancing model for Isaac Lab bring-up.
+
+  This is intentionally independent from recomoProto2-1190_moveit.urdf:
+  that model uses planar virtual base joints and its base mesh contains the
+  legacy four-wheel chassis. Neither is suitable for inverted-pendulum physics.
+
+  Coordinate convention:
+    x: forward
+    y: left
+    z: up
+
+  The base_link origin is on the ground plane at the axle midpoint. The URDF
+  has no world joint, so Isaac Lab must import base_link as a floating root.
+
+  IMPORTANT: Mass, inertia, wheel mass and effort limits below are provisional
+  bring-up values. Replace them with measured travel-pose/system-ID values
+  before treating simulation results as sim-to-real evidence.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="recomoProto2-two-wheel-balance">
+  <!-- Measured geometry currently available from chassis/firmware review. -->
+  <xacro:property name="wheel_track" value="0.620"/>
+  <!-- Confirmed 8-inch wheel diameter: 0.2032 m. -->
+  <xacro:property name="wheel_radius" value="0.1016"/>
+  <xacro:property name="wheel_width" value="0.050"/>
+
+  <!--
+    Provisional 28 kg aggregate model. The base mass includes the rigid upper
+    equipment; sensor/reference child links get explicit 1 g inertials only to
+    prevent the URDF importer from assigning its 1 kg fallback mass.
+  -->
+  <xacro:property name="body_mass" value="24.996"/>
+  <xacro:property name="body_com_x" value="0.0"/>
+  <xacro:property name="body_com_y" value="0.0"/>
+  <xacro:property name="body_com_z" value="0.400"/>
+  <xacro:property name="body_ixx" value="1.533"/>
+  <xacro:property name="body_iyy" value="1.613"/>
+  <xacro:property name="body_izz" value="0.694"/>
+
+  <xacro:property name="wheel_mass" value="1.5"/>
+  <xacro:property name="fixed_frame_mass" value="0.001"/>
+  <xacro:property name="fixed_frame_inertia" value="0.000001"/>
+  <xacro:property name="wheel_i_axis"
+                  value="${0.5 * wheel_mass * wheel_radius * wheel_radius}"/>
+  <xacro:property name="wheel_i_transverse"
+                  value="${wheel_mass * (3.0 * wheel_radius * wheel_radius + wheel_width * wheel_width) / 12.0}"/>
+
+  <!-- These limits are placeholders; the Isaac actuator model should override them. -->
+  <xacro:property name="wheel_peak_torque" value="20.0"/>
+  <xacro:property name="wheel_max_velocity" value="20.0"/>
+
+  <material name="chassis_dark">
+    <color rgba="0.12 0.14 0.16 1.0"/>
+  </material>
+  <material name="tower_gray">
+    <color rgba="0.55 0.58 0.62 1.0"/>
+  </material>
+  <material name="wheel_black">
+    <color rgba="0.025 0.025 0.025 1.0"/>
+  </material>
+  <material name="sensor_blue">
+    <color rgba="0.08 0.28 0.55 1.0"/>
+  </material>
+
+  <xacro:macro name="fixed_frame_inertial">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${fixed_frame_mass}"/>
+      <inertia ixx="${fixed_frame_inertia}" ixy="0" ixz="0"
+               iyy="${fixed_frame_inertia}" iyz="0" izz="${fixed_frame_inertia}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!--
+    Rigid travel-pose approximation. Multiple primitive collisions are used
+    instead of the 26 MB legacy STL to keep parallel PhysX simulation stable.
+  -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="${body_com_x} ${body_com_y} ${body_com_z}" rpy="0 0 0"/>
+      <mass value="${body_mass}"/>
+      <inertia ixx="${body_ixx}" ixy="0" ixz="0"
+               iyy="${body_iyy}" iyz="0" izz="${body_izz}"/>
+    </inertial>
+
+    <visual name="lower_chassis_visual">
+      <origin xyz="0 0 0.140" rpy="0 0 0"/>
+      <geometry><box size="0.520 0.460 0.140"/></geometry>
+      <material name="chassis_dark"/>
+    </visual>
+    <collision name="lower_chassis_collision">
+      <origin xyz="0 0 0.140" rpy="0 0 0"/>
+      <geometry><box size="0.520 0.460 0.140"/></geometry>
+    </collision>
+
+    <visual name="tower_visual">
+      <origin xyz="0 0 0.480" rpy="0 0 0"/>
+      <geometry><box size="0.200 0.200 0.620"/></geometry>
+      <material name="tower_gray"/>
+    </visual>
+    <collision name="tower_collision">
+      <origin xyz="0 0 0.480" rpy="0 0 0"/>
+      <geometry><box size="0.200 0.200 0.620"/></geometry>
+    </collision>
+
+    <visual name="sensor_head_visual">
+      <origin xyz="0 0 0.820" rpy="0 0 0"/>
+      <geometry><box size="0.400 0.300 0.100"/></geometry>
+      <material name="chassis_dark"/>
+    </visual>
+    <collision name="sensor_head_collision">
+      <origin xyz="0 0 0.820" rpy="0 0 0"/>
+      <geometry><box size="0.400 0.300 0.100"/></geometry>
+    </collision>
+  </link>
+
+  <xacro:macro name="drive_wheel" params="side y_offset">
+    <link name="${side}_wheel_link">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${wheel_mass}"/>
+        <!-- Cylinder axis is Y; positive joint rotation must drive chassis +X. -->
+        <inertia ixx="${wheel_i_transverse}" ixy="0" ixz="0"
+                 iyy="${wheel_i_axis}" iyz="0" izz="${wheel_i_transverse}"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+        <material name="wheel_black"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+      </collision>
+    </link>
+
+    <joint name="${side}_wheel_joint" type="continuous">
+      <origin xyz="0 ${y_offset} ${wheel_radius}" rpy="0 0 0"/>
+      <parent link="base_link"/>
+      <child link="${side}_wheel_link"/>
+      <!-- +Y rotation gives bottom-surface velocity -X, hence chassis motion +X. -->
+      <axis xyz="0 1 0"/>
+      <limit effort="${wheel_peak_torque}" velocity="${wheel_max_velocity}"/>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:drive_wheel side="left" y_offset="${wheel_track / 2.0}"/>
+  <xacro:drive_wheel side="right" y_offset="${-wheel_track / 2.0}"/>
+
+  <!-- Local balance IMU: approximately 10-12 cm above the ground. -->
+  <link name="imu_link">
+    <xacro:fixed_frame_inertial/>
+    <visual>
+      <geometry><box size="0.050 0.040 0.015"/></geometry>
+      <material name="sensor_blue"/>
+    </visual>
+  </link>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.110" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Upper LiDAR/IMU candidate corresponding to the /iv_imu measurement source. -->
+  <link name="laser_link">
+    <xacro:fixed_frame_inertial/>
+    <visual>
+      <geometry><cylinder radius="0.055" length="0.060"/></geometry>
+      <material name="sensor_blue"/>
+    </visual>
+  </link>
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_link"/>
+    <origin xyz="0 0 0.900" rpy="0 0 0"/>
+  </joint>
+
+  <link name="upper_imu_link">
+    <xacro:fixed_frame_inertial/>
+  </link>
+  <joint name="upper_imu_joint" type="fixed">
+    <parent link="laser_link"/>
+    <child link="upper_imu_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Reference frame only. It must not be configured as a ground contact. -->
+  <link name="arm_mount_link">
+    <xacro:fixed_frame_inertial/>
+  </link>
+  <joint name="arm_mount_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="arm_mount_link"/>
+    <origin xyz="0 0 0.880" rpy="0 0 0"/>
+  </joint>
+</robot>

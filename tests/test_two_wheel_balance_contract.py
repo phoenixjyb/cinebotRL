@@ -15,6 +15,7 @@ from rl_platform.tasks.two_wheel_balance.metrics import (
     diagnostic_plant_variations,
     lqr_action,
     mix_common_yaw_effort,
+    recovery_window_steps,
     solve_discrete_lqr,
 )
 
@@ -27,6 +28,18 @@ def test_contract_dimensions_and_rate() -> None:
     assert ACTION_NAMES == ("a_common", "a_yaw")
     assert LQR_STATE_NAMES == OBSERVATION_NAMES[:6]
     assert "vx" not in OBSERVATION_NAMES
+
+
+def test_initial_condition_recovery_starts_at_step_zero() -> None:
+    assert recovery_window_steps(np.zeros(6), 200, 220) == (True, 0, 0)
+
+
+def test_push_recovery_starts_after_push_window() -> None:
+    assert recovery_window_steps(np.array([-60.0, 60.0]), 200, 220) == (
+        False,
+        200,
+        220,
+    )
 
 
 def test_common_effort_drives_both_wheels_equally() -> None:
@@ -168,7 +181,9 @@ def test_cascaded_lqr_yaw_feedforward_follows_command_sign() -> None:
         control_dt=0.02,
         config=CascadedLQRConfig(
             vx_kp=0.0,
+            vx_ki=0.0,
             wz_kp=0.0,
+            wz_ki=0.0,
             wheel_difference_kp=0.0,
             wz_feedforward=0.5,
         ),
@@ -183,8 +198,8 @@ def test_cascaded_lqr_defaults_match_selected_tracking_gate() -> None:
     assert config.vx_kp == 0.6
     assert config.wz_kp == 0.25
     assert config.wz_feedforward == 0.6
-    assert config.vx_ki == 0.0
-    assert config.wz_ki == 0.0
+    assert config.vx_ki == 0.05
+    assert config.wz_ki == 0.05
     assert config.wheel_difference_kp == 0.0
     assert np.isclose(np.degrees(config.pitch_reference_limit_rad), 6.0)
     assert config.action_limit == 0.8
@@ -195,7 +210,12 @@ def test_diagnostic_plant_variations_are_bounded_and_unique() -> None:
     assert len(variations) == 16
     assert len({item.name for item in variations}) == len(variations)
     assert variations[0] == PlantVariation("nominal")
-    assert any(item.target_total_mass_kg == 40.0 for item in variations)
+    assert any(item.mass_scale == 1.25 for item in variations)
+    assert any(
+        item.name == "corner_heavy_high_com_low_grip_low_torque_delay"
+        and item.mass_scale == 1.15
+        for item in variations
+    )
     assert max(item.action_delay_steps for item in variations) == 4
     assert min(item.torque_scale for item in variations) == 0.8
     assert all(

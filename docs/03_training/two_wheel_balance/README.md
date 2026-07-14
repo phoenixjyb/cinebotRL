@@ -1,6 +1,6 @@
 # Two-Wheel Balance DirectRLEnv Bring-Up
 
-Date: 2026-07-13
+Date: 2026-07-14
 
 Branch: `codex/two-wheel-balance-rl`
 
@@ -14,20 +14,20 @@ Task: `RecomoTwoWheelBalance-v0`
 | Floating articulation and effort drives | Passed | Asset audit |
 | Passive fall and forbidden body contact | Passed | Gate 0 logs/artifacts |
 | Common/yaw effort direction | Passed after 8-inch wheel-axis correction | 2026-07-12 8-inch evidence |
-| 10D observation / 2D action contract | Passed | Eight pure contract tests |
+| 10D observation / 2D action contract | Passed | 16 pure contract tests |
 | Deterministic `32 x 2048` smoke | Passed | Two byte-equivalent metric runs |
 | Corrected-plant scripted PD controllability | Passed | Mean upright duration 113 -> 409 steps |
-| Nominal scripted LQR recovery | Passed | 32/32 signed pitch/yaw scenarios reached 10 s |
+| Fresh 28 kg inner-LQR recovery | Passed | 6/6 signed `+/-2/5/8 deg` starts recovered |
 | Upright-start LQR push recovery | Passed | 32/32 recovered from up to 6 N s at 0.5 m application height |
 | Cascaded low-speed `vx/wz` tracking | Passed | 32/32 survived signed commands and reversals |
-| Combined `vx/wz` tracking plus push recovery | Passed | 36/36 survived and recovered across signed 2/4/6 N s impulses |
-| Deterministic plant-uncertainty smoke | Failed | 15/16 survived, but only 7/16 met tracking recovery and RMSE limits |
-| URDF-to-PhysX mass contract | Failed | 26.0 kg authored resolves to 30.0 kg because four links lack inertials |
+| Corrected 28 kg combined tracking plus push | Passed | 36/36 passed; exact seeded repeat |
+| Deterministic plant-uncertainty smoke | Failed | 16/16 survived, but only 7/16 met all tracking limits |
+| URDF-to-PhysX mass contract | Passed | 28.000 kg authored and 27.999998 kg resolved |
 | PPO learning signal at 65,536 steps | Failed; stop rule active | PPO gate metrics |
-| Product stand policy | Not achieved | Blocked by failed Gate 3 |
-| Plant uncertainty, obstacles, arm, sim-to-real | Not started | Out of scope |
+| Learned product policy | Not achieved | PPO stop rule remains active |
+| Obstacles, arm, sim-to-real | Not started | After deterministic robustness |
 
-Do not resume or extend PPO from the failed checkpoint. The nominal LQR plus the accepted chassis outer loop is now the scripted controller baseline. Combined command-plus-disturbance robustness has passed; the next gate is bounded plant-parameter uncertainty, not more PPO timesteps.
+Do not resume or extend PPO from the failed checkpoint. The corrected 28 kg nominal controller is the scripted baseline. Combined command-plus-disturbance robustness has passed; plant uncertainty remains a deterministic controller/system-identification task, not a request for more PPO timesteps.
 
 ### 2026-07-12 geometry correction
 
@@ -44,6 +44,14 @@ wheel axes:          [0, +1, 0]
 The geometry audit also exposed that the previous `[0,-1,0]` wheel axes contradicted the claimed `+X` forward direction. Both axes are now `+Y`, and the original differential mixer is restored. Dynamic tests prove positive common action gives `+vx` and positive yaw action gives `+wz`.
 
 All PPO and PD evidence in `evidence_20260711/` and `evidence_20260712/` predates this physical-model correction. It remains historical diagnostic evidence and must not be used as the baseline for the corrected model. No PPO has been run on the corrected 8-inch plant.
+
+### 2026-07-14 mass and outer-loop correction
+
+The current robot is approximately `28 kg`, not `40 kg`. The model now authors exactly `28.0 kg`: `24.996 kg` on the aggregate `base_link`, `1.5 kg` on each wheel, and explicit `1 g` inertials on each of the four sensor/reference frames. The frame inertials prevent PhysX from silently assigning its `1 kg` fallback. Static authored mass and live resolved mass now agree within floating-point tolerance.
+
+The prior accepted gates actually ran on an unintended `30 kg` plant and are retained only as historical evidence. The old inner gain survived but failed `0/6` corrected signed-pitch recovery cases with `24.67%` saturation. A fresh 28 kg identification selected scale `0.6`; it recovers `6/6` signed `+/-2/5/8 deg` starts with a worst time of `0.825 s` and zero saturation. Bounded outer-loop integrals `vx_ki=wz_ki=0.05` then restore 36/36 combined tracking-plus-push success and are now the defaults.
+
+See `LQR_28KG_MODEL_AND_OUTER_LOOP_GATE_20260714.md` for the mass allocation, corrected metrics, uncertainty boundary, and stop rule.
 
 ### Historical pre-correction diagnosis and residual gate
 
@@ -112,6 +120,13 @@ Run from `/mnt/g/wSpace/cinebotRL-two-wheel-balance` on `.98`.
 /mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 -c \
   "import sys; sys.path[:0]=[r'G:\\wSpace\\cinebotRL-two-wheel-balance',r'G:\\wSpace\\cinebotRL-two-wheel-balance\\src']; from tests import test_two_wheel_balance_contract as t; tests=[getattr(t,n) for n in dir(t) if n.startswith('test_')]; [f() for f in tests]; print(f'{len(tests)} contract tests passed')"
 
+# Regenerate the two-wheel USD. The effort-drive flag is mandatory.
+/mnt/g/isaaclab_venv/Scripts/python.exe -u -X utf8 \
+  G:\\wSpace\\cinebotRL-two-wheel-balance\\scripts\\convert_urdf_to_usd.py \
+  --urdf assets_own/recomoProto2_two_wheel_balance/recomoProto2_two_wheel_balance.urdf \
+  --usd assets_own/recomoProto2_two_wheel_balance/recomoProto2_two_wheel_balance.usd \
+  --mesh-scale 1.0 --default-drive-type none --headless
+
 # Asset audit.
 /mnt/g/isaaclab_venv/Scripts/python.exe -X utf8 \
   G:\\wSpace\\cinebotRL-two-wheel-balance\\scripts\\two_wheel_balance\\smoke_asset.py \
@@ -141,27 +156,28 @@ Run from `/mnt/g/wSpace/cinebotRL-two-wheel-balance` on `.98`.
   G:\\wSpace\\cinebotRL-two-wheel-balance\\scripts\\two_wheel_balance\\tune_lqr.py \
   --num-envs 32 --horizon-steps 2000 --control-interval-steps 4 \
   --gain-scales 0.4,0.5,0.6 \
-  --output-dir G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\lqr_final_20260713 \
+  --output-dir G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\28kg_lqr_tune \
   --headless
 
-# Deterministic upright-start push-recovery gate. This does not train a policy.
+# Deterministic signed initial-pitch recovery gate. This does not train a policy.
 /mnt/g/isaaclab_venv/Scripts/python.exe -u -X utf8 \
   G:\\wSpace\\cinebotRL-two-wheel-balance\\scripts\\two_wheel_balance\\evaluate_lqr_push.py \
-  --gains G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260713_lqr_nominal\\lqr_gains.json \
-  --output G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\lqr_push\\push_gate.json \
+  --gains G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json \
+  --num-envs 6 --initial-pitch-deg=-8,-5,-2,2,5,8 --push-forces-n=0 \
+  --output G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\28kg_inner_recovery\\gate.json \
   --headless
 
 # Cascaded signed vx/wz command and reversal gate. This does not train a policy.
 /mnt/g/isaaclab_venv/Scripts/python.exe -u -X utf8 \
   G:\\wSpace\\cinebotRL-two-wheel-balance\\scripts\\two_wheel_balance\\evaluate_lqr_tracking.py \
-  --gains G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260713_lqr_nominal\\lqr_gains.json \
+  --gains G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json \
   --output G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\lqr_tracking\\tracking_gate.json \
   --headless
 
 # Combined signed vx/wz tracking plus 2/4/6 N s push gate. No policy is trained.
 /mnt/g/isaaclab_venv/Scripts/python.exe -u -X utf8 \
   G:\\wSpace\\cinebotRL-two-wheel-balance\\scripts\\two_wheel_balance\\evaluate_lqr_tracking_push.py \
-  --gains G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260713_lqr_nominal\\lqr_gains.json \
+  --gains G:\\wSpace\\cinebotRL-two-wheel-balance\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json \
   --num-envs 36 --push-forces-n=-60,-40,-20,20,40,60 \
   --output G:\\wSpace\\cinebotRL-two-wheel-balance\\artifacts\\two_wheel_balance\\lqr_tracking_push\\combined_gate.json \
   --headless
@@ -172,19 +188,16 @@ Use `scripts/two_wheel_balance/evaluate_policy.py` to reevaluate an existing che
 
 ## Evidence summary
 
-- Current static asset audit: 0.620 m track, 0.2032 m diameter, `+Y` wheel axes, `26.0 kg` explicitly authored, and zero wheel-drive stiffness/damping.
-- Runtime mass audit: PhysX resolves the plant to `30.0 kg`; `arm_mount_link`, `imu_link`, `laser_link`, and `upper_imu_link` have no URDF inertials and each receive a `1.0 kg` fallback.
+- Corrected asset audit: 0.620 m track, 0.2032 m diameter, `+Y` wheel axes, seven explicit inertials totaling `28.0000003 kg`, and zero wheel-drive stiffness/damping.
+- Runtime mass audit: PhysX resolves the same seven bodies to `27.9999981 kg`; no fallback mass remains.
 - Current Gate 1 run 1 and run 2: byte-identical metrics, 295 accounted body-contact resets, zero non-finite values.
 - Corrected passive baseline from 2 degrees: 113 policy steps mean upright duration.
 - Corrected PD sanity: 409 policy steps mean upright duration and two contacts per 1,000 steps.
-- Nominal LQR: 32/32 signed `2/5/8 deg` pitch and `-0.3/0/+0.3 rad/s` yaw-rate scenarios reached the 10-second timeout.
-- Selected LQR scale `0.6`: pitch p95 `2.765 deg`, pitch max `7.993 deg`, action p95 `0.586`, and zero saturation.
-- LQR push gate: 32/32 survived and recovered from signed `2/4/6 N s` impulses applied at an equivalent `0.5 m` height; worst recovery `0.415 s`, worst pitch `2.084 deg`, and aggregate saturation `0.0382%`.
-- The seeded push-gate repeat was exactly equal on all recorded scenario metrics.
-- Cascaded LQR tracking: 32/32 survived signed `+/-0.2 m/s` and `+/-0.4 rad/s` commands plus reversals; selected `vx` RMSE `0.0743 m/s`, `wz` RMSE `0.1055 rad/s`, peak pitch `6.096 deg`, and zero saturation.
-- The selected tracking repeat was exactly equal on all aggregate metrics, and the unchanged push regression exactly matched its accepted summary.
-- Combined tracking plus push: 36/36 scenarios passed across signed `2/4/6 N s` impulses while tracking `vx=+/-0.2 m/s` and `wz=-0.4/0/+0.4 rad/s`; worst balance recovery was `0.81 s`, worst tracking recovery was `1.07 s`, peak pitch was `7.825 deg`, and saturation was `0.1297%`.
-- The combined-gate repeat was exactly equal on all aggregate and per-scenario metrics. The rendered `-6 N s` case also survived without termination while tracking `vx=+0.2 m/s`, `wz=-0.4 rad/s`.
+- Fresh 28 kg LQR scale `0.6`: nominal tuner pitch p95 `1.690 deg`, pitch max `7.991 deg`, and zero saturation.
+- Corrected signed-pitch recovery: 6/6 `+/-2/5/8 deg` starts recovered; worst recovery was `0.825 s` and saturation was zero. The rejected old gain recovered 0/6 with `24.67%` saturation.
+- Corrected 28 kg combined gate: 36/36 scenarios passed with `vx_ki=wz_ki=0.05`; worst balance recovery was `0.765 s`, worst tracking recovery was `0.785 s`, peak pitch was `10.980 deg`, `vx/wz` RMSE was `0.0762/0.0746`, and saturation was `0.2131%`.
+- The corrected combined-gate repeat was exactly equal on all aggregate and per-scenario metrics. The rendered `-6 N s` case survived without termination while tracking `vx=+0.2 m/s`, `wz=-0.4 rad/s`.
+- Corrected uncertainty gate: 16/16 survived and recovered balance, while 7/16 passed every tracking limit; peak pitch was `10.417 deg` and requested-action saturation was zero.
 - No PPO checkpoint is valid for the corrected 8-inch/`+Y`-axis model.
 
 The rendered file under `evidence_20260711/` shows the obsolete 6-inch/pre-axis-fix asset and is retained only for provenance.
@@ -193,11 +206,11 @@ The rendered file under `evidence_20260711/` shows the obsolete 6-inch/pre-axis-
 
 Before another optimizer run or hardware claim:
 
-1. Author physically credible inertials for all fixed links, regenerate the USD, and require static and resolved runtime mass to agree.
-2. Rerun the nominal, push, tracking, and combined regressions against that corrected plant.
-3. Repeat the deterministic uncertainty matrix, then tune bounded `vx/wz` outer-loop integral action only if steady-state tracking remains the dominant failure.
-4. Add slopes, sensor noise, and command-rate limits after the plant-uncertainty gate passes.
+1. Measure or tightly bound aggregate COM, yaw inertia, available wheel torque, tire friction, and control delay.
+2. Replace broad assumed uncertainty ranges with credible hardware ranges.
+3. Evaluate torque/inertia-normalized yaw feedforward, anti-windup, or gain scheduling; do not increase the accepted integral gains.
+4. Add slopes, sensor noise, and command-rate limits after the corrected uncertainty gate passes.
 5. Repair the existing `arm_mount_link` and `upper_imu_link` visual-reference warnings before further rendered evidence.
 6. Reintroduce arm/end-effector tracking before obstacle avoidance, and only then evaluate whether a bounded residual policy adds value over the frozen controller.
 
-See `LQR_NOMINAL_GATE_20260713.md`, `LQR_PUSH_GATE_20260713.md`, `LQR_TRACKING_GATE_20260713.md`, `LQR_TRACKING_PUSH_GATE_20260713.md`, `LQR_PLANT_UNCERTAINTY_SMOKE_20260713.md`, and their evidence directories. The gains remain simulation-only because mass, COM, inertia, friction, actuator torque, and delay are provisional. The current runtime plant resolves to `30.0 kg`, not the approximately `40 kg` complete-robot target.
+See `LQR_28KG_MODEL_AND_OUTER_LOOP_GATE_20260714.md` and `evidence_20260714_28kg/` for the current baseline. Earlier LQR documents remain provenance for the unintended 30 kg plant. The gains remain simulation-only because COM, inertia, friction, actuator torque, and delay are provisional.

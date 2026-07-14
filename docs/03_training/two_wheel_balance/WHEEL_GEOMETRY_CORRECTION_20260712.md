@@ -1,5 +1,9 @@
 # Two-Wheel Geometry and Axis Correction
 
+> **Mass note 2026-07-14:** the geometry and axis correction remains current,
+> but the provisional mass statement below is superseded by the explicit 28 kg
+> contract in `LQR_28KG_MODEL_AND_OUTER_LOOP_GATE_20260714.md`.
+
 Date: 2026-07-12
 
 ## Corrected contract

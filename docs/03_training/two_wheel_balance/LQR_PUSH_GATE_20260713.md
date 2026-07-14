@@ -49,7 +49,7 @@ The same gain matrix in `evidence_20260713_lqr_nominal/lqr_gains.json` is used w
 
 ## Boundaries
 
-- This result used the `30.0 kg` PhysX-resolved plant. The URDF explicitly authors `26.0 kg`, but four fixed links without inertials resolve to `1.0 kg` each. It does not validate the approximately `40 kg` complete robot.
+- This result used the unintended `30.0 kg` PhysX-resolved plant. The URDF explicitly authored `26.0 kg`, but four fixed links without inertials resolved to `1.0 kg` each. It is historical and does not validate the corrected `28.0 kg` model.
 - Mass distribution, COM, inertia, tire friction, motor torque, transmission behavior, sensing delay, and control delay remain provisional.
 - The force-height model is a deterministic wrench approximation, not a contact-object impact test.
 - This gate starts upright. Simultaneous initial-angle recovery plus push is intentionally deferred until the single-disturbance layers are established.

@@ -25,6 +25,23 @@ OBSERVATION_NAMES = (
 LQR_STATE_NAMES = OBSERVATION_NAMES[:6]
 
 
+def recovery_window_steps(
+    push_forces_n: np.ndarray,
+    push_start_step: int,
+    push_end_step: int,
+) -> tuple[bool, int, int]:
+    """Select measurement/recovery windows for initial-state or push gates."""
+    forces = np.asarray(push_forces_n, dtype=np.float64)
+    if forces.size == 0 or not np.isfinite(forces).all():
+        raise ValueError("push forces must be a non-empty finite array")
+    if push_start_step < 0 or push_end_step < push_start_step:
+        raise ValueError("invalid push window")
+    initial_condition_only = bool(np.allclose(forces, 0.0))
+    if initial_condition_only:
+        return True, 0, 0
+    return False, push_start_step, push_end_step
+
+
 def mix_common_yaw_effort(actions: np.ndarray, torque_limit: float) -> np.ndarray:
     """Map normalized common/yaw actions to left/right wheel effort."""
     clipped = np.clip(np.asarray(actions, dtype=np.float64), -1.0, 1.0)
@@ -88,9 +105,9 @@ class CascadedLQRConfig:
     wheel_radius_m: float = 0.1016
     wheel_track_m: float = 0.620
     vx_kp: float = 0.6
-    vx_ki: float = 0.0
+    vx_ki: float = 0.05
     wz_kp: float = 0.25
-    wz_ki: float = 0.0
+    wz_ki: float = 0.05
     wz_feedforward: float = 0.6
     wheel_difference_kp: float = 0.0
     pitch_reference_limit_rad: float = math.radians(6.0)
@@ -157,7 +174,7 @@ def diagnostic_plant_variations() -> tuple[PlantVariation, ...]:
         PlantVariation("nominal"),
         PlantVariation("mass_0p85", mass_scale=0.85),
         PlantVariation("mass_1p15", mass_scale=1.15),
-        PlantVariation("mass_40kg_uniform", target_total_mass_kg=40.0),
+        PlantVariation("mass_1p25_stress", mass_scale=1.25),
         PlantVariation("com_x_minus_0p03", com_offset_x_m=-0.03),
         PlantVariation("com_x_plus_0p03", com_offset_x_m=0.03),
         PlantVariation("com_z_minus_0p05", com_offset_z_m=-0.05),
@@ -170,8 +187,8 @@ def diagnostic_plant_variations() -> tuple[PlantVariation, ...]:
         PlantVariation("delay_10ms", action_delay_steps=2),
         PlantVariation("delay_20ms", action_delay_steps=4),
         PlantVariation(
-            "corner_40kg_high_com_low_grip_low_torque_delay",
-            target_total_mass_kg=40.0,
+            "corner_heavy_high_com_low_grip_low_torque_delay",
+            mass_scale=1.15,
             inertia_scale=1.2,
             com_offset_z_m=0.05,
             static_friction=0.65,

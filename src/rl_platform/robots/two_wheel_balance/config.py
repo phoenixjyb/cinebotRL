@@ -14,6 +14,12 @@ TWO_WHEEL_USD_PATH = (
     / "recomoProto2_two_wheel_balance"
     / "recomoProto2_two_wheel_balance.usd"
 )
+TWO_WHEEL_WHOLE_BODY_USD_PATH = (
+    PROJECT_ROOT
+    / "assets_own"
+    / "recomoProto2_two_wheel_whole_body"
+    / "recomoProto2_two_wheel_whole_body.usd"
+)
 
 
 TWO_WHEEL_BALANCE_CFG = ArticulationCfg(
@@ -51,5 +57,59 @@ TWO_WHEEL_BALANCE_CFG = ArticulationCfg(
             stiffness=0.0,
             damping=0.0,
         )
+    },
+)
+
+
+TWO_WHEEL_WHOLE_BODY_CFG = ArticulationCfg(
+    prim_path="/World/envs/env_.*/Robot",
+    spawn=sim_utils.UsdFileCfg(
+        usd_path=str(TWO_WHEEL_WHOLE_BODY_USD_PATH),
+        activate_contact_sensors=True,
+        rigid_props=sim_utils.RigidBodyPropertiesCfg(
+            rigid_body_enabled=True,
+            max_linear_velocity=20.0,
+            max_angular_velocity=50.0,
+            max_depenetration_velocity=2.0,
+            enable_gyroscopic_forces=True,
+        ),
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+            enabled_self_collisions=False,
+            solver_position_iteration_count=8,
+            solver_velocity_iteration_count=2,
+            sleep_threshold=0.0,
+            stabilization_threshold=0.0001,
+        ),
+    ),
+    init_state=ArticulationCfg.InitialStateCfg(
+        pos=(0.0, 0.0, 0.003),
+        joint_pos={
+            "left_wheel_joint": 0.0,
+            "right_wheel_joint": 0.0,
+            "joint6_arm_yaw": 0.0,
+            "joint5_arm_pitch": 1.5707963268,
+            "joint4_elbow_pitch": 2.3561944902,
+        },
+        joint_vel={".*": 0.0},
+    ),
+    actuators={
+        "wheel_effort": ImplicitActuatorCfg(
+            joint_names_expr=["left_wheel_joint", "right_wheel_joint"],
+            effort_limit_sim=20.0,
+            velocity_limit_sim=20.0,
+            stiffness=0.0,
+            damping=0.0,
+        ),
+        "arm_home_hold": ImplicitActuatorCfg(
+            joint_names_expr=[
+                "joint6_arm_yaw",
+                "joint5_arm_pitch",
+                "joint4_elbow_pitch",
+            ],
+            effort_limit_sim=30.0,
+            velocity_limit_sim=0.5,
+            stiffness=200.0,
+            damping=20.0,
+        ),
     },
 )

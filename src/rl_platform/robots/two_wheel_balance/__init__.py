@@ -1,5 +1,15 @@
 """Two-wheel balancing robot asset configuration."""
 
-from .config import TWO_WHEEL_BALANCE_CFG, TWO_WHEEL_USD_PATH
+from .config import (
+    TWO_WHEEL_BALANCE_CFG,
+    TWO_WHEEL_USD_PATH,
+    TWO_WHEEL_WHOLE_BODY_CFG,
+    TWO_WHEEL_WHOLE_BODY_USD_PATH,
+)
 
-__all__ = ["TWO_WHEEL_BALANCE_CFG", "TWO_WHEEL_USD_PATH"]
+__all__ = [
+    "TWO_WHEEL_BALANCE_CFG",
+    "TWO_WHEEL_USD_PATH",
+    "TWO_WHEEL_WHOLE_BODY_CFG",
+    "TWO_WHEEL_WHOLE_BODY_USD_PATH",
+]

@@ -210,6 +210,8 @@ Use `scripts/two_wheel_balance/evaluate_policy.py` to reevaluate an existing che
 - The explicit `structural_robust_v1` profile passed 111/112 strict provisional cases with 112/112 balance recovery, 9.95 degree peak pitch, zero wheel-mixer saturation, and a 0.752 progress floor.
 - The same profile passed 36/36 nominal cases with no governor activation and improved post `vx` RMSE from 0.0819 to 0.0678 m/s. It remains opt-in; conservative defaults are unchanged.
 - The broad diagnostic stress boundary remains 11/16 strict, though eventual tracking recovery improved from 12/16 to 15/16. This is not a hardware-readiness claim.
+- The Stage 0 whole-body asset now exposes only two wheel and three physical arm DOFs; DJI gimbal and MoveIt virtual joints are fixed while `cam_link` remains the physical observation frame.
+- Static `home_v0` balance passed 1x2,000 and 16x2,000-step gates. The 16-environment gate had 3.260 degree peak pitch, 0.236 degree peak arm error, and no reset or non-finite state.
 - No PPO checkpoint is valid for the corrected 8-inch/`+Y`-axis model.
 
 The rendered file under `evidence_20260711/` shows the obsolete 6-inch/pre-axis-fix asset and is retained only for provenance.
@@ -220,9 +222,9 @@ Before another optimizer run or hardware claim:
 
 1. Measure or tightly bound aggregate COM, yaw inertia, available wheel torque, tire friction, and control delay.
 2. Replace broad assumed uncertainty ranges with credible hardware ranges.
-3. Consume the admitted chassis reference from `structural_robust_v1` in the arm/end-effector controller without weakening the balance safety layer.
+3. Add a low-amplitude no-obstacle `cam_link` tracking gate using conventional three-joint arm IK without weakening the balance safety layer.
 4. Replace guessed plant values with measurements before tightening tracking claims; add slopes, sensor noise, and command-rate limits only after reacceptance.
 5. Keep the repaired empty-visual USD composition check in every regenerated-asset audit.
 6. Pass no-obstacle whole-body tracking before obstacle avoidance, and only then evaluate whether a bounded residual policy adds value over the frozen controller.
 
-See `STRUCTURAL_TRACKING_DIAGNOSIS_20260714.md` and `evidence_20260714_structural_tracking/summary.json` for the accepted opt-in profile and its boundaries. Earlier LQR documents remain provenance. The gains remain simulation-only because COM, inertia, friction, actuator torque, and delay are guessed rather than measured.
+See `WHOLE_BODY_STAGE0_GATE_20260714.md`, `STRUCTURAL_TRACKING_DIAGNOSIS_20260714.md`, and `evidence_20260714_structural_tracking/summary.json` for the accepted boundaries. Earlier LQR documents remain provenance. The gains remain simulation-only because COM, inertia, friction, actuator torque, and delay are guessed rather than measured.

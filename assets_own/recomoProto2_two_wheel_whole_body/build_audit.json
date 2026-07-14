@@ -1,0 +1,55 @@
+{
+  "schema": "recomo_two_wheel_whole_body_urdf_build_v2",
+  "base_source": "assets_own/recomoProto2_two_wheel_balance/recomoProto2_two_wheel_balance.urdf",
+  "arm_source": "assets_own/sources/recomoProto2-1190_moveit_aa463a.urdf",
+  "arm_source_sha256": "aa463a14d84cc5718335f91de7091a49674ec66f8de016cb69d8190f7d98db77",
+  "output": "assets_own/recomoProto2_two_wheel_whole_body/recomoProto2_two_wheel_whole_body.urdf",
+  "target_total_mass_kg": 28.0,
+  "redistributed_base_mass_kg": 19.265269,
+  "previous_aggregate_base_mass_kg": 24.996,
+  "base_inertia_scale": 0.77073407745239,
+  "arm_mount_xyz_m": [
+    0.0,
+    0.0,
+    0.88
+  ],
+  "home_v0_rad": {
+    "joint6_arm_yaw": 0.0,
+    "joint5_arm_pitch": 1.5707963268,
+    "joint4_elbow_pitch": 2.3561944902
+  },
+  "physical_gimbal_fixed_rad": {
+    "joint3_gimbal_yaw": 0.0,
+    "joint2_gimbal_roll": 0.0,
+    "joint1_gimbal_pitch": 0.0
+  },
+  "virtual_frame_joints_locked_rad": {
+    "ee1_level_pitch": 0.0,
+    "ee1_rot_z": 0.0,
+    "ee1_rot_y": 0.0,
+    "ee1_rot_x": 0.0
+  },
+  "stage0_control_boundary": "wheel effort plus three physical arm joints; DJI gimbal attitude control is intentionally outside this asset",
+  "ee_observation_link": "cam_link",
+  "validation": {
+    "link_count": 20,
+    "joint_count": 19,
+    "root_links": [
+      "base_link"
+    ],
+    "total_mass_kg": 28.0,
+    "checks": {
+      "unique_links": true,
+      "unique_joints": true,
+      "single_base_link_root": true,
+      "total_mass_28kg": true,
+      "physical_arm_joints_present": true,
+      "virtual_frame_joints_present": true,
+      "stage0_gimbal_and_virtual_joints_fixed": true,
+      "physical_cam_link_present": true,
+      "no_planar_base_joints": true,
+      "two_wheel_joints": true
+    }
+  },
+  "passed": true
+}

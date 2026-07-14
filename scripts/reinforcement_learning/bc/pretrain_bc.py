@@ -108,6 +108,12 @@ def parse_args() -> argparse.Namespace:
         help="Optional grouped SB3 policy whose actor weights initialize this bounded BC update.",
     )
     parser.add_argument(
+        "--pretrained_observation_mapping",
+        choices=["strict", "split_reference_v2_from_legacy_v1"],
+        default="strict",
+        help="Explicit first-layer feature remap when expanding the grouped policy observation contract.",
+    )
+    parser.add_argument(
         "--use_action_mask",
         action="store_true",
         help="Use action_valid_mask from the demo file and compute MSE only on valid labels.",
@@ -262,6 +268,49 @@ class GroupedBCPolicyNet(nn.Module):
         return self.extractor.forward_actor(obs)
 
 
+def load_grouped_pretrained_actor(
+    target: GroupedBCPolicyNet,
+    source_extractor: nn.Module,
+    mapping: str,
+) -> None:
+    """Load a grouped actor, optionally remapping legacy 84D inputs into reference-v2 98D."""
+
+    if mapping == "strict":
+        target.extractor.load_state_dict(source_extractor.state_dict(), strict=True)
+        return
+    if mapping != "split_reference_v2_from_legacy_v1":
+        raise ValueError(f"unsupported pretrained observation mapping: {mapping}")
+
+    source_shared = source_extractor.shared_encoder
+    target_shared = target.extractor.shared_encoder
+    source_first = source_shared[0]
+    target_first = target_shared[0]
+    if source_first.in_features != 84 or target_first.in_features != 98:
+        raise ValueError(
+            "split_reference_v2_from_legacy_v1 requires source/target observations 84->98, got "
+            f"{source_first.in_features}->{target_first.in_features}"
+        )
+    if source_first.out_features != target_first.out_features:
+        raise ValueError("pretrained shared encoder width mismatch")
+
+    target_shared_state = target_shared.state_dict()
+    source_shared_state = source_shared.state_dict()
+    for key, value in source_shared_state.items():
+        if key == "0.weight":
+            continue
+        if key not in target_shared_state or target_shared_state[key].shape != value.shape:
+            raise ValueError(f"pretrained shared encoder mismatch at {key}")
+        target_shared_state[key] = value.detach().clone()
+    remapped_weight = torch.zeros_like(target_shared_state["0.weight"])
+    source_weight = source_shared_state["0.weight"]
+    remapped_weight[:, 0:65] = source_weight[:, 0:65]
+    remapped_weight[:, 79:97] = source_weight[:, 65:83]
+    remapped_weight[:, 97:98] = source_weight[:, 83:84]
+    target_shared_state["0.weight"] = remapped_weight
+    target_shared.load_state_dict(target_shared_state, strict=True)
+    target.extractor.action_heads.load_state_dict(source_extractor.action_heads.state_dict(), strict=True)
+
+
 # ---------------------------------------------------------------------------
 # BC training
 # ---------------------------------------------------------------------------
@@ -300,8 +349,15 @@ def train_bc(
             if not pretrained_path.exists():
                 raise FileNotFoundError(f"pretrained policy not found: {pretrained_path}")
             pretrained = PPO.load(str(pretrained_path), device=device)
-            net.extractor.load_state_dict(pretrained.policy.mlp_extractor.state_dict(), strict=True)
-            print(f"[INFO] Initialized grouped actor from: {pretrained_path}")
+            load_grouped_pretrained_actor(
+                net,
+                pretrained.policy.mlp_extractor,
+                args.pretrained_observation_mapping,
+            )
+            print(
+                f"[INFO] Initialized grouped actor from: {pretrained_path} "
+                f"mapping={args.pretrained_observation_mapping}"
+            )
     else:
         if args.pretrained_policy:
             raise ValueError("--pretrained_policy currently requires --policy_arch grouped")

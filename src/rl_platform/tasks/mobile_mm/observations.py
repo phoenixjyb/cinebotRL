@@ -24,6 +24,10 @@ def compose_observation(
 
     # Optional components
     lookahead_pos: torch.Tensor | None = None,
+    lookahead_quat: torch.Tensor | None = None,
+    trajectory_progress: torch.Tensor | None = None,
+    trajectory_time_remaining: torch.Tensor | None = None,
+    target_lin_vel: torch.Tensor | None = None,
     action_history: torch.Tensor | None = None,
     contact_forces: torch.Tensor | None = None,
     min_obstacle_dist: torch.Tensor | None = None,
@@ -45,6 +49,10 @@ def compose_observation(
         target_pos: Target position [num_envs, 3]
         target_quat: Target orientation [num_envs, 4]
         lookahead_pos: Lookahead positions [num_envs, steps, 3] or None
+        lookahead_quat: Future physical-camera targets [num_envs, steps, 4] or None
+        trajectory_progress: Normalized trajectory progress [num_envs, 1] or None
+        trajectory_time_remaining: Normalized remaining time [num_envs, 1] or None
+        target_lin_vel: Normalized world-frame target velocity [num_envs, 3] or None
         action_history: Previous actions [num_envs, history_len, action_dim] or None
         contact_forces: Contact forces [num_envs, num_bodies] or None
         min_obstacle_dist: Legacy signed obstacle clearance [num_envs, 1] or None
@@ -130,6 +138,37 @@ def compose_observation(
         batch_size = lookahead_pos.shape[0]
         lookahead_flat = lookahead_pos.view(batch_size, -1)
         components.append(lookahead_flat)
+
+    reference_fields = (
+        lookahead_quat,
+        trajectory_progress,
+        trajectory_time_remaining,
+        target_lin_vel,
+    )
+    if any(value is not None for value in reference_fields):
+        if not all(value is not None for value in reference_fields):
+            raise ValueError("reference conditioning requires lookahead attitude, progress, time, and velocity")
+        assert lookahead_quat is not None
+        assert trajectory_progress is not None
+        assert trajectory_time_remaining is not None
+        assert target_lin_vel is not None
+        batch_size, future_steps, quat_dim = lookahead_quat.shape
+        if quat_dim != 4 or batch_size != ee_quat.shape[0]:
+            raise ValueError(f"lookahead_quat must be [N,S,4], got {lookahead_quat.shape}")
+        for name, value, width in (
+            ("trajectory_progress", trajectory_progress, 1),
+            ("trajectory_time_remaining", trajectory_time_remaining, 1),
+            ("target_lin_vel", target_lin_vel, 3),
+        ):
+            if value.shape != (batch_size, width):
+                raise ValueError(f"{name} must have shape {(batch_size, width)}, got {value.shape}")
+        current_camera = ee_quat[:, None, :].expand(-1, future_steps, -1).reshape(-1, 4)
+        future_error = quat_diff(current_camera, lookahead_quat.reshape(-1, 4))
+        future_error = future_error * torch.where(future_error[:, :1] < 0.0, -1.0, 1.0)
+        future_axis_angle = quat_to_axis_angle(future_error).reshape(batch_size, future_steps * 3)
+        components.extend(
+            [trajectory_progress, trajectory_time_remaining, target_lin_vel, future_axis_angle]
+        )
 
     # Optional: Action history
     if action_history is not None:
@@ -284,6 +323,8 @@ def get_observation_dimensions(
     action_dim: int = 9,
     use_obstacles: bool = False,
     obstacle_feature_dim: int = 1,
+    use_reference_conditioning: bool = False,
+    reference_lookahead_steps: int | None = None,
 ) -> int:
     """Calculate total observation dimension.
 
@@ -297,6 +338,8 @@ def get_observation_dimensions(
         action_dim: Dimension of action space
         use_obstacles: Whether obstacle information is included
         obstacle_feature_dim: Number of appended obstacle features
+        use_reference_conditioning: Include progress, timing, velocity, and attitude lookahead
+        reference_lookahead_steps: Attitude lookahead count; defaults to lookahead_steps
 
     Returns:
         Total observation dimension
@@ -324,6 +367,10 @@ def get_observation_dimensions(
     # Optional: Lookahead
     if use_lookahead:
         dim += lookahead_steps * 3  # Position only
+
+    if use_reference_conditioning:
+        attitude_steps = lookahead_steps if reference_lookahead_steps is None else reference_lookahead_steps
+        dim += 5 + attitude_steps * 3
 
     # Optional: Action history
     if use_action_history:

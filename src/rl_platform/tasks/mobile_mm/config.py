@@ -318,6 +318,8 @@ class MobileMMTrackConfig:
     initial_joint_noise_std: float = 0.03  # radians; conservative Proto2 startup noise for PPO stability
 
     # Observation settings
+    observation_contract_name: str = "legacy_v1"
+    reference_time_scale_s: float = 30.0
     use_lookahead: bool = True
     lookahead_steps: int = 3
     lookahead_dt: float = 0.1  # seconds

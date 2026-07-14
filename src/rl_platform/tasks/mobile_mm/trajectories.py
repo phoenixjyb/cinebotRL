@@ -280,6 +280,19 @@ class TrajectoryManager:
             )
         return torch.clamp(self.recorded_lengths.to(torch.long), min=1, max=max_length)
 
+    def get_progress_and_time_remaining(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return finite recorded-trajectory progress and remaining seconds as [N,1]."""
+
+        if self.traj_type not in ["recorded", "multi_recorded"] or self.recorded_positions is None:
+            raise RuntimeError("reference-conditioned observations require a recorded trajectory")
+        real_lengths = self._get_recorded_real_lengths().to(dtype=torch.float32)
+        elapsed_steps = self.current_waypoint_idx.to(dtype=torch.float32)
+        elapsed_steps = elapsed_steps + self._recorded_time_accum / float(self.waypoint_dt)
+        final_step = torch.clamp(real_lengths - 1.0, min=1.0)
+        progress = torch.clamp(elapsed_steps / final_step, 0.0, 1.0)
+        remaining_s = torch.clamp((final_step - elapsed_steps) * float(self.waypoint_dt), min=0.0)
+        return progress.unsqueeze(-1), remaining_s.unsqueeze(-1)
+
     def _recorded_lookahead(self, steps: int, lookahead_dt: float) -> tuple[torch.Tensor, torch.Tensor]:
         """Look ahead through recorded waypoints without mutating playback state."""
         if self.recorded_positions is None or self.recorded_orientations is None:

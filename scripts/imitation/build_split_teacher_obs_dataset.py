@@ -24,7 +24,6 @@ from build_gik_obs_dataset import (  # noqa: E402
     angular_velocity_from_quats,
     backward_difference,
     build_action_history,
-    build_lookahead,
     chain_to_link,
     compose_batches,
     fk_ee_from_q,
@@ -78,9 +77,16 @@ def parse_args() -> argparse.Namespace:
         default=REPO_ROOT / "assets_own/recomoProto2-1190_moveit.urdf",
     )
     parser.add_argument("--lookahead-steps", type=int, default=3)
+    parser.add_argument("--lookahead-dt", type=float, default=0.1)
     parser.add_argument("--action-history-length", type=int, default=2)
     parser.add_argument("--num-contacts", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=4096)
+    parser.add_argument(
+        "--observation-contract",
+        choices=["split_reference_v1", "split_reference_v2"],
+        default="split_reference_v1",
+    )
+    parser.add_argument("--reference-time-scale-s", type=float, default=30.0)
     return parser.parse_args()
 
 
@@ -122,6 +128,13 @@ def quaternion_error_deg(lhs: np.ndarray, rhs: np.ndarray) -> np.ndarray:
     rhs = rhs / np.maximum(np.linalg.norm(rhs, axis=1, keepdims=True), 1e-12)
     dots = np.abs(np.sum(lhs * rhs, axis=1))
     return np.rad2deg(2.0 * np.arccos(np.clip(dots, -1.0, 1.0)))
+
+
+def build_strided_lookahead(values: np.ndarray, steps: int, stride: int) -> np.ndarray:
+    require(steps > 0, f"lookahead steps must be positive, got {steps}")
+    require(stride > 0, f"lookahead stride must be positive, got {stride}")
+    idx = np.arange(values.shape[0])[:, None] + stride * np.arange(1, steps + 1)[None, :]
+    return values[np.clip(idx, 0, values.shape[0] - 1)]
 
 
 def semantic_dfr_to_physical_cam_quat(semantic_wxyz: np.ndarray) -> np.ndarray:
@@ -206,6 +219,9 @@ def build_components(
     lookahead_steps: int,
     action_history_length: int,
     num_contacts: int,
+    observation_contract: str,
+    lookahead_dt: float,
+    reference_time_scale_s: float,
     duration_s: float | None = None,
     retime_dt: float = 0.1,
 ) -> tuple[dict[str, np.ndarray], dict[str, float], np.ndarray]:
@@ -273,6 +289,21 @@ def build_components(
     ee_pos, ee_quat = fk_ee_from_q(q_current, fk_chain)
     target_pos, _ = fk_ee_from_q(q_next, fk_chain)
 
+    use_reference_v2 = observation_contract == "split_reference_v2"
+    playback_dt = float(retime_dt if duration_s is not None else np.median(dt))
+    require(playback_dt > 0.0, "teacher playback dt must be positive")
+    lookahead_stride = 1
+    if use_reference_v2:
+        require(lookahead_dt > 0.0, "reference lookahead dt must be positive")
+        require(reference_time_scale_s > 0.0, "reference time scale must be positive")
+        stride_float = lookahead_dt / playback_dt
+        lookahead_stride = int(round(stride_float))
+        require(
+            lookahead_stride >= 1 and abs(stride_float - lookahead_stride) <= 1e-3,
+            f"lookahead dt {lookahead_dt} is not an integer multiple of playback dt {playback_dt}",
+        )
+    lookahead_pos = build_strided_lookahead(target_pos, lookahead_steps, lookahead_stride).astype(np.float32)
+
     q_velocity = backward_difference(q_current, dt)
     base_pos = np.zeros((count, 3), dtype=np.float32)
     base_pos[:, :2] = q_current[:, :2]
@@ -299,10 +330,35 @@ def build_components(
         "ee_ang_vel": ee_ang_vel.astype(np.float32),
         "target_pos": target_pos.astype(np.float32),
         "target_quat": target_quat,
-        "lookahead_pos": build_lookahead(target_pos, lookahead_steps).astype(np.float32),
+        "lookahead_pos": lookahead_pos,
         "action_history": build_action_history(actions, action_history_length).astype(np.float32),
         "contact_forces": np.zeros((count, num_contacts), dtype=np.float32),
     }
+    if use_reference_v2:
+        lookahead_quat = build_strided_lookahead(
+            target_quat,
+            lookahead_steps,
+            lookahead_stride,
+        ).astype(np.float32)
+        progress = np.arange(count, dtype=np.float32) / float(max(count - 1, 1))
+        remaining_s = (count - 1 - np.arange(count, dtype=np.float32)) * playback_dt
+        target_lin_vel = np.clip(
+            (lookahead_pos[:, 0, :] - target_pos) / float(lookahead_dt) / MAX_LINEAR_VELOCITY,
+            -2.0,
+            2.0,
+        ).astype(np.float32)
+        components.update(
+            {
+                "lookahead_quat": lookahead_quat,
+                "trajectory_progress": progress[:, None],
+                "trajectory_time_remaining": np.clip(
+                    remaining_s / float(reference_time_scale_s),
+                    0.0,
+                    2.0,
+                )[:, None].astype(np.float32),
+                "target_lin_vel": target_lin_vel,
+            }
+        )
     diagnostics = {
         "max_fk_actual_quaternion_error_deg": float(np.max(fk_error_deg)),
         "max_option_b_quaternion_error_deg": float(np.max(option_b_error_deg)),
@@ -359,6 +415,9 @@ def main() -> int:
                 lookahead_steps=args.lookahead_steps,
                 action_history_length=args.action_history_length,
                 num_contacts=args.num_contacts,
+                observation_contract=args.observation_contract,
+                lookahead_dt=args.lookahead_dt,
+                reference_time_scale_s=args.reference_time_scale_s,
                 duration_s=duration_map.get(episode_index),
                 retime_dt=args.retime_dt,
             )
@@ -422,6 +481,7 @@ def main() -> int:
         action_history_length=args.action_history_length,
         action_dim=ACTION_DIM,
         use_obstacles=False,
+        use_reference_conditioning=args.observation_contract == "split_reference_v2",
     )
     require(observations.shape[1] == expected_dim, f"obs dim {observations.shape[1]} != {expected_dim}")
     require(np.isfinite(observations).all(), "observations contain non-finite values")
@@ -435,6 +495,9 @@ def main() -> int:
         "observation_ee_frame": "physical_cam_link_fk",
         "target_position_source": "physical_cam_link_fk(q_next_physical_9)",
         "physical_gimbal_labels": "masked_diagnostic_only",
+        "observation_contract": args.observation_contract,
+        "lookahead_dt_s": args.lookahead_dt,
+        "reference_time_scale_s": args.reference_time_scale_s,
         "synchronized_retime": args.duration_manifest is not None,
         "retime_dt_s": args.retime_dt if args.duration_manifest is not None else None,
         "accepted_episode_count": len(accepted),
@@ -459,6 +522,7 @@ def main() -> int:
         observation_dim=np.asarray(expected_dim, dtype=np.int32),
         action_contract=np.asarray("split_base_arm_attitude_v1"),
         target_orientation_contract=np.asarray("semantic_dfr_to_physical_cam_v1"),
+        observation_contract=np.asarray(args.observation_contract),
     )
     if args.stage_output is not None:
         stage_root = args.stage_output.resolve()
@@ -475,6 +539,9 @@ def main() -> int:
             "reset_base_x_offset": 0.0,
             "reset_base_y_offset": 0.0,
             "trajectory_dt": float(args.retime_dt),
+            "lookahead_dt": float(args.lookahead_dt),
+            "observation_contract": args.observation_contract,
+            "reference_time_scale_s": float(args.reference_time_scale_s),
             "notes": "Reset base and physical arm/gimbal from each corrected split teacher.",
         }
         (stage_root / "reset_config.json").write_text(

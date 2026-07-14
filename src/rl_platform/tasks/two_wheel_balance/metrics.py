@@ -42,8 +42,10 @@ def recovery_window_steps(
     return False, push_start_step, push_end_step
 
 
-def mix_common_yaw_effort(actions: np.ndarray, torque_limit: float) -> np.ndarray:
-    """Map normalized common/yaw actions to left/right wheel effort."""
+def allocate_common_yaw_action(
+    actions: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Mirror the environment mixer and expose wheel-clipping authority loss."""
     clipped = np.clip(np.asarray(actions, dtype=np.float64), -1.0, 1.0)
     if clipped.shape[-1] != 2:
         raise ValueError(f"expected action shape (..., 2), got {clipped.shape}")
@@ -51,8 +53,19 @@ def mix_common_yaw_effort(actions: np.ndarray, torque_limit: float) -> np.ndarra
     yaw = clipped[..., 1]
     # With both +Y wheel axes, positive velocity drives +X. Positive body +Z
     # yaw therefore requires the right wheel forward and left wheel backward.
-    wheel = np.stack((common - yaw, common + yaw), axis=-1)
-    return np.clip(wheel, -1.0, 1.0) * float(torque_limit)
+    wheel_preclip = np.stack((common - yaw, common + yaw), axis=-1)
+    wheel = np.clip(wheel_preclip, -1.0, 1.0)
+    effective = np.stack(
+        ((wheel[..., 0] + wheel[..., 1]) * 0.5, (wheel[..., 1] - wheel[..., 0]) * 0.5),
+        axis=-1,
+    )
+    return wheel, effective, np.abs(wheel_preclip) > 1.0
+
+
+def mix_common_yaw_effort(actions: np.ndarray, torque_limit: float) -> np.ndarray:
+    """Map normalized common/yaw actions to left/right wheel effort."""
+    wheel, _, _ = allocate_common_yaw_action(actions)
+    return wheel * float(torque_limit)
 
 
 def compose_pd_residual_action(
@@ -113,6 +126,7 @@ class CascadedLQRConfig:
     pitch_reference_limit_rad: float = math.radians(6.0)
     vx_integral_limit: float = 0.5
     wz_integral_limit: float = 2.0
+    governor_include_opposing_bias: bool = False
     pitch_bias_adaptation_rate: float = 5.0
     pitch_bias_limit_rad: float = math.radians(4.0)
     pitch_bias_command_threshold: float = 0.01
@@ -124,6 +138,23 @@ class CascadedLQRConfig:
     governor_bias_full_rad: float = math.radians(2.5)
     governor_minimum_progress_scale: float = 0.75
     action_limit: float = 0.8
+
+
+def cascaded_lqr_config(
+    profile: str = "default", **overrides: float | bool
+) -> CascadedLQRConfig:
+    """Build a named controller profile while keeping conservative defaults."""
+    profile_values: dict[str, float | bool] = {}
+    if profile == "structural_robust_v1":
+        profile_values = {
+            "vx_ki": 0.075,
+            "vx_integral_limit": 0.7,
+            "path_progress_governor_enabled": True,
+            "governor_include_opposing_bias": True,
+        }
+    elif profile != "default":
+        raise ValueError(f"unknown cascaded LQR profile: {profile}")
+    return CascadedLQRConfig(**(profile_values | overrides))
 
 
 @dataclass(frozen=True)
@@ -305,10 +336,12 @@ def cascaded_lqr_action(
             0.0,
             1.0,
         )
-        reinforces_equilibrium_bias = stored_pitch_bias * vx_ref > 0.0
-        path_progress_scale[reinforces_equilibrium_bias] -= (
-            bias_severity[reinforces_equilibrium_bias]
-            * (1.0 - config.governor_minimum_progress_scale)
+        bias_governed = stored_pitch_bias * vx_ref > 0.0
+        if config.governor_include_opposing_bias:
+            bias_governed |= np.abs(stored_pitch_bias) > 0.0
+        governed_severity = np.where(bias_governed, bias_severity, 0.0)
+        path_progress_scale -= (
+            governed_severity * (1.0 - config.governor_minimum_progress_scale)
         )
     governed_vx_ref = vx_ref * path_progress_scale
     governed_wz_ref = wz_ref * path_progress_scale
@@ -405,6 +438,8 @@ def cascaded_lqr_action(
         gain,
         action_limit=config.action_limit,
     )
+    inner_common_action = actions[:, 0].copy()
+    inner_yaw_action = actions[:, 1].copy()
     wheel_difference_target = (
         config.wheel_track_m / config.wheel_radius_m
     ) * effective_wz_ref
@@ -426,7 +461,8 @@ def cascaded_lqr_action(
         + config.wz_feedforward * effective_wz_ref
         + config.wheel_difference_kp * wheel_difference_error
     )
-    actions[:, 1] += yaw_correction
+    final_yaw_unclipped = actions[:, 1] + yaw_correction
+    actions[:, 1] = final_yaw_unclipped
     actions = np.clip(actions, -config.action_limit, config.action_limit)
     diagnostics = {
         "requested_vx_ref": vx_ref,
@@ -440,6 +476,10 @@ def cascaded_lqr_action(
         "vx_error": vx_error,
         "wz_error": wz_error,
         "wheel_difference_error": wheel_difference_error,
+        "inner_common_action": inner_common_action,
+        "inner_yaw_action": inner_yaw_action,
+        "yaw_correction": yaw_correction,
+        "yaw_action_unclipped": final_yaw_unclipped,
         "pitch_reference": pitch_reference,
         "pitch_bias": pitch_bias,
         "applied_pitch_bias": applied_pitch_bias,
@@ -447,6 +487,9 @@ def cascaded_lqr_action(
         "pitch_bias_calibrated": pitch_bias_calibrated,
         "vx_integrator_blocked": vx_integrator_blocked,
         "wz_integrator_blocked": wz_integrator_blocked,
+        "governed_severity": governed_severity
+        if config.path_progress_governor_enabled
+        else np.zeros(batch, dtype=np.float64),
     }
     return actions, next_integrals, diagnostics
 

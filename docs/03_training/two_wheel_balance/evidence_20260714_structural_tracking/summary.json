@@ -1,0 +1,49 @@
+{
+  "schema": "recomo_two_wheel_structural_tracking_summary_v1",
+  "date": "2026-07-14",
+  "training_started": false,
+  "profile": {
+    "name": "structural_robust_v1",
+    "default_enabled": false,
+    "vx_ki": 0.075,
+    "vx_integral_limit": 0.7,
+    "path_progress_governor_enabled": true,
+    "governor_include_opposing_bias": true,
+    "minimum_path_progress_scale": 0.75,
+    "tracking_reference": "admitted"
+  },
+  "provisional_112": {
+    "strict_passed": 111,
+    "balance_recovered": 112,
+    "eventual_tracking_recovered": 112,
+    "peak_pitch_deg": 9.953993797302246,
+    "maximum_tracking_recovery_s": 2.025,
+    "minimum_path_progress_scale": 0.7515799919237132,
+    "post_admitted_vx_rmse": 0.06678316335797607,
+    "post_admitted_wz_rmse": 0.09183729250769335,
+    "wheel_mix_saturation_ratio": 0.0,
+    "passed": true
+  },
+  "nominal_36": {
+    "strict_passed": 36,
+    "balance_recovered": 36,
+    "peak_pitch_deg": 11.312904357910156,
+    "maximum_tracking_recovery_s": 0.685,
+    "minimum_path_progress_scale": 1.0,
+    "governed_cases": 0,
+    "post_vx_rmse": 0.06776506786188878,
+    "post_wz_rmse": 0.07364986249025435,
+    "passed": true
+  },
+  "diagnostic_stress_16": {
+    "strict_passed": 11,
+    "balance_recovered": 16,
+    "eventual_tracking_recovered": 15,
+    "peak_pitch_deg": 10.397430419921875,
+    "minimum_path_progress_scale": 0.7847907321154501,
+    "passed": false,
+    "classification": "diagnostic_boundary_not_release_gate"
+  },
+  "next_gate": "integrate admitted chassis references with arm and end-effector tracking before obstacles or PPO"
+}
+

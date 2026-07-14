@@ -48,6 +48,11 @@ parser.add_argument("--maximum-post-vx-rmse", type=float, default=0.10)
 parser.add_argument("--maximum-post-wz-rmse", type=float, default=0.15)
 parser.add_argument("--maximum-saturation-ratio", type=float, default=0.10)
 parser.add_argument("--minimum-success-rate", type=float, default=0.95)
+parser.add_argument(
+    "--controller-profile",
+    choices=("default", "structural_robust_v1"),
+    default="default",
+)
 parser.add_argument("--vx-kp", type=float)
 parser.add_argument("--vx-ki", type=float)
 parser.add_argument("--wz-kp", type=float)
@@ -55,10 +60,13 @@ parser.add_argument("--wz-ki", type=float)
 parser.add_argument("--wz-feedforward", type=float)
 parser.add_argument("--vx-integral-limit", type=float)
 parser.add_argument("--wz-integral-limit", type=float)
+parser.add_argument(
+    "--governor-include-opposing-bias", action="store_true", default=None
+)
 parser.add_argument("--pitch-reference-limit-deg", type=float)
 parser.add_argument("--vx-reference-slew-rate", type=float)
 parser.add_argument("--wz-reference-slew-rate", type=float)
-parser.add_argument("--path-progress-governor", action="store_true")
+parser.add_argument("--path-progress-governor", action="store_true", default=None)
 parser.add_argument("--governor-bias-start-deg", type=float, default=0.5)
 parser.add_argument("--governor-bias-full-deg", type=float, default=2.5)
 parser.add_argument("--governor-minimum-progress-scale", type=float, default=0.75)
@@ -86,8 +94,9 @@ from rl_platform.tasks.two_wheel_balance import RecomoTwoWheelBalanceEnvCfg
 from rl_platform.tasks.two_wheel_balance.metrics import (
     ACTION_NAMES,
     LQR_STATE_NAMES,
-    CascadedLQRConfig,
     PlantVariation,
+    allocate_common_yaw_action,
+    cascaded_lqr_config,
     cascaded_lqr_action,
     diagnostic_plant_variations,
     provisional_plant_variations,
@@ -319,6 +328,7 @@ def main() -> int:
     survived = np.zeros(args.num_envs, dtype=bool)
     duration_steps = np.full(args.num_envs, args.horizon_steps, dtype=np.int64)
     integrals = np.zeros((args.num_envs, 6), dtype=np.float64)
+    final_controller_state = np.zeros_like(integrals)
     requested_action_np = np.zeros(
         (args.num_envs, len(ACTION_NAMES)), dtype=np.float32
     )
@@ -337,6 +347,7 @@ def main() -> int:
             "wz_feedforward": args.wz_feedforward,
             "vx_integral_limit": args.vx_integral_limit,
             "wz_integral_limit": args.wz_integral_limit,
+            "governor_include_opposing_bias": args.governor_include_opposing_bias,
             "vx_reference_slew_rate_m_s2": args.vx_reference_slew_rate,
             "wz_reference_slew_rate_rad_s2": args.wz_reference_slew_rate,
             "path_progress_governor_enabled": args.path_progress_governor,
@@ -351,7 +362,9 @@ def main() -> int:
         }.items()
         if value is not None
     }
-    config = CascadedLQRConfig(action_limit=action_limit, **controller_overrides)
+    config = cascaded_lqr_config(
+        args.controller_profile, action_limit=action_limit, **controller_overrides
+    )
 
     balance_hold = np.zeros(args.num_envs, dtype=np.int64)
     tracking_hold = np.zeros(args.num_envs, dtype=np.int64)
@@ -368,12 +381,28 @@ def main() -> int:
     post_wz_squared_error = np.zeros(args.num_envs, dtype=np.float64)
     post_admitted_vx_squared_error = np.zeros(args.num_envs, dtype=np.float64)
     post_admitted_wz_squared_error = np.zeros(args.num_envs, dtype=np.float64)
+    post_vx_sum = np.zeros(args.num_envs, dtype=np.float64)
+    post_vx_odometry_sum = np.zeros(args.num_envs, dtype=np.float64)
+    post_wz_sum = np.zeros(args.num_envs, dtype=np.float64)
     post_samples = np.zeros(args.num_envs, dtype=np.int64)
     admitted_vx_ref = np.zeros(args.num_envs, dtype=np.float64)
     admitted_wz_ref = np.zeros(args.num_envs, dtype=np.float64)
     path_progress_scale_min = np.ones(args.num_envs, dtype=np.float64)
     path_progress_scale_sum = np.zeros(args.num_envs, dtype=np.float64)
     path_progress_scale_samples = np.zeros(args.num_envs, dtype=np.int64)
+    wheel_mix_saturated = np.zeros(args.num_envs, dtype=np.int64)
+    wheel_mix_samples = np.zeros(args.num_envs, dtype=np.int64)
+    post_wheel_mix_saturated = np.zeros(args.num_envs, dtype=np.int64)
+    post_wheel_mix_samples = np.zeros(args.num_envs, dtype=np.int64)
+    allocation_common_squared_loss = np.zeros(args.num_envs, dtype=np.float64)
+    allocation_yaw_squared_loss = np.zeros(args.num_envs, dtype=np.float64)
+    post_allocation_common_squared_loss = np.zeros(args.num_envs, dtype=np.float64)
+    post_allocation_yaw_squared_loss = np.zeros(args.num_envs, dtype=np.float64)
+    peak_wheel_command_preclip = np.zeros(args.num_envs, dtype=np.float64)
+    current_pitch_reference = np.zeros(args.num_envs, dtype=np.float64)
+    current_yaw_correction = np.zeros(args.num_envs, dtype=np.float64)
+    post_pitch_reference_sum = np.zeros(args.num_envs, dtype=np.float64)
+    post_yaw_correction_sum = np.zeros(args.num_envs, dtype=np.float64)
     pre_pitch_max = np.zeros(args.num_envs, dtype=np.float64)
     pre_roll_max = np.zeros(args.num_envs, dtype=np.float64)
     pre_pitch_rate_max = np.zeros(args.num_envs, dtype=np.float64)
@@ -409,6 +438,8 @@ def main() -> int:
             )
             admitted_vx_ref = diagnostics["governed_vx_ref"]
             admitted_wz_ref = diagnostics["governed_wz_ref"]
+            current_pitch_reference = diagnostics["pitch_reference"]
+            current_yaw_correction = diagnostics["yaw_correction"]
             if command_active:
                 progress_scale = diagnostics["path_progress_scale"]
                 path_progress_scale_min[active] = np.minimum(
@@ -427,6 +458,34 @@ def main() -> int:
                 action_np[env_index] = 0.0
         action_np *= torque_scale[:, None]
         action_np[~active] = 0.0
+        _, effective_action_np, wheel_saturated = allocate_common_yaw_action(action_np)
+        allocation_loss = action_np - effective_action_np
+        if command_active:
+            wheel_mix_saturated[active] += np.count_nonzero(
+                wheel_saturated[active], axis=1
+            )
+            wheel_mix_samples[active] += 2
+            allocation_common_squared_loss[active] += np.square(
+                allocation_loss[active, 0]
+            )
+            allocation_yaw_squared_loss[active] += np.square(
+                allocation_loss[active, 1]
+            )
+            peak_wheel_command_preclip[active] = np.maximum(
+                peak_wheel_command_preclip[active],
+                np.abs(action_np[active]).sum(axis=1),
+            )
+        if step >= latest_recovery_step:
+            post_wheel_mix_saturated[active] += np.count_nonzero(
+                wheel_saturated[active], axis=1
+            )
+            post_wheel_mix_samples[active] += 2
+            post_allocation_common_squared_loss[active] += np.square(
+                allocation_loss[active, 0]
+            )
+            post_allocation_yaw_squared_loss[active] += np.square(
+                allocation_loss[active, 1]
+            )
         obs, _, terminated, truncated, _ = env.step(
             torch.as_tensor(action_np, device=unwrapped.device)
         )
@@ -541,6 +600,11 @@ def main() -> int:
             post_admitted_wz_squared_error[active] += np.square(
                 wz_truth[active] - admitted_wz_ref[active]
             )
+            post_vx_sum[active] += vx_truth[active]
+            post_vx_odometry_sum[active] += vx_odometry[active]
+            post_wz_sum[active] += wz_truth[active]
+            post_pitch_reference_sum[active] += current_pitch_reference[active]
+            post_yaw_correction_sum[active] += current_yaw_correction[active]
             post_samples[active] += 1
 
         terminated_np = terminated.detach().cpu().numpy().astype(bool)
@@ -548,6 +612,7 @@ def main() -> int:
         finished = active & (terminated_np | truncated_np)
         duration_steps[finished] = step + 1
         survived[finished] = truncated_np[finished]
+        final_controller_state[finished] = integrals[finished]
         active[finished] = False
         integrals[~active] = 0.0
         if not np.any(active):
@@ -555,6 +620,7 @@ def main() -> int:
 
     set_push_wrench(unwrapped, np.zeros(args.num_envs))
     survived[active] = True
+    final_controller_state[active] = integrals[active]
     env.close()
 
     scenario_results = []
@@ -603,6 +669,9 @@ def main() -> int:
             if path_progress_scale_samples[index]
             else 1.0
         )
+        allocation_samples = max(int(wheel_mix_samples[index] / 2), 1)
+        post_allocation_samples = max(int(post_wheel_mix_samples[index] / 2), 1)
+        post_sample_count = max(int(post_samples[index]), 1)
         passed = bool(
             survived[index]
             and balance_recovery_s is not None
@@ -670,6 +739,11 @@ def main() -> int:
                 "post_vx_com_rmse": post_vx_com_rmse,
                 "post_vx_odometry_rmse": post_vx_odometry_rmse,
                 "post_wz_rmse": post_wz_rmse,
+                "post_vx_mean": float(post_vx_sum[index] / post_sample_count),
+                "post_vx_odometry_mean": float(
+                    post_vx_odometry_sum[index] / post_sample_count
+                ),
+                "post_wz_mean": float(post_wz_sum[index] / post_sample_count),
                 "post_admitted_vx_rmse": post_admitted_vx_rmse,
                 "post_admitted_wz_rmse": post_admitted_wz_rmse,
                 "selected_post_vx_rmse": selected_post_vx_rmse,
@@ -677,6 +751,42 @@ def main() -> int:
                 "path_progress_scale_min": float(path_progress_scale_min[index]),
                 "path_progress_scale_mean": float(progress_scale_mean),
                 "action_saturation_ratio": float(saturation_ratio),
+                "control_allocation": {
+                    "wheel_saturation_ratio": float(
+                        wheel_mix_saturated[index] / max(wheel_mix_samples[index], 1)
+                    ),
+                    "post_wheel_saturation_ratio": float(
+                        post_wheel_mix_saturated[index]
+                        / max(post_wheel_mix_samples[index], 1)
+                    ),
+                    "peak_wheel_command_preclip": float(
+                        peak_wheel_command_preclip[index]
+                    ),
+                    "common_authority_loss_rmse": safe_rmse(
+                        allocation_common_squared_loss[index], allocation_samples
+                    ),
+                    "yaw_authority_loss_rmse": safe_rmse(
+                        allocation_yaw_squared_loss[index], allocation_samples
+                    ),
+                    "post_common_authority_loss_rmse": safe_rmse(
+                        post_allocation_common_squared_loss[index],
+                        post_allocation_samples,
+                    ),
+                    "post_yaw_authority_loss_rmse": safe_rmse(
+                        post_allocation_yaw_squared_loss[index], post_allocation_samples
+                    ),
+                    "post_pitch_reference_mean_deg": float(
+                        np.degrees(post_pitch_reference_sum[index] / post_sample_count)
+                    ),
+                    "post_yaw_correction_mean": float(
+                        post_yaw_correction_sum[index] / post_sample_count
+                    ),
+                    "final_vx_integral": float(final_controller_state[index, 0]),
+                    "final_wz_integral": float(final_controller_state[index, 1]),
+                    "latched_pitch_bias_deg": float(
+                        np.degrees(final_controller_state[index, 2])
+                    ),
+                },
                 "passed": passed,
             }
         )
@@ -745,11 +855,22 @@ def main() -> int:
         ),
         "action_saturation_ratio": int(np.sum(saturated_actions))
         / max(int(np.sum(action_samples)), 1),
+        "wheel_mix_saturation_ratio": int(np.sum(wheel_mix_saturated))
+        / max(int(np.sum(wheel_mix_samples)), 1),
+        "post_wheel_mix_saturation_ratio": int(np.sum(post_wheel_mix_saturated))
+        / max(int(np.sum(post_wheel_mix_samples)), 1),
+        "peak_wheel_command_preclip_max": float(np.max(peak_wheel_command_preclip)),
+        "post_vx_mean": float(np.sum(post_vx_sum) / max(total_post_samples, 1)),
+        "post_vx_odometry_mean": float(
+            np.sum(post_vx_odometry_sum) / max(total_post_samples, 1)
+        ),
+        "post_wz_mean": float(np.sum(post_wz_sum) / max(total_post_samples, 1)),
     }
     result = {
-        "schema": "recomo_two_wheel_cascaded_lqr_tracking_push_gate_v3",
+        "schema": "recomo_two_wheel_cascaded_lqr_tracking_push_gate_v4",
         "seed": args.seed,
         "tracking_reference": args.tracking_reference,
+        "controller_profile": args.controller_profile,
         "gains": str(args.gains.resolve()),
         "selected_gain_scale": gain_data["selected_gain_scale"],
         "controller": {
@@ -760,6 +881,7 @@ def main() -> int:
             "wz_feedforward": config.wz_feedforward,
             "vx_integral_limit": config.vx_integral_limit,
             "wz_integral_limit": config.wz_integral_limit,
+            "governor_include_opposing_bias": config.governor_include_opposing_bias,
             "pitch_bias_adaptation_rate": config.pitch_bias_adaptation_rate,
             "pitch_bias_limit_deg": float(np.degrees(config.pitch_bias_limit_rad)),
             "vx_reference_slew_rate_m_s2": config.vx_reference_slew_rate_m_s2,

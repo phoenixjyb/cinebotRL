@@ -9,6 +9,8 @@ from rl_platform.tasks.two_wheel_balance.metrics import (
     BalanceContract,
     CascadedLQRConfig,
     PlantVariation,
+    allocate_common_yaw_action,
+    cascaded_lqr_config,
     cascaded_lqr_action,
     compose_pd_residual_action,
     controllability_matrix,
@@ -56,6 +58,13 @@ def test_yaw_effort_is_antisymmetric() -> None:
 def test_mixer_clips_each_wheel() -> None:
     effort = mix_common_yaw_effort(np.array([[1.0, 1.0]]), 20.0)
     np.testing.assert_allclose(effort, [[0.0, 20.0]])
+
+
+def test_mixer_reports_hidden_combined_action_clipping() -> None:
+    wheel, effective, saturated = allocate_common_yaw_action(np.array([[0.8, 0.8]]))
+    np.testing.assert_allclose(wheel, [[0.0, 1.0]])
+    np.testing.assert_allclose(effective, [[0.5, 0.5]])
+    np.testing.assert_array_equal(saturated, [[False, True]])
 
 
 def test_pd_residual_zero_matches_proven_feedback() -> None:
@@ -226,6 +235,28 @@ def test_cascaded_lqr_governor_is_disabled_by_default() -> None:
     np.testing.assert_allclose(diagnostics["governed_wz_ref"], [0.4])
 
 
+def test_cascaded_lqr_extended_governor_includes_opposing_bias() -> None:
+    controller_state = np.zeros((2, 6))
+    controller_state[:, 2] = np.radians(2.0)
+    controller_state[:, 3] = 1.0
+    _, _, diagnostics = cascaded_lqr_action(
+        np.zeros((2, len(LQR_STATE_NAMES))),
+        np.array([-0.2, 0.2]),
+        np.full(2, -0.4),
+        np.zeros((2, len(LQR_STATE_NAMES))),
+        controller_state,
+        control_dt=0.02,
+        config=CascadedLQRConfig(
+            path_progress_governor_enabled=True,
+            governor_include_opposing_bias=True,
+        ),
+    )
+    expected_bias_scale = 1.0 - 0.75 * 0.25
+    np.testing.assert_allclose(
+        diagnostics["path_progress_scale"], [expected_bias_scale, expected_bias_scale]
+    )
+
+
 def test_cascaded_lqr_estimates_equilibrium_pitch_only_at_zero_command() -> None:
     gain = np.zeros((2, len(LQR_STATE_NAMES)))
     states = np.zeros((1, len(LQR_STATE_NAMES)))
@@ -347,11 +378,22 @@ def test_cascaded_lqr_defaults_match_selected_tracking_gate() -> None:
     assert config.vx_ki == 0.05
     assert config.wz_ki == 0.10
     assert config.wz_integral_limit == 2.0
+    assert not config.governor_include_opposing_bias
     assert config.wheel_difference_kp == 0.0
     assert not config.path_progress_governor_enabled
     assert config.governor_minimum_progress_scale == 0.75
     assert np.isclose(np.degrees(config.pitch_reference_limit_rad), 6.0)
     assert config.action_limit == 0.8
+
+
+def test_structural_robust_profile_is_explicit_and_default_safe() -> None:
+    default = cascaded_lqr_config()
+    robust = cascaded_lqr_config("structural_robust_v1")
+    assert default == CascadedLQRConfig()
+    assert robust.vx_ki == 0.075
+    assert robust.vx_integral_limit == 0.7
+    assert robust.path_progress_governor_enabled
+    assert robust.governor_include_opposing_bias
 
 
 def test_diagnostic_plant_variations_are_bounded_and_unique() -> None:

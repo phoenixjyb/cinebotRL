@@ -138,7 +138,7 @@ def evaluate_candidate(
     active = np.ones(num_envs, dtype=bool)
     survived = np.zeros(num_envs, dtype=bool)
     duration_steps = np.full(num_envs, args.horizon_steps, dtype=np.int64)
-    integrals = np.zeros((num_envs, 2), dtype=np.float64)
+    integrals = np.zeros((num_envs, 4), dtype=np.float64)
     action_np = np.zeros((num_envs, len(ACTION_NAMES)), dtype=np.float32)
     pitch_reference_max = 0.0
     pitch_max = 0.0

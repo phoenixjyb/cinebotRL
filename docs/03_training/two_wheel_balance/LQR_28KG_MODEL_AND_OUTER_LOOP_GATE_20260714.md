@@ -1,5 +1,10 @@
 # 28 kg Model and Outer-Loop Gate
 
+> **Controller update:** the 28 kg model and inner-LQR evidence remain current.
+> The later provisional guessed-plant controller raises `wz_ki` to `0.10`, adds
+> anti-windup and startup equilibrium-pitch estimation, and is documented in
+> `PROVISIONAL_PLANT_PRIOR_AND_ROBUST_CONTROL_20260714.md`.
+
 Date: 2026-07-14
 
 Branch: `codex/two-wheel-balance-rl`

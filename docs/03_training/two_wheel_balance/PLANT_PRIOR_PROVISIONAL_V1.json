@@ -1,0 +1,56 @@
+{
+  "schema": "recomo_two_wheel_provisional_plant_prior_v1",
+  "status": "engineering_guess_pending_hardware_measurement",
+  "command_frame": "axle_midpoint_base_link",
+  "nominal": {
+    "total_mass_kg": 28.0,
+    "base_com_m": [0.0, 0.0, 0.4],
+    "base_diagonal_inertia_kg_m2": [1.533, 1.613, 0.694],
+    "wheel_torque_limit_nm_each": 20.0,
+    "static_friction": 0.9,
+    "dynamic_friction": 0.8,
+    "command_delay_s": 0.0,
+    "wheel_track_m": 0.62,
+    "wheel_diameter_m": 0.2032
+  },
+  "provisional_operating_envelope": {
+    "total_mass_kg": [26.6, 29.4],
+    "com_x_m": [-0.02, 0.02],
+    "com_z_m": [0.37, 0.43],
+    "inertia_scale": [0.85, 1.15],
+    "base_yaw_inertia_kg_m2": [0.5899, 0.7981],
+    "available_wheel_torque_nm_each": [18.0, 20.0],
+    "static_friction": [0.7, 1.0],
+    "dynamic_friction": [0.6, 0.9],
+    "command_delay_s": [0.0, 0.01],
+    "accepted_signed_push_impulse_ns": [-2.0, 2.0]
+  },
+  "stress_envelope_not_required_for_primary_acceptance": {
+    "mass_scale": [0.85, 1.25],
+    "com_x_m": [-0.03, 0.03],
+    "com_z_m": [0.35, 0.45],
+    "inertia_scale": [0.8, 1.2],
+    "available_wheel_torque_nm_each_min": 16.0,
+    "static_friction_min": 0.65,
+    "dynamic_friction_min": 0.55,
+    "command_delay_s_max": 0.02,
+    "push_impulse_ns": [-6.0, 6.0]
+  },
+  "selected_controller": {
+    "inner_lqr": "evidence_20260714_28kg/lqr_gains.json",
+    "vx_kp": 0.6,
+    "vx_ki": 0.05,
+    "vx_integral_limit": 0.5,
+    "wz_kp": 0.25,
+    "wz_ki": 0.1,
+    "wz_integral_limit": 2.0,
+    "wz_feedforward": 0.6,
+    "pitch_reference_limit_deg": 6.0,
+    "pitch_bias_adaptation_rate": 5.0,
+    "pitch_bias_limit_deg": 4.0,
+    "pitch_bias_one_shot_latched": true,
+    "action_limit": 0.8,
+    "conditional_anti_windup": true
+  },
+  "replacement_rule": "Replace guessed values with measured values, rerun nominal, provisional, stress, and signed recovery gates, then issue v2."
+}

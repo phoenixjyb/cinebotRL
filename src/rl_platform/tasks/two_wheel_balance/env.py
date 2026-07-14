@@ -134,9 +134,11 @@ class RecomoTwoWheelBalanceEnv(DirectRLEnv):
         return {
             "roll": roll,
             "pitch": pitch,
-            "pitch_rate": self.robot.data.root_ang_vel_b[:, 1],
-            "yaw_rate": self.robot.data.root_ang_vel_b[:, 2],
-            "vx": self.robot.data.root_lin_vel_b[:, 0],
+            "pitch_rate": self.robot.data.root_link_ang_vel_b[:, 1],
+            "yaw_rate": self.robot.data.root_link_ang_vel_b[:, 2],
+            # Track the axle/root-link frame, not COM velocity. The command
+            # frame is the midpoint between the wheel contact patches.
+            "vx": self.robot.data.root_link_lin_vel_b[:, 0],
             "mean_wheel_position": wheel_pos.mean(dim=1),
             "mean_wheel_velocity": wheel_vel.mean(dim=1),
             "wheel_velocity_difference": wheel_vel[:, 1] - wheel_vel[:, 0],

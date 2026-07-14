@@ -107,12 +107,16 @@ class CascadedLQRConfig:
     vx_kp: float = 0.6
     vx_ki: float = 0.05
     wz_kp: float = 0.25
-    wz_ki: float = 0.05
+    wz_ki: float = 0.10
     wz_feedforward: float = 0.6
     wheel_difference_kp: float = 0.0
     pitch_reference_limit_rad: float = math.radians(6.0)
     vx_integral_limit: float = 0.5
-    wz_integral_limit: float = 1.0
+    wz_integral_limit: float = 2.0
+    pitch_bias_adaptation_rate: float = 5.0
+    pitch_bias_limit_rad: float = math.radians(4.0)
+    pitch_bias_command_threshold: float = 0.01
+    pitch_bias_pitch_rate_threshold: float = 0.05
     action_limit: float = 0.8
 
 
@@ -199,6 +203,36 @@ def diagnostic_plant_variations() -> tuple[PlantVariation, ...]:
     )
 
 
+def provisional_plant_variations() -> tuple[PlantVariation, ...]:
+    """Return the guessed v1 operating envelope pending hardware measurement."""
+    return (
+        PlantVariation("nominal"),
+        PlantVariation("mass_0p95", mass_scale=0.95),
+        PlantVariation("mass_1p05", mass_scale=1.05),
+        PlantVariation("com_x_minus_0p02", com_offset_x_m=-0.02),
+        PlantVariation("com_x_plus_0p02", com_offset_x_m=0.02),
+        PlantVariation("com_z_minus_0p03", com_offset_z_m=-0.03),
+        PlantVariation("com_z_plus_0p03", com_offset_z_m=0.03),
+        PlantVariation("inertia_0p85", inertia_scale=0.85),
+        PlantVariation("inertia_1p15", inertia_scale=1.15),
+        PlantVariation("friction_low", static_friction=0.70, dynamic_friction=0.60),
+        PlantVariation("friction_high", static_friction=1.00, dynamic_friction=0.90),
+        PlantVariation("torque_0p9", torque_scale=0.90),
+        PlantVariation("delay_10ms", action_delay_steps=2),
+        PlantVariation(
+            "corner_provisional_v1",
+            mass_scale=1.05,
+            inertia_scale=1.15,
+            com_offset_x_m=-0.02,
+            com_offset_z_m=0.03,
+            static_friction=0.70,
+            dynamic_friction=0.60,
+            torque_scale=0.90,
+            action_delay_steps=2,
+        ),
+    )
+
+
 def cascaded_lqr_action(
     states: np.ndarray,
     vx_ref: np.ndarray,
@@ -222,37 +256,94 @@ def cascaded_lqr_action(
         raise ValueError(f"invalid gain shape: {gain.shape}")
     if vx_ref.shape != (batch,) or wz_ref.shape != (batch,):
         raise ValueError("command arrays must match the state batch")
-    if integrals.shape != (batch, 2):
-        raise ValueError(f"expected integral shape {(batch, 2)}, got {integrals.shape}")
+    valid_controller_state_shapes = ((batch, 2), (batch, 3), (batch, 4))
+    if integrals.shape not in valid_controller_state_shapes:
+        raise ValueError(
+            "expected controller state shape "
+            f"{(batch, 2)}, {(batch, 3)}, or {(batch, 4)}, got {integrals.shape}"
+        )
     if control_dt <= 0.0:
         raise ValueError("control_dt must be positive")
     if config.wheel_radius_m <= 0.0 or config.wheel_track_m <= 0.0:
         raise ValueError("wheel geometry must be positive")
+    if (
+        config.vx_integral_limit <= 0.0
+        or config.wz_integral_limit <= 0.0
+        or config.pitch_reference_limit_rad <= 0.0
+        or config.pitch_bias_limit_rad <= 0.0
+        or config.action_limit <= 0.0
+    ):
+        raise ValueError("controller limits must be positive")
+    if config.pitch_bias_adaptation_rate < 0.0:
+        raise ValueError("pitch bias adaptation rate must be non-negative")
 
     vx_estimate = config.wheel_radius_m * states[:, 3]
     vx_error = vx_ref - vx_estimate
     wz_error = wz_ref - states[:, 5]
-    next_integrals = integrals.copy()
-    next_integrals[:, 0] = np.clip(
-        next_integrals[:, 0] + control_dt * vx_error,
+    candidate_integrals = integrals.copy()
+    candidate_integrals[:, 0] = np.clip(
+        candidate_integrals[:, 0] + control_dt * vx_error,
         -config.vx_integral_limit,
         config.vx_integral_limit,
     )
-    next_integrals[:, 1] = np.clip(
-        next_integrals[:, 1] + control_dt * wz_error,
+    candidate_integrals[:, 1] = np.clip(
+        candidate_integrals[:, 1] + control_dt * wz_error,
         -config.wz_integral_limit,
         config.wz_integral_limit,
     )
 
     # A forward command first pulls the wheels back to create a forward lean;
     # the frozen balance LQR then drives the wheels under the falling body.
+    pitch_reference_unclipped = (
+        config.vx_kp * vx_error + config.vx_ki * candidate_integrals[:, 0]
+    )
+    vx_integrator_blocked = (
+        (pitch_reference_unclipped > config.pitch_reference_limit_rad) & (vx_error > 0.0)
+    ) | (
+        (pitch_reference_unclipped < -config.pitch_reference_limit_rad) & (vx_error < 0.0)
+    )
+    next_integrals = candidate_integrals.copy()
+    next_integrals[vx_integrator_blocked, 0] = integrals[vx_integrator_blocked, 0]
+    pitch_bias = np.zeros(batch, dtype=np.float64)
+    pitch_bias_adapting = np.zeros(batch, dtype=bool)
+    pitch_bias_calibrated = np.zeros(batch, dtype=bool)
+    if integrals.shape[1] >= 3:
+        pitch_bias = integrals[:, 2].copy()
+        zero_command = (
+            (np.abs(vx_ref) <= config.pitch_bias_command_threshold)
+            & (np.abs(wz_ref) <= config.pitch_bias_command_threshold)
+        )
+        pitch_bias_calibrated = (
+            integrals[:, 3] >= 0.5
+            if integrals.shape[1] == 4
+            else np.zeros(batch, dtype=bool)
+        )
+        pitch_bias_adapting = (
+            ~pitch_bias_calibrated
+            & zero_command
+            & (np.abs(states[:, 1]) <= config.pitch_bias_pitch_rate_threshold)
+        )
+        adaptation_alpha = np.clip(
+            config.pitch_bias_adaptation_rate * control_dt, 0.0, 1.0
+        )
+        pitch_bias[pitch_bias_adapting] += adaptation_alpha * (
+            states[pitch_bias_adapting, 0] - pitch_bias[pitch_bias_adapting]
+        )
+        pitch_bias = np.clip(
+            pitch_bias, -config.pitch_bias_limit_rad, config.pitch_bias_limit_rad
+        )
+        next_integrals[:, 2] = pitch_bias
+        if integrals.shape[1] == 4:
+            pitch_bias_calibrated |= ~zero_command
+            next_integrals[:, 3] = pitch_bias_calibrated.astype(np.float64)
+    applied_pitch_bias = np.where(pitch_bias_adapting, 0.0, pitch_bias)
     pitch_reference = np.clip(
         config.vx_kp * vx_error + config.vx_ki * next_integrals[:, 0],
         -config.pitch_reference_limit_rad,
         config.pitch_reference_limit_rad,
     )
     tracking_states = states.copy()
-    tracking_states[:, 0] -= pitch_reference
+    tracking_states[:, 0] -= applied_pitch_bias + pitch_reference
     tracking_states[:, 3] -= vx_ref / config.wheel_radius_m
     tracking_states[:, 4] -= (
         config.wheel_track_m / config.wheel_radius_m
@@ -266,12 +357,24 @@ def cascaded_lqr_action(
         config.wheel_track_m / config.wheel_radius_m
     ) * wz_ref
     wheel_difference_error = wheel_difference_target - states[:, 4]
-    actions[:, 1] += (
+    yaw_correction = (
         config.wz_kp * wz_error
         + config.wz_ki * next_integrals[:, 1]
         + config.wz_feedforward * wz_ref
         + config.wheel_difference_kp * wheel_difference_error
     )
+    yaw_unclipped = actions[:, 1] + yaw_correction
+    wz_integrator_blocked = (
+        (yaw_unclipped > config.action_limit) & (wz_error > 0.0)
+    ) | ((yaw_unclipped < -config.action_limit) & (wz_error < 0.0))
+    next_integrals[wz_integrator_blocked, 1] = integrals[wz_integrator_blocked, 1]
+    yaw_correction = (
+        config.wz_kp * wz_error
+        + config.wz_ki * next_integrals[:, 1]
+        + config.wz_feedforward * wz_ref
+        + config.wheel_difference_kp * wheel_difference_error
+    )
+    actions[:, 1] += yaw_correction
     actions = np.clip(actions, -config.action_limit, config.action_limit)
     diagnostics = {
         "vx_estimate": vx_estimate,
@@ -279,6 +382,12 @@ def cascaded_lqr_action(
         "wz_error": wz_error,
         "wheel_difference_error": wheel_difference_error,
         "pitch_reference": pitch_reference,
+        "pitch_bias": pitch_bias,
+        "applied_pitch_bias": applied_pitch_bias,
+        "pitch_bias_adapting": pitch_bias_adapting,
+        "pitch_bias_calibrated": pitch_bias_calibrated,
+        "vx_integrator_blocked": vx_integrator_blocked,
+        "wz_integrator_blocked": wz_integrator_blocked,
     }
     return actions, next_integrals, diagnostics
 

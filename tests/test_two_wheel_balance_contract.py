@@ -15,6 +15,7 @@ from rl_platform.tasks.two_wheel_balance.metrics import (
     diagnostic_plant_variations,
     lqr_action,
     mix_common_yaw_effort,
+    provisional_plant_variations,
     recovery_window_steps,
     solve_discrete_lqr,
 )
@@ -131,6 +132,81 @@ def test_cascaded_lqr_signed_commands_produce_signed_actions() -> None:
     assert diagnostics["pitch_reference"][1] < 0.0
 
 
+def test_cascaded_lqr_blocks_integrators_that_drive_further_into_limits() -> None:
+    gain = np.zeros((2, len(LQR_STATE_NAMES)))
+    _, integrals, diagnostics = cascaded_lqr_action(
+        np.zeros((1, len(LQR_STATE_NAMES))),
+        np.array([1.0]),
+        np.array([1.0]),
+        gain,
+        np.zeros((1, 2)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(
+            vx_kp=1.0,
+            vx_ki=1.0,
+            wz_kp=1.0,
+            wz_ki=1.0,
+            wz_feedforward=1.0,
+            pitch_reference_limit_rad=0.1,
+            action_limit=0.8,
+        ),
+    )
+    np.testing.assert_allclose(integrals, np.zeros((1, 2)))
+    assert diagnostics["vx_integrator_blocked"][0]
+    assert diagnostics["wz_integrator_blocked"][0]
+
+
+def test_cascaded_lqr_estimates_equilibrium_pitch_only_at_zero_command() -> None:
+    gain = np.zeros((2, len(LQR_STATE_NAMES)))
+    states = np.zeros((1, len(LQR_STATE_NAMES)))
+    states[0, 0] = 0.05
+    _, controller_state, diagnostics = cascaded_lqr_action(
+        states,
+        np.zeros(1),
+        np.zeros(1),
+        gain,
+        np.zeros((1, 4)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(pitch_bias_adaptation_rate=5.0),
+    )
+    np.testing.assert_allclose(controller_state[0, 2], 0.005)
+    assert diagnostics["pitch_bias_adapting"][0]
+    np.testing.assert_allclose(diagnostics["applied_pitch_bias"], np.zeros(1))
+
+    _, frozen_state, frozen_diagnostics = cascaded_lqr_action(
+        states,
+        np.ones(1) * 0.2,
+        np.zeros(1),
+        gain,
+        controller_state,
+        control_dt=0.02,
+        config=CascadedLQRConfig(pitch_bias_adaptation_rate=5.0),
+    )
+    np.testing.assert_allclose(frozen_state[0, 2], controller_state[0, 2])
+    assert frozen_state[0, 3] == 1.0
+    assert not frozen_diagnostics["pitch_bias_adapting"][0]
+    assert frozen_diagnostics["pitch_bias_calibrated"][0]
+    np.testing.assert_allclose(
+        frozen_diagnostics["applied_pitch_bias"], controller_state[:, 2]
+    )
+
+    _, stopped_state, stopped_diagnostics = cascaded_lqr_action(
+        states,
+        np.zeros(1),
+        np.zeros(1),
+        gain,
+        frozen_state,
+        control_dt=0.02,
+        config=CascadedLQRConfig(pitch_bias_adaptation_rate=5.0),
+    )
+    np.testing.assert_allclose(stopped_state, frozen_state)
+    assert not stopped_diagnostics["pitch_bias_adapting"][0]
+    assert stopped_diagnostics["pitch_bias_calibrated"][0]
+    np.testing.assert_allclose(
+        stopped_diagnostics["applied_pitch_bias"], controller_state[:, 2]
+    )
+
+
 def test_cascaded_lqr_enforces_integral_reference_and_action_limits() -> None:
     gain = np.array(
         [[-20.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 1.0, 0.0]]
@@ -199,7 +275,8 @@ def test_cascaded_lqr_defaults_match_selected_tracking_gate() -> None:
     assert config.wz_kp == 0.25
     assert config.wz_feedforward == 0.6
     assert config.vx_ki == 0.05
-    assert config.wz_ki == 0.05
+    assert config.wz_ki == 0.10
+    assert config.wz_integral_limit == 2.0
     assert config.wheel_difference_kp == 0.0
     assert np.isclose(np.degrees(config.pitch_reference_limit_rad), 6.0)
     assert config.action_limit == 0.8
@@ -223,6 +300,22 @@ def test_diagnostic_plant_variations_are_bounded_and_unique() -> None:
         or item.dynamic_friction <= item.static_friction
         for item in variations
     )
+
+
+def test_provisional_plant_variations_match_guessed_operating_envelope() -> None:
+    variations = provisional_plant_variations()
+    assert len(variations) == 14
+    assert len({item.name for item in variations}) == len(variations)
+    assert min(item.mass_scale for item in variations) == 0.95
+    assert max(item.mass_scale for item in variations) == 1.05
+    assert min(item.com_offset_x_m for item in variations) == -0.02
+    assert max(item.com_offset_x_m for item in variations) == 0.02
+    assert min(item.com_offset_z_m for item in variations) == -0.03
+    assert max(item.com_offset_z_m for item in variations) == 0.03
+    assert min(item.inertia_scale for item in variations) == 0.85
+    assert max(item.inertia_scale for item in variations) == 1.15
+    assert min(item.torque_scale for item in variations) == 0.9
+    assert max(item.action_delay_steps for item in variations) == 2
 
 
 def test_plant_variation_rejects_nonphysical_values() -> None:

@@ -53,9 +53,12 @@ parser.add_argument("--vx-ki", type=float)
 parser.add_argument("--wz-kp", type=float)
 parser.add_argument("--wz-ki", type=float)
 parser.add_argument("--wz-feedforward", type=float)
+parser.add_argument("--vx-integral-limit", type=float)
+parser.add_argument("--wz-integral-limit", type=float)
+parser.add_argument("--pitch-reference-limit-deg", type=float)
 parser.add_argument(
     "--plant-uncertainty-profile",
-    choices=("nominal", "diagnostic_v1"),
+    choices=("nominal", "provisional_prior_v1", "diagnostic_v1"),
     default="nominal",
 )
 parser.add_argument("--seed", type=int, default=20260713)
@@ -75,6 +78,7 @@ from rl_platform.tasks.two_wheel_balance.metrics import (
     PlantVariation,
     cascaded_lqr_action,
     diagnostic_plant_variations,
+    provisional_plant_variations,
 )
 from task_spec import register_isaac_lab_tasks
 
@@ -232,11 +236,12 @@ def main() -> int:
     vx_commands = parse_csv(args.vx_commands)
     wz_commands = parse_csv(args.wz_commands)
     push_forces_n = parse_csv(args.push_forces_n)
-    plant_variations = (
-        diagnostic_plant_variations()
-        if args.plant_uncertainty_profile == "diagnostic_v1"
-        else (PlantVariation("nominal"),)
-    )
+    if args.plant_uncertainty_profile == "diagnostic_v1":
+        plant_variations = diagnostic_plant_variations()
+    elif args.plant_uncertainty_profile == "provisional_prior_v1":
+        plant_variations = provisional_plant_variations()
+    else:
+        plant_variations = (PlantVariation("nominal"),)
     expected_scenarios = (
         len(vx_commands)
         * len(wz_commands)
@@ -248,7 +253,7 @@ def main() -> int:
         and args.num_envs != expected_scenarios
     ):
         raise ValueError(
-            "diagnostic plant profile requires complete Cartesian coverage: "
+            "non-nominal plant profile requires complete Cartesian coverage: "
             f"set --num-envs {expected_scenarios}"
         )
     scenarios = build_scenarios(
@@ -299,7 +304,7 @@ def main() -> int:
     active = np.ones(args.num_envs, dtype=bool)
     survived = np.zeros(args.num_envs, dtype=bool)
     duration_steps = np.full(args.num_envs, args.horizon_steps, dtype=np.int64)
-    integrals = np.zeros((args.num_envs, 2), dtype=np.float64)
+    integrals = np.zeros((args.num_envs, 4), dtype=np.float64)
     requested_action_np = np.zeros(
         (args.num_envs, len(ACTION_NAMES)), dtype=np.float32
     )
@@ -316,6 +321,13 @@ def main() -> int:
             "wz_kp": args.wz_kp,
             "wz_ki": args.wz_ki,
             "wz_feedforward": args.wz_feedforward,
+            "vx_integral_limit": args.vx_integral_limit,
+            "wz_integral_limit": args.wz_integral_limit,
+            "pitch_reference_limit_rad": (
+                np.radians(args.pitch_reference_limit_deg)
+                if args.pitch_reference_limit_deg is not None
+                else None
+            ),
         }.items()
         if value is not None
     }
@@ -331,12 +343,17 @@ def main() -> int:
     saturated_actions = np.zeros(args.num_envs, dtype=np.int64)
     action_samples = np.zeros(args.num_envs, dtype=np.int64)
     post_vx_squared_error = np.zeros(args.num_envs, dtype=np.float64)
+    post_vx_com_squared_error = np.zeros(args.num_envs, dtype=np.float64)
+    post_vx_odometry_squared_error = np.zeros(args.num_envs, dtype=np.float64)
     post_wz_squared_error = np.zeros(args.num_envs, dtype=np.float64)
     post_samples = np.zeros(args.num_envs, dtype=np.int64)
     pre_pitch_max = np.zeros(args.num_envs, dtype=np.float64)
     pre_roll_max = np.zeros(args.num_envs, dtype=np.float64)
     pre_pitch_rate_max = np.zeros(args.num_envs, dtype=np.float64)
     pre_roll_rate_max = np.zeros(args.num_envs, dtype=np.float64)
+    pre_command_pitch_deg = np.zeros(args.num_envs, dtype=np.float64)
+    pre_command_pitch_rate = np.zeros(args.num_envs, dtype=np.float64)
+    pre_command_wheel_speed = np.zeros(args.num_envs, dtype=np.float64)
 
     for step in range(args.horizon_steps):
         command_active = step >= args.command_start_step
@@ -384,10 +401,19 @@ def main() -> int:
         pitch_rate = np.abs(current_states[:, 1])
         roll_rate = np.abs(unwrapped.robot.data.root_ang_vel_b[:, 0].detach().cpu().numpy())
         vx_truth = state["vx"].detach().cpu().numpy()
+        vx_com_truth = (
+            unwrapped.robot.data.root_com_lin_vel_b[:, 0].detach().cpu().numpy()
+        )
+        vx_odometry = config.wheel_radius_m * current_states[:, 3]
         wz_truth = state["yaw_rate"].detach().cpu().numpy()
         wheel_speed = state["max_abs_wheel_velocity"].detach().cpu().numpy()
         vx_error = np.abs(vx_truth - step_vx_ref)
         wz_error = np.abs(wz_truth - step_wz_ref)
+
+        if step == args.command_start_step - 1:
+            pre_command_pitch_deg[:] = np.degrees(current_states[:, 0])
+            pre_command_pitch_rate[:] = current_states[:, 1]
+            pre_command_wheel_speed[:] = current_states[:, 3]
 
         if args.push_start_step - args.tracking_settle_steps <= step < args.push_start_step:
             pre_pitch_max[active] = np.maximum(pre_pitch_max[active], pitch_deg[active])
@@ -458,6 +484,12 @@ def main() -> int:
 
         if step >= latest_recovery_step:
             post_vx_squared_error[active] += np.square(vx_truth[active] - vx_ref[active])
+            post_vx_com_squared_error[active] += np.square(
+                vx_com_truth[active] - vx_ref[active]
+            )
+            post_vx_odometry_squared_error[active] += np.square(
+                vx_odometry[active] - vx_ref[active]
+            )
             post_wz_squared_error[active] += np.square(wz_truth[active] - wz_ref[active])
             post_samples[active] += 1
 
@@ -491,6 +523,12 @@ def main() -> int:
         post_vx_rmse = safe_rmse(
             post_vx_squared_error[index], int(post_samples[index])
         )
+        post_vx_com_rmse = safe_rmse(
+            post_vx_com_squared_error[index], int(post_samples[index])
+        )
+        post_vx_odometry_rmse = safe_rmse(
+            post_vx_odometry_squared_error[index], int(post_samples[index])
+        )
         post_wz_rmse = safe_rmse(
             post_wz_squared_error[index], int(post_samples[index])
         )
@@ -515,6 +553,13 @@ def main() -> int:
                 "peak_pitch_deg": float(peak_pitch_deg[index]),
                 "peak_roll_deg": float(peak_roll_deg[index]),
                 "peak_wheel_speed_rad_s": float(peak_wheel_speed[index]),
+                "pre_command_state": {
+                    "pitch_deg": float(pre_command_pitch_deg[index]),
+                    "pitch_rate": float(pre_command_pitch_rate[index]),
+                    "mean_wheel_velocity_rad_s": float(
+                        pre_command_wheel_speed[index]
+                    ),
+                },
                 "pre_push_balance_envelope": {
                     "pitch_deg": float(pre_pitch_max[index]),
                     "roll_deg": float(pre_roll_max[index]),
@@ -550,6 +595,8 @@ def main() -> int:
                     ),
                 },
                 "post_vx_rmse": post_vx_rmse,
+                "post_vx_com_rmse": post_vx_com_rmse,
+                "post_vx_odometry_rmse": post_vx_odometry_rmse,
                 "post_wz_rmse": post_wz_rmse,
                 "action_saturation_ratio": float(saturation_ratio),
                 "passed": passed,
@@ -580,6 +627,12 @@ def main() -> int:
         "peak_roll_deg_max": float(np.max(peak_roll_deg)),
         "peak_wheel_speed_rad_s_max": float(np.max(peak_wheel_speed)),
         "post_vx_rmse": safe_rmse(float(np.sum(post_vx_squared_error)), total_post_samples),
+        "post_vx_com_rmse": safe_rmse(
+            float(np.sum(post_vx_com_squared_error)), total_post_samples
+        ),
+        "post_vx_odometry_rmse": safe_rmse(
+            float(np.sum(post_vx_odometry_squared_error)), total_post_samples
+        ),
         "post_wz_rmse": safe_rmse(float(np.sum(post_wz_squared_error)), total_post_samples),
         "action_saturation_ratio": int(np.sum(saturated_actions))
         / max(int(np.sum(action_samples)), 1),
@@ -595,6 +648,10 @@ def main() -> int:
             "wz_kp": config.wz_kp,
             "wz_ki": config.wz_ki,
             "wz_feedforward": config.wz_feedforward,
+            "vx_integral_limit": config.vx_integral_limit,
+            "wz_integral_limit": config.wz_integral_limit,
+            "pitch_bias_adaptation_rate": config.pitch_bias_adaptation_rate,
+            "pitch_bias_limit_deg": float(np.degrees(config.pitch_bias_limit_rad)),
             "pitch_reference_limit_deg": float(
                 np.degrees(config.pitch_reference_limit_rad)
             ),
@@ -653,7 +710,7 @@ def main() -> int:
             "vx_ref",
             "wz_ref",
         ],
-        "evaluation_only_truth": ["base_vx", "base_roll"],
+        "evaluation_only_truth": ["base_link_vx", "base_roll"],
         "training_started": False,
     }
     result["passed"] = bool(

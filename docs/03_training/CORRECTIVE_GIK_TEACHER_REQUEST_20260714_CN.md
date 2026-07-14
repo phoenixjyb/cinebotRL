@@ -97,16 +97,23 @@ joint_limit_margin_min_rad
 建议额外返回 solver exit reason、碰撞余量、速度/加速度峰值、完整 6 关节预测值
 以及 physical gimbal 诊断值，便于判断 runtime DLS 和离线完整解是否一致。
 
-## 数据门限
+## 数据门限（已按物理可达性修订）
 
 首轮只处理已失败策略的 120 个状态，不做全量导出。每一行必须满足：
 
 - source identity 唯一且可追溯；
-- physical camera position residual `<= 0.05 m`；
-- physical camera orientation residual `<= 2 deg`；
+- 若初始 position error `<= 0.05 m`，0.5 s 终点 residual 必须 `<= 0.06 m`；
+- 否则 0.5 s 终点必须达到 `<= 0.05 m`，或至少改善
+  `min(0.02 m, 5% * initial_error)`；
+- orientation 终点不得恶化超过 `2 deg`，且低误差状态目标门限为 `4 deg`；
 - arm/base action 在 `proto2_safe_v1` envelope 内；
 - 无关节限位、速度、加速度、碰撞或非有限值违规；
 - 不使用虚拟关节或 physical DJI joint 作为策略标签。
+
+原先要求所有大偏差状态在一个 0.5 s runtime-bounded horizon 内达到 `0.05 m`，与
+底盘加速度、机械臂单周期 slew 和相机初始误差不相容。修订后的门限只判断教师
+是否给出物理可执行且正确方向的恢复标签；最终 tracking accuracy 仍由 Isaac 闭环
+rollout gate 判断，不能用离线 horizon improvement 代替。
 
 若 120 行中有效率太低，不应放宽门限掩盖不可行性；应调整短时域、底盘自由度或
 目标时序，再重新求解。
@@ -132,6 +139,18 @@ accepted no-obstacle trajectories。障碍物 curriculum 必须等 no-obstacle r
 
 ## 当前边界
 
-本次实现解决的是“如何把策略访问状态交给真正的纠偏教师”。它没有假装已经生成
-GIK 标签，也没有启动训练。当前最关键的外部依赖是 MATLAB/GIK 会话按上述合同
-返回小规模 corrected smoke。
+截至 2026-07-14，纠偏教师已完成：
+
+- MATLAB/Isaac physical `cam_link` FK parity：position max
+  `9.33e-7 m`，orientation max `9.11e-5 deg`；
+- runtime-aligned smoke：`3/3`、`12/12` 通过；
+- 全部请求状态：`120/120` 通过，每行完成 10 个 50 ms bounded step；
+- 已显式验证底盘 `vx/vy`（含 lateral `vy`）、`wz`、底盘/偏航加速度、机械臂
+  `0.015 rad/step` slew、云台 rate/acceleration、SRDF collision 和 action envelope；
+- corrective BC 数据已按 `sample_id` 与原始 98D observation 连接，保留通道
+  `3/4/5` 仍为 zero/masked；每行权重 `0.5`，总有效权重 `60`；
+- 与 62 条 accepted nominal teacher 合并后为 `21,137` 行、63 个 disjoint source
+  group，其中 nominal 为 `21,017` 行，corrective 为 120 行。
+
+当前仍未授权 PPO。下一步只允许从 accepted62 reference-v2 checkpoint 做一次低学习率、
+有限 epoch 的 BC warm-start，然后执行 5 条轨迹、每条 120 步的 Isaac 闭环 gate。

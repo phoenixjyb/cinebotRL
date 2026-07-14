@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import torch
 
 try:
     import pytest
@@ -20,6 +21,8 @@ from rl_platform.tasks.mobile_mm.rs4_adapter import (
     policy_rates_to_rs4_command_deg_s,
     quaternion_feedforward_policy_rates_deg_s,
     quaternion_residual_policy_rates_deg_s,
+    quaternion_residual_policy_rates_rad_s_torch,
+    quaternion_world_error_rotvec_rad_torch,
     quaternion_tracking_policy_rates_deg_s,
     slew_limit_policy_rate_sequence_deg_s,
 )
@@ -138,6 +141,58 @@ def test_rate_sequence_matches_runtime_acceleration_limit():
     )
 
 
+def test_torch_quaternion_residual_matches_numpy_adapter():
+    yaw_delta = np.deg2rad(12.0)
+    current = np.array([[1.0, 0.0, 0.0, 0.0]], dtype=np.float32)
+    target = np.array(
+        [[np.cos(yaw_delta / 2), 0.0, 0.0, np.sin(yaw_delta / 2)]],
+        dtype=np.float32,
+    )
+    config = Rs4RateAdapterConfig(enable_roll=True)
+    expected_rates_deg, expected_residual_deg = quaternion_residual_policy_rates_deg_s(
+        current,
+        target,
+        response_horizon_s=0.4,
+        config=config,
+    )
+    rates_rad, residual_rad = quaternion_residual_policy_rates_rad_s_torch(
+        torch.from_numpy(current),
+        torch.from_numpy(target),
+        response_horizon_s=0.4,
+        max_policy_rates_rad_s=torch.from_numpy(np.deg2rad(config.max_policy_order_rates)),
+        enable_roll=True,
+    )
+    np.testing.assert_allclose(np.rad2deg(rates_rad.numpy()), expected_rates_deg, atol=1e-4)
+    np.testing.assert_allclose(np.rad2deg(residual_rad.numpy()), expected_residual_deg, atol=1e-4)
+
+
+def test_world_error_rotvec_respects_rotated_camera_frame():
+    half = np.deg2rad(45.0)
+    current = torch.tensor([[np.cos(half), 0.0, np.sin(half), 0.0]], dtype=torch.float32)
+    local_yaw = np.deg2rad(10.0)
+    delta = torch.tensor(
+        [[np.cos(local_yaw / 2), 0.0, 0.0, np.sin(local_yaw / 2)]],
+        dtype=torch.float32,
+    )
+    w1, x1, y1, z1 = current.unbind(dim=-1)
+    w2, x2, y2, z2 = delta.unbind(dim=-1)
+    target = torch.stack(
+        [
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ],
+        dim=-1,
+    )
+    world_error = quaternion_world_error_rotvec_rad_torch(current, target)
+    np.testing.assert_allclose(
+        world_error.numpy(),
+        np.array([[local_yaw, 0.0, 0.0]], dtype=np.float32),
+        atol=1e-5,
+    )
+
+
 def test_quaternion_feedforward_preserves_small_target_motion_at_vertical_pitch():
     pitch = np.deg2rad(-90.0)
     base = np.array([np.cos(pitch / 2), 0.0, np.sin(pitch / 2), 0.0])
@@ -196,6 +251,8 @@ if __name__ == "__main__":
     test_integrate_policy_attitude_wraps_yaw_only()
     test_quaternion_residual_is_bounded_near_euler_pitch_singularity()
     test_rate_sequence_matches_runtime_acceleration_limit()
+    test_torch_quaternion_residual_matches_numpy_adapter()
+    test_world_error_rotvec_respects_rotated_camera_frame()
     test_quaternion_feedforward_preserves_small_target_motion_at_vertical_pitch()
     test_tracking_rate_combines_feedforward_and_feedback()
     # Manual equivalent for pytest.raises checks.

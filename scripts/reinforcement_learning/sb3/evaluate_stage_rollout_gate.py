@@ -12,10 +12,16 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import traceback
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
@@ -169,7 +175,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--action_contract",
-        choices=["sim_6joint_gimbal_v1", "rs4_attitude_rate_v1"],
+        choices=[
+            "sim_6joint_gimbal_v1",
+            "rs4_attitude_rate_v1",
+            "split_base_arm_attitude_v1",
+        ],
         default="sim_6joint_gimbal_v1",
     )
     parser.add_argument("--experimental_rs4_adapter", action="store_true")
@@ -274,8 +284,12 @@ def load_stage_reset_config(stage: str) -> dict[str, object]:
         out["reset_base_x_offset"] = float(data["reset_base_x_offset"])
     if "reset_base_y_offset" in data:
         out["reset_base_y_offset"] = float(data["reset_base_y_offset"])
+    if "reset_base_to_trajectory_metadata" in data:
+        out["reset_base_to_trajectory_metadata"] = bool(data["reset_base_to_trajectory_metadata"])
     if "reset_arm_to_trajectory_metadata" in data:
         out["reset_arm_to_trajectory_metadata"] = bool(data["reset_arm_to_trajectory_metadata"])
+    if "trajectory_dt" in data:
+        out["trajectory_dt"] = float(data["trajectory_dt"])
     raw_reward_overrides = data.get("reward_overrides", {})
     if isinstance(raw_reward_overrides, dict):
         out["reward_overrides"] = {
@@ -449,6 +463,9 @@ def main() -> int:
 
         env_cfg = MobileMMTrackEEEnvCfg()
         env_cfg.num_envs = args.num_envs
+        if "trajectory_dt" in reset_config:
+            env_cfg.task_config.trajectory_dt = float(reset_config["trajectory_dt"])
+            print(f"[gate] trajectory dt={env_cfg.task_config.trajectory_dt:.4f}s", flush=True)
         env_cfg.scene.num_envs = args.num_envs
         env_cfg.seed = args.seed
         if args.episode_length_s > 0.0:
@@ -472,7 +489,7 @@ def main() -> int:
         env_cfg.task_config.arm_action_envelope_profile = args.arm_action_envelope_profile
         target_orientation_contract = args.target_orientation_contract or (
             "semantic_dfr_to_physical_cam_v1"
-            if args.action_contract == "rs4_attitude_rate_v1"
+            if args.action_contract in {"rs4_attitude_rate_v1", "split_base_arm_attitude_v1"}
             else "as_recorded"
         )
         if args.enable_obstacles:
@@ -516,6 +533,7 @@ def main() -> int:
             start_waypoint_min_fraction=args.start_waypoint_min_fraction,
             start_waypoint_max_fraction=args.start_waypoint_max_fraction,
             reset_base_to_trajectory_start=bool(args.reset_base_to_trajectory_start),
+            reset_base_to_trajectory_metadata=reset_config.get("reset_base_to_trajectory_metadata", False),
             reset_anchor_target_blend=args.reset_anchor_target_blend,
             reset_base_x_offset=reset_config.get("reset_base_x_offset", 0.4415),
             reset_base_y_offset=reset_config.get("reset_base_y_offset", 0.2405),
@@ -813,6 +831,11 @@ def main() -> int:
         dataset_observations: list[np.ndarray] = []
         dataset_actions: list[np.ndarray] = []
         dataset_policy_actions: list[np.ndarray] = []
+        dataset_env_ids: list[np.ndarray] = []
+        dataset_steps: list[np.ndarray] = []
+        dataset_waypoint_indices: list[np.ndarray] = []
+        dataset_episode_indices: list[np.ndarray] = []
+        dataset_first_episode_valid: list[np.ndarray] = []
         base_teacher_observations: list[np.ndarray] = []
         base_teacher_actions: list[np.ndarray] = []
         base_teacher_masks: list[np.ndarray] = []
@@ -882,9 +905,24 @@ def main() -> int:
                 action = np.repeat(open_loop_actions[step : step + 1], args.num_envs, axis=0)
                 primary_action_for_dataset = np.asarray(action, dtype=np.float32).copy()
             if args.output_dataset_npz:
+                waypoint_idx = tensor_np(raw_env.trajectory_manager.current_waypoint_idx).astype(np.int32)
+                trajectory_metadata = list(
+                    getattr(raw_env.trajectory_manager, "current_trajectory_metadata", []) or []
+                )
+                episode_idx = np.full((args.num_envs,), -1, dtype=np.int32)
+                for env_id in range(args.num_envs):
+                    item = trajectory_metadata[env_id] if env_id < len(trajectory_metadata) else {}
+                    raw_metadata = item.get("metadata", {}) if isinstance(item, dict) else {}
+                    if isinstance(raw_metadata, dict) and "episode_index" in raw_metadata:
+                        episode_idx[env_id] = int(raw_metadata["episode_index"])
                 dataset_observations.append(obs_before_step)
                 dataset_actions.append(np.asarray(action, dtype=np.float32).copy())
                 dataset_policy_actions.append(np.asarray(primary_action_for_dataset, dtype=np.float32).copy())
+                dataset_env_ids.append(np.arange(args.num_envs, dtype=np.int32))
+                dataset_steps.append(np.full((args.num_envs,), step, dtype=np.int32))
+                dataset_waypoint_indices.append(waypoint_idx.copy())
+                dataset_episode_indices.append(episode_idx)
+                dataset_first_episode_valid.append((first_done_step_per_env < 0).copy())
             if args.output_base_teacher_npz:
                 expert_xy, expert_wz, active, expert_distance = compute_direct_base_teacher(raw_env, args)
                 expert_xy_np = tensor_np(expert_xy).astype(np.float32)
@@ -1194,6 +1232,11 @@ def main() -> int:
             dataset_obs = np.concatenate(dataset_observations, axis=0).astype(np.float32)
             dataset_actions_arr = np.concatenate(dataset_actions, axis=0).astype(np.float32)
             dataset_policy_actions_arr = np.concatenate(dataset_policy_actions, axis=0).astype(np.float32)
+            dataset_env_ids_arr = np.concatenate(dataset_env_ids, axis=0).astype(np.int32)
+            dataset_steps_arr = np.concatenate(dataset_steps, axis=0).astype(np.int32)
+            dataset_waypoint_indices_arr = np.concatenate(dataset_waypoint_indices, axis=0).astype(np.int32)
+            dataset_episode_indices_arr = np.concatenate(dataset_episode_indices, axis=0).astype(np.int32)
+            dataset_first_episode_valid_arr = np.concatenate(dataset_first_episode_valid, axis=0).astype(bool)
             dataset_mask = np.ones_like(dataset_actions_arr, dtype=np.float32)
             if row_blend_action_indices:
                 dataset_mask[:] = 0.0
@@ -1219,6 +1262,11 @@ def main() -> int:
                 actions=dataset_actions_arr,
                 action_valid_mask=dataset_mask,
                 policy_actions=dataset_policy_actions_arr,
+                rollout_env_id=dataset_env_ids_arr,
+                rollout_step=dataset_steps_arr,
+                rollout_waypoint_idx=dataset_waypoint_indices_arr,
+                source_episode_index=dataset_episode_indices_arr,
+                first_episode_valid=dataset_first_episode_valid_arr,
                 metadata=json.dumps(dataset_metadata, sort_keys=True),
             )
             print(f"[gate] wrote dataset {output_dataset} rows={dataset_obs.shape[0]}", flush=True)
@@ -1266,6 +1314,10 @@ def main() -> int:
                 flush=True,
             )
         env.close()
+    except BaseException:
+        print("[gate] fatal exception before Isaac shutdown:", flush=True)
+        traceback.print_exc()
+        raise
     finally:
         simulation_app.close()
     return 0

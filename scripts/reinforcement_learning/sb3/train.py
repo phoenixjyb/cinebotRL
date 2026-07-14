@@ -736,7 +736,11 @@ def parse_args():
         "--action_contract",
         type=str,
         default="sim_6joint_gimbal_v1",
-        choices=["sim_6joint_gimbal_v1", "rs4_attitude_rate_v1"],
+        choices=[
+            "sim_6joint_gimbal_v1",
+            "rs4_attitude_rate_v1",
+            "split_base_arm_attitude_v1",
+        ],
         help=(
             "Policy action contract. Default preserves the existing Isaac 6-joint gimbal semantics. "
             "rs4_attitude_rate_v1 is guarded until the simulator adapter is wired."
@@ -2476,6 +2480,12 @@ def main():
                         trajectory_config["reset_arm_to_trajectory_metadata"] = bool(
                             reset_config["reset_arm_to_trajectory_metadata"]
                         )
+                    if "reset_base_to_trajectory_metadata" in reset_config:
+                        trajectory_config["reset_base_to_trajectory_metadata"] = bool(
+                            reset_config["reset_base_to_trajectory_metadata"]
+                        )
+                    if "trajectory_dt" in reset_config:
+                        trajectory_config["trajectory_dt"] = float(reset_config["trajectory_dt"])
                     raw_reward_overrides = reset_config.get("reward_overrides", {})
                     if isinstance(raw_reward_overrides, dict):
                         stage_reward_overrides = {
@@ -2570,6 +2580,8 @@ def main():
         env_cfg.task_config.action_contract_name = args.action_contract
         env_cfg.task_config.experimental_rs4_adapter = args.experimental_rs4_adapter
         env_cfg.task_config.arm_action_envelope_profile = args.arm_action_envelope_profile
+        if "trajectory_dt" in trajectory_config:
+            env_cfg.task_config.trajectory_dt = float(trajectory_config["trajectory_dt"])
         print(
             "    Action contract: "
             f"{env_cfg.task_config.action_contract_name} "
@@ -2720,6 +2732,7 @@ def main():
             start_waypoint_max_fraction_initial=args.start_waypoint_max_fraction_initial,
             start_waypoint_fraction_decay_steps=max(int(args.start_waypoint_fraction_decay_steps), 0),
             reset_base_to_trajectory_start=reset_base_to_trajectory_start,
+            reset_base_to_trajectory_metadata=trajectory_config.get("reset_base_to_trajectory_metadata", False),
             reset_anchor_target_blend=args.reset_anchor_target_blend,
             reset_anchor_target_blend_initial=args.reset_anchor_target_blend_initial,
             reset_anchor_target_blend_decay_steps=max(int(args.reset_anchor_target_blend_decay_steps), 0),
@@ -2727,6 +2740,11 @@ def main():
             reset_base_y_offset=trajectory_config.get("reset_base_y_offset", 0.2405),
             reset_arm_to_trajectory_metadata=trajectory_config.get("reset_arm_to_trajectory_metadata", False),
             debug_sampling=args.debug_trajectory_sampling,
+            target_orientation_contract=(
+                "semantic_dfr_to_physical_cam_v1"
+                if args.action_contract == "split_base_arm_attitude_v1"
+                else "as_recorded"
+            ),
         )
         
         # Create environment directly with config

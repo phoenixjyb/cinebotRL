@@ -5,8 +5,9 @@ The current task has two different 9D action semantics under discussion:
 * ``sim_6joint_gimbal_v1`` is the existing Isaac contract and remains the
   default.  It controls six URDF arm/wrist joints plus body-frame base velocity.
 * ``rs4_attitude_rate_v1`` is a proposed deployment-oriented contract for a
-  3-DOF Realman arm plus DJI RS4/RS5 attitude/rate commands.  It is documented
-  here so future code can refer to it unambiguously, but it is not active yet.
+  3-DOF Realman arm plus DJI RS4/RS5 attitude/rate commands.
+* ``split_base_arm_attitude_v1`` gives the policy ownership of only the arm and
+  chassis. A separate camera-attitude adapter owns the physical gimbal.
 """
 
 from __future__ import annotations
@@ -113,9 +114,35 @@ RS4_ATTITUDE_RATE_V1 = ActionContract(
 )
 
 
+SPLIT_BASE_ARM_ATTITUDE_V1 = ActionContract(
+    name="split_base_arm_attitude_v1",
+    action_dim=9,
+    channels=(
+        ActionChannel(0, "arm_yaw", "Realman arm yaw target", "rad"),
+        ActionChannel(1, "arm_pitch", "Realman arm pitch target", "rad"),
+        ActionChannel(2, "arm_elbow", "Realman elbow target", "rad"),
+        ActionChannel(3, "attitude_adapter_reserved_yaw", "ignored; attitude adapter owns yaw", "none"),
+        ActionChannel(4, "attitude_adapter_reserved_pitch", "ignored; attitude adapter owns pitch", "none"),
+        ActionChannel(5, "attitude_adapter_reserved_roll", "ignored; attitude adapter owns roll", "none"),
+        ActionChannel(6, "base_vx", "body-frame base forward velocity command", "m/s"),
+        ActionChannel(7, "base_vy", "body-frame base lateral velocity command", "m/s"),
+        ActionChannel(8, "base_wz", "body-frame base yaw-rate command", "rad/s"),
+    ),
+    arm_indices=(0, 1, 2),
+    gimbal_or_attitude_indices=(3, 4, 5),
+    base_indices=(6, 7, 8),
+    deployment_ready=False,
+    description=(
+        "Split-teacher contract. The policy learns arm and chassis only; the "
+        "Option-B physical-camera attitude adapter controls the simulated gimbal."
+    ),
+)
+
+
 ACTION_CONTRACTS: dict[str, ActionContract] = {
     SIM_6JOINT_GIMBAL_V1.name: SIM_6JOINT_GIMBAL_V1,
     RS4_ATTITUDE_RATE_V1.name: RS4_ATTITUDE_RATE_V1,
+    SPLIT_BASE_ARM_ATTITUDE_V1.name: SPLIT_BASE_ARM_ATTITUDE_V1,
 }
 
 # Current default remains unchanged.

@@ -3,7 +3,7 @@ set -uo pipefail
 
 ROOT=${CINEBOTRL_ROOT:-/mnt/g/wSpace/cinebotRL-two-wheel-balance}
 OUT=${1:-$ROOT/evaluation_results/two_wheel_all79_playback/all79_promoted_defaults_v2}
-RETARGET_DIR=${RETARGET_DIR:-$ROOT/evaluation_results/two_wheel_all79_playback/retargeted_all79_v2_case7_scale125}
+RETARGET_DIR=${RETARGET_DIR:-$ROOT/evaluation_results/two_wheel_all79_playback/retargeted_all79_v3_case7_125_case9_150}
 PYTHON=${ISAAC_PYTHON:-/mnt/g/isaaclab_venv/Scripts/python.exe}
 RESULT_SCHEMA=recomo_two_wheel_all79_whole_body_playback_smoke_v2
 

@@ -102,3 +102,7 @@ Case 7 later exposed an acquisition-prefix tracking failure and passed after a
 case-local `1.25x` acquisition retime. See
 `ALL79_DYNAMIC_CASE7_RECOVERY_20260715.md`; no controller or semantic-path timing
 was changed.
+
+Case 9 exposed the same bounded failure family and passed after increasing its
+already-retimed acquisition from `1.25x` to `1.5x`. See
+`ALL79_DYNAMIC_CASE9_RECOVERY_20260715.md`.

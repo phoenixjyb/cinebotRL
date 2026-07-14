@@ -92,3 +92,8 @@ The full unabridged traces remain under
    bounded avoidance residual or arbitration layer.
 5. Hardware readiness still requires measured COM, inertia, wheel torque,
    friction, delay, and a separate sim-to-real acceptance gate.
+
+The resumable breadth gate is `scripts/two_wheel_balance/run_all79_dynamic_gate.sh`.
+It preflights all 79 retargeted NPZs, validates each result JSON independently,
+stops on the first failed case, and writes `summary.json` plus `COMPLETE` only
+after all cases pass. Windows/WSL process status alone is not accepted as proof.

@@ -39,6 +39,8 @@ parser.add_argument("--maximum-duration-scale", type=float, default=2.0)
 parser.add_argument("--enable-phase-governor", action="store_true")
 parser.add_argument("--disable-com-pitch-feedforward", action="store_true")
 parser.add_argument("--disable-arm-gravity-feedforward", action="store_true")
+parser.add_argument("--video-dir", type=Path)
+parser.add_argument("--video-fps", type=int, default=50)
 parser.add_argument("--output", type=Path, required=True)
 AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
@@ -51,6 +53,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 import gymnasium as gym
 import torch
 
+from isaaclab import sim as sim_utils
+from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
 from rl_platform.robots.two_wheel_balance import TWO_WHEEL_WHOLE_BODY_CFG
 from rl_platform.tasks.two_wheel_balance import RecomoTwoWheelBalanceEnvCfg
 from rl_platform.tasks.two_wheel_balance.metrics import (
@@ -140,6 +144,8 @@ def evaluate_case(
     gain: np.ndarray,
     control_interval: int,
     kinematics: UrdfPositionKinematics,
+    target_marker: VisualizationMarkers | None = None,
+    path_marker: VisualizationMarkers | None = None,
 ) -> dict[str, object]:
     obs, _ = env.reset(seed=20260714 + case)
     unwrapped = env.unwrapped
@@ -151,7 +157,7 @@ def evaluate_case(
         arm_ids.append(ids[0])
     tool_ids = unwrapped.robot.find_bodies("ee1_tool")[0]
     if len(tool_ids) != 1:
-        raise RuntimeError(f"expected physical ee1_tool body, got {tool_ids}")
+        raise RuntimeError(f"expected semantic ee1_tool body, got {tool_ids}")
 
     controller_state = np.zeros((1, 6), dtype=np.float64)
     current_states = obs["policy"][:, : len(LQR_STATE_NAMES)].detach().cpu().numpy()
@@ -195,6 +201,8 @@ def evaluate_case(
     body_masses = unwrapped.robot.data.default_mass[0].to(unwrapped.device)
     if not hasattr(unwrapped.robot.data, "body_com_pos_w"):
         raise RuntimeError("Isaac articulation data does not expose body_com_pos_w")
+    if path_marker is not None:
+        path_marker.visualize(candidate["target_position_world_m"][::2])
 
     for step in range(maximum_steps):
         elapsed_s = step / POLICY_HZ
@@ -257,6 +265,8 @@ def evaluate_case(
             )
             ik_correction = arm_target - desired_state[3:]
         previous_arm_target = arm_target.copy()
+        if target_marker is not None:
+            target_marker.visualize(position_target[None, :])
         arm_target_tensor = torch.as_tensor(
             arm_target[None, :], dtype=torch.float32, device=unwrapped.device
         )
@@ -495,6 +505,10 @@ def main() -> int:
     cases = [int(item) for item in args.cases.split(",") if item.strip()]
     if not cases or len(set(cases)) != len(cases):
         raise ValueError(f"invalid cases: {cases}")
+    if args.video_dir is not None and len(cases) != 1:
+        raise ValueError("video recording requires exactly one case")
+    if args.video_fps < 1:
+        raise ValueError("--video-fps must be positive")
     candidates = {case: load_candidate(case) for case in cases}
     kinematics = UrdfPositionKinematics(args.urdf)
     gain_data = json.loads(args.gains.read_text(encoding="utf-8"))
@@ -517,15 +531,76 @@ def main() -> int:
     )
     cfg.reset_pitch_rad = 0.0
     cfg.control_mode = "direct"
-    env = gym.make(
+    if args.video_dir is not None:
+        cfg.viewer.eye = (3.2, -4.5, 2.2)
+        cfg.viewer.lookat = (0.0, 0.0, 1.0)
+    raw_env = gym.make(
         "RecomoTwoWheelBalance-v0",
         cfg=cfg,
-        render_mode=None,
+        render_mode="rgb_array" if args.video_dir is not None else None,
         disable_env_checker=True,
     )
+    target_marker = None
+    path_marker = None
+    if args.video_dir is not None:
+        raw_env.unwrapped.sim.set_camera_view(
+            eye=cfg.viewer.eye, target=cfg.viewer.lookat
+        )
+        target_marker = VisualizationMarkers(
+            VisualizationMarkersCfg(
+                prim_path="/Visuals/All79PlaybackCurrentTarget",
+                markers={
+                    "target": sim_utils.SphereCfg(
+                        radius=0.05,
+                        visual_material=sim_utils.PreviewSurfaceCfg(
+                            diffuse_color=(1.0, 0.15, 0.05)
+                        ),
+                    )
+                },
+            )
+        )
+        path_marker = VisualizationMarkers(
+            VisualizationMarkersCfg(
+                prim_path="/Visuals/All79PlaybackTargetPath",
+                markers={
+                    "path": sim_utils.SphereCfg(
+                        radius=0.012,
+                        visual_material=sim_utils.PreviewSurfaceCfg(
+                            diffuse_color=(0.1, 0.65, 1.0)
+                        ),
+                    )
+                },
+            )
+        )
+        args.video_dir.mkdir(parents=True, exist_ok=True)
+        video_length = int(
+            math.ceil(
+                max(float(item["time_s"][-1]) for item in candidates.values())
+                * args.maximum_duration_scale
+                * POLICY_HZ
+            )
+        ) + 1
+        env = gym.wrappers.RecordVideo(
+            raw_env,
+            video_folder=str(args.video_dir),
+            step_trigger=lambda step: step == 0,
+            video_length=video_length,
+            fps=args.video_fps,
+            name_prefix=f"two-wheel-all79-case-{cases[0]:04d}",
+            disable_logger=True,
+        )
+    else:
+        env = raw_env
     results = [
         evaluate_case(
-            env, case, candidates[case], gain, control_interval, kinematics
+            env,
+            case,
+            candidates[case],
+            gain,
+            control_interval,
+            kinematics,
+            target_marker,
+            path_marker,
         )
         for case in cases
     ]
@@ -540,11 +615,25 @@ def main() -> int:
         "arm_gravity_feedforward_enabled": not args.disable_arm_gravity_feedforward,
         "arm_stiffness": args.arm_stiffness,
         "arm_damping": args.arm_damping,
+        "position_target_link": "ee1_tool",
+        "camera_attitude_tracking_enabled": False,
+        "physical_gimbal_control_enabled": False,
+        "video_fps": args.video_fps if args.video_dir is not None else None,
+        "video_playback_slowdown": (
+            POLICY_HZ / args.video_fps if args.video_dir is not None else None
+        ),
         "cases": cases,
         "passed_case_count": sum(item["passed"] for item in results),
         "results": results,
         "passed": all(item["passed"] for item in results),
     }
+    if args.video_dir is not None:
+        videos = sorted(
+            args.video_dir.glob("*.mp4"), key=lambda path: path.stat().st_mtime
+        )
+        if not videos:
+            raise RuntimeError(f"RecordVideo did not produce an mp4 in {args.video_dir}")
+        result["video"] = str(videos[-1].resolve())
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))

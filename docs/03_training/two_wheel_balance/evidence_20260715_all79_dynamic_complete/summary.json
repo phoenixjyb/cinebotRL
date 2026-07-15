@@ -1,0 +1,23 @@
+{
+  "schema": "recomo_two_wheel_all79_position_dynamic_gate_v1",
+  "date": "2026-07-15",
+  "training_started": false,
+  "ppo_allowed": false,
+  "position_target_link": "ee1_tool",
+  "camera_attitude_tracking_enabled": false,
+  "physical_gimbal_control_enabled": false,
+  "requested_case_count": 79,
+  "passed_case_count": 79,
+  "retimed_acquisition_cases": [6, 7, 9, 62],
+  "completed_reference_time_s": 1401.4236650248959,
+  "maximum_peak_pitch": {"case": 77, "value_deg": 11.651775945702015},
+  "maximum_peak_arm_error": {"case": 6, "value_deg": 5.607762893498889},
+  "maximum_peak_arm_effort": {"case": 34, "value_nm": 27.479568481445312},
+  "maximum_tool_position_p95": {"case": 57, "value_m": 0.14756702153174237},
+  "maximum_tool_position_error": {"case": 57, "value_m": 0.1969625957177508},
+  "maximum_wheel_action_saturation_ratio": {"case": 34, "value": 0.0006832934745473181},
+  "maximum_arm_effort_saturation_ratio": {"case": 1, "value": 0.0},
+  "termination_count": 0,
+  "unabridged_summary_sha256": "1bbe5b8170bb1443c7047eafd1e9b62d73dc1f5bf5275b2f34b17e4c950570db",
+  "passed": true
+}

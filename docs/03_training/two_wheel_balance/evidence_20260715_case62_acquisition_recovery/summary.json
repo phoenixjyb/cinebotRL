@@ -1,0 +1,45 @@
+{
+  "schema": "recomo_two_wheel_case62_acquisition_recovery_v1",
+  "date": "2026-07-15",
+  "decision": "promoted_case62_acquisition_scale_1p25",
+  "training_started": false,
+  "ppo_allowed": false,
+  "controller_changed": false,
+  "semantic_timing_changed": false,
+  "acquisition_time_scale": 1.25,
+  "retarget_payload": {
+    "directory": "evaluation_results/two_wheel_all79_playback/retargeted_all79_v4_case7_125_case9_150_case62_125",
+    "npz_count": 79,
+    "different_cases_from_v3": [62],
+    "overrides": {"7": 1.25, "9": 1.5, "62": 1.25},
+    "summary_sha256": "8a7d9b83ab82d140048540bee4046293fa4af9bfa6fd52fcab5459f29f50e625",
+    "passed": true
+  },
+  "original_dynamic": {
+    "duration_s": 5.98237425,
+    "tool_position_p95_m": 0.17959963717428976,
+    "tool_position_max_m": 0.18737201982984847,
+    "tool_position_max_elapsed_s": 1.805,
+    "peak_pitch_deg": 9.24163612158359,
+    "peak_arm_error_deg": 5.7641639802084255,
+    "peak_arm_effort_nm": 25.047508239746094,
+    "wheel_action_saturation_ratio": 0.0,
+    "arm_effort_saturation_ratio": 0.0,
+    "termination": null,
+    "passed": false
+  },
+  "recovered_dynamic": {
+    "duration_s": 6.73017103125,
+    "tool_position_mean_m": 0.0354793164044906,
+    "tool_position_p95_m": 0.09957607575845172,
+    "tool_position_max_m": 0.10602581252102534,
+    "peak_pitch_deg": 6.969039658763117,
+    "peak_arm_error_deg": 4.988575509385968,
+    "peak_arm_effort_nm": 23.162662506103516,
+    "wheel_action_saturation_ratio": 0.0,
+    "arm_effort_saturation_ratio": 0.0,
+    "termination": null,
+    "passed": true
+  },
+  "next_gate": "resume_all79_dynamic_from_case62_then_case63"
+}

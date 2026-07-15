@@ -11,6 +11,8 @@ from rl_platform.tasks.two_wheel_balance.all79_reference import (
     load_sparse_teacher,
     monotonic_pose_match,
     parse_acquisition_time_scale_overrides,
+    quaternion_slerp_wxyz,
+    regenerate_acquisition_attitude_prefix,
     regenerate_acquisition_prefix,
     source_body_velocities,
 )
@@ -91,6 +93,28 @@ def test_regenerate_acquisition_preserves_semantic_path(tmp_path: Path) -> None:
     np.testing.assert_allclose(targets[0], [0.5, 0.5, 0.5])
     np.testing.assert_allclose(semantic_start, full.positions_m[1])
     np.testing.assert_allclose(targets[1:], full.positions_m[1:])
+
+
+def test_regenerate_attitude_acquisition_uses_semantic_dfr_slerp(tmp_path: Path) -> None:
+    path = tmp_path / "0001_case.json"
+    write_full_reference(path)
+    full = load_full_reference(path)
+    home = np.array([2.0**-0.5, 0.0, 0.0, -2.0**-0.5])
+    attitudes, semantic_start = regenerate_acquisition_attitude_prefix(
+        full, home, acquisition_end_index=1
+    )
+    assert abs(float(np.dot(attitudes[0], home))) > 1.0 - 1e-12
+    assert abs(float(np.dot(attitudes[1], full.attitudes_wxyz[1]))) > 1.0 - 1e-12
+    assert abs(float(np.dot(semantic_start, full.attitudes_wxyz[1]))) > 1.0 - 1e-12
+    np.testing.assert_allclose(attitudes[1:], full.attitudes_wxyz[1:])
+
+
+def test_quaternion_slerp_uses_shortest_path_and_normalizes() -> None:
+    start = np.array([1.0, 0.0, 0.0, 0.0])
+    end = -np.array([2.0**-0.5, 0.0, 0.0, 2.0**-0.5])
+    values = quaternion_slerp_wxyz(start, end, np.array([0.0, 0.5, 1.0]))
+    np.testing.assert_allclose(np.linalg.norm(values, axis=1), 1.0)
+    assert abs(float(np.dot(values[-1], end))) > 1.0 - 1e-12
 
 
 def test_parse_acquisition_time_scale_overrides() -> None:

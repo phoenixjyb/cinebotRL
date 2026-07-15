@@ -239,6 +239,56 @@ def regenerate_acquisition_prefix(
     return targets, semantic_start
 
 
+def quaternion_slerp_wxyz(
+    start: np.ndarray, end: np.ndarray, fraction: np.ndarray
+) -> np.ndarray:
+    """Shortest-path quaternion interpolation for a vector of fractions."""
+
+    start_q = normalize_quaternions_wxyz(np.asarray(start, dtype=np.float64)[None, :])[0]
+    end_q = normalize_quaternions_wxyz(np.asarray(end, dtype=np.float64)[None, :])[0]
+    phase = np.asarray(fraction, dtype=np.float64).reshape(-1)
+    require(np.isfinite(phase).all(), "SLERP fractions contain non-finite values")
+    require(bool(np.all((phase >= 0.0) & (phase <= 1.0))), "SLERP fractions outside [0,1]")
+    dot = float(np.dot(start_q, end_q))
+    if dot < 0.0:
+        end_q = -end_q
+        dot = -dot
+    dot = float(np.clip(dot, -1.0, 1.0))
+    if dot > 0.9995:
+        values = start_q[None, :] + phase[:, None] * (end_q - start_q)[None, :]
+    else:
+        angle = math.acos(dot)
+        denominator = math.sin(angle)
+        values = (
+            np.sin((1.0 - phase) * angle)[:, None] / denominator * start_q[None, :]
+            + np.sin(phase * angle)[:, None] / denominator * end_q[None, :]
+        )
+    return normalize_quaternions_wxyz(values)
+
+
+def regenerate_acquisition_attitude_prefix(
+    reference: FullReference,
+    home_semantic_dfr_quat_wxyz: np.ndarray,
+    acquisition_end_index: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Blend semantic DFR attitude from physical home to the audited start."""
+
+    require(
+        1 <= acquisition_end_index < len(reference.time_s),
+        f"invalid acquisition end index {acquisition_end_index} for case {reference.case}",
+    )
+    attitudes = reference.attitudes_wxyz.copy()
+    phase = reference.time_s[: acquisition_end_index + 1] / reference.time_s[
+        acquisition_end_index
+    ]
+    blend = 10.0 * phase**3 - 15.0 * phase**4 + 6.0 * phase**5
+    semantic_start = attitudes[acquisition_end_index].copy()
+    attitudes[: acquisition_end_index + 1] = quaternion_slerp_wxyz(
+        home_semantic_dfr_quat_wxyz, semantic_start, blend
+    )
+    return attitudes, semantic_start
+
+
 def monotonic_pose_match(
     full: FullReference,
     positions_m: np.ndarray,

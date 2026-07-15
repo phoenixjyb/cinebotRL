@@ -1,0 +1,39 @@
+{
+  "schema": "two_wheel_semantic_dfr_attitude_smoke_v1",
+  "semantic_contract": {
+    "input": "semantic_DFR_world_quaternion",
+    "conversion": "R_world_cam = R_world_DFR * Rz(+pi/2)",
+    "observation_and_reward_link": "cam_link",
+    "internal_actuation": [
+      "joint3_gimbal_yaw",
+      "joint2_gimbal_roll",
+      "joint1_gimbal_pitch"
+    ],
+    "learned_physical_gimbal_joint_action": false
+  },
+  "steps": 1000,
+  "command_amplitude_deg": 5.0,
+  "command_frequency_hz": 0.25,
+  "observed_target_amplitude_deg": 5.0,
+  "attitude_p95_error_deg": 4.091643141795557,
+  "attitude_max_error_deg": 4.230255249715639,
+  "ik_max_residual_deg": 0.09990826474615297,
+  "ik_nonconverged_steps": 0,
+  "gimbal_target_saturation_ratio": 0.019,
+  "peak_gimbal_effort_nm": 10.0,
+  "peak_pitch_deg": 2.9818475751028273,
+  "termination": null,
+  "checks": {
+    "completed_horizon": true,
+    "no_termination": true,
+    "no_nonfinite": true,
+    "total_mass_28kg": true,
+    "policy_action_dimension_unchanged": true,
+    "commanded_motion_observed": true,
+    "all_ik_steps_converged": true,
+    "peak_pitch_below_limit": true,
+    "attitude_p95_below_limit": true,
+    "attitude_max_below_limit": true
+  },
+  "passed": true
+}

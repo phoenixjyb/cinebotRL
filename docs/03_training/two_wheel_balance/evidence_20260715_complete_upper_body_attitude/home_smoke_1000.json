@@ -1,0 +1,219 @@
+{
+  "schema": "two_wheel_complete_upper_body_attitude_home_smoke_v1",
+  "semantic_contract": {
+    "position_target_link": "ee1_tool",
+    "attitude_target": "semantic_DFR_world_quaternion_or_optical_axis",
+    "physical_camera_observation_link": "cam_link",
+    "frame_conversion": "R_world_cam = R_world_DFR * Rz(+pi/2)",
+    "physical_gimbal_joint_mode": "internal_sim_attitude_adapter_only",
+    "learned_physical_gimbal_joint_action": false
+  },
+  "steps": 1000,
+  "total_mass_kg": 28.0,
+  "joint_names": [
+    "left_wheel_joint",
+    "right_wheel_joint",
+    "joint6_arm_yaw",
+    "joint5_arm_pitch",
+    "joint4_elbow_pitch",
+    "joint3_gimbal_yaw",
+    "joint2_gimbal_roll",
+    "joint1_gimbal_pitch"
+  ],
+  "peak_pitch_deg": 2.928975934511405,
+  "peak_arm_error_deg": 0.17043371035932817,
+  "peak_gimbal_error_deg": 2.973004828005188,
+  "peak_arm_effort_nm": 2.998394012451172,
+  "peak_gimbal_effort_nm": 10.0,
+  "initial_gimbal_position_rad": {
+    "joint3_gimbal_yaw": 0.0,
+    "joint2_gimbal_roll": 0.0,
+    "joint1_gimbal_pitch": 0.0
+  },
+  "final_gimbal_position_rad": {
+    "joint3_gimbal_yaw": 0.007937291637063026,
+    "joint2_gimbal_roll": 0.010769306682050228,
+    "joint1_gimbal_pitch": -0.0504300557076931
+  },
+  "startup_trace": [
+    {
+      "step": 1,
+      "gimbal_position_rad": {
+        "joint3_gimbal_yaw": -1.316883130320079e-10,
+        "joint2_gimbal_roll": -2.1316595710807462e-10,
+        "joint1_gimbal_pitch": 1.8775652907421225e-11
+      },
+      "gimbal_velocity_rad_s": {
+        "joint3_gimbal_yaw": -4.242470197368675e-08,
+        "joint2_gimbal_roll": -6.820113185312948e-08,
+        "joint1_gimbal_pitch": 5.918751266875688e-09
+      },
+      "gimbal_applied_effort_nm": {
+        "joint3_gimbal_yaw": 1.4168484767651535e-06,
+        "joint2_gimbal_roll": 2.28034627980378e-06,
+        "joint1_gimbal_pitch": -1.9931951555918204e-07
+      }
+    },
+    {
+      "step": 2,
+      "gimbal_position_rad": {
+        "joint3_gimbal_yaw": -4.586770685488517e-10,
+        "joint2_gimbal_roll": -7.352125575010859e-10,
+        "joint1_gimbal_pitch": 5.648558704107742e-11
+      },
+      "gimbal_velocity_rad_s": {
+        "joint3_gimbal_yaw": -7.829843440276818e-08,
+        "joint2_gimbal_roll": -1.2431117113465007e-07,
+        "joint1_gimbal_pitch": 9.265211708964216e-09
+      },
+      "gimbal_applied_effort_nm": {
+        "joint3_gimbal_yaw": 3.0182402497302974e-06,
+        "joint2_gimbal_roll": 4.800786427949788e-06,
+        "joint1_gimbal_pitch": -3.5370626960684604e-07
+      }
+    },
+    {
+      "step": 3,
+      "gimbal_position_rad": {
+        "joint3_gimbal_yaw": -9.21733800396396e-10,
+        "joint2_gimbal_roll": -1.5126480068516912e-09,
+        "joint1_gimbal_pitch": 1.1120531578923121e-10
+      },
+      "gimbal_velocity_rad_s": {
+        "joint3_gimbal_yaw": -9.9266138420262e-08,
+        "joint2_gimbal_roll": -1.704835739246846e-07,
+        "joint1_gimbal_pitch": 1.1040585334853859e-08
+      },
+      "gimbal_applied_effort_nm": {
+        "joint3_gimbal_yaw": 4.266583800927037e-06,
+        "joint2_gimbal_roll": 7.007295153016457e-06,
+        "joint1_gimbal_pitch": -4.620606546268391e-07
+      }
+    },
+    {
+      "step": 5,
+      "gimbal_position_rad": {
+        "joint3_gimbal_yaw": 1.9776336557697505e-05,
+        "joint2_gimbal_roll": 8.117941615637392e-05,
+        "joint1_gimbal_pitch": -0.0003271109890192747
+      },
+      "gimbal_velocity_rad_s": {
+        "joint3_gimbal_yaw": 0.029738381505012512,
+        "joint2_gimbal_roll": 0.09538590908050537,
+        "joint1_gimbal_pitch": -0.4108488857746124
+      },
+      "gimbal_applied_effort_nm": {
+        "joint3_gimbal_yaw": 5.872776910109678e-06,
+        "joint2_gimbal_roll": 1.0600909263303038e-05,
+        "joint1_gimbal_pitch": -6.346261329781555e-07
+      }
+    },
+    {
+      "step": 10,
+      "gimbal_position_rad": {
+        "joint3_gimbal_yaw": 0.0015072171809151769,
+        "joint2_gimbal_roll": 0.002593721728771925,
+        "joint1_gimbal_pitch": -0.011392747983336449
+      },
+      "gimbal_velocity_rad_s": {
+        "joint3_gimbal_yaw": 0.06062502786517143,
+        "joint2_gimbal_roll": 0.09461232274770737,
+        "joint1_gimbal_pitch": -0.42616552114486694
+      },
+      "gimbal_applied_effort_nm": {
+        "joint3_gimbal_yaw": -2.9293055534362793,
+        "joint2_gimbal_roll": -4.8052825927734375,
+        "joint1_gimbal_pitch": 10.0
+      }
+    },
+    {
+      "step": 20,
+      "gimbal_position_rad": {
+        "joint3_gimbal_yaw": 0.0041400231420993805,
+        "joint2_gimbal_roll": 0.006628700532019138,
+        "joint1_gimbal_pitch": -0.029568590223789215
+      },
+      "gimbal_velocity_rad_s": {
+        "joint3_gimbal_yaw": 0.041506584733724594,
+        "joint2_gimbal_roll": 0.061817195266485214,
+        "joint1_gimbal_pitch": -0.27309849858283997
+      },
+      "gimbal_applied_effort_nm": {
+        "joint3_gimbal_yaw": -3.3849785327911377,
+        "joint2_gimbal_roll": -5.12398624420166,
+        "joint1_gimbal_pitch": 10.0
+      }
+    },
+    {
+      "step": 50,
+      "gimbal_position_rad": {
+        "joint3_gimbal_yaw": 0.006698140874505043,
+        "joint2_gimbal_roll": 0.010936366394162178,
+        "joint1_gimbal_pitch": -0.04672779142856598
+      },
+      "gimbal_velocity_rad_s": {
+        "joint3_gimbal_yaw": 0.004690981470048428,
+        "joint2_gimbal_roll": 0.0025881847832351923,
+        "joint1_gimbal_pitch": -0.025609994307160378
+      },
+      "gimbal_applied_effort_nm": {
+        "joint3_gimbal_yaw": -2.8763015270233154,
+        "joint2_gimbal_roll": -4.48018741607666,
+        "joint1_gimbal_pitch": 10.0
+      }
+    },
+    {
+      "step": 100,
+      "gimbal_position_rad": {
+        "joint3_gimbal_yaw": 0.0073908232152462006,
+        "joint2_gimbal_roll": 0.01096506230533123,
+        "joint1_gimbal_pitch": -0.04959039390087128
+      },
+      "gimbal_velocity_rad_s": {
+        "joint3_gimbal_yaw": 0.0016321560833603144,
+        "joint2_gimbal_roll": -0.0031468840315937996,
+        "joint1_gimbal_pitch": 0.0024104395415633917
+      },
+      "gimbal_applied_effort_nm": {
+        "joint3_gimbal_yaw": -3.003333568572998,
+        "joint2_gimbal_roll": -4.254533767700195,
+        "joint1_gimbal_pitch": 10.0
+      }
+    },
+    {
+      "step": 200,
+      "gimbal_position_rad": {
+        "joint3_gimbal_yaw": 0.006808175705373287,
+        "joint2_gimbal_roll": 0.011178218759596348,
+        "joint1_gimbal_pitch": -0.04849381744861603
+      },
+      "gimbal_velocity_rad_s": {
+        "joint3_gimbal_yaw": 0.0034484462812542915,
+        "joint2_gimbal_roll": -0.003987293690443039,
+        "joint1_gimbal_pitch": -0.00015525217168033123
+      },
+      "gimbal_applied_effort_nm": {
+        "joint3_gimbal_yaw": -2.79508638381958,
+        "joint2_gimbal_roll": -4.315670490264893,
+        "joint1_gimbal_pitch": 10.0
+      }
+    }
+  ],
+  "cam_attitude_drift_deg": 1.9261360672153665,
+  "nonfinite_count": 0,
+  "termination": null,
+  "checks": {
+    "completed_horizon": true,
+    "no_termination": true,
+    "no_nonfinite": true,
+    "total_mass_28kg": true,
+    "physical_camera_and_semantic_tool_present": true,
+    "physical_gimbal_dofs_present": true,
+    "virtual_frame_dofs_absent": true,
+    "policy_action_dimension_unchanged": true,
+    "peak_pitch_below_limit": true,
+    "peak_arm_error_below_limit": true,
+    "peak_gimbal_error_below_limit": true
+  },
+  "passed": true
+}

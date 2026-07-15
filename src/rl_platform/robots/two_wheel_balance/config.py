@@ -1,5 +1,7 @@
 """Isaac Lab articulation configuration for the two-wheel balance prototype."""
 
+import copy
+
 from pathlib import Path
 
 import isaaclab.sim as sim_utils
@@ -19,6 +21,12 @@ TWO_WHEEL_WHOLE_BODY_USD_PATH = (
     / "assets_own"
     / "recomoProto2_two_wheel_whole_body"
     / "recomoProto2_two_wheel_whole_body.usd"
+)
+TWO_WHEEL_WHOLE_BODY_ATTITUDE_USD_PATH = (
+    PROJECT_ROOT
+    / "assets_own"
+    / "recomoProto2_two_wheel_whole_body_attitude"
+    / "recomoProto2_two_wheel_whole_body_attitude.usd"
 )
 
 
@@ -112,4 +120,34 @@ TWO_WHEEL_WHOLE_BODY_CFG = ArticulationCfg(
             damping=20.0,
         ),
     },
+)
+
+
+TWO_WHEEL_WHOLE_BODY_ATTITUDE_CFG = copy.deepcopy(TWO_WHEEL_WHOLE_BODY_CFG)
+TWO_WHEEL_WHOLE_BODY_ATTITUDE_CFG.spawn.usd_path = str(
+    TWO_WHEEL_WHOLE_BODY_ATTITUDE_USD_PATH
+)
+TWO_WHEEL_WHOLE_BODY_ATTITUDE_CFG.init_state.joint_pos.update(
+    {
+        "joint3_gimbal_yaw": 0.0,
+        "joint2_gimbal_roll": 0.0,
+        "joint1_gimbal_pitch": 0.0,
+    }
+)
+TWO_WHEEL_WHOLE_BODY_ATTITUDE_CFG.actuators["gimbal_attitude_adapter"] = (
+    ImplicitActuatorCfg(
+        joint_names_expr=[
+            "joint3_gimbal_yaw",
+            "joint2_gimbal_roll",
+            "joint1_gimbal_pitch",
+        ],
+        effort_limit_sim=10.0,
+        velocity_limit_sim=0.5,
+        stiffness=400.0,
+        damping=40.0,
+        # The source CAD inertias omit reflected motor/gear inertia.  A small
+        # armature prevents the low-inertia gimbal axes from taking an
+        # unrealistic velocity impulse when the two-wheel base contacts ground.
+        armature=0.01,
+    )
 )

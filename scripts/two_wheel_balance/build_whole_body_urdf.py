@@ -25,8 +25,15 @@ DEFAULT_OUTPUT = (
     / "assets_own/recomoProto2_two_wheel_whole_body"
     / "recomoProto2_two_wheel_whole_body.urdf"
 )
+DEFAULT_ATTITUDE_OUTPUT = (
+    PROJECT_ROOT
+    / "assets_own/recomoProto2_two_wheel_whole_body_attitude"
+    / "recomoProto2_two_wheel_whole_body_attitude.urdf"
+)
 EXPECTED_ARM_SHA256 = "aa463a14d84cc5718335f91de7091a49674ec66f8de016cb69d8190f7d98db77"
 TARGET_TOTAL_MASS_KG = 28.0
+POSITION_ONLY_PROFILE = "position_only"
+SPLIT_ATTITUDE_PROFILE = "split_attitude"
 
 PHYSICAL_ARM_JOINTS = (
     "joint6_arm_yaw",
@@ -36,17 +43,12 @@ PHYSICAL_ARM_JOINTS = (
     "joint2_gimbal_roll",
     "joint1_gimbal_pitch",
 )
+PHYSICAL_GIMBAL_JOINTS = PHYSICAL_ARM_JOINTS[3:]
 VIRTUAL_FRAME_JOINTS = (
     "ee1_level_pitch",
     "ee1_rot_z",
     "ee1_rot_y",
     "ee1_rot_x",
-)
-STAGE0_LOCKED_JOINTS = (
-    "joint3_gimbal_yaw",
-    "joint2_gimbal_roll",
-    "joint1_gimbal_pitch",
-    *VIRTUAL_FRAME_JOINTS,
 )
 ARM_LINKS = (
     "arm_base_link",
@@ -140,7 +142,7 @@ def _set_base_mass(root: ET.Element, target_mass: float) -> tuple[float, float]:
     return old_mass, scale
 
 
-def _validate_tree(root: ET.Element) -> dict[str, object]:
+def _validate_tree(root: ET.Element, profile: str) -> dict[str, object]:
     links = root.findall("link")
     joints = root.findall("joint")
     link_names = [item.attrib["name"] for item in links]
@@ -160,11 +162,17 @@ def _validate_tree(root: ET.Element) -> dict[str, object]:
         "total_mass_28kg": abs(total_mass - TARGET_TOTAL_MASS_KG) < 1e-6,
         "physical_arm_joints_present": all(name in joint_names for name in PHYSICAL_ARM_JOINTS),
         "virtual_frame_joints_present": all(name in joint_names for name in VIRTUAL_FRAME_JOINTS),
-        "stage0_gimbal_and_virtual_joints_fixed": all(
+        "virtual_frame_joints_fixed": all(
             _named(root, "joint", name).attrib["type"] == "fixed"
-            for name in STAGE0_LOCKED_JOINTS
+            for name in VIRTUAL_FRAME_JOINTS
+        ),
+        "physical_gimbal_matches_profile": all(
+            _named(root, "joint", name).attrib["type"]
+            == ("fixed" if profile == POSITION_ONLY_PROFILE else "revolute")
+            for name in PHYSICAL_GIMBAL_JOINTS
         ),
         "physical_cam_link_present": "cam_link" in link_names,
+        "semantic_ee1_tool_present": "ee1_tool" in link_names,
         "no_planar_base_joints": all(
             name not in joint_names for name in ("base_joint_vx", "base_joint_vy", "base_joint_wz")
         ),
@@ -183,7 +191,14 @@ def _validate_tree(root: ET.Element) -> dict[str, object]:
     }
 
 
-def build(base_path: Path, arm_path: Path, output_path: Path) -> dict[str, object]:
+def build(
+    base_path: Path,
+    arm_path: Path,
+    output_path: Path,
+    profile: str = POSITION_ONLY_PROFILE,
+) -> dict[str, object]:
+    if profile not in (POSITION_ONLY_PROFILE, SPLIT_ATTITUDE_PROFILE):
+        raise ValueError(f"unsupported profile: {profile}")
     arm_sha256 = _sha256(arm_path)
     if arm_sha256 != EXPECTED_ARM_SHA256:
         raise RuntimeError(
@@ -223,7 +238,9 @@ def build(base_path: Path, arm_path: Path, output_path: Path) -> dict[str, objec
                 raise RuntimeError("joint5_arm_pitch has no limit")
             # Deployed home_v0 and software limits use an exact +90 degree bound.
             limit.attrib["upper"] = "1.5707963268"
-        if name in STAGE0_LOCKED_JOINTS:
+        if name in VIRTUAL_FRAME_JOINTS or (
+            profile == POSITION_ONLY_PROFILE and name in PHYSICAL_GIMBAL_JOINTS
+        ):
             _lock_joint(joint)
         base_root.append(joint)
         copied_joints.append(joint)
@@ -242,9 +259,10 @@ def build(base_path: Path, arm_path: Path, output_path: Path) -> dict[str, objec
     output_path.parent.mkdir(parents=True, exist_ok=True)
     xml_bytes = ET.tostring(base_root, encoding="utf-8", xml_declaration=True)
     output_path.write_bytes(xml_bytes.replace(b"\r\n", b"\n"))
-    validation = _validate_tree(base_root)
+    validation = _validate_tree(base_root, profile)
     result = {
-        "schema": "recomo_two_wheel_whole_body_urdf_build_v2",
+        "schema": "recomo_two_wheel_whole_body_urdf_build_v3",
+        "profile": profile,
         "base_source": _audit_path(base_path),
         "arm_source": _audit_path(arm_path),
         "arm_source_sha256": arm_sha256,
@@ -259,17 +277,20 @@ def build(base_path: Path, arm_path: Path, output_path: Path) -> dict[str, objec
             "joint5_arm_pitch": 1.5707963268,
             "joint4_elbow_pitch": 2.3561944902,
         },
-        "physical_gimbal_fixed_rad": {
-            "joint3_gimbal_yaw": 0.0,
-            "joint2_gimbal_roll": 0.0,
-            "joint1_gimbal_pitch": 0.0,
-        },
-        "virtual_frame_joints_locked_rad": {name: 0.0 for name in VIRTUAL_FRAME_JOINTS},
-        "stage0_control_boundary": (
-            "wheel effort plus three physical arm joints; DJI gimbal attitude control "
-            "is intentionally outside this asset"
+        "physical_gimbal_home_rad": {name: 0.0 for name in PHYSICAL_GIMBAL_JOINTS},
+        "physical_gimbal_joint_mode": (
+            "fixed"
+            if profile == POSITION_ONLY_PROFILE
+            else "internal_sim_attitude_adapter"
         ),
-        "ee_observation_link": "cam_link",
+        "learned_physical_gimbal_joint_action": False,
+        "virtual_frame_joints_locked_rad": {name: 0.0 for name in VIRTUAL_FRAME_JOINTS},
+        "control_boundary": (
+            "wheel effort plus three physical arm joints; semantic DFR attitude is "
+            "a separate command and physical gimbal joints are never learned labels"
+        ),
+        "position_target_link": "ee1_tool",
+        "physical_camera_observation_link": "cam_link",
         "validation": validation,
         "passed": True,
     }
@@ -282,9 +303,21 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", type=Path, default=DEFAULT_BASE)
     parser.add_argument("--arm", type=Path, default=DEFAULT_ARM)
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--profile",
+        choices=(POSITION_ONLY_PROFILE, SPLIT_ATTITUDE_PROFILE),
+        default=POSITION_ONLY_PROFILE,
+    )
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    result = build(args.base.resolve(), args.arm.resolve(), args.output.resolve())
+    output = args.output or (
+        DEFAULT_ATTITUDE_OUTPUT
+        if args.profile == SPLIT_ATTITUDE_PROFILE
+        else DEFAULT_OUTPUT
+    )
+    result = build(
+        args.base.resolve(), args.arm.resolve(), output.resolve(), args.profile
+    )
     print(json.dumps(result, indent=2))
     return 0
 

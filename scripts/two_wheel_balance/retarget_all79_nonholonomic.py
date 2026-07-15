@@ -19,7 +19,13 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from rl_platform.tasks.two_wheel_balance.all79_reference import (  # noqa: E402
     discover_full_stage,
     parse_acquisition_time_scale_overrides,
+    regenerate_acquisition_attitude_prefix,
     regenerate_acquisition_prefix,
+)
+from rl_platform.tasks.two_wheel_balance.camera_attitude import (  # noqa: E402
+    UrdfPhysicalCameraKinematics,
+    matrix_quaternion_wxyz,
+    physical_cam_to_semantic_dfr_quat_wxyz,
 )
 from rl_platform.tasks.two_wheel_balance.whole_body_kinematics import (  # noqa: E402
     UrdfPositionKinematics,
@@ -35,6 +41,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--full-stage", type=Path, required=True)
     parser.add_argument("--contract-audit-summary", type=Path, required=True)
     parser.add_argument("--urdf", type=Path, required=True)
+    parser.add_argument(
+        "--attitude-urdf",
+        type=Path,
+        help="Complete upper-body URDF; enables semantic DFR attitude schema v3",
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--cases", default="all")
     parser.add_argument("--maximum-linear-velocity", type=float, default=0.4)
@@ -72,6 +83,7 @@ def load_acquisition_end_indices(path: Path) -> dict[int, int]:
 def retarget_case(
     reference,
     kinematics: UrdfPositionKinematics,
+    home_semantic_dfr_quat_wxyz: np.ndarray | None,
     acquisition_end_index: int,
     acquisition_time_scale: float,
     args: argparse.Namespace,
@@ -82,6 +94,12 @@ def retarget_case(
     targets, semantic_start = regenerate_acquisition_prefix(
         reference, kinematics.position(state), acquisition_end_index
     )
+    target_attitudes = None
+    semantic_attitude_start = None
+    if home_semantic_dfr_quat_wxyz is not None:
+        target_attitudes, semantic_attitude_start = regenerate_acquisition_attitude_prefix(
+            reference, home_semantic_dfr_quat_wxyz, acquisition_end_index
+        )
     time_s = reference.time_s.copy()
     original_acquisition_duration = time_s[acquisition_end_index]
     time_s[: acquisition_end_index + 1] *= acquisition_time_scale
@@ -220,6 +238,11 @@ def retarget_case(
         "control_v_wz_darm": controls,
         "position_error_m": errors,
     }
+    if target_attitudes is not None:
+        summary["semantic_start_attitude_world_dfr_quat_wxyz"] = (
+            semantic_attitude_start.tolist()
+        )
+        arrays["target_attitude_world_dfr_quat_wxyz"] = target_attitudes
     return summary, arrays
 
 
@@ -228,6 +251,15 @@ def main() -> int:
     references = discover_full_stage(args.full_stage)
     acquisition_end_indices = load_acquisition_end_indices(args.contract_audit_summary)
     kinematics = UrdfPositionKinematics(args.urdf)
+    home_semantic_dfr_quat_wxyz = None
+    if args.attitude_urdf is not None:
+        camera_kinematics = UrdfPhysicalCameraKinematics(args.attitude_urdf)
+        home_physical_rotation = camera_kinematics.world_rotation(
+            np.array([1.0, 0.0, 0.0, 0.0]), HOME_V0, np.zeros(3)
+        )
+        home_semantic_dfr_quat_wxyz = physical_cam_to_semantic_dfr_quat_wxyz(
+            matrix_quaternion_wxyz(home_physical_rotation)
+        )
     cases = (
         sorted(references)
         if args.cases.strip().lower() == "all"
@@ -256,6 +288,7 @@ def main() -> int:
             summary, arrays = retarget_case(
                 references[case],
                 kinematics,
+                home_semantic_dfr_quat_wxyz,
                 acquisition_end_indices[case],
                 float(acquisition_time_scale),
                 args,
@@ -271,12 +304,16 @@ def main() -> int:
         rows.append(summary)
         print(json.dumps(summary, indent=2), flush=True)
 
+    attitude_enabled = home_semantic_dfr_quat_wxyz is not None
     result = {
-        "schema": "cinebotrl_two_wheel_nonholonomic_retarget_smoke_v2",
+        "schema": (
+            "cinebotrl_two_wheel_nonholonomic_retarget_smoke_v3"
+            if attitude_enabled
+            else "cinebotrl_two_wheel_nonholonomic_retarget_smoke_v2"
+        ),
         "training_started": False,
         "control_contract": "unicycle_v_wz_plus_arm3_delta",
         "acquisition_contract": "regenerated_home_to_audited_semantic_start_v1",
-        "orientation_tracking_included": False,
         "physical_gimbal_adapter_included": False,
         "acquisition_time_scale_overrides": {
             str(case): scale for case, scale in acquisition_scale_overrides.items()
@@ -306,6 +343,16 @@ def main() -> int:
         "passed": all(row["passed"] for row in rows),
         "results": rows,
     }
+    if attitude_enabled:
+        result.update(
+            {
+                "orientation_target_included": True,
+                "orientation_target_contract": "semantic_DFR_world_quaternion_wxyz",
+                "attitude_acquisition_contract": "physical_home_cam_to_semantic_DFR_slerp_v1",
+            }
+        )
+    else:
+        result["orientation_tracking_included"] = False
     (args.output_dir / "summary.json").write_text(
         json.dumps(result, indent=2) + "\n", encoding="utf-8", newline="\n"
     )

@@ -1,0 +1,162 @@
+{
+  "schema": "recomo_two_wheel_riser_asset_audit_v1",
+  "usd": "G:\\wSpace\\cinebotRL-two-wheel-riser\\assets_own\\recomoProto2_two_wheel_riser\\recomoProto2_two_wheel_riser.usd",
+  "urdf": "G:\\wSpace\\cinebotRL-two-wheel-riser\\assets_own\\recomoProto2_two_wheel_riser\\recomoProto2_two_wheel_riser.urdf",
+  "joint_names": [
+    "camera_optical_center",
+    "ee_tool_fixed",
+    "imu_joint",
+    "joint1_gimbal_pitch",
+    "joint2_gimbal_roll",
+    "joint3_gimbal_yaw",
+    "laser_joint",
+    "left_wheel_joint",
+    "right_wheel_joint",
+    "riser_guide_joint",
+    "riser_joint",
+    "semantic_dfr_from_cam_fixed",
+    "upper_imu_joint"
+  ],
+  "movable_joint_names": [
+    "joint1_gimbal_pitch",
+    "joint2_gimbal_roll",
+    "joint3_gimbal_yaw",
+    "left_wheel_joint",
+    "right_wheel_joint",
+    "riser_joint"
+  ],
+  "rigid_body_names": [
+    "arm_link_4",
+    "arm_link_5",
+    "arm_link_6",
+    "base_link",
+    "cam_link",
+    "ee1_tool",
+    "ee_tool",
+    "imu_link",
+    "laser_link",
+    "left_wheel_link",
+    "right_wheel_link",
+    "riser_carriage_link",
+    "riser_guide_link",
+    "upper_imu_link"
+  ],
+  "rigid_body_masses_kg": {
+    "/recomoProto2_two_wheel_riser/base_link/base_link": 19.155000686645508,
+    "/recomoProto2_two_wheel_riser/base_link/imu_link": 0.0010000000474974513,
+    "/recomoProto2_two_wheel_riser/base_link/laser_link": 0.0010000000474974513,
+    "/recomoProto2_two_wheel_riser/base_link/upper_imu_link": 0.0010000000474974513,
+    "/recomoProto2_two_wheel_riser/base_link/left_wheel_link": 1.5,
+    "/recomoProto2_two_wheel_riser/base_link/right_wheel_link": 1.5,
+    "/recomoProto2_two_wheel_riser/base_link/riser_guide_link": 1.5,
+    "/recomoProto2_two_wheel_riser/base_link/riser_carriage_link": 1.5,
+    "/recomoProto2_two_wheel_riser/base_link/arm_link_4": 0.44999998807907104,
+    "/recomoProto2_two_wheel_riser/base_link/arm_link_5": 0.44999998807907104,
+    "/recomoProto2_two_wheel_riser/base_link/arm_link_6": 0.23999999463558197,
+    "/recomoProto2_two_wheel_riser/base_link/cam_link": 1.7000000476837158,
+    "/recomoProto2_two_wheel_riser/base_link/ee_tool": 0.0010000000474974513,
+    "/recomoProto2_two_wheel_riser/base_link/ee1_tool": 0.0010000000474974513
+  },
+  "total_mass_kg": 28.000000705360435,
+  "drives": {
+    "imu_joint": {
+      "present": false,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "laser_joint": {
+      "present": false,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "upper_imu_joint": {
+      "present": false,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "left_wheel_joint": {
+      "present": true,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "right_wheel_joint": {
+      "present": true,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "riser_guide_joint": {
+      "present": false,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "riser_joint": {
+      "present": true,
+      "stiffness": 0.0,
+      "damping": 2.0
+    },
+    "joint3_gimbal_yaw": {
+      "present": true,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "joint2_gimbal_roll": {
+      "present": true,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "joint1_gimbal_pitch": {
+      "present": true,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "camera_optical_center": {
+      "present": false,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "ee_tool_fixed": {
+      "present": false,
+      "stiffness": 0.0,
+      "damping": 0.0
+    },
+    "semantic_dfr_from_cam_fixed": {
+      "present": false,
+      "stiffness": 0.0,
+      "damping": 0.0
+    }
+  },
+  "riser_usd_contract": {
+    "lower_limit": 0.0,
+    "upper_limit": 1.2000000476837158,
+    "local_pos0": [
+      0.0,
+      0.0,
+      0.5735305547714233
+    ],
+    "local_pos1": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "checks": {
+    "default_prim": true,
+    "single_articulation_root": true,
+    "fourteen_rigid_bodies": true,
+    "thirteen_joints": true,
+    "usd_joint_names_match_urdf": true,
+    "all_rigid_bodies_have_mass": true,
+    "positive_inertia": true,
+    "total_mass_28kg": true,
+    "exact_movable_joint_contract": true,
+    "arm_joints_absent": true,
+    "camera_frames_present": true,
+    "riser_range_and_speed": true,
+    "usd_riser_range_1p2m": true,
+    "usd_riser_origin_in_metres": true,
+    "imported_drives_disabled": true,
+    "wheel_track_620mm": true,
+    "wheel_diameter_8in": true
+  },
+  "passed": true
+}

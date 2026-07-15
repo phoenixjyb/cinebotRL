@@ -28,6 +28,12 @@ TWO_WHEEL_WHOLE_BODY_ATTITUDE_USD_PATH = (
     / "recomoProto2_two_wheel_whole_body_attitude"
     / "recomoProto2_two_wheel_whole_body_attitude.usd"
 )
+TWO_WHEEL_RISER_USD_PATH = (
+    PROJECT_ROOT
+    / "assets_own"
+    / "recomoProto2_two_wheel_riser"
+    / "recomoProto2_two_wheel_riser.usd"
+)
 
 
 TWO_WHEEL_BALANCE_CFG = ArticulationCfg(
@@ -150,4 +156,37 @@ TWO_WHEEL_WHOLE_BODY_ATTITUDE_CFG.actuators["gimbal_attitude_adapter"] = (
         # unrealistic velocity impulse when the two-wheel base contacts ground.
         armature=0.01,
     )
+)
+
+
+TWO_WHEEL_RISER_CFG = copy.deepcopy(TWO_WHEEL_BALANCE_CFG)
+TWO_WHEEL_RISER_CFG.spawn.usd_path = str(TWO_WHEEL_RISER_USD_PATH)
+TWO_WHEEL_RISER_CFG.init_state.joint_pos.update(
+    {
+        "riser_joint": 0.3,
+        "joint3_gimbal_yaw": 0.0,
+        "joint2_gimbal_roll": 0.0,
+        "joint1_gimbal_pitch": 0.0,
+    }
+)
+TWO_WHEEL_RISER_CFG.init_state.joint_vel = {".*": 0.0}
+TWO_WHEEL_RISER_CFG.actuators["riser_position"] = ImplicitActuatorCfg(
+    joint_names_expr=["riser_joint"],
+    effort_limit_sim=300.0,
+    velocity_limit_sim=1.0,
+    stiffness=1200.0,
+    damping=120.0,
+    armature=0.05,
+)
+TWO_WHEEL_RISER_CFG.actuators["gimbal_attitude_adapter"] = ImplicitActuatorCfg(
+    joint_names_expr=[
+        "joint3_gimbal_yaw",
+        "joint2_gimbal_roll",
+        "joint1_gimbal_pitch",
+    ],
+    effort_limit_sim=10.0,
+    velocity_limit_sim=0.5,
+    stiffness=400.0,
+    damping=40.0,
+    armature=0.01,
 )

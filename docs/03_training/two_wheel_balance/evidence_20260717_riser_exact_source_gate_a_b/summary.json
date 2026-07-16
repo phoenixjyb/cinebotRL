@@ -1,0 +1,56 @@
+{
+  "schema": "cinebotrl_riser_exact_source_gate_a_b_repo_summary_v1",
+  "date": "2026-07-17",
+  "source_package": {
+    "name": "gikWBC9DOF_exact_source_reference_all79_20260717",
+    "manifest_sha256": "f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d",
+    "case_count": 79,
+    "pose_count": 71038,
+    "path_length_m": 618.3046567881911,
+    "duration_s": 1388.4253330000001,
+    "reference_ingest_authorized": true,
+    "training_authorized": false
+  },
+  "gate_a": {
+    "namespace": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/20260717_exact_source_gate_a",
+    "reference_ingest_passed": true,
+    "training_rejection_passed": true,
+    "reference_ingest_audit_sha256": "84ba8709b3107efa40c88957b39b548890afed687e2adb6c1a376f174f7b382e",
+    "training_rejection_audit_sha256": "32ed1acf33dadbe0f0b83a5c3ec05f4321c645e70053b78e796cd73ec4abd293"
+  },
+  "gate_b_canaries": {
+    "namespace": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/20260717_exact_source_plan_canaries_v3_heading_retimed",
+    "cases": [1, 4, 7],
+    "exact_source_pass_count": 3,
+    "source_pose_count": 1642,
+    "source_path_length_m": 10.109224293242818,
+    "maximum_mapped_position_error_m": 0.0,
+    "kinematic_passed_cases": [7],
+    "kinematic_rejected_cases": [1, 4],
+    "manifest_sha256": "695ce88e767e62311f6bf4f756ca825cff23841aaffe8e8d41a3bea16b83924c",
+    "summary_sha256": "011b2b39b465c6f065400148796a9adf04255cb72b8046950eb10b6361138c5c"
+  },
+  "gate_b_all79": {
+    "namespace": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/20260717_exact_source_all79_plans_v1_heading_retimed",
+    "manifest_sha256": "940434d8caa5f85eb8c67d38d09a0894927a50b51fbb380b570d9e724fffe001",
+    "summary_sha256": "df2d6cc3383da1c70be52851e6a5de28d5c97efa5b9bc29ffb885cf40c4ab9f5",
+    "training_rejection_audit_sha256": "3090bcf87d372532dbd4b4ff43fcfe8e62f2e0aedf1d2c810ea2a3f01c49d127",
+    "case_count": 79,
+    "npz_count": 79,
+    "exact_source_pass_count": 79,
+    "source_pose_count": 71038,
+    "source_path_length_m": 618.3046567881911,
+    "source_duration_s": 1388.4253330000001,
+    "execution_duration_s": 7279.140145327684,
+    "kinematic_passed_cases": [2, 3, 7, 8, 9, 10, 11, 12, 14, 15, 19, 23, 24, 36, 37, 45, 46, 47, 48, 49, 50, 53, 56, 57, 61, 62, 63, 77],
+    "kinematic_rejected_cases": [1, 4, 5, 6, 13, 16, 17, 18, 20, 21, 22, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 38, 39, 40, 41, 42, 43, 44, 51, 52, 54, 55, 58, 59, 60, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 78, 79],
+    "kinematic_pass_count": 28,
+    "kinematic_reject_count": 51,
+    "training_authorized": false
+  },
+  "stop_rule_applied": true,
+  "dynamic_capture_started": false,
+  "residual_labels_collected": false,
+  "bc_started": false,
+  "ppo_started": false
+}

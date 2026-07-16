@@ -38,7 +38,9 @@ def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
     assert "20260717_all79_playback_exact_source_v1" in source
     assert "20260716_residual_all79_phase_v2" not in source
     assert "RISER_EXACT_SOURCE_MANIFEST_WSL" in source
+    assert "RISER_EXACT_SOURCE_MANIFEST_SHA256" in source
     assert "validate_riser_exact_source_manifest.py" in source
+    assert "--mode training" in source
     assert '"trajectory_integrity_contract": "exact_source_v1"' in source
     assert '"upstream_valid_for_training": True' in source
     assert 'git -C "$ROOT" diff --quiet' in source

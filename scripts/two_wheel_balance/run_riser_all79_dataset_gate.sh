@@ -15,6 +15,7 @@ SCRIPT_WIN="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playbac
 MERGER_WIN="$WIN_ROOT\\scripts\\two_wheel_balance\\build_riser_residual_dataset.py"
 ADMISSION="$ARTIFACTS_WSL/admission.json"
 SOURCE_MANIFEST="${RISER_EXACT_SOURCE_MANIFEST_WSL:-}"
+SOURCE_MANIFEST_SHA256="${RISER_EXACT_SOURCE_MANIFEST_SHA256:-}"
 EXACT_SOURCE_AUDIT="$ARTIFACTS_WSL/exact_source_admission.json"
 VALIDATOR="$ROOT/scripts/two_wheel_balance/validate_riser_exact_source_manifest.py"
 
@@ -27,11 +28,17 @@ VALIDATOR="$ROOT/scripts/two_wheel_balance/validate_riser_exact_source_manifest.
   printf 'missing quality-qualified exact_source_v1 manifest; set RISER_EXACT_SOURCE_MANIFEST_WSL\n' >&2
   exit 2
 }
+[[ "$SOURCE_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+  printf 'set RISER_EXACT_SOURCE_MANIFEST_SHA256 to the admitted manifest hash\n' >&2
+  exit 2
+}
 TEMP_AUDIT="$(mktemp)"
 trap 'rm -f "$TEMP_AUDIT"' EXIT
 python3 "$VALIDATOR" \
   --manifest "$SOURCE_MANIFEST" \
   --expected-count 79 \
+  --mode training \
+  --expected-manifest-sha256 "$SOURCE_MANIFEST_SHA256" \
   --output "$TEMP_AUDIT" >/dev/null
 git -C "$ROOT" diff --quiet && git -C "$ROOT" diff --cached --quiet || {
   printf 'tracked worktree changes make capture provenance ambiguous\n' >&2

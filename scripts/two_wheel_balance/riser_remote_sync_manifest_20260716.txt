@@ -6,6 +6,9 @@ docs/03_training/two_wheel_balance/RISER_MECHANISM_MOTOR_RECOMMENDATION_CN_20260
 docs/03_training/two_wheel_balance/RISER_RECURSIVE_IMPROVEMENT_LOG_20260716.md
 docs/03_training/two_wheel_balance/RISER_DNN_PROMOTION_PIPELINE_20260716.md
 docs/03_training/two_wheel_balance/RISER_UPSTREAM_TRAJECTORY_QUARANTINE_20260717.md
+docs/03_training/two_wheel_balance/RISER_EXACT_SOURCE_GATE_A_B_STATUS_20260717.md
+docs/03_training/two_wheel_balance/evidence_20260717_riser_exact_source_gate_a_b/README.md
+docs/03_training/two_wheel_balance/evidence_20260717_riser_exact_source_gate_a_b/summary.json
 docs/03_training/two_wheel_balance/evidence_20260716_riser_phase_profile_v2/README.md
 docs/03_training/two_wheel_balance/RISER_ROBOT_GOAL_AND_GATE_PLAN_20260715.md
 docs/03_training/two_wheel_balance/evidence_20260716_riser_rs4_attitude/cases.csv
@@ -43,6 +46,7 @@ scripts/two_wheel_balance/build_riser_residual_dataset.py
 scripts/two_wheel_balance/build_riser_corrected_stage.py
 scripts/two_wheel_balance/build_riser_urdf.py
 scripts/two_wheel_balance/export_riser_playback_plans.py
+scripts/two_wheel_balance/export_riser_exact_source_plans.py
 scripts/two_wheel_balance/gate_riser_residual_rollouts.py
 scripts/two_wheel_balance/run_riser_all79_dataset_gate.sh
 scripts/two_wheel_balance/run_riser_residual_bc_gate.sh
@@ -61,6 +65,7 @@ scripts/two_wheel_balance/sync_riser_to_98.sh
 src/rl_platform/robots/two_wheel_balance/__init__.py
 src/rl_platform/robots/two_wheel_balance/config.py
 src/rl_platform/tasks/two_wheel_balance/riser_control.py
+src/rl_platform/tasks/two_wheel_balance/riser_exact_source.py
 src/rl_platform/tasks/two_wheel_balance/riser_kinematics.py
 src/rl_platform/tasks/two_wheel_balance/riser_playback.py
 src/rl_platform/tasks/two_wheel_balance/riser_reference.py
@@ -74,6 +79,7 @@ tests/test_build_riser_residual_dataset.py
 tests/test_build_riser_corrected_stage.py
 tests/test_two_wheel_riser_asset.py
 tests/test_two_wheel_riser_control.py
+tests/test_two_wheel_riser_exact_source.py
 tests/test_two_wheel_riser_kinematics.py
 tests/test_two_wheel_riser_playback.py
 tests/test_two_wheel_riser_reference.py

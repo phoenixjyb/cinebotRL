@@ -56,9 +56,24 @@
   "current_stage": {
     "training_authorized": false,
     "ppo_authorized": false,
-    "upstream_trajectory_status": "quarantined_truncated_resampled_source",
+    "upstream_trajectory_status": "exact_source_reference_all79_integrity_passed_quality_not_qualified",
     "required_trajectory_integrity_contract": "exact_source_v1",
     "quality_qualified_exact_source_cases_available": 0,
+    "exact_source_gate_a_b_20260717": {
+      "source_manifest_sha256": "f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d",
+      "source_cases": 79,
+      "source_pose_count": 71038,
+      "source_path_length_m": 618.3046567881911,
+      "source_duration_s": 1388.4253330000001,
+      "plan_namespace": "20260717_exact_source_all79_plans_v1_heading_retimed",
+      "plan_manifest_sha256": "940434d8caa5f85eb8c67d38d09a0894927a50b51fbb380b570d9e724fffe001",
+      "integrity_passed_cases": 79,
+      "provisional_kinematic_passed_cases": 28,
+      "provisional_kinematic_rejected_cases": 51,
+      "dynamic_quality_qualified_cases": 0,
+      "training_authorized": false,
+      "ppo_authorized": false
+    },
     "quarantined_residual_capture_cases": 65,
     "quarantined_residual_capture_directory": "20260716_residual_all79_phase_v3_clean_QUARANTINED_UPSTREAM_TRUNCATED_SOURCE_20260717",
     "corrected_teacher_cases_available": 79,
@@ -146,13 +161,13 @@
       "training_authorized": false
     },
     "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
-    "current_root_cause": "the prior all-79 riser stage and v4 plans descend from truncated and resampled GIK logs, so their otherwise clean Isaac residual labels do not represent intact desired trajectories",
+    "current_root_cause": "the exact-source Gate B plans preserve all 71038 anchors, but only 28 of 79 pass the unchanged pure-kinematic screen; nonholonomic position tracking and proxy-rate feasibility must improve before dynamic capture",
     "remote_isaac_validation": "gate0_gate3_representative_and_repaired7_passed",
-    "accepted_evidence": "evidence_20260716_riser_residual_dataset_smoke/README.md"
+    "accepted_evidence": "evidence_20260717_riser_exact_source_gate_a_b/README.md"
   },
   "next_iteration": {
-    "hypothesis": "a quality-qualified exact_source_v1 teacher package can preserve every authoritative source pose and timestamp while producing safe ordered retargeted waypoint states",
-    "required_change": "obtain and validate 79 quality-qualified exact-source teachers, regenerate plans in a new namespace, and collect a new residual curriculum from an empty directory",
-    "stop_rule": "do not resume v4 capture or start BC/PPO; integrity-only canaries and the 65-case quarantined corpus are invalid for desired-trajectory training"
+    "hypothesis": "a planner that accounts for nonholonomic path geometry and RS4 proxy-rate coupling can raise exact-source pre-dynamic quality from 28 to at least 70 cases without changing source anchors",
+    "required_change": "diagnose the 51 Gate B rejects, make one structural retarget or timing change, and rerun all 79 in a new exact-source namespace",
+    "stop_rule": "do not start Gate C capture, BC, or PPO unless at least 70 cases pass unchanged pre-dynamic quality with complete exact-source anchor maps"
   }
 }

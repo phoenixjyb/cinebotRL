@@ -437,3 +437,39 @@ and must state whether its candidate was accepted or rejected.
   mismatch before retargeting.
 - Regenerate plans and residual captures from empty exact-source namespaces.
   Do not resume v4 plans or the quarantined corpus. Keep BC and PPO blocked.
+
+## Round 16: exact-source Gate A/B regeneration
+
+- Gate A now distinguishes reference ingest from training admission. The
+  SHA-pinned all-79 `exact_source_v1` package passes reference ingest and is
+  correctly rejected from training.
+- The Gate B exporter preserves original source timestamps, positions, and
+  semantic DFR `xyzw` quaternions verbatim. Every plan carries a strictly
+  increasing explicit execution schedule, a complete ordered anchor map, and
+  a separate empty initialization segment.
+- Ep1/4/7 canaries preserve `1,642/1,642` anchors and `10.109224 m` of path with
+  zero mapped-position error. Heading-aware retiming improves pure kinematic
+  quality, but ep1 and ep4 still fail at least one provisional quality check.
+- The all-79 namespace preserves `71,038/71,038` anchors, `618.304657 m` of
+  source path, and all original timestamps. Plan manifest SHA-256 is
+  `940434d8caa5f85eb8c67d38d09a0894927a50b51fbb380b570d9e724fffe001`.
+- Only `28/79` plans pass the provisional pure-kinematic gate. The remaining
+  `51/79` are explicit rejects; no threshold was relaxed and no historical
+  fallback was inserted.
+- Decision: apply the `<70 accepted` stop rule. Gate C Isaac capture, residual
+  labels, BC, and PPO remain unstarted and unauthorized.
+- Evidence: `evidence_20260717_riser_exact_source_gate_a_b/` and
+  `RISER_EXACT_SOURCE_GATE_A_B_STATUS_20260717.md`.
+- Lesson: exact desired-trajectory identity is necessary but not sufficient.
+  Retarget feasibility must be repaired structurally before dynamic learning
+  data can be collected.
+
+## Next round after Round 16
+
+- Diagnose the 51 pure-kinematic rejects by failure family: nonholonomic
+  position error, proxy-rate excess, riser bounds, and combinations thereof.
+- Change planner structure or explicit execution timing only; never drop or
+  reorder source anchors and never substitute quarantined plans.
+- Rerun all 79 in a fresh Gate B namespace. Enter Gate C only if at least 70
+  cases pass the unchanged pre-dynamic quality screen.
+- Keep BC and PPO blocked.

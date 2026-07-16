@@ -1,11 +1,15 @@
 import math
 
 import numpy as np
+import pytest
 
 from rl_platform.tasks.two_wheel_balance.riser_control import (
     RiserLimits,
     QuinticRiserMove,
     balance_progress_scale,
+    required_stopping_distance,
+    safe_riser_velocity_bounds,
+    safe_velocity_for_stopping_distance,
 )
 
 
@@ -54,3 +58,58 @@ def test_invalid_riser_contract_is_rejected() -> None:
         pass
     else:
         raise AssertionError("invalid travel range was accepted")
+
+
+def test_stopping_envelope_inverts_delay_and_deceleration_model() -> None:
+    distance = required_stopping_distance(1.0, 5.0, 0.02)
+    assert distance == pytest.approx(0.12)
+    assert safe_velocity_for_stopping_distance(distance, 5.0, 0.02) == pytest.approx(
+        1.0
+    )
+    assert safe_velocity_for_stopping_distance(0.05, 5.0, 0.02) == pytest.approx(
+        0.614142842854285
+    )
+    assert safe_velocity_for_stopping_distance(0.02, 5.0, 0.02) == pytest.approx(
+        0.358257569495584
+    )
+
+
+def test_buffered_mechanical_stroke_allows_full_speed_at_software_limits() -> None:
+    for position in (0.0, 1.2):
+        lower, upper = safe_riser_velocity_bounds(
+            position,
+            hard_lower_m=-0.15,
+            hard_upper_m=1.35,
+            maximum_velocity_mps=1.0,
+            maximum_deceleration_mps2=5.0,
+            response_delay_s=0.02,
+            hard_margin_m=0.03,
+        )
+        assert lower == pytest.approx(-1.0)
+        assert upper == pytest.approx(1.0)
+
+
+def test_unbuffered_stroke_requires_endpoint_velocity_governor() -> None:
+    lower, upper = safe_riser_velocity_bounds(
+        0.0,
+        hard_lower_m=0.0,
+        hard_upper_m=1.2,
+        maximum_velocity_mps=1.0,
+        maximum_deceleration_mps2=5.0,
+        response_delay_s=0.02,
+        hard_margin_m=0.03,
+    )
+    assert lower == 0.0
+    assert upper == pytest.approx(1.0)
+
+    lower, upper = safe_riser_velocity_bounds(
+        1.15,
+        hard_lower_m=0.0,
+        hard_upper_m=1.2,
+        maximum_velocity_mps=1.0,
+        maximum_deceleration_mps2=5.0,
+        response_delay_s=0.02,
+        hard_margin_m=0.03,
+    )
+    assert lower == pytest.approx(-1.0)
+    assert upper == pytest.approx(0.358257569495584)

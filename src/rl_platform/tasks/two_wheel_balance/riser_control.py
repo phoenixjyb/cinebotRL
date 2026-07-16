@@ -63,6 +63,104 @@ def balance_progress_scale(
     return 1.0 + blend * (minimum_scale - 1.0)
 
 
+def required_stopping_distance(
+    velocity_mps: float,
+    maximum_deceleration_mps2: float,
+    response_delay_s: float = 0.0,
+) -> float:
+    """Return delay travel plus constant-deceleration braking distance."""
+
+    values = (velocity_mps, maximum_deceleration_mps2, response_delay_s)
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError("stopping-envelope inputs must be finite")
+    if maximum_deceleration_mps2 <= 0.0 or response_delay_s < 0.0:
+        raise ValueError("deceleration must be positive and delay non-negative")
+    speed = abs(float(velocity_mps))
+    return speed * response_delay_s + speed**2 / (
+        2.0 * maximum_deceleration_mps2
+    )
+
+
+def safe_velocity_for_stopping_distance(
+    stopping_distance_m: float,
+    maximum_deceleration_mps2: float,
+    response_delay_s: float = 0.0,
+) -> float:
+    """Invert the stopping-distance model for a non-negative speed limit."""
+
+    values = (stopping_distance_m, maximum_deceleration_mps2, response_delay_s)
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError("stopping-envelope inputs must be finite")
+    if stopping_distance_m < 0.0:
+        raise ValueError("stopping distance must be non-negative")
+    if maximum_deceleration_mps2 <= 0.0 or response_delay_s < 0.0:
+        raise ValueError("deceleration must be positive and delay non-negative")
+    delayed_speed = maximum_deceleration_mps2 * response_delay_s
+    return max(
+        0.0,
+        math.sqrt(
+            delayed_speed**2
+            + 2.0 * maximum_deceleration_mps2 * stopping_distance_m
+        )
+        - delayed_speed,
+    )
+
+
+def safe_riser_velocity_bounds(
+    position_m: float,
+    *,
+    hard_lower_m: float,
+    hard_upper_m: float,
+    maximum_velocity_mps: float,
+    maximum_deceleration_mps2: float,
+    response_delay_s: float = 0.0,
+    hard_margin_m: float = 0.0,
+) -> tuple[float, float]:
+    """Return direction-aware velocity bounds that stop before hard margins."""
+
+    values = (
+        position_m,
+        hard_lower_m,
+        hard_upper_m,
+        maximum_velocity_mps,
+        maximum_deceleration_mps2,
+        response_delay_s,
+        hard_margin_m,
+    )
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError("riser velocity-envelope inputs must be finite")
+    if hard_upper_m <= hard_lower_m:
+        raise ValueError("hard upper limit must exceed hard lower limit")
+    if not hard_lower_m <= position_m <= hard_upper_m:
+        raise ValueError("riser position lies outside hard limits")
+    if maximum_velocity_mps <= 0.0 or maximum_deceleration_mps2 <= 0.0:
+        raise ValueError("riser velocity and deceleration limits must be positive")
+    if response_delay_s < 0.0 or hard_margin_m < 0.0:
+        raise ValueError("delay and hard margin must be non-negative")
+    if 2.0 * hard_margin_m >= hard_upper_m - hard_lower_m:
+        raise ValueError("hard margins consume the complete riser travel")
+
+    lower_distance = max(0.0, position_m - hard_lower_m - hard_margin_m)
+    upper_distance = max(0.0, hard_upper_m - hard_margin_m - position_m)
+    downward_speed = min(
+        maximum_velocity_mps,
+        safe_velocity_for_stopping_distance(
+            lower_distance,
+            maximum_deceleration_mps2,
+            response_delay_s,
+        ),
+    )
+    upward_speed = min(
+        maximum_velocity_mps,
+        safe_velocity_for_stopping_distance(
+            upper_distance,
+            maximum_deceleration_mps2,
+            response_delay_s,
+        ),
+    )
+    return -downward_speed, upward_speed
+
+
 @dataclass(frozen=True)
 class QuinticRiserMove:
     """Zero-velocity/acceleration endpoint move with analytic dynamic bounds."""

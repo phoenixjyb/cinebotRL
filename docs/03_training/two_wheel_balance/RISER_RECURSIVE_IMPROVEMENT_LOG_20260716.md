@@ -645,3 +645,43 @@ and must state whether its candidate was accepted or rejected.
 - When authorized, run corrected case 74 alone in a fresh guarded namespace.
 - Only if physical dynamic quality passes may case 77 start; the accepted-71
   batch and all learning stages remain closed until the canary sequence passes.
+
+## Round 21: physical riser sizing and endpoint safety contract
+
+- Re-audited the explicit `0.60--1.80 m` camera-height range against the
+  `1.20 m` modeled riser stroke and the previously required end stopping zones.
+  A `1.20 m` mechanical stroke cannot provide both the full software range and
+  independent full-speed stopping reserve.
+- Added pure stopping-envelope helpers. With `5 m/s^2` controlled emergency
+  deceleration and `20 ms` total response delay, stopping from `1 m/s` requires
+  `0.12 m`. Including a `0.03 m` hard margin at each end yields a recommended
+  `1.50 m` mechanical stroke around the unchanged `1.20 m` software stroke.
+- Camera working height remains strictly `0.60--1.80 m`; mechanical overtravel
+  is safety space and does not authorize `1.9 m` or a higher target.
+- Recomputed the 48 V/400 W servo sizing for `2:1` and `3:1` reductions. At the
+  conservative 8 kg moving load, `2:1` requires `1.4917 N m` and fails the
+  motor's `1.27 N m` rated torque. `3:1` requires `0.9945 N m` at `2571 rpm`
+  and passes rated torque, speed, and power, so `3:1` is now preferred.
+- The worst-direction emergency stop at 8 kg and `5 m/s^2` requires about
+  `1.20 N m` with `3:1`, leaving only about 5.5% rated-torque margin. The
+  calculation passes but keeps the 400 W choice provisional until bench tests.
+- Sealed the deterministic report at
+  `20260717_hardware_envelope_v1/summary.json`, SHA-256
+  `ab9373780dad90a120aaddecb72a20d8c8419cff8bf8c7b80ad4d4f2191c9afa`.
+  It is explicitly `valid_for_procurement=false` pending measured mass, duty,
+  inertia, offset load, regeneration, temperature, and safety validation.
+- This round changed no Isaac plant, trajectory plan, LQR gain, residual scale,
+  or learned policy. The expanded CPU-only riser/two-wheel suite is
+  `154 passed`; no GPU work, residual capture, BC, or PPO started.
+
+## Next round after Round 21
+
+- Obtain the measured moving assembly mass, camera offset moment, duty cycle,
+  available mechanical stroke, and 48 V bus/regeneration limits.
+- Bench-validate the `3:1` 400 W candidate with brake, independent height
+  sensing, hard limits, and fail-safe anti-fall hardware before procurement.
+- If mechanical travel remains `1.20 m`, integrate and validate the
+  direction-aware endpoint velocity governor before permitting `1 m/s` near
+  either end.
+- Keep the corrected case-74 GPU canary sequence unchanged and separately
+  blocked until explicit authorization.

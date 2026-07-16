@@ -11,6 +11,7 @@ from rl_platform.tasks.two_wheel_balance.exact_source_reference import (
     discover_exact_source_references,
     source_anchor_execution_indices,
     validate_exact_source_candidate,
+    validate_execution_plan_sha256,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -192,11 +193,29 @@ def test_exact_source_candidate_contract_accepts_complete_mapping(tmp_path: Path
     validate_exact_source_candidate(path)
 
 
+def test_execution_plan_identity_rejects_wrong_hash(tmp_path: Path) -> None:
+    path = tmp_path / "candidate.npz"
+    write_candidate(path)
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    assert validate_execution_plan_sha256(path, actual) == actual
+    with pytest.raises(ValueError, match="execution-plan SHA-256 mismatch"):
+        validate_execution_plan_sha256(path, "0" * 64)
+
+
 @pytest.mark.parametrize(
     "overrides,match",
     [
         ({"source_anchor_execution_index": np.array([2, 1])}, "mapping reordered"),
         ({"initialization_in_learned_actions": np.bool_(True)}, "initialization leaked"),
+        (
+            {"execution_schedule_metadata_sealed": np.bool_(False)},
+            "schedule is not sealed",
+        ),
+        (
+            {"acquisition_route_contract": np.asarray("forward_only_v0")},
+            "route contract is not admitted",
+        ),
+        ({"base_acquisition_route": np.asarray("sideways")}, "route is invalid"),
         ({"control_v_wz_darm": np.zeros((3, 5))}, "M-1 transitions"),
         ({"execution_transition_dt_s": np.array([0.1, 0.2])}, "dt is not aligned"),
     ],
@@ -404,5 +423,13 @@ def test_whole_body_runtime_separates_source_and_execution_clocks() -> None:
     assert "np.array_equal(time_s, execution_time_s)" in source
     assert '"source_duration_s": source_duration_s' in source
     assert '"execution_duration_s": execution_duration_s' in source
+    assert '"execution_plan_sha256": execution_plan_sha256' in source
+    assert (
+        '"execution_schedule_metadata_sealed": execution_schedule_metadata_sealed'
+        in source
+    )
+    assert '"acquisition_route_contract": acquisition_route_contract' in source
+    assert '"base_acquisition_route": base_acquisition_route' in source
+    assert "--expected-execution-plan-sha256" in source
     assert "phase_time_s >= execution_duration_s" in source
     assert "phase_time_s >= source_duration_s" not in source

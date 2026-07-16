@@ -9,7 +9,7 @@ ROOT=${CINEBOTRL_ROOT:-/mnt/g/wSpace/cinebotRL-two-wheel-balance}
 RETARGET_DIR=${RETARGET_DIR:-$ROOT/evaluation_results/two_wheel_exact_source_v1/gate2_all79_offline}
 OUT=${1:-$ROOT/evaluation_results/two_wheel_exact_source_v1/gate4_accepted_dynamic}
 PYTHON=${ISAAC_PYTHON:-/mnt/g/isaaclab_venv/Scripts/python.exe}
-RESULT_SCHEMA=recomo_two_wheel_corrected_full_pose_playback_smoke_v3
+RESULT_SCHEMA=recomo_two_wheel_corrected_full_pose_playback_smoke_v4
 EXACT_SOURCE_MANIFEST_SHA256=f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d
 
 mkdir -p "$OUT"
@@ -41,16 +41,27 @@ PY
 }
 
 validate_result() {
-  python3 - "$1" "$2" "$RESULT_SCHEMA" <<'PY'
+  python3 - "$1" "$2" "$RESULT_SCHEMA" "$3" <<'PY'
 import json
+import math
 import sys
 
-path, expected_case, expected_schema = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+path, expected_case, expected_schema, expected_plan_sha256 = (
+    sys.argv[1],
+    int(sys.argv[2]),
+    sys.argv[3],
+    sys.argv[4],
+)
 try:
     with open(path, encoding="utf-8") as stream:
         result = json.load(stream)
 except (OSError, ValueError):
     raise SystemExit(1)
+rows = result.get("results", [])
+row = rows[0] if len(rows) == 1 and isinstance(rows[0], dict) else {}
+source_duration_s = row.get("source_duration_s")
+execution_duration_s = row.get("execution_duration_s")
+route_yaw_deg = row.get("base_acquisition_total_yaw_travel_deg")
 valid = (
     result.get("schema") == expected_schema
     and result.get("training_started") is False
@@ -66,6 +77,21 @@ valid = (
     and result.get("camera_observation_and_reward_link") == "cam_link"
     and result.get("camera_frame_conversion")
     == "R_world_cam = R_world_DFR * Rz(+pi/2)"
+    and row.get("case") == expected_case
+    and row.get("execution_plan_sha256") == expected_plan_sha256
+    and row.get("execution_schedule_metadata_sealed") is True
+    and row.get("acquisition_route_contract")
+    == "minimum_total_yaw_forward_or_reverse_v1"
+    and row.get("base_acquisition_route")
+    in {"forward", "reverse", "rotate_in_place"}
+    and isinstance(route_yaw_deg, (int, float))
+    and math.isfinite(route_yaw_deg)
+    and 0.0 <= route_yaw_deg <= 360.0
+    and isinstance(source_duration_s, (int, float))
+    and isinstance(execution_duration_s, (int, float))
+    and math.isfinite(source_duration_s)
+    and math.isfinite(execution_duration_s)
+    and 0.0 < source_duration_s < execution_duration_s
 )
 raise SystemExit(0 if valid else 1)
 PY
@@ -120,6 +146,7 @@ while read -r case; do
   console="$OUT/case_${tag}.console.log"
 
   candidate_win=$(wslpath -w "$RETARGET_DIR/case_${tag}.npz")
+  candidate_sha256=$(sha256sum "$RETARGET_DIR/case_${tag}.npz" | awk '{print $1}')
   "$PYTHON" - "$candidate_win" <<'PY' || fail invalid_candidate_contract "$case"
 import sys
 sys.path.insert(0, r'G:\wSpace\cinebotRL-two-wheel-balance\src')
@@ -130,7 +157,7 @@ from rl_platform.tasks.two_wheel_balance.exact_source_reference import (
 validate_exact_source_candidate(Path(sys.argv[1]))
 PY
 
-  if [[ -f "$result" ]] && validate_result "$result" "$case"; then
+  if [[ -f "$result" ]] && validate_result "$result" "$case" "$candidate_sha256"; then
     printf '%s case=%s resume=passed\n' "$(date -Iseconds)" "$case"
     continue
   fi
@@ -145,12 +172,13 @@ PY
     --retarget-dir "$(wslpath -w "$RETARGET_DIR")" \
     --urdf 'G:\wSpace\cinebotRL-two-wheel-balance\assets_own\recomoProto2_two_wheel_whole_body_attitude\recomoProto2_two_wheel_whole_body_attitude.urdf' \
     --cases "$case" \
+    --expected-execution-plan-sha256 "$case=$candidate_sha256" \
     --enable-phase-governor \
     --output "$result_win" \
     --headless > "$console" 2>&1
   status=$?
 
-  if ! validate_result "$result" "$case"; then
+  if ! validate_result "$result" "$case" "$candidate_sha256"; then
     fail invalid_or_failed_case_result "$case" "$status"
   fi
   printf '%s case=%s state=passed interop_exit=%s\n' \

@@ -206,15 +206,21 @@ no result JSON. It is neither a dynamic pass nor a dynamic failure. The same v7
 command may be rerun only as a single-GPU job against the sealed reverse-route
 candidate.
 
-That exclusive-GPU rerun has now passed from clean commit `d8ca698`. It used
+That exclusive-GPU rerun physically passed from clean commit `d8ca698`. It used
 the sealed reverse execution plan `70c8e1ab...`, acquisition-plus-semantic
 bounded arm feedback, camera attitude gain 1.0, and a 25 degree bounded gimbal
 feedback envelope. It completed acquisition and the full 40.461261 s reference
 in 54.68 s wall time with no termination. Position p95/max were
 0.040045/0.089092 m, camera attitude p95/max were 6.47546/7.51440 degrees,
 peak pitch was 10.92131 degrees, and every arm/gimbal/action saturation and IK
-gate passed. This qualifies case 1 dynamically but does not authorize corpus
-training; `valid_for_training=false` and training has not started.
+gate passed. Its evidence schema nevertheless conflated the immutable
+4.634756 s source clock with the 40.461261 s execution schedule and did not
+embed the sealed plan identity and acquisition-route provenance. The physical
+metrics are therefore provisional rather than a final dynamic admission. A
+fresh rerun must preserve the same controller and gates while fail-closed
+runtime admission validates and emits both clocks, execution-plan SHA-256,
+schedule seal, and route metadata. `valid_for_training=false` and training has
+not started.
 
 Case 7 therefore proves the corrected source-integrity path, not executable
 teacher quality. Its gimbal failure requires a structural base/arm/gimbal
@@ -237,7 +243,8 @@ hide a real actuator-limit crossing and is not allowed.
 - Upstream ep1 and ep77 holonomic seeds may be used only as episode-specific
   solver priors after exact hash verification. They are not policy teachers and
   do not relax nonholonomic, source, gravity, timing, or output gates.
-- Case 1 now passes exact-source offline and representative dynamic gates. The
+- Case 1 now passes exact-source offline gates and has a provisional physical
+  dynamic pass pending the corrected evidence-schema rerun. The
   upstream ep7 branch search is closed without an admitted package: it
   crossed earlier branch failures but remained rate-disconnected at waypoint
   187. Ep7 therefore requires downstream `M>N` execution retiming with all 663

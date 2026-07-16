@@ -69,7 +69,7 @@
     "valid_for_training": false
   },
   "gate3_ep1_v7": {
-    "status": "passed_exclusive_gpu_rerun",
+    "status": "physical_pass_provisional_clock_and_provenance_schema",
     "source_commit": "d8ca698",
     "execution_plan_sha256": "70c8e1abca453f67c771a33640a26309e57858cf28170fffd73019d4fbb41bc6",
     "completed_phase_time_s": 40.461260644949895,
@@ -80,8 +80,10 @@
     "attitude_error_p95_deg": 6.475460483946485,
     "attitude_error_max_deg": 7.514396218216311,
     "peak_pitch_deg": 10.921313680952187,
-    "dynamic_pass_fail_classified": true,
-    "passed": true,
+    "dynamic_pass_fail_classified": false,
+    "final_evidence_admitted": false,
+    "physical_gates_passed": true,
+    "passed": false,
     "valid_for_training": false
   },
   "ep7_upstream_seed": {

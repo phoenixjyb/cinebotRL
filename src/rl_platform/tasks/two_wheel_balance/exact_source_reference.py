@@ -43,6 +43,20 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def validate_execution_plan_sha256(path: Path, expected_sha256: str) -> str:
+    if len(expected_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in expected_sha256
+    ):
+        raise ValueError("expected execution-plan SHA-256 must be lowercase hex")
+    actual_sha256 = sha256(path.resolve())
+    if actual_sha256 != expected_sha256:
+        raise ValueError(
+            f"execution-plan SHA-256 mismatch: expected {expected_sha256}, "
+            f"got {actual_sha256}"
+        )
+    return actual_sha256
+
+
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)

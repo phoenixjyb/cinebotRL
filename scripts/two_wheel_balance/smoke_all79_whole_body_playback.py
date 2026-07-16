@@ -25,6 +25,12 @@ parser.add_argument("--gains", type=Path, required=True)
 parser.add_argument("--retarget-dir", type=Path, required=True)
 parser.add_argument("--urdf", type=Path, required=True)
 parser.add_argument("--cases", default="1,20,28,50,79")
+parser.add_argument(
+    "--expected-execution-plan-sha256",
+    action="append",
+    required=True,
+    metavar="CASE=SHA256",
+)
 parser.add_argument("--maximum-pitch-deg", type=float, default=12.0)
 parser.add_argument("--maximum-com-pitch-bias-deg", type=float, default=10.5)
 parser.add_argument("--maximum-controller-pitch-target-deg", type=float, default=11.5)
@@ -87,6 +93,7 @@ from rl_platform.tasks.two_wheel_balance import RecomoTwoWheelBalanceEnvCfg
 from rl_platform.tasks.two_wheel_balance.all79_reference import quaternion_slerp_wxyz
 from rl_platform.tasks.two_wheel_balance.exact_source_reference import (
     validate_exact_source_candidate,
+    validate_execution_plan_sha256,
 )
 from rl_platform.tasks.two_wheel_balance.camera_attitude import (
     PHYSICAL_GIMBAL_JOINTS,
@@ -132,10 +139,35 @@ ARM_JOINTS = (
 )
 
 
-def load_candidate(case: int) -> dict[str, np.ndarray]:
+def parse_expected_execution_plan_sha256(
+    specs: list[str], cases: list[int]
+) -> dict[int, str]:
+    expected: dict[int, str] = {}
+    for spec in specs:
+        case_text, separator, digest = spec.partition("=")
+        if separator != "=" or not case_text.isdigit():
+            raise ValueError(
+                "execution-plan identity must use CASE=SHA256 syntax"
+            )
+        case = int(case_text)
+        if case in expected:
+            raise ValueError(f"duplicate execution-plan identity for case {case}")
+        expected[case] = digest
+    if set(expected) != set(cases):
+        raise ValueError(
+            "execution-plan identities differ from requested cases: "
+            f"{sorted(set(expected) ^ set(cases))}"
+        )
+    return expected
+
+
+def load_candidate(case: int, expected_plan_sha256: str) -> dict[str, np.ndarray]:
     path = args.retarget_dir / f"case_{case:04d}.npz"
     if not path.is_file():
         raise FileNotFoundError(path)
+    execution_plan_sha256 = validate_execution_plan_sha256(
+        path, expected_plan_sha256
+    )
     candidate = validate_exact_source_candidate(path)
     expected = {
         "schema",
@@ -197,6 +229,7 @@ def load_candidate(case: int) -> dict[str, np.ndarray]:
         raise ValueError(f"candidate {path} is not admitted for dynamic evaluation")
     if bool(candidate.get("physical_gimbal_joint_labels_included", True).item()):
         raise ValueError(f"candidate {path} contains physical gimbal joint labels")
+    candidate["execution_plan_sha256"] = np.asarray(execution_plan_sha256)
     return candidate
 
 
@@ -272,6 +305,17 @@ def evaluate_case(
     )
     source_duration_s = float(candidate["source_time_s"][-1])
     execution_duration_s = float(candidate["execution_time_s"][-1])
+    execution_plan_sha256 = str(candidate["execution_plan_sha256"].item())
+    execution_schedule_metadata_sealed = bool(
+        candidate["execution_schedule_metadata_sealed"].item()
+    )
+    acquisition_route_contract = str(
+        candidate["acquisition_route_contract"].item()
+    )
+    base_acquisition_route = str(candidate["base_acquisition_route"].item())
+    base_acquisition_total_yaw_travel_deg = float(
+        candidate["base_acquisition_total_yaw_travel_deg"].item()
+    )
     semantic_start_index = int(candidate["semantic_start_index"].item())
     semantic_start_time_s = float(candidate["time_s"][semantic_start_index])
     maximum_steps = int(
@@ -892,6 +936,13 @@ def evaluate_case(
         "case": case,
         "source_duration_s": source_duration_s,
         "execution_duration_s": execution_duration_s,
+        "execution_plan_sha256": execution_plan_sha256,
+        "execution_schedule_metadata_sealed": execution_schedule_metadata_sealed,
+        "acquisition_route_contract": acquisition_route_contract,
+        "base_acquisition_route": base_acquisition_route,
+        "base_acquisition_total_yaw_travel_deg": (
+            base_acquisition_total_yaw_travel_deg
+        ),
         "semantic_start_time_s": semantic_start_time_s,
         "maximum_steps": maximum_steps,
         "completed_steps": completed_steps,
@@ -1019,7 +1070,12 @@ def main() -> int:
     ):
         if not 0.0 <= value <= 1.0:
             raise ValueError(f"maximum {name} ratio must be in [0, 1]")
-    candidates = {case: load_candidate(case) for case in cases}
+    expected_plan_sha256 = parse_expected_execution_plan_sha256(
+        args.expected_execution_plan_sha256, cases
+    )
+    candidates = {
+        case: load_candidate(case, expected_plan_sha256[case]) for case in cases
+    }
     kinematics = UrdfPositionKinematics(args.urdf)
     camera_kinematics = UrdfPhysicalCameraKinematics(args.urdf)
     gain_data = json.loads(args.gains.read_text(encoding="utf-8"))
@@ -1118,7 +1174,7 @@ def main() -> int:
     ]
     env.close()
     result = {
-        "schema": "recomo_two_wheel_corrected_full_pose_playback_smoke_v3",
+        "schema": "recomo_two_wheel_corrected_full_pose_playback_smoke_v4",
         "training_started": False,
         "controller_profile": "structural_robust_v1",
         "task_space_feedback_enabled": not args.open_loop,

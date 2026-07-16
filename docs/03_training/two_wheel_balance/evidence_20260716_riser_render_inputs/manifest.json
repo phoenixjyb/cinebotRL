@@ -1,0 +1,119 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_playback_export_v1",
+  "training_started": false,
+  "source_contract": "corrected_physical_split_teacher",
+  "case_count": 3,
+  "cases": [
+    {
+      "case": 1,
+      "file": "case_0001_riser_playback_v1.npz",
+      "sha256": "68dab4fcaf3f60006a7087cccb1c275221979e7541758ef81208ae9913f65e66",
+      "sample_count": 503,
+      "duration_s": 25.12368904166667,
+      "planning_strategy": "joint_adaptive",
+      "vertical_shift_m": 0.0,
+      "kinematic_metrics": {
+        "position_error_p95_m": 6.343845671008317e-07,
+        "position_error_max_m": 7.304498377875598e-07,
+        "attitude_error_p95_deg": 1.2839251556525051e-07,
+        "attitude_error_max_deg": 1.2839257278081873e-07,
+        "maximum_abs_base_linear_velocity_mps": 0.0286937474806509,
+        "maximum_abs_base_lateral_velocity_mps": 1.3754218140538586e-14,
+        "maximum_abs_base_yaw_rate_radps": 0.20220662946867116,
+        "maximum_abs_riser_rate_mps": 0.011676432967818574,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.27248276441189956,
+        "maximum_abs_raw_proxy_target_step_rad": 0.013636996498602283,
+        "minimum_riser_position_m": 0.7355575690063545,
+        "maximum_riser_position_m": 0.7563278915499048
+      },
+      "kinematic_checks": {
+        "position_p95_bounded": true,
+        "position_max_bounded": true,
+        "attitude_p95_bounded": true,
+        "attitude_max_bounded": true,
+        "base_linear_velocity_bounded": true,
+        "base_lateral_velocity_bounded": true,
+        "base_yaw_rate_bounded": true,
+        "riser_rate_bounded": true,
+        "raw_proxy_target_rate_bounded": true,
+        "riser_lower_bound": true,
+        "riser_upper_bound": true
+      },
+      "passed": true
+    },
+    {
+      "case": 31,
+      "file": "case_0031_riser_playback_v1.npz",
+      "sha256": "f10de5ace90fc870aa171a7df42b3972b12338d70ace89f58a4335071bf56c99",
+      "sample_count": 293,
+      "duration_s": 14.640981,
+      "planning_strategy": "fixed_path",
+      "vertical_shift_m": 0.0,
+      "kinematic_metrics": {
+        "position_error_p95_m": 0.04591124778463498,
+        "position_error_max_m": 0.04717058729463785,
+        "attitude_error_p95_deg": 1.2839380688938305e-07,
+        "attitude_error_max_deg": 1.2839389079620174e-07,
+        "maximum_abs_base_linear_velocity_mps": 0.1075664195511701,
+        "maximum_abs_base_lateral_velocity_mps": 1.17027047218183e-08,
+        "maximum_abs_base_yaw_rate_radps": 0.25000000000000056,
+        "maximum_abs_riser_rate_mps": 0.00488364545442129,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.2449165073831076,
+        "maximum_abs_raw_proxy_target_step_rad": 0.012280198394460373,
+        "minimum_riser_position_m": 0.6012844953000718,
+        "maximum_riser_position_m": 0.607270226472444
+      },
+      "kinematic_checks": {
+        "position_p95_bounded": true,
+        "position_max_bounded": true,
+        "attitude_p95_bounded": true,
+        "attitude_max_bounded": true,
+        "base_linear_velocity_bounded": true,
+        "base_lateral_velocity_bounded": true,
+        "base_yaw_rate_bounded": true,
+        "riser_rate_bounded": true,
+        "raw_proxy_target_rate_bounded": true,
+        "riser_lower_bound": true,
+        "riser_upper_bound": true
+      },
+      "passed": true
+    },
+    {
+      "case": 73,
+      "file": "case_0073_riser_playback_v1.npz",
+      "sha256": "29eb5eb302b22bc2acb537fe9478c48f446bc8d557f5291f57cd1a0d9c23aa01",
+      "sample_count": 159,
+      "duration_s": 7.918541875,
+      "planning_strategy": "joint_adaptive",
+      "vertical_shift_m": 0.0,
+      "kinematic_metrics": {
+        "position_error_p95_m": 0.0007231175961492791,
+        "position_error_max_m": 0.0019696007481981963,
+        "attitude_error_p95_deg": 1.2839583178167205e-07,
+        "attitude_error_max_deg": 1.283958467783328e-07,
+        "maximum_abs_base_linear_velocity_mps": 0.039836600437897246,
+        "maximum_abs_base_lateral_velocity_mps": 1.7254695030373003e-14,
+        "maximum_abs_base_yaw_rate_radps": 0.3802682823870897,
+        "maximum_abs_riser_rate_mps": 0.03904782443825358,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.4173919111870304,
+        "maximum_abs_raw_proxy_target_step_rad": 0.020918578019118783,
+        "minimum_riser_position_m": 0.7708371602246622,
+        "maximum_riser_position_m": 0.8844736248550903
+      },
+      "kinematic_checks": {
+        "position_p95_bounded": true,
+        "position_max_bounded": true,
+        "attitude_p95_bounded": true,
+        "attitude_max_bounded": true,
+        "base_linear_velocity_bounded": true,
+        "base_lateral_velocity_bounded": true,
+        "base_yaw_rate_bounded": true,
+        "riser_rate_bounded": true,
+        "raw_proxy_target_rate_bounded": true,
+        "riser_lower_bound": true,
+        "riser_upper_bound": true
+      },
+      "passed": true
+    }
+  ]
+}

@@ -9,6 +9,28 @@
   "previous_aggregate_base_mass_kg": 24.996,
   "base_inertia_scale": 0.76632261161786,
   "provisional_moving_mass_kg": 4.342,
+  "fixed_gimbal_mount": {
+    "contract": "accepted62_rs4_semantic_body_basis_yaw025_v1",
+    "source_case_count": 62,
+    "source_sample_count": 21017,
+    "maximum_reference_base_yaw_rate_rad_s": 0.25,
+    "semantic_body_basis_quat_xyzw": [
+      0.37126688383868894,
+      0.6136484680880162,
+      -0.4508086827044413,
+      0.5313830917297113
+    ],
+    "joint3_origin_xyz_m": [
+      -0.07154336466914124,
+      0.13133273875487342,
+      0.03491422145395169
+    ],
+    "joint3_origin_rpy_rad": [
+      -1.75035342,
+      1.40878912,
+      -2.99569687
+    ]
+  },
   "riser": {
     "joint": "riser_joint",
     "stroke_m": 1.2,
@@ -30,6 +52,18 @@
     "joint2_gimbal_roll",
     "joint1_gimbal_pitch"
   ],
+  "sim_gimbal_joint_semantics": "rs4_attitude_proxy_not_motor_shaft_angles",
+  "sim_gimbal_joint_command_mapping": {
+    "joint3_gimbal_yaw": "ronin_pitch_from_rot_z",
+    "joint2_gimbal_roll": "ronin_roll_from_rot_y",
+    "joint1_gimbal_pitch": "ronin_yaw_from_rot_x"
+  },
+  "continuous_yaw_proxy_joint": "joint1_gimbal_pitch",
+  "continuous_yaw_proxy_reason": "avoid_wrapped_position_target_long_way_rotation",
+  "hardware_yaw_command_envelope_rad": [
+    -3.141592653589793,
+    3.141592653589793
+  ],
   "learned_physical_gimbal_joint_action": false,
   "position_target_and_observation_link": "cam_link",
   "semantic_attitude_target_link": "ee1_tool",
@@ -47,10 +81,10 @@
     "movable_joints": [
       "left_wheel_joint",
       "right_wheel_joint",
+      "joint1_gimbal_pitch",
       "riser_joint",
       "joint3_gimbal_yaw",
-      "joint2_gimbal_roll",
-      "joint1_gimbal_pitch"
+      "joint2_gimbal_roll"
     ],
     "total_mass_kg": 28.0,
     "checks": {
@@ -58,7 +92,7 @@
       "unique_joints": true,
       "single_base_link_root": true,
       "total_mass_28kg": true,
-      "wheel_joints_present": true,
+      "continuous_joint_contract": true,
       "riser_and_gimbal_joints_present": true,
       "arm_joints_absent": true,
       "no_planar_base_joints": true,

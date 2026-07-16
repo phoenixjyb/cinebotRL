@@ -11,6 +11,8 @@ import math
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+import numpy as np
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BASE = (
@@ -38,10 +40,29 @@ CAMERA_MIN_HEIGHT_M = 0.6
 CAMERA_MAX_HEIGHT_M = 1.8
 CAMERA_ZERO_OFFSET_Z_M = 0.02646943433666392
 RISER_JOINT_ORIGIN_Z_M = CAMERA_MIN_HEIGHT_M - CAMERA_ZERO_OFFSET_Z_M
-# Center the source gimbal/camera chain at its zero pose. These offsets are
-# derived from the exact rounded RPY values in EXPECTED_GIMBAL_SHA256.
-GIMBAL_MOUNT_X_M = 0.0000034107429272008745
-GIMBAL_MOUNT_Y_M = 0.14743617181939347
+# Fixed chassis-to-semantic-DFR zero-command basis fitted from all 21,017
+# samples in the corrected accepted 62-case stage with base yaw capped at
+# 0.25 rad/s. URDF rpy uses Rz(yaw) * Ry(pitch) * Rx(roll).
+RS4_BODY_BASIS_RPY_RAD = (-1.75035342, 1.40878912, -2.99569687)
+RS4_BODY_BASIS_QUAT_XYZW = (
+    0.37126688383868894,
+    0.6136484680880162,
+    -0.4508086827044413,
+    0.5313830917297113,
+)
+RS4_HARD_RATE_RAD_S = 2.0 * math.pi
+RS4_PROXY_JOINT_LIMITS_RAD = {
+    # Proxy order implements Rz(pitch) * Ry(roll) * Rx(yaw).
+    "joint3_gimbal_yaw": (math.radians(-112.0), math.radians(214.0)),
+    "joint2_gimbal_roll": (math.radians(-95.0), math.radians(240.0)),
+    "joint1_gimbal_pitch": (-math.pi, math.pi),
+}
+RS4_CONTINUOUS_PROXY_JOINT = "joint1_gimbal_pitch"
+RS4_PROXY_JOINT_COMMAND_MAPPING = {
+    "joint3_gimbal_yaw": "ronin_pitch_from_rot_z",
+    "joint2_gimbal_roll": "ronin_roll_from_rot_y",
+    "joint1_gimbal_pitch": "ronin_yaw_from_rot_x",
+}
 RISER_GUIDE_MASS_KG = 1.5
 RISER_CARRIAGE_MASS_KG = 1.5
 
@@ -115,6 +136,102 @@ def _rewrite_mesh_paths(element: ET.Element) -> None:
             # metres. Keep this scale local to mesh geometry so the importer
             # cannot shrink prismatic travel and joint origins.
             mesh.attrib["scale"] = "0.001 0.001 0.001"
+
+
+def _rpy_matrix(rpy: tuple[float, float, float] | np.ndarray) -> np.ndarray:
+    roll, pitch, yaw = np.asarray(rpy, dtype=np.float64)
+    return np.array(
+        [
+            [
+                math.cos(yaw) * math.cos(pitch),
+                math.cos(yaw) * math.sin(pitch) * math.sin(roll)
+                - math.sin(yaw) * math.cos(roll),
+                math.cos(yaw) * math.sin(pitch) * math.cos(roll)
+                + math.sin(yaw) * math.sin(roll),
+            ],
+            [
+                math.sin(yaw) * math.cos(pitch),
+                math.sin(yaw) * math.sin(pitch) * math.sin(roll)
+                + math.cos(yaw) * math.cos(roll),
+                math.sin(yaw) * math.sin(pitch) * math.cos(roll)
+                - math.cos(yaw) * math.sin(roll),
+            ],
+            [
+                -math.sin(pitch),
+                math.cos(pitch) * math.sin(roll),
+                math.cos(pitch) * math.cos(roll),
+            ],
+        ]
+    )
+
+
+def _matrix_rpy(rotation: np.ndarray) -> tuple[float, float, float]:
+    pitch = math.atan2(
+        -float(rotation[2, 0]),
+        math.hypot(float(rotation[0, 0]), float(rotation[1, 0])),
+    )
+    roll = math.atan2(float(rotation[2, 1]), float(rotation[2, 2]))
+    yaw = math.atan2(float(rotation[1, 0]), float(rotation[0, 0]))
+    return roll, pitch, yaw
+
+
+def _origin_rpy(joint: ET.Element) -> np.ndarray:
+    return _rpy_matrix(
+        np.fromstring(joint.find("origin").attrib.get("rpy", "0 0 0"), sep=" ")
+    )
+
+
+def _origin_xyz(joint: ET.Element) -> np.ndarray:
+    return np.fromstring(joint.find("origin").attrib.get("xyz", "0 0 0"), sep=" ")
+
+
+def _format_vector(values: np.ndarray | tuple[float, ...]) -> str:
+    return " ".join(f"{float(value):.12f}" for value in values)
+
+
+def _configure_rs4_proxy_chain(joints: dict[str, ET.Element]) -> np.ndarray:
+    """Make legacy-named sim joints implement the deployed attitude mapping."""
+
+    first = joints["joint3_gimbal_yaw"]
+    second = joints["joint2_gimbal_roll"]
+    third = joints["joint1_gimbal_pitch"]
+    camera = joints["camera_optical_center"]
+    r2 = _origin_rpy(second)
+    r3 = _origin_rpy(third)
+    r23 = r2 @ r3
+    rz_cam = _rpy_matrix((0.0, 0.0, math.pi / 2.0))
+
+    first.find("origin").attrib["rpy"] = _format_vector(RS4_BODY_BASIS_RPY_RAD)
+    first.find("axis").attrib["xyz"] = "0 0 1"
+    second.find("axis").attrib["xyz"] = _format_vector(r2.T @ np.array([0.0, 1.0, 0.0]))
+    third.find("axis").attrib["xyz"] = _format_vector(r23.T @ np.array([1.0, 0.0, 0.0]))
+    camera.find("origin").attrib["rpy"] = _format_vector(_matrix_rpy(r23.T @ rz_cam))
+
+    for name in PHYSICAL_GIMBAL_JOINTS:
+        lower, upper = RS4_PROXY_JOINT_LIMITS_RAD[name]
+        limit = joints[name].find("limit")
+        if name == RS4_CONTINUOUS_PROXY_JOINT:
+            # The DJI yaw command wraps at +/-pi. A continuous simulation
+            # coordinate lets the position servo follow the nearest equivalent
+            # target instead of attempting a nearly 2*pi reversal.
+            joints[name].attrib["type"] = "continuous"
+            limit.attrib.pop("lower", None)
+            limit.attrib.pop("upper", None)
+        else:
+            limit.attrib.update(lower=f"{lower:.12f}", upper=f"{upper:.12f}")
+        limit.attrib["velocity"] = f"{RS4_HARD_RATE_RAD_S:.12f}"
+
+    # Center the zero-command optical center on the riser axis. Joint
+    # translations remain from CAD; only command-frame rotations are adapted.
+    p_down = (
+        _origin_xyz(second)
+        + r2 @ _origin_xyz(third)
+        + r23 @ _origin_xyz(camera)
+    )
+    basis = _rpy_matrix(RS4_BODY_BASIS_RPY_RAD)
+    mount_xyz = np.array([0.0, 0.0, CAMERA_ZERO_OFFSET_Z_M]) - basis @ p_down
+    first.find("origin").attrib["xyz"] = _format_vector(mount_xyz)
+    return mount_xyz
 
 
 def _inertial(mass_kg: float, size_xyz: tuple[float, float, float]) -> ET.Element:
@@ -203,10 +320,10 @@ def _validate_tree(root: ET.Element) -> dict[str, object]:
         "unique_joints": len(joint_names) == len(set(joint_names)),
         "single_base_link_root": roots == ["base_link"],
         "total_mass_28kg": abs(total_mass - TARGET_TOTAL_MASS_KG) < 1e-6,
-        "wheel_joints_present": continuous
-        == ("left_wheel_joint", "right_wheel_joint"),
+        "continuous_joint_contract": continuous
+        == ("left_wheel_joint", "right_wheel_joint", RS4_CONTINUOUS_PROXY_JOINT),
         "riser_and_gimbal_joints_present": movable
-        == ("riser_joint", *PHYSICAL_GIMBAL_JOINTS),
+        == ("riser_joint", *PHYSICAL_GIMBAL_JOINTS[:2]),
         "arm_joints_absent": not set(ARM_JOINTS) & set(joint_names),
         "no_planar_base_joints": not {
             "base_joint_vx",
@@ -302,14 +419,15 @@ def build(base_path: Path, gimbal_path: Path, output_path: Path) -> dict[str, ob
         _rewrite_mesh_paths(link)
         root.append(link)
 
+    copied_joints = {
+        name: deepcopy(_named(gimbal_root, "joint", name)) for name in GIMBAL_JOINTS
+    }
+    mount_xyz = _configure_rs4_proxy_chain(copied_joints)
+    copied_joints["joint3_gimbal_yaw"].find("parent").attrib[
+        "link"
+    ] = "riser_carriage_link"
     for name in GIMBAL_JOINTS:
-        joint = deepcopy(_named(gimbal_root, "joint", name))
-        if name == "joint3_gimbal_yaw":
-            joint.find("parent").attrib["link"] = "riser_carriage_link"
-            joint.find("origin").attrib["xyz"] = (
-                f"{GIMBAL_MOUNT_X_M:.15f} {GIMBAL_MOUNT_Y_M:.15f} 0"
-            )
-        root.append(joint)
+        root.append(copied_joints[name])
 
     root.append(_semantic_tool_link())
     semantic_joint = ET.Element(
@@ -352,6 +470,15 @@ def build(base_path: Path, gimbal_path: Path, output_path: Path) -> dict[str, ob
         "previous_aggregate_base_mass_kg": round(old_base_mass, 9),
         "base_inertia_scale": round(inertia_scale, 14),
         "provisional_moving_mass_kg": round(moving_mass, 9),
+        "fixed_gimbal_mount": {
+            "contract": "accepted62_rs4_semantic_body_basis_yaw025_v1",
+            "source_case_count": 62,
+            "source_sample_count": 21017,
+            "maximum_reference_base_yaw_rate_rad_s": 0.25,
+            "semantic_body_basis_quat_xyzw": list(RS4_BODY_BASIS_QUAT_XYZW),
+            "joint3_origin_xyz_m": mount_xyz.tolist(),
+            "joint3_origin_rpy_rad": list(RS4_BODY_BASIS_RPY_RAD),
+        },
         "riser": {
             "joint": "riser_joint",
             "stroke_m": RISER_UPPER_M - RISER_LOWER_M,
@@ -362,6 +489,11 @@ def build(base_path: Path, gimbal_path: Path, output_path: Path) -> dict[str, ob
         },
         "removed_arm_joints": list(ARM_JOINTS),
         "physical_gimbal_joints": list(PHYSICAL_GIMBAL_JOINTS),
+        "sim_gimbal_joint_semantics": "rs4_attitude_proxy_not_motor_shaft_angles",
+        "sim_gimbal_joint_command_mapping": RS4_PROXY_JOINT_COMMAND_MAPPING,
+        "continuous_yaw_proxy_joint": RS4_CONTINUOUS_PROXY_JOINT,
+        "continuous_yaw_proxy_reason": "avoid_wrapped_position_target_long_way_rotation",
+        "hardware_yaw_command_envelope_rad": [-math.pi, math.pi],
         "learned_physical_gimbal_joint_action": False,
         "position_target_and_observation_link": "cam_link",
         "semantic_attitude_target_link": "ee1_tool",

@@ -1,0 +1,55 @@
+{
+  "schema": "recomo_two_wheel_riser_static_height_gate_v1",
+  "controller_profile": "structural_robust_v1",
+  "requested_steps": 2000,
+  "completed_steps": 2000,
+  "total_mass_kg": 28.0,
+  "rows": [
+    {
+      "camera_height_target_m": 0.6,
+      "riser_target_m": 0.0,
+      "pitch_p95_deg": 1.3340538024902344,
+      "pitch_max_deg": 1.406079649925232,
+      "camera_height_error_p95_m": 0.01072317361831665,
+      "camera_height_error_max_m": 0.012803852558135986,
+      "wheel_saturation_ratio": 0.0,
+      "riser_saturation_ratio": 0.0
+    },
+    {
+      "camera_height_target_m": 0.9,
+      "riser_target_m": 0.30000000000000004,
+      "pitch_p95_deg": 1.492198210954666,
+      "pitch_max_deg": 1.5861144065856934,
+      "camera_height_error_p95_m": 0.022738710045814514,
+      "camera_height_error_max_m": 0.02353501319885254,
+      "wheel_saturation_ratio": 0.0,
+      "riser_saturation_ratio": 0.0
+    },
+    {
+      "camera_height_target_m": 1.8,
+      "riser_target_m": 1.2000000000000002,
+      "pitch_p95_deg": 1.4550831258296966,
+      "pitch_max_deg": 1.6504054069519043,
+      "camera_height_error_p95_m": 0.024111175537109376,
+      "camera_height_error_max_m": 0.024219036102294922,
+      "wheel_saturation_ratio": 0.0,
+      "riser_saturation_ratio": 0.0
+    }
+  ],
+  "termination": null,
+  "nonfinite_count": 0,
+  "checks": {
+    "completed_horizon": true,
+    "no_termination": true,
+    "no_nonfinite": true,
+    "total_mass_28kg": true,
+    "riser_and_gimbal_dofs_present": true,
+    "arm_dofs_absent": true,
+    "camera_frames_present": true,
+    "all_pitch_max_below_limit": true,
+    "all_pitch_p95_below_limit": true,
+    "all_height_errors_below_limit": true,
+    "all_saturation_ratios_below_limit": true
+  },
+  "passed": true
+}

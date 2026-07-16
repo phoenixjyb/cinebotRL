@@ -1,0 +1,35 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_rs4_attitude_audit_v1",
+  "training_started": false,
+  "ppo_authorized": false,
+  "basis_fit_source": "accepted corrected 62-case semantic DFR corpus",
+  "physical_motor_joint_labels_used": false,
+  "command_order": [
+    "ronin_yaw_from_rot_x",
+    "ronin_roll_from_rot_y",
+    "ronin_pitch_from_rot_z"
+  ],
+  "body_basis_quat_xyzw": [
+    0.37126688383868894,
+    0.6136484680880162,
+    -0.4508086827044413,
+    0.5313830917297113
+  ],
+  "body_basis_zyx_deg": [
+    -171.64078726340884,
+    80.7176707258386,
+    -100.28786343143857
+  ],
+  "case_count": 62,
+  "passed_case_count": 62,
+  "command_envelope_feasible_case_count": 62,
+  "hard_rate_passed_case_count": 62,
+  "filming_rate_p95_passed_case_count": 62,
+  "failed_cases": [],
+  "thresholds": {
+    "maximum_base_yaw_rate_rad_s": 0.25,
+    "filming_command_rate_p95_deg_s": 24.0,
+    "hard_command_rate_max_deg_s": 360.0
+  },
+  "status": "diagnostic_only_pending_isaac_and_hardware_mapping_validation"
+}

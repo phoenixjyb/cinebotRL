@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -110,6 +111,23 @@ def main() -> int:
         "local_pos0": [float(value) for value in riser_usd.GetLocalPos0Attr().Get()],
         "local_pos1": [float(value) for value in riser_usd.GetLocalPos1Attr().Get()],
     }
+    yaw_proxy_urdf = urdf_joints["joint1_gimbal_pitch"]
+    yaw_proxy_prim = next(
+        joint for joint in joints if joint.GetName() == "joint1_gimbal_pitch"
+    )
+    yaw_proxy_usd = UsdPhysics.RevoluteJoint(yaw_proxy_prim)
+    yaw_lower_limit = float(yaw_proxy_usd.GetLowerLimitAttr().Get())
+    yaw_upper_limit = float(yaw_proxy_usd.GetUpperLimitAttr().Get())
+    yaw_proxy_usd_contract = {
+        "lower_limit_authored": yaw_proxy_usd.GetLowerLimitAttr().HasAuthoredValueOpinion(),
+        "upper_limit_authored": yaw_proxy_usd.GetUpperLimitAttr().HasAuthoredValueOpinion(),
+        "lower_limit": yaw_lower_limit if math.isfinite(yaw_lower_limit) else "-Infinity",
+        "upper_limit": yaw_upper_limit if math.isfinite(yaw_upper_limit) else "Infinity",
+        "effectively_unbounded": math.isinf(yaw_lower_limit)
+        and yaw_lower_limit < 0.0
+        and math.isinf(yaw_upper_limit)
+        and yaw_upper_limit > 0.0,
+    }
 
     total_mass = sum(masses.values())
     checks = {
@@ -128,6 +146,12 @@ def main() -> int:
         "riser_range_and_speed": float(riser_limit.attrib["lower"]) == 0.0
         and float(riser_limit.attrib["upper"]) == 1.2
         and float(riser_limit.attrib["velocity"]) == 1.0,
+        "yaw_proxy_continuous_in_urdf": yaw_proxy_urdf.attrib["type"] == "continuous"
+        and "lower" not in yaw_proxy_urdf.find("limit").attrib
+        and "upper" not in yaw_proxy_urdf.find("limit").attrib,
+        "yaw_proxy_unbounded_in_usd": yaw_proxy_usd_contract[
+            "effectively_unbounded"
+        ],
         "usd_riser_range_1p2m": abs(riser_usd_contract["lower_limit"]) < 1e-9
         and abs(riser_usd_contract["upper_limit"] - 1.2) < 1e-6,
         "usd_riser_origin_in_metres": abs(
@@ -152,6 +176,7 @@ def main() -> int:
         "total_mass_kg": total_mass,
         "drives": drives,
         "riser_usd_contract": riser_usd_contract,
+        "yaw_proxy_usd_contract": yaw_proxy_usd_contract,
         "checks": checks,
         "passed": all(checks.values()),
     }

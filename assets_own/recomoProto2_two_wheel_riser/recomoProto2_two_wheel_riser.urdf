@@ -322,28 +322,28 @@
     </collision>
   </link>
   <joint name="joint3_gimbal_yaw" type="revolute">
-    <origin xyz="0.000003410742927 0.147436171819393 0" rpy="1.5708 0 0" />
+    <origin xyz="-0.071543364669 0.131332738755 0.034914221454" rpy="-1.750353420000 1.408789120000 -2.995696870000" />
     <parent link="riser_carriage_link" />
     <child link="arm_link_4" />
     <axis xyz="0 0 1" />
-    <limit lower="-3.1416" upper="3.1416" effort="10.0" velocity="0.5" />
+    <limit lower="-1.954768762234" upper="3.735004599268" effort="10.0" velocity="6.283185307180" />
   </joint>
   <joint name="joint2_gimbal_roll" type="revolute">
     <origin xyz="-0.099888 0 0.077538" rpy="0 0.94248 0" />
     <parent link="arm_link_4" />
     <child link="arm_link_5" />
-    <axis xyz="0 0 1" />
-    <limit lower="-3.2" upper="1.57" effort="10.0" velocity="0.5" />
+    <axis xyz="0.000000000000 1.000000000000 0.000000000000" />
+    <limit lower="-1.658062789395" upper="4.188790204786" effort="10.0" velocity="6.283185307180" />
   </joint>
-  <joint name="joint1_gimbal_pitch" type="revolute">
+  <joint name="joint1_gimbal_pitch" type="continuous">
     <origin xyz="-0.0031465 -0.075 0.12575" rpy="-1.5708 -0.94248 0" />
     <parent link="arm_link_5" />
     <child link="arm_link_6" />
-    <axis xyz="0 0 1" />
-    <limit lower="-3.2" upper="1.57" effort="10.0" velocity="0.5" />
+    <axis xyz="1.000000000000 0.000000000000 -0.000000000000" />
+    <limit effort="10.0" velocity="6.283185307180" />
   </joint>
   <joint name="camera_optical_center" type="fixed">
-    <origin xyz="0 0.0065609 0.10147" rpy="0 -1.5708 0" />
+    <origin xyz="0 0.0065609 0.10147" rpy="3.141592653573 -1.570792653590 -1.570796326778" />
     <parent link="arm_link_6" />
     <child link="cam_link" />
   </joint>

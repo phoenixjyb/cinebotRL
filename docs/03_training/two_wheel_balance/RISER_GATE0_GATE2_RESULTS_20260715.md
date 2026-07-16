@@ -4,6 +4,12 @@ Date: 2026-07-15
 Worktree: `/mnt/g/wSpace/cinebotRL-two-wheel-riser`
 Branch: `codex/two-wheel-riser-rl`
 
+> **Superseded asset notice:** these measurements predate the fixed gimbal
+> bracket that restores the removed arm's accepted-corpus nominal orientation.
+> They remain valid evidence for the riser actuator/controller implementation,
+> but are not final-asset acceptance evidence. Gate 0, static heights, and all
+> dynamic runs must be repeated on the regenerated USD with unchanged limits.
+
 ## Scope
 
 This milestone proves the isolated riser asset and scripted vertical/balance
@@ -12,7 +18,7 @@ Obstacle avoidance remains excluded from this round.
 
 ## Gate 0: asset and frame contract
 
-Status: **PASS**
+Status: **PROVISIONAL PASS; FINAL-ASSET RERUN REQUIRED**
 
 - 14 rigid bodies and 13 joints imported into Isaac;
 - exactly six movable joints: two wheels, one riser, three physical gimbal
@@ -35,7 +41,7 @@ Evidence: `evidence_20260715_riser/gate0_asset_audit.json`.
 
 ## Gate 1: static balance at three heights
 
-Status: **PASS**, 2000 steps (10 s) per height.
+Status: **PROVISIONAL PASS; FINAL-ASSET RERUN REQUIRED**, 2000 steps (10 s) per height.
 
 | Camera height | Pitch p95 | Pitch max | Height error p95 | Wheel saturation | Riser saturation |
 |---:|---:|---:|---:|---:|---:|
@@ -49,7 +55,8 @@ Evidence: `evidence_20260715_riser/gate1_static_heights.json`.
 
 ## Gate 2: jerk-limited up/down motion
 
-Status: **PASS** after one controller-interface correction.
+Status: **PROVISIONAL PASS; FINAL-ASSET RERUN REQUIRED** after one
+controller-interface correction.
 
 The first run completed safely but failed the unchanged 30 mm tracking gate at
 higher speed because the implicit drive received only a position target; its

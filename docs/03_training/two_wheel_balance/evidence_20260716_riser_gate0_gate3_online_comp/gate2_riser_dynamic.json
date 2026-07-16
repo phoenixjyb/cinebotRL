@@ -1,0 +1,84 @@
+{
+  "schema": "recomo_two_wheel_riser_dynamic_gate_v1",
+  "controller_profile": "structural_robust_v1",
+  "riser_drive_contract": "position_plus_velocity_feedforward",
+  "reference_limits": {
+    "velocity_mps": 1.0,
+    "acceleration_mps2": 2.0,
+    "jerk_mps3": 8.0
+  },
+  "requested_steps": 10000,
+  "completed_steps": 9102,
+  "rows": [
+    {
+      "requested_speed_mps": 0.1,
+      "completed_roundtrip": true,
+      "completion_step": 9102,
+      "reference_speed_peak_mps": 0.1,
+      "measured_speed_peak_mps": 0.1123490184545517,
+      "pitch_p95_deg": 1.620582824945449,
+      "pitch_max_deg": 1.9016683101654053,
+      "camera_height_error_p95_m": 0.024216943979263304,
+      "camera_height_error_max_m": 0.024944305419921875,
+      "travel_overshoot_m": 0.0,
+      "wheel_saturation_ratio": 0.0,
+      "riser_saturation_ratio": 0.0
+    },
+    {
+      "requested_speed_mps": 0.25,
+      "completed_roundtrip": true,
+      "completion_step": 3700,
+      "reference_speed_peak_mps": 0.2499999999999999,
+      "measured_speed_peak_mps": 0.2611136734485626,
+      "pitch_p95_deg": 1.4169739067554472,
+      "pitch_max_deg": 1.9608604907989502,
+      "camera_height_error_p95_m": 0.023644739389419554,
+      "camera_height_error_max_m": 0.024716973304748535,
+      "travel_overshoot_m": 0.0,
+      "wheel_saturation_ratio": 0.0,
+      "riser_saturation_ratio": 0.0
+    },
+    {
+      "requested_speed_mps": 0.5,
+      "completed_roundtrip": true,
+      "completion_step": 1902,
+      "reference_speed_peak_mps": 0.5000000000000001,
+      "measured_speed_peak_mps": 0.5094388127326965,
+      "pitch_p95_deg": 1.4067212879657744,
+      "pitch_max_deg": 1.8857601881027222,
+      "camera_height_error_p95_m": 0.023027849197387693,
+      "camera_height_error_max_m": 0.02456533908843994,
+      "travel_overshoot_m": 0.0,
+      "wheel_saturation_ratio": 0.0,
+      "riser_saturation_ratio": 0.0
+    },
+    {
+      "requested_speed_mps": 1.0,
+      "completed_roundtrip": true,
+      "completion_step": 1002,
+      "reference_speed_peak_mps": 1.0,
+      "measured_speed_peak_mps": 0.9987143874168396,
+      "pitch_p95_deg": 1.3984827458858489,
+      "pitch_max_deg": 1.7364652156829834,
+      "camera_height_error_p95_m": 0.022424793243408202,
+      "camera_height_error_max_m": 0.025256574153900146,
+      "travel_overshoot_m": 0.0,
+      "wheel_saturation_ratio": 0.0,
+      "riser_saturation_ratio": 0.0
+    }
+  ],
+  "termination": null,
+  "nonfinite_count": 0,
+  "checks": {
+    "all_roundtrips_completed": true,
+    "no_termination": true,
+    "no_nonfinite": true,
+    "all_pitch_max_below_limit": true,
+    "all_pitch_p95_below_limit": true,
+    "all_height_errors_below_limit": true,
+    "all_travel_overshoot_below_limit": true,
+    "all_saturation_ratios_below_limit": true,
+    "measured_speed_within_hard_limit": true
+  },
+  "passed": true
+}

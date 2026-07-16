@@ -22,6 +22,21 @@ GIMBAL_JOINTS = {
 }
 
 
+def _config_float_constant(name: str) -> float:
+    import ast
+
+    source = (
+        PROJECT_ROOT / "src/rl_platform/robots/two_wheel_balance/config.py"
+    ).read_text(encoding="utf-8")
+    module = ast.parse(source)
+    for statement in module.body:
+        if not isinstance(statement, ast.Assign):
+            continue
+        if any(isinstance(target, ast.Name) and target.id == name for target in statement.targets):
+            return float(ast.literal_eval(statement.value))
+    raise AssertionError(f"missing configuration constant: {name}")
+
+
 def _rpy_matrix(rpy: np.ndarray) -> np.ndarray:
     roll, pitch, yaw = rpy
     cr, sr = math.cos(roll), math.sin(roll)
@@ -83,6 +98,10 @@ def test_riser_asset_has_exact_physical_dof_contract() -> None:
     assert float(riser_limit.attrib["upper"]) == 1.2
     assert float(riser_limit.attrib["velocity"]) == 1.0
     assert float(riser_limit.attrib["effort"]) == 300.0
+    yaw_proxy = joints["joint1_gimbal_pitch"]
+    assert yaw_proxy.attrib["type"] == "continuous"
+    assert "lower" not in yaw_proxy.find("limit").attrib
+    assert "upper" not in yaw_proxy.find("limit").attrib
 
 
 def test_riser_mass_and_camera_height_contract() -> None:
@@ -122,8 +141,41 @@ def test_riser_build_audit_preserves_learning_boundary() -> None:
     assert audit["learned_physical_gimbal_joint_action"] is False
     assert audit["position_target_and_observation_link"] == "cam_link"
     assert audit["semantic_attitude_target_link"] == "ee1_tool"
+    assert audit["sim_gimbal_joint_semantics"] == (
+        "rs4_attitude_proxy_not_motor_shaft_angles"
+    )
+    assert audit["sim_gimbal_joint_command_mapping"] == {
+        "joint3_gimbal_yaw": "ronin_pitch_from_rot_z",
+        "joint2_gimbal_roll": "ronin_roll_from_rot_y",
+        "joint1_gimbal_pitch": "ronin_yaw_from_rot_x",
+    }
+    assert audit["continuous_yaw_proxy_joint"] == "joint1_gimbal_pitch"
+    assert audit["hardware_yaw_command_envelope_rad"] == [-math.pi, math.pi]
     assert audit["riser"]["camera_height_range_m"] == [0.6, 1.8]
     assert audit["riser"]["speed_limit_mps"] == 1.0
+    mount = audit["fixed_gimbal_mount"]
+    assert mount["contract"] == "accepted62_rs4_semantic_body_basis_yaw025_v1"
+    assert mount["source_case_count"] == 62
+    assert mount["source_sample_count"] == 21017
+    assert mount["maximum_reference_base_yaw_rate_rad_s"] == 0.25
+
+
+def test_rs4_proxy_servo_keeps_recovery_headroom_above_filming_rate() -> None:
+    command_rate = _config_float_constant("RS4_PROXY_COMMAND_RATE_LIMIT_RAD_S")
+    servo_rate = _config_float_constant("RS4_PROXY_SERVO_VELOCITY_LIMIT_RAD_S")
+    stiffness = _config_float_constant("RS4_PROXY_SERVO_STIFFNESS_NM_PER_RAD")
+    damping = _config_float_constant("RS4_PROXY_SERVO_DAMPING_NMS_PER_RAD")
+    config_source = (
+        PROJECT_ROOT / "src/rl_platform/robots/two_wheel_balance/config.py"
+    ).read_text(encoding="utf-8")
+
+    assert math.isclose(command_rate, math.radians(24.0), abs_tol=1e-12)
+    assert math.isclose(servo_rate, math.radians(360.0), abs_tol=1e-12)
+    assert servo_rate >= 4.0 * command_rate
+    assert stiffness == 400.0
+    assert damping == 8.0
+    assert "velocity_limit_sim=RS4_PROXY_SERVO_VELOCITY_LIMIT_RAD_S" in config_source
+    assert "damping=RS4_PROXY_SERVO_DAMPING_NMS_PER_RAD" in config_source
 
 
 def test_riser_meshes_resolve_locally() -> None:

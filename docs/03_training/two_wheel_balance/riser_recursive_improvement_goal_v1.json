@@ -1,0 +1,101 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_recursive_goal_v1",
+  "date": "2026-07-16",
+  "status": "active",
+  "objective": "Produce a balance-safe residual DNN policy for the arm-free two-wheel riser robot that completes all 79 corrected semantic camera trajectories.",
+  "priority_order": [
+    "balance_and_finite_state_safety",
+    "riser_and_gimbal_safety",
+    "full_duration_camera_trajectory_tracking",
+    "tracking_error",
+    "control_effort"
+  ],
+  "out_of_scope": [
+    "obstacle_avoidance",
+    "legacy_uncorrected_npz_teachers",
+    "learned_physical_gimbal_joint_labels",
+    "unrestricted_ppo_from_scratch"
+  ],
+  "robot_contract": {
+    "total_mass_kg_provisional": 28.0,
+    "wheel_track_m": 0.62,
+    "wheel_diameter_m": 0.2032,
+    "camera_height_m": [0.6, 1.8],
+    "riser_speed_mps": 1.0,
+    "arm_joint_count": 0,
+    "learned_action_contract": "wheel_effort_2_plus_riser_target_1",
+    "gimbal_contract": "deterministic_semantic_dfr_attitude_adapter",
+    "observation_camera_frame": "physical_cam_link_fk",
+    "camera_frame_conversion": "R_world_cam = R_world_DFR * Rz(+pi/2)"
+  },
+  "completion_gates": {
+    "asset_gate": "pass",
+    "static_height_balance_cases": 3,
+    "riser_speed_matrix_mps": [0.1, 0.25, 0.5, 1.0],
+    "corrected_reference_pass_count": 79,
+    "full_duration_required": true,
+    "position_error_p95_m_max": 0.15,
+    "position_error_max_m_max": 0.25,
+    "attitude_error_p95_deg_max": 5.0,
+    "attitude_error_max_deg_max": 10.0,
+    "holdout_regression_max_fraction": 0.05,
+    "isaac_render_audit_required": true,
+    "deterministic_replay_required": true
+  },
+  "iteration_protocol": [
+    "select_the_highest_priority_failed_gate",
+    "state_one_testable_root_cause_hypothesis",
+    "change_one_structural_factor",
+    "run_pure_unit_and_contract_tests",
+    "run_deterministic_representative_cases",
+    "run_the_full_current_stage_only_if_smoke_passes",
+    "run_isaac_balance_and_render_gates_only_if_reference_gate_passes",
+    "accept_only_without_higher_priority_regression",
+    "record_evidence_and_next_failed_case"
+  ],
+  "current_stage": {
+    "training_authorized": false,
+    "ppo_authorized": false,
+    "corrected_teacher_cases_available": 62,
+    "corrected_teacher_cases_pending_regeneration": 17,
+    "representative_bounded_unicycle_passed_cases": [1, 31, 73],
+    "representative_bounded_unicycle_failed_cases": [],
+    "rs4_attitude_command_envelope_passed_cases": 62,
+    "rs4_attitude_rate_passed_cases": 62,
+    "rs4_full_pose_reference_passed_cases": 62,
+    "rs4_full_pose_strategy_counts": {
+      "fixed_path": 13,
+      "joint_adaptive": 49
+    },
+    "reference_base_yaw_rate_rad_s_max": 0.4,
+    "reference_proxy_joint_rate_rad_s_max": 0.4173919111870304,
+    "reference_raw_proxy_target_rate_rad_s_max": 0.4173919111870304,
+    "reference_raw_proxy_target_step_rad_max": 0.020930613755193672,
+    "reference_position_error_p95_m_worst": 0.12068981256023611,
+    "reference_position_error_max_m_worst": 0.13230521724320798,
+    "adaptive_proxy_rate_planning_margin": 0.995,
+    "continuous_yaw_proxy_joint": "joint1_gimbal_pitch",
+    "continuous_yaw_proxy_verified_in_usd": true,
+    "hardware_proxy_command_contract": "semantic_attitude_position_only",
+    "simulation_proxy_realization": "rate_audited_ideal_state_adapter",
+    "online_full_root_attitude_compensation": true,
+    "internal_proxy_rate_deg_s_max_representative": 40.4808,
+    "representative_playback_inputs": {
+      "cases": [1, 31, 73],
+      "self_contained": true,
+      "hash_manifest": "evidence_20260716_riser_render_inputs/manifest.json",
+      "isaac_execution_verified": true,
+      "isaac_passed_cases": [1, 31, 73],
+      "isaac_render_verified": true
+    },
+    "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
+    "current_root_cause": "17 trajectories still require corrected semantic teacher regeneration before an all-79 deterministic gate or residual dataset is valid",
+    "remote_isaac_validation": "gate0_gate3_representative_passed",
+    "accepted_evidence": "evidence_20260716_riser_gate0_gate3_online_comp/summary.json"
+  },
+  "next_iteration": {
+    "hypothesis": "the remaining 17 rejected trajectories can be regenerated from corrected semantic DFR targets and decomposed through the same balance-safe riser/RS4 portfolio",
+    "required_change": "regenerate the remaining 17 without quarantined NPZ or physical-gimbal labels, run pure all-79 feasibility, then add deterministic Isaac smokes for every repaired failure family",
+    "stop_rule": "do not build a residual dataset or resume PPO until all 79 corrected trajectories pass full-duration deterministic gates without balance regression"
+  }
+}

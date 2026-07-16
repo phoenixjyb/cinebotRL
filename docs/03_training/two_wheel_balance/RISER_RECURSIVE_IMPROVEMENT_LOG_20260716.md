@@ -1,0 +1,273 @@
+# Two-wheel riser recursive improvement log
+
+This log is append-only. Every round must preserve the balance-first priority
+and must state whether its candidate was accepted or rejected.
+
+## Round 0: isolated riser baseline
+
+- Change: removed the three arm joints; added the 1.2 m, 1.0 m/s riser and the
+  deterministic physical-gimbal adapter.
+- Result: Gate 0, static height, and riser dynamics passed on the original
+  identity gimbal mount.
+- Decision: superseded. The identity mount made corrected camera attitudes
+  infeasible and those Isaac results must be rerun after the mount repair.
+- Lesson: dynamics evidence is asset-version-specific.
+
+## Round 1: fixed gimbal bracket and corrected stage
+
+- Change: replaced the identity mount with the accepted-corpus median removed
+  arm orientation; reproduced the authoritative corrected stage locally.
+- Result: 62 accepted corrected cases and 17 rejected cases were preserved;
+  old physical-gimbal labels remained quarantined. Case 1 path-aligned
+  attitude error fell to 0.0068 degrees.
+- Decision: provisionally accepted for pure kinematics; Isaac/USD validation
+  remains pending because `192.168.100.98:2222` is unreachable.
+- Lesson: use semantic DFR targets and physical `cam_link` FK, never old motor
+  joint labels as the learned target.
+
+## Round 2: consistent reference gate
+
+- Hypothesis: contradictory tolerances and an incorrect lateral-velocity
+  projection were producing false negatives.
+- Change: tied solver convergence to the declared attitude gate, added p95
+  position/attitude metrics, added numerical tolerance at rate bounds, and
+  projected unicycle chord velocity at interval midpoint yaw.
+- Verification: 17 local pure tests passed. On representative corrected cases
+  with Gate-3 bounds, cases 1 and 73 passed and case 31 failed.
+- Decision: accepted. The change corrected measurement only and did not hide
+  case 31.
+- Remaining case-31 evidence: position p95 0.856 m and maximum 0.894 m; the
+  chassis rotates from about -0.39 rad to -2.38 rad while the legacy simulated
+  roll joint reaches its +1.57 rad limit.
+- Lesson: the old serial-joint envelope is not proven equivalent to RS4
+  attitude control. Do not widen those joints blindly.
+
+## Next round
+
+- Hypothesis: case 31 is feasible under the real RS4 camera-attitude contract
+  but appears infeasible through the legacy CAD motor-joint envelope.
+- Required evidence: explicit DFR-to-FLU axis/sign mapping, separate command
+  attitude and physical-joint state, and an attitude-envelope smoke test.
+- Stop rule: no PPO and no full 62-case Isaac run until the attitude adapter
+  passes the representative kinematic gate and the regenerated USD passes
+  Gate 0 on `.98`.
+
+## Round 3: semantic RS4 attitude envelope
+
+- Hypothesis: case 31 is feasible under the deployed RS4 attitude command
+  contract and only fails through the legacy CAD motor-joint envelope.
+- Change: implemented the explicit ZYX resolver and deployment mapping
+  `Ronin yaw <- rot_x`, `roll <- rot_y`, `pitch <- rot_z`; fitted a fixed
+  chassis-to-DFR zero-command basis from accepted corrected references; added
+  sequence-level Euler-branch optimization.
+- First result at `0.4 rad/s` base yaw: all 62 cases fit the position envelope
+  and hard `360 deg/s` rate, but 13 exceeded the conservative `24 deg/s` p95
+  filming rate.
+- Accepted bounded candidate: reduce reference chassis-yaw cap to
+  `0.25 rad/s`. The complete accepted stage then passed `62/62` command
+  envelope, hard-rate, and filming-rate checks.
+- Evidence: `evidence_20260716_riser_rs4_attitude/summary.json` and
+  `evidence_20260716_riser_rs4_attitude/cases.csv`.
+- Decision: accept the pure attitude contract and `0.25 rad/s` planning cap.
+  This does not authorize training because the Isaac articulation and USD have
+  not yet adopted or rendered the adapter.
+- Lesson: lower chassis yaw is both more balance-compatible and avoids forcing
+  the gimbal to cancel a fast base rotation. Retiming alone did not fix this
+  because the base yaw controller remained rate-saturated.
+
+## Next round after Round 3
+
+- Implement the deterministic RS4 attitude adapter in the riser Isaac path,
+  while keeping physical `cam_link` as the observation/reward frame.
+- Regenerate the URDF/USD and rerun Gate 0, static heights, riser dynamics, and
+  rendered cases 1, 31, and 73 on `.98`.
+- Keep PPO blocked until those dynamic gates pass without balance regression.
+
+## Round 4: full-pose RS4 reference portfolio
+
+- Hypothesis: a fixed path-heading planner and a joint adaptive yaw planner
+  cover complementary trajectory families, provided candidate selection first
+  enforces semantic attitude, proxy-rate, riser, and nonholonomic constraints.
+- First joint-adaptive result: `55/62`. It repaired all 11 failures from the
+  fixed planner but regressed seven previously feasible cases through local
+  one-step yaw choices. Three regressions were position errors and four were
+  small `24 deg/s` proxy-rate overshoots.
+- Change: retained both deterministic candidates and selected them
+  lexicographically, rejecting any candidate with an attitude or proxy-rate
+  violation before comparing p95 and maximum position error.
+- Final pure-kinematic result: `62/62`; 15 cases selected `fixed_path` and 47
+  selected `joint_adaptive`. Worst p95 position error was `0.146477 m`, worst
+  maximum position error was `0.155496 m`, worst proxy-joint rate was
+  `0.407419 rad/s`, and semantic attitude error remained numerical noise.
+- Evidence:
+  `evidence_20260716_riser_rs4_pose_portfolio/summary.json` and
+  `evidence_20260716_riser_rs4_pose_portfolio/cases.csv`.
+- Decision: accepted as the corrected-62 reference generator. This authorizes
+  regenerated-asset Isaac validation but does not authorize PPO or residual
+  training.
+- Lesson: a single greedy planner is not robust across all trajectory
+  families. Complementary deterministic teachers are useful only when safety
+  feasibility is ranked before tracking error.
+
+## Next round after Round 4
+
+- Transfer the updated URDF, semantic RS4 proxy, and planner to the isolated
+  `.98` worktree and regenerate the USD.
+- Rerun Gate 0, camera heights `0.6/1.2/1.8 m`, riser speeds
+  `0.1/0.25/0.5/1.0 m/s`, and rendered full-pose cases 1, 31, and 73.
+- Stop immediately on a balance, finite-state, articulation, camera-frame, or
+  proxy-rate regression. Keep PPO blocked until this dynamic gate is green.
+
+## Round 5: continuous RS4 yaw-proxy target
+
+- Diagnosis: the original proxy-rate metric treated Ronin yaw as cyclic while
+  the Isaac articulation target was a bounded revolute coordinate. Cases 39,
+  49, and 50 crossed the wrapped `+/-pi` command boundary in the fixed-heading
+  diagnostic, so a nominal two-degree command change could have appeared to a
+  position servo as a nearly 360-degree reversal.
+- Change: made only the Ronin-yaw proxy articulation coordinate continuous,
+  kept the DJI-facing semantic command wrapped to `[-pi, pi]`, and unwrapped
+  generated proxy targets to the nearest equivalent coordinate.
+- Verification: 28 pure tests passed. The complete corrected-62 portfolio
+  again passed `62/62`; worst raw proxy-target rate was `0.407419 rad/s` and
+  worst raw target step was `0.020489 rad`. Raw and cyclic rate metrics now
+  agree.
+- Decision: accepted. This closes a simulation-command ambiguity without
+  widening the physical DJI command envelope or changing camera FK.
+- Lesson: cyclic command semantics and articulation position coordinates must
+  be audited separately; a wrapped diagnostic alone is insufficient evidence
+  for a servo target.
+
+## Next round after Round 5
+
+- Sync the validated file manifest to `.98`, regenerate USD, and require the
+  imported Ronin-yaw proxy to have no authored angular limits.
+- Run the fail-fast Gate 0--2 script, then add and execute rendered semantic
+  full-pose replay for cases 1, 31, and 73.
+- Keep PPO and residual-DNN training blocked until the dynamic and rendered
+  gates are green.
+
+## Round 6: deterministic Isaac playback package
+
+- Change: added a versioned, self-contained playback format containing the
+  corrected target position and semantic DFR attitude, base pose, riser
+  reference, continuous RS4 proxy reference, and all feed-forward rates.
+- Exported representative cases 1, 31, and 73 with SHA-256 hashes. Their full
+  durations are 25.124 s, 14.641 s, and 7.919 s respectively; no temporary
+  teacher-stage path is required at playback time.
+- Added an Isaac playback gate that initializes the complete articulation,
+  drives the existing balance LQR, commands riser and proxy position plus
+  velocity feed-forward, measures physical `cam_link`, and checks position,
+  attitude, pitch, servo error, saturation, termination, and full-duration
+  completion.
+- The phase governor takes the minimum of tracking-error progress and
+  pitch-safety progress. It cannot trade balance margin for trajectory speed.
+- Added offscreen recording for each representative case with target and path
+  markers. The fail-fast remote runner requires the non-rendered three-case
+  metric gate before recording any MP4.
+- Verification: 30 pure tests passed; the 44-file transfer manifest is
+  complete and both shell runners pass syntax validation.
+- Remaining evidence boundary: none of this is Isaac runtime evidence until
+  the regenerated USD and playback run on `.98`.
+
+## Resume condition after Round 6
+
+- `192.168.100.98:2222` must become reachable.
+- Run `scripts/two_wheel_balance/sync_riser_to_98.sh` from the staging tree,
+  then execute `scripts/two_wheel_balance/run_riser_remote_gates.sh` in the
+  isolated remote worktree.
+- Do not regenerate the remaining 17 teachers or begin residual training until
+  Gate 0--3 and all three render audits pass.
+
+## Round 7: proxy-rate planning margin
+
+- Diagnosis: case 73 passed the pure position gate at p95 `0.146477 m`, only
+  3.5 mm below the dynamic threshold. Its joint-adaptive candidate tracked at
+  sub-millimetre error but exceeded the public `24 deg/s` proxy limit by about
+  0.14%, so the portfolio correctly selected the poorer fixed candidate.
+- Change: retained the unchanged public `24 deg/s` gate and planned the
+  adaptive candidate against a `0.995` internal rate margin. No actuator limit
+  or acceptance threshold was relaxed.
+- Representative result: case 73 switched to `joint_adaptive`; position p95
+  improved from `0.146477 m` to `0.000723 m`, maximum error to `0.001970 m`,
+  and raw proxy rate remained bounded at `0.417392 rad/s`.
+- Full corrected-62 result: `62/62` still pass; strategy mix is 13 fixed and
+  49 adaptive. Corpus worst p95 position error improved from `0.146477 m` to
+  `0.120690 m`, and worst maximum improved from `0.155496 m` to `0.132305 m`.
+  Case 24 also improved from p95 `0.056963 m` to `0.011673 m`.
+- Export boundary: the exporter now independently reconstructs physical
+  `cam_link` FK and refuses any plan that regresses position, attitude,
+  nonholonomic motion, riser bounds/rate, or raw proxy-target rate.
+- Decision: accepted. This increases dynamic tracking margin without changing
+  the balance hierarchy or hardware command envelope.
+- Remaining boundary: all results in this round are pure kinematics; `.98`
+  Isaac validation is still required before Gate 0--3 can be called green.
+
+## Round 8: regenerated asset and riser dynamics on `.98`
+
+- Change: synced the manifest-scoped riser worktree, regenerated URDF/USD, and
+  made the Gate runner parse every JSON `passed` field because Windows Isaac
+  can return shell success for a failed Python gate.
+- Gate 0 passed with 28 kg total mass, 14 rigid bodies, 13 joints, no arm DOFs,
+  physical and semantic camera frames, and an effectively unbounded continuous
+  Ronin-yaw proxy in USD.
+- Static height balance passed at 0.6, 0.9, and 1.8 m. Maximum pitch was
+  1.846 degrees and maximum camera-height error was 0.02395 m.
+- All 0.1, 0.25, 0.5, and 1.0 m/s riser round trips passed. Maximum pitch was
+  1.918 degrees, maximum camera-height error was 0.02501 m, and neither wheel
+  nor riser saturated.
+- Decision: accept Gate 0--2 for the regenerated asset.
+- Lesson: shell exit status is not authoritative across WSL/Windows Isaac;
+  gate JSON must be parsed explicitly.
+
+## Round 9: semantic RS4 realization and online base-tilt compensation
+
+- First Gate-3 failure: position and balance passed, but treating the virtual
+  attitude coordinates as 10 Nm physical motor shafts caused 59--90% proxy
+  saturation and 8--14 degree camera-attitude lag.
+- Diagnosis: these coordinates are semantic DJI attitude commands. Physical
+  motor-joint velocity is owned by the Ronin controller and is not a teacher
+  label or policy action. A rate-audited ideal state adapter reduced proxy
+  realization error from 9.36 degrees to 0.11 degrees.
+- Second failure: physical camera attitude still had 9.03 degree p95 error
+  because the exported proxy angles assumed an upright chassis.
+- Change: solve proxy coordinates online from current full root quaternion and
+  desired semantic DFR attitude, preserve yaw branch continuity, and cap
+  internal stabilization at 360 deg/s. Continue to measure reward and
+  observation from physical `cam_link` through Option B.
+- Case-73 result: physical attitude p95 0.148 degrees, proxy realization p95
+  0.131 degrees, zero IK failures, and 38.37 deg/s peak internal compensation.
+- Decision: accept the separate contracts
+  `semantic_attitude_position_only` for hardware and
+  `rate_audited_ideal_state_adapter` for simulation.
+- Lesson: world-attitude control must compensate live base roll/pitch; offline
+  upright-base proxy angles cannot be replayed as final gimbal coordinates.
+
+## Round 10: representative Gate 3 and D3D12 rendering
+
+- Non-rendered cases 1, 31, and 73 all passed full duration. Position p95 was
+  0.0905, 0.0833, and 0.0929 m; attitude p95 was 0.1637, 0.1548, and 0.1501
+  degrees; maximum pitch remained below 5 degrees.
+- Internal compensation stayed below 41 deg/s for all cases against the
+  separate 360 deg/s hard envelope, with zero IK failures and zero proxy
+  saturation.
+- The first render launch crashed in `rtx.scenedb` after selecting Vulkan.
+  Explicitly selecting the known D3D12 headless rendering experience and
+  allowing a five-second GPU-context cooldown fixed the launch.
+- All three render-time JSON gates passed. H.264 1280x720 real-time 50 fps
+  derivatives were verified and copied to
+  `/Users/yanbo/Downloads/cinebotRL_two_wheel_riser_20260716`.
+- Evidence: `evidence_20260716_riser_gate0_gate3_online_comp/`.
+- Decision: accept the deterministic corrected-62 representative milestone.
+  PPO remains blocked because 17 trajectories still require corrected teacher
+  regeneration and all-79 deterministic evaluation.
+
+## Next round after Round 10
+
+- Regenerate the remaining 17 cases only from corrected semantic DFR targets;
+  never restore quarantined old NPZ or physical-gimbal labels.
+- Run pure all-79 feasibility first, then deterministic Isaac smoke cases from
+  every repaired failure family. Repair structural reference issues before any
+  residual-DNN dataset is built.
+- Keep PPO blocked until all 79 corrected trajectories pass full-duration
+  deterministic gates without a higher-priority balance or riser regression.

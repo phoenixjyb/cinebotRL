@@ -1,0 +1,87 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_gate0_gate3_summary_v1",
+  "date": "2026-07-16",
+  "training_started": false,
+  "ppo_authorized": false,
+  "asset": {
+    "passed": true,
+    "total_mass_kg": 28.000000705,
+    "rigid_body_count": 14,
+    "joint_count": 13,
+    "continuous_yaw_proxy_verified_in_usd": true
+  },
+  "static_height_gate": {
+    "passed": true,
+    "camera_height_targets_m": [0.6, 0.9, 1.8],
+    "maximum_pitch_deg": 1.8459548950195312,
+    "maximum_camera_height_error_m": 0.02394413948059082
+  },
+  "dynamic_riser_gate": {
+    "passed": true,
+    "requested_speeds_mps": [0.1, 0.25, 0.5, 1.0],
+    "completed_steps": 9102,
+    "maximum_pitch_deg": 1.917710781097412,
+    "maximum_camera_height_error_m": 0.02500176429748535,
+    "measured_speed_at_1mps_mps": 0.9967621564865112,
+    "maximum_wheel_saturation_ratio": 0.0,
+    "maximum_riser_saturation_ratio": 0.0
+  },
+  "representative_playback": {
+    "passed": true,
+    "hardware_proxy_command_contract": "semantic_attitude_position_only",
+    "simulation_proxy_realization": "rate_audited_ideal_state_adapter",
+    "online_full_root_attitude_compensation": true,
+    "internal_proxy_rate_limit_deg_s": 360.0,
+    "cases": [
+      {
+        "case": 1,
+        "position_error_p95_m": 0.0905,
+        "attitude_error_p95_deg": 0.1637,
+        "pitch_max_deg": 3.4773,
+        "internal_proxy_rate_max_deg_s": 40.4808
+      },
+      {
+        "case": 31,
+        "position_error_p95_m": 0.0833,
+        "attitude_error_p95_deg": 0.1548,
+        "pitch_max_deg": 3.3372,
+        "internal_proxy_rate_max_deg_s": 35.2208
+      },
+      {
+        "case": 73,
+        "position_error_p95_m": 0.0929,
+        "attitude_error_p95_deg": 0.1501,
+        "pitch_max_deg": 4.9579,
+        "internal_proxy_rate_max_deg_s": 38.0122
+      }
+    ]
+  },
+  "rendering": {
+    "passed": true,
+    "experience": "G:\\isaaclab\\apps\\isaaclab.python.headless.rendering.d3d12.kit",
+    "codec": "h264",
+    "resolution": [1280, 720],
+    "realtime_derivatives": [
+      {
+        "case": 1,
+        "duration_s": 31.04,
+        "fps": 50,
+        "sha256": "7111040b8271952ac9a06e08131bd5cf34152fc2aaf27e7e60348b6caf1d75a8"
+      },
+      {
+        "case": 31,
+        "duration_s": 15.82,
+        "fps": 50,
+        "sha256": "1a397d07c1ffefb47fd9971d90b750568dc906af0e17873b637eb3102a03f7f1"
+      },
+      {
+        "case": 73,
+        "duration_s": 11.5,
+        "fps": 50,
+        "sha256": "8fe29e8ed17dc65d808e22a136f2118de23ceee8f71eff1bf9092cd9cf0ba88e"
+      }
+    ],
+    "mac_download_directory": "/Users/yanbo/Downloads/cinebotRL_two_wheel_riser_20260716"
+  },
+  "passed": true
+}

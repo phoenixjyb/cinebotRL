@@ -10,6 +10,10 @@ from isaaclab.assets import ArticulationCfg
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
+RS4_PROXY_COMMAND_RATE_LIMIT_RAD_S = 0.4188790204786391
+RS4_PROXY_SERVO_VELOCITY_LIMIT_RAD_S = 6.283185307179586
+RS4_PROXY_SERVO_STIFFNESS_NM_PER_RAD = 400.0
+RS4_PROXY_SERVO_DAMPING_NMS_PER_RAD = 8.0
 TWO_WHEEL_USD_PATH = (
     PROJECT_ROOT
     / "assets_own"
@@ -185,8 +189,15 @@ TWO_WHEEL_RISER_CFG.actuators["gimbal_attitude_adapter"] = ImplicitActuatorCfg(
         "joint1_gimbal_pitch",
     ],
     effort_limit_sim=10.0,
-    velocity_limit_sim=0.5,
-    stiffness=400.0,
-    damping=40.0,
+    # These legacy-named joints are the deterministic RS4 attitude proxy in
+    # [pitch, roll, yaw] order, not physical DJI motor shaft coordinates.
+    # The planned filming command remains capped at 24 deg/s.  The servo must
+    # retain the RS4 hard-rate headroom so it can recover from base motion
+    # instead of accumulating permanent tracking lag at the command limit.
+    velocity_limit_sim=RS4_PROXY_SERVO_VELOCITY_LIMIT_RAD_S,
+    stiffness=RS4_PROXY_SERVO_STIFFNESS_NM_PER_RAD,
+    # Forty Nms/rad made the low-inertia proxy strongly overdamped and held
+    # the 10 Nm drive at saturation through most filming-rate commands.
+    damping=RS4_PROXY_SERVO_DAMPING_NMS_PER_RAD,
     armature=0.01,
 )

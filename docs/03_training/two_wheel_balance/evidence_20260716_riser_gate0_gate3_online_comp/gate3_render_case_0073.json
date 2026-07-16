@@ -1,0 +1,731 @@
+{
+  "schema": "recomo_two_wheel_riser_reference_playback_v1",
+  "training_started": false,
+  "ppo_authorized": false,
+  "controller_profile": "structural_robust_v1",
+  "position_observation_link": "physical_cam_link_fk",
+  "target_attitude_contract": "semantic_dfr_to_physical_cam_v1",
+  "hardware_proxy_command_contract": "semantic_attitude_position_only",
+  "simulation_proxy_realization": "rate_audited_ideal_state_adapter",
+  "phase_governor_enabled": true,
+  "com_pitch_feedforward_enabled": true,
+  "cases": [
+    73
+  ],
+  "passed_case_count": 1,
+  "results": [
+    {
+      "case": 73,
+      "planning_strategy": "joint_adaptive",
+      "source_duration_s": 7.918541875,
+      "completed_phase_time_s": 7.918541875,
+      "completed_steps": 2289,
+      "wall_duration_s": 11.445,
+      "progress_scale_min": 0.5139527770487444,
+      "progress_scale_mean": 0.6922998332856354,
+      "position_error_p95_m": 0.09602141661103082,
+      "position_error_max_m": 0.10239728505753894,
+      "attitude_error_p95_deg": 0.14807287936599678,
+      "attitude_error_max_deg": 0.1898386264348776,
+      "pitch_p95_deg": 4.477359328785785,
+      "pitch_max_deg": 4.824995893858747,
+      "riser_servo_error_p95_m": 0.010470782627643515,
+      "riser_servo_error_max_m": 0.011511602415517852,
+      "proxy_servo_error_p95_deg": 0.13138148489880497,
+      "proxy_servo_error_max_deg": 0.20805765513005658,
+      "proxy_axis_error_p95_deg": [
+        0.1325554711521214,
+        0.0713619333394193,
+        0.13618298330894915
+      ],
+      "proxy_axis_velocity_max_abs_deg_s": [
+        36.15888595581055,
+        38.92578887939453,
+        43.950645446777344
+      ],
+      "proxy_axis_target_velocity_max_abs_deg_s": [
+        30.18655231209764,
+        19.465487578371455,
+        38.367021271225624
+      ],
+      "proxy_axis_effort_p95_nm": [
+        4.793306827545166,
+        2.7187012672424307,
+        4.785630226135254
+      ],
+      "proxy_axis_saturation_ratio": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "action_saturation_ratio": 0.0,
+      "riser_saturation_ratio": 0.0,
+      "proxy_saturation_ratio": 0.0,
+      "peak_base_xy_error_m": 0.15801049398916792,
+      "peak_base_yaw_error_deg": 10.02956409768615,
+      "peak_com_pitch_bias_deg": 0.8840891208438593,
+      "internal_attitude_ik_failures": 0,
+      "internal_attitude_ik_error_max_deg": 0.09987805325642123,
+      "internal_proxy_rate_max_deg_s": 38.367021271225624,
+      "termination": null,
+      "trace": [
+        {
+          "step": 1,
+          "elapsed_s": 0.0,
+          "phase_time_s": 0.0,
+          "progress_scale": 1.0,
+          "position_error_m": 0.0028768681879860355,
+          "attitude_error_deg": 0.009694997457949397,
+          "pitch_deg": 0.0,
+          "riser_error_m": 3.906858469449048e-05,
+          "proxy_error_deg": [
+            0.00019167900362144184,
+            0.00819873670148552,
+            0.005255011638485789
+          ],
+          "proxy_signed_error_deg": [
+            -0.00019167900362144184,
+            -0.00819873670148552,
+            -0.005255011638485789
+          ],
+          "proxy_target_deg": [
+            -21.960776407874114,
+            8.625798143108382,
+            10.760663327959447
+          ],
+          "proxy_actual_deg": [
+            -21.960582733154297,
+            8.63399600982666,
+            10.765917778015137
+          ],
+          "proxy_velocity_deg_s": [
+            0.05862603336572647,
+            2.8712334632873535,
+            1.8335793018341064
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -0.00776328332722187,
+            -0.37863877415657043,
+            -0.24289029836654663
+          ],
+          "base_xy_error_m": 2.6137537491533285e-10,
+          "base_yaw_error_deg": 7.260571021983586e-08,
+          "vx_reference_mps": -0.004556065848244966,
+          "wz_reference_rad_s": 0.29178602996817354
+        },
+        {
+          "step": 201,
+          "elapsed_s": 1.0,
+          "phase_time_s": 0.9692665258437002,
+          "progress_scale": 0.8479754873300768,
+          "position_error_m": 0.01812947447087371,
+          "attitude_error_deg": 0.04524114938792697,
+          "pitch_deg": 2.8925496818940806,
+          "riser_error_m": 0.009811364206029127,
+          "proxy_error_deg": [
+            0.05559730821299711,
+            0.056530884203771704,
+            0.1133547164556039
+          ],
+          "proxy_signed_error_deg": [
+            -0.05559730821299711,
+            -0.056530884203771704,
+            -0.1133547164556039
+          ],
+          "proxy_target_deg": [
+            -19.36294382757326,
+            15.186625975209003,
+            23.285772012004415
+          ],
+          "proxy_actual_deg": [
+            -19.30734634399414,
+            15.243156433105469,
+            23.399126052856445
+          ],
+          "proxy_velocity_deg_s": [
+            12.591830253601074,
+            15.627985954284668,
+            25.860881805419922
+          ],
+          "proxy_target_velocity_deg_s": [
+            9.610156394044486,
+            6.473769975636647,
+            19.319371281117576
+          ],
+          "proxy_applied_effort_nm": [
+            -1.982545018196106,
+            -2.2237071990966797,
+            -4.057059288024902
+          ],
+          "base_xy_error_m": 0.08378322503776073,
+          "base_yaw_error_deg": 1.003776660778571,
+          "vx_reference_mps": -0.07537097294537858,
+          "wz_reference_rad_s": 0.19579547849533305
+        },
+        {
+          "step": 401,
+          "elapsed_s": 2.0,
+          "phase_time_s": 1.7451152054379298,
+          "progress_scale": 0.6232634566377954,
+          "position_error_m": 0.026922135020462,
+          "attitude_error_deg": 0.1387936486082402,
+          "pitch_deg": 4.549620168883582,
+          "riser_error_m": 0.008961957166618184,
+          "proxy_error_deg": [
+            0.11895847716941198,
+            0.03701106657220388,
+            0.14091053911164725
+          ],
+          "proxy_signed_error_deg": [
+            -0.11895847716941198,
+            -0.03701106657220388,
+            -0.14091053911164725
+          ],
+          "proxy_target_deg": [
+            -16.05852996209315,
+            17.589475416919406,
+            32.08417809710239
+          ],
+          "proxy_actual_deg": [
+            -15.939570426940918,
+            17.62648582458496,
+            32.2250862121582
+          ],
+          "proxy_velocity_deg_s": [
+            26.196870803833008,
+            11.948517799377441,
+            31.662494659423828
+          ],
+          "proxy_target_velocity_deg_s": [
+            21.007682100728687,
+            1.7510410603343969,
+            23.97096643408448
+          ],
+          "proxy_applied_effort_nm": [
+            -4.168878555297852,
+            -1.5910815000534058,
+            -4.975593090057373
+          ],
+          "base_xy_error_m": 0.1337192318582677,
+          "base_yaw_error_deg": 0.06471122300425897,
+          "vx_reference_mps": -0.12684713094927408,
+          "wz_reference_rad_s": 0.059081851760507405
+        },
+        {
+          "step": 601,
+          "elapsed_s": 3.0,
+          "phase_time_s": 2.3840465719653707,
+          "progress_scale": 0.6572907701101993,
+          "position_error_m": 0.04708667465341215,
+          "attitude_error_deg": 0.08862969975574594,
+          "pitch_deg": 3.260837964252811,
+          "riser_error_m": 0.009496809570531228,
+          "proxy_error_deg": [
+            0.018365179961003196,
+            0.02277102829285464,
+            0.017052139354408996
+          ],
+          "proxy_signed_error_deg": [
+            -0.018365179961003196,
+            -0.02277102829285464,
+            -0.017052139354408996
+          ],
+          "proxy_target_deg": [
+            -11.823517292343887,
+            18.56228981652773,
+            39.27799604259109
+          ],
+          "proxy_actual_deg": [
+            -11.80515193939209,
+            18.585060119628906,
+            39.295047760009766
+          ],
+          "proxy_velocity_deg_s": [
+            7.1775736808776855,
+            8.572113990783691,
+            6.9032440185546875
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -0.8944796323776245,
+            -1.072821855545044,
+            -0.8488318920135498
+          ],
+          "base_xy_error_m": 0.12615760664217793,
+          "base_yaw_error_deg": 0.0012291556634908096,
+          "vx_reference_mps": -0.11569413881998233,
+          "wz_reference_rad_s": 0.07124594707785849
+        },
+        {
+          "step": 801,
+          "elapsed_s": 4.0,
+          "phase_time_s": 3.0209186216731325,
+          "progress_scale": 0.6798078120857554,
+          "position_error_m": 0.08157140152712652,
+          "attitude_error_deg": 0.04033889727872816,
+          "pitch_deg": 2.10392942357865,
+          "riser_error_m": 0.009699105194851732,
+          "proxy_error_deg": [
+            0.08628106792570085,
+            0.03146297881617694,
+            0.13308726611312724
+          ],
+          "proxy_signed_error_deg": [
+            -0.08628106792570085,
+            -0.03146297881617694,
+            -0.13308726611312724
+          ],
+          "proxy_target_deg": [
+            -3.1336401890092938,
+            21.73667775509462,
+            57.67662300087763
+          ],
+          "proxy_actual_deg": [
+            -3.047358989715576,
+            21.768138885498047,
+            57.80970764160156
+          ],
+          "proxy_velocity_deg_s": [
+            22.18484878540039,
+            9.615985870361328,
+            29.35188865661621
+          ],
+          "proxy_target_velocity_deg_s": [
+            12.042822286467487,
+            2.6467074580887973,
+            23.835628018765536
+          ],
+          "proxy_applied_effort_nm": [
+            -3.27797794342041,
+            -1.308842658996582,
+            -4.683835029602051
+          ],
+          "base_xy_error_m": 0.12115381953649883,
+          "base_yaw_error_deg": 5.525353049965148,
+          "vx_reference_mps": -0.05264580470415361,
+          "wz_reference_rad_s": 0.2980237202084577
+        },
+        {
+          "step": 1001,
+          "elapsed_s": 5.0,
+          "phase_time_s": 3.7385507818909836,
+          "progress_scale": 0.713034542630011,
+          "position_error_m": 0.09999251868231114,
+          "attitude_error_deg": 0.09916917102047945,
+          "pitch_deg": 1.7558976680291791,
+          "riser_error_m": 0.009912067015755976,
+          "proxy_error_deg": [
+            0.03427156539696525,
+            0.014546085721242072,
+            0.01670409453779621
+          ],
+          "proxy_signed_error_deg": [
+            -0.03427156539696525,
+            -0.014546085721242072,
+            -0.01670409453779621
+          ],
+          "proxy_target_deg": [
+            6.8164184174095785,
+            21.947705209306733,
+            78.75394148987331
+          ],
+          "proxy_actual_deg": [
+            6.85068941116333,
+            21.962249755859375,
+            78.77063751220703
+          ],
+          "proxy_velocity_deg_s": [
+            13.317618370056152,
+            5.231419086456299,
+            6.691197872161865
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6326969861984253,
+            -0.6914778351783752,
+            -0.803282618522644
+          ],
+          "base_xy_error_m": 0.11377010163777534,
+          "base_yaw_error_deg": 9.123058628841955,
+          "vx_reference_mps": -0.08295508540782784,
+          "wz_reference_rad_s": -0.012483082969927853
+        },
+        {
+          "step": 1201,
+          "elapsed_s": 6.0,
+          "phase_time_s": 4.423741828087678,
+          "progress_scale": 0.6030147286197072,
+          "position_error_m": 0.07207028032834005,
+          "attitude_error_deg": 0.15933748858492666,
+          "pitch_deg": 3.8716910234744355,
+          "riser_error_m": 0.009638423133773055,
+          "proxy_error_deg": [
+            0.03444145142008455,
+            0.01919428502406751,
+            0.025057905027503713
+          ],
+          "proxy_signed_error_deg": [
+            -0.03444145142008455,
+            -0.01919428502406751,
+            -0.025057905027503713
+          ],
+          "proxy_target_deg": [
+            4.124028724735676,
+            19.961398858182477,
+            75.23666678574877
+          ],
+          "proxy_actual_deg": [
+            4.158470153808594,
+            19.980592727661133,
+            75.26171875
+          ],
+          "proxy_velocity_deg_s": [
+            12.89461612701416,
+            7.448894500732422,
+            8.899086952209473
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6046253442764282,
+            -0.9199832081794739,
+            -1.1157666444778442
+          ],
+          "base_xy_error_m": 0.13821894919562064,
+          "base_yaw_error_deg": 1.3026009029617795,
+          "vx_reference_mps": -0.11658744752646602,
+          "wz_reference_rad_s": -0.06856930899809299
+        },
+        {
+          "step": 1401,
+          "elapsed_s": 7.0,
+          "phase_time_s": 5.085890573330274,
+          "progress_scale": 0.6672650313879831,
+          "position_error_m": 0.06535084229238845,
+          "attitude_error_deg": 0.07265461229263458,
+          "pitch_deg": 3.0798787189390815,
+          "riser_error_m": 0.010049553508950204,
+          "proxy_error_deg": [
+            0.03256997608484603,
+            0.017330128021493463,
+            0.014954965666611184
+          ],
+          "proxy_signed_error_deg": [
+            -0.03256997608484603,
+            -0.017330128021493463,
+            -0.014954965666611184
+          ],
+          "proxy_target_deg": [
+            5.2214787646402385,
+            17.591216863615077,
+            75.53358302873684
+          ],
+          "proxy_actual_deg": [
+            5.2540483474731445,
+            17.608545303344727,
+            75.54853057861328
+          ],
+          "proxy_velocity_deg_s": [
+            12.245676040649414,
+            6.927858829498291,
+            5.608237266540527
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.537535548210144,
+            -0.8296883702278137,
+            -0.7141485810279846
+          ],
+          "base_xy_error_m": 0.12394110413600377,
+          "base_yaw_error_deg": 1.4900852878113273,
+          "vx_reference_mps": -0.10899096840696963,
+          "wz_reference_rad_s": -0.04633568194956625
+        },
+        {
+          "step": 1601,
+          "elapsed_s": 8.0,
+          "phase_time_s": 5.760288641361965,
+          "progress_scale": 0.746445113582797,
+          "position_error_m": 0.0670131204394991,
+          "attitude_error_deg": 0.052535752244795834,
+          "pitch_deg": 1.7704752127086905,
+          "riser_error_m": 0.009738152655825894,
+          "proxy_error_deg": [
+            0.029874080342434998,
+            0.015237400147039072,
+            0.00813902370442674
+          ],
+          "proxy_signed_error_deg": [
+            -0.029874080342434998,
+            -0.015237400147039072,
+            -0.00813902370442674
+          ],
+          "proxy_target_deg": [
+            6.9015641063792925,
+            15.003465782760776,
+            75.28395268812173
+          ],
+          "proxy_actual_deg": [
+            6.931437969207764,
+            15.018702507019043,
+            75.2920913696289
+          ],
+          "proxy_velocity_deg_s": [
+            11.353408813476562,
+            6.155817985534668,
+            3.32169508934021
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.424443244934082,
+            -0.7574958205223083,
+            -0.42808017134666443
+          ],
+          "base_xy_error_m": 0.10634553031493402,
+          "base_yaw_error_deg": 2.970016111854147,
+          "vx_reference_mps": -0.09233274668689465,
+          "wz_reference_rad_s": -0.05240494753524554
+        },
+        {
+          "step": 1801,
+          "elapsed_s": 9.0,
+          "phase_time_s": 6.43317025517016,
+          "progress_scale": 0.6886443693428255,
+          "position_error_m": 0.061898293079171045,
+          "attitude_error_deg": 0.16037260926622923,
+          "pitch_deg": 2.4554130927016216,
+          "riser_error_m": 0.009913367801406059,
+          "proxy_error_deg": [
+            0.03149813451247483,
+            0.01858439862871041,
+            0.013717639072289392
+          ],
+          "proxy_signed_error_deg": [
+            -0.03149813451247483,
+            -0.01858439862871041,
+            -0.013717639072289392
+          ],
+          "proxy_target_deg": [
+            5.759269005626328,
+            13.817863411595026,
+            73.30467479886279
+          ],
+          "proxy_actual_deg": [
+            5.790766716003418,
+            13.836446762084961,
+            73.31838989257812
+          ],
+          "proxy_velocity_deg_s": [
+            11.783655166625977,
+            7.481204986572266,
+            5.045839786529541
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.4733315706253052,
+            -0.9142408967018127,
+            -0.662765622138977
+          ],
+          "base_xy_error_m": 0.11919014014603878,
+          "base_yaw_error_deg": 3.662412739199288,
+          "vx_reference_mps": -0.10081539828845672,
+          "wz_reference_rad_s": -0.09651596050822313
+        },
+        {
+          "step": 2001,
+          "elapsed_s": 10.0,
+          "phase_time_s": 7.06860993688722,
+          "progress_scale": 0.6135432055750867,
+          "position_error_m": 0.05457874940648535,
+          "attitude_error_deg": 0.06573358838192904,
+          "pitch_deg": 3.3461606873646104,
+          "riser_error_m": 0.00962684191170371,
+          "proxy_error_deg": [
+            0.0875531918778909,
+            0.03633433184652887,
+            0.006094780117953642
+          ],
+          "proxy_signed_error_deg": [
+            0.0875531918778909,
+            -0.03633433184652887,
+            0.006094780117953642
+          ],
+          "proxy_target_deg": [
+            3.8014186073140186,
+            13.131498576561844,
+            70.85609100295628
+          ],
+          "proxy_actual_deg": [
+            3.713865280151367,
+            13.167832374572754,
+            70.84999084472656
+          ],
+          "proxy_velocity_deg_s": [
+            -11.6425199508667,
+            11.000752449035645,
+            1.2256768941879272
+          ],
+          "proxy_target_velocity_deg_s": [
+            -23.902523462356232,
+            3.4671815631071037,
+            -3.8527850908475414
+          ],
+          "proxy_applied_effort_nm": [
+            2.4885671138763428,
+            -1.5096244812011719,
+            0.011050254106521606
+          ],
+          "base_xy_error_m": 0.13587928764998072,
+          "base_yaw_error_deg": 3.865733051348995,
+          "vx_reference_mps": -0.1164172426556141,
+          "wz_reference_rad_s": -0.06413845805525992
+        },
+        {
+          "step": 2201,
+          "elapsed_s": 11.0,
+          "phase_time_s": 7.6820705149278306,
+          "progress_scale": 0.5887542226350186,
+          "position_error_m": 0.05476717722635573,
+          "attitude_error_deg": 0.11026839855192577,
+          "pitch_deg": 3.5114183949935383,
+          "riser_error_m": 0.009619097769618778,
+          "proxy_error_deg": [
+            0.027270512364318152,
+            0.022694135080231798,
+            0.009523542832884301
+          ],
+          "proxy_signed_error_deg": [
+            -0.027270512364318152,
+            -0.022694135080231798,
+            -0.009523542832884301
+          ],
+          "proxy_target_deg": [
+            3.274956477268066,
+            12.387416369827143,
+            70.30404328297097
+          ],
+          "proxy_actual_deg": [
+            3.3022267818450928,
+            12.410109519958496,
+            70.31356048583984
+          ],
+          "proxy_velocity_deg_s": [
+            10.69820785522461,
+            8.372734069824219,
+            4.121362686157227
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.3093490600585938,
+            -1.0680251121520996,
+            -0.4799566864967346
+          ],
+          "base_xy_error_m": 0.14138795052555142,
+          "base_yaw_error_deg": 3.618997543860345,
+          "vx_reference_mps": -0.11558756503097735,
+          "wz_reference_rad_s": 0.001848871581130708
+        },
+        {
+          "step": 2289,
+          "elapsed_s": 11.44,
+          "phase_time_s": 7.918541875,
+          "progress_scale": 0.5859830185496159,
+          "position_error_m": 0.04679006307316646,
+          "attitude_error_deg": 0.06917552738534552,
+          "pitch_deg": 3.9015739548668873,
+          "riser_error_m": 0.009886327415515095,
+          "proxy_error_deg": [
+            0.028885706510610263,
+            0.020876994249647392,
+            0.012620438539258904
+          ],
+          "proxy_signed_error_deg": [
+            -0.028885706510610263,
+            -0.020876994249647392,
+            -0.012620438539258904
+          ],
+          "proxy_target_deg": [
+            2.7225319900069085,
+            12.33819406831116,
+            70.60789508856497
+          ],
+          "proxy_actual_deg": [
+            2.751417636871338,
+            12.359070777893066,
+            70.62051391601562
+          ],
+          "proxy_velocity_deg_s": [
+            10.96159839630127,
+            7.938722610473633,
+            4.777468681335449
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.3631439208984375,
+            -0.986821174621582,
+            -0.5939229726791382
+          ],
+          "base_xy_error_m": 0.14200377365564093,
+          "base_yaw_error_deg": 3.405847772500793,
+          "vx_reference_mps": -0.11622829498632901,
+          "wz_reference_rad_s": 0.00011801696312175453
+        }
+      ],
+      "checks": {
+        "completed_reference": true,
+        "no_termination": true,
+        "pitch_bounded": true,
+        "position_p95_bounded": true,
+        "position_max_bounded": true,
+        "attitude_p95_bounded": true,
+        "attitude_max_bounded": true,
+        "riser_servo_error_bounded": true,
+        "proxy_servo_error_bounded": true,
+        "action_saturation_bounded": true,
+        "riser_saturation_bounded": true,
+        "proxy_saturation_bounded": true,
+        "internal_attitude_ik_converged": true,
+        "internal_proxy_rate_bounded": true
+      },
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "video": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260716_rs4_proxy_rerun\\videos\\case_0073\\two-wheel-riser-case-0073-step-0.mp4"
+}

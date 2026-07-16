@@ -20,6 +20,23 @@ The control priority is:
 2. riser travel, speed, braking, and gimbal limit safety;
 3. semantic camera trajectory tracking.
 
+### Recursive improvement objective
+
+The optimization loop is lexicographic, not a weighted average:
+
+1. retain every previously passed balance and finite-state safety gate;
+2. increase full-duration corrected-reference pass count;
+3. reduce holdout position p95, then position maximum;
+4. reduce holdout attitude p95, then attitude maximum;
+5. reduce actuator saturation and control effort only after the tracking gates
+   above are non-regressing.
+
+Every round changes one structural factor, reruns the same deterministic smoke
+set, and records an accept or reject decision. A candidate is accepted only if
+it fixes the targeted failure without regressing any higher-priority gate.
+Longer training is forbidden as a response to a model, frame, reference, or
+feasibility failure.
+
 ## 2. Robot contract
 
 The new asset is `recomoProto2_two_wheel_riser`; the existing arm-based assets
@@ -47,6 +64,9 @@ Semantic interface:
   `R_world_cam = R_world_DFR * Rz(+pi/2)`;
 - physical DJI gimbal joint angles are internal adapter states, never teacher
   labels or direct learned actions.
+- the fixed riser-to-gimbal bracket reproduces the accepted corrected-corpus
+  median orientation of the removed arm; an identity mount is forbidden
+  because it makes path-aligned camera attitudes unreachable.
 
 `ee1_tool` is collocated with `cam_link` and fixed at `R_cam_DFR = Rz(-pi/2)`.
 This preserves the corrected Option-B camera-frame contract without retaining
@@ -87,6 +107,15 @@ The scripted baseline is mandatory before DNN training:
 5. a safety governor slows horizontal and riser progress as pitch margin,
    actuator headroom, or travel margin decreases.
 
+The fixed-path candidate caps chassis yaw at `0.25 rad/s`. The complementary
+joint-adaptive candidate may use up to `0.4 rad/s`, but it is eligible only when
+all raw continuous proxy targets remain below the `24 deg/s` filming slew
+limit. The adaptive optimizer uses a `0.995` internal rate margin rather than
+relaxing that public limit. The accepted 62-case portfolio satisfies the gate
+with a worst raw proxy rate of `0.417392 rad/s`. These are reference-planning
+results, not a claim that the balance plant has passed the same motion in
+Isaac.
+
 The first learned controller is a residual policy over the scripted baseline,
 not unrestricted PPO from scratch. Its initial residual action contract is:
 
@@ -106,6 +135,13 @@ not permitted until the corrected teacher and holdout attitude gates pass.
 - total mass 28.0 kg within 1e-6 kg;
 - camera optical-center height is 0.600 m at lower travel and 1.800 m at upper
   travel in the URDF root frame;
+- fixed gimbal mount contract is
+  `accepted62_rs4_semantic_body_basis_yaw025_v1`;
+- `joint1_gimbal_pitch`, the legacy-named Ronin-yaw proxy, is continuous in
+  simulation; the semantic adapter still wraps and bounds the hardware command
+  to `[-pi, pi]`;
+- raw proxy position-target deltas, without cyclic correction, must satisfy the
+  same `24 deg/s` rate gate;
 - riser limit is 0.0 to 1.2 m and speed limit is 1.0 m/s;
 - semantic and physical camera frames satisfy the Option-B transform.
 

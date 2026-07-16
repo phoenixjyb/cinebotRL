@@ -27,6 +27,7 @@ PLAYBACK_ATTITUDE_MAX_LIMIT_DEG = 10.0
 PLAYBACK_BASE_LINEAR_LIMIT_MPS = 0.4
 PLAYBACK_BASE_LATERAL_LIMIT_MPS = 0.02
 PLAYBACK_BASE_YAW_RATE_LIMIT_RAD_S = 0.4
+PLAYBACK_PLANNING_BASE_YAW_RATE_RAD_S = 0.25
 PLAYBACK_RISER_RATE_LIMIT_MPS = 1.0
 PLAYBACK_PROXY_RATE_LIMIT_RAD_S = math.radians(24.0)
 
@@ -254,6 +255,7 @@ def build_riser_playback_plan(
         reference,
         kinematics,
         vertical_shift_m=shift,
+        maximum_base_yaw_rate_rad_s=PLAYBACK_PLANNING_BASE_YAW_RATE_RAD_S,
     )
     playback = playback_plan_from_kinematic_plan(reference, plan)
     metrics = riser_playback_kinematic_metrics(playback, kinematics)

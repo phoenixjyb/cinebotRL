@@ -4,11 +4,16 @@ import numpy as np
 import pytest
 
 from rl_platform.tasks.two_wheel_balance.riser_playback import (
+    PLAYBACK_PLANNING_BASE_YAW_RATE_RAD_S,
     RiserPlaybackPlan,
     interpolate_riser_playback_plan,
     load_riser_playback_plan,
     save_riser_playback_plan,
 )
+
+
+def test_playback_planning_uses_accepted_all79_yaw_cap() -> None:
+    assert PLAYBACK_PLANNING_BASE_YAW_RATE_RAD_S == 0.25
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

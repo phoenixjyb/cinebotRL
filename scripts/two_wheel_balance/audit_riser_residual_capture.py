@@ -60,7 +60,7 @@ def main() -> int:
     parser.add_argument(
         "--minimum-scales",
         type=parse_scales,
-        default=parse_scales("0.25,0.4,0.1"),
+        default=parse_scales("0.3,0.4,0.1"),
     )
     parser.add_argument(
         "--scale-quantums",

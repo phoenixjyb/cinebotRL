@@ -45,7 +45,7 @@ ACTION_NAMES = (
     "residual_wz_normalized",
     "residual_riser_target_normalized",
 )
-ACTION_SCALES = np.array([0.25, 0.40, 0.10], dtype=np.float64)
+ACTION_SCALES = np.array([0.30, 0.40, 0.10], dtype=np.float64)
 SPLIT_NAMES = ("train", "validation", "holdout")
 
 

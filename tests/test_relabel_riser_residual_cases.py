@@ -70,7 +70,7 @@ def test_relabel_recovers_unclipped_action_from_raw_commands(tmp_path: Path) -> 
         metadata = json.loads(str(data["metadata_json"].item()))
         actions = np.asarray(data["actions"])
     assert metadata["action_scales"] == [0.3, 0.4, 0.1]
-    assert metadata["source_action_scales"] == [0.25, 0.4, 0.1]
+    assert metadata["source_action_scales"] == [0.3, 0.4, 0.1]
     np.testing.assert_allclose(actions[:, 0], [-0.23 / 0.3, -0.21 / 0.3, 0.0, 0.05 / 0.3])
     assert np.max(np.abs(actions)) < 1.0
     summary = json.loads(

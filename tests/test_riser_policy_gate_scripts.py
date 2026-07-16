@@ -32,6 +32,7 @@ def test_bc_gate_requires_complete_quarantined_all79_dataset() -> None:
 def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
     source = _read("run_riser_all79_dataset_gate.sh")
     assert "20260716_residual_all79_phase_v3_clean" in source
+    assert "20260716_all79_playback_inputs_v4" in source
     assert "20260716_residual_all79_phase_v2" not in source
     assert 'git -C "$ROOT" diff --quiet' in source
     assert 'git -C "$ROOT" diff --cached --quiet' in source
@@ -45,6 +46,7 @@ def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
 def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:
     source = _read("run_riser_residual_holdout_gate.sh")
     assert "phase_v3_clean" in source
+    assert "20260716_all79_playback_inputs_v4" in source
     assert "zero_policy_action_baseline" in source
     assert "torchscript_residual_policy" in source
     assert "gate_riser_residual_rollouts.py" in source
@@ -59,6 +61,7 @@ def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:
 def test_all79_policy_gate_requires_holdout_and_all_cases() -> None:
     source = _read("run_riser_residual_all79_policy_gate.sh")
     assert "phase_v3_clean" in source
+    assert "20260716_all79_playback_inputs_v4" in source
     assert 'holdout.get("passed") is True' in source
     assert "for case_number in $(seq 1 79)" in source
     assert "gate_riser_residual_rollouts.py" in source

@@ -14,6 +14,8 @@
 
 DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由冻结的 LQR 控制；DJI 云台姿态适配仍是确定性模块。物理云台电机关节角、旧版隔离 NPZ 和源 GIK 动作都不能作为策略标签。PPO 在本流程中保持未授权。
 
+最终归一化动作范围为 `0.30 m/s`、`0.40 rad/s`、`0.10 m`。该范围来自全部诊断轨迹的原始教师命令审计、`1.10x` 余量和 `0.05` 量化，不得从旧 NPZ 的裁剪动作反推。
+
 ## 固定运行合同
 
 - 机器人总质量暂定 `28 kg`；
@@ -26,11 +28,11 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 - 语义 DFR 到物理相机：`R_world_cam = R_world_DFR * Rz(+pi/2)`；
 - 跟踪配置：`riser_phase_consistent_v2`；
 - 相位合同：`derivatives_scaled_by_progress_v1`；
-- 默认规划偏航上限为 `0.25 rad/s`；case 15 单独为 `0.20 rad/s`，case 45 单独为 `0.325 rad/s`。所有值都低于不变的 `0.40 rad/s` 公共上限，且各自的云台代理速率仍必须通过 `24 deg/s` gate。
+- 默认规划偏航上限为 `0.25 rad/s`；case 15 单独为 `0.20 rad/s`，case 45 单独为 `0.325 rad/s`，case 78 单独为 `0.35 rad/s`。所有值都低于不变的 `0.40 rad/s` 公共上限，且各自的云台代理速率仍必须通过 `24 deg/s` gate。
 
 ## Gate A：79 条确定性稠密采集
 
-`20260716_residual_all79_phase_v2` 是动作范围诊断集，其中 case 1--26 早于连续云台轴修复，旧 `delta-vx` 归一化范围产生过标签裁剪，且 case 45 暴露了规划余量不足。该目录只能用于物理 gate、原始教师命令恢复和动作范围审计，不能作为最终训练集。正式采集使用 `20260716_all79_playback_inputs_v3` 与独立目录 `20260716_residual_all79_phase_v3_clean`。
+`20260716_residual_all79_phase_v2` 是动作范围诊断集，其中 case 1--26 早于连续云台轴修复，旧 `delta-vx` 归一化范围产生过标签裁剪，且 case 45、78 暴露了规划余量不足。该目录只能用于物理 gate、原始教师命令恢复和动作范围审计，不能作为最终训练集。正式采集使用 `20260716_all79_playback_inputs_v4` 与独立目录 `20260716_residual_all79_phase_v3_clean`。
 
 运行：
 

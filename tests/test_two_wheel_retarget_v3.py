@@ -15,10 +15,12 @@ from retarget_corrected_teacher_v3_nonholonomic import (  # noqa: E402
     BALANCE_PITCH_SOLVER_TOLERANCE_DEG,
     HOME_ARM,
     balance_pitch_optimization_margin_deg,
+    bounded_gimbal_recovery_deltas,
     build_gravity_aware_arm_acquisition,
     physical_gimbal_interpolation_error,
     physical_camera_rotation,
     select_acquisition_base_route,
+    semantic_gimbal_reserve_margin_ratio,
     solve_full_pose_anchor,
     wrap_angle,
 )
@@ -41,6 +43,42 @@ def test_balance_pitch_solver_and_output_tolerances_are_separate() -> None:
     assert balance_pitch_optimization_margin_deg(
         SimpleNamespace(camera_solve_root_model="upright")
     ) == 0.0
+
+
+def test_semantic_gimbal_reserve_does_not_relax_admission_margin() -> None:
+    args = SimpleNamespace(
+        minimum_semantic_gimbal_limit_margin_ratio=0.005,
+        minimum_semantic_gimbal_reserve_margin_ratio=0.01,
+    )
+    assert semantic_gimbal_reserve_margin_ratio(args) == 0.01
+    args.minimum_semantic_gimbal_reserve_margin_ratio = 0.004
+    with pytest.raises(ValueError, match="between the admission margin"):
+        semantic_gimbal_reserve_margin_ratio(args)
+
+
+def test_gimbal_recovery_seeds_include_bounded_center_step() -> None:
+    current = np.array([0.9, -0.4, 0.2])
+    previous = np.array([0.02, -0.01, 0.0])
+    lower_delta = np.full(3, -0.05)
+    upper_delta = np.full(3, 0.05)
+    lower = np.full(3, -1.0)
+    upper = np.full(3, 1.0)
+
+    deltas = bounded_gimbal_recovery_deltas(
+        current,
+        previous,
+        lower_delta,
+        upper_delta,
+        lower,
+        upper,
+    )
+
+    assert len(deltas) == 3
+    np.testing.assert_allclose(deltas[0], previous)
+    np.testing.assert_allclose(deltas[1], 0.0)
+    np.testing.assert_allclose(deltas[2], [-0.05, 0.05, -0.05])
+    assert all(np.all(delta >= lower_delta) for delta in deltas)
+    assert all(np.all(delta <= upper_delta) for delta in deltas)
 
 
 def test_acquisition_route_chooses_reverse_when_it_reduces_yaw_travel() -> None:

@@ -74,6 +74,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--minimum-anchor-gimbal-limit-margin-ratio", type=float, default=0.10)
     parser.add_argument("--minimum-semantic-gimbal-limit-margin-ratio", type=float, default=0.005)
+    parser.add_argument(
+        "--minimum-semantic-gimbal-reserve-margin-ratio",
+        type=float,
+        default=0.01,
+    )
     parser.add_argument("--semantic-gimbal-center-regularization", type=float, default=0.10)
     parser.add_argument("--position-scale-m", type=float, default=0.01)
     parser.add_argument("--control-regularization", type=float, default=0.01)

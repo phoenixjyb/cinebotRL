@@ -113,6 +113,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--minimum-semantic-gimbal-limit-margin-ratio", type=float, default=0.005
     )
+    parser.add_argument(
+        "--minimum-semantic-gimbal-reserve-margin-ratio",
+        type=float,
+        default=None,
+    )
     parser.add_argument("--semantic-gimbal-center-regularization", type=float, default=0.01)
     parser.add_argument("--position-scale-m", type=float, default=0.01)
     parser.add_argument("--control-regularization", type=float, default=0.01)
@@ -443,8 +448,51 @@ def semantic_gimbal_margin_ratio(args: argparse.Namespace) -> float:
     )
 
 
+def semantic_gimbal_reserve_margin_ratio(args: argparse.Namespace) -> float:
+    admission_margin = semantic_gimbal_margin_ratio(args)
+    configured = getattr(
+        args, "minimum_semantic_gimbal_reserve_margin_ratio", None
+    )
+    reserve_margin = (
+        admission_margin if configured is None else float(configured)
+    )
+    if not admission_margin <= reserve_margin <= 0.5:
+        raise ValueError(
+            "semantic gimbal reserve margin must be between the admission "
+            "margin and 0.5"
+        )
+    return reserve_margin
+
+
 def semantic_gimbal_center_regularization(args: argparse.Namespace) -> float:
     return float(getattr(args, "semantic_gimbal_center_regularization", 0.01))
+
+
+def bounded_gimbal_recovery_deltas(
+    current_q: np.ndarray,
+    previous_delta: np.ndarray,
+    lower_delta: np.ndarray,
+    upper_delta: np.ndarray,
+    gimbal_lower: np.ndarray,
+    gimbal_upper: np.ndarray,
+) -> tuple[np.ndarray, ...]:
+    """Return local branch seeds without changing actuator limits."""
+
+    center = 0.5 * (gimbal_lower + gimbal_upper)
+    candidates = (
+        np.asarray(previous_delta, dtype=np.float64),
+        np.zeros(3, dtype=np.float64),
+        np.asarray(center - current_q, dtype=np.float64),
+    )
+    bounded: list[np.ndarray] = []
+    for candidate in candidates:
+        clipped = np.clip(candidate, lower_delta, upper_delta)
+        if not any(
+            np.allclose(clipped, existing, atol=1e-12, rtol=0.0)
+            for existing in bounded
+        ):
+            bounded.append(clipped)
+    return tuple(bounded)
 
 
 def physical_camera_rotation(
@@ -1753,13 +1801,25 @@ def retarget_semantic_full_pose(
                                 / source_dt
                             )
                             recovery_seeds.append(seed)
-                    for seed in recovery_seeds:
-                        seed[5:8] = trial_control[5:8]
-                        if not any(
-                            np.allclose(seed, existing.x, atol=1e-8, rtol=0.0)
-                            for existing in solutions
-                        ):
-                            solutions.append(solve(seed))
+                    gimbal_recovery_deltas = bounded_gimbal_recovery_deltas(
+                        trial_state[6:9],
+                        trial_control[5:8],
+                        lower[5:8],
+                        upper[5:8],
+                        camera_kinematics.gimbal_lower,
+                        camera_kinematics.gimbal_upper,
+                    )
+                    for base_seed in recovery_seeds:
+                        for gimbal_delta in gimbal_recovery_deltas:
+                            seed = base_seed.copy()
+                            seed[5:8] = gimbal_delta
+                            if not any(
+                                np.allclose(
+                                    seed, existing.x, atol=1e-8, rtol=0.0
+                                )
+                                for existing in solutions
+                            ):
+                                solutions.append(solve(seed))
 
                 def rank(solution) -> tuple[bool, float]:
                     (
@@ -1895,6 +1955,12 @@ def retarget_semantic_full_pose(
                     semantic_gimbal_margin_ratio(args)
                     - min(trial_gimbal_margins),
                 )
+                + 100.0
+                * max(
+                    0.0,
+                    semantic_gimbal_reserve_margin_ratio(args)
+                    - min(trial_gimbal_margins),
+                )
             )
             attempts.append(
                 (
@@ -1909,7 +1975,9 @@ def retarget_semantic_full_pose(
                     trial_attitude_errors,
                 )
             )
-            if feasible:
+            if feasible and min(trial_gimbal_margins) >= (
+                semantic_gimbal_reserve_margin_ratio(args)
+            ):
                 break
 
         feasible_attempts = [item for item in attempts if item[0]]
@@ -2162,6 +2230,13 @@ def retarget_case(
         "physical_camera_final_gate_root_model": (
             "yaw_plus_predicted_equilibrium_pitch"
         ),
+        "minimum_semantic_gimbal_limit_margin_ratio": (
+            semantic_gimbal_margin_ratio(args)
+        ),
+        "minimum_semantic_gimbal_reserve_margin_ratio": (
+            semantic_gimbal_reserve_margin_ratio(args)
+        ),
+        "semantic_gimbal_reserve_contract": "search_ranking_only",
         **gimbal,
         "checks": checks,
         "passed": all(checks.values()),
@@ -2182,6 +2257,15 @@ def retarget_case(
         "physical_gimbal_joint_labels_included": np.bool_(False),
         "camera_solve_root_model": np.asarray(
             getattr(args, "camera_solve_root_model", "balanced")
+        ),
+        "minimum_semantic_gimbal_limit_margin_ratio": np.float64(
+            semantic_gimbal_margin_ratio(args)
+        ),
+        "minimum_semantic_gimbal_reserve_margin_ratio": np.float64(
+            semantic_gimbal_reserve_margin_ratio(args)
+        ),
+        "semantic_gimbal_reserve_contract": np.asarray(
+            "search_ranking_only"
         ),
         "time_s": time_s,
         "source_time_s": reference.time_s,

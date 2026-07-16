@@ -182,6 +182,30 @@ acquisition nor the semantic reference completed. The dynamic candidate remains
 unapproved and `valid_for_training=false`. This is a Gate-3 acquisition/control
 completion blocker, not an offline source-integrity regression.
 
+Subsequent bounded diagnosis established that acquisition was unnecessarily
+using the longer forward-only chassis route. The pose-equivalent route planner
+now compares signed forward and reverse approaches and minimizes total yaw
+travel without changing linear/yaw limits. For case 1 it selects reverse and
+reduces planned yaw travel to 133.844064 degrees. The regenerated candidate:
+
+- preserves the same 256 source anchors, source timestamps, source positions,
+  source attitudes, and exact 2.4522479583 m source path;
+- has 1,118 states / 1,117 transitions and 40.461261 s execution duration;
+- passes position, gravity, pitch, physical-gimbal IK/rate/margin/interpolation,
+  and exact-source gates;
+- embeds the sealed route contract and schedule metadata in the NPZ itself;
+- has execution-plan SHA-256
+  `70c8e1abca453f67c771a33640a26309e57858cf28170fffd73019d4fbb41bc6`;
+- remains `valid_for_training=false`.
+
+Playback experiments that attempted stationary rotate/drive recovery were
+rejected because they caused large chassis/camera excursions. The acquisition
+task-space-arm v7 run is computationally inconclusive: it reached the explicit
+900 s wall timeout while a separate riser canary owned the shared GPU and wrote
+no result JSON. It is neither a dynamic pass nor a dynamic failure. The same v7
+command may be rerun only as a single-GPU job against the sealed reverse-route
+candidate.
+
 Case 7 therefore proves the corrected source-integrity path, not executable
 teacher quality. Its gimbal failure requires a structural base/arm/gimbal
 branch-selection correction; wrapping the exported physical joint angle would
@@ -204,10 +228,12 @@ hide a real actuator-limit crossing and is not allowed.
   solver priors after exact hash verification. They are not policy teachers and
   do not relax nonholonomic, source, gravity, timing, or output gates.
 - Next action is to diagnose the case-1 acquisition governor stall and compare
-  case 7 against the completed upstream multi-branch seed when available. An
-  ep4 upstream branch should then be requested because its current canary still
-  rejects at the position/gravity boundary. Gate-2 all-79 regeneration, a full
-  dynamic corpus, BC, and PPO remain blocked.
+  case 1 using the sealed reverse-route candidate once the shared GPU is free.
+  The upstream ep7 branch search is closed without an admitted package: it
+  crossed earlier branch failures but remained rate-disconnected at waypoint
+  187. Ep7 therefore requires downstream `M>N` execution retiming with all 663
+  source anchors, original source times, and complete ordered mapping retained.
+  Gate-2 all-79 regeneration, a full dynamic corpus, BC, and PPO remain blocked.
 
 Machine-readable quarantine evidence is stored in:
 

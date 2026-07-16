@@ -38,12 +38,25 @@ def seal(
         raise ValueError("refusing to seal a non-exact-source candidate")
     execution_time = np.asarray(arrays["execution_time_s"], dtype=np.float64)
     mapping = np.asarray(arrays["source_anchor_execution_index"], dtype=np.int64)
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    route = str(result.get("base_acquisition_route", ""))
+    route_yaw_deg = float(result.get("base_acquisition_total_yaw_travel_deg", -1.0))
+    if route not in {"forward", "reverse", "rotate_in_place"}:
+        raise ValueError("result lacks a supported acquisition route")
+    if not np.isfinite(route_yaw_deg) or not 0.0 <= route_yaw_deg <= 2.0 * 180.0:
+        raise ValueError("result has invalid acquisition yaw travel")
     arrays.update(
         {
             "execution_transition_dt_s": np.diff(execution_time),
             "source_anchor_execution_time_s": execution_time[mapping],
             "source_interval_execution_step_count": np.diff(mapping),
             "source_interval_execution_duration_s": np.diff(execution_time[mapping]),
+            "acquisition_route_contract": np.asarray(
+                "minimum_total_yaw_forward_or_reverse_v1"
+            ),
+            "base_acquisition_route": np.asarray(route),
+            "base_acquisition_total_yaw_travel_deg": np.float64(route_yaw_deg),
+            "execution_schedule_metadata_sealed": np.bool_(True),
         }
     )
     temporary = candidate_path.with_suffix(".sealed.tmp.npz")
@@ -55,8 +68,8 @@ def seal(
         require_dynamic_approval=False,
     )
     digest = sha256(candidate_path)
-    result = json.loads(result_path.read_text(encoding="utf-8"))
     result["candidate_sha256"] = digest
+    result["execution_plan_sha256"] = digest
     result["execution_schedule_metadata_sealed"] = True
     result_path.write_text(
         json.dumps(result, indent=2) + "\n", encoding="utf-8", newline="\n"

@@ -18,6 +18,25 @@
     "valid_for_dynamic_evaluation": true,
     "valid_for_training": false
   },
+  "gate1_ep1_reverse_acquisition": {
+    "status": "sealed_offline_executable_quality_passed",
+    "base_acquisition_route": "reverse",
+    "base_acquisition_total_yaw_travel_deg": 133.8440637845214,
+    "source_anchor_count": 256,
+    "execution_sample_count": 1118,
+    "execution_transition_count": 1117,
+    "retargeted_duration_s": 40.461260644949895,
+    "position_error_p95_m": 0.04932595423992467,
+    "position_error_max_m": 0.04994881746446465,
+    "maximum_arm_gravity_effort_nm": 29.504641235225993,
+    "maximum_equilibrium_pitch_deg": 8.065140765771337,
+    "physical_gimbal_interpolation_max_error_deg": 0.09968327249115806,
+    "physical_gimbal_limit_margin_min_ratio": 0.005035236349243101,
+    "execution_plan_sha256": "70c8e1abca453f67c771a33640a26309e57858cf28170fffd73019d4fbb41bc6",
+    "execution_schedule_metadata_sealed": true,
+    "valid_for_dynamic_evaluation": true,
+    "valid_for_training": false
+  },
   "gate1_ep4": {
     "status": "rejected_source_interval_192",
     "position_error_max_m": 0.051691,
@@ -47,6 +66,21 @@
     "position_error_max_m": 0.1111377115813742,
     "attitude_error_p95_deg": 4.297424524889269,
     "attitude_error_max_deg": 4.502242992493168,
+    "valid_for_training": false
+  },
+  "gate3_ep1_v7": {
+    "status": "computationally_inconclusive_shared_gpu_timeout",
+    "wall_timeout_s": 900,
+    "result_json_written": false,
+    "dynamic_pass_fail_classified": false,
+    "valid_for_training": false
+  },
+  "ep7_upstream_seed": {
+    "status": "no_package_exported",
+    "last_connected_source_waypoint": 186,
+    "first_rate_disconnected_source_waypoint": 187,
+    "required_downstream_action": "explicit_M_greater_than_N_execution_retiming",
+    "source_anchor_count_required": 663,
     "valid_for_training": false
   },
   "training_started": false,

@@ -55,6 +55,9 @@ parser.add_argument("--gimbal-effort-limit-nm", type=float, default=10.0)
 parser.add_argument("--arm-stiffness", type=float, default=400.0)
 parser.add_argument("--arm-damping", type=float, default=40.0)
 parser.add_argument("--open-loop", action="store_true")
+parser.add_argument(
+    "--enable-acquisition-task-space-arm-feedback", action="store_true"
+)
 parser.add_argument("--maximum-duration-scale", type=float, default=2.0)
 parser.add_argument("--enable-phase-governor", action="store_true")
 parser.add_argument("--phase-governor-pitch-start-deg", type=float, default=10.5)
@@ -106,7 +109,7 @@ from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     bounded_attitude_progress_scale,
     bounded_balance_progress_scale,
     bounded_base_references,
-    bounded_progress_scale,
+    bounded_phase_progress_scale,
     bounded_semantic_arm_target,
     bounded_task_space_base_target,
     equilibrium_pitch_from_world_com,
@@ -427,7 +430,8 @@ def evaluate_case(
                 actual_tool_position,
                 dt=1.0 / POLICY_HZ,
                 semantic_feedback_enabled=(
-                    phase_time_s >= semantic_start_time_s
+                    args.enable_acquisition_task_space_arm_feedback
+                    or phase_time_s >= semantic_start_time_s
                 ),
                 config=tracking_config,
             )
@@ -687,8 +691,12 @@ def evaluate_case(
         if position_error >= max(position_errors):
             peak_position_error_step = step + 1
         if args.enable_phase_governor:
-            tracking_progress_scale = bounded_progress_scale(
-                base_xy_error, position_error, tracking_config
+            acquisition_phase = phase_time_s < semantic_start_time_s
+            tracking_progress_scale = bounded_phase_progress_scale(
+                base_xy_error,
+                position_error,
+                acquisition_phase,
+                tracking_config,
             )
             balance_progress_scale = bounded_balance_progress_scale(
                 float(state["pitch"][0].item()),
@@ -735,6 +743,9 @@ def evaluate_case(
                     ),
                     "progress_scale": progress_scale,
                     "tracking_progress_scale": tracking_progress_scale,
+                    "base_error_in_progress_governor": (
+                        phase_time_s >= semantic_start_time_s
+                    ),
                     "balance_progress_scale": balance_progress_scale,
                     "attitude_progress_scale": attitude_progress_scale,
                     "com_pitch_bias_deg": math.degrees(com_pitch_bias),
@@ -1101,9 +1112,20 @@ def main() -> int:
         "acquisition_root_tilt_compensation_enabled": False,
         "task_space_base_compensation_enabled": not args.open_loop,
         "task_space_arm_feedback_enabled": not args.open_loop,
-        "task_space_arm_feedback_phase": "semantic_only",
+        "task_space_arm_feedback_phase": (
+            "acquisition_and_semantic"
+            if args.enable_acquisition_task_space_arm_feedback
+            else "semantic_only"
+        ),
+        "acquisition_task_space_arm_feedback_enabled": (
+            args.enable_acquisition_task_space_arm_feedback
+        ),
         "semantic_task_space_feedback_enabled": not args.open_loop,
         "phase_governor_enabled": args.enable_phase_governor,
+        "acquisition_progress_contract": (
+            "ee1_tool_position_plus_cam_link_attitude_plus_balance"
+        ),
+        "semantic_progress_includes_base_error": True,
         "phase_governor_pitch_start_deg": args.phase_governor_pitch_start_deg,
         "phase_governor_pitch_stop_deg": args.phase_governor_pitch_stop_deg,
         "phase_governor_position_stop_m": args.maximum_position_p95_m,

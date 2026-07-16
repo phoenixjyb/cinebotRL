@@ -383,6 +383,16 @@ def process_case(
             "valid_for_dynamic_evaluation": np.bool_(summary["passed"]),
             "valid_for_candidate_training": np.bool_(False),
             "valid_for_training": np.bool_(False),
+            "acquisition_route_contract": np.asarray(
+                "minimum_total_yaw_forward_or_reverse_v1"
+            ),
+            "base_acquisition_route": np.asarray(
+                summary["base_acquisition_route"]
+            ),
+            "base_acquisition_total_yaw_travel_deg": np.float64(
+                summary["base_acquisition_total_yaw_travel_deg"]
+            ),
+            "execution_schedule_metadata_sealed": np.bool_(False),
         }
     )
     arrays.pop("source_teacher_quality_passed", None)

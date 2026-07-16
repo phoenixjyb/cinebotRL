@@ -254,6 +254,22 @@ def validate_exact_source_candidate(
     _require(not bool(scalar("physical_gimbal_joint_labels_included")), f"physical gimbal labels leaked: {path}")
     _require(not bool(scalar("initialization_in_learned_actions")), f"initialization leaked into learned actions: {path}")
     _require(not bool(scalar("valid_for_training")), f"offline candidate claims training validity: {path}")
+    _require(bool(scalar("execution_schedule_metadata_sealed")), f"candidate schedule is not sealed: {path}")
+    _require(
+        scalar("acquisition_route_contract")
+        == "minimum_total_yaw_forward_or_reverse_v1",
+        f"candidate acquisition route contract is not admitted: {path}",
+    )
+    _require(
+        scalar("base_acquisition_route")
+        in {"forward", "reverse", "rotate_in_place"},
+        f"candidate acquisition route is invalid: {path}",
+    )
+    route_yaw_deg = float(scalar("base_acquisition_total_yaw_travel_deg"))
+    _require(
+        np.isfinite(route_yaw_deg) and 0.0 <= route_yaw_deg <= 360.0,
+        f"candidate acquisition yaw travel is invalid: {path}",
+    )
     if require_offline_quality:
         _require(bool(scalar("offline_executable_quality_passed")), f"offline executable quality failed: {path}")
     if require_dynamic_approval:

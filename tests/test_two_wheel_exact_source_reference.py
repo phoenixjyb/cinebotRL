@@ -148,6 +148,12 @@ def write_candidate(path: Path, **overrides) -> None:
         "physical_gimbal_joint_labels_included": np.bool_(False),
         "initialization_in_learned_actions": np.bool_(False),
         "valid_for_training": np.bool_(False),
+        "execution_schedule_metadata_sealed": np.bool_(True),
+        "acquisition_route_contract": np.asarray(
+            "minimum_total_yaw_forward_or_reverse_v1"
+        ),
+        "base_acquisition_route": np.asarray("reverse"),
+        "base_acquisition_total_yaw_travel_deg": np.float64(120.0),
         "offline_executable_quality_passed": np.bool_(True),
         "valid_for_dynamic_evaluation": np.bool_(True),
         "source_pose_count": np.int32(2),
@@ -365,8 +371,24 @@ def test_seal_adds_deterministic_execution_schedule_metadata(tmp_path: Path) -> 
         }
     np.savez_compressed(candidate, **arrays)
     result = tmp_path / "candidate.result.json"
-    result.write_text('{"case": 1, "passed": true}\n', encoding="utf-8")
+    result.write_text(
+        json.dumps(
+            {
+                "case": 1,
+                "passed": True,
+                "base_acquisition_route": "reverse",
+                "base_acquisition_total_yaw_travel_deg": 120.0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     digest = seal(candidate, result)
     assert len(digest) == 64
     validate_exact_source_candidate(candidate)
-    assert json.loads(result.read_text())["execution_schedule_metadata_sealed"] is True
+    sealed_result = json.loads(result.read_text())
+    assert sealed_result["execution_schedule_metadata_sealed"] is True
+    assert sealed_result["execution_plan_sha256"] == digest
+    with np.load(candidate, allow_pickle=False) as data:
+        assert bool(data["execution_schedule_metadata_sealed"].item())
+        assert data["base_acquisition_route"].item() == "reverse"

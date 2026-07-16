@@ -320,6 +320,20 @@ def bounded_base_references(
     }
 
 
+def bounded_phase_progress_scale(
+    base_position_error_m: float,
+    tool_position_error_m: float,
+    acquisition_phase: bool,
+    config: WholeBodyTrackingConfig,
+) -> float:
+    """Gate acquisition on its EE contract, then include base error in tracking."""
+
+    governed_base_error = 0.0 if acquisition_phase else base_position_error_m
+    return bounded_progress_scale(
+        governed_base_error, tool_position_error_m, config
+    )
+
+
 def numerical_arm_position_jacobian(
     kinematics: UrdfPositionKinematics,
     base_arm_q: np.ndarray,

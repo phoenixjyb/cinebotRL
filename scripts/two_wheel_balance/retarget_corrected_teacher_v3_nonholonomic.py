@@ -388,6 +388,40 @@ def wrap_angle(value: float) -> float:
     return math.atan2(math.sin(value), math.cos(value))
 
 
+def select_acquisition_base_route(
+    target_base_q: np.ndarray,
+) -> tuple[float, float, float, str]:
+    """Choose forward or reverse approach with the least total yaw travel."""
+
+    target = np.asarray(target_base_q, dtype=np.float64)
+    if target.shape != (3,) or not np.isfinite(target).all():
+        raise ValueError("acquisition base target must be finite shape (3,)")
+    distance = float(np.linalg.norm(target[:2]))
+    if distance <= 1e-12:
+        final_turn = wrap_angle(float(target[2]))
+        return 0.0, 0.0, final_turn, "rotate_in_place"
+    bearing = math.atan2(float(target[1]), float(target[0]))
+    candidates = []
+    for name, approach_heading, drive_distance in (
+        ("forward", bearing, distance),
+        ("reverse", wrap_angle(bearing + math.pi), -distance),
+    ):
+        first_turn = wrap_angle(approach_heading)
+        final_turn = wrap_angle(float(target[2]) - approach_heading)
+        candidates.append(
+            (
+                abs(first_turn) + abs(final_turn),
+                abs(first_turn),
+                name,
+                first_turn,
+                drive_distance,
+                final_turn,
+            )
+        )
+    _, _, name, first_turn, drive_distance, final_turn = min(candidates)
+    return first_turn, drive_distance, final_turn, name
+
+
 def gimbal_limit_margin_ratio(
     gimbal_q: np.ndarray, kinematics: UrdfPhysicalCameraKinematics
 ) -> float:
@@ -1187,16 +1221,19 @@ def build_feasible_acquisition(
             base_states.append(base.copy())
             base_controls.append((velocity, yaw_rate))
 
-    distance = float(np.linalg.norm(anchor[:2]))
-    heading = math.atan2(float(anchor[1]), float(anchor[0])) if distance > 1e-12 else 0.0
+    first_turn, drive_distance, final_turn, base_route = (
+        select_acquisition_base_route(anchor[:3])
+    )
     append_segment(
-        wrap_angle(heading - base[2]),
+        first_turn,
         args.maximum_acquisition_yaw_rate,
         drive=False,
     )
-    append_segment(distance, args.maximum_acquisition_linear_velocity, drive=True)
     append_segment(
-        wrap_angle(float(anchor[2]) - base[2]),
+        drive_distance, args.maximum_acquisition_linear_velocity, drive=True
+    )
+    append_segment(
+        final_turn,
         args.maximum_acquisition_yaw_rate,
         drive=False,
     )
@@ -1272,6 +1309,10 @@ def build_feasible_acquisition(
         ]
     )
     diagnostics = {
+        "base_acquisition_route": base_route,
+        "base_acquisition_total_yaw_travel_deg": math.degrees(
+            abs(first_turn) + abs(final_turn)
+        ),
         "arm_acquisition_plan": arm_plan,
         "arm_acquisition_predicted_gravity_max_nm": arm_gravity,
         "arm_acquisition_predicted_equilibrium_pitch_max_deg": float(

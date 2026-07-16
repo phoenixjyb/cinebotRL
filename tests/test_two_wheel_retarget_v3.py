@@ -1,4 +1,5 @@
 from pathlib import Path
+import math
 import sys
 from types import SimpleNamespace
 
@@ -17,7 +18,9 @@ from retarget_corrected_teacher_v3_nonholonomic import (  # noqa: E402
     build_gravity_aware_arm_acquisition,
     physical_gimbal_interpolation_error,
     physical_camera_rotation,
+    select_acquisition_base_route,
     solve_full_pose_anchor,
+    wrap_angle,
 )
 from rl_platform.tasks.two_wheel_balance.camera_attitude import (  # noqa: E402
     UrdfPhysicalCameraKinematics,
@@ -38,6 +41,37 @@ def test_balance_pitch_solver_and_output_tolerances_are_separate() -> None:
     assert balance_pitch_optimization_margin_deg(
         SimpleNamespace(camera_solve_root_model="upright")
     ) == 0.0
+
+
+def test_acquisition_route_chooses_reverse_when_it_reduces_yaw_travel() -> None:
+    target = np.array([0.34391828, -0.39179693, 2.33601960])
+    first_turn, drive_distance, final_turn, route = (
+        select_acquisition_base_route(target)
+    )
+
+    assert route == "reverse"
+    assert drive_distance < 0.0
+    np.testing.assert_allclose(
+        abs(first_turn) + abs(final_turn), math.radians(133.844), atol=1e-3
+    )
+
+
+def test_acquisition_route_preserves_target_pose_for_forward_and_reverse() -> None:
+    for target in (
+        np.array([1.0, 0.2, 0.3]),
+        np.array([-0.4, 0.3, -2.0]),
+    ):
+        first_turn, drive_distance, final_turn, _ = (
+            select_acquisition_base_route(target)
+        )
+        state = np.zeros(3)
+        state[2] = first_turn
+        state[:2] = drive_distance * np.array(
+            [math.cos(first_turn), math.sin(first_turn)]
+        )
+        state[2] = wrap_angle(first_turn + final_turn)
+        np.testing.assert_allclose(state[:2], target[:2], atol=1e-12)
+        np.testing.assert_allclose(state[2], wrap_angle(target[2]), atol=1e-12)
 
 
 def test_physical_gimbal_interpolation_rejects_equivalent_branch_jump() -> None:

@@ -1,0 +1,40 @@
+{
+  "schema": "cinebotrl_two_wheel_exact_source_canary_audit_v1",
+  "trajectory_integrity_contract": "exact_source_v1",
+  "cases": [
+    1
+  ],
+  "integrity_passed_cases": [
+    1
+  ],
+  "offline_quality_passed_cases": [
+    1
+  ],
+  "valid_for_training": false,
+  "results": [
+    {
+      "case": 1,
+      "candidate": "G:\\wSpace\\cinebotRL-two-wheel-balance\\evaluation_results\\two_wheel_exact_source_v1\\gate1_ep1_reverse_acquisition_20260717\\case_0001.npz",
+      "candidate_sha256": "70c8e1abca453f67c771a33640a26309e57858cf28170fffd73019d4fbb41bc6",
+      "source_manifest_sha256": "f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d",
+      "source_json_sha256": "d9a3ea5cf78cad56e01f6d7bc0728de01af4cf016a28b93fc7e85ae3ab94b8c7",
+      "source_pose_count": 256,
+      "source_anchor_count": 256,
+      "execution_sample_count": 1118,
+      "execution_transition_count": 1117,
+      "source_anchor_position_max_error_m": 0.0,
+      "source_anchor_attitude_max_error_rad": 2.9802322387695312e-08,
+      "source_path_length_m": 2.4522479583115233,
+      "mapped_anchor_path_length_m": 2.4522479583115233,
+      "semantic_execution_target_path_length_m": 2.4522479583115238,
+      "anchor_mapping_strict": true,
+      "initialization_separate": true,
+      "offline_executable_quality_passed": true,
+      "valid_for_dynamic_evaluation": true,
+      "valid_for_training": false,
+      "trajectory_integrity_passed": true
+    }
+  ],
+  "trajectory_integrity_passed": true,
+  "offline_executable_quality_passed": true
+}

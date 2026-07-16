@@ -11,6 +11,7 @@ from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     bounded_attitude_progress_scale,
     bounded_balance_progress_scale,
     bounded_base_references,
+    bounded_phase_progress_scale,
     bounded_dls_arm_target,
     bounded_progress_scale,
     bounded_semantic_arm_target,
@@ -284,6 +285,17 @@ def test_progress_governor_slows_on_tracking_error() -> None:
 def test_progress_governor_can_fully_pause() -> None:
     config = WholeBodyTrackingConfig(minimum_progress_scale=0.0)
     assert bounded_progress_scale(0.25, 0.0, config) == 0.0
+
+
+def test_acquisition_progress_ignores_internal_base_compensation_error() -> None:
+    config = WholeBodyTrackingConfig(
+        progress_error_full_m=0.15, minimum_progress_scale=0.0
+    )
+    acquisition = bounded_phase_progress_scale(0.16, 0.08, True, config)
+    semantic = bounded_phase_progress_scale(0.16, 0.08, False, config)
+
+    assert acquisition > 0.0
+    assert semantic == 0.0
 
 
 def test_balance_progress_governor_preserves_pitch_reserve() -> None:

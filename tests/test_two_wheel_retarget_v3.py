@@ -21,6 +21,8 @@ from retarget_corrected_teacher_v3_nonholonomic import (  # noqa: E402
     physical_camera_rotation,
     select_acquisition_base_route,
     semantic_gimbal_reserve_margin_ratio,
+    semantic_gimbal_reserve_search_max_scale,
+    should_stop_semantic_retime_search,
     solve_full_pose_anchor,
     wrap_angle,
 )
@@ -54,6 +56,36 @@ def test_semantic_gimbal_reserve_does_not_relax_admission_margin() -> None:
     args.minimum_semantic_gimbal_reserve_margin_ratio = 0.004
     with pytest.raises(ValueError, match="between the admission margin"):
         semantic_gimbal_reserve_margin_ratio(args)
+
+
+def test_semantic_gimbal_reserve_search_scale_is_bounded_separately() -> None:
+    args = SimpleNamespace(maximum_semantic_gimbal_reserve_search_scale=24)
+    assert semantic_gimbal_reserve_search_max_scale(args) == 24
+    assert semantic_gimbal_reserve_search_max_scale(SimpleNamespace()) is None
+    args.maximum_semantic_gimbal_reserve_search_scale = 0
+    with pytest.raises(ValueError, match="must be positive"):
+        semantic_gimbal_reserve_search_max_scale(args)
+
+
+def test_hard_infeasible_search_continues_beyond_soft_reserve_cap() -> None:
+    assert not should_stop_semantic_retime_search(
+        hard_feasible=False,
+        achieved_gimbal_margin_ratio=0.0,
+        reserve_margin_ratio=0.01,
+        time_scale=96,
+        reserve_search_max_scale=24,
+    )
+
+
+def test_hard_feasible_reserve_low_search_stops_at_soft_cap() -> None:
+    common = {
+        "hard_feasible": True,
+        "achieved_gimbal_margin_ratio": 0.006,
+        "reserve_margin_ratio": 0.01,
+        "reserve_search_max_scale": 24,
+    }
+    assert not should_stop_semantic_retime_search(time_scale=16, **common)
+    assert should_stop_semantic_retime_search(time_scale=24, **common)
 
 
 def test_gimbal_recovery_seeds_include_bounded_center_step() -> None:

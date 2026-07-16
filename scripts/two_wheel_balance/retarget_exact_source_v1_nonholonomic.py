@@ -79,6 +79,11 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.01,
     )
+    parser.add_argument(
+        "--maximum-semantic-gimbal-reserve-search-scale",
+        type=int,
+        default=24,
+    )
     parser.add_argument("--semantic-gimbal-center-regularization", type=float, default=0.10)
     parser.add_argument("--position-scale-m", type=float, default=0.01)
     parser.add_argument("--control-regularization", type=float, default=0.01)

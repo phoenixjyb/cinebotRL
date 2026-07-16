@@ -264,6 +264,16 @@ hide a real actuator-limit crossing and is not allowed.
   source anchors, original source times, and complete ordered mapping retained.
   Gate-2 all-79 regeneration, a full dynamic corpus, BC, and PPO remain blocked.
 
+The first downstream ep7 reserve-aware schedule canary crossed the upstream
+branch failures at source waypoints 144, 158, 162, 167, and 187, then reached
+source interval 552/662 under the unchanged local pose/rate gates. It hit the
+explicit 1,800 s wall timeout because a gate-feasible but reserve-low interval
+searched execution scales through 96 before selecting scale 1. No candidate or
+result JSON was exported, so the run is computationally inconclusive rather
+than an admission pass/failure. The next CPU fix bounds reserve-only search;
+segments that are genuinely admission-infeasible retain the full execution
+scale ladder. No second canary, playback, or learning stage has been started.
+
 Final-exclusive schema-v4 case-1 dynamic evidence is stored in:
 
 ```text

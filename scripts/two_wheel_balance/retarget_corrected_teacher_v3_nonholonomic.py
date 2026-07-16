@@ -118,6 +118,11 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=None,
     )
+    parser.add_argument(
+        "--maximum-semantic-gimbal-reserve-search-scale",
+        type=int,
+        default=None,
+    )
     parser.add_argument("--semantic-gimbal-center-regularization", type=float, default=0.01)
     parser.add_argument("--position-scale-m", type=float, default=0.01)
     parser.add_argument("--control-regularization", type=float, default=0.01)
@@ -462,6 +467,38 @@ def semantic_gimbal_reserve_margin_ratio(args: argparse.Namespace) -> float:
             "margin and 0.5"
         )
     return reserve_margin
+
+
+def semantic_gimbal_reserve_search_max_scale(
+    args: argparse.Namespace,
+) -> int | None:
+    configured = getattr(
+        args, "maximum_semantic_gimbal_reserve_search_scale", None
+    )
+    if configured is None:
+        return None
+    maximum_scale = int(configured)
+    if maximum_scale < 1:
+        raise ValueError("semantic gimbal reserve search scale must be positive")
+    return maximum_scale
+
+
+def should_stop_semantic_retime_search(
+    *,
+    hard_feasible: bool,
+    achieved_gimbal_margin_ratio: float,
+    reserve_margin_ratio: float,
+    time_scale: int,
+    reserve_search_max_scale: int | None,
+) -> bool:
+    if not hard_feasible:
+        return False
+    if achieved_gimbal_margin_ratio >= reserve_margin_ratio:
+        return True
+    return (
+        reserve_search_max_scale is not None
+        and time_scale >= reserve_search_max_scale
+    )
 
 
 def semantic_gimbal_center_regularization(args: argparse.Namespace) -> float:
@@ -1975,8 +2012,14 @@ def retarget_semantic_full_pose(
                     trial_attitude_errors,
                 )
             )
-            if feasible and min(trial_gimbal_margins) >= (
-                semantic_gimbal_reserve_margin_ratio(args)
+            if should_stop_semantic_retime_search(
+                hard_feasible=feasible,
+                achieved_gimbal_margin_ratio=min(trial_gimbal_margins),
+                reserve_margin_ratio=semantic_gimbal_reserve_margin_ratio(args),
+                time_scale=time_scale,
+                reserve_search_max_scale=(
+                    semantic_gimbal_reserve_search_max_scale(args)
+                ),
             ):
                 break
 
@@ -2237,6 +2280,9 @@ def retarget_case(
             semantic_gimbal_reserve_margin_ratio(args)
         ),
         "semantic_gimbal_reserve_contract": "search_ranking_only",
+        "maximum_semantic_gimbal_reserve_search_scale": (
+            semantic_gimbal_reserve_search_max_scale(args)
+        ),
         **gimbal,
         "checks": checks,
         "passed": all(checks.values()),
@@ -2266,6 +2312,11 @@ def retarget_case(
         ),
         "semantic_gimbal_reserve_contract": np.asarray(
             "search_ranking_only"
+        ),
+        "maximum_semantic_gimbal_reserve_search_scale": np.int32(
+            -1
+            if semantic_gimbal_reserve_search_max_scale(args) is None
+            else semantic_gimbal_reserve_search_max_scale(args)
         ),
         "time_s": time_s,
         "source_time_s": reference.time_s,

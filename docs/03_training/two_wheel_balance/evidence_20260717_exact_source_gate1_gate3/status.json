@@ -116,6 +116,22 @@
     "source_anchor_count_required": 663,
     "valid_for_training": false
   },
+  "ep7_downstream_schedule_reserve_v3": {
+    "status": "computationally_inconclusive_wall_timeout",
+    "source_commit": "e5d00360baa166ac8639e6f5ef734c5b72447e73",
+    "wall_timeout_s": 1800,
+    "last_completed_source_interval": 552,
+    "source_interval_count": 662,
+    "candidate_exported": false,
+    "result_json_written": false,
+    "admission_gate_failed": false,
+    "minimum_semantic_gimbal_limit_margin_ratio": 0.005,
+    "minimum_semantic_gimbal_reserve_margin_ratio": 0.01,
+    "diagnosis": "reserve_only_search_explored_execution_scales_through_96",
+    "required_fix": "bound_reserve_only_search_but_keep_full_ladder_for_admission_infeasible_segments",
+    "valid_for_dynamic_evaluation": false,
+    "valid_for_training": false
+  },
   "training_started": false,
   "bc_started": false,
   "ppo_started": false

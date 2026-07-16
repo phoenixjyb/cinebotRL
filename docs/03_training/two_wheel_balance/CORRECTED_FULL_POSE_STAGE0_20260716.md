@@ -206,6 +206,16 @@ no result JSON. It is neither a dynamic pass nor a dynamic failure. The same v7
 command may be rerun only as a single-GPU job against the sealed reverse-route
 candidate.
 
+That exclusive-GPU rerun has now passed from clean commit `d8ca698`. It used
+the sealed reverse execution plan `70c8e1ab...`, acquisition-plus-semantic
+bounded arm feedback, camera attitude gain 1.0, and a 25 degree bounded gimbal
+feedback envelope. It completed acquisition and the full 40.461261 s reference
+in 54.68 s wall time with no termination. Position p95/max were
+0.040045/0.089092 m, camera attitude p95/max were 6.47546/7.51440 degrees,
+peak pitch was 10.92131 degrees, and every arm/gimbal/action saturation and IK
+gate passed. This qualifies case 1 dynamically but does not authorize corpus
+training; `valid_for_training=false` and training has not started.
+
 Case 7 therefore proves the corrected source-integrity path, not executable
 teacher quality. Its gimbal failure requires a structural base/arm/gimbal
 branch-selection correction; wrapping the exported physical joint angle would
@@ -227,13 +237,18 @@ hide a real actuator-limit crossing and is not allowed.
 - Upstream ep1 and ep77 holonomic seeds may be used only as episode-specific
   solver priors after exact hash verification. They are not policy teachers and
   do not relax nonholonomic, source, gravity, timing, or output gates.
-- Next action is to diagnose the case-1 acquisition governor stall and compare
-  case 1 using the sealed reverse-route candidate once the shared GPU is free.
-  The upstream ep7 branch search is closed without an admitted package: it
+- Case 1 now passes exact-source offline and representative dynamic gates. The
+  upstream ep7 branch search is closed without an admitted package: it
   crossed earlier branch failures but remained rate-disconnected at waypoint
   187. Ep7 therefore requires downstream `M>N` execution retiming with all 663
   source anchors, original source times, and complete ordered mapping retained.
   Gate-2 all-79 regeneration, a full dynamic corpus, BC, and PPO remain blocked.
+
+Exclusive case-1 dynamic evidence is stored in:
+
+```text
+docs/03_training/two_wheel_balance/evidence_20260717_exact_source_ep1_reverse_dynamic_v7
+```
 
 Machine-readable quarantine evidence is stored in:
 

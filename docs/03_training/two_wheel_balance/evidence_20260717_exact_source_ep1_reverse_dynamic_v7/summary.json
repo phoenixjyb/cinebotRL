@@ -1,0 +1,23 @@
+{
+  "schema": "cinebotrl_two_wheel_exact_source_ep1_reverse_dynamic_v7_evidence_v1",
+  "source_commit": "d8ca698",
+  "execution_plan_sha256": "70c8e1abca453f67c771a33640a26309e57858cf28170fffd73019d4fbb41bc6",
+  "exclusive_gpu_verified_before_launch": true,
+  "controller_flags": {
+    "enable_phase_governor": true,
+    "enable_acquisition_task_space_arm_feedback": true,
+    "camera_attitude_feedback_gain": 1.0,
+    "maximum_gimbal_feedback_joint_offset_deg": 25.0
+  },
+  "completed_phase_time_s": 40.461260644949895,
+  "completed_acquisition": true,
+  "completed_reference": true,
+  "position_error_p95_m": 0.04004479667787098,
+  "position_error_max_m": 0.08909243764261035,
+  "attitude_error_p95_deg": 6.475460483946485,
+  "attitude_error_max_deg": 7.514396218216311,
+  "peak_pitch_deg": 10.921313680952187,
+  "passed": true,
+  "valid_for_training": false,
+  "training_started": false
+}

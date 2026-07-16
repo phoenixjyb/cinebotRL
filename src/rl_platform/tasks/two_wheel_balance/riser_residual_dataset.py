@@ -149,11 +149,15 @@ def apply_residual_action(
     actual_riser_position_m: float,
     action: np.ndarray,
     *,
+    maximum_linear_velocity_m_s: float = 0.4,
+    maximum_yaw_rate_rad_s: float = 0.4,
     riser_bounds_m: tuple[float, float] = (0.0, 1.2),
 ) -> np.ndarray:
     action = np.clip(np.asarray(action, dtype=np.float64), -1.0, 1.0)
     if action.shape != (3,) or not np.isfinite(action).all():
         raise ValueError("invalid residual action")
+    if maximum_linear_velocity_m_s <= 0.0 or maximum_yaw_rate_rad_s <= 0.0:
+        raise ValueError("base command limits must be positive")
     command = np.array(
         [
             feedforward_vx_m_s + ACTION_SCALES[0] * action[0],
@@ -161,6 +165,12 @@ def apply_residual_action(
             actual_riser_position_m + ACTION_SCALES[2] * action[2],
         ],
         dtype=np.float64,
+    )
+    command[0] = np.clip(
+        command[0], -maximum_linear_velocity_m_s, maximum_linear_velocity_m_s
+    )
+    command[1] = np.clip(
+        command[1], -maximum_yaw_rate_rad_s, maximum_yaw_rate_rad_s
     )
     command[2] = np.clip(command[2], *riser_bounds_m)
     return command

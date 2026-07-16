@@ -4,17 +4,19 @@ set -euo pipefail
 ROOT="${RISER_ROOT:-/mnt/g/wSpace/cinebotRL-two-wheel-riser}"
 WIN_ROOT="${RISER_WIN_ROOT:-G:\\wSpace\\cinebotRL-two-wheel-riser}"
 PY="${ISAAC_PYTHON:-/mnt/g/isaaclab_venv/Scripts/python.exe}"
-STAMP="${RISER_ALL79_STAMP:-20260716_residual_all79_v1}"
+STAMP="${RISER_ALL79_STAMP:-20260716_residual_all79_phase_v2}"
 ARTIFACTS_WSL="$ROOT/artifacts/two_wheel_riser/$STAMP"
 ARTIFACTS_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$STAMP"
-PLAN_DIR_WIN="${RISER_ALL79_PLAN_DIR_WIN:-$WIN_ROOT\\artifacts\\two_wheel_riser\\20260716_all79_playback_inputs}"
+PLAN_STAMP="${RISER_ALL79_PLAN_STAMP:-20260716_all79_playback_inputs_v2}"
+PLAN_DIR_WSL="$ROOT/artifacts/two_wheel_riser/$PLAN_STAMP"
+PLAN_DIR_WIN="${RISER_ALL79_PLAN_DIR_WIN:-$WIN_ROOT\\artifacts\\two_wheel_riser\\$PLAN_STAMP}"
 GAINS_WIN="${RISER_GAINS_WIN:-$WIN_ROOT\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json}"
 SCRIPT_WIN="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 MERGER_WIN="$WIN_ROOT\\scripts\\two_wheel_balance\\build_riser_residual_dataset.py"
 
 [[ -x "$PY" ]] || { printf 'missing Isaac Python: %s\n' "$PY" >&2; exit 2; }
-[[ -d "$ROOT/artifacts/two_wheel_riser/20260716_all79_playback_inputs" ]] || {
-  printf 'missing all-79 playback inputs\n' >&2
+[[ -s "$PLAN_DIR_WSL/manifest.json" ]] || {
+  printf 'missing all-79 playback manifest: %s\n' "$PLAN_DIR_WSL/manifest.json" >&2
   exit 2
 }
 mkdir -p "$ARTIFACTS_WSL/cases" "$ARTIFACTS_WSL/gates" "$ARTIFACTS_WSL/logs"
@@ -34,6 +36,9 @@ payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 case = int(sys.argv[2])
 valid = (
     payload.get("passed") is True
+    and payload.get("tracking_profile") == "riser_phase_consistent_v2"
+    and payload.get("phase_feedforward_contract")
+    == "derivatives_scaled_by_progress_v1"
     and payload.get("passed_case_count") == 1
     and payload.get("cases") == [case]
     and len(payload.get("results", [])) == 1
@@ -74,13 +79,15 @@ done
   --output "$ARTIFACTS_WIN\\all79_residual_dataset_v1.npz" \
   --expected-count 79 >"$ARTIFACTS_WSL/merge.log" 2>&1
 
-python3 - "$ARTIFACTS_WSL" "$(git -C "$ROOT" rev-parse HEAD)" <<'PY'
+python3 - "$ARTIFACTS_WSL" "$(git -C "$ROOT" rev-parse HEAD)" "$PLAN_DIR_WSL/manifest.json" <<'PY'
+import hashlib
 import json
 from pathlib import Path
 import sys
 
 root = Path(sys.argv[1])
 commit = sys.argv[2]
+plan_manifest = Path(sys.argv[3])
 gates = []
 for path in sorted((root / "gates").glob("case_*.json")):
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -88,6 +95,8 @@ for path in sorted((root / "gates").glob("case_*.json")):
     gates.append(
         {
             "case": result["case"],
+            "tracking_profile": payload.get("tracking_profile"),
+            "phase_governor_enabled": payload.get("phase_governor_enabled"),
             "completed_steps": result["completed_steps"],
             "position_error_p95_m": result["position_error_p95_m"],
             "position_error_max_m": result["position_error_max_m"],
@@ -103,8 +112,14 @@ dataset_summary = json.loads(
 summary = {
     "schema": "cinebotrl_two_wheel_riser_all79_dynamic_dataset_gate_v1",
     "git_commit": commit,
+    "plan_manifest": str(plan_manifest),
+    "plan_manifest_sha256": hashlib.sha256(plan_manifest.read_bytes()).hexdigest(),
     "training_started": False,
     "ppo_authorized": False,
+    "tracking_profiles": sorted({item["tracking_profile"] for item in gates}),
+    "phase_governor_enabled": all(
+        item["phase_governor_enabled"] is True for item in gates
+    ),
     "case_count": len(gates),
     "passed_case_count": sum(item["passed"] for item in gates),
     "total_steps": sum(item["completed_steps"] for item in gates),

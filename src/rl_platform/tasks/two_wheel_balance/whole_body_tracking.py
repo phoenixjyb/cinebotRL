@@ -81,6 +81,18 @@ class WholeBodyTrackingConfig:
     minimum_progress_scale: float = 0.1
 
 
+def riser_tracking_config(**overrides: float) -> WholeBodyTrackingConfig:
+    """Use the accepted outer-loop profile for the arm-free riser platform."""
+
+    values = {
+        "along_track_kp": 1.6,
+        "cross_track_kp": 1.5,
+        "yaw_kp": 1.2,
+    }
+    values.update(overrides)
+    return WholeBodyTrackingConfig(**values)
+
+
 def bounded_progress_scale(
     base_position_error_m: float,
     tool_position_error_m: float,

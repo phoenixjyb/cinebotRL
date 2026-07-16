@@ -362,3 +362,46 @@ and must state whether its candidate was accepted or rejected.
 - Require zero failed captures, zero split leakage, finite values, bounded labels,
   and exact teacher-command reconstruction before offline BC.
 - Do not start BC or any learned-policy rollout from the seven-case smoke.
+
+## Round 14: phase-consistent playback and case-15 recovery
+
+- The first resumable all-79 capture stopped correctly at case 15. Cases 1--14
+  passed, but case 15 produced `0.209044 m` camera-position p95 against the
+  unchanged `0.15 m` gate. Completion, balance, attitude, riser, proxy, IK, and
+  saturation checks all passed.
+- Root cause: the phase governor slowed phase time but continued to send the
+  unscaled source feed-forward derivatives. Case 15 reached a progress scale
+  near `0.25`, so the target advanced slowly while base velocity and yaw
+  feed-forward remained at full trajectory speed.
+- Contract fix: scale base linear/yaw, riser, and proxy derivatives by the same
+  progress scale used to advance phase. Use these scaled values consistently in
+  deterministic commands, observations, residual labels, and policy baselines.
+- Tracking fix: promote `riser_phase_consistent_v2` with outer-loop gains
+  `along=1.6`, `cross=1.5`, and `yaw=1.2`. Wheel-speed, yaw-rate, phase, riser,
+  gimbal, and acceptance limits are unchanged.
+- Plan fix: case 15 alone uses a manifest-recorded planning yaw cap of
+  `0.20 rad/s` instead of `0.25 rad/s`. Its pure p95 improves from `0.110273 m`
+  to `0.102839 m`; all other 78 playback NPZ hashes remain unchanged.
+- Case-15 Isaac result: position p95 `0.140834 m`, maximum `0.143522 m`, peak
+  pitch `5.1849 deg`, peak yaw error `3.9377 deg`, no termination, and zero
+  action saturation.
+- Regression result: representative cases 1, 15, 31, and 73 pass `4/4`.
+  Repaired cases 18, 23, 24, 41, 50, 72, and 79 pass `7/7` over 34,002 steps.
+  Repaired-family worst position p95 is `0.122759 m`, maximum is `0.127505 m`,
+  attitude p95 is `0.199269 deg`, and pitch maximum is `4.876883 deg`.
+- Rejected work: stronger yaw-loop gains, direct camera-point feedback, blended
+  camera feedback, and larger cross-track gains all failed to beat the fixed
+  gate and were not promoted.
+- Decision: accept the v2 deterministic baseline. Discard the old cases 1--14
+  captures because their phase/action contract is stale. Start a fresh all-79
+  dataset stamp; BC and PPO remain blocked until it passes and merges.
+
+## Next round after Round 14
+
+- Run `20260716_residual_all79_phase_v2` from case 1 using only
+  `20260716_all79_playback_inputs_v2`.
+- Require every resumable gate to report `riser_phase_consistent_v2` and
+  `derivatives_scaled_by_progress_v1`; record the plan-manifest SHA-256 in the
+  merged summary.
+- Only after `79/79` dynamic captures and a case-disjoint merge pass may the
+  offline BC candidate be trained. PPO remains unauthorized.

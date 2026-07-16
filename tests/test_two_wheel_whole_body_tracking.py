@@ -11,6 +11,7 @@ from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     bounded_dls_arm_target,
     bounded_progress_scale,
     equilibrium_pitch_from_world_com,
+    riser_tracking_config,
     slew_limited_arm_target,
     yaw_from_quaternion_wxyz,
 )
@@ -37,6 +38,17 @@ def test_yaw_and_base_feedback_signs() -> None:
     assert yaw_rate > 0.0
     assert diagnostics["along_track_error_m"] > 0.0
     assert diagnostics["cross_track_error_m"] > 0.0
+
+
+def test_riser_tracking_profile_preserves_limits_and_raises_path_authority() -> None:
+    default = WholeBodyTrackingConfig()
+    riser = riser_tracking_config()
+    assert riser.along_track_kp == 1.6
+    assert riser.cross_track_kp == 1.5
+    assert riser.yaw_kp == 1.2
+    assert riser.maximum_linear_velocity_mps == default.maximum_linear_velocity_mps
+    assert riser.maximum_yaw_rate_radps == default.maximum_yaw_rate_radps
+    assert riser.progress_error_full_m == default.progress_error_full_m
 
 
 def test_dls_target_reduces_small_position_error() -> None:

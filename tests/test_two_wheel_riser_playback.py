@@ -8,6 +8,7 @@ from rl_platform.tasks.two_wheel_balance.riser_playback import (
     RiserPlaybackPlan,
     interpolate_riser_playback_plan,
     load_riser_playback_plan,
+    phase_scaled_feedforward,
     save_riser_playback_plan,
 )
 
@@ -54,6 +55,20 @@ def test_playback_plan_roundtrip_and_interpolation(tmp_path: Path) -> None:
     assert sample.riser_q == pytest.approx(0.15)
     assert np.rad2deg(sample.proxy_gimbal_q[2]) == pytest.approx(182.0)
     assert sample.feedforward_v_mps == pytest.approx(0.1)
+
+
+def test_phase_governor_scales_every_playback_derivative() -> None:
+    sample = interpolate_riser_playback_plan(_plan(), 0.15)
+    velocity, yaw_rate, riser_rate, proxy_rate = phase_scaled_feedforward(
+        sample, 0.25
+    )
+    assert velocity == pytest.approx(0.025)
+    assert yaw_rate == pytest.approx(0.0)
+    assert riser_rate == pytest.approx(0.25)
+    np.testing.assert_allclose(proxy_rate, np.deg2rad([0.0, 0.0, 5.0]))
+
+    with pytest.raises(ValueError, match="progress scale"):
+        phase_scaled_feedforward(sample, 1.01)
 
 
 def test_playback_plan_rejects_wrapped_yaw_servo_jump() -> None:

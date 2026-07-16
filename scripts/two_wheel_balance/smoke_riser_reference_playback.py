@@ -37,11 +37,28 @@ parser.add_argument("--maximum-saturation-ratio", type=float, default=0.20)
 parser.add_argument("--disable-phase-governor", action="store_true")
 parser.add_argument("--disable-com-pitch-feedforward", action="store_true")
 parser.add_argument("--disable-semantic-proxy-state-adapter", action="store_true")
+parser.add_argument("--controller-wz-kp", type=float)
+parser.add_argument("--controller-wz-ki", type=float)
+parser.add_argument("--controller-wz-feedforward", type=float)
+parser.add_argument("--controller-wheel-difference-kp", type=float)
+parser.add_argument("--tracking-along-kp", type=float)
+parser.add_argument("--tracking-cross-kp", type=float)
+parser.add_argument("--tracking-yaw-kp", type=float)
 parser.add_argument("--video-dir", type=Path)
 parser.add_argument(
     "--dataset-dir",
     type=Path,
     help="Write dense pre-action executed-state residual datasets per case.",
+)
+parser.add_argument(
+    "--residual-policy",
+    type=Path,
+    help="Optional gated TorchScript high-level residual policy.",
+)
+parser.add_argument(
+    "--residual-policy-device",
+    choices=("cpu", "cuda"),
+    default="cuda",
 )
 # RecordVideo receives one frame per 200 Hz policy step.  Encoding at the same
 # rate preserves simulation time; viewing derivatives may be transcoded to 50.
@@ -49,6 +66,10 @@ parser.add_argument("--video-fps", type=int, default=200)
 parser.add_argument("--output", type=Path, required=True)
 AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
+for name in ("tracking_along_kp", "tracking_cross_kp", "tracking_yaw_kp"):
+    value = getattr(args, name)
+    if value is not None and value < 0.0:
+        parser.error(f"--{name.replace('_', '-')} must be non-negative")
 app = AppLauncher(args).app
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -77,21 +98,23 @@ from rl_platform.tasks.two_wheel_balance.riser_playback import (
     RiserPlaybackPlan,
     interpolate_riser_playback_plan,
     load_riser_playback_plan,
+    phase_scaled_feedforward,
 )
 from rl_platform.tasks.two_wheel_balance.riser_kinematics import (
     UrdfRiserCameraKinematics,
 )
 from rl_platform.tasks.two_wheel_balance.riser_control import balance_progress_scale
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
+    apply_residual_action,
     build_executed_observation,
     build_residual_action,
     save_case_dataset,
 )
 from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
-    WholeBodyTrackingConfig,
     bounded_base_references,
     bounded_progress_scale,
     equilibrium_pitch_from_world_com,
+    riser_tracking_config,
     yaw_from_quaternion_wxyz,
 )
 from task_spec import register_isaac_lab_tasks
@@ -171,6 +194,8 @@ def evaluate_case(
     target_marker: VisualizationMarkers | None,
     path_marker: VisualizationMarkers | None,
     dataset_dir: Path | None,
+    residual_policy,
+    residual_policy_device: torch.device,
 ) -> dict[str, object]:
     _, proxy_ids, riser_id = initialize_case(env, plan)
     unwrapped = env.unwrapped
@@ -186,8 +211,29 @@ def evaluate_case(
     controller_state = np.zeros((1, 6), dtype=np.float64)
     current_states = current_lqr_state(unwrapped)
     action = np.zeros((1, len(ACTION_NAMES)), dtype=np.float32)
-    controller_cfg = cascaded_lqr_config("structural_robust_v1")
-    tracking_cfg = WholeBodyTrackingConfig()
+    controller_overrides = {
+        name: value
+        for name, value in {
+            "wz_kp": args.controller_wz_kp,
+            "wz_ki": args.controller_wz_ki,
+            "wz_feedforward": args.controller_wz_feedforward,
+            "wheel_difference_kp": args.controller_wheel_difference_kp,
+        }.items()
+        if value is not None
+    }
+    controller_cfg = cascaded_lqr_config(
+        "structural_robust_v1", **controller_overrides
+    )
+    tracking_overrides = {
+        name: value
+        for name, value in {
+            "along_track_kp": args.tracking_along_kp,
+            "cross_track_kp": args.tracking_cross_kp,
+            "yaw_kp": args.tracking_yaw_kp,
+        }.items()
+        if value is not None
+    }
+    tracking_cfg = riser_tracking_config(**tracking_overrides)
     source_duration_s = float(plan.time_s[-1])
     maximum_steps = int(
         math.ceil(source_duration_s * args.maximum_duration_scale * POLICY_HZ)
@@ -225,6 +271,7 @@ def evaluate_case(
     dataset_phase_time = []
     dataset_baseline_actions = []
     dataset_teacher_commands = []
+    applied_residual_actions = []
     previous_residual_action = np.zeros(3, dtype=np.float32)
     completed_steps = 0
     body_masses = robot.data.default_mass[0].to(unwrapped.device)
@@ -239,6 +286,12 @@ def evaluate_case(
     for step in range(maximum_steps):
         elapsed_s = step / POLICY_HZ
         sample = interpolate_riser_playback_plan(plan, phase_time_s)
+        (
+            phase_feedforward_v_mps,
+            phase_feedforward_wz_rad_s,
+            phase_feedforward_riser_velocity_mps,
+            phase_feedforward_proxy_velocity_rad_s,
+        ) = phase_scaled_feedforward(sample, progress_scale)
         root_position = robot.data.root_pos_w[0].detach().cpu().numpy()
         root_quaternion = robot.data.root_quat_w[0].detach().cpu().numpy()
         actual_base = np.array(
@@ -248,18 +301,18 @@ def evaluate_case(
                 yaw_from_quaternion_wxyz(root_quaternion),
             ]
         )
-        vx_ref, wz_ref, _ = bounded_base_references(
-            sample.base_xy_yaw,
-            actual_base,
-            sample.feedforward_v_mps,
-            sample.feedforward_wz_rad_s,
-            tracking_cfg,
-        )
         actual_camera_position_pre = (
             robot.data.body_pos_w[0, cam_id].detach().cpu().numpy()
         )
         actual_camera_quaternion_pre = (
             robot.data.body_quat_w[0, cam_id].detach().cpu().numpy()
+        )
+        vx_ref, wz_ref, _ = bounded_base_references(
+            sample.base_xy_yaw,
+            actual_base,
+            phase_feedforward_v_mps,
+            phase_feedforward_wz_rad_s,
+            tracking_cfg,
         )
         actual_riser_pre = float(robot.data.joint_pos[0, riser_id].item())
         actual_riser_velocity_pre = float(
@@ -270,51 +323,80 @@ def evaluate_case(
                 sample.target_semantic_dfr_quat_wxyz
             )
         )
-        residual_action = build_residual_action(
-            feedforward_vx_m_s=sample.feedforward_v_mps,
-            feedforward_wz_rad_s=sample.feedforward_wz_rad_s,
+        teacher_residual_action = build_residual_action(
+            feedforward_vx_m_s=phase_feedforward_v_mps,
+            feedforward_wz_rad_s=phase_feedforward_wz_rad_s,
             commanded_vx_m_s=vx_ref,
             commanded_wz_rad_s=wz_ref,
             actual_riser_position_m=actual_riser_pre,
             target_riser_position_m=sample.riser_q,
         )
-        dataset_observations.append(
-            build_executed_observation(
-                lqr_state=current_states[0],
-                actual_base_xy_yaw=actual_base,
-                target_base_xy_yaw=sample.base_xy_yaw,
-                actual_camera_position_world_m=actual_camera_position_pre,
-                target_camera_position_world_m=sample.target_position_world_m,
-                actual_camera_quat_wxyz=actual_camera_quaternion_pre,
-                target_camera_quat_wxyz=target_physical_camera_quaternion,
-                riser_position_m=actual_riser_pre,
-                riser_velocity_m_s=actual_riser_velocity_pre,
-                riser_target_m=sample.riser_q,
-                feedforward_vx_m_s=sample.feedforward_v_mps,
-                feedforward_wz_rad_s=sample.feedforward_wz_rad_s,
-                feedforward_riser_velocity_m_s=(
-                    sample.feedforward_riser_velocity_mps
-                ),
-                phase_fraction=phase_time_s / source_duration_s,
-                progress_scale=progress_scale,
-                previous_residual_action=previous_residual_action,
-            )
+        executed_observation = build_executed_observation(
+            lqr_state=current_states[0],
+            actual_base_xy_yaw=actual_base,
+            target_base_xy_yaw=sample.base_xy_yaw,
+            actual_camera_position_world_m=actual_camera_position_pre,
+            target_camera_position_world_m=sample.target_position_world_m,
+            actual_camera_quat_wxyz=actual_camera_quaternion_pre,
+            target_camera_quat_wxyz=target_physical_camera_quaternion,
+            riser_position_m=actual_riser_pre,
+            riser_velocity_m_s=actual_riser_velocity_pre,
+            riser_target_m=sample.riser_q,
+            feedforward_vx_m_s=phase_feedforward_v_mps,
+            feedforward_wz_rad_s=phase_feedforward_wz_rad_s,
+            feedforward_riser_velocity_m_s=phase_feedforward_riser_velocity_mps,
+            phase_fraction=phase_time_s / source_duration_s,
+            progress_scale=progress_scale,
+            previous_residual_action=previous_residual_action,
         )
-        dataset_actions.append(residual_action)
-        dataset_elapsed_time.append(elapsed_s)
-        dataset_phase_time.append(phase_time_s)
-        dataset_teacher_commands.append([vx_ref, wz_ref, sample.riser_q])
-        previous_residual_action = residual_action
+        if residual_policy is None:
+            applied_residual_action = teacher_residual_action
+            commanded_riser_target = sample.riser_q
+        else:
+            with torch.inference_mode():
+                policy_output = residual_policy(
+                    torch.as_tensor(
+                        executed_observation[None, :],
+                        dtype=torch.float32,
+                        device=residual_policy_device,
+                    )
+                )
+            applied_residual_action = (
+                policy_output.detach().cpu().numpy().reshape(-1)
+            )
+            if (
+                applied_residual_action.shape != (3,)
+                or not np.isfinite(applied_residual_action).all()
+                or np.max(np.abs(applied_residual_action)) > 1.0 + 1e-6
+            ):
+                raise ValueError("residual policy produced an invalid action")
+            vx_ref, wz_ref, commanded_riser_target = apply_residual_action(
+                phase_feedforward_v_mps,
+                phase_feedforward_wz_rad_s,
+                actual_riser_pre,
+                applied_residual_action,
+                maximum_linear_velocity_m_s=tracking_cfg.maximum_linear_velocity_mps,
+                maximum_yaw_rate_rad_s=tracking_cfg.maximum_yaw_rate_radps,
+                riser_bounds_m=(kinematics.riser_lower, kinematics.riser_upper),
+            )
+        applied_residual_actions.append(applied_residual_action.copy())
+        if dataset_dir is not None:
+            dataset_observations.append(executed_observation)
+            dataset_actions.append(teacher_residual_action)
+            dataset_elapsed_time.append(elapsed_s)
+            dataset_phase_time.append(phase_time_s)
+            dataset_teacher_commands.append([vx_ref, wz_ref, sample.riser_q])
+        previous_residual_action = applied_residual_action
         riser_target = torch.tensor(
-            [[sample.riser_q]], dtype=torch.float32, device=unwrapped.device
+            [[commanded_riser_target]], dtype=torch.float32, device=unwrapped.device
         )
         riser_velocity_target = torch.tensor(
-            [[sample.feedforward_riser_velocity_mps]],
+            [[phase_feedforward_riser_velocity_mps]],
             dtype=torch.float32,
             device=unwrapped.device,
         )
         proxy_command = sample.proxy_gimbal_q.copy()
-        proxy_command_rate = sample.feedforward_proxy_velocity_rad_s.copy()
+        proxy_command_rate = phase_feedforward_proxy_velocity_rad_s.copy()
         if not args.disable_semantic_proxy_state_adapter:
             attitude_ik = kinematics.solve_semantic_attitude_robust(
                 root_quaternion,
@@ -418,6 +500,15 @@ def evaluate_case(
             obs["policy"][:, : len(LQR_STATE_NAMES)].detach().cpu().numpy()
         )
         state = unwrapped._state_terms()
+        root_position_post = robot.data.root_pos_w[0].detach().cpu().numpy()
+        root_quaternion_post = robot.data.root_quat_w[0].detach().cpu().numpy()
+        actual_base_post = np.array(
+            [
+                root_position_post[0],
+                root_position_post[1],
+                yaw_from_quaternion_wxyz(root_quaternion_post),
+            ]
+        )
         actual_cam_position = robot.data.body_pos_w[0, cam_id].detach().cpu().numpy()
         actual_cam_quaternion = (
             robot.data.body_quat_w[0, cam_id].detach().cpu().numpy()
@@ -455,11 +546,16 @@ def evaluate_case(
             np.abs(actual_proxy - proxy_command)
         )
         pitch_deg = math.degrees(abs(float(state["pitch"][0].item())))
-        base_xy_error = float(np.linalg.norm(actual_base[:2] - sample.base_xy_yaw[:2]))
+        camera_position_error_vector = (
+            actual_cam_position - sample.target_position_world_m
+        )
+        base_xy_error = float(
+            np.linalg.norm(actual_base_post[:2] - sample.base_xy_yaw[:2])
+        )
         base_yaw_error = abs(
             math.atan2(
-                math.sin(actual_base[2] - sample.base_xy_yaw[2]),
-                math.cos(actual_base[2] - sample.base_xy_yaw[2]),
+                math.sin(actual_base_post[2] - sample.base_xy_yaw[2]),
+                math.cos(actual_base_post[2] - sample.base_xy_yaw[2]),
             )
         )
         peak_base_xy_error_m = max(peak_base_xy_error_m, base_xy_error)
@@ -519,6 +615,18 @@ def evaluate_case(
                     "proxy_applied_effort_nm": latest_proxy_effort_nm.tolist(),
                     "base_xy_error_m": base_xy_error,
                     "base_yaw_error_deg": math.degrees(base_yaw_error),
+                    "actual_base_xy_yaw": actual_base_post.tolist(),
+                    "target_base_xy_yaw": sample.base_xy_yaw.tolist(),
+                    "camera_position_error_xyz_m": (
+                        camera_position_error_vector.tolist()
+                    ),
+                    "actual_camera_position_world_m": actual_cam_position.tolist(),
+                    "target_camera_position_world_m": (
+                        sample.target_position_world_m.tolist()
+                    ),
+                    "actual_yaw_rate_rad_s": float(state["yaw_rate"][0].item()),
+                    "phase_feedforward_v_mps": phase_feedforward_v_mps,
+                    "phase_feedforward_wz_rad_s": phase_feedforward_wz_rad_s,
                     "vx_reference_mps": vx_ref,
                     "wz_reference_rad_s": wz_ref,
                 }
@@ -549,6 +657,9 @@ def evaluate_case(
         proxy_target_velocity_samples_deg_s, dtype=np.float64
     )
     proxy_effort_values = np.asarray(proxy_effort_samples_nm, dtype=np.float64)
+    applied_residual_values = np.asarray(
+        applied_residual_actions, dtype=np.float64
+    )
     pitches = np.asarray(pitch_samples_deg, dtype=np.float64)
     action_saturation_ratio = saturated_actions / max(action_count, 1)
     riser_saturation_ratio = saturated_riser / max(riser_effort_count, 1)
@@ -637,6 +748,9 @@ def evaluate_case(
         "action_saturation_ratio": action_saturation_ratio,
         "riser_saturation_ratio": riser_saturation_ratio,
         "proxy_saturation_ratio": proxy_saturation_ratio,
+        "residual_action_abs_max": np.max(
+            np.abs(applied_residual_values), axis=0
+        ).tolist(),
         "peak_base_xy_error_m": peak_base_xy_error_m,
         "peak_base_yaw_error_deg": peak_base_yaw_error_deg,
         "peak_com_pitch_bias_deg": peak_com_pitch_bias_deg,
@@ -659,6 +773,8 @@ def main() -> int:
         raise ValueError("maximum duration scale must be at least one")
     if args.video_dir is not None and len(cases) != 1:
         raise ValueError("video recording requires exactly one case")
+    if args.dataset_dir is not None and args.residual_policy is not None:
+        raise ValueError("teacher dataset collection and learned policy rollout are exclusive")
     if args.video_fps <= 0:
         raise ValueError("video fps must be positive")
     plans = {
@@ -669,6 +785,14 @@ def main() -> int:
     }
     if any(plan.case != case for case, plan in plans.items()):
         raise ValueError("playback case metadata mismatch")
+    residual_policy_device = torch.device(args.residual_policy_device)
+    residual_policy = None
+    if args.residual_policy is not None:
+        if residual_policy_device.type == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError("CUDA residual policy requested but CUDA is unavailable")
+        residual_policy = torch.jit.load(
+            str(args.residual_policy), map_location=residual_policy_device
+        ).eval()
     gain_data = json.loads(args.gains.read_text(encoding="utf-8"))
     gain = np.asarray(gain_data["selected_gain"], dtype=np.float64)
     control_interval = int(gain_data["control_interval_steps"])
@@ -756,6 +880,8 @@ def main() -> int:
             target_marker,
             path_marker,
             args.dataset_dir,
+            residual_policy,
+            residual_policy_device,
         )
         for case in cases
     ]
@@ -765,6 +891,27 @@ def main() -> int:
         "training_started": False,
         "ppo_authorized": False,
         "controller_profile": "structural_robust_v1",
+        "tracking_profile": "riser_phase_consistent_v2",
+        "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
+        "controller_overrides": {
+            name: value
+            for name, value in {
+                "wz_kp": args.controller_wz_kp,
+                "wz_ki": args.controller_wz_ki,
+                "wz_feedforward": args.controller_wz_feedforward,
+                "wheel_difference_kp": args.controller_wheel_difference_kp,
+            }.items()
+            if value is not None
+        },
+        "tracking_overrides": {
+            name: value
+            for name, value in {
+                "along_track_kp": args.tracking_along_kp,
+                "cross_track_kp": args.tracking_cross_kp,
+                "yaw_kp": args.tracking_yaw_kp,
+            }.items()
+            if value is not None
+        },
         "position_observation_link": "physical_cam_link_fk",
         "target_attitude_contract": "semantic_dfr_to_physical_cam_v1",
         "hardware_proxy_command_contract": "semantic_attitude_position_only",
@@ -775,6 +922,14 @@ def main() -> int:
         ),
         "phase_governor_enabled": not args.disable_phase_governor,
         "com_pitch_feedforward_enabled": not args.disable_com_pitch_feedforward,
+        "trajectory_command_source": (
+            "deterministic_teacher"
+            if residual_policy is None
+            else "torchscript_residual_policy"
+        ),
+        "residual_policy": (
+            None if args.residual_policy is None else str(args.residual_policy.resolve())
+        ),
         "cases": cases,
         "passed_case_count": sum(item["passed"] for item in results),
         "results": results,

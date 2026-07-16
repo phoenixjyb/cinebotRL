@@ -29,6 +29,16 @@ def test_residual_action_reconstructs_bounded_teacher_command() -> None:
     assert ACTION_SCALES.tolist() == [0.2, 0.4, 0.1]
 
 
+def test_residual_action_clips_final_base_and_riser_commands() -> None:
+    command = apply_residual_action(
+        0.35,
+        -0.30,
+        1.18,
+        np.array([1.0, -1.0, 1.0]),
+    )
+    np.testing.assert_allclose(command, [0.4, -0.4, 1.2])
+
+
 def test_executed_observation_uses_body_frame_errors() -> None:
     observation = build_executed_observation(
         lqr_state=np.arange(6, dtype=float),

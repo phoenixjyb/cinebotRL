@@ -105,6 +105,21 @@ class RiserPlaybackSample:
     feedforward_proxy_velocity_rad_s: np.ndarray
 
 
+def phase_scaled_feedforward(
+    sample: RiserPlaybackSample, progress_scale: float
+) -> tuple[float, float, float, np.ndarray]:
+    """Scale trajectory derivatives consistently with governed phase time."""
+
+    if not math.isfinite(progress_scale) or not 0.0 <= progress_scale <= 1.0:
+        raise ValueError("progress scale must be finite and in [0, 1]")
+    return (
+        sample.feedforward_v_mps * progress_scale,
+        sample.feedforward_wz_rad_s * progress_scale,
+        sample.feedforward_riser_velocity_mps * progress_scale,
+        sample.feedforward_proxy_velocity_rad_s * progress_scale,
+    )
+
+
 def riser_playback_kinematic_metrics(
     plan: RiserPlaybackPlan,
     kinematics: UrdfRiserCameraKinematics,
@@ -246,7 +261,13 @@ def build_riser_playback_plan(
     kinematics: UrdfRiserCameraKinematics,
     *,
     minimum_camera_height_m: float = 0.6,
+    maximum_base_yaw_rate_rad_s: float = PLAYBACK_PLANNING_BASE_YAW_RATE_RAD_S,
 ) -> RiserPlaybackPlan:
+    if not (
+        math.isfinite(maximum_base_yaw_rate_rad_s)
+        and 0.0 < maximum_base_yaw_rate_rad_s <= PLAYBACK_BASE_YAW_RATE_LIMIT_RAD_S
+    ):
+        raise ValueError("planning base yaw rate must be within the playback limit")
     shift = max(
         0.0,
         minimum_camera_height_m - float(np.min(reference.positions_m[:, 2])),
@@ -255,7 +276,7 @@ def build_riser_playback_plan(
         reference,
         kinematics,
         vertical_shift_m=shift,
-        maximum_base_yaw_rate_rad_s=PLAYBACK_PLANNING_BASE_YAW_RATE_RAD_S,
+        maximum_base_yaw_rate_rad_s=maximum_base_yaw_rate_rad_s,
     )
     playback = playback_plan_from_kinematic_plan(reference, plan)
     metrics = riser_playback_kinematic_metrics(playback, kinematics)

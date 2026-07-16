@@ -17,6 +17,8 @@ from rl_platform.tasks.two_wheel_balance.riser_kinematics import (  # noqa: E402
     UrdfRiserCameraKinematics,
 )
 from rl_platform.tasks.two_wheel_balance.riser_playback import (  # noqa: E402
+    PLAYBACK_BASE_YAW_RATE_LIMIT_RAD_S,
+    PLAYBACK_PLANNING_BASE_YAW_RATE_RAD_S,
     build_riser_playback_plan,
     riser_playback_kinematic_gate,
     riser_playback_kinematic_metrics,
@@ -34,6 +36,26 @@ def parse_cases(value: str) -> list[int]:
     return cases
 
 
+def parse_yaw_rate_overrides(value: str) -> dict[int, float]:
+    overrides: dict[int, float] = {}
+    if not value.strip():
+        return overrides
+    for item in value.split(","):
+        case_text, separator, rate_text = item.partition(":")
+        if not separator:
+            raise argparse.ArgumentTypeError("yaw overrides must use CASE:RAD_S")
+        case = int(case_text)
+        rate = float(rate_text)
+        if (
+            case <= 0
+            or not 0.0 < rate <= PLAYBACK_BASE_YAW_RATE_LIMIT_RAD_S
+            or case in overrides
+        ):
+            raise argparse.ArgumentTypeError("invalid or duplicate yaw-rate override")
+        overrides[case] = rate
+    return overrides
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -49,6 +71,11 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--cases", type=parse_cases, default=parse_cases("1,31,73"))
     parser.add_argument("--expected-count", type=int, default=62)
+    parser.add_argument(
+        "--planning-yaw-rate-overrides",
+        type=parse_yaw_rate_overrides,
+        default={},
+    )
     args = parser.parse_args()
 
     references = discover_corrected_riser_stage(
@@ -61,7 +88,14 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     rows = []
     for case in args.cases:
-        plan = build_riser_playback_plan(references[case], kinematics)
+        planning_yaw_rate = args.planning_yaw_rate_overrides.get(
+            case, PLAYBACK_PLANNING_BASE_YAW_RATE_RAD_S
+        )
+        plan = build_riser_playback_plan(
+            references[case],
+            kinematics,
+            maximum_base_yaw_rate_rad_s=planning_yaw_rate,
+        )
         metrics = riser_playback_kinematic_metrics(plan, kinematics)
         checks = riser_playback_kinematic_gate(metrics, kinematics)
         if not all(checks.values()):
@@ -75,6 +109,7 @@ def main() -> int:
                 "sha256": sha256(output),
                 "sample_count": len(plan.time_s),
                 "duration_s": float(plan.time_s[-1]),
+                "planning_base_yaw_rate_rad_s": planning_yaw_rate,
                 "planning_strategy": plan.planning_strategy,
                 "vertical_shift_m": plan.vertical_shift_m,
                 "kinematic_metrics": metrics,
@@ -89,6 +124,10 @@ def main() -> int:
             {str(references[case].metadata["source"]) for case in args.cases}
         ),
         "case_count": len(rows),
+        "planning_yaw_rate_overrides": {
+            str(case): rate
+            for case, rate in sorted(args.planning_yaw_rate_overrides.items())
+        },
         "cases": rows,
     }
     (args.output_dir / "manifest.json").write_text(

@@ -4,6 +4,7 @@ docs/03_training/two_wheel_balance/RISER_FIXED_GIMBAL_MOUNT_AUDIT_20260715.md
 docs/03_training/two_wheel_balance/RISER_GATE0_GATE2_RESULTS_20260715.md
 docs/03_training/two_wheel_balance/RISER_MECHANISM_MOTOR_RECOMMENDATION_CN_20260715.md
 docs/03_training/two_wheel_balance/RISER_RECURSIVE_IMPROVEMENT_LOG_20260716.md
+docs/03_training/two_wheel_balance/evidence_20260716_riser_phase_profile_v2/README.md
 docs/03_training/two_wheel_balance/RISER_ROBOT_GOAL_AND_GATE_PLAN_20260715.md
 docs/03_training/two_wheel_balance/evidence_20260716_riser_rs4_attitude/cases.csv
 docs/03_training/two_wheel_balance/evidence_20260716_riser_rs4_attitude/summary.json
@@ -45,6 +46,7 @@ scripts/two_wheel_balance/riser_remote_sync_manifest_20260716.txt
 scripts/two_wheel_balance/smoke_riser_asset.py
 scripts/two_wheel_balance/smoke_riser_dynamic.py
 scripts/two_wheel_balance/smoke_riser_reference_playback.py
+scripts/two_wheel_balance/train_riser_residual_bc.py
 scripts/two_wheel_balance/smoke_riser_static_heights.py
 scripts/two_wheel_balance/sync_riser_to_98.sh
 src/rl_platform/robots/two_wheel_balance/__init__.py
@@ -54,8 +56,10 @@ src/rl_platform/tasks/two_wheel_balance/riser_kinematics.py
 src/rl_platform/tasks/two_wheel_balance/riser_playback.py
 src/rl_platform/tasks/two_wheel_balance/riser_reference.py
 src/rl_platform/tasks/two_wheel_balance/riser_residual_dataset.py
+src/rl_platform/tasks/two_wheel_balance/riser_residual_policy.py
 src/rl_platform/tasks/two_wheel_balance/riser_rs4_attitude.py
 src/rl_platform/tasks/two_wheel_balance/riser_rs4_reference.py
+src/rl_platform/tasks/two_wheel_balance/whole_body_tracking.py
 tests/test_build_riser_all79_stage.py
 tests/test_build_riser_residual_dataset.py
 tests/test_build_riser_corrected_stage.py
@@ -65,4 +69,7 @@ tests/test_two_wheel_riser_kinematics.py
 tests/test_two_wheel_riser_playback.py
 tests/test_two_wheel_riser_reference.py
 tests/test_two_wheel_riser_residual_dataset.py
+tests/test_two_wheel_riser_residual_policy.py
+tests/test_train_riser_residual_bc.py
 tests/test_two_wheel_riser_rs4_attitude.py
+tests/test_two_wheel_whole_body_tracking.py

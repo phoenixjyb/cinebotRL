@@ -615,3 +615,33 @@ and must state whether its candidate was accepted or rejected.
   start the accepted-71 batch before that canary sequence passes.
 - Keep residual capture, Gate D, BC, and PPO blocked; do not widen the frozen
   action envelope from this failed case.
+
+## Round 20: reverse-recovery event ordering audit
+
+- Independent verification fixed the final case-74 status identity at SHA-256
+  `b6bbd2dc25783ddff8364bafea1a23b06555d7f2dfe089095dfad29304cde4ee`.
+  Riser GPU work remained stopped.
+- Added a hash-bound CPU audit that separates planned reverse motion from the
+  post-fault recovery response. Its output
+  `CPU_REVERSE_RECOVERY_AUDIT.json` has SHA-256
+  `0a8e611a567640451103a80b05de955601718f5c63aa19d0e21fe9ab475df60a`.
+- Before the first false yaw-branch error, `54` sampled reverse-motion points
+  ran without command saturation. Maximum absolute `vx` reference was
+  `0.233591 m/s`; maximum base and camera position errors were
+  `0.144051/0.182615 m`.
+- After the yaw fault, `7/11` sampled commands saturated at `0.4 m/s`, the
+  command changed direction, and base error reached `1.361215 m`. This is
+  downstream recovery evidence, not proof that reverse tracking caused the
+  original failure.
+- Decision: do not alter reverse gains, add clipping/hysteresis, or relax any
+  gate from this 1 Hz trace. Preserve the continuous-yaw repair and require a
+  corrected case-74 dynamic canary before opening a recovery-controller change.
+- The CPU-only riser/two-wheel suite passes `147` tests. No Isaac, residual
+  capture, BC, PPO, dataset, or learned action was started.
+
+## Next round after Round 20
+
+- Keep all riser GPU work stopped until explicit authorization.
+- When authorized, run corrected case 74 alone in a fresh guarded namespace.
+- Only if physical dynamic quality passes may case 77 start; the accepted-71
+  batch and all learning stages remain closed until the canary sequence passes.

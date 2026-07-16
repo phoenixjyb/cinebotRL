@@ -274,6 +274,20 @@ at `61 s`, position failed at `64 s`, and forbidden contact occurred at
 with only `-0.420 deg` wrapped error. This is strong temporal evidence, not yet
 dynamic proof that the repair cures case 74.
 
+A second hash-bound CPU audit separates valid reverse tracking from downstream
+recovery. `CPU_REVERSE_RECOVERY_AUDIT.json` has SHA-256
+`0a8e611a567640451103a80b05de955601718f5c63aa19d0e21fe9ab475df60a`.
+Before the yaw fault, all `54` sampled reverse-motion points remained below
+chassis-command saturation: maximum absolute `vx` reference was
+`0.233591 m/s`, base error was at most `0.144051 m`, and camera position error
+was at most `0.182615 m`. After the fault, `7/11` sampled commands saturated at
+`0.4 m/s`, the recovery command reversed direction, and base error grew to
+`1.361215 m`. The sealed 1 Hz trace therefore supports yaw-branch mismatch as
+the primary observed precursor and full-scale bidirectional recovery as a
+downstream response. It does not authorize a reverse-controller change; a
+corrected-yaw dynamic canary is required first. The expanded CPU-only
+riser/two-wheel suite passes `147` tests.
+
 This repair is not dynamically validated. All riser GPU work remains stopped.
 The next admissible runtime step is one fresh exclusive case-74 structural
 canary after code review, commit/push, and explicit GPU authorization. Case 77,

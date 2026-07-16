@@ -509,3 +509,42 @@ and must state whether its candidate was accepted or rejected.
 - Collect residual labels only from dynamically passing cases, then recompute
   the residual envelope before freezing action scales.
 - Keep BC/PPO blocked.
+
+## Round 18: Gate C timing, gate order, and GPU ownership repair
+
+- Frozen Gate B portfolio admission passed for cases `1,52,74,77` from clean
+  pushed commit `abc87fd`; no dataset or learned policy was requested.
+- Provisional dynamic cases 1 and 52 passed all physical checks. Case 52 ran
+  `70,952` steps with position p95/max `0.108022/0.153767 m`, attitude p95/max
+  `0.151288/0.211011 deg`, pitch max `5.569997 deg`, zero saturation, and no
+  termination or dataset.
+- Evidence audit found runtime `source_duration_s` contained retimed execution
+  duration. Commit `af4a4da` preserves and validates both clocks and reports
+  them separately in riser and whole-body runtime JSON.
+- Case 74 exposed prospective normalized residual
+  `[1.00200645,0.19818327,0.0356378]`. This was initially misclassified as a
+  dynamic reject. The deterministic commands had already been computed and
+  the normalized label was never applied.
+- Commit `d4c2097` separates raw residual command, frozen-envelope diagnostics,
+  and learned action normalization. Gate C physics continues without clipping
+  or labels; dataset capture still rejects envelope overflow.
+- The first v2 reseal was stopped because a differential run owned the GPU.
+  Its partial case-1 log is retained as invalid shared-GPU evidence, with no
+  completed runtime JSON.
+- Commit `f08271e` enforces exclusive GPU ownership before namespace creation
+  and before every case. A live test rejected the competing run with exit `5`
+  and left the v3 namespace absent.
+- Decision: do not infer case-74 dynamic quality yet. Hold all riser Isaac
+  launches while the differential final exclusive rerun uses commit `3e820e8`.
+  Keep residual capture, Gate D, BC, and PPO closed.
+
+## Next round after Round 18
+
+- Wait for explicit GPU release.
+- Run `20260717_gate_c_canary_v3_exclusive_timing_resealed` for
+  `1,52,74,77` from clean pushed `f08271e` or a verified descendant.
+- Require exclusive GPU ownership, both timing fields, unchanged safety gates,
+  no dataset, and independent dynamic versus label-envelope outcomes.
+- If all four dynamically pass, expand Gate C across the 71 accepted plans.
+- Recompute the raw residual envelope only from dynamically passing cases;
+  do not widen frozen action scales before that audit.

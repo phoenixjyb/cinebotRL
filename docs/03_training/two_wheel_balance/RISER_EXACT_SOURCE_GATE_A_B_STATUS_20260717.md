@@ -178,3 +178,36 @@ all existing safety gates, record dynamic rejects honestly, and collect no
 residual label from a failing case. BC and PPO remain blocked until dynamic
 qualification, clean residual capture, case-disjoint split, command
 reconstruction, zero-clipping, and untouched holdout gates all pass.
+
+## Gate C canary correction and current stop
+
+The first canary namespace, `20260717_gate_c_canary_v1`, is preserved as
+provisional audit evidence only. Cases 1 and 52 passed every physical dynamic
+check, but their JSON mislabeled retimed execution duration as source duration.
+Case 74 then stopped because the runtime normalized a prospective residual
+label against the frozen `[0.30, 0.40, 0.10]` scale before completing dynamic
+evaluation. The first normalized vector was
+`[1.00200645, 0.19818327, 0.0356378]`; no failing action or dataset was written.
+
+This was a gate-order bug, not a physical dynamic reject. The correction is
+sealed beside the v1 evidence as `GATE_ORDER_CORRECTION.json` with SHA-256
+`dbe43eadcfceac7a084a76237bf2edacd95cf862ded51aba15b92c3a62acb6dc`.
+The timing-schema repair is commit `af4a4da`; raw residual diagnostics were
+decoupled from Gate C dynamics in `d4c2097`. Gate C now reports independent
+`dynamic_quality_passed` and `residual_label_envelope_passed` outcomes. It
+does not clip, widen scales, apply raw labels, or write residual datasets.
+
+The first reseal attempt was interrupted because a differential whole-body
+Isaac run already owned the GPU. Namespace
+`20260717_gate_c_canary_v2_timing_resealed` is explicitly
+`interrupted_shared_gpu`, has no completed case, and is invalid for Gate C.
+Commit `f08271e` adds a live exclusive-GPU admission guard; it was proven to
+exit `5` before creating an artifact namespace while the competing process was
+active.
+
+All riser GPU/Isaac launches are now held while the differential session runs
+its final exclusive rerun from commit `3e820e8`. Next riser continuation is the
+fresh namespace `20260717_gate_c_canary_v3_exclusive_timing_resealed`, only
+after explicit GPU release. Rerun cases `1,52,74,77`; stop only on
+physical/safety/quality failure. A label-envelope failure keeps Gate D,
+residual capture, BC, and PPO closed, but no longer stops Gate C dynamics.

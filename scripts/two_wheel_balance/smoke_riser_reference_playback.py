@@ -23,6 +23,11 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--gains", type=Path, required=True)
 parser.add_argument("--plan-dir", type=Path, required=True)
+parser.add_argument(
+    "--plan-filename-template",
+    default="case_{case:04d}_riser_playback_v1.npz",
+    help="Plan basename template; must contain exactly one integer {case} field.",
+)
 parser.add_argument("--cases", default="1,31,73")
 parser.add_argument("--maximum-duration-scale", type=float, default=2.0)
 parser.add_argument("--maximum-pitch-deg", type=float, default=12.0)
@@ -139,6 +144,16 @@ def parse_cases(value: str) -> list[int]:
     if not cases or len(cases) != len(set(cases)):
         raise ValueError("cases must be a non-empty unique list")
     return cases
+
+
+def plan_path(plan_dir: Path, template: str, case: int) -> Path:
+    try:
+        name = template.format(case=case)
+    except (KeyError, ValueError) as exc:
+        raise ValueError("invalid plan filename template") from exc
+    if Path(name).name != name or "{case" not in template:
+        raise ValueError("plan filename template must be a basename with a {case} field")
+    return plan_dir / name
 
 
 def single_joint_id(robot, name: str) -> int:
@@ -795,7 +810,7 @@ def main() -> int:
         raise ValueError("video fps must be positive")
     plans = {
         case: load_riser_playback_plan(
-            args.plan_dir / f"case_{case:04d}_riser_playback_v1.npz"
+            plan_path(args.plan_dir, args.plan_filename_template, case)
         )
         for case in cases
     }

@@ -52,6 +52,23 @@ def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
     assert '"$CAPTURE_COMMIT"' in source
 
 
+def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
+    source = _read("run_riser_gate_c_canary.sh")
+    assert "validate_riser_gate_c_portfolio.py" in source
+    assert "851a7b2751cd397ba35daf57d1a8c6971fb14ed0186683af48d3c6109090570a" in source
+    assert 'git -C "$ROOT" diff --quiet' in source
+    assert 'git -C "$ROOT" diff --cached --quiet' in source
+    assert "rev-parse '@{u}'" in source
+    assert "--plan-filename-template" in source
+    assert "exact_source_riser_playback_v1.npz" in source
+    assert "--dataset-dir" not in source
+    assert "--residual-policy" not in source
+    assert "--zero-policy-action" not in source
+    assert '"residual_capture_started": False' in source
+    assert '"bc_started": False' in source
+    assert '"ppo_started": False' in source
+
+
 def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:
     source = _read("run_riser_residual_holdout_gate.sh")
     assert "exact_source_v1" in source

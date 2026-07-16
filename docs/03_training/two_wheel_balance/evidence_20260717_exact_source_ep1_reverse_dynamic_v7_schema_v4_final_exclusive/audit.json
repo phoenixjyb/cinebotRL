@@ -1,0 +1,63 @@
+{
+  "schema": "cinebotrl_two_wheel_exact_source_dynamic_evidence_audit_v1",
+  "date": "2026-07-17",
+  "classification": "final_exclusive_dynamic_pass_training_blocked",
+  "source_commit": "3e820e80d110c071369115a29bdcc2f698a1510b",
+  "remote_namespace": "evaluation_results/two_wheel_exact_source_v1/gate3_ep1_reverse_v7_schema_v4_final_exclusive_20260717",
+  "result_schema": "recomo_two_wheel_corrected_full_pose_playback_smoke_v4",
+  "remote_result_json_sha256": "0d20d30d1c185474a8434843fa9ccadb04a609f631558050a3ad1d613377d6c8",
+  "remote_console_log_sha256": "e3ee42f6eac7c0baee8361508a93d23580de38a02f5fde79d680ace50db5988a",
+  "repository_result_json_lf_sha256": "c6e88ff0433fe6e745558a56103fe083eec609a205078a3750b8b90be3df0744",
+  "repository_console_log_lf_sha256": "90c48feedbc89d17ef65ad2a11502bff94bd9c4d244efb2c12e781c3c5fa24ee",
+  "gpu_ownership_log_sha256": "a1ce39ba1bf1238d769f224b12ad9ed0016bb5772d9988f0831368754c21c510",
+  "gpu_ownership": {
+    "sample_interval_s": 2,
+    "sample_count": 201,
+    "first_sample": "2026-07-17T05:50:36+08:00",
+    "last_sample": "2026-07-17T05:57:18+08:00",
+    "foreign_playback_command_count": 0,
+    "riser_command_observed": false,
+    "gpu_empty_after_close": true
+  },
+  "execution_contract": {
+    "source_duration_s": 4.634756,
+    "execution_duration_s": 40.461260644949895,
+    "execution_plan_sha256": "70c8e1abca453f67c771a33640a26309e57858cf28170fffd73019d4fbb41bc6",
+    "execution_schedule_metadata_sealed": true,
+    "acquisition_route_contract": "minimum_total_yaw_forward_or_reverse_v1",
+    "base_acquisition_route": "reverse",
+    "base_acquisition_total_yaw_travel_deg": 133.8440637845214
+  },
+  "dynamic_metrics": {
+    "completed_phase_time_s": 40.461260644949895,
+    "wall_duration_s": 54.68,
+    "position_error_p95_m": 0.04004479667787098,
+    "position_error_max_m": 0.08909243764261035,
+    "attitude_error_p95_deg": 6.475460483946485,
+    "attitude_error_max_deg": 7.514396218216311,
+    "peak_pitch_deg": 10.921313680952187,
+    "peak_arm_error_deg": 3.9441832362303657,
+    "gimbal_ik_nonconverged_steps": 0,
+    "action_saturation_ratio": 0.000365764447695684,
+    "arm_effort_saturation_ratio": 0.019873201658132163,
+    "gimbal_effort_saturation_ratio": 0.0,
+    "termination": null
+  },
+  "all_dynamic_checks_passed": true,
+  "training_started": false,
+  "valid_for_training": false,
+  "provisional_shared_gpu_run": {
+    "namespace": "evaluation_results/two_wheel_exact_source_v1/gate3_ep1_reverse_v7_schema_v4_exclusive_20260717",
+    "result_json_sha256": "0d20d30d1c185474a8434843fa9ccadb04a609f631558050a3ad1d613377d6c8",
+    "console_log_sha256": "222d4323fa36fbd3a35ceb9278c6186a1e0a90c1fbc3135013f448419b8ee46e",
+    "run_started": "2026-07-17T05:40:21+08:00",
+    "foreign_riser_started": "2026-07-17T05:41:55+08:00",
+    "foreign_riser_last_observed": "2026-07-17T05:47:39+08:00",
+    "foreign_riser_confirmed_absent_by": "2026-07-17T05:48:26+08:00",
+    "result_written": "2026-07-17T05:49:12+08:00",
+    "classification": "provisional_shared_gpu_not_admitted"
+  },
+  "next_required_action": "ep7_downstream_explicit_M_greater_than_N_execution_retiming",
+  "bc_started": false,
+  "ppo_started": false
+}

@@ -222,6 +222,19 @@ runtime admission validates and emits both clocks, execution-plan SHA-256,
 schedule seal, and route metadata. `valid_for_training=false` and training has
 not started.
 
+That corrected rerun is now complete from clean commit `3e820e8`. The runtime
+first verifies the exact NPZ SHA-256 and sealed route/schedule metadata, then
+emits the immutable 4.634756 s source clock separately from the 40.461261 s
+execution clock. An initial schema-v4 attempt reproduced the physical pass but
+overlapped a later riser process and is retained only as provisional shared-GPU
+evidence. The final-exclusive namespace was monitored every two seconds from
+05:50:36 to 05:57:18, produced 201 ownership samples, and contained no foreign
+playback command. It reproduced the same metrics and all 15 dynamic checks
+passed. The final JSON, console, and ownership-log SHA-256 values are sealed in
+the evidence audit. Case 1 therefore passes the representative dynamic gate,
+but remains `valid_for_training=false`; this single case does not admit BC,
+PPO, residual capture, or a corpus-wide teacher.
+
 Case 7 therefore proves the corrected source-integrity path, not executable
 teacher quality. Its gimbal failure requires a structural base/arm/gimbal
 branch-selection correction; wrapping the exported physical joint angle would
@@ -243,19 +256,22 @@ hide a real actuator-limit crossing and is not allowed.
 - Upstream ep1 and ep77 holonomic seeds may be used only as episode-specific
   solver priors after exact hash verification. They are not policy teachers and
   do not relax nonholonomic, source, gravity, timing, or output gates.
-- Case 1 now passes exact-source offline gates and has a provisional physical
-  dynamic pass pending the corrected evidence-schema rerun. The
+- Case 1 now passes exact-source offline and final-exclusive representative
+  dynamic gates under the corrected schema-v4 evidence contract. The
   upstream ep7 branch search is closed without an admitted package: it
   crossed earlier branch failures but remained rate-disconnected at waypoint
   187. Ep7 therefore requires downstream `M>N` execution retiming with all 663
   source anchors, original source times, and complete ordered mapping retained.
   Gate-2 all-79 regeneration, a full dynamic corpus, BC, and PPO remain blocked.
 
-Exclusive case-1 dynamic evidence is stored in:
+Final-exclusive schema-v4 case-1 dynamic evidence is stored in:
 
 ```text
-docs/03_training/two_wheel_balance/evidence_20260717_exact_source_ep1_reverse_dynamic_v7
+docs/03_training/two_wheel_balance/evidence_20260717_exact_source_ep1_reverse_dynamic_v7_schema_v4_final_exclusive
 ```
+
+The older `evidence_20260717_exact_source_ep1_reverse_dynamic_v7` namespace is
+historical/provisional evidence and must not be used as the final admission.
 
 Machine-readable quarantine evidence is stored in:
 

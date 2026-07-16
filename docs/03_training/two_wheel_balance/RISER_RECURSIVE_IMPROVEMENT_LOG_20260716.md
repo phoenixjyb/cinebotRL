@@ -329,3 +329,36 @@ and must state whether its candidate was accepted or rejected.
   deterministic-baseline regression gates before any learned-policy rollout.
 - Keep PPO blocked. The next accepted artifact is a validated residual dataset,
   not another blind training run.
+
+## Round 13: executed-state residual dataset smoke
+
+- Contract decision: the DNN does not directly replace the balance controller.
+  It predicts bounded high-level residuals `delta-vx`, `delta-wz`, and a riser
+  target increment with scales `0.20 m/s`, `0.40 rad/s`, and `0.10 m`.
+  Cascaded LQR still owns wheel effort and the semantic DJI adapter remains
+  deterministic.
+- Observation contract: 26 deployable values from physical LQR state, body-frame
+  base and camera errors, physical-camera attitude error, riser state/error,
+  trajectory feed-forward, phase/governor state, and prior residual action.
+- Collection rule: record dense pre-action Isaac state only; do not copy GIK
+  actions or physical gimbal labels. A per-case NPZ is saved only after the
+  unchanged dynamic replay gate passes.
+- Result: repaired cases 18, 23, 24, 41, 50, 72, and 79 passed `7/7` and produced
+  39,430 rows. No action channel clipped; absolute maxima were `0.754922`,
+  `0.594813`, and `0.121189`.
+- Dataset audit: finite values, 26-by-3 dimensions, no case leakage, and teacher
+  command reconstruction error `1.1921e-7`. The deterministic split uses five
+  train cases, case 23 for validation, and case 18 for holdout.
+- Decision: accept the collection and schema pipeline, but reject this seven-case
+  corpus as a training dataset. Training and PPO remain unauthorized.
+- Evidence: `evidence_20260716_riser_residual_dataset_smoke/`.
+- Lesson: the safe learned boundary is above the proven LQR, and dataset admission
+  must be coupled to successful physical-camera dynamic replay.
+
+## Next round after Round 13
+
+- Export self-contained plans for all 79 corrected trajectories and collect all
+  79 through the same dense Isaac path.
+- Require zero failed captures, zero split leakage, finite values, bounded labels,
+  and exact teacher-command reconstruction before offline BC.
+- Do not start BC or any learned-policy rollout from the seven-case smoke.

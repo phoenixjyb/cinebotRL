@@ -38,6 +38,11 @@ parser.add_argument("--disable-phase-governor", action="store_true")
 parser.add_argument("--disable-com-pitch-feedforward", action="store_true")
 parser.add_argument("--disable-semantic-proxy-state-adapter", action="store_true")
 parser.add_argument("--video-dir", type=Path)
+parser.add_argument(
+    "--dataset-dir",
+    type=Path,
+    help="Write dense pre-action executed-state residual datasets per case.",
+)
 # RecordVideo receives one frame per 200 Hz policy step.  Encoding at the same
 # rate preserves simulation time; viewing derivatives may be transcoded to 50.
 parser.add_argument("--video-fps", type=int, default=200)
@@ -77,6 +82,11 @@ from rl_platform.tasks.two_wheel_balance.riser_kinematics import (
     UrdfRiserCameraKinematics,
 )
 from rl_platform.tasks.two_wheel_balance.riser_control import balance_progress_scale
+from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
+    build_executed_observation,
+    build_residual_action,
+    save_case_dataset,
+)
 from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     WholeBodyTrackingConfig,
     bounded_base_references,
@@ -160,6 +170,7 @@ def evaluate_case(
     control_interval: int,
     target_marker: VisualizationMarkers | None,
     path_marker: VisualizationMarkers | None,
+    dataset_dir: Path | None,
 ) -> dict[str, object]:
     _, proxy_ids, riser_id = initialize_case(env, plan)
     unwrapped = env.unwrapped
@@ -208,6 +219,13 @@ def evaluate_case(
     internal_proxy_rate_max_deg_s = 0.0
     termination = None
     trace = []
+    dataset_observations = []
+    dataset_actions = []
+    dataset_elapsed_time = []
+    dataset_phase_time = []
+    dataset_baseline_actions = []
+    dataset_teacher_commands = []
+    previous_residual_action = np.zeros(3, dtype=np.float32)
     completed_steps = 0
     body_masses = robot.data.default_mass[0].to(unwrapped.device)
     kinematics = UrdfRiserCameraKinematics(
@@ -237,6 +255,56 @@ def evaluate_case(
             sample.feedforward_wz_rad_s,
             tracking_cfg,
         )
+        actual_camera_position_pre = (
+            robot.data.body_pos_w[0, cam_id].detach().cpu().numpy()
+        )
+        actual_camera_quaternion_pre = (
+            robot.data.body_quat_w[0, cam_id].detach().cpu().numpy()
+        )
+        actual_riser_pre = float(robot.data.joint_pos[0, riser_id].item())
+        actual_riser_velocity_pre = float(
+            robot.data.joint_vel[0, riser_id].item()
+        )
+        target_physical_camera_quaternion = (
+            semantic_dfr_to_physical_cam_quat_wxyz(
+                sample.target_semantic_dfr_quat_wxyz
+            )
+        )
+        residual_action = build_residual_action(
+            feedforward_vx_m_s=sample.feedforward_v_mps,
+            feedforward_wz_rad_s=sample.feedforward_wz_rad_s,
+            commanded_vx_m_s=vx_ref,
+            commanded_wz_rad_s=wz_ref,
+            actual_riser_position_m=actual_riser_pre,
+            target_riser_position_m=sample.riser_q,
+        )
+        dataset_observations.append(
+            build_executed_observation(
+                lqr_state=current_states[0],
+                actual_base_xy_yaw=actual_base,
+                target_base_xy_yaw=sample.base_xy_yaw,
+                actual_camera_position_world_m=actual_camera_position_pre,
+                target_camera_position_world_m=sample.target_position_world_m,
+                actual_camera_quat_wxyz=actual_camera_quaternion_pre,
+                target_camera_quat_wxyz=target_physical_camera_quaternion,
+                riser_position_m=actual_riser_pre,
+                riser_velocity_m_s=actual_riser_velocity_pre,
+                riser_target_m=sample.riser_q,
+                feedforward_vx_m_s=sample.feedforward_v_mps,
+                feedforward_wz_rad_s=sample.feedforward_wz_rad_s,
+                feedforward_riser_velocity_m_s=(
+                    sample.feedforward_riser_velocity_mps
+                ),
+                phase_fraction=phase_time_s / source_duration_s,
+                progress_scale=progress_scale,
+                previous_residual_action=previous_residual_action,
+            )
+        )
+        dataset_actions.append(residual_action)
+        dataset_elapsed_time.append(elapsed_s)
+        dataset_phase_time.append(phase_time_s)
+        dataset_teacher_commands.append([vx_ref, wz_ref, sample.riser_q])
+        previous_residual_action = residual_action
         riser_target = torch.tensor(
             [[sample.riser_q]], dtype=torch.float32, device=unwrapped.device
         )
@@ -338,6 +406,7 @@ def evaluate_case(
                 ),
             )
             action = action.astype(np.float32)
+        dataset_baseline_actions.append(action[0].copy())
         saturated_actions += int(
             np.count_nonzero(np.abs(action) >= controller_cfg.action_limit - 1e-6)
         )
@@ -510,6 +579,27 @@ def evaluate_case(
         "internal_proxy_rate_bounded": internal_proxy_rate_max_deg_s
         <= args.maximum_internal_proxy_rate_deg_s + 1e-6,
     }
+    dataset_path = None
+    if dataset_dir is not None and all(checks.values()):
+        dataset_path = dataset_dir / f"case_{plan.case:04d}_executed_residual_v1.npz"
+        count = len(dataset_observations)
+        save_case_dataset(
+            dataset_path,
+            plan.case,
+            {
+                "observations": np.asarray(dataset_observations, dtype=np.float32),
+                "actions": np.asarray(dataset_actions, dtype=np.float32),
+                "case_ids": np.full(count, plan.case, dtype=np.int16),
+                "elapsed_time_s": np.asarray(dataset_elapsed_time, dtype=np.float64),
+                "phase_time_s": np.asarray(dataset_phase_time, dtype=np.float64),
+                "baseline_wheel_actions": np.asarray(
+                    dataset_baseline_actions, dtype=np.float32
+                ),
+                "teacher_commands": np.asarray(
+                    dataset_teacher_commands, dtype=np.float32
+                ),
+            },
+        )
     return {
         "case": plan.case,
         "planning_strategy": plan.planning_strategy,
@@ -556,6 +646,9 @@ def evaluate_case(
         "termination": termination,
         "trace": trace,
         "checks": checks,
+        "executed_residual_dataset": (
+            None if dataset_path is None else str(dataset_path.resolve())
+        ),
         "passed": all(checks.values()),
     }
 
@@ -662,6 +755,7 @@ def main() -> int:
             control_interval,
             target_marker,
             path_marker,
+            args.dataset_dir,
         )
         for case in cases
     ]

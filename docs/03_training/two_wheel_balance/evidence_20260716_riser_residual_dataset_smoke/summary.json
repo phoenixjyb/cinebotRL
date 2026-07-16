@@ -1,0 +1,109 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_residual_merged_v1",
+  "source_case_schema": "cinebotrl_two_wheel_riser_executed_residual_v1",
+  "observation_names": [
+    "pitch_rad",
+    "pitch_rate_rad_s",
+    "mean_wheel_position_rad",
+    "mean_wheel_velocity_rad_s",
+    "wheel_velocity_difference_rad_s",
+    "yaw_rate_rad_s",
+    "base_target_longitudinal_error_m",
+    "base_target_lateral_error_m",
+    "base_target_yaw_error_rad",
+    "camera_target_longitudinal_error_m",
+    "camera_target_lateral_error_m",
+    "camera_target_vertical_error_m",
+    "camera_attitude_error_x_rad",
+    "camera_attitude_error_y_rad",
+    "camera_attitude_error_z_rad",
+    "riser_position_m",
+    "riser_velocity_m_s",
+    "riser_target_error_m",
+    "feedforward_vx_m_s",
+    "feedforward_wz_rad_s",
+    "feedforward_riser_velocity_m_s",
+    "phase_fraction",
+    "progress_scale",
+    "previous_residual_vx_normalized",
+    "previous_residual_wz_normalized",
+    "previous_residual_riser_target_normalized"
+  ],
+  "action_names": [
+    "residual_vx_normalized",
+    "residual_wz_normalized",
+    "residual_riser_target_normalized"
+  ],
+  "action_scales": [
+    0.2,
+    0.4,
+    0.1
+  ],
+  "action_contract": "trajectory_command_residual_above_frozen_balance_lqr_v1",
+  "case_count": 7,
+  "row_count": 39430,
+  "seed": 20260716,
+  "split_cases": {
+    "holdout": [
+      18
+    ],
+    "validation": [
+      23
+    ],
+    "train": [
+      24,
+      41,
+      50,
+      72,
+      79
+    ]
+  },
+  "split_row_counts": {
+    "train": 30536,
+    "validation": 6195,
+    "holdout": 2699
+  },
+  "finite_values": true,
+  "trajectory_leakage": false,
+  "action_abs_p95": [
+    0.5515085339546203,
+    0.31021739989519065,
+    0.10308697260916232
+  ],
+  "action_abs_max": [
+    0.7549218535423279,
+    0.5948125123977661,
+    0.12118898332118988
+  ],
+  "action_clip_ratio": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "teacher_command_reconstruction_max_error": 1.1920928955078125e-07,
+  "source_files": [
+    "case_0018_executed_residual_v1.npz",
+    "case_0023_executed_residual_v1.npz",
+    "case_0024_executed_residual_v1.npz",
+    "case_0041_executed_residual_v1.npz",
+    "case_0050_executed_residual_v1.npz",
+    "case_0072_executed_residual_v1.npz",
+    "case_0079_executed_residual_v1.npz"
+  ],
+  "source_sha256": [
+    "fbc35107b9e31155db9df77f8c57b3340ae362efb657d4420228b72e7ce3563e",
+    "91b6e85ad54d737db1621f23874d0663c96652c2b25ebb2eff5d0a2fcb83d05c",
+    "390732bcc1060ed58b4cc19589bc931ff77204135e0a5aa431e691b0fc2b7b97",
+    "ee0816902119f2a1dcdafb524f536206342fdf55cac61cee070b733ef8a281d6",
+    "293d5e926b907bf8685df4a43a2d2abe1add1e61cfc63a05594c7289b52b35fd",
+    "7f7fe897a9a642671532ccf02444ae856462402b14955961b452f1fd5e2fdf99",
+    "17382922543f9ee834e562439b73189de381086ba78afbe97e9a6c04bed98c94"
+  ],
+  "source_action_labels_used": false,
+  "physical_gimbal_labels_used_as_actions": false,
+  "training_started": false,
+  "ppo_authorized": false,
+  "dataset_file": "repaired7_residual_dataset_v1.npz",
+  "dataset_size_bytes": 4610317,
+  "dataset_sha256": "ea421303faa5b94eaf8c6933e8fa9c7616999c67c169b39ab701d3ae5998523f"
+}

@@ -23,7 +23,7 @@
     "camera_height_m": [0.6, 1.8],
     "riser_speed_mps": 1.0,
     "arm_joint_count": 0,
-    "learned_action_contract": "wheel_effort_2_plus_riser_target_1",
+    "learned_action_contract": "trajectory_command_residual_dvx_dwz_driser_above_frozen_lqr_v1",
     "gimbal_contract": "deterministic_semantic_dfr_attitude_adapter",
     "observation_camera_frame": "physical_cam_link_fk",
     "camera_frame_conversion": "R_world_cam = R_world_DFR * Rz(+pi/2)"
@@ -127,14 +127,27 @@
       "riser_saturation_ratio_max": 0.0,
       "proxy_saturation_ratio_max": 0.000762063112681423
     },
+    "executed_residual_dataset_smoke": {
+      "cases": [18, 23, 24, 41, 50, 72, 79],
+      "dynamic_gate_passed_cases": 7,
+      "rows": 39430,
+      "observation_dimension": 26,
+      "action_dimension": 3,
+      "action_scales": [0.2, 0.4, 0.1],
+      "action_clip_ratio": [0.0, 0.0, 0.0],
+      "teacher_command_reconstruction_max_error": 1.1920928955078125e-7,
+      "trajectory_leakage": false,
+      "dataset_sha256": "ea421303faa5b94eaf8c6933e8fa9c7616999c67c169b39ab701d3ae5998523f",
+      "training_authorized": false
+    },
     "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
-    "current_root_cause": "all 79 pure references and every repaired failure family now pass deterministic gates; the residual observation/action dataset and broad all-79 dynamic coverage do not yet exist",
+    "current_root_cause": "the executed residual contract passes a seven-family smoke, but all-79 dynamic captures and a case-disjoint all-79 dataset do not yet exist",
     "remote_isaac_validation": "gate0_gate3_representative_and_repaired7_passed",
-    "accepted_evidence": "evidence_20260716_riser_all79_recovery/README.md"
+    "accepted_evidence": "evidence_20260716_riser_residual_dataset_smoke/README.md"
   },
   "next_iteration": {
-    "hypothesis": "the accepted deterministic planner can provide balance-safe residual targets when observations and actions are generated from executed state rather than copied source actions",
-    "required_change": "define and build a versioned residual dataset from all 79 deterministic plans, use case-level train-validation-holdout splits, and pass offline schema, leakage, finite-value, dimensional, and deterministic-baseline regression tests",
-    "stop_rule": "do not run a learned-policy rollout or resume PPO until the residual dataset contract and deterministic baseline regression are green"
+    "hypothesis": "the residual action scales and deployable observation contract remain unclipped and reconstruct the deterministic teacher across all 79 trajectory families",
+    "required_change": "export self-contained playback plans for all 79 cases, collect dense passed Isaac executions, and build a case-disjoint all-79 dataset with the same schema and regression checks",
+    "stop_rule": "do not train or roll out a learned candidate from the seven-case smoke; require all-79 executed coverage and dataset gates first"
   }
 }

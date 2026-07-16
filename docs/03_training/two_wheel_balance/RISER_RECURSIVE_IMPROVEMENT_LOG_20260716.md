@@ -473,3 +473,39 @@ and must state whether its candidate was accepted or rejected.
 - Rerun all 79 in a fresh Gate B namespace. Enter Gate C only if at least 70
   cases pass the unchanged pre-dynamic quality screen.
 - Keep BC and PPO blocked.
+
+## Round 17: preview/coupled Gate B recovery
+
+- Added preview steering candidates, selected-plan execution retiming, and
+  bounded constant vertical placement. Source anchors, source timestamps, and
+  all acceptance thresholds remain unchanged.
+- Bound the independent vertical-workspace audit SHA-256
+  `51c2e60e11e53cf8b1884d0d01bec61df4f8cacec9d7cf35bb3b5b08f81447ab`.
+  It confirms `78/79` sources are vertically compatible and ep27 is the sole
+  irreducible span reject.
+- All-79 v2 preserves `79/79` exact-source plans and raises the unchanged
+  kinematic gate from `28/79` to `66/79`. Manifest SHA-256 is
+  `c37ab4762e91492309f7c80a54df61379137282395f8bc3b482adb605ceca296`.
+- Targeted proxy/preview recovery passes cases `52,69,74,75,76`. The recovery
+  uses an explicit `6 deg/s` timing design margin while the acceptance gate
+  stays at `24 deg/s`.
+- The final hash-audited portfolio preserves the accepted 66, substitutes only
+  those five passing recoveries, and reaches `71/79`. Portfolio manifest
+  SHA-256 is
+  `851a7b2751cd397ba35daf57d1a8c6971fb14ed0186683af48d3c6109090570a`.
+- Explicit remaining rejects are `6,13,18,21,22,27,55,64`. Ep6/18 are
+  terminal XY maximum-only; ep21/22 are paired p95-only; ep27 is vertical-span
+  incompatible; ep13/55 are proxy-only; ep64 is mixed p95/proxy.
+- Ep77's upstream seed was hash-verified and agrees with the riser source and
+  base-path diagnosis, but remains reference-only with no learned actions.
+- Decision: the Gate C candidate-count requirement is met. Gate C dynamic
+  execution, residual capture, BC, and PPO have not started.
+
+## Next round after Round 17
+
+- Commit and freeze the exact Gate B code and portfolio identity.
+- Run Gate C only on the 71 accepted cases with frozen LQR and unchanged
+  dynamic safety gates.
+- Collect residual labels only from dynamically passing cases, then recompute
+  the residual envelope before freezing action scales.
+- Keep BC/PPO blocked.

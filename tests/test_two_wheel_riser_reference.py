@@ -164,7 +164,14 @@ def test_rs4_portfolio_tracks_feasible_full_pose_without_rate_violation() -> Non
 
     plan = plan_rs4_riser_reference(reference, kinematics)
     metrics = plan_rate_metrics(plan)
-    assert plan.planning_strategy in {"fixed_path", "joint_adaptive"}
+    assert plan.planning_strategy in {
+        "fixed_path",
+        "joint_adaptive",
+        "preview_0.10m_g1.15",
+        "preview_0.10m_g1.50",
+        "preview_0.25m_g1.50",
+        "preview_0.50m_g1.50",
+    }
     assert metrics["position_error_p95_m"] < 1e-3
     assert metrics["attitude_error_max_deg"] < 0.1
     assert np.max(np.abs(proxy_joint_rates_rad_s(plan.gimbal_q, time_s))) <= math.radians(24.0) + 1e-9

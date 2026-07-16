@@ -65,11 +65,13 @@
       "source_pose_count": 71038,
       "source_path_length_m": 618.3046567881911,
       "source_duration_s": 1388.4253330000001,
-      "plan_namespace": "20260717_exact_source_all79_plans_v1_heading_retimed",
-      "plan_manifest_sha256": "940434d8caa5f85eb8c67d38d09a0894927a50b51fbb380b570d9e724fffe001",
+      "plan_namespace": "20260717_exact_source_all79_portfolio_v4_threshold71",
+      "plan_manifest_sha256": "851a7b2751cd397ba35daf57d1a8c6971fb14ed0186683af48d3c6109090570a",
       "integrity_passed_cases": 79,
-      "provisional_kinematic_passed_cases": 28,
-      "provisional_kinematic_rejected_cases": 51,
+      "provisional_kinematic_passed_cases": 71,
+      "provisional_kinematic_rejected_cases": 8,
+      "provisional_kinematic_rejected_case_ids": [6, 13, 18, 21, 22, 27, 55, 64],
+      "gate_c_candidate_count_sufficient": true,
       "dynamic_quality_qualified_cases": 0,
       "training_authorized": false,
       "ppo_authorized": false
@@ -161,13 +163,13 @@
       "training_authorized": false
     },
     "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
-    "current_root_cause": "the exact-source Gate B plans preserve all 71038 anchors, but only 28 of 79 pass the unchanged pure-kinematic screen; nonholonomic position tracking and proxy-rate feasibility must improve before dynamic capture",
+    "current_root_cause": "Gate B now has 71 exact-source kinematic candidates; dynamic Isaac quality and the replacement residual envelope remain unmeasured",
     "remote_isaac_validation": "gate0_gate3_representative_and_repaired7_passed",
     "accepted_evidence": "evidence_20260717_riser_exact_source_gate_a_b/README.md"
   },
   "next_iteration": {
-    "hypothesis": "a planner that accounts for nonholonomic path geometry and RS4 proxy-rate coupling can raise exact-source pre-dynamic quality from 28 to at least 70 cases without changing source anchors",
-    "required_change": "diagnose the 51 Gate B rejects, make one structural retarget or timing change, and rerun all 79 in a new exact-source namespace",
-    "stop_rule": "do not start Gate C capture, BC, or PPO unless at least 70 cases pass unchanged pre-dynamic quality with complete exact-source anchor maps"
+    "hypothesis": "the 71 accepted exact-source plans can pass frozen-LQR dynamic qualification without safety regression and yield an unclipped reconstructable residual envelope",
+    "required_change": "freeze one clean code commit, run Gate C on accepted cases only, and record every dynamic rejection before collecting any residual corpus",
+    "stop_rule": "do not start BC or PPO; collect no residual labels from a dynamic failure and stop on safety, clipping, reconstruction, provenance, or accepted-count regression"
   }
 }

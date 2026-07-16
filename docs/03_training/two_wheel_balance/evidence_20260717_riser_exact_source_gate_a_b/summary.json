@@ -1,5 +1,5 @@
 {
-  "schema": "cinebotrl_riser_exact_source_gate_a_b_repo_summary_v1",
+  "schema": "cinebotrl_riser_exact_source_gate_a_b_repo_summary_v2",
   "date": "2026-07-17",
   "source_package": {
     "name": "gikWBC9DOF_exact_source_reference_all79_20260717",
@@ -48,7 +48,29 @@
     "kinematic_reject_count": 51,
     "training_authorized": false
   },
-  "stop_rule_applied": true,
+  "gate_b_portfolio_v4": {
+    "namespace": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/20260717_exact_source_all79_portfolio_v4_threshold71",
+    "base_manifest_sha256": "c37ab4762e91492309f7c80a54df61379137282395f8bc3b482adb605ceca296",
+    "recovery_manifest_sha256": "63e09a54090db7c78aee54f58f106e08906cf522a9ca0ceeb60a7dd2cf68294a",
+    "manifest_sha256": "851a7b2751cd397ba35daf57d1a8c6971fb14ed0186683af48d3c6109090570a",
+    "summary_sha256": "688b5bc23d801705c3132c511f009e1deb3d2af0a16a2a3ae33467764272db83",
+    "training_rejection_audit_sha256": "77a0b80c1e6a4b97da67b09a2f381d86c774758e9275709af787505407f7e8ee",
+    "exact_source_pass_count": 79,
+    "kinematic_pass_count": 71,
+    "kinematic_reject_count": 8,
+    "recovered_cases": [52, 69, 74, 75, 76],
+    "rejected_cases": [6, 13, 18, 21, 22, 27, 55, 64],
+    "gate_c_candidate_count_sufficient": true,
+    "valid_for_training": false
+  },
+  "upstream_diagnostic_evidence": {
+    "vertical_workspace_json_sha256": "51c2e60e11e53cf8b1884d0d01bec61df4f8cacec9d7cf35bb3b5b08f81447ab",
+    "vertical_compatible_cases": 78,
+    "irreducible_vertical_reject_cases": [27],
+    "ep77_seed_manifest_sha256": "2dc31d86325155fafb0dc3afe8870f9ae32ea3c58d5ed7d2671f43aa2d4d7404",
+    "ep77_seed_valid_for_training": false
+  },
+  "stop_rule_applied": false,
   "dynamic_capture_started": false,
   "residual_labels_collected": false,
   "bc_started": false,

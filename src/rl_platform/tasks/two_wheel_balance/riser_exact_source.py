@@ -16,6 +16,8 @@ from .riser_reference import CorrectedRiserReference, bidirectional_path_heading
 
 EXACT_SOURCE_CONTRACT = "exact_source_v1"
 EXACT_SOURCE_PACKAGE_SCHEMA = "gik_exact_source_reference_package_v1"
+MINIMUM_CAMERA_HEIGHT_M = 0.60
+MAXIMUM_CAMERA_HEIGHT_M = 1.80
 
 
 def sha256_file(path: Path) -> str:
@@ -140,6 +142,82 @@ def execution_schedule_for_source(
             vertical_dt,
             attitude_dt,
             heading_dt,
+        )
+    )
+    return np.r_[0.0, np.cumsum(execution_dt)]
+
+
+def camera_envelope_vertical_shift(
+    source_position_world_m: np.ndarray,
+    *,
+    minimum_camera_height_m: float = MINIMUM_CAMERA_HEIGHT_M,
+    maximum_camera_height_m: float = MAXIMUM_CAMERA_HEIGHT_M,
+) -> tuple[float, bool]:
+    """Choose the smallest constant shift that fits the camera-Z envelope."""
+
+    position = np.asarray(source_position_world_m, dtype=np.float64)
+    _require(
+        position.ndim == 2
+        and position.shape[1] == 3
+        and len(position) >= 2
+        and np.isfinite(position).all(),
+        "source positions must be finite shape (N,3)",
+    )
+    _require(
+        math.isfinite(minimum_camera_height_m)
+        and math.isfinite(maximum_camera_height_m)
+        and minimum_camera_height_m < maximum_camera_height_m,
+        "invalid camera height envelope",
+    )
+    lower_shift = minimum_camera_height_m - float(np.min(position[:, 2]))
+    upper_shift = maximum_camera_height_m - float(np.max(position[:, 2]))
+    compatible = lower_shift <= upper_shift + 1e-12
+    if compatible:
+        shift = float(np.clip(0.0, lower_shift, upper_shift))
+    else:
+        # Preserve the lower safety boundary and let the explicit upper gate reject.
+        shift = lower_shift
+    return shift, compatible
+
+
+def refine_execution_schedule_for_plan(
+    source: ExactSourceRiserReference,
+    plan: RiserPlaybackPlan,
+    *,
+    maximum_base_linear_velocity_mps: float = 0.30,
+    maximum_base_yaw_rate_rad_s: float = 0.20,
+    maximum_riser_rate_mps: float = 0.80,
+    maximum_proxy_rate_rad_s: float = math.radians(12.0),
+) -> np.ndarray:
+    """Stretch intervals from selected-plan demand without changing anchors."""
+
+    plan.validate()
+    _require(
+        len(plan.time_s) == source.source_pose_count,
+        "selected plan must retain one state per source anchor",
+    )
+    limits = (
+        maximum_base_linear_velocity_mps,
+        maximum_base_yaw_rate_rad_s,
+        maximum_riser_rate_mps,
+        maximum_proxy_rate_rad_s,
+    )
+    _require(all(math.isfinite(item) and item > 0.0 for item in limits), "bad plan limits")
+    delta_xy = np.diff(plan.base_xy_yaw[:, :2], axis=0)
+    yaw = np.unwrap(plan.base_xy_yaw[:, 2])
+    midpoint = 0.5 * (yaw[:-1] + yaw[1:])
+    forward_distance = np.abs(
+        np.cos(midpoint) * delta_xy[:, 0]
+        + np.sin(midpoint) * delta_xy[:, 1]
+    )
+    proxy_delta = np.abs(np.diff(plan.proxy_gimbal_q, axis=0))
+    execution_dt = np.maximum.reduce(
+        (
+            np.diff(plan.time_s),
+            forward_distance / maximum_base_linear_velocity_mps,
+            np.abs(np.diff(yaw)) / maximum_base_yaw_rate_rad_s,
+            np.abs(np.diff(plan.riser_q)) / maximum_riser_rate_mps,
+            np.max(proxy_delta, axis=1) / maximum_proxy_rate_rad_s,
         )
     )
     return np.r_[0.0, np.cumsum(execution_dt)]

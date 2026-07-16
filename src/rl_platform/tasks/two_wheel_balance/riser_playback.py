@@ -30,6 +30,8 @@ PLAYBACK_BASE_YAW_RATE_LIMIT_RAD_S = 0.4
 PLAYBACK_PLANNING_BASE_YAW_RATE_RAD_S = 0.25
 PLAYBACK_RISER_RATE_LIMIT_MPS = 1.0
 PLAYBACK_PROXY_RATE_LIMIT_RAD_S = math.radians(24.0)
+PLAYBACK_CAMERA_HEIGHT_MIN_M = 0.60
+PLAYBACK_CAMERA_HEIGHT_MAX_M = 1.80
 
 
 @dataclass(frozen=True)
@@ -63,9 +65,18 @@ class RiserPlaybackPlan:
             "base_feedforward": self.feedforward_v_wz.shape == (count - 1, 2),
             "riser_feedforward": self.feedforward_riser_velocity.shape == (count - 1,),
             "proxy_feedforward": self.feedforward_proxy_velocity.shape == (count - 1, 3),
-            "vertical_shift": math.isfinite(self.vertical_shift_m)
-            and self.vertical_shift_m >= 0.0,
-            "strategy": self.planning_strategy in {"fixed_path", "joint_adaptive"},
+            "vertical_shift": math.isfinite(self.vertical_shift_m),
+            "strategy": self.planning_strategy in {
+                "fixed_path",
+                "joint_adaptive",
+                "preview_0.10m",
+                "preview_0.25m",
+                "preview_0.50m",
+                "preview_0.10m_g1.15",
+                "preview_0.10m_g1.50",
+                "preview_0.25m_g1.50",
+                "preview_0.50m_g1.50",
+            },
         }
         arrays = (
             self.time_s,
@@ -183,6 +194,12 @@ def riser_playback_kinematic_metrics(
         ),
         "minimum_riser_position_m": float(np.min(plan.riser_q)),
         "maximum_riser_position_m": float(np.max(plan.riser_q)),
+        "minimum_target_camera_height_m": float(
+            np.min(plan.target_position_world_m[:, 2])
+        ),
+        "maximum_target_camera_height_m": float(
+            np.max(plan.target_position_world_m[:, 2])
+        ),
     }
 
 
@@ -220,6 +237,14 @@ def riser_playback_kinematic_gate(
         >= kinematics.riser_lower - epsilon,
         "riser_upper_bound": metrics["maximum_riser_position_m"]
         <= kinematics.riser_upper + epsilon,
+        "target_camera_height_lower_bound": metrics[
+            "minimum_target_camera_height_m"
+        ]
+        >= PLAYBACK_CAMERA_HEIGHT_MIN_M - epsilon,
+        "target_camera_height_upper_bound": metrics[
+            "maximum_target_camera_height_m"
+        ]
+        <= PLAYBACK_CAMERA_HEIGHT_MAX_M + epsilon,
     }
 
 

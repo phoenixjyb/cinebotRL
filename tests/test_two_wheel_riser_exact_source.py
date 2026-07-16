@@ -7,8 +7,10 @@ import pytest
 
 from rl_platform.tasks.two_wheel_balance.riser_exact_source import (
     audit_exact_source_playback_plan,
+    camera_envelope_vertical_shift,
     execution_schedule_for_source,
     load_exact_source_package,
+    refine_execution_schedule_for_plan,
     save_exact_source_playback_plan,
 )
 from rl_platform.tasks.two_wheel_balance.riser_playback import RiserPlaybackPlan
@@ -106,6 +108,20 @@ def test_exact_source_loader_and_retimer_preserve_reference(tmp_path: Path) -> N
     np.testing.assert_array_equal(planning.time_s, execution_time)
 
 
+def test_camera_envelope_shift_supports_downward_placement_and_honest_reject() -> None:
+    shift, compatible = camera_envelope_vertical_shift(
+        np.array([[0.0, 0.0, 1.0], [0.0, 0.0, 1.9]])
+    )
+    assert compatible
+    assert shift == pytest.approx(-0.1)
+
+    shift, compatible = camera_envelope_vertical_shift(
+        np.array([[0.0, 0.0, -0.7], [0.0, 0.0, 1.5]])
+    )
+    assert not compatible
+    assert shift == pytest.approx(1.3)
+
+
 def test_exact_source_plan_audit_binds_all_anchors_and_blocks_training(tmp_path: Path) -> None:
     manifest = _package(tmp_path)
     reference = load_exact_source_package(
@@ -122,6 +138,23 @@ def test_exact_source_plan_audit_binds_all_anchors_and_blocks_training(tmp_path:
     assert audit["maximum_mapped_position_error_m"] == 0.0
     assert not audit["quality_gate_passed"]
     assert not audit["valid_for_training"]
+
+
+def test_plan_timing_refinement_stretches_proxy_demand_without_changing_count(
+    tmp_path: Path,
+) -> None:
+    manifest = _package(tmp_path)
+    reference = load_exact_source_package(
+        manifest, expected_manifest_sha256=_sha(manifest), expected_count=1
+    )[1]
+    plan = _plan(np.array([0.0, 0.1, 0.2]))
+    fast_proxy = plan.proxy_gimbal_q.copy()
+    fast_proxy[:, 0] = [0.0, 0.2, 0.4]
+    plan = RiserPlaybackPlan(**{**plan.__dict__, "proxy_gimbal_q": fast_proxy})
+    refined = refine_execution_schedule_for_plan(reference, plan)
+    assert refined.shape == reference.source_time_s.shape
+    assert refined[0] == 0.0
+    assert np.all(np.diff(refined) >= 0.2 / np.deg2rad(20.0) - 1e-12)
 
 
 def test_exact_source_plan_audit_rejects_missing_reordered_and_initialization_leak(

@@ -2,8 +2,10 @@
 
 ## Decision
 
-Gate A and Gate B are complete. Gate C, residual capture, BC, and PPO are
-blocked by the handoff stop rule.
+Gate A and Gate B are complete. A hash-audited portfolio now has `71/79`
+kinematic candidates, so the numerical count requirement for Gate C is met.
+Gate C dynamic qualification has not started. Residual capture, BC, and PPO
+remain unauthorized.
 
 The authoritative package is admitted only as reference input:
 
@@ -107,15 +109,72 @@ Provisional kinematic rejects:
 The all-79 plan manifest is also rejected by training-mode admission, as
 required. It has integrity evidence but no dynamic quality authorization.
 
+## Superseding Gate B v2 and targeted recovery
+
+The v1 result above is retained as historical evidence. Structural changes
+were then made without changing any source anchor or acceptance threshold:
+
+- added preview steering so the nonholonomic base corrects cross-track error
+  before reaching the current waypoint;
+- coupled explicit execution timing to selected base, riser, and RS4 proxy
+  demand;
+- selected a constant vertical placement within the fixed camera envelope
+  `[0.60, 1.80] m`, including safe negative shifts when required;
+- retained older strategy labels in the loader so historical v2 plans remain
+  composable and auditable.
+
+The upstream vertical audit is bound by SHA-256
+`51c2e60e11e53cf8b1884d0d01bec61df4f8cacec9d7cf35bb3b5b08f81447ab`.
+It independently proves `78/79` trajectories are span-compatible. Ep27 is the
+only irreducible vertical reject: source span `2.145973 m` exceeds the robot's
+`1.20 m` camera-height range.
+
+All-79 v2 namespace and hashes:
+
+```text
+20260717_exact_source_all79_plans_v2_preview_coupled
+manifest c37ab4762e91492309f7c80a54df61379137282395f8bc3b482adb605ceca296
+summary  58f2a1273a75d60c51277ca752d4a97caaff33d8cd129b37e63e0d9b60de0afb
+```
+
+V2 preserves `79/79` exact-source plans and improves the unchanged kinematic
+gate from `28/79` to `66/79`. Targeted recovery then passes cases
+`52,69,74,75,76` using an explicit `6 deg/s` proxy-retiming design margin;
+the unchanged acceptance limit remains `24 deg/s`.
+
+Final portfolio namespace and hashes:
+
+```text
+20260717_exact_source_all79_portfolio_v4_threshold71
+manifest 851a7b2751cd397ba35daf57d1a8c6971fb14ed0186683af48d3c6109090570a
+summary  688b5bc23d801705c3132c511f009e1deb3d2af0a16a2a3ae33467764272db83
+training rejection audit 77a0b80c1e6a4b97da67b09a2f381d86c774758e9275709af787505407f7e8ee
+```
+
+Final Gate B result:
+
+- exact-source integrity: `79/79`;
+- unchanged kinematic gate: `71/79`;
+- Gate C candidates: `71`;
+- explicit rejects: `6,13,18,21,22,27,55,64`;
+- dynamic quality-qualified cases: `0`;
+- residual labels: none;
+- training admission: rejected;
+- BC/PPO: not started.
+
+The ep77 upstream seed manifest
+`2dc31d86325155fafb0dc3afe8870f9ae32ea3c58d5ed7d2671f43aa2d4d7404`
+was independently checked. Its source timestamps and positions match exactly;
+its seed and riser base paths are `2.125 m` and `2.122 m`. It confirms ep77 as
+a useful planner canary but remains `valid_for_training=false` and contributes
+no learned actions.
+
 ## Stop and next action
 
-The handoff requires at least 70 accepted episodes before a proposed
-50/10/10 split. The current provisional quality count is 28, so starting Isaac
-capture for labels, BC, or PPO would violate the stop rule.
-
-The next bounded task is planner/retarget diagnosis on the 51 rejects. It must
-improve nonholonomic position tracking and proxy-rate feasibility without
-dropping anchors, changing source geometry, relaxing quality thresholds, or
-falling back to quarantined plans. After a structural fix, rerun Gate B in a
-new namespace and only enter Gate C if at least 70 cases pass the pre-dynamic
-quality screen.
+The `>=70` pre-dynamic count rule is now satisfied by 71 hash-audited plans.
+The next bounded task is Gate C deterministic dynamic qualification of those
+71 cases from one clean code commit. Gate C must preserve the frozen LQR and
+all existing safety gates, record dynamic rejects honestly, and collect no
+residual label from a failing case. BC and PPO remain blocked until dynamic
+qualification, clean residual capture, case-disjoint split, command
+reconstruction, zero-clipping, and untouched holdout gates all pass.

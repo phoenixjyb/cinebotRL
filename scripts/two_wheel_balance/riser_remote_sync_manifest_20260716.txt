@@ -44,6 +44,7 @@ scripts/two_wheel_balance/audit_riser_rs4_pose_references.py
 scripts/two_wheel_balance/build_riser_all79_stage.py
 scripts/two_wheel_balance/build_riser_residual_dataset.py
 scripts/two_wheel_balance/build_riser_corrected_stage.py
+scripts/two_wheel_balance/compose_riser_exact_source_plan_portfolio.py
 scripts/two_wheel_balance/build_riser_urdf.py
 scripts/two_wheel_balance/export_riser_playback_plans.py
 scripts/two_wheel_balance/export_riser_exact_source_plans.py

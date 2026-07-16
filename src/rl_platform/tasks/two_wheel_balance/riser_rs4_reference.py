@@ -16,7 +16,6 @@ from .camera_attitude import (
 from .riser_kinematics import UrdfRiserCameraKinematics
 from .riser_reference import CorrectedRiserReference, RiserKinematicPlan
 from .riser_rs4_attitude import (
-    ACCEPTED62_BASE_YAW_RATE_RAD_S,
     RS4_FILMING_RATE_LIMIT_DEG_S,
     accepted62_body_basis_rotation,
     bounded_path_yaw_schedule,
@@ -371,9 +370,7 @@ def plan_rs4_riser_reference(
     fixed = _plan_fixed_path_rs4_riser_reference(
         reference,
         kinematics,
-        maximum_base_yaw_rate_rad_s=min(
-            maximum_base_yaw_rate_rad_s, ACCEPTED62_BASE_YAW_RATE_RAD_S
-        ),
+        maximum_base_yaw_rate_rad_s=maximum_base_yaw_rate_rad_s,
         **shared,
     )
     joint = _plan_joint_rs4_riser_reference(

@@ -4,22 +4,57 @@ set -euo pipefail
 ROOT="${RISER_ROOT:-/mnt/g/wSpace/cinebotRL-two-wheel-riser}"
 WIN_ROOT="${RISER_WIN_ROOT:-G:\\wSpace\\cinebotRL-two-wheel-riser}"
 PY="${ISAAC_PYTHON:-/mnt/g/isaaclab_venv/Scripts/python.exe}"
-STAMP="${RISER_ALL79_STAMP:-20260716_residual_all79_phase_v2}"
+STAMP="${RISER_ALL79_STAMP:-20260716_residual_all79_phase_v3_clean}"
 ARTIFACTS_WSL="$ROOT/artifacts/two_wheel_riser/$STAMP"
 ARTIFACTS_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$STAMP"
-PLAN_STAMP="${RISER_ALL79_PLAN_STAMP:-20260716_all79_playback_inputs_v2}"
+PLAN_STAMP="${RISER_ALL79_PLAN_STAMP:-20260716_all79_playback_inputs_v3}"
 PLAN_DIR_WSL="$ROOT/artifacts/two_wheel_riser/$PLAN_STAMP"
 PLAN_DIR_WIN="${RISER_ALL79_PLAN_DIR_WIN:-$WIN_ROOT\\artifacts\\two_wheel_riser\\$PLAN_STAMP}"
 GAINS_WIN="${RISER_GAINS_WIN:-$WIN_ROOT\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json}"
 SCRIPT_WIN="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 MERGER_WIN="$WIN_ROOT\\scripts\\two_wheel_balance\\build_riser_residual_dataset.py"
+ADMISSION="$ARTIFACTS_WSL/admission.json"
 
 [[ -x "$PY" ]] || { printf 'missing Isaac Python: %s\n' "$PY" >&2; exit 2; }
 [[ -s "$PLAN_DIR_WSL/manifest.json" ]] || {
   printf 'missing all-79 playback manifest: %s\n' "$PLAN_DIR_WSL/manifest.json" >&2
   exit 2
 }
+git -C "$ROOT" diff --quiet && git -C "$ROOT" diff --cached --quiet || {
+  printf 'tracked worktree changes make capture provenance ambiguous\n' >&2
+  exit 2
+}
+CAPTURE_COMMIT="$(git -C "$ROOT" rev-parse HEAD)"
+if [[ ! -e "$ADMISSION" ]] && find \
+  "$ARTIFACTS_WSL/cases" "$ARTIFACTS_WSL/gates" \
+  -type f -print -quit 2>/dev/null | grep -q .; then
+  printf 'refusing to backfill admission onto existing capture artifacts\n' >&2
+  exit 2
+fi
 mkdir -p "$ARTIFACTS_WSL/cases" "$ARTIFACTS_WSL/gates" "$ARTIFACTS_WSL/logs"
+python3 - "$ADMISSION" "$CAPTURE_COMMIT" "$PLAN_DIR_WSL/manifest.json" <<'PY'
+import hashlib
+import json
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+manifest = Path(sys.argv[3])
+expected = {
+    "schema": "cinebotrl_two_wheel_riser_capture_admission_v1",
+    "git_commit": sys.argv[2],
+    "plan_manifest": str(manifest),
+    "plan_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+    "cases": list(range(1, 80)),
+    "tracking_profile": "riser_phase_consistent_v2",
+    "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
+}
+if path.exists():
+    if json.loads(path.read_text(encoding="utf-8")) != expected:
+        raise SystemExit("capture admission differs from existing partial run")
+else:
+    path.write_text(json.dumps(expected, indent=2) + "\n", encoding="utf-8")
+PY
 
 gate_is_resumable() {
   local case_number="$1"
@@ -79,7 +114,7 @@ done
   --output "$ARTIFACTS_WIN\\all79_residual_dataset_v1.npz" \
   --expected-count 79 >"$ARTIFACTS_WSL/merge.log" 2>&1
 
-python3 - "$ARTIFACTS_WSL" "$(git -C "$ROOT" rev-parse HEAD)" "$PLAN_DIR_WSL/manifest.json" <<'PY'
+python3 - "$ARTIFACTS_WSL" "$CAPTURE_COMMIT" "$PLAN_DIR_WSL/manifest.json" "$ADMISSION" <<'PY'
 import hashlib
 import json
 from pathlib import Path
@@ -88,6 +123,7 @@ import sys
 root = Path(sys.argv[1])
 commit = sys.argv[2]
 plan_manifest = Path(sys.argv[3])
+admission = Path(sys.argv[4])
 gates = []
 for path in sorted((root / "gates").glob("case_*.json")):
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -112,6 +148,8 @@ dataset_summary = json.loads(
 summary = {
     "schema": "cinebotrl_two_wheel_riser_all79_dynamic_dataset_gate_v1",
     "git_commit": commit,
+    "capture_admission": str(admission),
+    "capture_admission_sha256": hashlib.sha256(admission.read_bytes()).hexdigest(),
     "plan_manifest": str(plan_manifest),
     "plan_manifest_sha256": hashlib.sha256(plan_manifest.read_bytes()).hexdigest(),
     "training_started": False,

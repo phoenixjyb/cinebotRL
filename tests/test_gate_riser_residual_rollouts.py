@@ -1,0 +1,107 @@
+import json
+from pathlib import Path
+
+import pytest
+
+from scripts.two_wheel_balance.gate_riser_residual_rollouts import (
+    REGRESSION_METRICS,
+    gate_rollouts,
+)
+
+
+def _write_rollout(
+    root: Path,
+    case: int,
+    source: str,
+    position_p95_m: float,
+    *,
+    pitch_max_deg: float = 4.0,
+) -> None:
+    metrics = {name: 1.0 for name in REGRESSION_METRICS}
+    metrics.update(
+        {
+            "position_error_p95_m": position_p95_m,
+            "position_error_max_m": position_p95_m + 0.01,
+            "pitch_p95_deg": pitch_max_deg - 0.2,
+            "pitch_max_deg": pitch_max_deg,
+        }
+    )
+    result = {
+        "case": case,
+        "passed": True,
+        "residual_action_abs_max": [0.2, 0.3, 0.1],
+        **metrics,
+    }
+    payload = {
+        "cases": [case],
+        "passed": True,
+        "trajectory_command_source": source,
+        "tracking_profile": "riser_phase_consistent_v2",
+        "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
+        "results": [result],
+    }
+    root.mkdir(parents=True, exist_ok=True)
+    (root / f"case_{case:04d}.json").write_text(
+        json.dumps(payload), encoding="utf-8"
+    )
+
+
+def test_holdout_gate_beats_zero_without_teacher_regression(tmp_path: Path) -> None:
+    teacher = tmp_path / "teacher"
+    zero = tmp_path / "zero"
+    learned = tmp_path / "learned"
+    policy = tmp_path / "policy.pt"
+    policy.write_bytes(b"policy")
+    for case in (1, 2, 3):
+        _write_rollout(teacher, case, "deterministic_teacher", 0.10)
+        _write_rollout(zero, case, "zero_policy_action_baseline", 0.15)
+        _write_rollout(learned, case, "torchscript_residual_policy", 0.102)
+    summary = gate_rollouts(
+        teacher_dir=teacher,
+        zero_dir=zero,
+        learned_dir=learned,
+        cases=[1, 2, 3],
+        policy=policy,
+        mode="holdout",
+        maximum_regression_fraction=0.05,
+    )
+    assert summary["passed"]
+    assert summary["aggregate_checks"]["learned_beats_zero_by_required_mean"]
+
+
+def test_holdout_gate_rejects_balance_regression(tmp_path: Path) -> None:
+    teacher = tmp_path / "teacher"
+    zero = tmp_path / "zero"
+    learned = tmp_path / "learned"
+    policy = tmp_path / "policy.pt"
+    policy.write_bytes(b"policy")
+    _write_rollout(teacher, 1, "deterministic_teacher", 0.10, pitch_max_deg=4.0)
+    _write_rollout(zero, 1, "zero_policy_action_baseline", 0.20, pitch_max_deg=4.0)
+    _write_rollout(
+        learned, 1, "torchscript_residual_policy", 0.10, pitch_max_deg=4.3
+    )
+    summary = gate_rollouts(
+        teacher_dir=teacher,
+        zero_dir=zero,
+        learned_dir=learned,
+        cases=[1],
+        policy=policy,
+        mode="holdout",
+        maximum_regression_fraction=0.05,
+    )
+    assert not summary["passed"]
+    assert not summary["rows"][0]["checks"]["regression_pitch_max_deg"]
+
+
+def test_all79_mode_requires_the_complete_case_set(tmp_path: Path) -> None:
+    policy = tmp_path / "policy.pt"
+    policy.write_bytes(b"policy")
+    with pytest.raises(ValueError, match="cases 1 through 79"):
+        gate_rollouts(
+            teacher_dir=tmp_path,
+            learned_dir=tmp_path,
+            cases=[1],
+            policy=policy,
+            mode="all79",
+            maximum_regression_fraction=0.05,
+        )

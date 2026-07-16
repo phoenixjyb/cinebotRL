@@ -17,6 +17,18 @@ def test_playback_planning_uses_accepted_all79_yaw_cap() -> None:
     assert PLAYBACK_PLANNING_BASE_YAW_RATE_RAD_S == 0.25
 
 
+def test_fixed_path_planner_respects_bounded_per_case_yaw_override() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "src/rl_platform/tasks/two_wheel_balance/riser_rs4_reference.py"
+    ).read_text(encoding="utf-8")
+    call = source.split("fixed = _plan_fixed_path_rs4_riser_reference(", 1)[1].split(
+        ")\n", 1
+    )[0]
+    assert "maximum_base_yaw_rate_rad_s=maximum_base_yaw_rate_rad_s" in call
+    assert "min(" not in call
+
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -97,3 +109,5 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert "np.abs(actual_proxy - sample.proxy_gimbal_q)" not in source
     assert "set_joint_velocity_target(proxy_velocity_target" not in source
     assert 'parser.add_argument("--video-fps", type=int, default=200)' in source
+    assert '"residual_teacher_unclipped"' in source
+    assert "float(np.max(np.abs(teacher_residual_values))) < 1.0 - 1e-6" in source

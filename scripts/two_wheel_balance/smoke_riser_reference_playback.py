@@ -60,6 +60,11 @@ parser.add_argument(
     choices=("cpu", "cuda"),
     default="cuda",
 )
+parser.add_argument(
+    "--zero-policy-action",
+    action="store_true",
+    help="Evaluate the null high-level policy action above the frozen balance LQR.",
+)
 # RecordVideo receives one frame per 200 Hz policy step.  Encoding at the same
 # rate preserves simulation time; viewing derivatives may be transcoded to 50.
 parser.add_argument("--video-fps", type=int, default=200)
@@ -196,6 +201,7 @@ def evaluate_case(
     dataset_dir: Path | None,
     residual_policy,
     residual_policy_device: torch.device,
+    zero_policy_action: bool,
 ) -> dict[str, object]:
     _, proxy_ids, riser_id = initialize_case(env, plan)
     unwrapped = env.unwrapped
@@ -349,21 +355,24 @@ def evaluate_case(
             progress_scale=progress_scale,
             previous_residual_action=previous_residual_action,
         )
-        if residual_policy is None:
+        if residual_policy is None and not zero_policy_action:
             applied_residual_action = teacher_residual_action
             commanded_riser_target = sample.riser_q
         else:
-            with torch.inference_mode():
-                policy_output = residual_policy(
-                    torch.as_tensor(
-                        executed_observation[None, :],
-                        dtype=torch.float32,
-                        device=residual_policy_device,
+            if zero_policy_action:
+                applied_residual_action = np.zeros(3, dtype=np.float32)
+            else:
+                with torch.inference_mode():
+                    policy_output = residual_policy(
+                        torch.as_tensor(
+                            executed_observation[None, :],
+                            dtype=torch.float32,
+                            device=residual_policy_device,
+                        )
                     )
+                applied_residual_action = (
+                    policy_output.detach().cpu().numpy().reshape(-1)
                 )
-            applied_residual_action = (
-                policy_output.detach().cpu().numpy().reshape(-1)
-            )
             if (
                 applied_residual_action.shape != (3,)
                 or not np.isfinite(applied_residual_action).all()
@@ -660,6 +669,7 @@ def evaluate_case(
     applied_residual_values = np.asarray(
         applied_residual_actions, dtype=np.float64
     )
+    teacher_residual_values = np.asarray(dataset_actions, dtype=np.float64)
     pitches = np.asarray(pitch_samples_deg, dtype=np.float64)
     action_saturation_ratio = saturated_actions / max(action_count, 1)
     riser_saturation_ratio = saturated_riser / max(riser_effort_count, 1)
@@ -689,6 +699,8 @@ def evaluate_case(
         "internal_attitude_ik_converged": internal_attitude_ik_failures == 0,
         "internal_proxy_rate_bounded": internal_proxy_rate_max_deg_s
         <= args.maximum_internal_proxy_rate_deg_s + 1e-6,
+        "residual_teacher_unclipped": dataset_dir is None
+        or float(np.max(np.abs(teacher_residual_values))) < 1.0 - 1e-6,
     }
     dataset_path = None
     if dataset_dir is not None and all(checks.values()):
@@ -773,8 +785,12 @@ def main() -> int:
         raise ValueError("maximum duration scale must be at least one")
     if args.video_dir is not None and len(cases) != 1:
         raise ValueError("video recording requires exactly one case")
-    if args.dataset_dir is not None and args.residual_policy is not None:
-        raise ValueError("teacher dataset collection and learned policy rollout are exclusive")
+    if args.dataset_dir is not None and (
+        args.residual_policy is not None or args.zero_policy_action
+    ):
+        raise ValueError("teacher dataset collection and residual rollout are exclusive")
+    if args.residual_policy is not None and args.zero_policy_action:
+        raise ValueError("learned and zero-action policy modes are exclusive")
     if args.video_fps <= 0:
         raise ValueError("video fps must be positive")
     plans = {
@@ -882,6 +898,7 @@ def main() -> int:
             args.dataset_dir,
             residual_policy,
             residual_policy_device,
+            args.zero_policy_action,
         )
         for case in cases
     ]
@@ -924,8 +941,12 @@ def main() -> int:
         "com_pitch_feedforward_enabled": not args.disable_com_pitch_feedforward,
         "trajectory_command_source": (
             "deterministic_teacher"
-            if residual_policy is None
-            else "torchscript_residual_policy"
+            if residual_policy is None and not args.zero_policy_action
+            else (
+                "zero_policy_action_baseline"
+                if args.zero_policy_action
+                else "torchscript_residual_policy"
+            )
         ),
         "residual_policy": (
             None if args.residual_policy is None else str(args.residual_policy.resolve())

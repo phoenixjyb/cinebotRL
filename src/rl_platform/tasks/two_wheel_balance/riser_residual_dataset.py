@@ -45,7 +45,7 @@ ACTION_NAMES = (
     "residual_wz_normalized",
     "residual_riser_target_normalized",
 )
-ACTION_SCALES = np.array([0.20, 0.40, 0.10], dtype=np.float64)
+ACTION_SCALES = np.array([0.25, 0.40, 0.10], dtype=np.float64)
 SPLIT_NAMES = ("train", "validation", "holdout")
 
 
@@ -140,7 +140,10 @@ def build_residual_action(
     )
     if not np.isfinite(residual).all():
         raise ValueError("residual action is non-finite")
-    return np.clip(residual / ACTION_SCALES, -1.0, 1.0).astype(np.float32)
+    normalized = residual / ACTION_SCALES
+    if np.max(np.abs(normalized)) >= 1.0 - 1e-6:
+        raise ValueError(f"residual action scale is too small: {normalized}")
+    return normalized.astype(np.float32)
 
 
 def apply_residual_action(
@@ -238,6 +241,8 @@ def load_case_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarr
         payload = {name: np.asarray(data[name]) for name in data.files if name != "metadata_json"}
     if metadata.get("schema") != DATASET_SCHEMA:
         raise ValueError(f"wrong residual dataset schema in {path}")
+    if not np.allclose(metadata.get("action_scales"), ACTION_SCALES, atol=1e-12):
+        raise ValueError(f"residual action scale mismatch in {path}")
     case = int(metadata["case"])
     validate_case_dataset(payload, expected_case=case)
     return metadata, payload

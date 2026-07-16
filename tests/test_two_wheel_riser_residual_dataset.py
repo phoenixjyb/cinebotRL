@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     ACTION_SCALES,
@@ -20,13 +21,13 @@ def test_residual_action_reconstructs_bounded_teacher_command() -> None:
         actual_riser_position_m=0.40,
         target_riser_position_m=0.43,
     )
-    np.testing.assert_allclose(action, [0.2, 0.3, 0.3], atol=1e-6)
+    np.testing.assert_allclose(action, [0.16, 0.3, 0.3], atol=1e-6)
     np.testing.assert_allclose(
         apply_residual_action(0.10, -0.10, 0.40, action),
         [0.14, 0.02, 0.43],
         atol=1e-6,
     )
-    assert ACTION_SCALES.tolist() == [0.2, 0.4, 0.1]
+    assert ACTION_SCALES.tolist() == [0.25, 0.4, 0.1]
 
 
 def test_residual_action_clips_final_base_and_riser_commands() -> None:
@@ -37,6 +38,18 @@ def test_residual_action_clips_final_base_and_riser_commands() -> None:
         np.array([1.0, -1.0, 1.0]),
     )
     np.testing.assert_allclose(command, [0.4, -0.4, 1.2])
+
+
+def test_residual_teacher_action_rejects_scale_clipping() -> None:
+    with pytest.raises(ValueError, match="scale is too small"):
+        build_residual_action(
+            feedforward_vx_m_s=0.1,
+            feedforward_wz_rad_s=0.0,
+            commanded_vx_m_s=-0.16,
+            commanded_wz_rad_s=0.0,
+            actual_riser_position_m=0.4,
+            target_riser_position_m=0.4,
+        )
 
 
 def test_executed_observation_uses_body_frame_errors() -> None:

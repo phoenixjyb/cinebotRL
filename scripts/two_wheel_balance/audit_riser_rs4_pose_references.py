@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from dataclasses import replace
 import json
 from pathlib import Path
 import sys
@@ -17,6 +18,9 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from rl_platform.tasks.two_wheel_balance.riser_kinematics import (  # noqa: E402
     UrdfRiserCameraKinematics,
+)
+from rl_platform.tasks.two_wheel_balance.all79_reference import (  # noqa: E402
+    parse_acquisition_time_scale_overrides,
 )
 from rl_platform.tasks.two_wheel_balance.riser_reference import (  # noqa: E402
     discover_corrected_riser_stage,
@@ -36,6 +40,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--urdf", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--expected-count", type=int, default=62)
+    parser.add_argument("--cases", default="all")
+    parser.add_argument("--time-scale-overrides", default="")
+    parser.add_argument("--acquisition-time-scale-overrides", default="")
     parser.add_argument(
         "--vertical-shift-mode",
         choices=("none", "per_case_preserve_shape"),
@@ -59,10 +66,47 @@ def main() -> int:
     references = discover_corrected_riser_stage(
         args.stage, expected_count=args.expected_count
     )
+    if args.cases.strip().lower() != "all":
+        selected = {
+            int(item.strip()) for item in args.cases.split(",") if item.strip()
+        }
+        missing = selected - set(references)
+        if not selected or missing:
+            raise ValueError(f"invalid selected cases: {sorted(selected)}")
+        references = {case: references[case] for case in sorted(selected)}
+    time_scale_overrides = parse_acquisition_time_scale_overrides(
+        args.time_scale_overrides
+    )
+    acquisition_scale_overrides = parse_acquisition_time_scale_overrides(
+        args.acquisition_time_scale_overrides
+    )
+    overlap = set(time_scale_overrides) & set(acquisition_scale_overrides)
+    if overlap:
+        raise ValueError(f"cases cannot use both retiming modes: {sorted(overlap)}")
+    unselected_overrides = (
+        set(time_scale_overrides) | set(acquisition_scale_overrides)
+    ) - set(references)
+    if unselected_overrides:
+        raise ValueError(
+            f"time-scale overrides target unselected cases: {sorted(unselected_overrides)}"
+        )
     kinematics = UrdfRiserCameraKinematics(args.urdf)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     rows = []
     for case, reference in references.items():
+        time_scale = time_scale_overrides.get(case, 1.0)
+        acquisition_scale = acquisition_scale_overrides.get(case, 1.0)
+        if time_scale != 1.0:
+            reference = replace(reference, time_s=reference.time_s * time_scale)
+        elif acquisition_scale != 1.0:
+            acquisition_end = int(reference.metadata["acquisition_end_index"])
+            time_s = reference.time_s.copy()
+            acquisition_duration = float(time_s[acquisition_end])
+            time_s[: acquisition_end + 1] *= acquisition_scale
+            time_s[acquisition_end + 1 :] += (
+                acquisition_scale - 1.0
+            ) * acquisition_duration
+            reference = replace(reference, time_s=time_s)
         shift = 0.0
         if args.vertical_shift_mode == "per_case_preserve_shape":
             shift = max(
@@ -110,6 +154,9 @@ def main() -> int:
             {
                 "case": case,
                 "planning_strategy": plan.planning_strategy,
+                "time_scale": time_scale,
+                "acquisition_time_scale": acquisition_scale,
+                "retimed_duration_s": float(reference.time_s[-1]),
                 "vertical_shift_m": shift,
                 **metrics,
                 **checks,
@@ -128,6 +175,17 @@ def main() -> int:
         "training_started": False,
         "ppo_authorized": False,
         "case_count": len(rows),
+        "time_scale_overrides": {
+            str(case): scale for case, scale in time_scale_overrides.items()
+        },
+        "acquisition_time_scale_overrides": {
+            str(case): scale for case, scale in acquisition_scale_overrides.items()
+        },
+        "retimed_cases": [
+            row["case"]
+            for row in rows
+            if row["time_scale"] != 1.0 or row["acquisition_time_scale"] != 1.0
+        ],
         "passed_case_count": sum(row["passed"] for row in rows),
         "failed_cases": [row["case"] for row in rows if not row["passed"]],
         "strategy_counts": {

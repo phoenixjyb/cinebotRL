@@ -271,3 +271,61 @@ and must state whether its candidate was accepted or rejected.
   residual-DNN dataset is built.
 - Keep PPO blocked until all 79 corrected trajectories pass full-duration
   deterministic gates without a higher-priority balance or riser regression.
+
+## Round 11: strict all-79 admission and acquisition recovery
+
+- Source audit: adopted the corrected all-79 v3 semantic teacher package. Its
+  per-case schema exposes base-arm state and separate world-DFR attitude, but
+  no source action or physical DJI motor-joint label is admitted as a riser
+  policy target. The unexported MATLAB initialization sample is also excluded.
+- First result: directly placing the full trajectories behind the riser home
+  state passed `0/79`; all cases violated the synthetic acquisition-rate
+  contract. This candidate was rejected.
+- Structural change: regenerate home-to-first-target acquisition from physical
+  riser FK and physical `cam_link` converted to semantic DFR. Apply any
+  low-height translation before acquisition generation.
+- Second result: `72/79` passed. Cases 23, 24, 41, and 72 only failed inside
+  synthetic acquisition; cases 18 and 79 required whole-path slowing; case 50
+  exposed a double-applied vertical shift.
+- Bounded repair: whole-path scales are case 18 `1.5x` and case 79 `1.5x`;
+  acquisition-only scales are case 23 `6.5x`, case 24 `4.5x`, case 41 `1.3x`,
+  and case 72 `1.5x`; case 50 applies its shift before home acquisition. No
+  public gate or actuator limit changed.
+- Final pure result: `79/79` passed. Strategy mix is 30 fixed-path and 49
+  joint-adaptive. Worst position p95 is `0.149015 m`, maximum is `0.152459 m`,
+  and proxy rate is `0.413218 rad/s` against the unchanged limit.
+- Decision: accept the corrected all-79 deterministic stage. Training and PPO
+  remain blocked pending dynamic repaired-family validation and a residual
+  dataset contract.
+- Lesson: removed-arm acquisition is robot-specific executable scaffolding,
+  not a teacher label. It must be regenerated and provenance-audited.
+
+## Round 12: repaired-family Isaac dynamics
+
+- Change: exported self-contained playback plans for cases 18, 23, 24, 41,
+  50, 72, and 79, then ran all seven through the regenerated 28 kg Isaac asset
+  with balance LQR, riser control, online semantic-attitude IK, and the phase
+  governor.
+- Result: `7/7` passed over 39,430 steps with full-duration completion, no
+  termination, no attitude-IK failure, and zero action/riser saturation. Worst
+  proxy saturation ratio was the accepted `0.000762` in case 72.
+- Dynamic worst metrics: position p95 `0.131495 m`, position maximum
+  `0.144621 m`, attitude p95 `0.182725 deg`, attitude maximum `0.225993 deg`,
+  pitch maximum `5.968319 deg`, riser-servo p95 `0.011064 m`, and internal
+  proxy rate `62.243368 deg/s`.
+- Evidence: `evidence_20260716_riser_all79_recovery/`.
+- Decision: accept the all-79 recovery milestone. This closes the known
+  repaired failure families but is not evidence for a residual DNN policy.
+- Lesson: dynamic smokes should be selected from each structural repair family,
+  not only from easy or representative trajectories.
+
+## Next round after Round 12
+
+- Define a versioned residual observation/action contract from deterministic
+  executed state. Do not copy source GIK actions or physical gimbal labels.
+- Split by complete case, never by adjacent samples, to prevent trajectory
+  leakage across train, validation, and holdout sets.
+- Require dataset schema, dimensional, finite-value, timing, leakage, and
+  deterministic-baseline regression gates before any learned-policy rollout.
+- Keep PPO blocked. The next accepted artifact is a validated residual dataset,
+  not another blind training run.

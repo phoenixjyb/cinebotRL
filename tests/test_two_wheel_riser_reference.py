@@ -72,6 +72,21 @@ def test_corrected_stage_loader_rejects_old_or_ambiguous_source(tmp_path: Path) 
         load_corrected_riser_reference(path)
 
 
+def test_corrected_stage_loader_accepts_explicit_nonuniform_time(tmp_path: Path) -> None:
+    path = _write_case(tmp_path, 1)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["poses"].append(
+        {"position": [0.2, 0.0, 1.0], "orientation": [0.0, 0.0, 0.0, 1.0]}
+    )
+    payload["time_s"] = [0.0, 0.2, 0.3]
+    payload["metadata"]["duration_s"] = 0.3
+    payload["metadata"]["timing_contract"] = "explicit_time_s_v1"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    reference = load_corrected_riser_reference(path)
+    np.testing.assert_allclose(reference.time_s, [0.0, 0.2, 0.3])
+
+
 def test_bidirectional_heading_uses_reverse_motion_without_pi_turn() -> None:
     xy = np.array([[0.0, 0.0], [1.0, 0.0], [0.5, 0.0], [0.0, 0.0]])
     yaw = bidirectional_path_heading(xy, 0.1)

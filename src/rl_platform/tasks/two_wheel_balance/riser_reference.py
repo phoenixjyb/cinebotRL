@@ -21,7 +21,10 @@ from .whole_body_kinematics import integrate_unicycle
 
 
 REFERENCE_RE = re.compile(r"^episode_(?P<case>\d{4})_split_teacher_v1\.json$")
-EXPECTED_SOURCE = "corrected_physical_split_teacher"
+EXPECTED_SOURCES = {
+    "corrected_physical_split_teacher",
+    "corrected_all79_full_stage_v2",
+}
 EXPECTED_ATTITUDE_CONTRACT = "semantic_dfr_to_physical_cam_v1"
 EXPECTED_OBSERVATION_FRAME = "physical_cam_link_fk"
 
@@ -83,7 +86,7 @@ def load_corrected_riser_reference(path: Path) -> CorrectedRiserReference:
     poses = payload.get("poses")
     _require(isinstance(metadata, dict), f"missing metadata in {path}")
     _require(isinstance(poses, list) and len(poses) >= 2, f"bad poses in {path}")
-    _require(metadata.get("source") == EXPECTED_SOURCE, f"wrong source in {path}")
+    _require(metadata.get("source") in EXPECTED_SOURCES, f"wrong source in {path}")
     _require(metadata.get("quality_status") == "accepted", f"unaccepted case in {path}")
     _require(
         metadata.get("target_orientation_contract") == EXPECTED_ATTITUDE_CONTRACT,
@@ -106,11 +109,30 @@ def load_corrected_riser_reference(path: Path) -> CorrectedRiserReference:
     duration = float(metadata.get("duration_s", 0.0))
     waypoint_dt = float(metadata.get("waypoint_dt", 0.0))
     _require(duration > 0.0 and waypoint_dt > 0.0, f"bad timing in {path}")
-    time_s = np.linspace(0.0, duration, len(poses), dtype=np.float64)
-    _require(
-        abs(float(np.median(np.diff(time_s))) - waypoint_dt) <= waypoint_dt * 0.02,
-        f"duration/count mismatch in {path}",
-    )
+    if "time_s" in payload:
+        _require(
+            metadata.get("timing_contract") == "explicit_time_s_v1",
+            f"wrong explicit timing contract in {path}",
+        )
+        time_s = np.asarray(payload["time_s"], dtype=np.float64)
+        _require(time_s.shape == (len(poses),), f"bad explicit time shape in {path}")
+        _require(
+            np.isfinite(time_s).all()
+            and abs(float(time_s[0])) <= 1e-12
+            and bool(np.all(np.diff(time_s) > 0.0)),
+            f"bad explicit time values in {path}",
+        )
+        _require(
+            abs(float(time_s[-1]) - duration) <= 1e-8,
+            f"explicit duration mismatch in {path}",
+        )
+    else:
+        time_s = np.linspace(0.0, duration, len(poses), dtype=np.float64)
+        _require(
+            abs(float(np.median(np.diff(time_s))) - waypoint_dt)
+            <= waypoint_dt * 0.02,
+            f"duration/count mismatch in {path}",
+        )
     initial_base = np.asarray(metadata.get("initial_base_pose_xyyaw"), dtype=np.float64)
     _require(initial_base.shape == (3,) and np.isfinite(initial_base).all(), f"bad initial base in {path}")
     return CorrectedRiserReference(

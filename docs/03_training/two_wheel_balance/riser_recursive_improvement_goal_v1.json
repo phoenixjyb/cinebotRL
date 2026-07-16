@@ -56,23 +56,23 @@
   "current_stage": {
     "training_authorized": false,
     "ppo_authorized": false,
-    "corrected_teacher_cases_available": 62,
-    "corrected_teacher_cases_pending_regeneration": 17,
+    "corrected_teacher_cases_available": 79,
+    "corrected_teacher_cases_pending_regeneration": 0,
     "representative_bounded_unicycle_passed_cases": [1, 31, 73],
     "representative_bounded_unicycle_failed_cases": [],
-    "rs4_attitude_command_envelope_passed_cases": 62,
-    "rs4_attitude_rate_passed_cases": 62,
-    "rs4_full_pose_reference_passed_cases": 62,
+    "rs4_attitude_command_envelope_passed_cases": 79,
+    "rs4_attitude_rate_passed_cases": 79,
+    "rs4_full_pose_reference_passed_cases": 79,
     "rs4_full_pose_strategy_counts": {
-      "fixed_path": 13,
+      "fixed_path": 30,
       "joint_adaptive": 49
     },
     "reference_base_yaw_rate_rad_s_max": 0.4,
-    "reference_proxy_joint_rate_rad_s_max": 0.4173919111870304,
-    "reference_raw_proxy_target_rate_rad_s_max": 0.4173919111870304,
-    "reference_raw_proxy_target_step_rad_max": 0.020930613755193672,
-    "reference_position_error_p95_m_worst": 0.12068981256023611,
-    "reference_position_error_max_m_worst": 0.13230521724320798,
+    "reference_proxy_joint_rate_rad_s_max": 0.41321813851462186,
+    "reference_raw_proxy_target_rate_rad_s_max": 0.41321813851462186,
+    "reference_raw_proxy_target_step_rad_max": 0.26505221230327125,
+    "reference_position_error_p95_m_worst": 0.14901469114847316,
+    "reference_position_error_max_m_worst": 0.15245876611972142,
     "adaptive_proxy_rate_planning_margin": 0.995,
     "continuous_yaw_proxy_joint": "joint1_gimbal_pitch",
     "continuous_yaw_proxy_verified_in_usd": true,
@@ -88,14 +88,53 @@
       "isaac_passed_cases": [1, 31, 73],
       "isaac_render_verified": true
     },
+    "corrected_all79_stage": {
+      "schema": "cinebotrl_riser_corrected_all79_stage_v2",
+      "accepted_cases": 79,
+      "rejected_cases": 0,
+      "source_action_labels_used": false,
+      "physical_gimbal_labels_used_as_actions": false,
+      "matlab_initialization_sample_used_as_label": false,
+      "source_total_duration_s": 1394.6449314583328,
+      "executable_total_duration_s": 1435.9650171044236,
+      "whole_trajectory_time_scales": {
+        "18": 1.5,
+        "79": 1.5
+      },
+      "acquisition_only_time_scales": {
+        "23": 6.5,
+        "24": 4.5,
+        "41": 1.3,
+        "72": 1.5
+      },
+      "geometry_repaired_cases": [50]
+    },
+    "repaired_family_isaac_validation": {
+      "cases": [18, 23, 24, 41, 50, 72, 79],
+      "passed_cases": 7,
+      "completed_steps": 39430,
+      "terminations": 0,
+      "attitude_ik_failures": 0,
+      "position_error_p95_m_worst": 0.13149530876308826,
+      "position_error_max_m_worst": 0.14462073366133227,
+      "attitude_error_p95_deg_worst": 0.1827251348998125,
+      "attitude_error_max_deg_worst": 0.22599314354121788,
+      "pitch_max_deg_worst": 5.96831876138693,
+      "riser_servo_error_p95_m_worst": 0.011063819726294988,
+      "proxy_servo_error_p95_deg_worst": 0.16400868933677792,
+      "internal_proxy_rate_deg_s_max": 62.2433684056464,
+      "action_saturation_ratio_max": 0.0,
+      "riser_saturation_ratio_max": 0.0,
+      "proxy_saturation_ratio_max": 0.000762063112681423
+    },
     "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
-    "current_root_cause": "17 trajectories still require corrected semantic teacher regeneration before an all-79 deterministic gate or residual dataset is valid",
-    "remote_isaac_validation": "gate0_gate3_representative_passed",
-    "accepted_evidence": "evidence_20260716_riser_gate0_gate3_online_comp/summary.json"
+    "current_root_cause": "all 79 pure references and every repaired failure family now pass deterministic gates; the residual observation/action dataset and broad all-79 dynamic coverage do not yet exist",
+    "remote_isaac_validation": "gate0_gate3_representative_and_repaired7_passed",
+    "accepted_evidence": "evidence_20260716_riser_all79_recovery/README.md"
   },
   "next_iteration": {
-    "hypothesis": "the remaining 17 rejected trajectories can be regenerated from corrected semantic DFR targets and decomposed through the same balance-safe riser/RS4 portfolio",
-    "required_change": "regenerate the remaining 17 without quarantined NPZ or physical-gimbal labels, run pure all-79 feasibility, then add deterministic Isaac smokes for every repaired failure family",
-    "stop_rule": "do not build a residual dataset or resume PPO until all 79 corrected trajectories pass full-duration deterministic gates without balance regression"
+    "hypothesis": "the accepted deterministic planner can provide balance-safe residual targets when observations and actions are generated from executed state rather than copied source actions",
+    "required_change": "define and build a versioned residual dataset from all 79 deterministic plans, use case-level train-validation-holdout splits, and pass offline schema, leakage, finite-value, dimensional, and deterministic-baseline regression tests",
+    "stop_rule": "do not run a learned-policy rollout or resume PPO until the residual dataset contract and deterministic baseline regression are green"
   }
 }

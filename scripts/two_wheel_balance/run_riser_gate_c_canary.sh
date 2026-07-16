@@ -75,6 +75,7 @@ payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 case = int(sys.argv[2])
 valid = (
     payload.get("passed") is True
+    and payload.get("dynamic_quality_passed") is True
     and payload.get("training_started") is False
     and payload.get("ppo_authorized") is False
     and payload.get("trajectory_command_source") == "deterministic_teacher"
@@ -83,6 +84,7 @@ valid = (
     and payload.get("passed_case_count") == 1
     and len(payload.get("results", [])) == 1
     and payload["results"][0].get("passed") is True
+    and payload["results"][0].get("dynamic_quality_passed") is True
     and payload["results"][0].get("executed_residual_dataset") is None
 )
 raise SystemExit(0 if valid else 1)

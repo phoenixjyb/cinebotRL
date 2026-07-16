@@ -83,10 +83,14 @@ def test_runtime_evidence_separates_source_and_execution_clocks() -> None:
     assert 'candidate["source_time_s"][-1]' in whole_body
     assert 'candidate["execution_time_s"][-1]' in whole_body
     assert "np.array_equal(time_s, execution_time_s)" in whole_body
-    assert '"action_envelope_zero_clipping_rejection"' in riser
+    assert '"residual_label_envelope_rejection"' in riser
     assert "threading.Timer(60.0" in riser
     assert "failure_plan.source_time_s[-1]" in riser
     assert "failure_plan.time_s[-1]" in riser
+    assert "if dataset_dir is not None:" in riser
+    assert '"raw_residual_label_applied_to_commands": False' in riser
+    assert '"dynamic_quality_passed": dynamic_quality_passed' in riser
+    assert '"residual_label_envelope_passed": residual_label_envelope_ok' in riser
 
 
 def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:

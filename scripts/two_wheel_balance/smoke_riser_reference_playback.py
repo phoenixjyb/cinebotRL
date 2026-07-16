@@ -118,8 +118,11 @@ from rl_platform.tasks.two_wheel_balance.riser_kinematics import (
 from rl_platform.tasks.two_wheel_balance.riser_control import balance_progress_scale
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     apply_residual_action,
+    build_raw_residual_command,
     build_executed_observation,
     build_residual_action,
+    normalize_residual_command,
+    residual_action_envelope_passed,
     save_case_dataset,
 )
 from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
@@ -296,6 +299,8 @@ def evaluate_case(
     dataset_baseline_actions = []
     dataset_teacher_commands = []
     applied_residual_actions = []
+    raw_residual_commands = []
+    normalized_residual_labels = []
     previous_residual_action = np.zeros(3, dtype=np.float32)
     completed_steps = 0
     body_masses = robot.data.default_mass[0].to(unwrapped.device)
@@ -347,7 +352,7 @@ def evaluate_case(
                 sample.target_semantic_dfr_quat_wxyz
             )
         )
-        teacher_residual_action = build_residual_action(
+        raw_residual_command = build_raw_residual_command(
             feedforward_vx_m_s=phase_feedforward_v_mps,
             feedforward_wz_rad_s=phase_feedforward_wz_rad_s,
             commanded_vx_m_s=vx_ref,
@@ -355,6 +360,20 @@ def evaluate_case(
             actual_riser_position_m=actual_riser_pre,
             target_riser_position_m=sample.riser_q,
         )
+        normalized_residual_label = normalize_residual_command(raw_residual_command)
+        raw_residual_commands.append(raw_residual_command.copy())
+        normalized_residual_labels.append(normalized_residual_label.copy())
+        if dataset_dir is not None:
+            teacher_residual_action = build_residual_action(
+                feedforward_vx_m_s=phase_feedforward_v_mps,
+                feedforward_wz_rad_s=phase_feedforward_wz_rad_s,
+                commanded_vx_m_s=vx_ref,
+                commanded_wz_rad_s=wz_ref,
+                actual_riser_position_m=actual_riser_pre,
+                target_riser_position_m=sample.riser_q,
+            )
+        else:
+            teacher_residual_action = normalized_residual_label.astype(np.float32)
         executed_observation = build_executed_observation(
             lqr_state=current_states[0],
             actual_base_xy_yaw=actual_base,
@@ -374,7 +393,11 @@ def evaluate_case(
             previous_residual_action=previous_residual_action,
         )
         if residual_policy is None and not zero_policy_action:
-            applied_residual_action = teacher_residual_action
+            applied_residual_action = (
+                teacher_residual_action
+                if dataset_dir is not None
+                else np.zeros(3, dtype=np.float32)
+            )
             commanded_riser_target = sample.riser_q
         else:
             if zero_policy_action:
@@ -687,6 +710,10 @@ def evaluate_case(
     applied_residual_values = np.asarray(
         applied_residual_actions, dtype=np.float64
     )
+    raw_residual_values = np.asarray(raw_residual_commands, dtype=np.float64)
+    normalized_residual_values = np.asarray(
+        normalized_residual_labels, dtype=np.float64
+    )
     teacher_residual_values = np.asarray(dataset_actions, dtype=np.float64)
     pitches = np.asarray(pitch_samples_deg, dtype=np.float64)
     action_saturation_ratio = saturated_actions / max(action_count, 1)
@@ -720,8 +747,13 @@ def evaluate_case(
         "residual_teacher_unclipped": dataset_dir is None
         or float(np.max(np.abs(teacher_residual_values))) < 1.0 - 1e-6,
     }
+    dynamic_quality_passed = all(checks.values())
+    residual_label_envelope_ok = all(
+        residual_action_envelope_passed(value)
+        for value in normalized_residual_values
+    )
     dataset_path = None
-    if dataset_dir is not None and all(checks.values()):
+    if dataset_dir is not None and dynamic_quality_passed:
         dataset_path = dataset_dir / f"case_{plan.case:04d}_executed_residual_v1.npz"
         count = len(dataset_observations)
         save_case_dataset(
@@ -782,6 +814,18 @@ def evaluate_case(
         "residual_action_abs_max": np.max(
             np.abs(applied_residual_values), axis=0
         ).tolist(),
+        "raw_residual_command_abs_max": np.max(
+            np.abs(raw_residual_values), axis=0
+        ).tolist(),
+        "normalized_residual_label_abs_max": np.max(
+            np.abs(normalized_residual_values), axis=0
+        ).tolist(),
+        "raw_residual_label_applied_to_commands": False,
+        "dynamic_quality_passed": dynamic_quality_passed,
+        "residual_label_envelope_passed": residual_label_envelope_ok,
+        "residual_label_admission_passed": (
+            dynamic_quality_passed and residual_label_envelope_ok
+        ),
         "peak_base_xy_error_m": peak_base_xy_error_m,
         "peak_base_yaw_error_deg": peak_base_yaw_error_deg,
         "peak_com_pitch_bias_deg": peak_com_pitch_bias_deg,
@@ -794,7 +838,7 @@ def evaluate_case(
         "executed_residual_dataset": (
             None if dataset_path is None else str(dataset_path.resolve())
         ),
-        "passed": all(checks.values()),
+        "passed": dynamic_quality_passed,
     }
 
 
@@ -972,6 +1016,15 @@ def main() -> int:
         ),
         "cases": cases,
         "passed_case_count": sum(item["passed"] for item in results),
+        "dynamic_quality_passed": all(
+            item["dynamic_quality_passed"] for item in results
+        ),
+        "residual_label_envelope_passed": all(
+            item["residual_label_envelope_passed"] for item in results
+        ),
+        "residual_label_admission_passed": all(
+            item["residual_label_admission_passed"] for item in results
+        ),
         "results": results,
         "passed": all(item["passed"] for item in results),
     }
@@ -1002,7 +1055,7 @@ def write_runtime_failure(exc: Exception) -> None:
         except Exception:
             failure_plan = None
     classification = (
-        "action_envelope_zero_clipping_rejection"
+        "residual_label_envelope_rejection"
         if normalized is not None
         else "runtime_exception"
     )
@@ -1019,7 +1072,7 @@ def write_runtime_failure(exc: Exception) -> None:
                 "case": cases[0] if len(cases) == 1 else None,
                 "passed": False,
                 "stage": (
-                    "pre_execution_residual_action_reconstruction"
+                    "runtime_label_capture_envelope"
                     if normalized is not None
                     else "runtime"
                 ),
@@ -1027,6 +1080,8 @@ def write_runtime_failure(exc: Exception) -> None:
                 "exception_type": type(exc).__name__,
                 "exception_message": message,
                 "normalized_action": normalized,
+                "offline_admission_failure": False,
+                "failing_step_action_applied": False,
                 "source_duration_s": (
                     None
                     if failure_plan is None

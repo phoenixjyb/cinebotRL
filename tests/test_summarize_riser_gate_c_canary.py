@@ -8,7 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/two_wheel_balance/summarize_riser_gate_c_canary.py"
 
 
-def _gate(path: Path, case: int, passed: bool) -> None:
+def _gate(
+    path: Path, case: int, passed: bool, *, label_envelope_passed: bool = True
+) -> None:
     path.write_text(
         json.dumps(
             {
@@ -20,6 +22,11 @@ def _gate(path: Path, case: int, passed: bool) -> None:
                         "source_duration_s": 1.0,
                         "execution_duration_s": 3.0,
                         "completed_steps": 10,
+                        "dynamic_quality_passed": passed,
+                        "residual_label_envelope_passed": label_envelope_passed,
+                        "residual_label_admission_passed": (
+                            passed and label_envelope_passed
+                        ),
                         "classification": (
                             None
                             if passed
@@ -65,3 +72,37 @@ def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path)
     assert not summary["bc_started"]
     assert not summary["ppo_started"]
     assert not summary["passed"]
+
+
+def test_dynamic_pass_is_independent_of_label_envelope(tmp_path: Path) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "admission.json").write_text("{}")
+    _gate(
+        tmp_path / "gates/case_0074.json",
+        74,
+        True,
+        label_envelope_passed=False,
+    )
+    output = tmp_path / "summary.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--git-commit",
+            "a" * 40,
+            "--cases",
+            "74",
+            "--output",
+            str(output),
+        ],
+        check=True,
+    )
+    summary = json.loads(output.read_text())
+    assert summary["passed"]
+    assert summary["dynamic_quality_passed"]
+    assert not summary["residual_label_envelope_passed"]
+    assert not summary["residual_label_admission_passed"]
+    assert not summary["valid_for_training"]

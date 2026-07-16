@@ -6,9 +6,12 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     OBSERVATION_NAMES,
     apply_residual_action,
     build_executed_observation,
+    build_raw_residual_command,
     build_residual_action,
     load_case_dataset,
     save_case_dataset,
+    normalize_residual_command,
+    residual_action_envelope_passed,
 )
 
 
@@ -50,6 +53,28 @@ def test_residual_teacher_action_rejects_scale_clipping() -> None:
             actual_riser_position_m=0.4,
             target_riser_position_m=0.4,
         )
+
+
+def test_raw_residual_overflow_remains_diagnostic_without_clipping() -> None:
+    raw = build_raw_residual_command(
+        feedforward_vx_m_s=0.1,
+        feedforward_wz_rad_s=0.0,
+        commanded_vx_m_s=0.400601935,
+        commanded_wz_rad_s=0.079273308,
+        actual_riser_position_m=0.4,
+        target_riser_position_m=0.40356378,
+    )
+    normalized = normalize_residual_command(raw)
+    np.testing.assert_allclose(normalized, [1.00200645, 0.19818327, 0.0356378])
+    assert not residual_action_envelope_passed(normalized)
+    np.testing.assert_allclose(
+        [0.400601935, 0.079273308, 0.40356378],
+        [
+            0.1 + raw[0],
+            raw[1],
+            0.4 + raw[2],
+        ],
+    )
 
 
 def test_executed_observation_uses_body_frame_errors() -> None:

@@ -121,7 +121,7 @@ def build_executed_observation(
     return observation.astype(np.float32)
 
 
-def build_residual_action(
+def build_raw_residual_command(
     *,
     feedforward_vx_m_s: float,
     feedforward_wz_rad_s: float,
@@ -140,8 +140,44 @@ def build_residual_action(
     )
     if not np.isfinite(residual).all():
         raise ValueError("residual action is non-finite")
-    normalized = residual / ACTION_SCALES
-    if np.max(np.abs(normalized)) >= 1.0 - 1e-6:
+    return residual
+
+
+def normalize_residual_command(residual: np.ndarray) -> np.ndarray:
+    residual = np.asarray(residual, dtype=np.float64)
+    if residual.shape != (3,) or not np.isfinite(residual).all():
+        raise ValueError("invalid raw residual command")
+    return residual / ACTION_SCALES
+
+
+def residual_action_envelope_passed(normalized: np.ndarray) -> bool:
+    normalized = np.asarray(normalized, dtype=np.float64)
+    return bool(
+        normalized.shape == (3,)
+        and np.isfinite(normalized).all()
+        and np.max(np.abs(normalized)) < 1.0 - 1e-6
+    )
+
+
+def build_residual_action(
+    *,
+    feedforward_vx_m_s: float,
+    feedforward_wz_rad_s: float,
+    commanded_vx_m_s: float,
+    commanded_wz_rad_s: float,
+    actual_riser_position_m: float,
+    target_riser_position_m: float,
+) -> np.ndarray:
+    residual = build_raw_residual_command(
+        feedforward_vx_m_s=feedforward_vx_m_s,
+        feedforward_wz_rad_s=feedforward_wz_rad_s,
+        commanded_vx_m_s=commanded_vx_m_s,
+        commanded_wz_rad_s=commanded_wz_rad_s,
+        actual_riser_position_m=actual_riser_position_m,
+        target_riser_position_m=target_riser_position_m,
+    )
+    normalized = normalize_residual_command(residual)
+    if not residual_action_envelope_passed(normalized):
         raise ValueError(f"residual action scale is too small: {normalized}")
     return normalized.astype(np.float32)
 

@@ -45,6 +45,13 @@ def main() -> int:
             "source_duration_s": result.get("source_duration_s"),
             "execution_duration_s": result.get("execution_duration_s"),
             "completed_steps": result.get("completed_steps"),
+            "dynamic_quality_passed": result.get("dynamic_quality_passed"),
+            "residual_label_envelope_passed": result.get(
+                "residual_label_envelope_passed"
+            ),
+            "residual_label_admission_passed": result.get(
+                "residual_label_admission_passed"
+            ),
         }
         gate_rows.append(row)
         if row["passed"]:
@@ -79,6 +86,11 @@ def main() -> int:
             and row["execution_duration_s"] is not None
             for row in gate_rows
         ),
+        "dynamic_quality_passed": passed,
+        "residual_label_envelope_passed": bool(gate_rows)
+        and all(row["residual_label_envelope_passed"] is True for row in gate_rows),
+        "residual_label_admission_passed": bool(gate_rows)
+        and all(row["residual_label_admission_passed"] is True for row in gate_rows),
         "thresholds_relaxed": False,
         "actions_clipped": False,
         "residual_capture_started": False,

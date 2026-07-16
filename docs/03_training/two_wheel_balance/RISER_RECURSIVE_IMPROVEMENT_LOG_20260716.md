@@ -577,9 +577,20 @@ and must state whether its candidate was accepted or rejected.
   `2*pi` branch, and wraps continuous-yaw servo diagnostics. It does not change
   source anchors, execution timing, LQR gains, physical gates, residual scales,
   clipping, or training admission.
+- Added a hash-bound CPU scope audit over all 71 admitted plans. It finds that
+  `45/71` require nearest-equivalent branch handling; all 45 contain canonical
+  branch crossings. Case 71 can differ naively by `720 deg`. Cases 74/75/76
+  share the largest valid unwrapped step at `178.000692 deg`, confirming case
+  74 as the strongest next structural canary rather than an arbitrary retry.
+- Scope summary SHA-256 is
+  `7e357237237cb459a5b5c47f630852b4a179b955e022f4d55835c4949413fcbe`;
+  CSV SHA-256 is
+  `67bbfe164f6376189843517e9195437fb90b51e0186e8d1dfa32c4db15fc55cc`.
+  All plan hashes, semantic continuity checks, and nearest-branch orientation
+  equivalence checks pass. Multi-turn DJI attitude remains authoritative.
 - The runner now seals dynamic-failure evidence even if Isaac returns process
   status zero while its JSON says `passed=false`. The full CPU-only
-  riser/two-wheel suite is `118 passed`; no GPU rerun has been performed.
+  riser/two-wheel suite is `119 passed`; no GPU rerun has been performed.
 
 ## Next round after Round 19
 

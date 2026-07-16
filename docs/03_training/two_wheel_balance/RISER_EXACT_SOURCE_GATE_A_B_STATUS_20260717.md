@@ -245,8 +245,21 @@ reverse recovery. The repair preserves the unwrapped semantic target for
 attitude continuity and audit, but sends the nearest equivalent yaw branch to
 PhysX and computes continuous-yaw servo error modulo `2*pi`. The exact branch
 pair is regression-tested, and the full CPU-only riser/two-wheel suite passes
-`118` tests. The canary runner also now seals a summary when Isaac returns a
+`119` tests. The canary runner also now seals a summary when Isaac returns a
 failed JSON with process status zero.
+
+A sealed portfolio-wide CPU audit is stored at
+`20260717_gate_c_continuous_yaw_scope_audit_v1`. Summary SHA-256 is
+`7e357237237cb459a5b5c47f630852b4a179b955e022f4d55835c4949413fcbe`;
+CSV SHA-256 is
+`67bbfe164f6376189843517e9195437fb90b51e0186e8d1dfa32c4db15fc55cc`.
+It proves `45/71` admitted plans require nearest-branch handling and all 45
+contain canonical branch crossings. Case 71 has the largest possible naive
+branch discrepancy at `720 deg`. Cases 74/75/76 share the largest valid
+unwrapped waypoint step at `178.000692 deg`, making case 74 the strongest
+bounded structural canary. Every plan hash and continuity check passes;
+nearest-branch orientation error is at most `2.22e-16`. Multi-turn semantic
+attitude remains authoritative and is not rejected or flattened.
 
 This repair is not dynamically validated. All riser GPU work remains stopped.
 The next admissible runtime step is one fresh exclusive case-74 structural

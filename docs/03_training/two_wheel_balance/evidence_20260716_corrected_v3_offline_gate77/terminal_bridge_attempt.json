@@ -1,0 +1,14 @@
+{
+  "schema": "cinebotrl_two_wheel_terminal_bridge_attempt_v1",
+  "runtime_approved": false,
+  "training_started": false,
+  "cases": [73, 78],
+  "wall_clock_limit_s": 1800,
+  "completed_case_count": 0,
+  "candidate_npz_count": 0,
+  "exit_code": 124,
+  "outcome": "timeout",
+  "adopted_in_production_path": false,
+  "attempt": "unguided short diagnostic followed by terminal-guided forward multistart",
+  "conclusion": "Forward terminal guidance is still too expensive and did not prove either case. Keep both cases excluded and use a true bidirectional or precomputed bridge planner next."
+}

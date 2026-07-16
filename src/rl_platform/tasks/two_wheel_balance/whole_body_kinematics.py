@@ -70,7 +70,18 @@ class TreeJoint:
 class UrdfPositionKinematics:
     """Evaluate one URDF link position from planar base plus three arm joints."""
 
-    def __init__(self, urdf: Path, target_link: str = "ee1_tool") -> None:
+    def __init__(
+        self,
+        urdf: Path,
+        target_link: str = "ee1_tool",
+        *,
+        passive_joint_positions: dict[str, float] | None = None,
+    ) -> None:
+        self.passive_joint_positions = dict(passive_joint_positions or {})
+        if not all(
+            math.isfinite(value) for value in self.passive_joint_positions.values()
+        ):
+            raise ValueError("passive joint positions must be finite")
         root = ET.parse(urdf).getroot()
         inertials = {}
         for link_element in root.findall("link"):
@@ -117,6 +128,7 @@ class UrdfPositionKinematics:
         self._tree_by_parent = {
             parent: tuple(joints) for parent, joints in tree_by_parent.items()
         }
+        self._base_mass_kg, self._base_com = inertials["base_link"]
 
         reverse_chain = []
         link = target_link
@@ -147,7 +159,8 @@ class UrdfPositionKinematics:
             link = joint.find("parent").attrib["link"]
         self.chain = tuple(reversed(reverse_chain))
         movable = tuple(joint.name for joint in self.chain if joint.joint_type != "fixed")
-        if movable != ARM_JOINTS:
+        expected_movable = ARM_JOINTS + tuple(self.passive_joint_positions)
+        if movable != expected_movable:
             raise ValueError(f"unexpected movable chain to {target_link}: {movable}")
         self.target_link = target_link
 
@@ -169,33 +182,150 @@ class UrdfPositionKinematics:
             raise ValueError(f"expected finite base/arm q shape (6,), got {base_arm_q.shape}")
         x, y, yaw = base_arm_q[:3]
         value = _transform(np.array([x, y, 0.0]), _rpy_matrix(np.array([0.0, 0.0, yaw])))
-        arm = dict(zip(ARM_JOINTS, base_arm_q[3:], strict=True))
+        joint_positions = {
+            **dict(zip(ARM_JOINTS, base_arm_q[3:], strict=True)),
+            **self.passive_joint_positions,
+        }
         for joint in self.chain:
             value = value @ joint.origin
             if joint.joint_type != "fixed":
                 value = value @ _transform(
-                    np.zeros(3), _axis_rotation(joint.axis, arm[joint.name])
+                    np.zeros(3),
+                    _axis_rotation(joint.axis, joint_positions[joint.name]),
                 )
         return value
 
     def position(self, base_arm_q: np.ndarray) -> np.ndarray:
         return self.transform(base_arm_q)[:3, 3]
 
+    def center_of_mass_root_m(self, base_arm_q: np.ndarray) -> np.ndarray:
+        """Return the complete URDF tree COM in the unpitched base frame."""
+
+        base_arm_q = np.asarray(base_arm_q, dtype=np.float64)
+        if base_arm_q.shape != (6,) or not np.isfinite(base_arm_q).all():
+            raise ValueError(f"expected finite base/arm q shape (6,), got {base_arm_q.shape}")
+        joint_positions = {
+            **dict(zip(ARM_JOINTS, base_arm_q[3:], strict=True)),
+            **self.passive_joint_positions,
+        }
+        weighted_position = self._base_mass_kg * self._base_com[:3, 3].copy()
+        total_mass = self._base_mass_kg
+
+        def subtree(link: str, parent_transform: np.ndarray) -> None:
+            nonlocal weighted_position, total_mass
+            for joint in self._tree_by_parent.get(link, ()):
+                child_transform = parent_transform @ joint.origin
+                if joint.joint_type != "fixed":
+                    child_transform = child_transform @ _transform(
+                        np.zeros(3),
+                        _axis_rotation(
+                            joint.axis, joint_positions.get(joint.name, 0.0)
+                        ),
+                    )
+                if joint.child_mass_kg > 0.0:
+                    com_position = (child_transform @ joint.child_com)[:3, 3]
+                    weighted_position += joint.child_mass_kg * com_position
+                    total_mass += joint.child_mass_kg
+                subtree(joint.child_link, child_transform)
+
+        subtree("base_link", np.eye(4))
+        if total_mass <= 0.0:
+            raise ValueError("URDF tree has no positive mass")
+        return weighted_position / total_mass
+
+    def equilibrium_pitch_rad(
+        self, base_arm_q: np.ndarray, wheel_axle_height_m: float
+    ) -> float:
+        if wheel_axle_height_m <= 0.0:
+            raise ValueError("wheel axle height must be positive")
+        center_of_mass = self.center_of_mass_root_m(base_arm_q)
+        return -math.atan2(
+            float(center_of_mass[0]),
+            float(center_of_mass[2] - wheel_axle_height_m),
+        )
+
     def gravitational_effort_nm(
         self,
         base_arm_q: np.ndarray,
         gravity_mps2: float = 9.81,
         epsilon: float = 1e-5,
+        *,
+        finite_difference: bool = False,
+        root_roll_pitch_rad: np.ndarray | None = None,
     ) -> np.ndarray:
         base_arm_q = np.asarray(base_arm_q, dtype=np.float64)
         if base_arm_q.shape != (6,) or gravity_mps2 <= 0.0 or epsilon <= 0.0:
             raise ValueError("invalid state, gravity, or finite-difference epsilon")
+        if root_roll_pitch_rad is None:
+            root_roll_pitch_rad = np.zeros(2, dtype=np.float64)
+        else:
+            root_roll_pitch_rad = np.asarray(root_roll_pitch_rad, dtype=np.float64)
+        if root_roll_pitch_rad.shape != (2,) or not np.isfinite(
+            root_roll_pitch_rad
+        ).all():
+            raise ValueError("root roll/pitch must be a finite shape-(2,) vector")
+
+        if not finite_difference:
+            x, y, yaw = base_arm_q[:3]
+            root_transform = _transform(
+                np.array([x, y, 0.0]),
+                _rpy_matrix(np.array([*root_roll_pitch_rad, yaw])),
+            )
+            arm = dict(zip(ARM_JOINTS, base_arm_q[3:], strict=True))
+            arm_indices = {name: index for index, name in enumerate(ARM_JOINTS)}
+            effort = np.zeros(3, dtype=np.float64)
+            vertical = np.array([0.0, 0.0, 1.0])
+
+            def subtree(
+                link: str,
+                parent_transform: np.ndarray,
+                active_joints: tuple[tuple[int, np.ndarray, np.ndarray], ...],
+            ) -> None:
+                for joint in self._tree_by_parent.get(link, ()):
+                    joint_transform = parent_transform @ joint.origin
+                    child_active_joints = active_joints
+                    if joint.name in arm_indices:
+                        axis_world = joint_transform[:3, :3] @ (
+                            joint.axis / np.linalg.norm(joint.axis)
+                        )
+                        child_active_joints = active_joints + (
+                            (
+                                arm_indices[joint.name],
+                                joint_transform[:3, 3].copy(),
+                                axis_world,
+                            ),
+                        )
+                    child_transform = joint_transform
+                    if joint.joint_type != "fixed":
+                        angle = arm.get(joint.name, 0.0)
+                        child_transform = child_transform @ _transform(
+                            np.zeros(3), _axis_rotation(joint.axis, angle)
+                        )
+                    if joint.child_mass_kg > 0.0:
+                        com_position = (child_transform @ joint.child_com)[:3, 3]
+                        for index, joint_position, axis_world in child_active_joints:
+                            effort[index] += (
+                                joint.child_mass_kg
+                                * gravity_mps2
+                                * np.dot(
+                                    axis_world,
+                                    np.cross(com_position - joint_position, vertical),
+                                )
+                            )
+                    subtree(
+                        joint.child_link,
+                        child_transform,
+                        child_active_joints,
+                    )
+
+            subtree("base_link", root_transform, ())
+            return effort
 
         def potential_energy(state: np.ndarray) -> float:
             x, y, yaw = state[:3]
             value = _transform(
                 np.array([x, y, 0.0]),
-                _rpy_matrix(np.array([0.0, 0.0, yaw])),
+                _rpy_matrix(np.array([*root_roll_pitch_rad, yaw])),
             )
             arm = dict(zip(ARM_JOINTS, state[3:], strict=True))
 

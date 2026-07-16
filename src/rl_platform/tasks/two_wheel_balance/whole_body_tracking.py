@@ -25,6 +25,46 @@ def yaw_from_quaternion_wxyz(quaternion: np.ndarray) -> float:
     return math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
 
 
+def roll_pitch_from_quaternion_wxyz(quaternion: np.ndarray) -> np.ndarray:
+    rotation = rotation_matrix_from_quaternion_wxyz(quaternion)
+    return np.array(
+        [
+            math.atan2(float(rotation[2, 1]), float(rotation[2, 2])),
+            math.atan2(
+                float(-rotation[2, 0]),
+                math.hypot(float(rotation[2, 1]), float(rotation[2, 2])),
+            ),
+        ],
+        dtype=np.float64,
+    )
+
+
+def quaternion_from_roll_pitch_yaw_wxyz(
+    roll: float, pitch: float, yaw: float
+) -> np.ndarray:
+    if not all(math.isfinite(value) for value in (roll, pitch, yaw)):
+        raise ValueError("roll, pitch, and yaw must be finite")
+    half_roll = 0.5 * roll
+    half_pitch = 0.5 * pitch
+    half_yaw = 0.5 * yaw
+    cr, sr = math.cos(half_roll), math.sin(half_roll)
+    cp, sp = math.cos(half_pitch), math.sin(half_pitch)
+    cy, sy = math.cos(half_yaw), math.sin(half_yaw)
+    return np.array(
+        [
+            cr * cp * cy + sr * sp * sy,
+            sr * cp * cy - cr * sp * sy,
+            cr * sp * cy + sr * cp * sy,
+            cr * cp * sy - sr * sp * cy,
+        ],
+        dtype=np.float64,
+    )
+
+
+def quaternion_from_pitch_yaw_wxyz(pitch: float, yaw: float) -> np.ndarray:
+    return quaternion_from_roll_pitch_yaw_wxyz(0.0, pitch, yaw)
+
+
 def rotation_matrix_from_quaternion_wxyz(quaternion: np.ndarray) -> np.ndarray:
     quaternion = np.asarray(quaternion, dtype=np.float64)
     if quaternion.shape != (4,) or not np.isfinite(quaternion).all():
@@ -81,6 +121,66 @@ class WholeBodyTrackingConfig:
     minimum_progress_scale: float = 0.1
 
 
+@dataclass(frozen=True)
+class GimbalRootAttitudeFeedbackConfig:
+    gain: float = 0.5
+    time_constant_s: float = 0.15
+    maximum_error_rad: float = math.radians(12.0)
+
+
+def filtered_gimbal_root_attitude_command(
+    actual_root_quaternion_wxyz: np.ndarray,
+    nominal_pitch_rad: float,
+    nominal_yaw_rad: float,
+    previous_filtered_error_rpy_rad: np.ndarray,
+    dt: float,
+    config: GimbalRootAttitudeFeedbackConfig,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Add smooth measured chassis-attitude feedback to gimbal feed-forward."""
+
+    previous = np.asarray(previous_filtered_error_rpy_rad, dtype=np.float64)
+    if previous.shape != (3,) or not np.isfinite(previous).all():
+        raise ValueError("previous root-attitude error must be finite shape (3,)")
+    if dt <= 0.0 or not math.isfinite(dt):
+        raise ValueError("dt must be finite and positive")
+    if not (
+        0.0 <= config.gain <= 1.0
+        and config.time_constant_s >= 0.0
+        and config.maximum_error_rad > 0.0
+    ):
+        raise ValueError("invalid gimbal root-attitude feedback configuration")
+
+    actual_roll, actual_pitch = roll_pitch_from_quaternion_wxyz(
+        actual_root_quaternion_wxyz
+    )
+    actual_yaw = yaw_from_quaternion_wxyz(actual_root_quaternion_wxyz)
+    bounded_error = np.clip(
+        np.array(
+            [
+                actual_roll,
+                actual_pitch - nominal_pitch_rad,
+                wrap_to_pi(actual_yaw - nominal_yaw_rad),
+            ],
+            dtype=np.float64,
+        ),
+        -config.maximum_error_rad,
+        config.maximum_error_rad,
+    )
+    alpha = (
+        1.0
+        if config.time_constant_s == 0.0
+        else 1.0 - math.exp(-dt / config.time_constant_s)
+    )
+    filtered_error = previous + alpha * (bounded_error - previous)
+    applied_correction = config.gain * filtered_error
+    command_quaternion = quaternion_from_roll_pitch_yaw_wxyz(
+        float(applied_correction[0]),
+        nominal_pitch_rad + float(applied_correction[1]),
+        nominal_yaw_rad + float(applied_correction[2]),
+    )
+    return command_quaternion, filtered_error, applied_correction
+
+
 def bounded_progress_scale(
     base_position_error_m: float,
     tool_position_error_m: float,
@@ -90,7 +190,7 @@ def bounded_progress_scale(
         raise ValueError("tracking errors must be non-negative")
     if not (
         0.0 < config.progress_error_start_m < config.progress_error_full_m
-        and 0.0 < config.minimum_progress_scale <= 1.0
+        and 0.0 <= config.minimum_progress_scale <= 1.0
     ):
         raise ValueError("invalid progress governor configuration")
     worst_error = max(base_position_error_m, tool_position_error_m)
@@ -101,6 +201,74 @@ def bounded_progress_scale(
         1.0,
     )
     return float(1.0 - severity * (1.0 - config.minimum_progress_scale))
+
+
+def bounded_balance_progress_scale(
+    pitch_rad: float,
+    slowdown_start_rad: float,
+    full_stop_rad: float,
+    minimum_progress_scale: float = 0.0,
+) -> float:
+    """Reduce reference progress before chassis pitch reaches its hard gate."""
+
+    if not all(
+        math.isfinite(value)
+        for value in (
+            pitch_rad,
+            slowdown_start_rad,
+            full_stop_rad,
+            minimum_progress_scale,
+        )
+    ):
+        raise ValueError("balance progress governor inputs must be finite")
+    if not (
+        0.0 <= slowdown_start_rad < full_stop_rad
+        and 0.0 <= minimum_progress_scale <= 1.0
+    ):
+        raise ValueError("invalid balance progress governor configuration")
+    severity = np.clip(
+        (abs(pitch_rad) - slowdown_start_rad)
+        / (full_stop_rad - slowdown_start_rad),
+        0.0,
+        1.0,
+    )
+    return float(1.0 - severity * (1.0 - minimum_progress_scale))
+
+
+def bounded_attitude_progress_scale(
+    attitude_error_rad: float,
+    slowdown_start_rad: float,
+    full_stop_rad: float,
+    minimum_progress_scale: float = 0.0,
+) -> float:
+    """Pause reference progress when camera attitude feedback cannot catch up."""
+
+    if attitude_error_rad < 0.0:
+        raise ValueError("attitude error must be non-negative")
+    return bounded_balance_progress_scale(
+        attitude_error_rad,
+        slowdown_start_rad,
+        full_stop_rad,
+        minimum_progress_scale,
+    )
+
+
+def phase_scaled_feedforward(
+    feedforward_v_mps: float,
+    feedforward_wz_radps: float,
+    progress_scale: float,
+) -> tuple[float, float]:
+    """Convert phase derivatives to wall-time feedforward commands."""
+
+    if not all(
+        math.isfinite(value)
+        for value in (feedforward_v_mps, feedforward_wz_radps, progress_scale)
+    ) or not 0.0 <= progress_scale <= 1.0:
+        raise ValueError("progress scale must be finite and within [0, 1]")
+    return (
+        progress_scale * feedforward_v_mps,
+        progress_scale * feedforward_wz_radps,
+    )
 
 
 def bounded_base_references(
@@ -224,6 +392,121 @@ def bounded_dls_arm_target(
         "target_correction_rad": target - nominal_arm_q,
         "jacobian_condition": float(np.linalg.cond(jacobian)),
     }
+
+
+def bounded_semantic_arm_target(
+    kinematics: UrdfPositionKinematics,
+    actual_base_q: np.ndarray,
+    actual_arm_q: np.ndarray,
+    nominal_arm_q: np.ndarray,
+    previous_arm_target_q: np.ndarray,
+    target_position_world_m: np.ndarray,
+    actual_position_world_m: np.ndarray,
+    dt: float,
+    semantic_feedback_enabled: bool,
+    config: WholeBodyTrackingConfig,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Apply bounded DLS only after semantic playback has started."""
+
+    requested = np.asarray(nominal_arm_q, dtype=np.float64)
+    if semantic_feedback_enabled:
+        requested, _ = bounded_dls_arm_target(
+            kinematics,
+            actual_base_q,
+            actual_arm_q,
+            nominal_arm_q,
+            target_position_world_m,
+            actual_position_world_m,
+            config,
+        )
+    target = slew_limited_arm_target(
+        requested,
+        previous_arm_target_q,
+        dt,
+        kinematics,
+        config,
+    )
+    return target, target - np.asarray(nominal_arm_q, dtype=np.float64)
+
+
+def bounded_task_space_base_target(
+    kinematics: UrdfPositionKinematics,
+    desired_base_q: np.ndarray,
+    desired_arm_q: np.ndarray,
+    target_position_world_m: np.ndarray,
+    root_tilt_displacement_world_m: np.ndarray,
+    maximum_offset_m: float,
+) -> tuple[np.ndarray, dict[str, np.ndarray | float]]:
+    """Allocate horizontal physical-tool displacement to the wheel base.
+
+    The retargeter uses planar FK, while the balancing root pitches in Isaac.
+    The internal base target absorbs the resulting horizontal tool displacement
+    plus any retained planar retarget residual.  The semantic tool target and
+    teacher arm joints remain unchanged.
+    """
+
+    desired_base_q = np.asarray(desired_base_q, dtype=np.float64)
+    desired_arm_q = np.asarray(desired_arm_q, dtype=np.float64)
+    target_position_world_m = np.asarray(target_position_world_m, dtype=np.float64)
+    root_tilt_displacement_world_m = np.asarray(
+        root_tilt_displacement_world_m, dtype=np.float64
+    )
+    arrays = (
+        desired_base_q,
+        desired_arm_q,
+        target_position_world_m,
+        root_tilt_displacement_world_m,
+    )
+    if any(value.shape != (3,) for value in arrays):
+        raise ValueError("base-compensation vectors must all have shape (3,)")
+    if not all(np.isfinite(value).all() for value in arrays):
+        raise ValueError("base-compensation vectors contain non-finite values")
+    if maximum_offset_m <= 0.0:
+        raise ValueError("maximum base offset must be positive")
+
+    planar_nominal = kinematics.position(
+        np.concatenate((desired_base_q, desired_arm_q))
+    )
+    retarget_residual = target_position_world_m[:2] - planar_nominal[:2]
+    requested_offset = retarget_residual - root_tilt_displacement_world_m[:2]
+    requested_norm = float(np.linalg.norm(requested_offset))
+    scale = min(1.0, maximum_offset_m / max(requested_norm, 1e-12))
+    bounded_offset = requested_offset * scale
+    target = desired_base_q.copy()
+    target[:2] += bounded_offset
+    return target, {
+        "requested_offset_world_m": requested_offset,
+        "bounded_offset_world_m": bounded_offset,
+        "retarget_residual_world_m": retarget_residual,
+        "offset_saturated": float(requested_norm > maximum_offset_m),
+    }
+
+
+def slew_limited_planar_offset(
+    requested_offset_world_m: np.ndarray,
+    previous_offset_world_m: np.ndarray,
+    dt: float,
+    maximum_rate_mps: float,
+) -> np.ndarray:
+    requested_offset_world_m = np.asarray(
+        requested_offset_world_m, dtype=np.float64
+    )
+    previous_offset_world_m = np.asarray(previous_offset_world_m, dtype=np.float64)
+    if requested_offset_world_m.shape != (2,) or previous_offset_world_m.shape != (2,):
+        raise ValueError("planar offsets must have shape (2,)")
+    if not np.isfinite(
+        np.concatenate((requested_offset_world_m, previous_offset_world_m))
+    ).all():
+        raise ValueError("planar offsets contain non-finite values")
+    if dt <= 0.0 or maximum_rate_mps <= 0.0:
+        raise ValueError("offset timestep and rate must be positive")
+
+    delta = requested_offset_world_m - previous_offset_world_m
+    delta_norm = float(np.linalg.norm(delta))
+    maximum_delta = maximum_rate_mps * dt
+    if delta_norm > maximum_delta:
+        delta *= maximum_delta / delta_norm
+    return previous_offset_world_m + delta
 
 
 def slew_limited_arm_target(

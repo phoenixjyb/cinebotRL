@@ -1,0 +1,50 @@
+{
+  "schema": "cinebotrl_two_wheel_terminal_pose_feasibility_v1",
+  "runtime_approved": false,
+  "training_started": false,
+  "position_limit_m": 0.0001,
+  "attitude_limit_deg": 0.01,
+  "arm_gravity_limit_nm": 29.51,
+  "minimum_gimbal_limit_margin_ratio": 0.1,
+  "cases": [
+    {
+      "case": 73,
+      "feasible": true,
+      "position_error_m": 8.376863890705295e-09,
+      "attitude_error_deg": 7.021090036686835e-06,
+      "maximum_arm_gravity_effort_nm": 25.934761315227203,
+      "minimum_gimbal_limit_margin_ratio": 0.27408505664064603,
+      "base_arm_gimbal_q": [
+        0.28540002998561226,
+        -0.820031281378848,
+        -0.5786131931841814,
+        -0.5644469344511144,
+        0.40376435014324463,
+        -0.9863711672678132,
+        1.4194687721154928,
+        -1.3998462365876942,
+        -0.8314533773078903
+      ]
+    },
+    {
+      "case": 78,
+      "feasible": true,
+      "position_error_m": 2.372606483989018e-08,
+      "attitude_error_deg": 6.325412477395574e-05,
+      "maximum_arm_gravity_effort_nm": 27.012237175938477,
+      "minimum_gimbal_limit_margin_ratio": 0.20578944364578264,
+      "base_arm_gimbal_q": [
+        0.6720547883005212,
+        -0.8103585107119725,
+        -0.30958026972244906,
+        -0.29467583373946205,
+        0.4593441316966971,
+        -1.095029944391603,
+        1.8485837676848185,
+        -1.705750242076052,
+        -0.4134439941889229
+      ]
+    }
+  ],
+  "conclusion": "Both terminal poses are physically feasible; failures are in sequential nonholonomic branch planning."
+}

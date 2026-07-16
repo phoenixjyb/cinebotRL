@@ -1,0 +1,310 @@
+from pathlib import Path
+import sys
+from types import SimpleNamespace
+
+import numpy as np
+import pytest
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "scripts/two_wheel_balance"))
+
+from retarget_corrected_teacher_v3_nonholonomic import (  # noqa: E402
+    BALANCE_PITCH_OUTPUT_TOLERANCE_DEG,
+    BALANCE_PITCH_SOLVER_TOLERANCE_DEG,
+    HOME_ARM,
+    balance_pitch_optimization_margin_deg,
+    build_gravity_aware_arm_acquisition,
+    physical_gimbal_interpolation_error,
+    physical_camera_rotation,
+    solve_full_pose_anchor,
+)
+from rl_platform.tasks.two_wheel_balance.camera_attitude import (  # noqa: E402
+    UrdfPhysicalCameraKinematics,
+    matrix_quaternion_wxyz,
+    physical_cam_to_semantic_dfr_quat_wxyz,
+)
+from rl_platform.tasks.two_wheel_balance.whole_body_kinematics import (  # noqa: E402
+    UrdfPositionKinematics,
+)
+
+
+def test_balance_pitch_solver_and_output_tolerances_are_separate() -> None:
+    assert BALANCE_PITCH_SOLVER_TOLERANCE_DEG == 1e-6
+    assert BALANCE_PITCH_OUTPUT_TOLERANCE_DEG == 0.001
+    assert balance_pitch_optimization_margin_deg(
+        SimpleNamespace(camera_solve_root_model="balanced")
+    ) == 0.01
+    assert balance_pitch_optimization_margin_deg(
+        SimpleNamespace(camera_solve_root_model="upright")
+    ) == 0.0
+
+
+def test_physical_gimbal_interpolation_rejects_equivalent_branch_jump() -> None:
+    urdf = (
+        PROJECT_ROOT
+        / "assets_own/recomoProto2_two_wheel_whole_body_attitude"
+        / "recomoProto2_two_wheel_whole_body_attitude.urdf"
+    )
+    position_kinematics = UrdfPositionKinematics(urdf)
+    camera_kinematics = UrdfPhysicalCameraKinematics(urdf)
+    states = np.array(
+        [
+            [
+                0.3381004080507735,
+                -0.23059601128545915,
+                -0.9768655253307925,
+                0.16432255310411242,
+                -0.1283785282691526,
+                -1.731140586419033,
+                3.1400471469325355,
+                -3.0216091963656546,
+                0.23872870100388868,
+            ],
+            [
+                0.32388400192431144,
+                -0.20860717394875136,
+                -1.0168655253307926,
+                0.203492842067913,
+                -0.17837852826915265,
+                -1.7697833166181511,
+                0.13552841161858523,
+                -0.10491205258953261,
+                -1.6428041890370524,
+            ],
+        ]
+    )
+    attitudes = np.array(
+        [
+            [
+                0.6182402293384809,
+                0.2952324714745884,
+                0.6532700042933122,
+                -0.32226558628734314,
+            ],
+            [
+                0.6199273707680406,
+                0.29155735414977213,
+                0.6551952951960943,
+                -0.31843914546850477,
+            ],
+        ]
+    )
+
+    error_deg, interval = physical_gimbal_interpolation_error(
+        states,
+        attitudes,
+        position_kinematics,
+        camera_kinematics,
+        SimpleNamespace(wheel_axle_height_m=0.1016),
+    )
+
+    assert interval == 0
+    assert error_deg > 40.0
+
+
+def test_gravity_aware_acquisition_avoids_unsafe_direct_path() -> None:
+    urdf = (
+        PROJECT_ROOT
+        / "assets_own/recomoProto2_two_wheel_whole_body_attitude"
+        / "recomoProto2_two_wheel_whole_body_attitude.urdf"
+    )
+    kinematics = UrdfPositionKinematics(urdf)
+    args = SimpleNamespace(
+        maximum_acquisition_arm_rate=0.2,
+        acquisition_dt_s=0.1,
+        maximum_arm_gravity_effort_nm=29.5,
+        gravity_effort_tolerance_nm=0.01,
+        maximum_equilibrium_pitch_deg=180.0,
+        wheel_axle_height_m=0.1016,
+    )
+    anchor_arm = np.array(
+        [-0.30821131351426295, 0.6192383220173465, -0.8758694939937766]
+    )
+
+    path, gravity_max, plan = build_gravity_aware_arm_acquisition(
+        anchor_arm, kinematics, args
+    )
+
+    assert plan.startswith("staged_")
+    assert gravity_max <= args.maximum_arm_gravity_effort_nm
+    np.testing.assert_allclose(path[0], HOME_ARM)
+    np.testing.assert_allclose(path[-1], anchor_arm)
+    maximum_rate = float(
+        np.max(np.abs(np.diff(path, axis=0))) / args.acquisition_dt_s
+    )
+    assert maximum_rate <= args.maximum_acquisition_arm_rate + 1e-9
+
+
+def test_full_pose_anchor_jointly_satisfies_case38_gravity_and_gimbal_margin() -> None:
+    urdf = (
+        PROJECT_ROOT
+        / "assets_own/recomoProto2_two_wheel_whole_body_attitude"
+        / "recomoProto2_two_wheel_whole_body_attitude.urdf"
+    )
+    position_kinematics = UrdfPositionKinematics(urdf)
+    camera_kinematics = UrdfPhysicalCameraKinematics(urdf)
+    args = SimpleNamespace(
+        maximum_acquisition_arm_rate=0.2,
+        acquisition_dt_s=0.1,
+        maximum_arm_gravity_effort_nm=29.5,
+        gravity_effort_tolerance_nm=0.01,
+        minimum_anchor_gimbal_limit_margin_ratio=0.10,
+        maximum_equilibrium_pitch_deg=180.0,
+        wheel_axle_height_m=0.1016,
+    )
+    source_base_arm_q = np.array(
+        [
+            0.3583312,
+            0.75625449,
+            0.56068647,
+            0.57370007,
+            0.66025621,
+            -0.6767742,
+        ]
+    )
+    feasible_full_state = np.array(
+        [
+            0.68565355,
+            -0.50122637,
+            -0.32407767,
+            -0.31106408,
+            0.62622937,
+            -0.86622609,
+            1.40637726,
+            -1.47981939,
+            -1.47745958,
+        ]
+    )
+    target_position = position_kinematics.position(feasible_full_state[:6])
+    target_physical_quaternion = matrix_quaternion_wxyz(
+        physical_camera_rotation(feasible_full_state, camera_kinematics)
+    )
+    target_semantic_attitude = physical_cam_to_semantic_dfr_quat_wxyz(
+        target_physical_quaternion
+    )
+
+    anchor, position_error, attitude_error = solve_full_pose_anchor(
+        source_base_arm_q,
+        target_position,
+        target_semantic_attitude,
+        position_kinematics,
+        camera_kinematics,
+        args,
+    )
+
+    gravity_max = float(
+        np.max(
+            np.abs(position_kinematics.gravitational_effort_nm(anchor[:6]))
+        )
+    )
+    gimbal_range = camera_kinematics.gimbal_upper - camera_kinematics.gimbal_lower
+    gimbal_margin = float(
+        np.min(
+            np.minimum(
+                anchor[6:9] - camera_kinematics.gimbal_lower,
+                camera_kinematics.gimbal_upper - anchor[6:9],
+            )
+            / gimbal_range
+        )
+    )
+    assert position_error <= 1e-4
+    assert attitude_error <= 0.01
+    assert gravity_max <= 29.51
+    assert gimbal_margin >= 0.10
+
+
+def test_gravity_aware_acquisition_routes_case4_through_safe_graph() -> None:
+    urdf = (
+        PROJECT_ROOT
+        / "assets_own/recomoProto2_two_wheel_whole_body_attitude"
+        / "recomoProto2_two_wheel_whole_body_attitude.urdf"
+    )
+    kinematics = UrdfPositionKinematics(urdf)
+    args = SimpleNamespace(
+        maximum_acquisition_arm_rate=0.2,
+        acquisition_dt_s=0.1,
+        maximum_arm_gravity_effort_nm=29.5,
+        gravity_effort_tolerance_nm=0.01,
+        maximum_equilibrium_pitch_deg=180.0,
+        wheel_axle_height_m=0.1016,
+    )
+    anchor_arm = np.array(
+        [-0.061872423001616765, 1.5563690195169733, -1.025919604013786]
+    )
+
+    path, gravity_max, plan = build_gravity_aware_arm_acquisition(
+        anchor_arm, kinematics, args
+    )
+
+    assert plan.startswith("astar_pitch_elbow_")
+    assert gravity_max <= 29.51
+    np.testing.assert_allclose(path[0], HOME_ARM)
+    np.testing.assert_allclose(path[-1], anchor_arm)
+    maximum_rate = float(
+        np.max(np.abs(np.diff(path, axis=0))) / args.acquisition_dt_s
+    )
+    assert maximum_rate <= args.maximum_acquisition_arm_rate + 1e-9
+
+
+def test_acquisition_rejects_endpoint_above_balance_pitch_budget() -> None:
+    urdf = (
+        PROJECT_ROOT
+        / "assets_own/recomoProto2_two_wheel_whole_body_attitude"
+        / "recomoProto2_two_wheel_whole_body_attitude.urdf"
+    )
+    kinematics = UrdfPositionKinematics(urdf)
+    args = SimpleNamespace(
+        maximum_acquisition_arm_rate=0.2,
+        acquisition_dt_s=0.1,
+        maximum_arm_gravity_effort_nm=29.5,
+        gravity_effort_tolerance_nm=0.01,
+        maximum_equilibrium_pitch_deg=8.5,
+        wheel_axle_height_m=0.1016,
+    )
+    unsafe_anchor_arm = np.radians([-17.8, 21.3, -68.7])
+
+    with pytest.raises(ValueError, match="gravity/COM-safe"):
+        build_gravity_aware_arm_acquisition(
+            unsafe_anchor_arm, kinematics, args, allow_astar=False
+        )
+
+
+def test_case28_acquisition_uses_yaw_first_com_safe_graph() -> None:
+    urdf = (
+        PROJECT_ROOT
+        / "assets_own/recomoProto2_two_wheel_whole_body_attitude"
+        / "recomoProto2_two_wheel_whole_body_attitude.urdf"
+    )
+    kinematics = UrdfPositionKinematics(urdf)
+    args = SimpleNamespace(
+        maximum_acquisition_arm_rate=0.2,
+        acquisition_dt_s=0.1,
+        maximum_arm_gravity_effort_nm=29.5,
+        gravity_effort_tolerance_nm=0.01,
+        maximum_equilibrium_pitch_deg=10.0,
+        wheel_axle_height_m=0.1016,
+    )
+    anchor_arm = np.array(
+        [0.17624625627262436, 0.36142375712669467, -2.0143416473789166]
+    )
+
+    path, gravity_max, plan = build_gravity_aware_arm_acquisition(
+        anchor_arm, kinematics, args
+    )
+    pitch_max = max(
+        np.degrees(
+            abs(
+                kinematics.equilibrium_pitch_rad(
+                    np.concatenate((np.zeros(3), arm)), 0.1016
+                )
+            )
+        )
+        for arm in path
+    )
+
+    assert plan.startswith("astar_pitch_elbow_yaw_first_")
+    assert gravity_max <= 29.51
+    assert pitch_max <= 10.000001
+    np.testing.assert_allclose(path[0], HOME_ARM)
+    np.testing.assert_allclose(path[-1], anchor_arm)

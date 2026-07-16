@@ -1,5 +1,7 @@
 """Pure tests for the two-wheel action and observation contract."""
 
+import math
+
 import numpy as np
 
 from rl_platform.tasks.two_wheel_balance.metrics import (
@@ -399,7 +401,27 @@ def test_cascaded_lqr_defaults_match_selected_tracking_gate() -> None:
     assert not config.path_progress_governor_enabled
     assert config.governor_minimum_progress_scale == 0.75
     assert np.isclose(np.degrees(config.pitch_reference_limit_rad), 6.0)
+    assert np.isclose(np.degrees(config.total_pitch_target_limit_rad), 10.0)
     assert config.action_limit == 0.8
+
+
+def test_cascaded_lqr_caps_combined_pitch_bias_and_velocity_target() -> None:
+    _, _, diagnostics = cascaded_lqr_action(
+        np.zeros((1, len(LQR_STATE_NAMES))),
+        np.ones(1),
+        np.zeros(1),
+        np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES))),
+        np.zeros((1, 6)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(
+            pitch_bias_limit_rad=math.radians(10.0),
+            total_pitch_target_limit_rad=math.radians(12.0),
+        ),
+        pitch_bias_override_rad=np.array([math.radians(10.0)]),
+    )
+    np.testing.assert_allclose(
+        diagnostics["pitch_target"], [math.radians(12.0)]
+    )
 
 
 def test_structural_robust_profile_is_explicit_and_default_safe() -> None:

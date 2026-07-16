@@ -16,6 +16,9 @@ from rl_platform.tasks.two_wheel_balance.all79_reference import (
     regenerate_acquisition_prefix,
     source_body_velocities,
 )
+from rl_platform.tasks.two_wheel_balance.whole_body_kinematics import (
+    UrdfPositionKinematics,
+)
 
 
 def write_full_reference(path: Path) -> None:
@@ -30,26 +33,48 @@ def write_full_reference(path: Path) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def write_sparse_teacher(path: Path, runtime_approved: bool = False) -> None:
+def write_sparse_teacher(
+    path: Path,
+    runtime_approved: bool = False,
+    teacher_quality_passed: bool = True,
+    include_integrity_contract: bool = True,
+) -> None:
     current = np.array([[0.0, 0.0, 0.0, 0.0, 1.0, 2.0], [0.1, 0.02, 0.0, 0.1, 1.0, 2.0]])
     next_q = np.array([[0.1, 0.02, 0.0, 0.1, 1.0, 2.0], [0.2, 0.04, 0.0, 0.2, 1.0, 2.0]])
-    np.savez_compressed(
-        path,
-        schema="cinebotrl_gik_monorepo_ee1_split_teacher_v2",
-        valid_for_training=np.bool_(True),
-        runtime_approved=np.bool_(runtime_approved),
-        position_target_link="ee1_tool",
-        quaternion_order="wxyz",
-        action_order=np.asarray(EXPECTED_ACTION_ORDER),
-        q_current_base_arm_6=current,
-        q_next_base_arm_6=next_q,
-        time_s=np.array([0.1, 0.2]),
-        dt_s=np.array([0.1, 0.1]),
-        gimbal_attitude_target_world_dfr_quat_wxyz=np.array(
+    values = {
+        "schema": "cinebotrl_gik_monorepo_ee1_split_teacher_v2",
+        "trajectory_integrity_passed": np.bool_(True),
+        "valid_for_training": np.bool_(teacher_quality_passed),
+        "valid_for_candidate_training": np.bool_(teacher_quality_passed),
+        "teacher_quality_passed": np.bool_(teacher_quality_passed),
+        "teacher_approved_envelope": np.bool_(teacher_quality_passed),
+        "runtime_approved": np.bool_(runtime_approved),
+        "position_target_link": "ee1_tool",
+        "quaternion_order": "wxyz",
+        "action_order": np.asarray(EXPECTED_ACTION_ORDER),
+        "q_current_base_arm_6": current,
+        "q_next_base_arm_6": next_q,
+        "time_s": np.array([0.1, 0.2]),
+        "dt_s": np.array([0.1, 0.1]),
+        "gimbal_attitude_target_world_dfr_quat_wxyz": np.array(
             [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]]
         ),
-        episode_index=np.int32(1),
-    )
+        "desired_time_full_s": np.array([0.0, 0.1, 0.2]),
+        "desired_position_full_m": np.array(
+            [[0.0, 0.0, 1.0], [0.1, 0.0, 1.0], [0.2, 0.0, 1.0]]
+        ),
+        "desired_attitude_full_world_dfr_quat_wxyz": np.array(
+            [[1.0, 0.0, 0.0, 0.0]] * 3
+        ),
+        "source_pose_count": np.int32(3),
+        "reference_pose_count": np.int32(3),
+        "state_count": np.int32(3),
+        "action_count": np.int32(2),
+        "episode_index": np.int32(1),
+    }
+    if include_integrity_contract:
+        values["trajectory_integrity_contract"] = "exact_source_v1"
+    np.savez_compressed(path, **values)
 
 
 def test_full_reference_and_monotonic_match(tmp_path: Path) -> None:
@@ -80,6 +105,31 @@ def test_sparse_teacher_rejects_runtime_approval(tmp_path: Path) -> None:
     path = tmp_path / "teacher.npz"
     write_sparse_teacher(path, runtime_approved=True)
     with pytest.raises(ValueError, match="runtime-approved"):
+        load_sparse_teacher(path)
+
+
+def test_sparse_teacher_rejects_pre_exact_source_lineage(tmp_path: Path) -> None:
+    path = tmp_path / "teacher.npz"
+    write_sparse_teacher(path, include_integrity_contract=False)
+    with pytest.raises(ValueError, match="trajectory_integrity_contract"):
+        load_sparse_teacher(path)
+
+
+def test_integrity_canary_is_not_quality_qualified_teacher(tmp_path: Path) -> None:
+    path = tmp_path / "teacher.npz"
+    write_sparse_teacher(path, teacher_quality_passed=False)
+    with pytest.raises(ValueError, match="teacher not valid"):
+        load_sparse_teacher(path)
+
+
+def test_sparse_teacher_rejects_transition_count_mismatch(tmp_path: Path) -> None:
+    path = tmp_path / "teacher.npz"
+    write_sparse_teacher(path)
+    with np.load(path, allow_pickle=False) as data:
+        values = {key: data[key] for key in data.files}
+    values["action_count"] = np.int32(1)
+    np.savez_compressed(path, **values)
+    with pytest.raises(ValueError, match="N-1 mismatch"):
         load_sparse_teacher(path)
 
 
@@ -132,3 +182,23 @@ def test_parse_acquisition_time_scale_overrides() -> None:
 def test_reject_invalid_acquisition_time_scale_override(value: str) -> None:
     with pytest.raises(ValueError):
         parse_acquisition_time_scale_overrides(value)
+
+
+def test_source_ee1_position_fk_accepts_zeroed_semantic_frame_joints() -> None:
+    source_urdf = (
+        Path(__file__).resolve().parents[1]
+        / "assets_own/sources/recomoProto2-1190_moveit_aa463a.urdf"
+    )
+    kinematics = UrdfPositionKinematics(
+        source_urdf,
+        passive_joint_positions={
+            "ee1_level_pitch": 0.0,
+            "ee1_rot_z": 0.0,
+            "ee1_rot_y": 0.0,
+            "ee1_rot_x": 0.0,
+        },
+    )
+    position = kinematics.position(
+        np.array([0.58322558, 0.53503527, 0.3681535, 0.38171859, 0.49359496, -0.90382045])
+    )
+    np.testing.assert_allclose(position, [0.0, 0.0, 1.35], atol=1e-7)

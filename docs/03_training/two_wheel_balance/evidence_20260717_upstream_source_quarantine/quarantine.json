@@ -1,0 +1,56 @@
+{
+  "schema": "cinebotrl_upstream_source_quarantine_v1",
+  "status": "QUARANTINED_UPSTREAM_TRUNCATED_SOURCE_20260717",
+  "effective_date": "2026-07-17",
+  "invalid_lineage": "no_obstacle_monorepo_ee1_split_teacher_all79_moveit_urdf_v3_20260713",
+  "source_package_manifest_sha256": "af035fb50f17322add90bf008427c9247dbbf08ee0bc38dd6d24172d9e3e14e4",
+  "reason": "split_teacher_v2 inputs came from truncated and resampled GIK logs; downstream retargeting cannot restore removed authoritative waypoints",
+  "valid_for_training": false,
+  "valid_for_candidate_training": false,
+  "runtime_approved": false,
+  "training_started": false,
+  "ppo_allowed": false,
+  "bc_allowed": false,
+  "derived_artifact_policy": "preserve_as_controller_diagnostics_only",
+  "integrity_canary_path_98": "/mnt/g/wSpace/cinebotRL/data/gikWBC9DOF_exact_source_teacher_integrity_canaries_20260716",
+  "integrity_canaries_valid_for_training": false,
+  "mismatches": [
+    {
+      "case": 1,
+      "quarantined_pose_count": 253,
+      "quarantined_duration_s": 25.123689,
+      "quarantined_path_length_m": 1.092,
+      "authoritative_pose_count": 256,
+      "authoritative_duration_s": 4.634756,
+      "authoritative_path_length_m": 2.452
+    },
+    {
+      "case": 4,
+      "quarantined_pose_count": 224,
+      "quarantined_duration_s": 22.291202,
+      "quarantined_path_length_m": 2.007,
+      "authoritative_pose_count": 723,
+      "authoritative_duration_s": 14.042191,
+      "authoritative_path_length_m": 3.849
+    },
+    {
+      "case": 7,
+      "quarantined_pose_count": 174,
+      "quarantined_duration_s": 17.247189,
+      "quarantined_path_length_m": 2.260,
+      "authoritative_pose_count": 663,
+      "authoritative_duration_s": 12.940941,
+      "authoritative_path_length_m": 3.808
+    }
+  ],
+  "replacement_contract": {
+    "trajectory_integrity_contract": "exact_source_v1",
+    "ordered_geometry_preserved": true,
+    "retiming_may_remove_or_replace_waypoints": false,
+    "state_count": "N",
+    "transition_count": "N-1",
+    "initialization_separate": true,
+    "teacher_quality_passed": true,
+    "teacher_approved_envelope": true
+  }
+}

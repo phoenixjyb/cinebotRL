@@ -14,6 +14,10 @@ import numpy as np
 
 V3_PACKAGE_SCHEMA = "cinebotrl_gik_monorepo_ee1_curriculum_package_v2"
 V3_EPISODE_SCHEMA = "cinebotrl_gik_monorepo_ee1_split_teacher_v2"
+TRAJECTORY_INTEGRITY_CONTRACT = "exact_source_v1"
+QUARANTINED_SOURCE_PACKAGE_SHA256S = frozenset(
+    {"af035fb50f17322add90bf008427c9247dbbf08ee0bc38dd6d24172d9e3e14e4"}
+)
 EXPECTED_ACTION_ORDER = (
     "joint6_arm_yaw_abs_norm",
     "joint5_arm_pitch_abs_norm",
@@ -42,6 +46,8 @@ class SparseTeacher:
     base_arm_q: np.ndarray
     time_s: np.ndarray
     dfr_attitudes_wxyz: np.ndarray
+    desired_positions_m: np.ndarray
+    desired_attitudes_wxyz: np.ndarray
     action_order: tuple[str, ...]
 
 
@@ -144,7 +150,28 @@ def load_sparse_teacher(path: Path) -> SparseTeacher:
     path = path.resolve()
     with np.load(path, allow_pickle=False) as data:
         require(_scalar(data, "schema") == V3_EPISODE_SCHEMA, f"legacy schema in {path}")
+        require(
+            _scalar(data, "trajectory_integrity_contract")
+            == TRAJECTORY_INTEGRITY_CONTRACT,
+            f"teacher lacks {TRAJECTORY_INTEGRITY_CONTRACT} in {path}",
+        )
+        require(
+            bool(_scalar(data, "trajectory_integrity_passed")),
+            f"teacher trajectory integrity failed in {path}",
+        )
         require(bool(_scalar(data, "valid_for_training")), f"teacher not valid in {path}")
+        require(
+            bool(_scalar(data, "valid_for_candidate_training")),
+            f"teacher not candidate-valid in {path}",
+        )
+        require(
+            bool(_scalar(data, "teacher_quality_passed")),
+            f"teacher quality gate failed in {path}",
+        )
+        require(
+            bool(_scalar(data, "teacher_approved_envelope")),
+            f"teacher envelope is not approved in {path}",
+        )
         require(not bool(_scalar(data, "runtime_approved")), f"offline teacher marked runtime-approved: {path}")
         require(_scalar(data, "position_target_link") == "ee1_tool", f"wrong target link in {path}")
         require(_scalar(data, "quaternion_order") == "wxyz", f"wrong quaternion order in {path}")
@@ -157,31 +184,95 @@ def load_sparse_teacher(path: Path) -> SparseTeacher:
         attitudes = normalize_quaternions_wxyz(
             np.asarray(data["gimbal_attitude_target_world_dfr_quat_wxyz"], dtype=np.float64)
         )
+        desired_time = np.asarray(data["desired_time_full_s"], dtype=np.float64).reshape(-1)
+        desired_positions = np.asarray(data["desired_position_full_m"], dtype=np.float64)
+        desired_attitudes = normalize_quaternions_wxyz(
+            np.asarray(
+                data["desired_attitude_full_world_dfr_quat_wxyz"],
+                dtype=np.float64,
+            )
+        )
+        source_pose_count = int(_scalar(data, "source_pose_count"))
+        reference_pose_count = int(_scalar(data, "reference_pose_count"))
+        state_count = int(_scalar(data, "state_count"))
+        action_count = int(_scalar(data, "action_count"))
         case = int(_scalar(data, "episode_index"))
     require(current.ndim == 2 and current.shape[1] == 6, f"bad current q shape in {path}")
     require(next_q.shape == current.shape, f"q pair mismatch in {path}")
     require(sample_time.shape == dt.shape == (len(current),), f"timing mismatch in {path}")
     require(attitudes.shape == (len(current), 4), f"attitude length mismatch in {path}")
+    expected_state_count = len(current) + 1
+    require(
+        source_pose_count == reference_pose_count == state_count == expected_state_count,
+        f"exact-source N-count mismatch in {path}",
+    )
+    require(action_count == len(current), f"exact-source N-1 mismatch in {path}")
+    require(
+        desired_time.shape == (expected_state_count,),
+        f"bad full desired timing in {path}: {desired_time.shape}",
+    )
+    require(
+        desired_positions.shape == (expected_state_count, 3),
+        f"bad full desired positions in {path}: {desired_positions.shape}",
+    )
+    require(
+        desired_attitudes.shape == (expected_state_count, 4),
+        f"bad full desired attitudes in {path}: {desired_attitudes.shape}",
+    )
     require(np.isfinite(current).all() and np.isfinite(next_q).all(), f"non-finite q in {path}")
     require(np.all(dt > 0.0) and np.all(np.diff(sample_time) > 0.0), f"non-monotonic time in {path}")
     require(np.allclose(current[1:], next_q[:-1], atol=2e-6), f"discontinuous q pairs in {path}")
     q_path = np.vstack((current, next_q[-1]))
     initial_time = sample_time[0] - dt[0]
     time_s = np.concatenate(([initial_time], sample_time))
+    require(
+        np.allclose(time_s, desired_time, atol=1e-9, rtol=0.0),
+        f"teacher timestamps do not preserve exact source in {path}",
+    )
+    require(
+        np.allclose(dt, np.diff(desired_time), atol=2e-7, rtol=0.0),
+        f"teacher transition durations do not match source timestamps in {path}",
+    )
+    attitude_dots = np.abs(np.sum(attitudes * desired_attitudes[1:], axis=1))
+    require(
+        bool(np.all(attitude_dots >= 1.0 - 1e-6)),
+        f"transition attitudes replace ordered source attitudes in {path}",
+    )
     return SparseTeacher(
         case=case,
         path=path,
         base_arm_q=q_path,
         time_s=time_s,
         dfr_attitudes_wxyz=attitudes,
+        desired_positions_m=desired_positions,
+        desired_attitudes_wxyz=desired_attitudes,
         action_order=action_order,
     )
 
 
 def discover_v3_package(package_dir: Path, expected_cases: int = 79) -> dict[int, SparseTeacher]:
     package_dir = package_dir.resolve()
-    manifest = json.loads((package_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest_path = package_dir / "manifest.json"
+    package_sha256 = sha256(manifest_path)
+    require(
+        package_sha256 not in QUARANTINED_SOURCE_PACKAGE_SHA256S,
+        f"source package is quarantined upstream-truncated lineage: {package_sha256}",
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     require(manifest.get("schema") == V3_PACKAGE_SCHEMA, "wrong all-79 package schema")
+    require(
+        manifest.get("trajectory_integrity_contract")
+        == TRAJECTORY_INTEGRITY_CONTRACT,
+        f"package lacks {TRAJECTORY_INTEGRITY_CONTRACT}",
+    )
+    require(
+        manifest.get("trajectory_integrity_passed") is True,
+        "package trajectory integrity failed",
+    )
+    require(
+        manifest.get("teacher_quality_passed") is True,
+        "package teacher quality gate failed",
+    )
     require(manifest.get("valid_for_training") is True, "package is not teacher-valid")
     require(manifest.get("runtime_approved") is False, "offline package cannot be runtime-approved")
     require(tuple(manifest.get("learned_action_order", ())) == EXPECTED_ACTION_ORDER, "package action order changed")

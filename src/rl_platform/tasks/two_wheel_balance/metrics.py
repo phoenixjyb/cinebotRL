@@ -124,6 +124,7 @@ class CascadedLQRConfig:
     wz_feedforward: float = 0.6
     wheel_difference_kp: float = 0.0
     pitch_reference_limit_rad: float = math.radians(6.0)
+    total_pitch_target_limit_rad: float = math.radians(10.0)
     vx_integral_limit: float = 0.5
     wz_integral_limit: float = 2.0
     governor_include_opposing_bias: bool = False
@@ -317,6 +318,7 @@ def cascaded_lqr_action(
         config.vx_integral_limit <= 0.0
         or config.wz_integral_limit <= 0.0
         or config.pitch_reference_limit_rad <= 0.0
+        or config.total_pitch_target_limit_rad <= 0.0
         or config.pitch_bias_limit_rad <= 0.0
         or config.action_limit <= 0.0
     ):
@@ -449,8 +451,13 @@ def cascaded_lqr_action(
         -config.pitch_reference_limit_rad,
         config.pitch_reference_limit_rad,
     )
+    pitch_target = np.clip(
+        applied_pitch_bias + pitch_reference,
+        -config.total_pitch_target_limit_rad,
+        config.total_pitch_target_limit_rad,
+    )
     tracking_states = states.copy()
-    tracking_states[:, 0] -= applied_pitch_bias + pitch_reference
+    tracking_states[:, 0] -= pitch_target
     tracking_states[:, 3] -= effective_vx_ref / config.wheel_radius_m
     tracking_states[:, 4] -= (
         config.wheel_track_m / config.wheel_radius_m
@@ -503,6 +510,7 @@ def cascaded_lqr_action(
         "yaw_correction": yaw_correction,
         "yaw_action_unclipped": final_yaw_unclipped,
         "pitch_reference": pitch_reference,
+        "pitch_target": pitch_target,
         "pitch_bias": pitch_bias,
         "applied_pitch_bias": applied_pitch_bias,
         "pitch_bias_adapting": pitch_bias_adapting,

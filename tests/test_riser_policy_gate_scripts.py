@@ -54,6 +54,7 @@ def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
 
 def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
     source = _read("run_riser_gate_c_canary.sh")
+    summarizer = _read("summarize_riser_gate_c_canary.py")
     assert "validate_riser_gate_c_portfolio.py" in source
     assert "851a7b2751cd397ba35daf57d1a8c6971fb14ed0186683af48d3c6109090570a" in source
     assert 'git -C "$ROOT" diff --quiet' in source
@@ -64,9 +65,28 @@ def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
     assert "--dataset-dir" not in source
     assert "--residual-policy" not in source
     assert "--zero-policy-action" not in source
-    assert '"residual_capture_started": False' in source
-    assert '"bc_started": False' in source
-    assert '"ppo_started": False' in source
+    assert '"residual_capture_started": False' in summarizer
+    assert '"bc_started": False' in summarizer
+    assert '"ppo_started": False' in summarizer
+    assert "summarize_riser_gate_c_canary.py" in source
+    assert "20260717_gate_c_canary_v2_timing_resealed" in source
+
+
+def test_runtime_evidence_separates_source_and_execution_clocks() -> None:
+    riser = _read("smoke_riser_reference_playback.py")
+    whole_body = _read("smoke_all79_whole_body_playback.py")
+    for source in (riser, whole_body):
+        assert '"source_duration_s": source_duration_s' in source
+        assert '"execution_duration_s": execution_duration_s' in source
+        assert "phase_time_s >= execution_duration_s" in source
+        assert "phase_time_s >= source_duration_s" not in source
+    assert 'candidate["source_time_s"][-1]' in whole_body
+    assert 'candidate["execution_time_s"][-1]' in whole_body
+    assert "np.array_equal(time_s, execution_time_s)" in whole_body
+    assert '"action_envelope_zero_clipping_rejection"' in riser
+    assert "threading.Timer(60.0" in riser
+    assert "failure_plan.source_time_s[-1]" in riser
+    assert "failure_plan.time_s[-1]" in riser
 
 
 def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:

@@ -76,17 +76,17 @@ def validate_reference_ingest(
                 "source_json_sha256"
             )
             try:
-                positions, quaternions_xyzw, time_s = _load_source_poses(source)
+                positions, quaternions_xyzw, source_time_s = _load_source_poses(source)
             except (TypeError, ValueError, KeyError, json.JSONDecodeError):
                 positions = []
                 quaternions_xyzw = []
-                time_s = []
-            count = len(time_s)
+                source_time_s = []
+            count = len(source_time_s)
             positions_valid = _finite_rows(positions, 3)
             quaternions_valid = _finite_rows(quaternions_xyzw, 4)
             times_valid = all(
                 isinstance(value, (int, float)) and math.isfinite(value)
-                for value in time_s
+                for value in source_time_s
             )
             checks.update(
                 {
@@ -102,12 +102,17 @@ def validate_reference_ingest(
                         and times_valid
                     ),
                     "source_time_preserved": count >= 2
-                    and abs(float(time_s[0])) <= 1e-12
+                    and abs(float(source_time_s[0])) <= 1e-12
                     and all(
                         current > previous
-                        for previous, current in zip(time_s, time_s[1:])
+                        for previous, current in zip(
+                            source_time_s, source_time_s[1:]
+                        )
                     )
-                    and abs(float(time_s[-1]) - float(item.get("source_duration_s", -1.0)))
+                    and abs(
+                        float(source_time_s[-1])
+                        - float(item.get("source_duration_s", -1.0))
+                    )
                     <= 1e-9,
                     "source_quaternions_normalized": count >= 2
                     and quaternions_valid

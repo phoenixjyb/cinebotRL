@@ -273,23 +273,28 @@ def load_exact_source_package(
         _require(isinstance(poses, list) and len(poses) >= 2, f"bad poses for case {case}")
         position = np.asarray([pose["position"] for pose in poses], dtype=np.float64)
         quaternion_xyzw = np.asarray([pose["orientation"] for pose in poses], dtype=np.float64)
-        time_s = np.asarray([pose["time"] for pose in poses], dtype=np.float64)
+        source_time_s = np.asarray([pose["time"] for pose in poses], dtype=np.float64)
         count = len(poses)
         _require(position.shape == (count, 3), f"bad position shape for case {case}")
         _require(quaternion_xyzw.shape == (count, 4), f"bad attitude shape for case {case}")
         _require(
             np.isfinite(position).all()
             and np.isfinite(quaternion_xyzw).all()
-            and np.isfinite(time_s).all(),
+            and np.isfinite(source_time_s).all(),
             f"non-finite source value for case {case}",
         )
         _require(
-            time_s[0] == 0.0 and bool(np.all(np.diff(time_s) > 0.0)),
+            source_time_s[0] == 0.0
+            and bool(np.all(np.diff(source_time_s) > 0.0)),
             f"bad source timestamps for case {case}",
         )
         _require(count == item.get("source_pose_count"), f"pose count mismatch for case {case}")
         _require(
-            abs(float(time_s[-1]) - float(item.get("source_duration_s", -1.0))) <= 1e-9,
+            abs(
+                float(source_time_s[-1])
+                - float(item.get("source_duration_s", -1.0))
+            )
+            <= 1e-9,
             f"duration mismatch for case {case}",
         )
         _require(
@@ -305,7 +310,7 @@ def load_exact_source_package(
             package_manifest_sha256=actual_manifest_sha256,
             source_json_path=source_path,
             source_json_sha256=source_sha256,
-            source_time_s=time_s,
+            source_time_s=source_time_s,
             source_position_world_m=position,
             source_semantic_dfr_quat_xyzw=quaternion_xyzw,
             initial_base_yaw_rad=_initial_yaw(position, preferred_vx),

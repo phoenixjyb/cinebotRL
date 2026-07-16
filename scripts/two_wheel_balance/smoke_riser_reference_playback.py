@@ -9,7 +9,9 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import sys
+import threading
 
 import numpy as np
 
@@ -255,9 +257,10 @@ def evaluate_case(
         if value is not None
     }
     tracking_cfg = riser_tracking_config(**tracking_overrides)
-    source_duration_s = float(plan.time_s[-1])
+    execution_duration_s = float(plan.time_s[-1])
+    source_duration_s = float(plan.source_time_s[-1])
     maximum_steps = int(
-        math.ceil(source_duration_s * args.maximum_duration_scale * POLICY_HZ)
+        math.ceil(execution_duration_s * args.maximum_duration_scale * POLICY_HZ)
     ) + 1
     phase_time_s = 0.0
     progress_scale = 1.0
@@ -366,7 +369,7 @@ def evaluate_case(
             feedforward_vx_m_s=phase_feedforward_v_mps,
             feedforward_wz_rad_s=phase_feedforward_wz_rad_s,
             feedforward_riser_velocity_m_s=phase_feedforward_riser_velocity_mps,
-            phase_fraction=phase_time_s / source_duration_s,
+            phase_fraction=phase_time_s / execution_duration_s,
             progress_scale=progress_scale,
             previous_residual_action=previous_residual_action,
         )
@@ -617,7 +620,7 @@ def evaluate_case(
                 balance_progress_scale(abs(float(state["pitch"][0].item()))),
             )
         progress_samples.append(progress_scale)
-        if step % 200 == 0 or phase_time_s >= source_duration_s:
+        if step % 200 == 0 or phase_time_s >= execution_duration_s:
             trace.append(
                 {
                     "step": step + 1,
@@ -665,10 +668,10 @@ def evaluate_case(
                 "reset_reason_counts": dict(unwrapped.reset_reason_counts),
             }
             break
-        if phase_time_s >= source_duration_s:
+        if phase_time_s >= execution_duration_s:
             break
         phase_time_s = min(
-            source_duration_s,
+            execution_duration_s,
             phase_time_s + progress_scale / POLICY_HZ,
         )
 
@@ -690,7 +693,7 @@ def evaluate_case(
     riser_saturation_ratio = saturated_riser / max(riser_effort_count, 1)
     proxy_saturation_ratio = saturated_proxy / max(proxy_effort_count, 1)
     checks = {
-        "completed_reference": phase_time_s >= source_duration_s,
+        "completed_reference": phase_time_s >= execution_duration_s,
         "no_termination": termination is None,
         "pitch_bounded": float(np.max(pitches)) <= args.maximum_pitch_deg,
         "position_p95_bounded": float(np.percentile(position, 95))
@@ -742,6 +745,7 @@ def evaluate_case(
         "case": plan.case,
         "planning_strategy": plan.planning_strategy,
         "source_duration_s": source_duration_s,
+        "execution_duration_s": execution_duration_s,
         "completed_phase_time_s": phase_time_s,
         "completed_steps": completed_steps,
         "wall_duration_s": completed_steps / POLICY_HZ,
@@ -984,13 +988,78 @@ def main() -> int:
     return 0 if result["passed"] else 2
 
 
+def write_runtime_failure(exc: Exception) -> None:
+    message = str(exc)
+    match = re.search(r"residual action scale is too small: \[([^]]+)\]", message)
+    normalized = [float(value) for value in match.group(1).split()] if match else None
+    cases = parse_cases(args.cases)
+    failure_plan = None
+    if len(cases) == 1:
+        try:
+            failure_plan = load_riser_playback_plan(
+                plan_path(args.plan_dir, args.plan_filename_template, cases[0])
+            )
+        except Exception:
+            failure_plan = None
+    classification = (
+        "action_envelope_zero_clipping_rejection"
+        if normalized is not None
+        else "runtime_exception"
+    )
+    result = {
+        "schema": "recomo_two_wheel_riser_reference_playback_failure_v1",
+        "training_started": False,
+        "ppo_authorized": False,
+        "trajectory_command_source": "deterministic_teacher",
+        "residual_policy": None,
+        "cases": cases,
+        "passed_case_count": 0,
+        "results": [
+            {
+                "case": cases[0] if len(cases) == 1 else None,
+                "passed": False,
+                "stage": (
+                    "pre_execution_residual_action_reconstruction"
+                    if normalized is not None
+                    else "runtime"
+                ),
+                "classification": classification,
+                "exception_type": type(exc).__name__,
+                "exception_message": message,
+                "normalized_action": normalized,
+                "source_duration_s": (
+                    None
+                    if failure_plan is None
+                    else float(failure_plan.source_time_s[-1])
+                ),
+                "execution_duration_s": (
+                    None if failure_plan is None else float(failure_plan.time_s[-1])
+                ),
+                "executed_residual_dataset": None,
+            }
+        ],
+        "passed": False,
+    }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+
+
 exit_code = 1
 try:
     exit_code = main()
-except Exception:
+except Exception as exc:
     import traceback
 
+    write_runtime_failure(exc)
     traceback.print_exc()
-finally:
+    sys.stderr.flush()
+    shutdown_guard = threading.Timer(60.0, lambda: os._exit(1))
+    shutdown_guard.daemon = True
+    shutdown_guard.start()
+    try:
+        app.close()
+    finally:
+        shutdown_guard.cancel()
+else:
     app.close()
 raise SystemExit(exit_code)

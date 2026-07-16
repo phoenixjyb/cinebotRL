@@ -48,6 +48,7 @@ class RiserPlaybackPlan:
     feedforward_proxy_velocity: np.ndarray
     vertical_shift_m: float
     planning_strategy: str
+    source_time_s: np.ndarray | None = None
 
     def validate(self) -> None:
         count = len(self.time_s)
@@ -78,6 +79,14 @@ class RiserPlaybackPlan:
                 "preview_0.50m_g1.50",
             },
         }
+        if self.source_time_s is not None:
+            checks["source_time"] = (
+                self.source_time_s.ndim == 1
+                and len(self.source_time_s) >= 2
+                and self.source_time_s[0] == 0.0
+                and bool(np.all(np.diff(self.source_time_s) > 0.0))
+                and bool(np.isfinite(self.source_time_s).all())
+            )
         arrays = (
             self.time_s,
             self.target_position_world_m,
@@ -276,6 +285,7 @@ def playback_plan_from_kinematic_plan(
         feedforward_proxy_velocity=np.diff(plan.gimbal_q, axis=0) / dt[:, None],
         vertical_shift_m=plan.vertical_shift_m,
         planning_strategy=plan.planning_strategy,
+        source_time_s=reference.time_s.copy(),
     )
     result.validate()
     return result
@@ -329,6 +339,7 @@ def save_riser_playback_plan(path: Path, plan: RiserPlaybackPlan) -> None:
         path,
         metadata_json=np.array(json.dumps(metadata, sort_keys=True)),
         time_s=plan.time_s,
+        execution_time_s=plan.time_s,
         target_position_world_m=plan.target_position_world_m,
         target_semantic_dfr_quat_wxyz=plan.target_semantic_dfr_quat_wxyz,
         base_xy_yaw=plan.base_xy_yaw,
@@ -337,6 +348,9 @@ def save_riser_playback_plan(path: Path, plan: RiserPlaybackPlan) -> None:
         feedforward_v_wz=plan.feedforward_v_wz,
         feedforward_riser_velocity=plan.feedforward_riser_velocity,
         feedforward_proxy_velocity=plan.feedforward_proxy_velocity,
+        source_time_s=(
+            plan.time_s if plan.source_time_s is None else plan.source_time_s
+        ),
     )
 
 
@@ -345,9 +359,29 @@ def load_riser_playback_plan(path: Path) -> RiserPlaybackPlan:
         metadata = json.loads(str(data["metadata_json"].item()))
         if metadata.get("schema") != PLAYBACK_SCHEMA:
             raise ValueError(f"unexpected playback schema in {path}")
+        execution_time_s = np.asarray(
+            (
+                data["execution_time_s"]
+                if "execution_time_s" in data.files
+                else data["time_s"]
+            ),
+            dtype=np.float64,
+        )
+        if "time_s" in data.files and not np.array_equal(
+            np.asarray(data["time_s"], dtype=np.float64), execution_time_s
+        ):
+            raise ValueError(f"ambiguous execution time aliases in {path}")
+        source_time_s = np.asarray(
+            (
+                data["source_time_s"]
+                if "source_time_s" in data.files
+                else execution_time_s
+            ),
+            dtype=np.float64,
+        )
         plan = RiserPlaybackPlan(
             case=int(metadata["case"]),
-            time_s=np.asarray(data["time_s"], dtype=np.float64),
+            time_s=execution_time_s,
             target_position_world_m=np.asarray(
                 data["target_position_world_m"], dtype=np.float64
             ),
@@ -366,6 +400,7 @@ def load_riser_playback_plan(path: Path) -> RiserPlaybackPlan:
             ),
             vertical_shift_m=float(metadata["vertical_shift_m"]),
             planning_strategy=str(metadata["planning_strategy"]),
+            source_time_s=source_time_s,
         )
     plan.validate()
     return plan

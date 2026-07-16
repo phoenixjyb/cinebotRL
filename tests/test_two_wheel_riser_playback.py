@@ -69,6 +69,23 @@ def test_playback_plan_roundtrip_and_interpolation(tmp_path: Path) -> None:
     assert sample.feedforward_v_mps == pytest.approx(0.1)
 
 
+def test_playback_roundtrip_preserves_unequal_source_and_execution_clocks(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "case.npz"
+    plan = RiserPlaybackPlan(
+        **{**_plan().__dict__, "source_time_s": np.array([0.0, 0.04, 0.08])}
+    )
+    save_riser_playback_plan(path, plan)
+    with np.load(path, allow_pickle=False) as arrays:
+        np.testing.assert_array_equal(arrays["execution_time_s"], [0.0, 0.1, 0.2])
+        np.testing.assert_array_equal(arrays["source_time_s"], [0.0, 0.04, 0.08])
+    loaded = load_riser_playback_plan(path)
+    np.testing.assert_array_equal(loaded.source_time_s, [0.0, 0.04, 0.08])
+    np.testing.assert_array_equal(loaded.time_s, [0.0, 0.1, 0.2])
+    assert loaded.source_time_s[-1] != loaded.time_s[-1]
+
+
 def test_phase_governor_scales_every_playback_derivative() -> None:
     sample = interpolate_riser_playback_plan(_plan(), 0.15)
     velocity, yaw_rate, riser_rate, proxy_rate = phase_scaled_feedforward(
@@ -111,3 +128,7 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert 'parser.add_argument("--video-fps", type=int, default=200)' in source
     assert '"residual_teacher_unclipped"' in source
     assert "float(np.max(np.abs(teacher_residual_values))) < 1.0 - 1e-6" in source
+    assert '"source_duration_s": source_duration_s' in source
+    assert '"execution_duration_s": execution_duration_s' in source
+    assert "phase_time_s >= execution_duration_s" in source
+    assert "phase_time_s >= source_duration_s" not in source

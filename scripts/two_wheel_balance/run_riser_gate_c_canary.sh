@@ -10,12 +10,13 @@ PORTFOLIO_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$PORTFOLIO_STAMP"
 EXPECTED_MANIFEST_SHA256="${RISER_GATE_C_MANIFEST_SHA256:-851a7b2751cd397ba35daf57d1a8c6971fb14ed0186683af48d3c6109090570a}"
 EXPECTED_SOURCE_SHA256="${RISER_GATE_C_SOURCE_SHA256:-f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d}"
 CASES="${RISER_GATE_C_CASES:-1,52,74,77}"
-STAMP="${RISER_GATE_C_STAMP:-20260717_gate_c_canary_v1}"
+STAMP="${RISER_GATE_C_STAMP:-20260717_gate_c_canary_v2_timing_resealed}"
 OUTPUT_WSL="$ROOT/artifacts/two_wheel_riser/$STAMP"
 OUTPUT_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$STAMP"
 GAINS_WIN="${RISER_GAINS_WIN:-$WIN_ROOT\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json}"
 VALIDATOR="$ROOT/scripts/two_wheel_balance/validate_riser_gate_c_portfolio.py"
 PLAYBACK_WIN="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
+SUMMARIZER="$ROOT/scripts/two_wheel_balance/summarize_riser_gate_c_canary.py"
 
 [[ -x "$PY" ]] || { printf 'missing Isaac Python: %s\n' "$PY" >&2; exit 2; }
 [[ -s "$PORTFOLIO_WSL/manifest.json" ]] || { printf 'missing portfolio manifest\n' >&2; exit 2; }
@@ -49,17 +50,22 @@ for raw_case in "${case_list[@]}"; do
   case_number="$((10#$raw_case))"
   padded="$(printf '%04d' "$case_number")"
   printf 'Gate C canary case %s\n' "$padded"
-  "$PY" -u -X utf8 "$PLAYBACK_WIN" \
+  if ! "$PY" -u -X utf8 "$PLAYBACK_WIN" \
     --gains "$GAINS_WIN" \
     --plan-dir "$PORTFOLIO_WIN" \
     --plan-filename-template 'case_{case:04d}_exact_source_riser_playback_v1.npz' \
     --cases "$case_number" \
     --output "$OUTPUT_WIN\\gates\\case_$padded.json" \
-    --headless >"$OUTPUT_WSL/logs/case_$padded.log" 2>&1 || {
+    --headless >"$OUTPUT_WSL/logs/case_$padded.log" 2>&1; then
+      python3 "$SUMMARIZER" \
+        --root "$OUTPUT_WSL" \
+        --git-commit "$COMMIT" \
+        --cases "$CASES" \
+        --output "$OUTPUT_WSL/summary.json" >/dev/null
       tail -n 100 "$OUTPUT_WSL/logs/case_$padded.log" >&2
       printf 'Gate C stopped on first dynamic reject: case %s\n' "$padded" >&2
       exit 4
-    }
+  fi
   python3 - "$OUTPUT_WSL/gates/case_$padded.json" "$case_number" <<'PY'
 import json
 from pathlib import Path
@@ -83,33 +89,10 @@ raise SystemExit(0 if valid else 1)
 PY
 done
 
-python3 - "$OUTPUT_WSL" "$COMMIT" "$CASES" <<'PY'
-import hashlib
-import json
-from pathlib import Path
-import sys
-
-root = Path(sys.argv[1])
-cases = [int(value) for value in sys.argv[3].split(",")]
-gates = [json.loads((root / "gates" / f"case_{case:04d}.json").read_text()) for case in cases]
-results = [gate["results"][0] for gate in gates]
-admission = root / "admission.json"
-summary = {
-    "schema": "cinebotrl_two_wheel_riser_gate_c_canary_v1",
-    "git_commit": sys.argv[2],
-    "admission_sha256": hashlib.sha256(admission.read_bytes()).hexdigest(),
-    "cases": cases,
-    "case_count": len(cases),
-    "passed_case_count": sum(result["passed"] for result in results),
-    "first_dynamic_reject": None,
-    "residual_capture_started": False,
-    "bc_started": False,
-    "ppo_started": False,
-    "results": results,
-    "passed": all(result["passed"] for result in results),
-}
-(root / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
-print(json.dumps(summary, indent=2))
-PY
+python3 "$SUMMARIZER" \
+  --root "$OUTPUT_WSL" \
+  --git-commit "$COMMIT" \
+  --cases "$CASES" \
+  --output "$OUTPUT_WSL/summary.json"
 
 printf 'Gate C canary passed without labels: %s\n' "$OUTPUT_WSL"

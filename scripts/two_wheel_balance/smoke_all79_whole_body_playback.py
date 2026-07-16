@@ -145,6 +145,8 @@ def load_candidate(case: int) -> dict[str, np.ndarray]:
         "valid_for_dynamic_evaluation",
         "physical_gimbal_joint_labels_included",
         "time_s",
+        "execution_time_s",
+        "source_time_s",
         "semantic_start_index",
         "target_position_world_m",
         "base_arm_q",
@@ -154,6 +156,8 @@ def load_candidate(case: int) -> dict[str, np.ndarray]:
     if not expected <= set(candidate):
         raise ValueError(f"candidate {path} is missing {sorted(expected - set(candidate))}")
     time_s = candidate["time_s"]
+    execution_time_s = candidate["execution_time_s"]
+    source_time_s = candidate["source_time_s"]
     if (
         time_s.ndim != 1
         or len(time_s) < 2
@@ -161,6 +165,15 @@ def load_candidate(case: int) -> dict[str, np.ndarray]:
         or np.any(np.diff(time_s) <= 0.0)
     ):
         raise ValueError(f"invalid candidate time in {path}")
+    if not np.array_equal(time_s, execution_time_s):
+        raise ValueError(f"ambiguous execution time aliases in {path}")
+    if (
+        source_time_s.ndim != 1
+        or len(source_time_s) < 2
+        or source_time_s[0] != 0.0
+        or np.any(np.diff(source_time_s) <= 0.0)
+    ):
+        raise ValueError(f"invalid source time in {path}")
     if candidate["base_arm_q"].shape != (len(time_s), 6):
         raise ValueError(f"invalid candidate state shape in {path}")
     if candidate["target_position_world_m"].shape != (len(time_s), 3):
@@ -257,11 +270,12 @@ def evaluate_case(
         progress_error_full_m=args.maximum_position_p95_m,
         minimum_progress_scale=0.0,
     )
-    source_duration_s = float(candidate["time_s"][-1])
+    source_duration_s = float(candidate["source_time_s"][-1])
+    execution_duration_s = float(candidate["execution_time_s"][-1])
     semantic_start_index = int(candidate["semantic_start_index"].item())
     semantic_start_time_s = float(candidate["time_s"][semantic_start_index])
     maximum_steps = int(
-        math.ceil(source_duration_s * args.maximum_duration_scale * POLICY_HZ)
+        math.ceil(execution_duration_s * args.maximum_duration_scale * POLICY_HZ)
     ) + 1
     position_errors = []
     attitude_errors_deg = []
@@ -729,7 +743,7 @@ def evaluate_case(
         if (
             step % 200 == 0
             or step + 1 == maximum_steps
-            or phase_time_s >= source_duration_s
+            or phase_time_s >= execution_duration_s
         ):
             trace.append(
                 {
@@ -828,10 +842,10 @@ def evaluate_case(
                 "reset_reason_counts": dict(unwrapped.reset_reason_counts),
             }
             break
-        if phase_time_s >= source_duration_s:
+        if phase_time_s >= execution_duration_s:
             break
         phase_time_s = min(
-            source_duration_s,
+            execution_duration_s,
             phase_time_s + progress_scale / POLICY_HZ,
         )
 
@@ -850,7 +864,7 @@ def evaluate_case(
     )
     checks = {
         "completed_acquisition": phase_time_s >= semantic_start_time_s,
-        "completed_reference": phase_time_s >= source_duration_s,
+        "completed_reference": phase_time_s >= execution_duration_s,
         "no_termination": termination is None,
         "peak_pitch_below_limit": peak_pitch_deg <= args.maximum_pitch_deg,
         "peak_arm_error_below_limit": peak_arm_error_deg <= args.maximum_arm_error_deg,
@@ -877,6 +891,7 @@ def evaluate_case(
     return {
         "case": case,
         "source_duration_s": source_duration_s,
+        "execution_duration_s": execution_duration_s,
         "semantic_start_time_s": semantic_start_time_s,
         "maximum_steps": maximum_steps,
         "completed_steps": completed_steps,

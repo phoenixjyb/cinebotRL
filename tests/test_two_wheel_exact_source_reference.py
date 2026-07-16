@@ -392,3 +392,17 @@ def test_seal_adds_deterministic_execution_schedule_metadata(tmp_path: Path) -> 
     with np.load(candidate, allow_pickle=False) as data:
         assert bool(data["execution_schedule_metadata_sealed"].item())
         assert data["base_acquisition_route"].item() == "reverse"
+
+
+def test_whole_body_runtime_separates_source_and_execution_clocks() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/smoke_all79_whole_body_playback.py"
+    ).read_text(encoding="utf-8")
+    assert 'candidate["source_time_s"][-1]' in source
+    assert 'candidate["execution_time_s"][-1]' in source
+    assert "np.array_equal(time_s, execution_time_s)" in source
+    assert '"source_duration_s": source_duration_s' in source
+    assert '"execution_duration_s": execution_duration_s' in source
+    assert "phase_time_s >= execution_duration_s" in source
+    assert "phase_time_s >= source_duration_s" not in source

@@ -22,8 +22,25 @@ from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
 )
 
 
+BRANCH_REFERENCE_TURNS = (-2, -1, 0, 1, 2)
+
+
 def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def replay_nearest_branch(
+    semantic_yaw: np.ndarray,
+    initial_reference: float,
+) -> np.ndarray:
+    """Map an unwrapped semantic sequence onto one continuous physics branch."""
+
+    mapped = np.empty_like(semantic_yaw)
+    reference = float(initial_reference)
+    for index, target in enumerate(semantic_yaw):
+        mapped[index] = nearest_equivalent_angle(float(target), reference)
+        reference = float(mapped[index])
+    return mapped
 
 
 def audit_case(root: Path, item: dict[str, object]) -> dict[str, object]:
@@ -64,12 +81,41 @@ def audit_case(root: Path, item: dict[str, object]) -> dict[str, object]:
             np.max(np.abs(np.cos(yaw) - np.cos(canonical))),
         )
     )
+    stateful_trials = [
+        replay_nearest_branch(
+            yaw,
+            canonical[0] + turns * 2.0 * math.pi,
+        )
+        for turns in BRANCH_REFERENCE_TURNS
+    ]
+    maximum_stateful_step = max(
+        float(np.max(np.abs(np.diff(mapped)))) for mapped in stateful_trials
+    )
+    stateful_delta_error = max(
+        float(np.max(np.abs(np.diff(mapped) - np.diff(yaw))))
+        for mapped in stateful_trials
+    )
+    stateful_orientation_error = max(
+        float(
+            max(
+                np.max(np.abs(np.sin(mapped) - np.sin(yaw))),
+                np.max(np.abs(np.cos(mapped) - np.cos(yaw))),
+            )
+        )
+        for mapped in stateful_trials
+    )
+    branch_margin = math.pi - maximum_stateful_step
     checks = {
         "plan_hash_matches": plan_hash == expected_hash,
         "yaw_is_finite": finite,
         "unwrapped_semantic_continuity_reconstructs": reconstruction_error <= 1e-9,
         "nearest_physics_branch_is_equivalent": nearest_error <= 1e-12,
         "orientation_is_preserved": orientation_error <= 1e-12,
+        "stateful_mapping_preserves_semantic_deltas": stateful_delta_error <= 1e-9,
+        "stateful_mapping_preserves_orientation": (
+            stateful_orientation_error <= 1e-12
+        ),
+        "stateful_mapping_stays_below_half_turn": branch_margin > 0.0,
     }
     return {
         "case": case,
@@ -85,6 +131,11 @@ def audit_case(root: Path, item: dict[str, object]) -> dict[str, object]:
         "semantic_reconstruction_error_rad": reconstruction_error,
         "nearest_branch_error_rad": nearest_error,
         "orientation_equivalence_error": orientation_error,
+        "stateful_branch_reference_turn_trials": list(BRANCH_REFERENCE_TURNS),
+        "maximum_stateful_mapped_step_deg": math.degrees(maximum_stateful_step),
+        "minimum_stateful_branch_margin_deg": math.degrees(branch_margin),
+        "stateful_semantic_delta_error_rad": stateful_delta_error,
+        "stateful_orientation_equivalence_error": stateful_orientation_error,
         "nearest_physics_branch_required": bool(np.any(outside_principal)),
         "checks": checks,
         "passed": all(checks.values()),
@@ -114,6 +165,18 @@ def main() -> int:
         for row in rows
         if math.isclose(row["maximum_unwrapped_step_deg"], maximum_step, abs_tol=1e-12)
     ]
+    minimum_stateful_margin = min(
+        row["minimum_stateful_branch_margin_deg"] for row in rows
+    )
+    minimum_stateful_margin_cases = [
+        row["case"]
+        for row in rows
+        if math.isclose(
+            row["minimum_stateful_branch_margin_deg"],
+            minimum_stateful_margin,
+            abs_tol=1e-12,
+        )
+    ]
     checks = {
         "manifest_hash_matches": manifest_hash == args.expected_manifest_sha256,
         "accepted_count_matches": len(accepted_cases) == args.expected_accepted_count,
@@ -124,7 +187,7 @@ def main() -> int:
         "all_case_audits_pass": all(row["passed"] for row in rows),
     }
     summary = {
-        "schema": "cinebotrl_two_wheel_riser_continuous_yaw_scope_audit_v1",
+        "schema": "cinebotrl_two_wheel_riser_continuous_yaw_scope_audit_v2",
         "manifest": str(args.manifest.resolve()),
         "manifest_sha256": manifest_hash,
         "accepted_case_count": len(accepted_cases),
@@ -136,6 +199,9 @@ def main() -> int:
         "maximum_naive_branch_delta_case": maximum_row["case"],
         "maximum_unwrapped_step_deg": maximum_step,
         "maximum_unwrapped_step_cases": maximum_step_cases,
+        "branch_reference_turn_trials": list(BRANCH_REFERENCE_TURNS),
+        "minimum_stateful_branch_margin_deg": minimum_stateful_margin,
+        "minimum_stateful_branch_margin_cases": minimum_stateful_margin_cases,
         "semantic_unwrapped_yaw_is_authoritative": True,
         "nearest_equivalent_physics_branch_required": True,
         "multi_turn_semantic_plans_rejected": False,
@@ -163,6 +229,10 @@ def main() -> int:
         "semantic_reconstruction_error_rad",
         "nearest_branch_error_rad",
         "orientation_equivalence_error",
+        "maximum_stateful_mapped_step_deg",
+        "minimum_stateful_branch_margin_deg",
+        "stateful_semantic_delta_error_rad",
+        "stateful_orientation_equivalence_error",
         "nearest_physics_branch_required",
         "passed",
     ]
@@ -179,6 +249,9 @@ def main() -> int:
         "maximum_naive_branch_delta_case",
         "maximum_unwrapped_step_deg",
         "maximum_unwrapped_step_cases",
+        "branch_reference_turn_trials",
+        "minimum_stateful_branch_margin_deg",
+        "minimum_stateful_branch_margin_cases",
         "passed",
     )}, indent=2))
     return 0 if summary["passed"] else 2

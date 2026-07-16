@@ -685,3 +685,35 @@ and must state whether its candidate was accepted or rejected.
   either end.
 - Keep the corrected case-74 GPU canary sequence unchanged and separately
   blocked until explicit authorization.
+
+## Round 22: portfolio-wide stateful continuous-yaw preflight
+
+- Preserved the sealed v1 continuous-yaw scope audit byte-for-byte at summary
+  SHA-256 `7e357237237cb459a5b5c47f630852b4a179b955e022f4d55835c4949413fcbe`
+  and CSV SHA-256
+  `67bbfe164f6376189843517e9195437fb90b51e0186e8d1dfa32c4db15fc55cc`.
+- Strengthened the audit in a fresh v2 namespace by replaying each accepted
+  semantic-yaw sequence statefully from five equivalent physics branches:
+  `-2,-1,0,+1,+2` turns. The audit now verifies mapped delta continuity and
+  orientation equivalence, not only pointwise canonical equivalence.
+- All `71/71` accepted plans pass. The known `45/71` branch-crossing plans
+  remain covered, and the maximum naive mismatch remains `720 deg`.
+- Cases 74/75/76 have the tightest valid source step, `178.000692269 deg`, but
+  retain a positive `1.999307731 deg` stateful margin below the half-turn
+  ambiguity boundary in every branch-reference trial.
+- The fresh v2 summary SHA-256 is
+  `458e3f819c140d92d5664fa9118d0b1699b06ab55ac742ac3ee3ea7f48f2c2c6`;
+  CSV SHA-256 is
+  `88912658ecb77b1df462c65def2271d4ad566ad9fb1baac03b1fee3cae2d5786`.
+- This round changes no runtime command, source anchor, threshold, LQR gain,
+  residual scale, or learned policy. It creates no labels or dataset and starts
+  no Isaac, residual capture, BC, or PPO.
+
+## Next round after Round 22
+
+- Keep case 74 as the only next dynamic canary and require explicit GPU
+  authorization plus exclusive ownership before launch.
+- If corrected case 74 physically passes, admit case 77 next. Otherwise stop
+  at its first unchanged physical gate and diagnose structurally.
+- Keep the accepted-71 batch and all learning stages closed until both canaries
+  satisfy the unchanged Gate C contract.

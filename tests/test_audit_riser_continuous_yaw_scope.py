@@ -67,6 +67,9 @@ def test_scope_audit_preserves_multi_turn_semantics_and_reports_branch_risk(
     summary = json.loads(output_json.read_text(encoding="utf-8"))
 
     assert result.returncode == 0
+    assert summary["schema"] == (
+        "cinebotrl_two_wheel_riser_continuous_yaw_scope_audit_v2"
+    )
     assert summary["passed"]
     assert summary["affected_cases"] == [1, 2, 3]
     assert summary["canonical_crossing_cases"] == [1, 2, 3]
@@ -74,6 +77,21 @@ def test_scope_audit_preserves_multi_turn_semantics_and_reports_branch_risk(
     assert summary["maximum_naive_branch_delta_deg"] == 720.0
     assert summary["maximum_unwrapped_step_deg"] == 11.0
     assert summary["maximum_unwrapped_step_cases"] == [1, 2, 3]
+    assert summary["branch_reference_turn_trials"] == [-2, -1, 0, 1, 2]
+    assert abs(summary["minimum_stateful_branch_margin_deg"] - 169.0) < 1e-12
+    assert summary["minimum_stateful_branch_margin_cases"] == [1, 2, 3]
+    assert all(
+        abs(row["maximum_stateful_mapped_step_deg"] - 11.0) < 1e-12
+        for row in summary["rows"]
+    )
+    assert all(
+        row["stateful_semantic_delta_error_rad"] < 1e-12
+        for row in summary["rows"]
+    )
+    assert all(
+        row["stateful_orientation_equivalence_error"] < 1e-12
+        for row in summary["rows"]
+    )
     assert summary["semantic_unwrapped_yaw_is_authoritative"]
     assert summary["nearest_equivalent_physics_branch_required"]
     assert not summary["multi_turn_semantic_plans_rejected"]

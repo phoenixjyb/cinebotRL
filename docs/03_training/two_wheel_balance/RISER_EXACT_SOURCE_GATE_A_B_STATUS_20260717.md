@@ -245,7 +245,7 @@ reverse recovery. The repair preserves the unwrapped semantic target for
 attitude continuity and audit, but sends the nearest equivalent yaw branch to
 PhysX and computes continuous-yaw servo error modulo `2*pi`. The exact branch
 pair is regression-tested, and the full CPU-only riser/two-wheel suite passes
-`119` tests. The canary runner also now seals a summary when Isaac returns a
+`154` tests. The canary runner also now seals a summary when Isaac returns a
 failed JSON with process status zero.
 
 A sealed portfolio-wide CPU audit is stored at
@@ -260,6 +260,20 @@ unwrapped waypoint step at `178.000692 deg`, making case 74 the strongest
 bounded structural canary. Every plan hash and continuity check passes;
 nearest-branch orientation error is at most `2.22e-16`. Multi-turn semantic
 attitude remains authoritative and is not rejected or flattened.
+
+The original v1 evidence above remains byte-identical. A stronger stateful
+preflight is separately sealed at
+`20260717_gate_c_continuous_yaw_stateful_preflight_v2`. It replays every one
+of the 71 accepted semantic-yaw sequences from five equivalent PhysX branch
+references (`-2,-1,0,+1,+2` turns), then verifies semantic delta preservation,
+orientation equivalence, and a strictly positive margin below a half-turn
+branch ambiguity. All 71 pass. Cases 74/75/76 remain the tightest at
+`1.999307731 deg` margin. Summary SHA-256 is
+`458e3f819c140d92d5664fa9118d0b1699b06ab55ac742ac3ee3ea7f48f2c2c6`;
+CSV SHA-256 is
+`88912658ecb77b1df462c65def2271d4ad566ad9fb1baac03b1fee3cae2d5786`.
+This is CPU structural evidence only; it does not promote case 74 or authorize
+case 77, residual capture, BC, or PPO.
 
 The case-74 causal timeline is sealed as `CPU_FAILURE_TIMELINE_AUDIT.json`,
 SHA-256

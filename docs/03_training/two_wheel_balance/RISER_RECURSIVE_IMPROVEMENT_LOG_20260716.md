@@ -405,3 +405,35 @@ and must state whether its candidate was accepted or rejected.
   merged summary.
 - Only after `79/79` dynamic captures and a case-disjoint merge pass may the
   offline BC candidate be trained. PPO remains unauthorized.
+
+## Round 15: upstream trajectory-integrity quarantine
+
+- Upstream audit proved that `no_obstacle_episode_*_split_teacher_v2.npz`, the
+  ancestor of the all-79 riser stage and v4 plans, contains truncated/resampled
+  GIK trajectories rather than the complete authoritative source sequences.
+- Concrete examples: episode 1 is 253 poses / 25.123689 s versus authoritative
+  256 / 4.634756 s; episode 4 is 224 / 22.291202 s versus 723 / 14.042191 s;
+  episode 7 is 174 / 17.247189 s versus 663 / 12.940941 s. Their path lengths
+  are also reduced from 2.452/3.849/3.808 m to 1.092/2.007/2.260 m.
+- The clean Isaac capture was paused after active case 65 completed. Case 66
+  was never started. The complete 65 JSON gates and 65 NPZ files were preserved
+  under `20260716_residual_all79_phase_v3_clean_QUARANTINED_UPSTREAM_TRUNCATED_SOURCE_20260717`.
+- Decision: none of the quarantined labels is eligible for desired-trajectory
+  BC, holdout, PPO, or policy promotion. Frozen-LQR, governor, residual-envelope,
+  command-reconstruction, and dynamic-safety findings remain controller
+  diagnostics only.
+- Replacement contract: `exact_source_v1` requires N authoritative source
+  poses/timestamps, N ordered retargeted waypoint states, N-1 transitions,
+  explicit initialization separation, and a separate quality/safety gate.
+- The episode 1/4/7 canary package passes transport integrity but is explicitly
+  `valid_for_training=false`; it cannot unblock collection.
+
+## Next round after Round 15
+
+- Wait for a quality-qualified 79-case `exact_source_v1` teacher package with
+  package-level and per-case `valid_for_training=true`.
+- Run `validate_riser_exact_source_manifest.py`; reject resampling, missing
+  timestamps, blended initialization, failed quality gates, or any case-count
+  mismatch before retargeting.
+- Regenerate plans and residual captures from empty exact-source namespaces.
+  Do not resume v4 plans or the quarantined corpus. Keep BC and PPO blocked.

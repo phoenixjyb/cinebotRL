@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="${RISER_ROOT:-/mnt/g/wSpace/cinebotRL-two-wheel-riser}"
 WIN_ROOT="${RISER_WIN_ROOT:-G:\\wSpace\\cinebotRL-two-wheel-riser}"
 PY="${RISER_TRAIN_PYTHON:-/mnt/g/isaaclab_venv/Scripts/python.exe}"
-DATASET_STAMP="${RISER_DATASET_STAMP:-20260716_residual_all79_phase_v3_clean}"
-POLICY_STAMP="${RISER_POLICY_STAMP:-20260716_residual_bc_phase_v3_clean}"
+DATASET_STAMP="${RISER_DATASET_STAMP:-20260717_residual_all79_exact_source_v1}"
+POLICY_STAMP="${RISER_POLICY_STAMP:-20260717_residual_bc_exact_source_v1}"
 DATASET_ROOT="$ROOT/artifacts/two_wheel_riser/$DATASET_STAMP"
 DATASET_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$DATASET_STAMP\\all79_residual_dataset_v1.npz"
 POLICY_ROOT="$ROOT/artifacts/two_wheel_riser/$POLICY_STAMP"
@@ -32,10 +32,17 @@ summary = json.loads(summary_path.read_text(encoding="utf-8"))
 dataset = summary.get("dataset", {})
 plan_manifest = Path(summary.get("plan_manifest", ""))
 capture_admission = Path(summary.get("capture_admission", ""))
+source_manifest = Path(summary.get("exact_source_manifest", ""))
+source_audit = Path(summary.get("exact_source_admission", ""))
 source_commit = summary.get("git_commit")
 admission = (
     json.loads(capture_admission.read_text(encoding="utf-8"))
     if capture_admission.is_file()
+    else {}
+)
+exact_source_audit = (
+    json.loads(source_audit.read_text(encoding="utf-8"))
+    if source_audit.is_file()
     else {}
 )
 checks = {
@@ -58,6 +65,26 @@ checks = {
     "capture_admission_plan": admission.get("plan_manifest_sha256")
     == summary.get("plan_manifest_sha256"),
     "capture_admission_cases": admission.get("cases") == list(range(1, 80)),
+    "exact_source_contract": summary.get("trajectory_integrity_contract")
+    == "exact_source_v1",
+    "exact_source_training_qualified": summary.get(
+        "upstream_valid_for_training"
+    )
+    is True,
+    "exact_source_manifest_hash": source_manifest.is_file()
+    and summary.get("exact_source_manifest_sha256")
+    == hashlib.sha256(source_manifest.read_bytes()).hexdigest(),
+    "exact_source_audit_hash": source_audit.is_file()
+    and summary.get("exact_source_admission_sha256")
+    == hashlib.sha256(source_audit.read_bytes()).hexdigest(),
+    "exact_source_audit_passed": exact_source_audit.get("passed") is True
+    and exact_source_audit.get("training_authorized") is True,
+    "capture_exact_source_hash": admission.get("exact_source_manifest_sha256")
+    == summary.get("exact_source_manifest_sha256"),
+    "capture_exact_source_admission_hash": admission.get(
+        "exact_source_admission_sha256"
+    )
+    == summary.get("exact_source_admission_sha256"),
     "dataset_case_count": dataset.get("case_count") == 79,
     "dataset_no_leakage": dataset.get("trajectory_leakage") is False,
     "dataset_finite": dataset.get("finite_values") is True,

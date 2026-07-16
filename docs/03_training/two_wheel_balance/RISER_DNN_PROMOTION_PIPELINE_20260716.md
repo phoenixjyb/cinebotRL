@@ -1,5 +1,7 @@
 # 两轮升降云台机器人 DNN 策略晋级流程
 
+> **2026-07-17 上游隔离：** 原 `corrected_all79_stage`/v4 plans 继承了截断、重采样的 GIK 源日志。`20260716_residual_all79_phase_v3_clean` 已整体隔离，不能用于 BC/PPO 或期望轨迹晋级。本流程仅在质量合格的 79-case `exact_source_v1` package 到达后恢复。详见 `RISER_UPSTREAM_TRAJECTORY_QUARANTINE_20260717.md`。
+
 ## 目标与边界
 
 目标是在已验证的平衡 LQR 之上训练高层残差 DNN，使无机械臂的两轮升降云台机器人完成全部 79 条修正轨迹。
@@ -32,7 +34,9 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 
 ## Gate A：79 条确定性稠密采集
 
-`20260716_residual_all79_phase_v2` 是动作范围诊断集，其中 case 1--26 早于连续云台轴修复，旧 `delta-vx` 归一化范围产生过标签裁剪，且 case 45、78 暴露了规划余量不足。该目录只能用于物理 gate、原始教师命令恢复和动作范围审计，不能作为最终训练集。正式采集使用 `20260716_all79_playback_inputs_v4` 与独立目录 `20260716_residual_all79_phase_v3_clean`。
+`20260716_residual_all79_phase_v2` 和隔离后的 `phase_v3_clean` 都只能作为控制器诊断。正式采集必须使用新的 `20260717_all79_playback_exact_source_v1` 和空的 `20260717_residual_all79_exact_source_v1`，不得复用旧 gate/NPZ。
+
+启动 Gate A 前必须设置 `RISER_EXACT_SOURCE_MANIFEST_WSL`。该 manifest 必须声明 `exact_source_v1`，包含连续 1--79 case，并对每个 case 证明 `N` 源姿态、`N` 源时间戳、`N` retarget waypoint states、`N-1` transitions、顺序几何保持、初始化分离、完整性通过、独立质量 gate 通过和 `valid_for_training=true`。完整性 canary 的 `valid_for_training=false`，因此不能启动采集。
 
 运行：
 
@@ -40,14 +44,14 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 bash scripts/two_wheel_balance/run_riser_all79_dataset_gate.sh
 ```
 
-每条轨迹单独启动 Isaac 进程，成功后才保留 JSON gate 与 NPZ。启动时要求 tracked worktree 无改动，并生成不可回填的 `admission.json`，锁定 Git commit、规划 manifest SHA-256、case 1--79、跟踪配置和相位合同。运行可恢复，但 admission 与当前状态必须完全一致，且只接受以下合同完全一致的已有结果：
+每条轨迹单独启动 Isaac 进程，成功后才保留 JSON gate 与 NPZ。启动时要求 tracked worktree 无改动，并生成不可回填的 `exact_source_admission.json` 和 `admission.json`，锁定上游 manifest、Git commit、规划 manifest SHA-256、case 1--79、跟踪配置和相位合同。运行可恢复，但 admission 与当前状态必须完全一致，且只接受以下合同完全一致的已有结果：
 
 - `riser_phase_consistent_v2`；
 - `derivatives_scaled_by_progress_v1`；
 - 动态 gate 全部通过；
 - NPZ 与 JSON 同时存在。
 
-合并前必须满足：`79/79`、无终止、标签无裁剪、有限数值、教师命令重建误差不超过 `2e-6`、按完整 case 分割且无轨迹泄漏。最终 summary 记录运行 commit、admission SHA-256、规划 manifest SHA-256、所有源 NPZ SHA-256。BC 入口会再次验证整条 provenance 链。
+合并前必须满足：上游 exact-source/quality admission 通过、`79/79`、无终止、标签无裁剪、有限数值、教师命令重建误差不超过 `2e-6`、按完整 case 分割且无轨迹泄漏。最终 summary 记录上游 manifest/admission SHA-256、运行 commit、capture admission SHA-256、规划 manifest SHA-256、所有源 NPZ SHA-256。BC 入口会再次验证整条 provenance 链。
 
 任一 case 失败即停止。禁止用已通过的部分数据提前训练。
 

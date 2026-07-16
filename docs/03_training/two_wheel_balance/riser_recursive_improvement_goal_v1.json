@@ -56,6 +56,11 @@
   "current_stage": {
     "training_authorized": false,
     "ppo_authorized": false,
+    "upstream_trajectory_status": "quarantined_truncated_resampled_source",
+    "required_trajectory_integrity_contract": "exact_source_v1",
+    "quality_qualified_exact_source_cases_available": 0,
+    "quarantined_residual_capture_cases": 65,
+    "quarantined_residual_capture_directory": "20260716_residual_all79_phase_v3_clean_QUARANTINED_UPSTREAM_TRUNCATED_SOURCE_20260717",
     "corrected_teacher_cases_available": 79,
     "corrected_teacher_cases_pending_regeneration": 0,
     "representative_bounded_unicycle_passed_cases": [1, 31, 73],
@@ -141,13 +146,13 @@
       "training_authorized": false
     },
     "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
-    "current_root_cause": "the executed residual contract passes a seven-family smoke, but all-79 dynamic captures and a case-disjoint all-79 dataset do not yet exist",
+    "current_root_cause": "the prior all-79 riser stage and v4 plans descend from truncated and resampled GIK logs, so their otherwise clean Isaac residual labels do not represent intact desired trajectories",
     "remote_isaac_validation": "gate0_gate3_representative_and_repaired7_passed",
     "accepted_evidence": "evidence_20260716_riser_residual_dataset_smoke/README.md"
   },
   "next_iteration": {
-    "hypothesis": "the residual action scales and deployable observation contract remain unclipped and reconstruct the deterministic teacher across all 79 trajectory families",
-    "required_change": "export self-contained playback plans for all 79 cases, collect dense passed Isaac executions, and build a case-disjoint all-79 dataset with the same schema and regression checks",
-    "stop_rule": "do not train or roll out a learned candidate from the seven-case smoke; require all-79 executed coverage and dataset gates first"
+    "hypothesis": "a quality-qualified exact_source_v1 teacher package can preserve every authoritative source pose and timestamp while producing safe ordered retargeted waypoint states",
+    "required_change": "obtain and validate 79 quality-qualified exact-source teachers, regenerate plans in a new namespace, and collect a new residual curriculum from an empty directory",
+    "stop_rule": "do not resume v4 capture or start BC/PPO; integrity-only canaries and the 65-case quarantined corpus are invalid for desired-trajectory training"
   }
 }

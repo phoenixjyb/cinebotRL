@@ -39,6 +39,7 @@ scripts/two_wheel_balance/build_riser_residual_dataset.py
 scripts/two_wheel_balance/build_riser_corrected_stage.py
 scripts/two_wheel_balance/build_riser_urdf.py
 scripts/two_wheel_balance/export_riser_playback_plans.py
+scripts/two_wheel_balance/run_riser_all79_dataset_gate.sh
 scripts/two_wheel_balance/run_riser_remote_gates.sh
 scripts/two_wheel_balance/riser_remote_sync_manifest_20260716.txt
 scripts/two_wheel_balance/smoke_riser_asset.py

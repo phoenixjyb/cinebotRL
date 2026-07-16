@@ -85,7 +85,9 @@ def main() -> int:
     manifest = {
         "schema": "cinebotrl_two_wheel_riser_playback_export_v1",
         "training_started": False,
-        "source_contract": "corrected_physical_split_teacher",
+        "source_contracts": sorted(
+            {str(references[case].metadata["source"]) for case in args.cases}
+        ),
         "case_count": len(rows),
         "cases": rows,
     }

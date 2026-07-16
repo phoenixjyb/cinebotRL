@@ -82,6 +82,9 @@ from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
 from rl_platform.robots.two_wheel_balance import TWO_WHEEL_WHOLE_BODY_ATTITUDE_CFG
 from rl_platform.tasks.two_wheel_balance import RecomoTwoWheelBalanceEnvCfg
 from rl_platform.tasks.two_wheel_balance.all79_reference import quaternion_slerp_wxyz
+from rl_platform.tasks.two_wheel_balance.exact_source_reference import (
+    validate_exact_source_candidate,
+)
 from rl_platform.tasks.two_wheel_balance.camera_attitude import (
     PHYSICAL_GIMBAL_JOINTS,
     UrdfPhysicalCameraKinematics,
@@ -130,14 +133,13 @@ def load_candidate(case: int) -> dict[str, np.ndarray]:
     path = args.retarget_dir / f"case_{case:04d}.npz"
     if not path.is_file():
         raise FileNotFoundError(path)
-    with np.load(path, allow_pickle=False) as data:
-        candidate = {name: np.asarray(data[name]) for name in data.files}
+    candidate = validate_exact_source_candidate(path)
     expected = {
         "schema",
         "trajectory_integrity_contract",
         "source_trajectory_integrity_passed",
-        "source_teacher_quality_passed",
-        "valid_for_candidate_training",
+        "offline_executable_quality_passed",
+        "valid_for_dynamic_evaluation",
         "physical_gimbal_joint_labels_included",
         "time_s",
         "semantic_start_index",
@@ -167,16 +169,16 @@ def load_candidate(case: int) -> dict[str, np.ndarray]:
     semantic_start_index = int(candidate["semantic_start_index"].item())
     if not 1 <= semantic_start_index < len(time_s) - 1:
         raise ValueError(f"invalid semantic start index in {path}")
-    if str(candidate.get("schema", "").item()) != "cinebotrl_two_wheel_corrected_semantic_retarget_v3":
-        raise ValueError(f"candidate {path} is not corrected schema v3")
+    if str(candidate.get("schema", "").item()) != "cinebotrl_two_wheel_exact_source_retarget_v1":
+        raise ValueError(f"candidate {path} is not exact-source schema v1")
     if str(candidate["trajectory_integrity_contract"].item()) != "exact_source_v1":
         raise ValueError(f"candidate {path} does not preserve exact_source_v1")
     if not bool(candidate["source_trajectory_integrity_passed"].item()):
         raise ValueError(f"candidate {path} failed source trajectory integrity")
-    if not bool(candidate["source_teacher_quality_passed"].item()):
-        raise ValueError(f"candidate {path} failed source teacher quality")
-    if not bool(candidate["valid_for_candidate_training"].item()):
-        raise ValueError(f"candidate {path} is not candidate-training valid")
+    if not bool(candidate["offline_executable_quality_passed"].item()):
+        raise ValueError(f"candidate {path} failed offline executable quality")
+    if not bool(candidate["valid_for_dynamic_evaluation"].item()):
+        raise ValueError(f"candidate {path} is not admitted for dynamic evaluation")
     if bool(candidate.get("physical_gimbal_joint_labels_included", True).item()):
         raise ValueError(f"candidate {path} contains physical gimbal joint labels")
     return candidate

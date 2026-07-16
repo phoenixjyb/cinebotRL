@@ -110,6 +110,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--minimum-anchor-gimbal-limit-margin-ratio", type=float, default=0.10
     )
+    parser.add_argument(
+        "--minimum-semantic-gimbal-limit-margin-ratio", type=float, default=0.005
+    )
+    parser.add_argument("--semantic-gimbal-center-regularization", type=float, default=0.01)
     parser.add_argument("--position-scale-m", type=float, default=0.01)
     parser.add_argument("--control-regularization", type=float, default=0.01)
     parser.add_argument("--maximum-position-p95-m", type=float, default=0.10)
@@ -384,6 +388,31 @@ def wrap_angle(value: float) -> float:
     return math.atan2(math.sin(value), math.cos(value))
 
 
+def gimbal_limit_margin_ratio(
+    gimbal_q: np.ndarray, kinematics: UrdfPhysicalCameraKinematics
+) -> float:
+    joint_range = kinematics.gimbal_upper - kinematics.gimbal_lower
+    return float(
+        np.min(
+            np.minimum(
+                gimbal_q - kinematics.gimbal_lower,
+                kinematics.gimbal_upper - gimbal_q,
+            )
+            / joint_range
+        )
+    )
+
+
+def semantic_gimbal_margin_ratio(args: argparse.Namespace) -> float:
+    return float(
+        getattr(args, "minimum_semantic_gimbal_limit_margin_ratio", 0.005)
+    )
+
+
+def semantic_gimbal_center_regularization(args: argparse.Namespace) -> float:
+    return float(getattr(args, "semantic_gimbal_center_regularization", 0.01))
+
+
 def physical_camera_rotation(
     state: np.ndarray, kinematics: UrdfPhysicalCameraKinematics
 ) -> np.ndarray:
@@ -515,6 +544,10 @@ def retime_gimbal_for_equilibrium_pitch(
     errors_deg = np.empty(len(time_s), dtype=np.float64)
     nonconverged = []
     previous = np.zeros(3, dtype=np.float64)
+    margin_ratio = semantic_gimbal_margin_ratio(args)
+    gimbal_range = camera_kinematics.gimbal_upper - camera_kinematics.gimbal_lower
+    lower = camera_kinematics.gimbal_lower + margin_ratio * gimbal_range
+    upper = camera_kinematics.gimbal_upper - margin_ratio * gimbal_range
     for index, (state, attitude) in enumerate(zip(states, attitudes, strict=True)):
         pitch = position_kinematics.equilibrium_pitch_rad(
             state[:6], args.wheel_axle_height_m
@@ -525,6 +558,8 @@ def retime_gimbal_for_equilibrium_pitch(
             state[3:6],
             attitude,
             previous,
+            gimbal_lower_bound=lower,
+            gimbal_upper_bound=upper,
         )
         gimbal_path[index] = result.gimbal_q
         errors_deg[index] = math.degrees(result.orientation_error_rad)
@@ -542,6 +577,9 @@ def retime_gimbal_for_equilibrium_pitch(
     retimed_states = states.copy()
     retimed_states[:, 6:9] = gimbal_path
     achieved_rate = gimbal_delta / new_dt[:, None]
+    minimum_margin_ratio = min(
+        gimbal_limit_margin_ratio(q, camera_kinematics) for q in gimbal_path
+    )
     (
         interpolation_error_deg,
         interpolation_error_interval,
@@ -556,6 +594,8 @@ def retime_gimbal_for_equilibrium_pitch(
         "physical_gimbal_ik_nonconverged_indices": nonconverged,
         "physical_gimbal_ik_max_error_deg": float(np.max(errors_deg)),
         "physical_gimbal_rate_max_radps": float(np.max(achieved_rate)),
+        "physical_gimbal_limit_margin_min_ratio": minimum_margin_ratio,
+        "physical_gimbal_limit_margin_required_ratio": margin_ratio,
         "physical_gimbal_interpolation_max_error_deg": interpolation_error_deg,
         "physical_gimbal_interpolation_max_error_interval": (
             interpolation_error_interval
@@ -1360,6 +1400,14 @@ def build_com_safe_semantic_prior(
                 f"{equilibrium_pitch_deg(state, position_kinematics, args):.6f} deg"
             )
         prior[index] = candidate(solution.x)
+        if getattr(args, "report_exact_source_prior_progress", False) and (
+            index % 25 == 0 or index == len(reference.time_s) - 1
+        ):
+            print(
+                f"[case {reference.case}] exact-source seed prior "
+                f"{index}/{len(reference.time_s) - 1}",
+                flush=True,
+            )
     return prior
 
 
@@ -1381,13 +1429,20 @@ def retarget_semantic_full_pose(
     np.ndarray,
     int,
 ]:
-    safe_source_base_arm_q = build_com_safe_semantic_prior(
-        reference,
-        anchor,
-        source_base_arm_q,
-        position_kinematics,
-        args,
-    )
+    if getattr(args, "integrity_seed_prior_only", False) and not getattr(
+        args, "rebuild_com_safe_seed_prior", False
+    ):
+        # Exact-source canary states are solver regularization, never emitted
+        # labels. Every executable state still passes the physical gates below.
+        safe_source_base_arm_q = np.asarray(source_base_arm_q, dtype=np.float64)
+    else:
+        safe_source_base_arm_q = build_com_safe_semantic_prior(
+            reference,
+            anchor,
+            source_base_arm_q,
+            position_kinematics,
+            args,
+        )
     states = [anchor.copy()]
     controls: list[np.ndarray] = []
     target_positions = [reference.positions_m[0].copy()]
@@ -1409,7 +1464,12 @@ def retarget_semantic_full_pose(
         segment_start_state = states[-1].copy()
         segment_start_control = previous_control.copy()
         attempts = []
-        for time_scale in (1, 2, 4, 8, 12, 16, 24):
+        time_scales = (
+            (1, 2, 4, 8, 12, 16, 24, 32, 48, 64, 96)
+            if getattr(args, "integrity_seed_prior_only", False)
+            else (1, 2, 4, 8, 12, 16, 24)
+        )
+        for time_scale in time_scales:
             trial_state = segment_start_state.copy()
             trial_control = segment_start_control.copy()
             trial_states = []
@@ -1421,6 +1481,7 @@ def retarget_semantic_full_pose(
             trial_gravity = []
             trial_balance_pitch = []
             trial_source_arm_errors = []
+            trial_gimbal_margins = []
             for substep in range(1, time_scale + 1):
                 fraction = substep / time_scale
                 target_position = (
@@ -1492,8 +1553,12 @@ def retarget_semantic_full_pose(
                         target_rotation,
                     ) / math.radians(args.maximum_ik_error_deg)
                     source_delta = next_state[:6] - source_q
-                    source_regularization = np.concatenate(
-                        (0.1 * source_delta[:3], source_delta[3:6] / 0.35)
+                    source_regularization = (
+                        np.zeros(6, dtype=np.float64)
+                        if getattr(args, "integrity_seed_prior_only", False)
+                        else np.concatenate(
+                            (0.1 * source_delta[:3], source_delta[3:6] / 0.35)
+                        )
                     )
                     gravity_effort = position_kinematics.gravitational_effort_nm(
                         next_state[:6]
@@ -1521,6 +1586,10 @@ def retarget_semantic_full_pose(
                         camera_kinematics.gimbal_upper
                         - camera_kinematics.gimbal_lower
                     )
+                    gimbal_margin = np.minimum(
+                        next_state[6:9] - camera_kinematics.gimbal_lower,
+                        camera_kinematics.gimbal_upper - next_state[6:9],
+                    ) / gimbal_range
                     return np.concatenate(
                         (
                             position_error,
@@ -1528,8 +1597,16 @@ def retarget_semantic_full_pose(
                             source_regularization,
                             gravity_overrun,
                             [balance_pitch_overrun],
+                            np.maximum(
+                                semantic_gimbal_margin_ratio(args)
+                                - gimbal_margin,
+                                0.0,
+                            )
+                            / 0.002,
                             0.002 * control,
-                            0.01 * (next_state[6:9] - gimbal_center) / gimbal_range,
+                            semantic_gimbal_center_regularization(args)
+                            * (next_state[6:9] - gimbal_center)
+                            / gimbal_range,
                         )
                     )
 
@@ -1548,7 +1625,7 @@ def retarget_semantic_full_pose(
 
                 def solution_metrics(
                     solution,
-                ) -> tuple[float, float, float, float]:
+                ) -> tuple[float, float, float, float, float]:
                     next_state = candidate(solution.x)
                     position_error = float(
                         np.linalg.norm(
@@ -1583,7 +1660,10 @@ def retarget_semantic_full_pose(
                     balance_pitch = equilibrium_pitch_deg(
                         next_state, position_kinematics, args
                     )
-                    return position_error, attitude_error, gravity, balance_pitch
+                    margin = gimbal_limit_margin_ratio(
+                        next_state[6:9], camera_kinematics
+                    )
+                    return position_error, attitude_error, gravity, balance_pitch, margin
 
                 initial_metrics = solution_metrics(solutions[0])
                 if not (
@@ -1595,6 +1675,8 @@ def retarget_semantic_full_pose(
                     and initial_metrics[3]
                     <= args.maximum_equilibrium_pitch_deg
                     + BALANCE_PITCH_SOLVER_TOLERANCE_DEG
+                    and initial_metrics[4]
+                    >= semantic_gimbal_margin_ratio(args)
                 ):
                     source_seed = np.zeros(8, dtype=np.float64)
                     source_delta_xy = source_q[:2] - trial_state[:2]
@@ -1644,6 +1726,7 @@ def retarget_semantic_full_pose(
                         attitude_error,
                         gravity,
                         balance_pitch,
+                        gimbal_margin,
                     ) = solution_metrics(solution)
                     feasible = (
                         position_error <= 0.05
@@ -1654,6 +1737,8 @@ def retarget_semantic_full_pose(
                         and balance_pitch
                         <= args.maximum_equilibrium_pitch_deg
                         + BALANCE_PITCH_SOLVER_TOLERANCE_DEG
+                        and gimbal_margin
+                        >= semantic_gimbal_margin_ratio(args)
                     )
                     score = (
                         position_error / 0.02
@@ -1665,6 +1750,12 @@ def retarget_semantic_full_pose(
                         + max(
                             0.0,
                             balance_pitch - args.maximum_equilibrium_pitch_deg,
+                        )
+                        + 10.0
+                        * max(
+                            0.0,
+                            semantic_gimbal_margin_ratio(args)
+                            - gimbal_margin,
                         )
                     )
                     return feasible, score
@@ -1721,6 +1812,11 @@ def retarget_semantic_full_pose(
                 trial_source_arm_errors.append(
                     float(np.linalg.norm(trial_state[3:6] - source_q[3:6]))
                 )
+                trial_gimbal_margins.append(
+                    gimbal_limit_margin_ratio(
+                        trial_state[6:9], camera_kinematics
+                    )
+                )
 
             feasible = (
                 max(trial_position_errors) <= 0.05
@@ -1731,11 +1827,17 @@ def retarget_semantic_full_pose(
                 and max(trial_balance_pitch)
                 <= args.maximum_equilibrium_pitch_deg
                 + BALANCE_PITCH_SOLVER_TOLERANCE_DEG
+                and min(trial_gimbal_margins)
+                >= semantic_gimbal_margin_ratio(args)
             )
             score = (
                 max(trial_position_errors) / 0.02
                 + max(trial_attitude_errors) / args.maximum_ik_error_deg
-                + max(trial_source_arm_errors) / 0.2
+                + (
+                    0.0
+                    if getattr(args, "integrity_seed_prior_only", False)
+                    else max(trial_source_arm_errors) / 0.2
+                )
                 + max(
                     0.0,
                     max(trial_gravity) - args.maximum_arm_gravity_effort_nm,
@@ -1746,6 +1848,12 @@ def retarget_semantic_full_pose(
                     - args.maximum_equilibrium_pitch_deg,
                 )
                 + 0.01 * time_scale
+                + 10.0
+                * max(
+                    0.0,
+                    semantic_gimbal_margin_ratio(args)
+                    - min(trial_gimbal_margins),
+                )
             )
             attempts.append(
                 (
@@ -1783,12 +1891,19 @@ def retarget_semantic_full_pose(
                 equilibrium_pitch_deg(state, position_kinematics, args)
                 for state in best_states
             )
+            best_gimbal_margin = min(
+                gimbal_limit_margin_ratio(state[6:9], camera_kinematics)
+                for state in best_states
+            )
             raise ValueError(
-                f"semantic interval {index} has no COM-safe nonholonomic solve: "
+                f"semantic interval {index} has no physical-gate-safe "
+                "nonholonomic solve: "
                 f"position_max={max(best[7]):.6f} m, "
                 f"attitude_max={max(best[8]):.6f} deg, "
                 f"gravity_max={best_gravity:.6f} Nm, "
-                f"equilibrium_pitch_max={best_pitch:.9f} deg"
+                f"equilibrium_pitch_max={best_pitch:.9f} deg, "
+                f"gimbal_margin_min_ratio={best_gimbal_margin:.9f}, "
+                f"gimbal_margin_required_ratio={semantic_gimbal_margin_ratio(args):.9f}"
             )
         selected = min(feasible_attempts, key=lambda item: item[1])
         (
@@ -1950,6 +2065,11 @@ def retarget_case(
             "physical_gimbal_rate_max_radps"
         ]
         <= args.maximum_gimbal_rate + 1e-9,
+        "physical_gimbal_limit_margin_bounded": gimbal[
+            "physical_gimbal_limit_margin_min_ratio"
+        ]
+        + 1e-9
+        >= semantic_gimbal_margin_ratio(args),
         "physical_gimbal_interpolation_error_bounded": gimbal[
             "physical_gimbal_interpolation_max_error_deg"
         ]

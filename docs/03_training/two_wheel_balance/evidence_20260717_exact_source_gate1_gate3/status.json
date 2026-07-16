@@ -1,0 +1,55 @@
+{
+  "schema": "cinebotrl_two_wheel_exact_source_gate_checkpoint_v1",
+  "date": "2026-07-17",
+  "trajectory_integrity_contract": "exact_source_v1",
+  "source_manifest_sha256": "f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d",
+  "quarantined_source_manifest_sha256": "af035fb50f17322add90bf008427c9247dbbf08ee0bc38dd6d24172d9e3e14e4",
+  "gate1_ep1": {
+    "status": "offline_executable_quality_passed",
+    "source_anchor_count": 256,
+    "execution_sample_count": 1183,
+    "source_path_length_m": 2.4522479583115233,
+    "position_error_p95_m": 0.049322020521607536,
+    "position_error_max_m": 0.049983321163577336,
+    "maximum_arm_gravity_effort_nm": 29.504693834601092,
+    "maximum_equilibrium_pitch_deg": 7.865757560415262,
+    "physical_gimbal_interpolation_max_error_deg": 0.0998588462162596,
+    "candidate_sha256": "461c14f018032c296b16bebb39b1b123a6ae747886352e68329a9a82e3dac070",
+    "valid_for_dynamic_evaluation": true,
+    "valid_for_training": false
+  },
+  "gate1_ep4": {
+    "status": "rejected_source_interval_192",
+    "position_error_max_m": 0.051691,
+    "maximum_arm_gravity_effort_nm": 29.503752,
+    "valid_for_dynamic_evaluation": false,
+    "valid_for_training": false
+  },
+  "gate1_ep7": {
+    "status": "rejected_physical_gimbal_branch_margin",
+    "source_interval": 557,
+    "position_error_max_m": 0.006293,
+    "attitude_error_max_deg": 0.005741,
+    "maximum_arm_gravity_effort_nm": 16.808017,
+    "maximum_equilibrium_pitch_deg": 0.242668814,
+    "physical_gimbal_limit_margin_min_ratio": 0.004721766,
+    "physical_gimbal_limit_margin_required_ratio": 0.005,
+    "valid_for_dynamic_evaluation": false,
+    "valid_for_training": false
+  },
+  "gate3_ep1": {
+    "status": "rejected_acquisition_not_completed",
+    "completed_steps": 16368,
+    "completed_phase_time_s": 14.235398735573979,
+    "acquisition_duration_s": 23.5,
+    "no_termination": true,
+    "position_error_p95_m": 0.09895850709363772,
+    "position_error_max_m": 0.1111377115813742,
+    "attitude_error_p95_deg": 4.297424524889269,
+    "attitude_error_max_deg": 4.502242992493168,
+    "valid_for_training": false
+  },
+  "training_started": false,
+  "bc_started": false,
+  "ppo_started": false
+}

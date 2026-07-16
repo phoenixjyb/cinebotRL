@@ -85,7 +85,25 @@ all of these gates:
 Only after these upstream gates pass may the existing retarget feasibility,
 gravity, balance, actuator, interpolation, and dynamic quality/safety gates run.
 
-## Exact-source canaries
+## Exact-source reference and canaries
+
+The authoritative reference package is now available at:
+
+```text
+/mnt/g/wSpace/cinebotRL/data/gikWBC9DOF_exact_source_reference_all79_20260717
+```
+
+Its manifest SHA-256 is:
+
+```text
+f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d
+```
+
+It contains 79 episodes and 71,038 authoritative source poses under the
+`exact_source_v1` integrity contract. It is a reference-only package:
+`quality_qualified_teacher=false` and `valid_for_training=false`. The loader
+may use it to define immutable source geometry and timestamps for retargeting,
+but it must never expose policy actions or be admitted directly to training.
 
 The `.98` transport canaries are at:
 
@@ -93,10 +111,81 @@ The `.98` transport canaries are at:
 /mnt/g/wSpace/cinebotRL/data/gikWBC9DOF_exact_source_teacher_integrity_canaries_20260716
 ```
 
-Cases 1, 4, and 7 prove the loader/transport contract: exact counts, `N-1`
-actions, zero timestamp error, and near-zero source pose error. They are
-intentionally `valid_for_training=false` because solver/envelope/trajectory
-quality has not been approved. They must never be retargeted as training data.
+Cases 1, 4, and 7 prove the loader/transport contract: exact counts, exact
+timestamps, and near-zero source pose error. Their free-GIK states are solver
+priors only. They are intentionally `valid_for_training=false` and must never
+be played back or admitted directly to training.
+
+The downstream exact-source candidate contract stores `M` executable states,
+`M-1` controls, the immutable `N` source poses/timestamps, a complete ordered
+source-anchor map, explicit acquisition metadata, and per-source-interval
+retiming. Candidate admission independently verifies all of those fields and
+the source package hash before any dynamic execution.
+
+## Gate-1 bounded result
+
+Gate 0 is implemented and fail-closed. The old `af035fb5...` lineage is denied,
+the exact-source package and episode hashes are verified, initialization cannot
+replace source anchor 0, and downstream playback/dynamic entrypoints reject
+non-exact-source schemas.
+
+The first bounded Gate-1 canaries remain rejected for training:
+
+- Case 1 with the original free-GIK prior reached source interval 129 but could
+  not satisfy the unchanged 0.05 m position gate. Its best bounded result was
+  0.052198 m while static arm gravity remained 29.504716 Nm.
+- Case 4 rejected at source interval 192 with 0.051691 m position error and
+  29.503752 Nm static arm gravity.
+- Case 7 preserved all 663 source anchors, exact source path length
+  3.8081273358 m, and exact geometry/timestamps through a 1,763-state
+  executable retarget. It is still rejected because the physical gimbal yaw
+  branch jumps 179.994 degrees near interval 1578 at the physical +/-180 degree
+  joint limit.
+
+The branch-aware correction now enforces a physical gimbal margin throughout
+semantic retargeting and in the final balanced-pitch IK. This converts the late
+interpolation failure into a fail-closed solver decision. A bounded first run
+rejected at source interval 569; proactive gimbal centering produced a distinct
+branch but rejected at interval 557 with minimum margin 0.004721766 versus the
+required 0.005. At that point position error was 0.006293 m, attitude error
+0.005741 degrees, gravity 16.808017 Nm, and equilibrium pitch 0.242669 degrees,
+so the physical joint-limit margin is the isolated blocker. The margin will not
+be weakened merely to obtain a pass. A completed upstream multi-branch ep7 seed
+is the next justified comparison.
+
+The bounded case-1 upstream-seed A/B then closed the old forward-solver
+blocker without changing any output gate:
+
+- 256/256 immutable source anchors and exact timestamps were preserved;
+- the exact source, mapped-anchor, and execution-target path lengths are all
+  2.4522479583 m;
+- 1,183 executable states and 1,182 transitions were generated, with
+  initialization kept separate;
+- position p95/max are 0.049322/0.049983 m, arm gravity is 29.504694 Nm,
+  equilibrium pitch is 7.86576 degrees, and physical gimbal IK/interpolation
+  max error is 0.099859 degrees;
+- candidate SHA-256 is
+  `461c14f018032c296b16bebb39b1b123a6ae747886352e68329a9a82e3dac070`.
+
+Independent sealing and audit confirm integrity and offline executable quality.
+The candidate is `valid_for_dynamic_evaluation=true` but remains
+`valid_for_training=false`; dynamic execution has not yet passed and training
+has not started. This A/B is evidence that a quality-qualified upstream
+configuration branch can resolve a downstream nonholonomic solve boundary. It
+does not make the upstream holonomic seed itself a policy teacher.
+
+The first representative Isaac dynamic gate was safe but rejected. It ran all
+16,368 bounded simulation steps with no termination and passed pitch, arm,
+position, attitude, gimbal, action, and effort limits. However, the phase
+governor stalled in acquisition at phase time 14.235399 s of 23.5 s, so neither
+acquisition nor the semantic reference completed. The dynamic candidate remains
+unapproved and `valid_for_training=false`. This is a Gate-3 acquisition/control
+completion blocker, not an offline source-integrity regression.
+
+Case 7 therefore proves the corrected source-integrity path, not executable
+teacher quality. Its gimbal failure requires a structural base/arm/gimbal
+branch-selection correction; wrapping the exported physical joint angle would
+hide a real actuator-limit crossing and is not allowed.
 
 ## Current status and next admission
 
@@ -107,12 +196,27 @@ quality has not been approved. They must never be retargeted as training data.
 - The loader, retargeter, assembler, and dynamic runner fail closed unless the
   exact-source and teacher-quality contract is present.
 - PPO and BC remain blocked.
-- Next action is to receive a small quality-qualified `exact_source_v1` teacher
-  smoke, validate cases 1/4/7 end to end, then regenerate a bounded pilot. A
-  full accepted corpus is not regenerated until that pilot passes.
+- Gate-1 exact-source retargeting is active only as bounded solver diagnosis.
+  Case 1 now passes exact-source integrity and offline executable quality with
+  its verified upstream solver seed. Case 4 still fails the position/gravity
+  boundary and case 7 still fails physical gimbal branch continuity.
+- Upstream ep1 and ep77 holonomic seeds may be used only as episode-specific
+  solver priors after exact hash verification. They are not policy teachers and
+  do not relax nonholonomic, source, gravity, timing, or output gates.
+- Next action is to diagnose the case-1 acquisition governor stall and compare
+  case 7 against the completed upstream multi-branch seed when available. An
+  ep4 upstream branch should then be requested because its current canary still
+  rejects at the position/gravity boundary. Gate-2 all-79 regeneration, a full
+  dynamic corpus, BC, and PPO remain blocked.
 
 Machine-readable quarantine evidence is stored in:
 
 ```text
 docs/03_training/two_wheel_balance/evidence_20260717_upstream_source_quarantine/quarantine.json
+```
+
+Independent case-1 audit evidence is stored in:
+
+```text
+docs/03_training/two_wheel_balance/evidence_20260717_exact_source_ep1_upstream_seed_independent_audit
 ```

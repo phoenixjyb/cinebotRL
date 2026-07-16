@@ -62,6 +62,31 @@ def test_continuity_solver_recovers_alternate_euler_branch() -> None:
     assert recovered.orientation_error_rad < math.radians(0.1)
 
 
+def test_continuity_solver_honors_tightened_physical_joint_bounds() -> None:
+    kinematics = UrdfPhysicalCameraKinematics(URDF)
+    root_quat = np.array([1.0, 0.0, 0.0, 0.0])
+    expected_gimbal = np.array([0.35, -0.25, 0.20])
+    physical_rotation = kinematics.world_rotation(root_quat, ARM_HOME, expected_gimbal)
+    semantic_target = physical_cam_to_semantic_dfr_quat_wxyz(
+        matrix_quaternion_wxyz(physical_rotation)
+    )
+    lower = np.maximum(kinematics.gimbal_lower, np.full(3, -0.1))
+    upper = np.minimum(kinematics.gimbal_upper, np.full(3, 0.1))
+
+    result = kinematics.solve_semantic_attitude_continuous(
+        root_quat,
+        ARM_HOME,
+        semantic_target,
+        np.zeros(3),
+        gimbal_lower_bound=lower,
+        gimbal_upper_bound=upper,
+    )
+
+    assert np.all(result.gimbal_q >= lower)
+    assert np.all(result.gimbal_q <= upper)
+    assert not result.converged
+
+
 def test_local_attitude_solver_stays_on_nominal_euler_branch() -> None:
     kinematics = UrdfPhysicalCameraKinematics(URDF)
     nominal = np.array([0.35, -0.25, 0.20])

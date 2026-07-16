@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Validate only accepted corrected schema-v3 candidates under Isaac Lab.
+# Validate only accepted exact-source-v1 candidates under Isaac Lab.
 # This is fail-fast and resumable; it never starts PPO or promotes rejected or
 # runtime-quarantined candidates.
 
 set -uo pipefail
 
 ROOT=${CINEBOTRL_ROOT:-/mnt/g/wSpace/cinebotRL-two-wheel-balance}
-RETARGET_DIR=${RETARGET_DIR:-$ROOT/evaluation_results/two_wheel_corrected_full_pose/retarget_interpolation_gate_v3}
-OUT=${1:-$ROOT/evaluation_results/two_wheel_corrected_full_pose/accepted_dynamic_interpolation_gate_v3}
+RETARGET_DIR=${RETARGET_DIR:-$ROOT/evaluation_results/two_wheel_exact_source_v1/gate2_all79_offline}
+OUT=${1:-$ROOT/evaluation_results/two_wheel_exact_source_v1/gate4_accepted_dynamic}
 PYTHON=${ISAAC_PYTHON:-/mnt/g/isaaclab_venv/Scripts/python.exe}
 RESULT_SCHEMA=recomo_two_wheel_corrected_full_pose_playback_smoke_v3
-QUARANTINED_SOURCE_PACKAGE_SHA256=af035fb50f17322add90bf008427c9247dbbf08ee0bc38dd6d24172d9e3e14e4
+EXACT_SOURCE_MANIFEST_SHA256=f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d
 
 mkdir -p "$OUT"
 rm -f "$OUT/COMPLETE" "$OUT/FAILED.json"
@@ -75,12 +75,12 @@ python3 - \
   "$RETARGET_DIR/summary.json" \
   "$RETARGET_DIR" \
   "$OUT/accepted_cases.txt" \
-  "$QUARANTINED_SOURCE_PACKAGE_SHA256" <<'PY' || fail invalid_retarget_corpus
+  "$EXACT_SOURCE_MANIFEST_SHA256" <<'PY' || fail invalid_retarget_corpus
 import json
 from pathlib import Path
 import sys
 
-summary_path, candidate_dir, output_path, quarantined_sha = sys.argv[1:]
+summary_path, candidate_dir, output_path, expected_sha = sys.argv[1:]
 candidate_dir = Path(candidate_dir)
 with open(summary_path, encoding="utf-8") as stream:
     result = json.load(stream)
@@ -89,21 +89,17 @@ accepted = sorted(int(row["case"]) for row in rows if row.get("passed") is True)
 rejected = sorted(int(row["case"]) for row in rows if row.get("passed") is not True)
 valid = (
     result.get("schema")
-    == "cinebotrl_two_wheel_corrected_semantic_retarget_batch_v3"
-    and result.get("candidate_schema")
-    == "cinebotrl_two_wheel_corrected_semantic_retarget_v3"
-    and result.get("source_package_sha256") != quarantined_sha
+    == "cinebotrl_two_wheel_exact_source_retarget_batch_v1"
+    and result.get("source_manifest_sha256") == expected_sha
     and result.get("trajectory_integrity_contract") == "exact_source_v1"
-    and result.get("source_trajectory_integrity_passed") is True
-    and result.get("source_teacher_quality_passed") is True
-    and result.get("source_package_case_count") == 79
+    and result.get("source_reference_quality_qualified_teacher") is False
+    and result.get("source_reference_valid_for_training") is False
     and result.get("training_started") is False
-    and result.get("runtime_approved") is False
-    and result.get("physical_gimbal_joint_labels_exported") is False
-    and result.get("orientation_target_contract")
-    == "semantic_DFR_world_quaternion_wxyz_option_B"
+    and result.get("valid_for_training") is False
+    and result.get("requested_cases") == list(range(1, 80))
     and len(rows) == 79
-    and len(accepted) == result.get("passed_case_count")
+    and accepted == result.get("passed_cases")
+    and rejected == result.get("rejected_cases")
     and accepted
     and all((candidate_dir / f"case_{case:04d}.npz").is_file() for case in accepted)
     and all(not (candidate_dir / f"case_{case:04d}.npz").exists() for case in rejected)
@@ -122,6 +118,17 @@ while read -r case; do
   tag=$(printf '%04d' "$case")
   result="$OUT/case_${tag}.json"
   console="$OUT/case_${tag}.console.log"
+
+  candidate_win=$(wslpath -w "$RETARGET_DIR/case_${tag}.npz")
+  "$PYTHON" - "$candidate_win" <<'PY' || fail invalid_candidate_contract "$case"
+import sys
+sys.path.insert(0, r'G:\wSpace\cinebotRL-two-wheel-balance\src')
+from pathlib import Path
+from rl_platform.tasks.two_wheel_balance.exact_source_reference import (
+    validate_exact_source_candidate,
+)
+validate_exact_source_candidate(Path(sys.argv[1]))
+PY
 
   if [[ -f "$result" ]] && validate_result "$result" "$case"; then
     printf '%s case=%s resume=passed\n' "$(date -Iseconds)" "$case"

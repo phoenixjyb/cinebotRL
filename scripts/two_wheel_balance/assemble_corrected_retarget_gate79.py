@@ -14,6 +14,9 @@ import numpy as np
 
 
 CANDIDATE_SCHEMA = "cinebotrl_two_wheel_corrected_semantic_retarget_v3"
+QUARANTINED_SOURCE_PACKAGE_SHA256 = (
+    "af035fb50f17322add90bf008427c9247dbbf08ee0bc38dd6d24172d9e3e14e4"
+)
 FORBIDDEN_KEYS = {
     "physical_gimbal_q",
     "physical_gimbal_joint_labels",
@@ -159,6 +162,8 @@ def main() -> int:
         or base_summary.get("trajectory_integrity_contract") != "exact_source_v1"
         or base_summary.get("source_trajectory_integrity_passed") is not True
         or base_summary.get("source_teacher_quality_passed") is not True
+        or base_summary.get("source_package_sha256")
+        == QUARANTINED_SOURCE_PACKAGE_SHA256
         or base_summary.get("source_package_case_count") != 79
         or base_summary.get("runtime_approved") is not False
         or base_summary.get("training_started") is not False

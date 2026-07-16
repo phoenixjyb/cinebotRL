@@ -426,6 +426,8 @@ class UrdfPhysicalCameraKinematics:
         *,
         maximum_iterations: int = 100,
         tolerance_rad: float = math.radians(0.1),
+        gimbal_lower_bound: np.ndarray | None = None,
+        gimbal_upper_bound: np.ndarray | None = None,
     ) -> AttitudeIkResult:
         """Solve from the previous command, then search alternate Euler branches.
 
@@ -435,11 +437,21 @@ class UrdfPhysicalCameraKinematics:
         the continuity seed fails.
         """
 
-        seed = np.clip(
-            np.asarray(seed_gimbal_q, dtype=np.float64),
-            self.gimbal_lower,
-            self.gimbal_upper,
+        lower = self.gimbal_lower if gimbal_lower_bound is None else np.asarray(
+            gimbal_lower_bound, dtype=np.float64
         )
+        upper = self.gimbal_upper if gimbal_upper_bound is None else np.asarray(
+            gimbal_upper_bound, dtype=np.float64
+        )
+        if (
+            lower.shape != (3,)
+            or upper.shape != (3,)
+            or np.any(lower < self.gimbal_lower)
+            or np.any(upper > self.gimbal_upper)
+            or np.any(lower >= upper)
+        ):
+            raise ValueError("invalid continuous gimbal bounds")
+        seed = np.clip(np.asarray(seed_gimbal_q, dtype=np.float64), lower, upper)
         primary = self.solve_semantic_attitude(
             root_quat_wxyz,
             arm_q,
@@ -447,14 +459,16 @@ class UrdfPhysicalCameraKinematics:
             seed,
             maximum_iterations=maximum_iterations,
             tolerance_rad=tolerance_rad,
+            gimbal_lower_bound=lower,
+            gimbal_upper_bound=upper,
         )
         if primary.converged:
             return primary
 
         levels = tuple(
-            (lower, 0.5 * (lower + upper), upper)
-            for lower, upper in zip(
-                self.gimbal_lower, self.gimbal_upper, strict=True
+            (lower_value, 0.5 * (lower_value + upper_value), upper_value)
+            for lower_value, upper_value in zip(
+                lower, upper, strict=True
             )
         )
         results = [primary]
@@ -469,6 +483,8 @@ class UrdfPhysicalCameraKinematics:
                         candidate_seed,
                         maximum_iterations=maximum_iterations,
                         tolerance_rad=tolerance_rad,
+                        gimbal_lower_bound=lower,
+                        gimbal_upper_bound=upper,
                     )
                     results.append(result)
 

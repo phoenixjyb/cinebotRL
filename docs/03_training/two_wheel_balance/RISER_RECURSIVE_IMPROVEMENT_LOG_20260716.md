@@ -588,6 +588,17 @@ and must state whether its candidate was accepted or rejected.
   `67bbfe164f6376189843517e9195437fb90b51e0186e8d1dfa32c4db15fc55cc`.
   All plan hashes, semantic continuity checks, and nearest-branch orientation
   equivalence checks pass. Multi-turn DJI attitude remains authoritative.
+- Sealed `CPU_FAILURE_TIMELINE_AUDIT.json` at SHA-256
+  `d4d85cd7f2b18a376a40e20d41bc92194536688310ba7e2313818f8bc45d424e`.
+  Crossing `180 deg` at `17 s` was healthy. The first false branch error appears
+  only when target yaw exceeds `360 deg` at `58 s`: raw error `719.580 deg`,
+  proxy effort `10 Nm`, but position error still `0.128 m` and pitch only
+  `0.275 deg`. Base XY fails at `59 s`, progress reaches zero at `61 s`, camera
+  position fails at `64 s`, and forbidden contact follows at `68.29 s`.
+- At the first fault, nearest-equivalent target is `-354.278 deg` relative to
+  reported `-353.857 deg`, leaving a wrapped error of only `-0.420 deg` while
+  preserving orientation. This establishes causal ordering but not a dynamic
+  cure; only a corrected case-74 rerun can provide that proof.
 - The runner now seals dynamic-failure evidence even if Isaac returns process
   status zero while its JSON says `passed=false`. The full CPU-only
   riser/two-wheel suite is `119 passed`; no GPU rerun has been performed.

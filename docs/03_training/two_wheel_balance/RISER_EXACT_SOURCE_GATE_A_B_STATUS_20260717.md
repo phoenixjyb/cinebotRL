@@ -261,6 +261,19 @@ bounded structural canary. Every plan hash and continuity check passes;
 nearest-branch orientation error is at most `2.22e-16`. Multi-turn semantic
 attitude remains authoritative and is not rejected or flattened.
 
+The case-74 causal timeline is sealed as `CPU_FAILURE_TIMELINE_AUDIT.json`,
+SHA-256
+`d4d85cd7f2b18a376a40e20d41bc92194536688310ba7e2313818f8bc45d424e`.
+Leaving the principal branch at `17 s` caused no error, so multi-turn attitude
+is not itself a failure. At `58 s`, the target first exceeded one full turn:
+semantic target `365.722 deg`, reported state `-353.857 deg`, false raw error
+`719.580 deg`, and proxy effort exactly `10 Nm`. Position error was still only
+`0.128 m` and pitch `0.275 deg`. Base XY failed at `59 s`, the governor stopped
+at `61 s`, position failed at `64 s`, and forbidden contact occurred at
+`68.29 s`. Nearest-equivalent mapping at the first fault is `-354.278 deg`
+with only `-0.420 deg` wrapped error. This is strong temporal evidence, not yet
+dynamic proof that the repair cures case 74.
+
 This repair is not dynamically validated. All riser GPU work remains stopped.
 The next admissible runtime step is one fresh exclusive case-74 structural
 canary after code review, commit/push, and explicit GPU authorization. Case 77,

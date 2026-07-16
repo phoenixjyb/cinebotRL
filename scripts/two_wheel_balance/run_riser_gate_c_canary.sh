@@ -10,13 +10,22 @@ PORTFOLIO_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$PORTFOLIO_STAMP"
 EXPECTED_MANIFEST_SHA256="${RISER_GATE_C_MANIFEST_SHA256:-851a7b2751cd397ba35daf57d1a8c6971fb14ed0186683af48d3c6109090570a}"
 EXPECTED_SOURCE_SHA256="${RISER_GATE_C_SOURCE_SHA256:-f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d}"
 CASES="${RISER_GATE_C_CASES:-1,52,74,77}"
-STAMP="${RISER_GATE_C_STAMP:-20260717_gate_c_canary_v2_timing_resealed}"
+STAMP="${RISER_GATE_C_STAMP:-20260717_gate_c_canary_v3_exclusive_timing_resealed}"
 OUTPUT_WSL="$ROOT/artifacts/two_wheel_riser/$STAMP"
 OUTPUT_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$STAMP"
 GAINS_WIN="${RISER_GAINS_WIN:-$WIN_ROOT\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json}"
 VALIDATOR="$ROOT/scripts/two_wheel_balance/validate_riser_gate_c_portfolio.py"
 PLAYBACK_WIN="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 SUMMARIZER="$ROOT/scripts/two_wheel_balance/summarize_riser_gate_c_canary.py"
+
+assert_exclusive_gpu() {
+  local owners
+  owners="$(ps -ef | grep -E '[p]ython\.exe .*smoke_.*playback\.py' || true)"
+  if [[ -n "$owners" ]]; then
+    printf 'refusing shared-GPU Gate C launch; active playback owner:\n%s\n' "$owners" >&2
+    return 1
+  fi
+}
 
 [[ -x "$PY" ]] || { printf 'missing Isaac Python: %s\n' "$PY" >&2; exit 2; }
 [[ -s "$PORTFOLIO_WSL/manifest.json" ]] || { printf 'missing portfolio manifest\n' >&2; exit 2; }
@@ -31,6 +40,7 @@ UPSTREAM="$(git -C "$ROOT" rev-parse '@{u}')"
   printf 'Gate C commit is not pushed to upstream: %s != %s\n' "$COMMIT" "$UPSTREAM" >&2
   exit 2
 }
+assert_exclusive_gpu || exit 5
 
 TEMP_ADMISSION="$(mktemp)"
 trap 'rm -f "$TEMP_ADMISSION"' EXIT
@@ -49,6 +59,7 @@ IFS=',' read -r -a case_list <<< "$CASES"
 for raw_case in "${case_list[@]}"; do
   case_number="$((10#$raw_case))"
   padded="$(printf '%04d' "$case_number")"
+  assert_exclusive_gpu || exit 5
   printf 'Gate C canary case %s\n' "$padded"
   if ! "$PY" -u -X utf8 "$PLAYBACK_WIN" \
     --gains "$GAINS_WIN" \

@@ -128,7 +128,9 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
 from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     bounded_base_references,
     bounded_progress_scale,
+    continuous_joint_error,
     equilibrium_pitch_from_world_com,
+    nearest_equivalent_angle,
     riser_tracking_config,
     yaw_from_quaternion_wxyz,
 )
@@ -479,8 +481,13 @@ def evaluate_case(
                 float(np.max(np.abs(np.rad2deg(proxy_command_rate)))),
             )
             previous_proxy_command = proxy_command.copy()
+        actual_proxy_pre = robot.data.joint_pos[0, proxy_ids].detach().cpu().numpy()
+        proxy_sim_command = proxy_command.copy()
+        proxy_sim_command[2] = nearest_equivalent_angle(
+            proxy_command[2], actual_proxy_pre[2]
+        )
         proxy_target = torch.as_tensor(
-            proxy_command[None, :],
+            proxy_sim_command[None, :],
             dtype=torch.float32,
             device=unwrapped.device,
         )
@@ -582,9 +589,11 @@ def evaluate_case(
         )
         actual_riser = float(robot.data.joint_pos[0, riser_id].item())
         actual_proxy = robot.data.joint_pos[0, proxy_ids].detach().cpu().numpy()
-        signed_proxy_error_deg = np.rad2deg(
-            proxy_command - actual_proxy
+        signed_proxy_error = proxy_sim_command - actual_proxy
+        signed_proxy_error[2] = continuous_joint_error(
+            proxy_sim_command[2], actual_proxy[2]
         )
+        signed_proxy_error_deg = np.rad2deg(signed_proxy_error)
         actual_proxy_velocity_deg_s = np.rad2deg(
             robot.data.joint_vel[0, proxy_ids].detach().cpu().numpy()
         )
@@ -592,9 +601,7 @@ def evaluate_case(
             proxy_command_rate
         )
         riser_error = abs(actual_riser - sample.riser_q)
-        proxy_error_deg = np.rad2deg(
-            np.abs(actual_proxy - proxy_command)
-        )
+        proxy_error_deg = np.abs(signed_proxy_error_deg)
         pitch_deg = math.degrees(abs(float(state["pitch"][0].item())))
         camera_position_error_vector = (
             actual_cam_position - sample.target_position_world_m
@@ -656,7 +663,8 @@ def evaluate_case(
                     "riser_error_m": riser_error,
                     "proxy_error_deg": proxy_error_deg.tolist(),
                     "proxy_signed_error_deg": signed_proxy_error_deg.tolist(),
-                    "proxy_target_deg": np.rad2deg(
+                    "proxy_target_deg": np.rad2deg(proxy_sim_command).tolist(),
+                    "proxy_unwrapped_semantic_target_deg": np.rad2deg(
                         proxy_command
                     ).tolist(),
                     "proxy_actual_deg": np.rad2deg(actual_proxy).tolist(),

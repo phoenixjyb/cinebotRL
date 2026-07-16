@@ -77,7 +77,7 @@ for raw_case in "${case_list[@]}"; do
       printf 'Gate C stopped on first dynamic reject: case %s\n' "$padded" >&2
       exit 4
   fi
-  python3 - "$OUTPUT_WSL/gates/case_$padded.json" "$case_number" <<'PY'
+  if ! python3 - "$OUTPUT_WSL/gates/case_$padded.json" "$case_number" <<'PY'
 import json
 from pathlib import Path
 import sys
@@ -100,6 +100,15 @@ valid = (
 )
 raise SystemExit(0 if valid else 1)
 PY
+  then
+    python3 "$SUMMARIZER" \
+      --root "$OUTPUT_WSL" \
+      --git-commit "$COMMIT" \
+      --cases "$CASES" \
+      --output "$OUTPUT_WSL/summary.json" >/dev/null
+    printf 'Gate C runtime JSON is not a sealed dynamic pass: case %s\n' "$padded" >&2
+    exit 4
+  fi
 done
 
 python3 "$SUMMARIZER" \

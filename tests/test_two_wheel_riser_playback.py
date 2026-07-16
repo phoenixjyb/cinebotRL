@@ -122,7 +122,11 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert '"rate_audited_ideal_state_adapter"' in source
     assert "robot.set_joint_position_target(proxy_target, joint_ids=proxy_ids)" in source
     assert "robot.write_joint_state_to_sim(" in source
-    assert "np.abs(actual_proxy - proxy_command)" in source
+    assert "nearest_equivalent_angle(" in source
+    assert "continuous_joint_error(" in source
+    assert "proxy_sim_command" in source
+    assert '"proxy_unwrapped_semantic_target_deg"' in source
+    assert "np.abs(actual_proxy - proxy_command)" not in source
     assert "np.abs(actual_proxy - sample.proxy_gimbal_q)" not in source
     assert "set_joint_velocity_target(proxy_velocity_target" not in source
     assert 'parser.add_argument("--video-fps", type=int, default=200)' in source

@@ -72,6 +72,7 @@ def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
     assert "20260717_gate_c_canary_v3_exclusive_timing_resealed" in source
     assert "assert_exclusive_gpu" in source
     assert "refusing shared-GPU Gate C launch" in source
+    assert "Gate C runtime JSON is not a sealed dynamic pass" in source
 
 
 def test_runtime_evidence_separates_source_and_execution_clocks() -> None:

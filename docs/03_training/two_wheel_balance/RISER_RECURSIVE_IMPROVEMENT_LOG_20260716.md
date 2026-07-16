@@ -548,3 +548,48 @@ and must state whether its candidate was accepted or rejected.
 - If all four dynamically pass, expand Gate C across the 71 accepted plans.
 - Recompute the raw residual envelope only from dynamically passing cases;
   do not widen frozen action scales before that audit.
+
+## Round 19: final case-74 dynamic reject and continuous-yaw diagnosis
+
+- After explicit differential GPU release, the exclusive guarded runner opened
+  `20260717_gate_c_case74_77_v3_exclusive_timing_resealed` for cases 74 then
+  77. Case 74 ran first; case 77 was fail-closed and never started.
+- Case 74 is a final physical Gate C reject, not a label-envelope-only reject.
+  It stopped at phase `46.961485/188.546638 s` after `13,659` steps with one
+  forbidden-body contact. Position p95/max was `0.546011/1.842571 m`, pitch
+  max `15.802575 deg`, attitude max `32.765379 deg`, and proxy servo error max
+  `719.887930 deg`.
+- Source and execution clocks are independently correct at `11.373883 s` and
+  `188.546638 s`. The runtime JSON SHA-256 is
+  `9bec49cf68d37d100b800e6505f5d0e5b6df2d1af30cd5f4e89bbe10d7794eb4`.
+  Final status SHA-256 is
+  `b6bbd2dc25783ddff8364bafea1a23b06555d7f2dfe089095dfad29304cde4ee`.
+- Label-envelope admission independently failed: raw maxima
+  `[0.4011729574,0.3081566074,0.0125294506]`, normalized maxima
+  `[1.3372431914,0.7703915184,0.1252945059]`. These labels were not applied;
+  residual action remained zero and no dataset or training was created.
+- Trace evidence localized a continuous-yaw branch error. The unwrapped
+  semantic proxy target reached about `+401.749 deg`, while PhysX reported the
+  equivalent `-317.933 deg`. Raw subtraction created a false `~720 deg` servo
+  error, saturated the proxy drive, and preceded chassis divergence.
+- CPU-only repair keeps the unwrapped semantic target as the authoritative DJI
+  attitude trajectory, maps only the PhysX target to its nearest equivalent
+  `2*pi` branch, and wraps continuous-yaw servo diagnostics. It does not change
+  source anchors, execution timing, LQR gains, physical gates, residual scales,
+  clipping, or training admission.
+- The runner now seals dynamic-failure evidence even if Isaac returns process
+  status zero while its JSON says `passed=false`. The full CPU-only
+  riser/two-wheel suite is `118 passed`; no GPU rerun has been performed.
+
+## Next round after Round 19
+
+- Review, commit, and push the continuous-yaw and runner repair from one clean
+  riser commit.
+- Keep GPU launches stopped until explicit ownership release/authorization.
+- Then run case 74 only in a new namespace with unchanged deterministic
+  commands and physical gates. Require wrapped proxy error, both clocks, raw
+  residual diagnostics, zero learned action, and no dataset.
+- Start case 77 only if the repaired case 74 passes dynamic quality. Do not
+  start the accepted-71 batch before that canary sequence passes.
+- Keep residual capture, Gate D, BC, and PPO blocked; do not widen the frozen
+  action envelope from this failed case.

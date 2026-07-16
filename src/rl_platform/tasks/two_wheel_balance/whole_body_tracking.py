@@ -14,6 +14,20 @@ def wrap_to_pi(angle: float) -> float:
     return math.atan2(math.sin(angle), math.cos(angle))
 
 
+def continuous_joint_error(target: float, measured: float) -> float:
+    """Return the shortest signed error for a continuous revolute joint."""
+
+    if not math.isfinite(target) or not math.isfinite(measured):
+        raise ValueError("continuous joint angles must be finite")
+    return wrap_to_pi(target - measured)
+
+
+def nearest_equivalent_angle(target: float, reference: float) -> float:
+    """Represent ``target`` on the nearest 2-pi branch to ``reference``."""
+
+    return reference + continuous_joint_error(target, reference)
+
+
 def yaw_from_quaternion_wxyz(quaternion: np.ndarray) -> float:
     quaternion = np.asarray(quaternion, dtype=np.float64)
     if quaternion.shape != (4,) or not np.isfinite(quaternion).all():

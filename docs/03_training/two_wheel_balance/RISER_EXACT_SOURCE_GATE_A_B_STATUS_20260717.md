@@ -205,9 +205,50 @@ Commit `f08271e` adds a live exclusive-GPU admission guard; it was proven to
 exit `5` before creating an artifact namespace while the competing process was
 active.
 
-All riser GPU/Isaac launches are now held while the differential session runs
-its final exclusive rerun from commit `3e820e8`. Next riser continuation is the
-fresh namespace `20260717_gate_c_canary_v3_exclusive_timing_resealed`, only
-after explicit GPU release. Rerun cases `1,52,74,77`; stop only on
-physical/safety/quality failure. A label-envelope failure keeps Gate D,
-residual capture, BC, and PPO closed, but no longer stops Gate C dynamics.
+The differential run then explicitly released the GPU. The corrected riser
+continuation started case 74 alone before case 77 in a fresh exclusive
+namespace:
+
+```text
+20260717_gate_c_case74_77_v3_exclusive_timing_resealed
+```
+
+Case 74 is the first final Gate C dynamic reject. Evidence hashes are:
+
+```text
+admission     bd555b2b2298f0f6591b5f497e858e7ab3bfd66707324aa3932331a0f909c8b7
+case JSON     9bec49cf68d37d100b800e6505f5d0e5b6df2d1af30cd5f4e89bbe10d7794eb4
+runtime log   eddd6b7532a33e4b1d8dc6a8baf6bbe372945239b898f89c30fa04ee02b02875
+summary       b4e6d3bd3e0ec8cebf0b1646fa57d6b65e527dddb68c0a9458d33689da29ad2b
+final status  b6bbd2dc25783ddff8364bafea1a23b06555d7f2dfe089095dfad29304cde4ee
+```
+
+The two clocks are correctly separate: source `11.373883 s`, execution
+`188.546638 s`. Runtime stopped at phase `46.961485 s` after `13,659` steps
+on one forbidden-body contact. Position p95/max reached
+`0.546011/1.842571 m`, pitch max `15.802575 deg`, attitude max
+`32.765379 deg`, and proxy servo error max `719.887930 deg`.
+
+The residual-label result is independently false but did not cause the
+physical failure. Raw maxima were
+`[0.4011729574,0.3081566074,0.0125294506]`; normalized maxima were
+`[1.3372431914,0.7703915184,0.1252945059]`. The raw label was not applied,
+the executed residual action stayed `[0,0,0]`, and no dataset, BC, or PPO was
+started. Case 77 did not start. The final ownership audit records no playback
+owner after the run.
+
+CPU diagnosis found a continuous-joint representation bug in the ideal DJI
+proxy adapter. Near failure, semantic yaw was `+401.749 deg` while PhysX
+reported the equivalent `-317.933 deg`; the runtime treated the branch
+difference as about `720 deg`, saturated proxy effort, and destabilized the
+reverse recovery. The repair preserves the unwrapped semantic target for
+attitude continuity and audit, but sends the nearest equivalent yaw branch to
+PhysX and computes continuous-yaw servo error modulo `2*pi`. The exact branch
+pair is regression-tested, and the full CPU-only riser/two-wheel suite passes
+`118` tests. The canary runner also now seals a summary when Isaac returns a
+failed JSON with process status zero.
+
+This repair is not dynamically validated. All riser GPU work remains stopped.
+The next admissible runtime step is one fresh exclusive case-74 structural
+canary after code review, commit/push, and explicit GPU authorization. Case 77,
+the accepted-71 batch, residual capture, Gate D, BC, and PPO remain closed.

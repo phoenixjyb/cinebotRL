@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from rl_platform.tasks.two_wheel_balance.whole_body_kinematics import (
     UrdfPositionKinematics,
@@ -10,7 +11,9 @@ from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     bounded_base_references,
     bounded_dls_arm_target,
     bounded_progress_scale,
+    continuous_joint_error,
     equilibrium_pitch_from_world_com,
+    nearest_equivalent_angle,
     riser_tracking_config,
     slew_limited_arm_target,
     yaw_from_quaternion_wxyz,
@@ -38,6 +41,26 @@ def test_yaw_and_base_feedback_signs() -> None:
     assert yaw_rate > 0.0
     assert diagnostics["along_track_error_m"] > 0.0
     assert diagnostics["cross_track_error_m"] > 0.0
+
+
+def test_continuous_joint_target_uses_nearest_physical_branch() -> None:
+    target = np.deg2rad(401.749127557215)
+    measured = np.deg2rad(-317.9332275390625)
+    nearest = nearest_equivalent_angle(target, measured)
+
+    assert np.rad2deg(nearest) == pytest.approx(-318.250872442785, abs=1e-9)
+    assert np.rad2deg(continuous_joint_error(target, measured)) == pytest.approx(
+        -0.3176449037225, abs=1e-9
+    )
+    assert np.sin(nearest) == pytest.approx(np.sin(target), abs=1e-12)
+    assert np.cos(nearest) == pytest.approx(np.cos(target), abs=1e-12)
+
+
+def test_continuous_joint_helpers_reject_nonfinite_angles() -> None:
+    with pytest.raises(ValueError, match="finite"):
+        continuous_joint_error(float("nan"), 0.0)
+    with pytest.raises(ValueError, match="finite"):
+        nearest_equivalent_angle(0.0, float("inf"))
 
 
 def test_riser_tracking_profile_preserves_limits_and_raises_path_authority() -> None:

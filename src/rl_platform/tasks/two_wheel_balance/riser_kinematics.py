@@ -107,6 +107,11 @@ class UrdfRiserCameraKinematics:
         self.gimbal_upper = np.array(
             [limits[name][1] for name in PHYSICAL_GIMBAL_JOINTS], dtype=np.float64
         )
+        joint_types = {item.name: item.joint_type for item in self.chain}
+        self.gimbal_continuous = np.array(
+            [joint_types[name] == "continuous" for name in PHYSICAL_GIMBAL_JOINTS],
+            dtype=bool,
+        )
 
     def normalized_gimbal_limit_margin(self, gimbal_q: np.ndarray) -> float:
         q = np.asarray(gimbal_q, dtype=np.float64)
@@ -185,7 +190,10 @@ class UrdfRiserCameraKinematics:
         target = quaternion_matrix_wxyz(
             semantic_dfr_to_physical_cam_quat_wxyz(semantic_dfr_quat_wxyz)
         )
-        q = np.clip(np.asarray(seed_gimbal_q, dtype=np.float64), self.gimbal_lower, self.gimbal_upper)
+        seed = np.asarray(seed_gimbal_q, dtype=np.float64)
+        lower = np.where(self.gimbal_continuous, -np.inf, self.gimbal_lower)
+        upper = np.where(self.gimbal_continuous, np.inf, self.gimbal_upper)
+        q = np.clip(seed, lower, upper)
         if q.shape != (3,) or not np.isfinite(q).all():
             raise ValueError("seed_gimbal_q must be finite shape (3,)")
         iterations = 0
@@ -207,8 +215,8 @@ class UrdfRiserCameraKinematics:
             )
             q = np.clip(
                 q + np.clip(delta, -maximum_step_rad, maximum_step_rad),
-                self.gimbal_lower,
-                self.gimbal_upper,
+                lower,
+                upper,
             )
         error = float(
             np.linalg.norm(
@@ -230,10 +238,13 @@ class UrdfRiserCameraKinematics:
     ) -> AttitudeIkResult:
         """Preserve the current branch, then recover from a bad seed if needed."""
 
-        seed = np.clip(
-            np.asarray(seed_gimbal_q, dtype=np.float64),
-            self.gimbal_lower,
-            self.gimbal_upper,
+        raw_seed = np.asarray(seed_gimbal_q, dtype=np.float64)
+        if raw_seed.shape != (3,) or not np.isfinite(raw_seed).all():
+            raise ValueError("seed_gimbal_q must be finite shape (3,)")
+        seed = np.where(
+            self.gimbal_continuous,
+            raw_seed,
+            np.clip(raw_seed, self.gimbal_lower, self.gimbal_upper),
         )
         primary = self.solve_semantic_attitude(
             root_quat_wxyz,
@@ -248,18 +259,22 @@ class UrdfRiserCameraKinematics:
 
         center = 0.5 * (self.gimbal_lower + self.gimbal_upper)
         axes = [
-            np.unique(
-                np.clip(
-                    np.array(
-                        [
-                            self.gimbal_lower[index] + 0.05,
-                            center[index],
-                            0.0,
-                            self.gimbal_upper[index] - 0.05,
-                        ]
-                    ),
-                    self.gimbal_lower[index],
-                    self.gimbal_upper[index],
+            (
+                np.array([seed[index] - math.pi, seed[index], seed[index] + math.pi])
+                if self.gimbal_continuous[index]
+                else np.unique(
+                    np.clip(
+                        np.array(
+                            [
+                                self.gimbal_lower[index] + 0.05,
+                                center[index],
+                                0.0,
+                                self.gimbal_upper[index] - 0.05,
+                            ]
+                        ),
+                        self.gimbal_lower[index],
+                        self.gimbal_upper[index],
+                    )
                 )
             )
             for index in range(3)

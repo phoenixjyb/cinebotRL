@@ -96,6 +96,25 @@ def test_robust_attitude_ik_recovers_far_pose_without_branch_hint() -> None:
     assert np.linalg.norm(rotation_error_vector(achieved, physical)) < math.radians(0.1)
 
 
+def test_robust_attitude_ik_keeps_continuous_axis_unwrapped_near_seed() -> None:
+    kinematics = UrdfRiserCameraKinematics(URDF)
+    root_quat = np.array([1.0, 0.0, 0.0, 0.0])
+    expected_gimbal = np.deg2rad([14.0, -11.0, -187.0])
+    seed = np.deg2rad([9.0, -8.0, -162.0])
+    physical = kinematics.world_rotation(root_quat, 0.84, expected_gimbal)
+    semantic = physical_cam_to_semantic_dfr_quat_wxyz(
+        matrix_quaternion_wxyz(physical)
+    )
+    result = kinematics.solve_semantic_attitude_robust(
+        root_quat, 0.84, semantic, seed
+    )
+    achieved = kinematics.world_rotation(root_quat, 0.84, result.gimbal_q)
+    assert result.converged
+    assert result.gimbal_q[2] < -math.pi
+    assert np.max(np.abs(result.gimbal_q - seed)) < math.radians(30.0)
+    assert np.linalg.norm(rotation_error_vector(achieved, physical)) < math.radians(0.1)
+
+
 def test_rs4_proxy_joint_fk_matches_deployed_semantic_command_mapping() -> None:
     kinematics = UrdfRiserCameraKinematics(URDF)
     basis = Rotation.from_quat(

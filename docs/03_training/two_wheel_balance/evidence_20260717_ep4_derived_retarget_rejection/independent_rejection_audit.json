@@ -1,0 +1,103 @@
+{
+  "all_checks_passed": true,
+  "checkpoint": {
+    "controls": 94,
+    "next_source_interval": 50,
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-balance\\evaluation_results\\two_wheel_exact_source_v1\\gate1_ep4_relief20mm_reservecap8_b9a8f7a_canary_20260717.checkpoint.npz",
+    "retimed_interval_count": 15,
+    "sha256": "d00f4aaf88a74f8c370de9ee094b723a222064317beb5233228fc325de705861",
+    "states": 95
+  },
+  "checks": {
+    "all_array_hashes_match": true,
+    "checkpoint_sha_unchanged": true,
+    "checkpoint_training_false": true,
+    "dynamic_and_training_false": true,
+    "identity_cli_hash_valid": true,
+    "identity_commit_matches": true,
+    "identity_schema_exact_11_fields": true,
+    "identity_source_count_matches": true,
+    "identity_source_time_hash_matches": true,
+    "no_candidate_npz": true,
+    "prefix_attitudes_match_derived_source": true,
+    "prefix_expanded_clock_exact": true,
+    "prefix_map_complete_strict": true,
+    "prefix_next_interval_50": true,
+    "prefix_positions_match_derived_source": true,
+    "prefix_retimed_count_exact": true,
+    "prefix_shapes_n_nminus1": true,
+    "result_summary_agree_rejected": true
+  },
+  "classification": "offline_derived_candidate_rejected_at_interval_50",
+  "code_contract_sha256": "b41b80c6d715b89bb51dcc4205e774a5cb90b955151fe8501dc05ddf9a179676",
+  "commit": "b9a8f7a98bd9ccc6114b865d5685a0e6d543c005",
+  "derived_reference": {
+    "cartesian_arc_length_relative_error": -7.023072411505016e-05,
+    "derived_pose_count": 192,
+    "duration_s": 14.042191,
+    "manifest_sha256": "c3e670981aff556e9dc4779d6b3364d2dc9babf1f5ab7a07af1b6fe4000a2241",
+    "path": "G:\\wSpace\\cinebotRL\\data\\gikWBC9DOF_ep04_relief20mm_stride4_localstride2_b9a8f7a_20260717",
+    "position_deviation_max_m": 0.020000000000000052,
+    "raw_pose_count": 723,
+    "source_sha256": "d3e07f94144f6da7e6f054c4a24fb0736d926c3b6e3efbf4ba06c3d6807616aa",
+    "valid_for_training": false
+  },
+  "ended_utc": "2026-07-17T15:15:48Z",
+  "files": {
+    "case_0004.result.json": {
+      "sha256": "19fe9a6e2dbb8b9168bbadd73750d5ff5cc5577c18c26fb0c41ca4a68a24bc51",
+      "size_bytes": 865
+    },
+    "gate1_ep4_relief20mm_reservecap8_b9a8f7a_resume_v2_20260717.command.txt": {
+      "sha256": "5912f8ff517c07584c5a0cd0f3072d454613b2a749ce4ad869e10cb2b1d9fb9f",
+      "size_bytes": 2325
+    },
+    "gate1_ep4_relief20mm_reservecap8_b9a8f7a_resume_v2_20260717.console.log": {
+      "sha256": "1f274fa2989f1374c42d6ec60560e37dae23cfd6b1b3dc939bbd6593ecd88fef",
+      "size_bytes": 886
+    },
+    "gate1_ep4_relief20mm_reservecap8_b9a8f7a_resume_v2_20260717.exit.txt": {
+      "sha256": "6b17b8f1415cfc684104d1e2ce6fe1e33be4445c17e17deb25c1dccfc864a889",
+      "size_bytes": 294
+    },
+    "gate1_ep4_relief20mm_reservecap8_b9a8f7a_resume_v2_20260717.ownership.log": {
+      "sha256": "9a2dc388455e68f2235f8ff6f9c40516987fd7ba740d5e6c7dc08753be4870cf",
+      "size_bytes": 742
+    },
+    "summary.json": {
+      "sha256": "65f47d972fcc7b77dd61c1f395dbf06aa1eb27275976b866ecbc450236f38e57",
+      "size_bytes": 1440
+    }
+  },
+  "learning_started": false,
+  "namespace": "gate1_ep4_relief20mm_reservecap8_b9a8f7a_resume_v2_20260717",
+  "overlap": {
+    "action": "preserved; no kill",
+    "detected": true,
+    "process": "G:\\Python311\\python.exe -",
+    "result_completed_after_overlap": true,
+    "workspace": "G:\\\\wSpace\\\\cinebotRL-two-wheel-riser"
+  },
+  "physical_playback_started": false,
+  "rejection": {
+    "attitude_max_deg": 0.03331,
+    "equilibrium_pitch_max_deg": 3.928917189,
+    "gimbal_margin_min_ratio": 0.016184765,
+    "gravity_max_nm": 29.50398,
+    "gravity_seed_generated": 231,
+    "gravity_seed_selected": 0,
+    "position_max_m": 0.057255,
+    "required_gimbal_margin_ratio": 0.005,
+    "source_interval": 50
+  },
+  "runtime_s": 1163,
+  "schema": "cinebotrl_ep4_derived_retarget_rejection_audit_v1",
+  "started_utc": "2026-07-17T14:56:25Z",
+  "strict_cpu_exclusive": false,
+  "tests": {
+    "focused": "80 passed, 2 warnings",
+    "repository": "248 passed, 2 warnings"
+  },
+  "valid_for_dynamic_evaluation": false,
+  "valid_for_training": false
+}

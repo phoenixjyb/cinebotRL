@@ -138,6 +138,43 @@ def test_projection_rejects_an_incomplete_localized_cap_contract() -> None:
         )
 
 
+def test_proportional_lower_bounds_distributes_slack_without_migration() -> None:
+    time_s, positions, attitudes = sample_trajectory()
+    result = derive_time_reparameterization(
+        time_s,
+        positions,
+        attitudes,
+        TimeReparameterizationConfig(
+            episode_index=1,
+            time_allocation_strategy="proportional_lower_bounds",
+            diagnostic_transition_start_1based=4,
+            diagnostic_transition_end_1based=7,
+        ),
+    )
+    scale = result.derived_dt_s / result.lower_dt_s
+    assert result.derived_time_s[-1] == time_s[-1]
+    assert np.max(scale) - np.min(scale) <= 1.0e-12
+    assert np.min(result.derived_dt_s) >= 1.0e-3
+    assert np.max(result.derived_translation_speed_mps) < 0.4
+    assert np.max(result.derived_angular_speed_radps) < 0.35
+
+
+def test_projection_rejects_unknown_time_allocation_strategy() -> None:
+    time_s, positions, attitudes = sample_trajectory()
+    with pytest.raises(ValueError, match="unsupported time allocation strategy"):
+        derive_time_reparameterization(
+            time_s,
+            positions,
+            attitudes,
+            TimeReparameterizationConfig(
+                episode_index=1,
+                time_allocation_strategy="unknown",
+                diagnostic_transition_start_1based=4,
+                diagnostic_transition_end_1based=7,
+            ),
+        )
+
+
 def write_reference_package(root: Path) -> str:
     time_s, positions, attitudes = sample_trajectory()
     episode_dir = root / "episode_0001"

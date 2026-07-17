@@ -22,7 +22,7 @@ from .exact_source_reference import (
 
 
 PACKAGE_SCHEMA = "cinebotrl_ep4_duration_preserving_time_warp_v1"
-DERIVATION_CONTRACT = "duration_preserving_minimum_l2_time_reparameterization_v1"
+DERIVATION_CONTRACT = "duration_preserving_bounded_time_reparameterization_v2"
 ARRAY_HASH_CONTRACT = "shape_ascii_nul_little_endian_float64_c_order_v1"
 PAIRED_SEED_SCHEMA = "cinebotrl_ep4_time_warp_integrity_seed_v1"
 PAIRED_SEED_PACKAGE_SCHEMA = "cinebotrl_ep4_time_warp_integrity_seed_package_v1"
@@ -40,6 +40,7 @@ RETARGET_MAXIMUM_ARM_RATE_RADPS = 0.5
 @dataclass(frozen=True)
 class TimeReparameterizationConfig:
     episode_index: int = 4
+    time_allocation_strategy: str = "minimum_l2"
     translation_speed_cap_mps: float = 0.40
     angular_speed_cap_radps: float = 0.35
     minimum_interval_dt_s: float = 1.0e-3
@@ -185,6 +186,11 @@ def derive_time_reparameterization(
     _require(config.translation_speed_cap_mps > 0.0, "translation speed cap must be positive")
     _require(config.angular_speed_cap_radps > 0.0, "angular speed cap must be positive")
     _require(config.minimum_interval_dt_s > 0.0, "minimum interval dt must be positive")
+    _require(
+        config.time_allocation_strategy
+        in {"minimum_l2", "proportional_lower_bounds"},
+        "unsupported time allocation strategy",
+    )
     localized_values = (
         config.localized_transition_start_1based,
         config.localized_transition_end_1based,
@@ -229,7 +235,16 @@ def derive_time_reparameterization(
         )
     )
     duration = float(source_time[-1] - source_time[0])
-    derived_dt = _project_with_lower_bounds(source_dt, lower_dt, duration)
+    if config.time_allocation_strategy == "minimum_l2":
+        derived_dt = _project_with_lower_bounds(source_dt, lower_dt, duration)
+    else:
+        lower_sum = float(np.sum(lower_dt))
+        tolerance = 1.0e-12 * max(1.0, duration)
+        _require(
+            lower_sum <= duration + tolerance,
+            "fixed duration is shorter than the sum of interval lower bounds",
+        )
+        derived_dt = lower_dt * (duration / lower_sum)
     derived_time = np.concatenate(
         ([source_time[0]], source_time[0] + np.cumsum(derived_dt))
     )
@@ -304,6 +319,7 @@ def _result_metrics(
         config.diagnostic_transition_end_1based,
     )
     metrics: dict[str, object] = {
+        "time_allocation_strategy": config.time_allocation_strategy,
         "source_duration_s": float(result.source_time_s[-1] - result.source_time_s[0]),
         "derived_duration_s": float(result.derived_time_s[-1] - result.derived_time_s[0]),
         "position_deviation_max_m": 0.0,
@@ -329,6 +345,10 @@ def _result_metrics(
             result.translation_speed_cap_mps
         ),
         "lower_dt_sum_s": float(np.sum(result.lower_dt_s)),
+        "duration_to_lower_bound_scale": float(
+            (result.derived_time_s[-1] - result.derived_time_s[0])
+            / np.sum(result.lower_dt_s)
+        ),
         "slowdown_duration_added_s": float(
             np.sum(np.maximum(result.derived_dt_s - result.source_dt_s, 0.0))
         ),

@@ -24,6 +24,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reference-package", type=Path, required=True)
     parser.add_argument("--raw-integrity-seed-package", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument(
+        "--time-allocation-strategy",
+        choices=("minimum_l2", "proportional_lower_bounds"),
+        default="minimum_l2",
+    )
     parser.add_argument("--translation-speed-cap-mps", type=float, default=0.40)
     parser.add_argument("--angular-speed-cap-radps", type=float, default=0.35)
     parser.add_argument("--minimum-interval-dt-s", type=float, default=1.0e-3)
@@ -38,6 +43,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     config = TimeReparameterizationConfig(
+        time_allocation_strategy=args.time_allocation_strategy,
         translation_speed_cap_mps=args.translation_speed_cap_mps,
         angular_speed_cap_radps=args.angular_speed_cap_radps,
         minimum_interval_dt_s=args.minimum_interval_dt_s,

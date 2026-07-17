@@ -6,8 +6,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import subprocess
 import sys
+import tempfile
 
 import numpy as np
 
@@ -34,6 +37,10 @@ from rl_platform.tasks.two_wheel_balance.exact_source_reference import (  # noqa
     discover_exact_source_references,
     source_anchor_execution_indices,
 )
+from rl_platform.tasks.two_wheel_balance.exact_source_checkpoint import (  # noqa: E402
+    canonical_json_sha256,
+    source_time_sha256,
+)
 from rl_platform.tasks.two_wheel_balance.whole_body_kinematics import (  # noqa: E402
     UrdfPositionKinematics,
 )
@@ -44,6 +51,47 @@ UPSTREAM_SEED_MANIFEST_SHA256_BY_EPISODE = {
     1: "8d10e4c2093c44cc2e5cf9bc1b12b760da2375e24c083f47bf31b954cdc9f272",
     77: "2dc31d86325155fafb0dc3afe8870f9ae32ea3c58d5ed7d2671f43aa2d4d7404",
 }
+CHECKPOINT_CODE_CONTRACT_PATHS = (
+    Path("scripts/two_wheel_balance/retarget_exact_source_v1_nonholonomic.py"),
+    Path("scripts/two_wheel_balance/retarget_corrected_teacher_v3_nonholonomic.py"),
+    Path("src/rl_platform/tasks/two_wheel_balance/exact_source_checkpoint.py"),
+)
+RETARGET_CLI_CONFIG_FIELDS = (
+    "reference_package",
+    "integrity_seed_package",
+    "target_urdf",
+    "cases",
+    "acquisition_dt_s",
+    "minimum_acquisition_duration_s",
+    "maximum_acquisition_position_rate_mps",
+    "maximum_acquisition_attitude_rate_radps",
+    "maximum_linear_velocity",
+    "maximum_yaw_rate",
+    "maximum_arm_rate",
+    "maximum_gimbal_rate",
+    "maximum_acquisition_linear_velocity",
+    "maximum_acquisition_yaw_rate",
+    "maximum_acquisition_arm_rate",
+    "maximum_acquisition_gimbal_rate",
+    "maximum_arm_gravity_effort_nm",
+    "gravity_effort_tolerance_nm",
+    "maximum_equilibrium_pitch_deg",
+    "wheel_axle_height_m",
+    "camera_solve_root_model",
+    "minimum_anchor_gimbal_limit_margin_ratio",
+    "minimum_semantic_gimbal_limit_margin_ratio",
+    "minimum_semantic_gimbal_reserve_margin_ratio",
+    "maximum_semantic_gimbal_reserve_search_scale",
+    "semantic_gimbal_center_regularization",
+    "position_scale_m",
+    "control_regularization",
+    "maximum_position_p95_m",
+    "maximum_position_error_m",
+    "maximum_ik_error_deg",
+    "maximum_gimbal_interpolation_error_deg",
+    "rebuild_com_safe_seed_prior",
+    "checkpoint_cadence_source_intervals",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -92,7 +140,151 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--maximum-ik-error-deg", type=float, default=0.1)
     parser.add_argument("--maximum-gimbal-interpolation-error-deg", type=float, default=0.25)
     parser.add_argument("--rebuild-com-safe-seed-prior", action="store_true")
+    parser.add_argument(
+        "--checkpoint-path",
+        type=Path,
+        help="Atomic exact-source interval-prefix checkpoint (single case only).",
+    )
+    parser.add_argument(
+        "--resume-checkpoint",
+        action="store_true",
+        help="Resume from --checkpoint-path after validating every bound identity.",
+    )
+    parser.add_argument(
+        "--checkpoint-cadence-source-intervals",
+        type=int,
+        default=10,
+        help="Persist each N completed source intervals and always at completion.",
+    )
     return parser.parse_args()
+
+
+def _atomic_save_npz(path: Path, arrays: dict[str, np.ndarray]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w+b", prefix=f".{path.name}.", suffix=".tmp", dir=path.parent, delete=False
+        ) as stream:
+            temporary = Path(stream.name)
+            np.savez_compressed(stream, **arrays)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        temporary = None
+        _fsync_parent_directory(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _atomic_write_json(path: Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n", prefix=f".{path.name}.", suffix=".tmp", dir=path.parent, delete=False
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(json.dumps(value, indent=2) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        temporary = None
+        _fsync_parent_directory(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _fsync_parent_directory(path: Path) -> None:
+    if os.name != "posix":
+        return
+    directory_fd = os.open(path.resolve().parent, os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def finalize_case_artifacts(
+    output_path: Path,
+    result_path: Path,
+    arrays: dict[str, np.ndarray],
+    summary: dict[str, object],
+    checkpoint_path: Path | None,
+) -> None:
+    _atomic_save_npz(output_path, arrays)
+    summary["candidate_sha256"] = sha256(output_path)
+    _atomic_write_json(result_path, summary)
+    if checkpoint_path is not None:
+        checkpoint_path = checkpoint_path.resolve()
+        checkpoint_path.unlink()
+        _fsync_parent_directory(checkpoint_path)
+
+
+def _json_cli_value(value: object) -> object:
+    if isinstance(value, Path):
+        return str(value.resolve())
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    raise TypeError(f"unsupported CLI configuration value: {type(value).__name__}")
+
+
+def retarget_cli_config(args: argparse.Namespace) -> dict[str, object]:
+    missing = [field for field in RETARGET_CLI_CONFIG_FIELDS if not hasattr(args, field)]
+    if missing:
+        raise ValueError(f"checkpoint CLI configuration fields missing: {missing}")
+    return {
+        field: _json_cli_value(getattr(args, field))
+        for field in RETARGET_CLI_CONFIG_FIELDS
+    }
+
+
+def checkpoint_code_contract() -> tuple[str, str]:
+    git_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=PROJECT_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    dirty = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        cwd=PROJECT_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if dirty:
+        raise ValueError("refusing exact-source checkpoint from a dirty code contract")
+    files = {
+        str(path): sha256(PROJECT_ROOT / path)
+        for path in CHECKPOINT_CODE_CONTRACT_PATHS
+    }
+    return git_commit, canonical_json_sha256(files)
+
+
+def build_checkpoint_identity(
+    reference: ExactSourceReference,
+    args: argparse.Namespace,
+    seed_sha256: str,
+) -> dict[str, object]:
+    git_commit, code_contract_sha256 = checkpoint_code_contract()
+    config = retarget_cli_config(args)
+    return {
+        "git_commit": git_commit,
+        "code_contract_sha256": code_contract_sha256,
+        "case": reference.episode_index,
+        "retarget_cli_config": config,
+        "retarget_cli_config_sha256": canonical_json_sha256(config),
+        "reference_manifest_sha256": reference.manifest_sha256,
+        "reference_episode_sha256": reference.source_json_sha256,
+        "integrity_seed_sha256": seed_sha256,
+        "target_urdf_sha256": sha256(args.target_urdf.resolve()),
+        "source_pose_count": len(reference.time_s),
+        "source_time_sha256": source_time_sha256(reference.time_s),
+    }
 
 
 def _scalar(data: np.lib.npyio.NpzFile, key: str):
@@ -328,6 +520,12 @@ def process_case(
     teacher, seed_diagnostics = load_integrity_seed(
         args.integrity_seed_package.resolve(), reference
     )
+    if args.checkpoint_path is not None:
+        args.exact_source_checkpoint_path = args.checkpoint_path.resolve()
+        args.exact_source_resume_checkpoint = args.resume_checkpoint
+        args.exact_source_checkpoint_identity = build_checkpoint_identity(
+            reference, args, str(seed_diagnostics["seed_sha256"])
+        )
     position_kinematics = UrdfPositionKinematics(args.target_urdf.resolve())
     camera_kinematics = UrdfPhysicalCameraKinematics(args.target_urdf.resolve())
     semantic_reference, seed_fk_error = build_semantic_reference(
@@ -449,10 +647,12 @@ def process_case(
         }
     )
     output_path = args.output_dir / f"case_{reference.episode_index:04d}.npz"
-    np.savez_compressed(output_path, **arrays)
-    summary["candidate_sha256"] = sha256(output_path)
-    (args.output_dir / f"case_{reference.episode_index:04d}.result.json").write_text(
-        json.dumps(summary, indent=2) + "\n", encoding="utf-8", newline="\n"
+    finalize_case_artifacts(
+        output_path,
+        args.output_dir / f"case_{reference.episode_index:04d}.result.json",
+        arrays,
+        summary,
+        args.checkpoint_path,
     )
     return summary
 
@@ -468,6 +668,20 @@ def main() -> int:
     cases = [int(value) for value in args.cases.split(",") if value.strip()]
     if not cases or any(case not in references for case in cases):
         raise ValueError(f"invalid exact-source cases: {cases}")
+    if args.resume_checkpoint and args.checkpoint_path is None:
+        raise ValueError("--resume-checkpoint requires --checkpoint-path")
+    if args.checkpoint_cadence_source_intervals <= 0:
+        raise ValueError("checkpoint cadence must be positive")
+    if args.checkpoint_path is not None:
+        if len(cases) != 1:
+            raise ValueError("checkpointing requires exactly one requested case")
+        checkpoint_exists = args.checkpoint_path.resolve().is_file()
+        if args.resume_checkpoint and not checkpoint_exists:
+            raise FileNotFoundError(args.checkpoint_path)
+        if not args.resume_checkpoint and checkpoint_exists:
+            raise FileExistsError(
+                f"refusing to overwrite existing checkpoint {args.checkpoint_path}"
+            )
     results = []
     for case in cases:
         try:

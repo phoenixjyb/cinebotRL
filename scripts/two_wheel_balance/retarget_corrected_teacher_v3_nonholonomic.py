@@ -37,6 +37,11 @@ from rl_platform.tasks.two_wheel_balance.camera_attitude import (  # noqa: E402
     rotation_error_vector,
     semantic_dfr_to_physical_cam_quat_wxyz,
 )
+from rl_platform.tasks.two_wheel_balance.exact_source_checkpoint import (  # noqa: E402
+    ExactSourceRetargetPrefix,
+    load_exact_source_checkpoint,
+    save_exact_source_checkpoint,
+)
 from rl_platform.tasks.two_wheel_balance.whole_body_kinematics import (  # noqa: E402
     UrdfPositionKinematics,
     integrate_unicycle,
@@ -1569,23 +1574,56 @@ def retarget_semantic_full_pose(
             position_kinematics,
             args,
         )
-    states = [anchor.copy()]
-    controls: list[np.ndarray] = []
-    target_positions = [reference.positions_m[0].copy()]
-    target_attitudes = [reference.attitudes_wxyz[0].copy()]
-    time_s = [0.0]
-    position_errors = [
-        float(
-            np.linalg.norm(
-                position_kinematics.position(anchor[:6]) - reference.positions_m[0]
-            )
+    checkpoint_path = getattr(args, "exact_source_checkpoint_path", None)
+    checkpoint_identity = getattr(args, "exact_source_checkpoint_identity", None)
+    resume_checkpoint = getattr(args, "exact_source_resume_checkpoint", False)
+    if checkpoint_path is not None and checkpoint_identity is None:
+        raise ValueError("exact-source checkpoint identity is required")
+    if resume_checkpoint and checkpoint_path is None:
+        raise ValueError("resume requested without exact-source checkpoint path")
+    if resume_checkpoint:
+        prefix = load_exact_source_checkpoint(
+            checkpoint_path,
+            checkpoint_identity,
+            source_time_s=reference.time_s,
+            source_positions_m=reference.positions_m,
+            source_attitudes_wxyz=reference.attitudes_wxyz,
+            expected_anchor=anchor,
         )
-    ]
-    attitude_errors = [0.0]
-    previous_control = np.zeros(8, dtype=np.float64)
-    retimed_interval_count = 0
+        states = [row.copy() for row in prefix.states]
+        controls = [row.copy() for row in prefix.controls]
+        target_positions = [row.copy() for row in prefix.target_positions]
+        target_attitudes = [row.copy() for row in prefix.target_attitudes]
+        time_s = prefix.execution_time_s.tolist()
+        position_errors = prefix.position_errors_m.tolist()
+        attitude_errors = prefix.attitude_errors_deg.tolist()
+        previous_control = prefix.previous_control.copy()
+        source_anchor_indices = (
+            prefix.source_anchor_execution_index_prefix.tolist()
+        )
+        retimed_interval_count = prefix.retimed_interval_count
+        start_index = prefix.next_source_interval
+    else:
+        states = [anchor.copy()]
+        controls: list[np.ndarray] = []
+        target_positions = [reference.positions_m[0].copy()]
+        target_attitudes = [reference.attitudes_wxyz[0].copy()]
+        time_s = [0.0]
+        position_errors = [
+            float(
+                np.linalg.norm(
+                    position_kinematics.position(anchor[:6])
+                    - reference.positions_m[0]
+                )
+            )
+        ]
+        attitude_errors = [0.0]
+        previous_control = np.zeros(8, dtype=np.float64)
+        source_anchor_indices = [0]
+        retimed_interval_count = 0
+        start_index = 1
 
-    for index in range(1, len(reference.time_s)):
+    for index in range(start_index, len(reference.time_s)):
         source_dt = float(reference.time_s[index] - reference.time_s[index - 1])
         segment_start_state = states[-1].copy()
         segment_start_control = previous_control.copy()
@@ -2094,6 +2132,40 @@ def retarget_semantic_full_pose(
             position_errors.append(position_error)
             attitude_errors.append(attitude_error)
             time_s.append(time_s[-1] + source_dt)
+        source_anchor_indices.append(len(states) - 1)
+        checkpoint_cadence = int(
+            getattr(args, "checkpoint_cadence_source_intervals", 10)
+        )
+        if checkpoint_cadence <= 0:
+            raise ValueError("checkpoint cadence must be positive")
+        completed_interval_count = index
+        final_interval = index == len(reference.time_s) - 1
+        if checkpoint_path is not None and (
+            completed_interval_count % checkpoint_cadence == 0 or final_interval
+        ):
+            save_exact_source_checkpoint(
+                checkpoint_path,
+                checkpoint_identity,
+                ExactSourceRetargetPrefix(
+                    states=np.asarray(states),
+                    controls=np.asarray(controls),
+                    target_positions=np.asarray(target_positions),
+                    target_attitudes=np.asarray(target_attitudes),
+                    execution_time_s=np.asarray(time_s),
+                    position_errors_m=np.asarray(position_errors),
+                    attitude_errors_deg=np.asarray(attitude_errors),
+                    previous_control=previous_control,
+                    source_anchor_execution_index_prefix=np.asarray(
+                        source_anchor_indices, dtype=np.int64
+                    ),
+                    retimed_interval_count=retimed_interval_count,
+                    next_source_interval=index + 1,
+                ),
+                source_time_s=reference.time_s,
+                source_positions_m=reference.positions_m,
+                source_attitudes_wxyz=reference.attitudes_wxyz,
+                expected_anchor=anchor,
+            )
 
     state_array = np.asarray(states)
     return (

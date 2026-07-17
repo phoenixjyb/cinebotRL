@@ -274,6 +274,17 @@ than an admission pass/failure. The next CPU fix bounds reserve-only search;
 segments that are genuinely admission-infeasible retain the full execution
 scale ladder. No second canary, playback, or learning stage has been started.
 
+The authorized v4 CPU rerun used clean commit `385a8b8`, the same authoritative
+manifest `f265aa1b...`, the same 1,800 s wall bound, and unchanged hard gates.
+The reserve-only scale cap reduced the interval-552 search enough to complete
+that interval, but the run timed out before interval 553 completed. Exit code
+was 124 and console SHA-256 is `1ceeca34740f...`. The output namespace contains
+no NPZ or result JSON, so no 663-anchor, source-time, ordered-map, physical
+margin, interpolation, gravity, pitch, rate, or quality admission claim can be
+made. V4 computationally supersedes v3 only as a search diagnostic; neither is
+physically classified or valid for training. No Isaac playback or learning
+stage was started.
+
 Final-exclusive schema-v4 case-1 dynamic evidence is stored in:
 
 ```text

@@ -117,7 +117,7 @@
     "valid_for_training": false
   },
   "ep7_downstream_schedule_reserve_v3": {
-    "status": "computationally_inconclusive_wall_timeout",
+    "status": "computationally_superseded_by_v4_never_physically_classified",
     "source_commit": "e5d00360baa166ac8639e6f5ef734c5b72447e73",
     "wall_timeout_s": 1800,
     "last_completed_source_interval": 552,
@@ -129,6 +129,28 @@
     "minimum_semantic_gimbal_reserve_margin_ratio": 0.01,
     "diagnosis": "reserve_only_search_explored_execution_scales_through_96",
     "required_fix": "bound_reserve_only_search_but_keep_full_ladder_for_admission_infeasible_segments",
+    "valid_for_dynamic_evaluation": false,
+    "valid_for_training": false
+  },
+  "ep7_downstream_schedule_reserve_v4": {
+    "status": "computationally_inconclusive_wall_timeout",
+    "source_commit": "385a8b8923d5d58f2618d4f02b0998b28cfd2248",
+    "source_manifest_sha256": "f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d",
+    "console_sha256": "1ceeca34740f35b8ca12751a78d35af7b89eb14c62abcace2321ba9a2ee861c8",
+    "interop_exit_code": 124,
+    "wall_timeout_s": 1800,
+    "last_completed_source_interval": 552,
+    "source_interval_count": 662,
+    "minimum_semantic_gimbal_limit_margin_ratio": 0.005,
+    "minimum_semantic_gimbal_reserve_margin_ratio": 0.01,
+    "maximum_semantic_gimbal_reserve_search_scale": 24,
+    "candidate_exported": false,
+    "result_json_written": false,
+    "source_anchor_count_audited": false,
+    "source_time_equality_audited": false,
+    "anchor_map_audited": false,
+    "admission_gate_failed": false,
+    "physical_result_classified": false,
     "valid_for_dynamic_evaluation": false,
     "valid_for_training": false
   },

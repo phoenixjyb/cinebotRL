@@ -43,6 +43,9 @@ class TimeReparameterizationConfig:
     translation_speed_cap_mps: float = 0.40
     angular_speed_cap_radps: float = 0.35
     minimum_interval_dt_s: float = 1.0e-3
+    localized_transition_start_1based: int | None = None
+    localized_transition_end_1based: int | None = None
+    localized_translation_speed_cap_mps: float | None = None
     diagnostic_transition_start_1based: int = 190
     diagnostic_transition_end_1based: int = 205
 
@@ -55,6 +58,7 @@ class TimeReparameterizationResult:
     derived_dt_s: np.ndarray
     segment_distance_m: np.ndarray
     segment_angle_rad: np.ndarray
+    translation_speed_cap_mps: np.ndarray
     lower_dt_s: np.ndarray
     source_translation_speed_mps: np.ndarray
     derived_translation_speed_mps: np.ndarray
@@ -181,6 +185,16 @@ def derive_time_reparameterization(
     _require(config.translation_speed_cap_mps > 0.0, "translation speed cap must be positive")
     _require(config.angular_speed_cap_radps > 0.0, "angular speed cap must be positive")
     _require(config.minimum_interval_dt_s > 0.0, "minimum interval dt must be positive")
+    localized_values = (
+        config.localized_transition_start_1based,
+        config.localized_transition_end_1based,
+        config.localized_translation_speed_cap_mps,
+    )
+    localized_enabled = any(value is not None for value in localized_values)
+    _require(
+        not localized_enabled or all(value is not None for value in localized_values),
+        "localized translation cap requires start, end, and speed",
+    )
     _require(
         1
         <= config.diagnostic_transition_start_1based
@@ -191,11 +205,26 @@ def derive_time_reparameterization(
 
     distance = np.linalg.norm(np.diff(positions, axis=0), axis=1)
     angle = _quaternion_interval_angles(attitudes)
+    translation_speed_cap = np.full_like(source_dt, config.translation_speed_cap_mps)
+    if localized_enabled:
+        localized_start = int(config.localized_transition_start_1based)
+        localized_end = int(config.localized_transition_end_1based)
+        localized_cap = float(config.localized_translation_speed_cap_mps)
+        _require(
+            1 <= localized_start <= localized_end <= count - 1,
+            "localized transition window is outside the trajectory",
+        )
+        _require(localized_cap > 0.0, "localized translation speed cap must be positive")
+        _require(
+            localized_cap <= config.translation_speed_cap_mps,
+            "localized translation speed cap must not exceed the global cap",
+        )
+        translation_speed_cap[localized_start - 1 : localized_end] = localized_cap
     minimum_dt = np.full_like(source_dt, config.minimum_interval_dt_s)
     lower_dt = np.maximum.reduce(
         (
             minimum_dt,
-            distance / config.translation_speed_cap_mps,
+            distance / translation_speed_cap,
             angle / config.angular_speed_cap_radps,
         )
     )
@@ -228,6 +257,7 @@ def derive_time_reparameterization(
         derived_dt_s=derived_dt,
         segment_distance_m=distance,
         segment_angle_rad=angle,
+        translation_speed_cap_mps=translation_speed_cap,
         lower_dt_s=lower_dt,
         source_translation_speed_mps=source_translation_speed,
         derived_translation_speed_mps=derived_translation_speed,
@@ -273,7 +303,7 @@ def _result_metrics(
         config.diagnostic_transition_start_1based - 1,
         config.diagnostic_transition_end_1based,
     )
-    return {
+    metrics: dict[str, object] = {
         "source_duration_s": float(result.source_time_s[-1] - result.source_time_s[0]),
         "derived_duration_s": float(result.derived_time_s[-1] - result.derived_time_s[0]),
         "position_deviation_max_m": 0.0,
@@ -294,6 +324,9 @@ def _result_metrics(
         "source_angular_speed_radps": _distribution(result.source_angular_speed_radps),
         "derived_angular_speed_radps": _distribution(
             result.derived_angular_speed_radps
+        ),
+        "translation_speed_cap_mps": _distribution(
+            result.translation_speed_cap_mps
         ),
         "lower_dt_sum_s": float(np.sum(result.lower_dt_s)),
         "slowdown_duration_added_s": float(
@@ -325,6 +358,26 @@ def _result_metrics(
             ),
         },
     }
+    if config.localized_transition_start_1based is not None:
+        start = int(config.localized_transition_start_1based)
+        end = int(config.localized_transition_end_1based)
+        localized = slice(start - 1, end)
+        metrics["localized_translation_cap_window"] = {
+            "numbering_contract": "transition k is source anchor k-1 to k",
+            "first_transition_1based": start,
+            "last_transition_1based": end,
+            "translation_speed_cap_mps": float(
+                config.localized_translation_speed_cap_mps
+            ),
+            "cartesian_arc_length_m": float(
+                np.sum(result.segment_distance_m[localized])
+            ),
+            "derived_duration_s": float(np.sum(result.derived_dt_s[localized])),
+            "derived_translation_speed_max_mps": float(
+                np.max(result.derived_translation_speed_mps[localized])
+            ),
+        }
+    return metrics
 
 
 def _interval_csv(result: TimeReparameterizationResult) -> bytes:
@@ -339,6 +392,7 @@ def _interval_csv(result: TimeReparameterizationResult) -> bytes:
             "source_dt_s",
             "derived_dt_s",
             "lower_dt_s",
+            "translation_speed_cap_mps",
             "distance_m",
             "angle_rad",
             "source_translation_speed_mps",
@@ -364,6 +418,7 @@ def _interval_csv(result: TimeReparameterizationResult) -> bytes:
                 repr(float(result.source_dt_s[index])),
                 repr(float(result.derived_dt_s[index])),
                 repr(float(result.lower_dt_s[index])),
+                repr(float(result.translation_speed_cap_mps[index])),
                 repr(float(result.segment_distance_m[index])),
                 repr(float(result.segment_angle_rad[index])),
                 repr(float(result.source_translation_speed_mps[index])),
@@ -768,6 +823,13 @@ def derive_ep4_time_warp_package(
             "timestamps_strictly_increasing": True,
             "cartesian_arc_length_relative_error": 0.0,
             "derivation_translation_speed_cap_mps": config.translation_speed_cap_mps,
+            "localized_transition_start_1based": (
+                config.localized_transition_start_1based
+            ),
+            "localized_transition_end_1based": config.localized_transition_end_1based,
+            "localized_translation_speed_cap_mps": (
+                config.localized_translation_speed_cap_mps
+            ),
             "solver_or_admission_gates_modified": False,
         },
         "artifact_classification": "derived_duration_preserving_time_reparameterization",

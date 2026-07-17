@@ -27,6 +27,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--translation-speed-cap-mps", type=float, default=0.40)
     parser.add_argument("--angular-speed-cap-radps", type=float, default=0.35)
     parser.add_argument("--minimum-interval-dt-s", type=float, default=1.0e-3)
+    parser.add_argument("--localized-transition-start-1based", type=int)
+    parser.add_argument("--localized-transition-end-1based", type=int)
+    parser.add_argument("--localized-translation-speed-cap-mps", type=float)
     parser.add_argument("--diagnostic-transition-start-1based", type=int, default=190)
     parser.add_argument("--diagnostic-transition-end-1based", type=int, default=205)
     return parser.parse_args()
@@ -38,6 +41,11 @@ def main() -> int:
         translation_speed_cap_mps=args.translation_speed_cap_mps,
         angular_speed_cap_radps=args.angular_speed_cap_radps,
         minimum_interval_dt_s=args.minimum_interval_dt_s,
+        localized_transition_start_1based=args.localized_transition_start_1based,
+        localized_transition_end_1based=args.localized_transition_end_1based,
+        localized_translation_speed_cap_mps=(
+            args.localized_translation_speed_cap_mps
+        ),
         diagnostic_transition_start_1based=args.diagnostic_transition_start_1based,
         diagnostic_transition_end_1based=args.diagnostic_transition_end_1based,
     )

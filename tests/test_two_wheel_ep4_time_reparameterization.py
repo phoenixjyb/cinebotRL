@@ -99,6 +99,45 @@ def test_projection_does_not_create_a_fast_micro_interval() -> None:
     assert np.min(result.derived_dt_s) >= 1.0e-3 - 1.0e-12
 
 
+def test_projection_applies_a_localized_translation_cap_with_fixed_duration() -> None:
+    time_s, positions, attitudes = sample_trajectory()
+    result = derive_time_reparameterization(
+        time_s,
+        positions,
+        attitudes,
+        TimeReparameterizationConfig(
+            episode_index=1,
+            translation_speed_cap_mps=0.4,
+            localized_transition_start_1based=4,
+            localized_transition_end_1based=7,
+            localized_translation_speed_cap_mps=0.27,
+            diagnostic_transition_start_1based=4,
+            diagnostic_transition_end_1based=7,
+        ),
+    )
+    assert result.derived_time_s[-1] == time_s[-1]
+    assert np.max(result.derived_translation_speed_mps[3:7]) <= 0.27 + 1.0e-12
+    assert np.max(result.derived_translation_speed_mps[:3]) <= 0.4 + 1.0e-12
+    assert np.max(result.derived_translation_speed_mps[7:]) <= 0.4 + 1.0e-12
+    assert np.all(result.translation_speed_cap_mps[3:7] == 0.27)
+
+
+def test_projection_rejects_an_incomplete_localized_cap_contract() -> None:
+    time_s, positions, attitudes = sample_trajectory()
+    with pytest.raises(ValueError, match="requires start, end, and speed"):
+        derive_time_reparameterization(
+            time_s,
+            positions,
+            attitudes,
+            TimeReparameterizationConfig(
+                episode_index=1,
+                localized_transition_start_1based=4,
+                diagnostic_transition_start_1based=4,
+                diagnostic_transition_end_1based=7,
+            ),
+        )
+
+
 def write_reference_package(root: Path) -> str:
     time_s, positions, attitudes = sample_trajectory()
     episode_dir = root / "episode_0001"

@@ -130,6 +130,10 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     residual_action_envelope_passed,
     save_case_dataset,
 )
+from rl_platform.tasks.two_wheel_balance.riser_recovery_evidence import (
+    RECOVERY_TELEMETRY_SCHEMA,
+    RecoveryTelemetryAccumulator,
+)
 from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     bounded_base_references,
     bounded_progress_scale,
@@ -285,6 +289,7 @@ def evaluate_case(
     saturated_riser = 0
     riser_effort_count = 0
     riser_thermal_monitor = RiserMotorThermalMonitor()
+    recovery_telemetry = RecoveryTelemetryAccumulator()
     saturated_proxy = 0
     proxy_effort_count = 0
     proxy_axis_saturated = np.zeros(len(PROXY_JOINTS), dtype=np.int64)
@@ -350,6 +355,28 @@ def evaluate_case(
             phase_feedforward_v_mps,
             phase_feedforward_wz_rad_s,
             tracking_cfg,
+        )
+        legacy_wz_ref = float(
+            np.clip(
+                phase_feedforward_wz_rad_s
+                + tracking_cfg.yaw_kp
+                * base_tracking_diagnostics["yaw_error_rad"]
+                + tracking_cfg.cross_track_kp
+                * base_tracking_diagnostics["feedforward_direction"]
+                * base_tracking_diagnostics["cross_track_error_m"],
+                -tracking_cfg.maximum_yaw_rate_radps,
+                tracking_cfg.maximum_yaw_rate_radps,
+            )
+        )
+        recovery_telemetry.step(
+            recovery_blend=base_tracking_diagnostics["direction_recovery_blend"],
+            motion_direction=base_tracking_diagnostics["motion_direction"],
+            feedback_motion_direction=base_tracking_diagnostics[
+                "feedback_motion_direction"
+            ],
+            candidate_yaw_rate_rad_s=wz_ref,
+            legacy_yaw_rate_rad_s=legacy_wz_ref,
+            maximum_yaw_rate_rad_s=tracking_cfg.maximum_yaw_rate_radps,
         )
         actual_riser_pre = float(robot.data.joint_pos[0, riser_id].item())
         actual_riser_velocity_pre = float(
@@ -797,7 +824,13 @@ def evaluate_case(
     action_saturation_ratio = saturated_actions / max(action_count, 1)
     riser_saturation_ratio = saturated_riser / max(riser_effort_count, 1)
     proxy_saturation_ratio = saturated_proxy / max(proxy_effort_count, 1)
-    checks = {
+    recovery_telemetry_summary = recovery_telemetry.summary()
+    recovery_telemetry_observed = (
+        recovery_telemetry_summary["schema"] == RECOVERY_TELEMETRY_SCHEMA
+        and recovery_telemetry_summary["policy_rate_sample_count"]
+        == completed_steps
+    )
+    dynamic_checks = {
         "completed_reference": phase_time_s >= execution_duration_s,
         "no_termination": termination is None,
         "pitch_bounded": float(np.max(pitches)) <= args.maximum_pitch_deg,
@@ -817,6 +850,15 @@ def evaluate_case(
         <= args.maximum_saturation_ratio,
         "riser_saturation_bounded": riser_saturation_ratio
         <= args.maximum_saturation_ratio,
+        "proxy_saturation_bounded": proxy_saturation_ratio
+        <= args.maximum_saturation_ratio,
+        "internal_attitude_ik_converged": internal_attitude_ik_failures == 0,
+        "internal_proxy_rate_bounded": internal_proxy_rate_max_deg_s
+        <= args.maximum_internal_proxy_rate_deg_s + 1e-6,
+        "residual_teacher_unclipped": dataset_dir is None
+        or float(np.max(np.abs(teacher_residual_values))) < 1.0 - 1e-6,
+    }
+    thermal_checks = {
         "riser_thermal_force_observed": (
             riser_thermal_monitor.sample_count == completed_steps
         ),
@@ -826,21 +868,17 @@ def evaluate_case(
         "riser_peak_force_bounded": (
             riser_thermal_monitor.peak_force_violation_count == 0
         ),
-        "proxy_saturation_bounded": proxy_saturation_ratio
-        <= args.maximum_saturation_ratio,
-        "internal_attitude_ik_converged": internal_attitude_ik_failures == 0,
-        "internal_proxy_rate_bounded": internal_proxy_rate_max_deg_s
-        <= args.maximum_internal_proxy_rate_deg_s + 1e-6,
-        "residual_teacher_unclipped": dataset_dir is None
-        or float(np.max(np.abs(teacher_residual_values))) < 1.0 - 1e-6,
     }
-    dynamic_quality_passed = all(checks.values())
+    checks = dynamic_checks | thermal_checks
+    dynamic_quality_passed = all(dynamic_checks.values())
+    thermal_admission_passed = all(thermal_checks.values())
+    case_admission_passed = dynamic_quality_passed and thermal_admission_passed
     residual_label_envelope_ok = all(
         residual_action_envelope_passed(value)
         for value in normalized_residual_values
     )
     dataset_path = None
-    if dataset_dir is not None and dynamic_quality_passed:
+    if dataset_dir is not None and case_admission_passed:
         dataset_path = dataset_dir / f"case_{plan.case:04d}_executed_residual_v2.npz"
         count = len(dataset_observations)
         save_case_dataset(
@@ -909,6 +947,8 @@ def evaluate_case(
         "riser_thermal_time_constant_s": (
             riser_thermal_monitor.thermal_time_constant_s
         ),
+        "recovery_telemetry": recovery_telemetry_summary,
+        "recovery_telemetry_observed": recovery_telemetry_observed,
         "proxy_saturation_ratio": proxy_saturation_ratio,
         "residual_action_abs_max": np.max(
             np.abs(applied_residual_values), axis=0
@@ -921,9 +961,10 @@ def evaluate_case(
         ).tolist(),
         "raw_residual_label_applied_to_commands": False,
         "dynamic_quality_passed": dynamic_quality_passed,
+        "thermal_admission_passed": thermal_admission_passed,
         "residual_label_envelope_passed": residual_label_envelope_ok,
         "residual_label_admission_passed": (
-            dynamic_quality_passed and residual_label_envelope_ok
+            case_admission_passed and residual_label_envelope_ok
         ),
         "peak_base_xy_error_m": peak_base_xy_error_m,
         "peak_base_yaw_error_deg": peak_base_yaw_error_deg,
@@ -937,7 +978,7 @@ def evaluate_case(
         "executed_residual_dataset": (
             None if dataset_path is None else str(dataset_path.resolve())
         ),
-        "passed": dynamic_quality_passed,
+        "passed": case_admission_passed,
     }
 
 
@@ -1125,6 +1166,9 @@ def main() -> int:
         "passed_case_count": sum(item["passed"] for item in results),
         "dynamic_quality_passed": all(
             item["dynamic_quality_passed"] for item in results
+        ),
+        "thermal_admission_passed": all(
+            item["thermal_admission_passed"] for item in results
         ),
         "residual_label_envelope_passed": all(
             item["residual_label_envelope_passed"] for item in results

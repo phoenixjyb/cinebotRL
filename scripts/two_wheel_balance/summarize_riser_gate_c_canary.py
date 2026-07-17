@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 
 
@@ -13,10 +14,91 @@ EXPECTED_CONTROLLER_PROFILE = "structural_robust_v1"
 EXPECTED_TRACKING_PROFILE = "riser_recovery_direction_v4"
 EXPECTED_RECOVERY_ERROR_RANGE_M = [0.2, 0.4]
 EXPECTED_RISER_THERMAL_FORCE_CONTRACT = "leadshine_400w_first_order_monitor_v1"
+EXPECTED_RECOVERY_TELEMETRY_SCHEMA = "riser_recovery_direction_policy_rate_v1"
+REQUIRED_CONTRACT_IDENTITIES = {
+    "source_manifest",
+    "portfolio_manifest",
+    "case74_plan",
+    "lqr_gains",
+    "robot_usd",
+    "tracking_controller",
+    "riser_control",
+    "recovery_evidence",
+    "playback",
+    "case74_wrapper",
+    "shared_runner",
+    "summarizer",
+    "contract_validator",
+    "portfolio_validator",
+}
 
 
 def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def recovery_telemetry_passed(result: dict[str, object]) -> bool:
+    telemetry = result.get("recovery_telemetry")
+    if not isinstance(telemetry, dict):
+        return False
+    integer_fields = (
+        "policy_rate_sample_count",
+        "activation_step_count",
+        "full_authority_step_count",
+        "activation_segment_count",
+        "motion_direction_sign_change_count",
+        "feedback_direction_sign_change_count",
+        "consecutive_active_motion_direction_chatter_count",
+        "candidate_yaw_saturation_step_count",
+        "legacy_yaw_saturation_step_count",
+        "candidate_vs_legacy_delta_nonzero_step_count",
+    )
+    values = [telemetry.get(name) for name in integer_fields]
+    if not all(isinstance(value, int) and value >= 0 for value in values):
+        return False
+    samples = telemetry["policy_rate_sample_count"]
+    active = telemetry["activation_step_count"]
+    return (
+        telemetry.get("schema") == EXPECTED_RECOVERY_TELEMETRY_SCHEMA
+        and samples == result.get("completed_steps")
+        and 0 <= active <= samples
+        and telemetry["full_authority_step_count"] <= active
+        and telemetry["activation_segment_count"] <= active
+        and telemetry["motion_direction_sign_change_count"] <= active
+        and telemetry["feedback_direction_sign_change_count"] <= active
+        and telemetry["consecutive_active_motion_direction_chatter_count"]
+        <= active
+        and telemetry["candidate_yaw_saturation_step_count"] <= active
+        and telemetry["legacy_yaw_saturation_step_count"] <= active
+        and telemetry["candidate_vs_legacy_delta_nonzero_step_count"] <= active
+        and isinstance(telemetry.get("candidate_vs_legacy_yaw_delta_abs_max_rad_s"), (int, float))
+        and math.isfinite(telemetry["candidate_vs_legacy_yaw_delta_abs_max_rad_s"])
+        and telemetry["candidate_vs_legacy_yaw_delta_abs_max_rad_s"] >= 0.0
+        and isinstance(telemetry.get("recovery_blend_max"), (int, float))
+        and math.isfinite(telemetry["recovery_blend_max"])
+        and 0.0 <= telemetry["recovery_blend_max"] <= 1.0
+    )
+
+
+def contract_identity_rows_passed(admission: dict[str, object]) -> bool:
+    identities = admission.get("identities")
+    checks = admission.get("checks")
+    if not isinstance(identities, dict) or set(identities) != REQUIRED_CONTRACT_IDENTITIES:
+        return False
+    if not isinstance(checks, dict) or not checks or not all(checks.values()):
+        return False
+    for name, row in identities.items():
+        if not isinstance(row, dict) or row.get("passed") is not True:
+            return False
+        sha = row.get("sha256")
+        if not isinstance(sha, str) or len(sha) != 64:
+            return False
+        if name != "source_manifest":
+            blob = row.get("git_blob_sha1")
+            if not isinstance(blob, str) or len(blob) != 40:
+                return False
+    contract_blob = admission.get("contract_git_blob_sha1")
+    return isinstance(contract_blob, str) and len(contract_blob) == 40
 
 
 def main() -> int:
@@ -25,8 +107,35 @@ def main() -> int:
     parser.add_argument("--git-commit", required=True)
     parser.add_argument("--cases", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--require-case74-contract", action="store_true")
+    parser.add_argument("--expected-case74-contract-sha256")
     args = parser.parse_args()
     requested = [int(value) for value in args.cases.split(",")]
+    admission = args.root / "admission.json"
+    admission_payload = json.loads(admission.read_text(encoding="utf-8"))
+    contract_admission_passed = not args.require_case74_contract or (
+        requested == [74]
+        and args.expected_case74_contract_sha256 is not None
+        and admission_payload.get("schema")
+        == "cinebotrl_case74_recovery_v4_contract_admission_v1"
+        and admission_payload.get("contract_sha256")
+        == args.expected_case74_contract_sha256
+        and admission_payload.get("reviewed_controller_parent_commit")
+        == "ba8f4e0b44dc15a60d61b8353a208032727ad0ae"
+        and admission_payload.get("runtime_commit") == args.git_commit
+        and admission_payload.get("upstream_commit") == args.git_commit
+        and admission_payload.get("case") == 74
+        and admission_payload.get("namespace") == args.root.name
+        and admission_payload.get("tracking_profile") == EXPECTED_TRACKING_PROFILE
+        and admission_payload.get("recovery_error_range_m")
+        == EXPECTED_RECOVERY_ERROR_RANGE_M
+        and admission_payload.get("identity_passed") is True
+        and contract_identity_rows_passed(admission_payload)
+        and admission_payload.get("residual_capture_authorized") is False
+        and admission_payload.get("bc_authorized") is False
+        and admission_payload.get("ppo_authorized") is False
+        and admission_payload.get("valid_for_training") is False
+    )
     passed_cases = []
     gate_rows = []
     first_reject = None
@@ -44,10 +153,15 @@ def main() -> int:
         payload = json.loads(gate.read_text(encoding="utf-8"))
         result = payload.get("results", [{}])[0]
         physical_dynamic_passed = (
-            payload.get("passed") is True
-            and payload.get("dynamic_quality_passed") is True
-            and result.get("passed") is True
+            payload.get("dynamic_quality_passed") is True
             and result.get("dynamic_quality_passed") is True
+        )
+        thermal_admission_passed = (
+            payload.get("thermal_admission_passed") is True
+            and result.get("thermal_admission_passed") is True
+            and result.get("checks", {}).get("riser_thermal_force_observed") is True
+            and result.get("checks", {}).get("riser_thermal_load_bounded") is True
+            and result.get("checks", {}).get("riser_peak_force_bounded") is True
         )
         runtime_contract_passed = (
             payload.get("training_started") is False
@@ -60,9 +174,8 @@ def main() -> int:
             == EXPECTED_RECOVERY_ERROR_RANGE_M
             and payload.get("riser_thermal_force_contract")
             == EXPECTED_RISER_THERMAL_FORCE_CONTRACT
-            and result.get("checks", {}).get("riser_thermal_force_observed") is True
-            and result.get("checks", {}).get("riser_thermal_load_bounded") is True
-            and result.get("checks", {}).get("riser_peak_force_bounded") is True
+            and result.get("recovery_telemetry_observed") is True
+            and recovery_telemetry_passed(result)
             and payload.get("cases") == [case]
             and payload.get("passed_case_count") == 1
             and len(payload.get("results", [])) == 1
@@ -72,8 +185,11 @@ def main() -> int:
             "case": case,
             "gate": str(gate.resolve()),
             "gate_sha256": sha256_file(gate),
-            "passed": physical_dynamic_passed and runtime_contract_passed,
+            "passed": physical_dynamic_passed
+            and thermal_admission_passed
+            and runtime_contract_passed,
             "physical_dynamic_quality_passed": physical_dynamic_passed,
+            "thermal_admission_passed": thermal_admission_passed,
             "runtime_contract_passed": runtime_contract_passed,
             "controller_profile": payload.get("controller_profile"),
             "tracking_profile": payload.get("tracking_profile"),
@@ -85,6 +201,7 @@ def main() -> int:
             ),
             "riser_thermal_load_max": result.get("riser_thermal_load_max"),
             "riser_effort_max_n": result.get("riser_effort_max_n"),
+            "recovery_telemetry": result.get("recovery_telemetry"),
             "source_duration_s": result.get("source_duration_s"),
             "execution_duration_s": result.get("execution_duration_s"),
             "completed_steps": result.get("completed_steps"),
@@ -103,12 +220,17 @@ def main() -> int:
         first_reject = {
             "case": case,
             "classification": (
-                "runtime_contract_rejection"
-                if physical_dynamic_passed and not runtime_contract_passed
-                else result.get("classification", "dynamic_gate_rejection")
+                "thermal_admission_rejection"
+                if physical_dynamic_passed and not thermal_admission_passed
+                else (
+                    "runtime_contract_rejection"
+                    if physical_dynamic_passed and not runtime_contract_passed
+                    else result.get("classification", "dynamic_gate_rejection")
+                )
             ),
             "stage": result.get("stage", "dynamic_gate"),
             "physical_dynamic_quality_passed": physical_dynamic_passed,
+            "thermal_admission_passed": thermal_admission_passed,
             "runtime_contract_passed": runtime_contract_passed,
             "exception_type": result.get("exception_type"),
             "exception_message": result.get("exception_message"),
@@ -119,12 +241,18 @@ def main() -> int:
         break
 
     not_started = requested[len(passed_cases) + (1 if first_reject else 0) :]
-    admission = args.root / "admission.json"
-    passed = first_reject is None and passed_cases == requested
+    passed = (
+        first_reject is None
+        and passed_cases == requested
+        and contract_admission_passed
+    )
     summary = {
         "schema": "cinebotrl_two_wheel_riser_gate_c_canary_v2",
         "git_commit": args.git_commit,
         "admission_sha256": sha256_file(admission),
+        "case74_contract_required": args.require_case74_contract,
+        "case74_contract_admission_passed": contract_admission_passed,
+        "case74_contract_sha256": admission_payload.get("contract_sha256"),
         "requested_cases": requested,
         "dynamically_passed_cases": passed_cases,
         "first_dynamic_reject": first_reject,
@@ -138,6 +266,9 @@ def main() -> int:
         "dynamic_quality_passed": bool(gate_rows)
         and len(gate_rows) == len(requested)
         and all(row["physical_dynamic_quality_passed"] for row in gate_rows),
+        "thermal_admission_passed": bool(gate_rows)
+        and len(gate_rows) == len(requested)
+        and all(row["thermal_admission_passed"] for row in gate_rows),
         "runtime_contract_passed": bool(gate_rows)
         and len(gate_rows) == len(requested)
         and all(row["runtime_contract_passed"] for row in gate_rows),
@@ -149,6 +280,7 @@ def main() -> int:
         "expected_riser_thermal_force_contract": (
             EXPECTED_RISER_THERMAL_FORCE_CONTRACT
         ),
+        "expected_recovery_telemetry_schema": EXPECTED_RECOVERY_TELEMETRY_SCHEMA,
         "residual_label_envelope_passed": bool(gate_rows)
         and all(row["residual_label_envelope_passed"] is True for row in gate_rows),
         "residual_label_admission_passed": bool(gate_rows)

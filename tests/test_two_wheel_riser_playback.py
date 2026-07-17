@@ -146,6 +146,10 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert '"residual_teacher_unclipped"' in source
     assert "float(np.max(np.abs(teacher_residual_values))) < 1.0 - 1e-6" in source
     assert '"source_duration_s": source_duration_s' in source
+    assert "RecoveryTelemetryAccumulator" in source
+    assert "recovery_telemetry.step(" in source
+    assert '"recovery_telemetry": recovery_telemetry_summary' in source
+    assert '"recovery_telemetry_observed"' in source
     assert '"execution_duration_s": execution_duration_s' in source
     assert "LOOKAHEAD_HORIZONS_S" in source
     assert "phase_time_s + horizon_s" in source

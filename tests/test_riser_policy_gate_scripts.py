@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import subprocess
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -93,14 +95,54 @@ def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
     assert '"riser_peak_force_bounded"' in summarizer
 
 
-def test_case74_recovery_wrapper_requires_explicit_one_case_authorization() -> None:
+def test_case74_recovery_wrapper_has_no_runtime_authorization() -> None:
     source = _read("run_riser_case74_recovery_canary.sh")
     assert 'RISER_CASE74_GPU_AUTHORIZATION' in source
     assert 'AUTHORIZED_CASE74_RECOVERY_V4' in source
-    assert 'RISER_GATE_C_CASES="74"' in source
-    assert 'case74_recovery_direction_v4_exclusive' in source
-    assert "run_riser_gate_c_canary.sh" in source
+    assert "obsolete case-74 authorization is permanently rejected" in source
+    assert "no case-74 runtime authorization token exists" in source
+    assert 'PINNED_CASE="74"' in source
+    assert 'case74_recovery_v4_contract_v1_exclusive' in source
+    assert "exec " not in source
     assert "1,52,74,77" not in source
+    assert "case 74 has no runtime authorization path" in _read(
+        "run_riser_gate_c_canary.sh"
+    )
+
+
+def test_case74_wrapper_rejects_obsolete_unknown_and_override_before_python(
+    tmp_path: Path,
+) -> None:
+    wrapper = SCRIPTS / "run_riser_case74_recovery_canary.sh"
+    base_env = os.environ.copy()
+    for authorization in ("AUTHORIZED_CASE74_RECOVERY_V4", "future-token"):
+        env = base_env | {"RISER_CASE74_GPU_AUTHORIZATION": authorization}
+        result = subprocess.run(
+            ["bash", str(wrapper)], capture_output=True, text=True, env=env
+        )
+        assert result.returncode == 7
+    env = base_env | {"RISER_GATE_C_CASES": "74"}
+    result = subprocess.run(
+        ["bash", str(wrapper)], capture_output=True, text=True, env=env
+    )
+    assert result.returncode == 7
+    assert "rejects environment override" in result.stderr
+    assert not list(tmp_path.iterdir())
+
+
+def test_shared_runner_rejects_case74_before_runtime_checks(tmp_path: Path) -> None:
+    runner = SCRIPTS / "run_riser_gate_c_canary.sh"
+    env = os.environ.copy() | {
+        "RISER_GATE_C_CASES": "74",
+        "RISER_ROOT": str(tmp_path / "missing-root"),
+        "ISAAC_PYTHON": str(tmp_path / "missing-python"),
+    }
+    result = subprocess.run(
+        ["bash", str(runner)], capture_output=True, text=True, env=env
+    )
+    assert result.returncode == 7
+    assert "no runtime authorization path" in result.stderr
+    assert not (tmp_path / "missing-root").exists()
 
 
 def test_runtime_evidence_separates_source_and_execution_clocks() -> None:

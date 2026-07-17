@@ -18,6 +18,13 @@ VALIDATOR="$ROOT/scripts/two_wheel_balance/validate_riser_gate_c_portfolio.py"
 PLAYBACK_WIN="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 SUMMARIZER="$ROOT/scripts/two_wheel_balance/summarize_riser_gate_c_canary.py"
 
+case ",$CASES," in
+  *,74,*)
+    printf 'case 74 has no runtime authorization path in this revision\n' >&2
+    exit 7
+    ;;
+esac
+
 assert_exclusive_gpu() {
   local owners
   owners="$(ps -ef | grep -E '[p]ython\.exe .*smoke_.*playback\.py' || true)"

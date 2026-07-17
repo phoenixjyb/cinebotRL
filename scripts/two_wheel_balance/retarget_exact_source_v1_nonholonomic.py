@@ -41,6 +41,11 @@ from rl_platform.tasks.two_wheel_balance.exact_source_checkpoint import (  # noq
     canonical_json_sha256,
     source_time_sha256,
 )
+from rl_platform.tasks.two_wheel_balance.ep4_time_reparameterization import (  # noqa: E402
+    DERIVATION_CONTRACT as EP4_TIME_WARP_DERIVATION_CONTRACT,
+    load_ep4_time_warp_reference,
+    verify_ep4_time_warp_package,
+)
 from rl_platform.tasks.two_wheel_balance.whole_body_kinematics import (  # noqa: E402
     UrdfPositionKinematics,
 )
@@ -55,10 +60,13 @@ CHECKPOINT_CODE_CONTRACT_PATHS = (
     Path("scripts/two_wheel_balance/retarget_exact_source_v1_nonholonomic.py"),
     Path("scripts/two_wheel_balance/retarget_corrected_teacher_v3_nonholonomic.py"),
     Path("src/rl_platform/tasks/two_wheel_balance/exact_source_checkpoint.py"),
+    Path("src/rl_platform/tasks/two_wheel_balance/ep4_time_reparameterization.py"),
 )
 RETARGET_CLI_CONFIG_FIELDS = (
     "reference_package",
     "integrity_seed_package",
+    "ep4_time_warp_package",
+    "ep4_time_warp_raw_integrity_seed_package",
     "target_urdf",
     "cases",
     "acquisition_dt_s",
@@ -101,6 +109,16 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference-package", type=Path, required=True)
     parser.add_argument("--integrity-seed-package", type=Path, required=True)
+    parser.add_argument(
+        "--ep4-time-warp-package",
+        type=Path,
+        help="Verified ep4 derived reference package; requires the paired integrity seed.",
+    )
+    parser.add_argument(
+        "--ep4-time-warp-raw-integrity-seed-package",
+        type=Path,
+        help="Sealed raw integrity seed used only to verify ep4 time-warp provenance.",
+    )
     parser.add_argument("--target-urdf", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--cases", default="1,4,7")
@@ -311,7 +329,7 @@ def build_checkpoint_identity(
 ) -> dict[str, object]:
     git_commit, code_contract_sha256 = checkpoint_code_contract()
     config = retarget_cli_config(args)
-    return {
+    identity = {
         "git_commit": git_commit,
         "code_contract_sha256": code_contract_sha256,
         "case": reference.episode_index,
@@ -324,6 +342,68 @@ def build_checkpoint_identity(
         "source_pose_count": len(reference.time_s),
         "source_time_sha256": source_time_sha256(reference.time_s),
     }
+    verified_time_warp = getattr(args, "verified_ep4_time_warp_identity", None)
+    if verified_time_warp is not None:
+        identity["ep4_time_warp"] = verified_time_warp
+    return identity
+
+
+def load_retarget_inputs(
+    args: argparse.Namespace,
+) -> tuple[dict[int, ExactSourceReference], list[int]]:
+    """Resolve raw or derived references without entering the solver."""
+
+    cases = [int(value) for value in args.cases.split(",") if value.strip()]
+    time_warp_package = args.ep4_time_warp_package
+    raw_seed_package = args.ep4_time_warp_raw_integrity_seed_package
+    if time_warp_package is None:
+        if raw_seed_package is not None:
+            raise ValueError(
+                "--ep4-time-warp-raw-integrity-seed-package requires "
+                "--ep4-time-warp-package"
+            )
+        references = discover_exact_source_references(args.reference_package)
+    else:
+        if cases != [4]:
+            raise ValueError("--ep4-time-warp-package requires exactly --cases 4")
+        if raw_seed_package is None:
+            raise ValueError(
+                "--ep4-time-warp-package requires "
+                "--ep4-time-warp-raw-integrity-seed-package"
+            )
+        time_warp_package = time_warp_package.resolve()
+        expected_seed_package = (time_warp_package / "paired_integrity_seed").resolve()
+        if args.integrity_seed_package.resolve() != expected_seed_package:
+            raise ValueError(
+                "--integrity-seed-package must equal the verified ep4 paired_integrity_seed"
+            )
+        manifest = verify_ep4_time_warp_package(
+            args.reference_package,
+            raw_seed_package,
+            time_warp_package,
+        )
+        reference = load_ep4_time_warp_reference(
+            args.reference_package,
+            raw_seed_package,
+            time_warp_package,
+        )
+        if reference.episode_index != 4:
+            raise ValueError("derived time-warp package is not ep4")
+        args.verified_ep4_time_warp_identity = {
+            "derivation_contract": EP4_TIME_WARP_DERIVATION_CONTRACT,
+            "time_warp_sha256": manifest["time_warp_sha256"],
+            "derived_manifest_sha256": reference.manifest_sha256,
+            "derived_source_sha256": reference.source_json_sha256,
+            "derived_time_sha256": source_time_sha256(reference.time_s),
+            "implementation_file_sha256": manifest["producer"][
+                "implementation_file_sha256"
+            ],
+            "valid_for_training": False,
+        }
+        references = {4: reference}
+    if not cases or any(case not in references for case in cases):
+        raise ValueError(f"invalid exact-source cases: {cases}")
+    return references, cases
 
 
 def _scalar(data: np.lib.npyio.NpzFile, key: str):
@@ -700,13 +780,10 @@ def main() -> int:
     args = parse_args()
     args.integrity_seed_prior_only = True
     args.report_exact_source_prior_progress = args.rebuild_com_safe_seed_prior
+    references, cases = load_retarget_inputs(args)
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
         raise FileExistsError(f"refusing to overwrite nonempty {args.output_dir}")
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    references = discover_exact_source_references(args.reference_package)
-    cases = [int(value) for value in args.cases.split(",") if value.strip()]
-    if not cases or any(case not in references for case in cases):
-        raise ValueError(f"invalid exact-source cases: {cases}")
     if args.resume_checkpoint and args.checkpoint_path is None:
         raise ValueError("--resume-checkpoint requires --checkpoint-path")
     if args.checkpoint_cadence_source_intervals <= 0:

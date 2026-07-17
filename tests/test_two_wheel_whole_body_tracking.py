@@ -45,20 +45,22 @@ def test_yaw_and_base_feedback_signs() -> None:
 
 def test_cross_track_direction_follows_feedback_reverse_command() -> None:
     velocity, yaw_rate, diagnostics = bounded_base_references(
-        desired_base_q=np.array([-0.2, 0.2, -0.25]),
+        desired_base_q=np.array([-0.5, 0.5, -0.6]),
         actual_base_q=np.zeros(3),
         feedforward_v_mps=0.01,
         feedforward_wz_radps=0.0,
         config=riser_tracking_config(),
     )
 
-    assert velocity == pytest.approx(-0.31)
+    assert velocity == pytest.approx(-0.4)
     assert yaw_rate == pytest.approx(-0.4)
     assert diagnostics["feedforward_direction"] == 1.0
+    assert diagnostics["feedback_motion_direction"] == -1.0
+    assert diagnostics["direction_recovery_blend"] == 1.0
     assert diagnostics["motion_direction"] == -1.0
 
 
-def test_cross_track_direction_blends_smoothly_near_zero_speed() -> None:
+def test_healthy_tracking_preserves_feedforward_cross_track_direction() -> None:
     velocity, yaw_rate, diagnostics = bounded_base_references(
         desired_base_q=np.array([0.009375, 0.1, 0.0]),
         actual_base_q=np.zeros(3),
@@ -68,8 +70,10 @@ def test_cross_track_direction_blends_smoothly_near_zero_speed() -> None:
     )
 
     assert velocity == pytest.approx(0.025)
-    assert yaw_rate == pytest.approx(0.075)
-    assert diagnostics["motion_direction"] == pytest.approx(0.5)
+    assert yaw_rate == pytest.approx(0.15)
+    assert diagnostics["feedback_motion_direction"] == pytest.approx(0.5)
+    assert diagnostics["direction_recovery_blend"] == 0.0
+    assert diagnostics["motion_direction"] == 1.0
 
 
 def test_continuous_joint_target_uses_nearest_physical_branch() -> None:

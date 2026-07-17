@@ -333,10 +333,34 @@ The legacy cross-track sign nearly cancels yaw recovery and commands only
 `+0.107292 rad/s`; motion-command-aware steering requests the bounded
 `-0.4 rad/s` direction instead.
 
-The CPU-only candidate uses commanded velocity, smoothly blended over
-`0.05 m/s`, to choose cross-track steering direction. Future traces expose
-the reconstructed along/cross/yaw errors and both direction values directly.
-This candidate changes no plan, source anchor, gate, LQR gain, residual scale,
-or learned action and is not dynamically validated. A new case-74-only canary
-requires separate explicit GPU authorization; case 77 and all learning remain
-closed.
+The initial CPU-only `riser_motion_direction_v3` candidate used commanded
+velocity, smoothly blended over `0.05 m/s`, to choose cross-track steering
+direction. Counterfactual replay against the sealed passing case 1 and case 52
+traces showed that broad rule was too invasive: it changed healthy commands
+even though both cases remained below `0.16 m` peak base error. It is therefore
+rejected before dynamic promotion and remains historical diagnostic code only.
+
+The replacement `riser_recovery_direction_v4` keeps the legacy feedforward
+direction below `0.20 m` base-position error, blends toward feedback-command
+direction from `0.20--0.40 m`, and reaches full recovery authority at or above
+`0.40 m`. It preserves all existing velocity/yaw limits and uses the existing
+`0.05 m/s` feedback-direction blend; it does not alter source anchors, plans,
+timing, gates, LQR gains, residual scales, or learned actions.
+
+Case-74 recovery evidence is sealed at
+`20260717_gate_c_case74_motion_direction_recovery_gate_v2/summary.json`,
+SHA-256
+`bb98816f1fad26e7c404080e5c5d00fe00f0be1fa253e8e6255ace53e8441935`.
+It retains the full bounded `-0.4 rad/s` correction at the peak recovery state.
+The independent healthy-trace compatibility audit is sealed at
+`20260717_gate_c_motion_direction_healthy_compatibility_v1/summary.json`,
+SHA-256
+`74597d37f60c14a5b99ebffde5d4036fed05a1f1641853489e0b1cc98374286b`.
+Recovery activation is zero for every sampled state in cases 1 and 52, and the
+candidate command delta is exactly zero. The full CPU-only suite passes `234`
+tests.
+
+This is compatibility and structural-recovery evidence, not dynamic proof.
+No GPU work, label capture, dataset, BC, or PPO was started. A new case-74-only
+canary still requires separate explicit GPU authorization; case 77 and all
+learning remain closed.

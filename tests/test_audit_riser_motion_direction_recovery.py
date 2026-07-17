@@ -71,6 +71,7 @@ def test_motion_direction_audit_localizes_reverse_steering_cancellation(
     assert summary["passed"]
     assert summary["direction_conflict_sample_count"] == 2
     assert summary["bad_position_direction_conflict_sample_count"] == 2
-    assert summary["peak_position_error"]["candidate_yaw_rate_rad_s"] == -0.4
+    assert summary["peak_position_error"]["candidate_yaw_rate_rad_s"] < -0.2
+    assert summary["candidate_scope"] == "base_error_gated_recovery_only"
     assert not summary["candidate_dynamically_validated"]
     assert not summary["valid_for_training"]

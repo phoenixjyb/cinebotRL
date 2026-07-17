@@ -699,8 +699,17 @@ def evaluate_case(
                     "raw_velocity_reference_mps": base_tracking_diagnostics[
                         "raw_velocity_reference_mps"
                     ],
+                    "base_position_error_m": base_tracking_diagnostics[
+                        "base_position_error_m"
+                    ],
                     "feedforward_direction": base_tracking_diagnostics[
                         "feedforward_direction"
+                    ],
+                    "feedback_motion_direction": base_tracking_diagnostics[
+                        "feedback_motion_direction"
+                    ],
+                    "direction_recovery_blend": base_tracking_diagnostics[
+                        "direction_recovery_blend"
                     ],
                     "motion_direction": base_tracking_diagnostics[
                         "motion_direction"
@@ -997,10 +1006,14 @@ def main() -> int:
         "training_started": False,
         "ppo_authorized": False,
         "controller_profile": "structural_robust_v1",
-        "tracking_profile": "riser_motion_direction_v3",
+        "tracking_profile": "riser_recovery_direction_v4",
         "tracking_direction_blend_speed_mps": (
             riser_tracking_config().direction_blend_speed_mps
         ),
+        "tracking_direction_recovery_error_range_m": [
+            riser_tracking_config().direction_recovery_error_start_m,
+            riser_tracking_config().direction_recovery_error_full_m,
+        ],
         "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
         "controller_overrides": {
             name: value

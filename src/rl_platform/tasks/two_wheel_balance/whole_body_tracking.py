@@ -86,6 +86,8 @@ class WholeBodyTrackingConfig:
     maximum_linear_velocity_mps: float = 0.4
     maximum_yaw_rate_radps: float = 0.4
     direction_blend_speed_mps: float = 0.05
+    direction_recovery_error_start_m: float = 0.20
+    direction_recovery_error_full_m: float = 0.40
     ik_damping: float = 0.04
     ik_task_gain: float = 0.7
     nominal_arm_pull: float = 0.15
@@ -148,6 +150,14 @@ def bounded_base_references(
         or config.direction_blend_speed_mps <= 0.0
     ):
         raise ValueError("direction blend speed must be finite and positive")
+    if not (
+        math.isfinite(config.direction_recovery_error_start_m)
+        and math.isfinite(config.direction_recovery_error_full_m)
+        and 0.0
+        <= config.direction_recovery_error_start_m
+        < config.direction_recovery_error_full_m
+    ):
+        raise ValueError("invalid direction recovery error bounds")
 
     delta_world = desired_base_q[:2] - actual_base_q[:2]
     cosine = math.cos(actual_base_q[2])
@@ -164,8 +174,27 @@ def bounded_base_references(
             config.maximum_linear_velocity_mps,
         )
     )
-    motion_direction = float(
+    feedback_motion_direction = float(
         np.clip(velocity / config.direction_blend_speed_mps, -1.0, 1.0)
+    )
+    base_position_error = math.hypot(along_error, cross_error)
+    direction_recovery_blend = float(
+        np.clip(
+            (
+                base_position_error - config.direction_recovery_error_start_m
+            )
+            / (
+                config.direction_recovery_error_full_m
+                - config.direction_recovery_error_start_m
+            ),
+            0.0,
+            1.0,
+        )
+    )
+    motion_direction = (
+        feedforward_direction
+        + direction_recovery_blend
+        * (feedback_motion_direction - feedforward_direction)
     )
     yaw_rate = (
         feedforward_wz_radps
@@ -184,7 +213,10 @@ def bounded_base_references(
         "cross_track_error_m": float(cross_error),
         "yaw_error_rad": yaw_error,
         "raw_velocity_reference_mps": float(raw_velocity),
+        "base_position_error_m": base_position_error,
         "feedforward_direction": feedforward_direction,
+        "feedback_motion_direction": feedback_motion_direction,
+        "direction_recovery_blend": direction_recovery_blend,
         "motion_direction": motion_direction,
     }
 

@@ -763,3 +763,38 @@ and must state whether its candidate was accepted or rejected.
 - Only after separate explicit GPU authorization, run case 74 alone in a fresh
   guarded namespace. Stop on the first unchanged dynamic gate and use the new
   direction diagnostics to accept or reject the candidate structurally.
+
+## Round 24: recovery-gated steering and healthy-trace compatibility
+
+- Counterfactual replay showed the broad `riser_motion_direction_v3` rule was
+  not suitable for dynamic promotion. It altered `62/104` sampled case-1
+  commands and also perturbed case 52 despite both sealed runs being healthy.
+  The broad candidate is retained only as diagnostic history.
+- Replaced it with `riser_recovery_direction_v4`. Legacy feedforward-direction
+  steering is unchanged below `0.20 m` base-position error; recovery authority
+  blends from `0.20--0.40 m` and is complete at `0.40 m`. Existing command
+  limits and the `0.05 m/s` feedback-direction blend remain unchanged.
+- Sealed the case-74 CPU recovery audit at
+  `20260717_gate_c_case74_motion_direction_recovery_gate_v2/summary.json`,
+  SHA-256
+  `bb98816f1fad26e7c404080e5c5d00fe00f0be1fa253e8e6255ace53e8441935`.
+  The gated candidate preserves the full bounded `-0.4 rad/s` correction at
+  the peak recovery state.
+- Added a hash-bound compatibility audit over the sealed passing case-1 and
+  case-52 traces. Both remain entirely below recovery activation, with exactly
+  zero candidate command delta. Summary SHA-256 is
+  `74597d37f60c14a5b99ebffde5d4036fed05a1f1641853489e0b1cc98374286b`.
+- Runtime traces now expose base-position error, feedforward direction,
+  feedback motion direction, recovery blend, and final motion direction. The
+  full CPU-only repository suite passes `234` tests.
+- No Isaac/GPU work, source plan, threshold, LQR gain, residual scale, label,
+  dataset, BC, or PPO was changed or started.
+
+## Next round after Round 24
+
+- Commit and push the recovery-gated controller, audits, tests, and durable
+  evidence references as one scoped CPU-only change.
+- Keep case 77, the accepted-71 batch, residual capture, BC, and PPO closed.
+- Only after separate explicit GPU authorization and an empty ownership guard,
+  run case 74 alone in a fresh namespace. Preserve all physical gates and stop
+  on the first failure; dynamic success must be proven before case 77 starts.

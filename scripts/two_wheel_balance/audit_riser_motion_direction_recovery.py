@@ -44,9 +44,26 @@ def reconstruct_row(row: dict[str, object]) -> dict[str, float | bool]:
     raw_velocity = feedforward_v + config.along_track_kp * along_error
     velocity = clamp(raw_velocity, config.maximum_linear_velocity_mps)
     legacy_direction = 1.0 if feedforward_v >= 0.0 else -1.0
-    motion_direction = clamp(
+    feedback_motion_direction = clamp(
         velocity / config.direction_blend_speed_mps,
         1.0,
+    )
+    base_position_error = math.hypot(delta_x, delta_y)
+    direction_recovery_blend = clamp(
+        (
+            base_position_error - config.direction_recovery_error_start_m
+        )
+        / (
+            config.direction_recovery_error_full_m
+            - config.direction_recovery_error_start_m
+        ),
+        1.0,
+    )
+    direction_recovery_blend = max(0.0, direction_recovery_blend)
+    motion_direction = (
+        legacy_direction
+        + direction_recovery_blend
+        * (feedback_motion_direction - legacy_direction)
     )
     legacy_yaw_rate = clamp(
         feedforward_wz
@@ -68,6 +85,8 @@ def reconstruct_row(row: dict[str, object]) -> dict[str, float | bool]:
         "legacy_yaw_rate_rad_s": legacy_yaw_rate,
         "candidate_yaw_rate_rad_s": candidate_yaw_rate,
         "legacy_direction": legacy_direction,
+        "feedback_motion_direction": feedback_motion_direction,
+        "direction_recovery_blend": direction_recovery_blend,
         "motion_direction": motion_direction,
         "direction_conflict": feedforward_v * velocity < 0.0,
     }
@@ -201,7 +220,12 @@ def audit(
         "diagnosis": (
             "feedforward_sign_cross_track_cancellation_during_feedback_reverse"
         ),
-        "candidate": "motion_command_direction_with_zero_speed_blend",
+        "candidate": "recovery_gated_motion_command_direction",
+        "candidate_scope": "base_error_gated_recovery_only",
+        "candidate_recovery_error_range_m": [
+            riser_tracking_config().direction_recovery_error_start_m,
+            riser_tracking_config().direction_recovery_error_full_m,
+        ],
         "candidate_dynamically_validated": False,
         "thresholds_relaxed": False,
         "runtime_result_modified": False,

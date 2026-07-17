@@ -24,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reference-package", type=Path, required=True)
     parser.add_argument("--raw-integrity-seed-package", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--waypoint-stride", type=int, default=1)
     parser.add_argument(
         "--time-allocation-strategy",
         choices=("minimum_l2", "proportional_lower_bounds"),
@@ -43,6 +44,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     config = TimeReparameterizationConfig(
+        waypoint_stride=args.waypoint_stride,
         time_allocation_strategy=args.time_allocation_strategy,
         translation_speed_cap_mps=args.translation_speed_cap_mps,
         angular_speed_cap_radps=args.angular_speed_cap_radps,

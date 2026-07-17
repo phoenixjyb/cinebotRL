@@ -253,6 +253,9 @@ def write_raw_seed_package(root: Path, reference_dir: Path) -> tuple[str, str]:
         trajectory_integrity_passed=np.bool_(True),
         episode_index=np.int32(1),
         base_arm_actions=actions,
+        gimbal_attitude_target_world_dfr_quat_wxyz=attitudes_xyzw[1:, [3, 0, 1, 2]].astype(
+            np.float32
+        ),
         q_current_base_arm_6=base_arm_q[:-1],
         q_next_base_arm_6=base_arm_q[1:],
         desired_time_full_s=time_s,
@@ -268,6 +271,7 @@ def write_raw_seed_package(root: Path, reference_dir: Path) -> tuple[str, str]:
         max_linear_velocity=np.float32(1.5),
         max_angular_velocity=np.float32(2.0),
         max_abs_base_action_unclipped=np.float32(0.0),
+        max_abs_arm_action_unclipped=np.float32(0.5),
         source_json_sha256=np.asarray(
             hashlib.sha256((reference_dir / "episode_0001/source.json").read_bytes()).hexdigest()
         ),
@@ -305,7 +309,7 @@ def build_package(tmp_path: Path) -> tuple[Path, Path, Path, dict[str, object]]:
     return reference_dir, raw_seed_dir, output_dir, manifest
 
 
-def test_package_preserves_pose_and_seed_state_bytes_and_binds_provenance(
+def test_package_preserves_pose_subset_and_seed_state_bytes_and_binds_provenance(
     tmp_path: Path,
 ) -> None:
     reference_dir, raw_seed_dir, output_dir, manifest = build_package(tmp_path)
@@ -314,8 +318,8 @@ def test_package_preserves_pose_and_seed_state_bytes_and_binds_provenance(
     )
     assert verified == manifest
     assert manifest["valid_for_training"] is False
-    assert manifest["constraints"]["positions_byte_identical"] is True
-    assert manifest["constraints"]["orientations_byte_identical"] is True
+    assert manifest["constraints"]["derived_positions_are_exact_source_subset"] is True
+    assert manifest["constraints"]["derived_orientations_are_exact_source_subset"] is True
     assert manifest["constraints"]["solver_or_admission_gates_modified"] is False
     seed_rates = manifest["metrics"]["integrity_seed_rate_diagnostics"]
     assert seed_rates["seed_state_rate_bounds_used_in_projection"] is False
@@ -333,6 +337,52 @@ def test_package_preserves_pose_and_seed_state_bytes_and_binds_provenance(
     assert array_sha256(raw_attitudes) == array_sha256(new_attitudes)
     assert derived["poses"][0]["time"] == raw["poses"][0]["time"]
     assert derived["poses"][-1]["time"] == raw["poses"][-1]["time"]
+
+
+def test_waypoint_stride_keeps_exact_ordered_subset_and_paired_seed_contract(
+    tmp_path: Path,
+) -> None:
+    reference_dir = tmp_path / "reference"
+    reference_digest = write_reference_package(reference_dir)
+    raw_seed_dir = tmp_path / "raw_seed"
+    raw_seed_manifest_digest, raw_seed_digest = write_raw_seed_package(
+        raw_seed_dir, reference_dir
+    )
+    output_dir = tmp_path / "derived_stride2"
+    manifest = derive_ep4_time_warp_package(
+        reference_dir,
+        raw_seed_dir,
+        output_dir,
+        config=TimeReparameterizationConfig(
+            episode_index=1,
+            waypoint_stride=2,
+            time_allocation_strategy="proportional_lower_bounds",
+            diagnostic_transition_start_1based=2,
+            diagnostic_transition_end_1based=5,
+        ),
+        expected_manifest_sha256=reference_digest,
+        expected_episodes=1,
+        expected_raw_seed_manifest_sha256=raw_seed_manifest_digest,
+        expected_raw_seed_sha256=raw_seed_digest,
+    )
+    verified = verify_ep4_time_warp_package(
+        reference_dir, raw_seed_dir, output_dir, expected_episodes=1
+    )
+    assert verified == manifest
+    assert manifest["source"]["pose_count"] == 11
+    assert manifest["derived"]["pose_count"] == 6
+    assert manifest["derived"]["waypoint_source_index_0based"] == [0, 2, 4, 6, 8, 10]
+    assert manifest["constraints"]["pose_count_preserved"] is False
+    assert abs(manifest["constraints"]["cartesian_arc_length_relative_error"]) < 0.01
+
+    reference = load_ep4_time_warp_reference(
+        reference_dir, raw_seed_dir, output_dir, expected_episodes=1
+    )
+    teacher, _ = exact_retarget.load_integrity_seed(
+        output_dir / "paired_integrity_seed", reference
+    )
+    assert len(reference.time_s) == 6
+    assert teacher.base_arm_q.shape == (6, 6)
 
 
 def test_derived_reference_and_seed_load_together_but_raw_seed_is_rejected(

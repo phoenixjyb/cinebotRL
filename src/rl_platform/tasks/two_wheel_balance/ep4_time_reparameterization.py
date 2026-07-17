@@ -40,6 +40,7 @@ RETARGET_MAXIMUM_ARM_RATE_RADPS = 0.5
 @dataclass(frozen=True)
 class TimeReparameterizationConfig:
     episode_index: int = 4
+    waypoint_stride: int = 1
     time_allocation_strategy: str = "minimum_l2"
     translation_speed_cap_mps: float = 0.40
     angular_speed_cap_radps: float = 0.35
@@ -102,6 +103,14 @@ def _quaternion_interval_angles(attitudes_xyzw: np.ndarray) -> np.ndarray:
     _require(np.allclose(norms, 1.0, atol=1.0e-9), "attitudes are not unit quaternions")
     dots = np.abs(np.sum(attitudes[:-1] * attitudes[1:], axis=1))
     return 2.0 * np.arccos(np.clip(dots, -1.0, 1.0))
+
+
+def _waypoint_indices(count: int, stride: int) -> np.ndarray:
+    _require(stride >= 1, "waypoint stride must be positive")
+    indices = np.arange(0, count, stride, dtype=np.int64)
+    if indices[-1] != count - 1:
+        indices = np.append(indices, count - 1)
+    return indices
 
 
 def _project_with_lower_bounds(
@@ -186,6 +195,7 @@ def derive_time_reparameterization(
     _require(config.translation_speed_cap_mps > 0.0, "translation speed cap must be positive")
     _require(config.angular_speed_cap_radps > 0.0, "angular speed cap must be positive")
     _require(config.minimum_interval_dt_s > 0.0, "minimum interval dt must be positive")
+    _require(config.waypoint_stride >= 1, "waypoint stride must be positive")
     _require(
         config.time_allocation_strategy
         in {"minimum_l2", "proportional_lower_bounds"},
@@ -361,9 +371,6 @@ def _result_metrics(
             "numbering_contract": "transition k is source anchor k-1 to k",
             "first_transition_1based": config.diagnostic_transition_start_1based,
             "last_transition_1based": config.diagnostic_transition_end_1based,
-            "observed_hard_transition_1based": 198,
-            "observed_hard_source_anchor_from_0based": 197,
-            "observed_hard_source_anchor_to_0based": 198,
             "source_translation_speed_max_mps": float(
                 np.max(result.source_translation_speed_mps[hard])
             ),
@@ -628,6 +635,7 @@ def _seed_state_rate_diagnostics(
 def _paired_seed_payload(
     raw_arrays: dict[str, np.ndarray],
     result: TimeReparameterizationResult,
+    waypoint_indices: np.ndarray,
     *,
     raw_seed_sha256: str,
     raw_manifest_sha256: str,
@@ -637,6 +645,7 @@ def _paired_seed_payload(
 ) -> dict[str, np.ndarray | str | np.generic]:
     required = {
         "base_arm_actions",
+        "gimbal_attitude_target_world_dfr_quat_wxyz",
         "q_current_base_arm_6",
         "q_next_base_arm_6",
         "desired_position_full_m",
@@ -648,7 +657,15 @@ def _paired_seed_payload(
     current = np.asarray(raw_arrays["q_current_base_arm_6"], dtype=np.float32)
     next_q = np.asarray(raw_arrays["q_next_base_arm_6"], dtype=np.float32)
     _require(current.shape == next_q.shape, "raw integrity-seed transition shape mismatch")
-    base_arm_q = np.vstack((current, next_q[-1]))
+    raw_base_arm_q = np.vstack((current, next_q[-1]))
+    waypoint_indices = np.asarray(waypoint_indices, dtype=np.int64)
+    _require(
+        waypoint_indices[0] == 0
+        and waypoint_indices[-1] == len(raw_base_arm_q) - 1
+        and np.all(np.diff(waypoint_indices) > 0),
+        "waypoint index mapping is invalid",
+    )
+    base_arm_q = raw_base_arm_q[waypoint_indices]
     _require(len(base_arm_q) == len(result.derived_time_s), "raw seed/reference count mismatch")
     maximum_linear_velocity = float(np.asarray(raw_arrays["max_linear_velocity"]).item())
     maximum_angular_velocity = float(np.asarray(raw_arrays["max_angular_velocity"]).item())
@@ -659,9 +676,17 @@ def _paired_seed_payload(
         maximum_angular_velocity,
     )
     raw_actions = np.asarray(raw_arrays["base_arm_actions"], dtype=np.float32)
-    _require(raw_actions.shape == (len(result.derived_dt_s), 6), "raw action shape mismatch")
-    derived_actions = raw_actions.copy()
+    _require(raw_actions.shape == (len(raw_base_arm_q) - 1, 6), "raw action shape mismatch")
+    transition_rows = waypoint_indices[1:] - 1
+    derived_actions = raw_actions[transition_rows].copy()
     derived_actions[:, 3:] = base_actions
+    desired_position = np.asarray(raw_arrays["desired_position_full_m"])[waypoint_indices]
+    desired_attitude = np.asarray(
+        raw_arrays["desired_attitude_full_world_dfr_quat_wxyz"]
+    )[waypoint_indices]
+    gimbal_target = np.asarray(
+        raw_arrays["gimbal_attitude_target_world_dfr_quat_wxyz"]
+    )[transition_rows]
 
     payload: dict[str, np.ndarray | str | np.generic] = {
         key: np.asarray(value).copy() for key, value in raw_arrays.items()
@@ -670,9 +695,19 @@ def _paired_seed_payload(
         {
             "schema": PAIRED_SEED_SCHEMA,
             "base_arm_actions": derived_actions,
+            "gimbal_attitude_target_world_dfr_quat_wxyz": gimbal_target,
+            "q_current_base_arm_6": base_arm_q[:-1],
+            "q_next_base_arm_6": base_arm_q[1:],
             "time_s": result.derived_time_s[1:].astype(np.float64),
             "dt_s": result.derived_dt_s.astype(np.float32),
             "desired_time_full_s": result.derived_time_s.astype(np.float64),
+            "desired_position_full_m": desired_position,
+            "desired_attitude_full_world_dfr_quat_wxyz": desired_attitude,
+            "waypoint_source_index_0based": waypoint_indices.astype(np.int32),
+            "source_pose_count": np.int32(len(waypoint_indices)),
+            "reference_pose_count": np.int32(len(waypoint_indices)),
+            "state_count": np.int32(len(waypoint_indices)),
+            "action_count": np.int32(len(waypoint_indices) - 1),
             "max_timestamp_error_s": np.float64(0.0),
             "max_abs_base_action_unclipped": np.float32(np.max(np.abs(base_raw))),
             "source_json_sha256": derived_source_json_sha256,
@@ -745,10 +780,14 @@ def derive_ep4_time_warp_package(
     source_attitudes = np.asarray(
         [pose["orientation"] for pose in source_poses], dtype=np.float64
     )
+    waypoint_indices = _waypoint_indices(len(reference.time_s), config.waypoint_stride)
+    derived_source_time = reference.time_s[waypoint_indices]
+    derived_positions = source_positions[waypoint_indices]
+    derived_attitudes = source_attitudes[waypoint_indices]
     result = derive_time_reparameterization(
-        reference.time_s,
-        source_positions,
-        source_attitudes,
+        derived_source_time,
+        derived_positions,
+        derived_attitudes,
         config,
     )
     raw_current = np.asarray(raw_seed_arrays["q_current_base_arm_6"], dtype=np.float32)
@@ -756,6 +795,7 @@ def derive_ep4_time_warp_package(
     raw_base_arm_q = np.vstack((raw_current, raw_next[-1]))
 
     derived_payload = json.loads(reference.source_json.read_text(encoding="utf-8"))
+    derived_payload["poses"] = [source_poses[int(index)] for index in waypoint_indices]
     for pose, timestamp in zip(derived_payload["poses"], result.derived_time_s, strict=True):
         pose["time"] = float(timestamp)
     derived_source_bytes = (
@@ -763,8 +803,11 @@ def derive_ep4_time_warp_package(
     ).encode("utf-8")
     intervals_bytes = _interval_csv(result)
 
-    position_hash = array_sha256(source_positions)
-    attitude_hash = array_sha256(source_attitudes)
+    source_position_hash = array_sha256(source_positions)
+    source_attitude_hash = array_sha256(source_attitudes)
+    derived_position_hash = array_sha256(derived_positions)
+    derived_attitude_hash = array_sha256(derived_attitudes)
+    waypoint_index_sha256 = _canonical_json_sha256(waypoint_indices.tolist())
     derived_source_sha256 = hashlib.sha256(derived_source_bytes).hexdigest()
     time_warp_identity = {
         "derivation_contract": DERIVATION_CONTRACT,
@@ -776,13 +819,17 @@ def derive_ep4_time_warp_package(
         "raw_integrity_seed_sha256": expected_raw_seed_sha256,
         "source_time_array_sha256": array_sha256(reference.time_s),
         "derived_time_array_sha256": array_sha256(result.derived_time_s),
-        "position_array_sha256": position_hash,
-        "orientation_array_sha256": attitude_hash,
+        "waypoint_source_index_sha256": waypoint_index_sha256,
+        "source_position_array_sha256": source_position_hash,
+        "source_orientation_array_sha256": source_attitude_hash,
+        "derived_position_array_sha256": derived_position_hash,
+        "derived_orientation_array_sha256": derived_attitude_hash,
     }
     time_warp_sha256 = _canonical_json_sha256(time_warp_identity)
     paired_seed_payload = _paired_seed_payload(
         raw_seed_arrays,
         result,
+        waypoint_indices,
         raw_seed_sha256=expected_raw_seed_sha256,
         raw_manifest_sha256=expected_raw_seed_manifest_sha256,
         raw_source_json_sha256=reference.source_json_sha256,
@@ -791,9 +838,20 @@ def derive_ep4_time_warp_package(
     )
     metrics = _result_metrics(result, config)
     metrics["integrity_seed_rate_diagnostics"] = _seed_state_rate_diagnostics(
-        raw_base_arm_q, result
+        raw_base_arm_q[waypoint_indices], result
     )
-    path_length = float(np.sum(result.segment_distance_m))
+    source_segment_distance = np.linalg.norm(np.diff(source_positions, axis=0), axis=1)
+    source_path_length = float(np.sum(source_segment_distance))
+    derived_path_length = float(np.sum(result.segment_distance_m))
+    path_length_relative_error = derived_path_length / source_path_length - 1.0
+    metrics["waypoint_reduction"] = {
+        "source_pose_count": len(reference.time_s),
+        "derived_pose_count": len(waypoint_indices),
+        "waypoint_stride": config.waypoint_stride,
+        "source_transition_count": len(reference.time_s) - 1,
+        "derived_transition_count": len(waypoint_indices) - 1,
+        "cartesian_arc_length_relative_error": path_length_relative_error,
+    }
     manifest: dict[str, object] = {
         "schema": PACKAGE_SCHEMA,
         "derivation_contract": DERIVATION_CONTRACT,
@@ -804,21 +862,24 @@ def derive_ep4_time_warp_package(
             "source_json_sha256": reference.source_json_sha256,
             "pose_count": len(reference.time_s),
             "time_array_sha256": array_sha256(reference.time_s),
-            "position_array_sha256": position_hash,
-            "orientation_array_sha256": attitude_hash,
+            "position_array_sha256": source_position_hash,
+            "orientation_array_sha256": source_attitude_hash,
             "duration_s": float(reference.time_s[-1] - reference.time_s[0]),
-            "cartesian_arc_length_m": path_length,
+            "cartesian_arc_length_m": source_path_length,
         },
         "derived": {
             "source_json": "source.json",
             "source_json_sha256": derived_source_sha256,
             "interval_evidence_csv": "intervals.csv",
             "interval_evidence_csv_sha256": hashlib.sha256(intervals_bytes).hexdigest(),
+            "pose_count": len(waypoint_indices),
+            "waypoint_source_index_0based": waypoint_indices.tolist(),
+            "waypoint_source_index_sha256": waypoint_index_sha256,
             "time_array_sha256": array_sha256(result.derived_time_s),
-            "position_array_sha256": position_hash,
-            "orientation_array_sha256": attitude_hash,
+            "position_array_sha256": derived_position_hash,
+            "orientation_array_sha256": derived_attitude_hash,
             "duration_s": float(result.derived_time_s[-1] - result.derived_time_s[0]),
-            "cartesian_arc_length_m": path_length,
+            "cartesian_arc_length_m": derived_path_length,
         },
         "time_warp_identity": time_warp_identity,
         "time_warp_sha256": time_warp_sha256,
@@ -832,16 +893,17 @@ def derive_ep4_time_warp_package(
         "config": asdict(config),
         "metrics": metrics,
         "constraints": {
-            "pose_count_preserved": True,
-            "positions_byte_identical": True,
-            "orientations_byte_identical": True,
+            "pose_count_preserved": config.waypoint_stride == 1,
+            "waypoint_order_preserved": True,
+            "derived_positions_are_exact_source_subset": True,
+            "derived_orientations_are_exact_source_subset": True,
             "first_pose_preserved": True,
             "last_pose_preserved": True,
             "start_timestamp_preserved": True,
             "end_timestamp_preserved": True,
             "total_duration_preserved": True,
             "timestamps_strictly_increasing": True,
-            "cartesian_arc_length_relative_error": 0.0,
+            "cartesian_arc_length_relative_error": path_length_relative_error,
             "derivation_translation_speed_cap_mps": config.translation_speed_cap_mps,
             "localized_transition_start_1based": (
                 config.localized_transition_start_1based
@@ -852,7 +914,11 @@ def derive_ep4_time_warp_package(
             ),
             "solver_or_admission_gates_modified": False,
         },
-        "artifact_classification": "derived_duration_preserving_time_reparameterization",
+        "artifact_classification": (
+            "derived_duration_preserving_waypoint_reduced_time_reparameterization"
+            if config.waypoint_stride > 1
+            else "derived_duration_preserving_time_reparameterization"
+        ),
         "quality_qualified_teacher": False,
         "valid_for_dynamic_evaluation": False,
         "valid_for_training": False,
@@ -880,6 +946,7 @@ def derive_ep4_time_warp_package(
         _save_npz_durable(paired_seed_path, paired_seed_payload)
         paired_seed_sha256 = sha256(paired_seed_path)
         raw_base_actions = np.asarray(raw_seed_arrays["base_arm_actions"], dtype=np.float32)
+        raw_selected_base_actions = raw_base_actions[waypoint_indices[1:] - 1]
         paired_base_actions = np.asarray(paired_seed_payload["base_arm_actions"], dtype=np.float32)
         paired_seed_manifest = {
             "schema": PAIRED_SEED_PACKAGE_SCHEMA,
@@ -895,13 +962,18 @@ def derive_ep4_time_warp_package(
             "bundled_source_json_sha256": derived_source_sha256,
             "output_npz": f"episode_{config.episode_index:04d}/{seed_name}",
             "output_npz_sha256": paired_seed_sha256,
-            "state_arrays_byte_identical": True,
-            "pose_arrays_byte_identical": True,
+            "state_arrays_are_exact_source_subset": True,
+            "pose_arrays_are_exact_source_subset": True,
+            "waypoint_source_index_sha256": waypoint_index_sha256,
             "time_dependent_base_actions_recomputed": True,
             "base_action_transition_count": len(paired_base_actions),
             "base_action_changed_transition_count": int(
                 np.count_nonzero(
-                    np.any(raw_base_actions[:, 3:] != paired_base_actions[:, 3:], axis=1)
+                    np.any(
+                        raw_selected_base_actions[:, 3:]
+                        != paired_base_actions[:, 3:],
+                        axis=1,
+                    )
                 )
             ),
             "raw_max_abs_base_action_unclipped": float(
@@ -1011,10 +1083,20 @@ def verify_ep4_time_warp_package(
     source_poses = source_payload.get("poses")
     derived_poses = derived_payload.get("poses")
     _require(isinstance(source_poses, list) and isinstance(derived_poses, list), "poses missing")
-    _require(len(source_poses) == len(derived_poses), "derived pose count changed")
     source_positions = np.asarray([pose["position"] for pose in source_poses], dtype=np.float64)
-    derived_positions = np.asarray([pose["position"] for pose in derived_poses], dtype=np.float64)
     source_attitudes = np.asarray([pose["orientation"] for pose in source_poses], dtype=np.float64)
+    waypoint_indices = np.asarray(
+        derived_record.get("waypoint_source_index_0based", []), dtype=np.int64
+    )
+    _require(
+        np.array_equal(
+            waypoint_indices,
+            _waypoint_indices(len(source_poses), int(manifest["config"]["waypoint_stride"])),
+        ),
+        "derived waypoint index mapping changed",
+    )
+    _require(len(derived_poses) == len(waypoint_indices), "derived pose count mismatch")
+    derived_positions = np.asarray([pose["position"] for pose in derived_poses], dtype=np.float64)
     derived_attitudes = np.asarray(
         [pose["orientation"] for pose in derived_poses], dtype=np.float64
     )
@@ -1027,8 +1109,31 @@ def verify_ep4_time_warp_package(
         array_sha256(source_attitudes) == source_record.get("orientation_array_sha256"),
         "source orientation provenance hash changed",
     )
-    _require(source_positions.tobytes() == derived_positions.tobytes(), "positions changed")
-    _require(source_attitudes.tobytes() == derived_attitudes.tobytes(), "orientations changed")
+    _require(
+        source_positions[waypoint_indices].tobytes() == derived_positions.tobytes(),
+        "derived positions are not an exact source subset",
+    )
+    _require(
+        source_attitudes[waypoint_indices].tobytes() == derived_attitudes.tobytes(),
+        "derived orientations are not an exact source subset",
+    )
+    _require(
+        array_sha256(derived_positions) == derived_record.get("position_array_sha256"),
+        "derived position hash mismatch",
+    )
+    _require(
+        array_sha256(derived_attitudes) == derived_record.get("orientation_array_sha256"),
+        "derived orientation hash mismatch",
+    )
+    _require(
+        int(derived_record.get("pose_count", -1)) == len(waypoint_indices),
+        "derived pose-count evidence changed",
+    )
+    _require(
+        _canonical_json_sha256(waypoint_indices.tolist())
+        == derived_record.get("waypoint_source_index_sha256"),
+        "derived waypoint index hash mismatch",
+    )
     _require(
         array_sha256(derived_time) == derived_record.get("time_array_sha256"),
         "derived timestamp hash mismatch",
@@ -1041,17 +1146,17 @@ def verify_ep4_time_warp_package(
     except (TypeError, ValueError) as exc:
         raise ValueError("invalid derived config") from exc
     expected = derive_time_reparameterization(
-        reference.time_s,
-        source_positions,
-        source_attitudes,
+        reference.time_s[waypoint_indices],
+        derived_positions,
+        derived_attitudes,
         config,
     )
     _require(
         array_sha256(expected.derived_time_s) == array_sha256(derived_time),
         "derived timestamp mapping is not deterministic",
     )
-    _require(derived_time[0] == reference.time_s[0], "derived start changed")
-    _require(derived_time[-1] == reference.time_s[-1], "derived duration changed")
+    _require(derived_time[0] == reference.time_s[waypoint_indices[0]], "derived start changed")
+    _require(derived_time[-1] == reference.time_s[waypoint_indices[-1]], "derived duration changed")
     _require(np.all(np.diff(derived_time) > 0.0), "derived timestamps are not strict")
 
     paired_record = manifest.get("paired_integrity_seed")
@@ -1068,8 +1173,13 @@ def verify_ep4_time_warp_package(
         "raw_integrity_seed_sha256": paired_record.get("raw_integrity_seed_sha256"),
         "source_time_array_sha256": array_sha256(reference.time_s),
         "derived_time_array_sha256": array_sha256(derived_time),
-        "position_array_sha256": array_sha256(source_positions),
-        "orientation_array_sha256": array_sha256(source_attitudes),
+        "waypoint_source_index_sha256": _canonical_json_sha256(
+            waypoint_indices.tolist()
+        ),
+        "source_position_array_sha256": array_sha256(source_positions),
+        "source_orientation_array_sha256": array_sha256(source_attitudes),
+        "derived_position_array_sha256": array_sha256(derived_positions),
+        "derived_orientation_array_sha256": array_sha256(derived_attitudes),
     }
     _require(
         manifest.get("time_warp_identity") == expected_identity,
@@ -1118,20 +1228,40 @@ def verify_ep4_time_warp_package(
             paired_arrays = {key: np.asarray(data[key]) for key in data.files}
     except Exception as exc:
         raise ValueError("paired integrity seed is unreadable") from exc
-    for key in (
-        "q_current_base_arm_6",
-        "q_next_base_arm_6",
-        "desired_position_full_m",
-        "desired_attitude_full_world_dfr_quat_wxyz",
-    ):
+    raw_current = np.asarray(raw_arrays["q_current_base_arm_6"], dtype=np.float32)
+    raw_next = np.asarray(raw_arrays["q_next_base_arm_6"], dtype=np.float32)
+    raw_base_arm_q = np.vstack((raw_current, raw_next[-1]))
+    transition_rows = waypoint_indices[1:] - 1
+    expected_subset_arrays = {
+        "q_current_base_arm_6": raw_base_arm_q[waypoint_indices[:-1]],
+        "q_next_base_arm_6": raw_base_arm_q[waypoint_indices[1:]],
+        "desired_position_full_m": np.asarray(raw_arrays["desired_position_full_m"])[
+            waypoint_indices
+        ],
+        "desired_attitude_full_world_dfr_quat_wxyz": np.asarray(
+            raw_arrays["desired_attitude_full_world_dfr_quat_wxyz"]
+        )[waypoint_indices],
+        "gimbal_attitude_target_world_dfr_quat_wxyz": np.asarray(
+            raw_arrays["gimbal_attitude_target_world_dfr_quat_wxyz"]
+        )[transition_rows],
+    }
+    for key, expected_array in expected_subset_arrays.items():
         _require(
-            np.asarray(raw_arrays[key]).tobytes() == np.asarray(paired_arrays[key]).tobytes(),
-            f"paired integrity-seed array changed: {key}",
+            np.asarray(expected_array).tobytes()
+            == np.asarray(paired_arrays[key]).tobytes(),
+            f"paired integrity-seed subset changed: {key}",
         )
     _require(
-        np.asarray(raw_arrays["base_arm_actions"])[:, :3].tobytes()
+        np.asarray(raw_arrays["base_arm_actions"])[transition_rows, :3].tobytes()
         == np.asarray(paired_arrays["base_arm_actions"])[:, :3].tobytes(),
-        "paired integrity-seed arm actions changed",
+        "paired integrity-seed arm action subset changed",
+    )
+    _require(
+        np.array_equal(
+            np.asarray(paired_arrays["waypoint_source_index_0based"]),
+            waypoint_indices,
+        ),
+        "paired integrity-seed waypoint mapping changed",
     )
     paired_current = np.asarray(paired_arrays["q_current_base_arm_6"], dtype=np.float32)
     paired_next = np.asarray(paired_arrays["q_next_base_arm_6"], dtype=np.float32)

@@ -825,3 +825,36 @@ and must state whether its candidate was accepted or rejected.
 - On authorization, verify empty ownership and run only the new wrapper.
 - Admit case 77 only after case 74 passes both physical dynamic quality and the
   runtime contract. Keep the accepted-71 batch and all learning closed.
+
+## Round 26: belt-drive and Isaac plant parity boundary
+
+- Added a hash-bound CPU audit that connects the URDF, Isaac actuator config,
+  riser build audit, and provisional motor-sizing envelope.
+- The URDF and Isaac limits agree at `300 N / 1.0 m/s`. The selected 400 W,
+  1.27 N m motor with `3:1` reduction and 70 mm/rev lead provides
+  `292.397 N` continuous rated equivalent, `877.191 N` peak equivalent, and
+  `1.1667 m/s` at rated motor speed.
+- Therefore the current 300 N plant cap is a transient cap, not a continuous
+  hardware rating. It is only 2.6% above the rated-force equivalent and below
+  peak capability. The 8 kg emergency design force remains covered, but with
+  only a `1.0557x` continuous-force margin.
+- Counterbalance is not required for the present conservative sizing checks.
+  If a 50--70 N constant-force spring is installed, its bidirectional force,
+  friction, and fail-safe behavior must be added to the Isaac plant before
+  hardware-transfer training.
+- Sealed the CPU report at
+  `20260717_hardware_sim_parity_v1/summary.json`, SHA-256
+  `5d4247fc63e2875e1b2602753e58bdfbf6705187aff2e9674c0a307e637e7190`.
+  Concept screening passes, but procurement, hardware transfer, residual
+  capture, BC, and PPO remain false.
+- No Isaac/GPU process or Gate C namespace was started.
+- The complete CPU-only repository suite passes `239` tests.
+
+## Next round after Round 26
+
+- Keep the case-74-only canary ready behind its explicit authorization token.
+- Before hardware transfer, measure carriage mass/friction and output force,
+  then add a continuous-current/thermal governor and the final counterbalance
+  model.
+- Do not reinterpret the 300 N transient simulation cap as a continuous motor
+  guarantee or relax any trajectory/safety gate.

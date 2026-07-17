@@ -239,7 +239,58 @@ SITEMA 的官方 safety catcher 资料给出了典型安全逻辑：失电、断
 `artifacts/two_wheel_riser/20260717_hardware_envelope_v1/summary.json`，SHA-256 为
 `ab9373780dad90a120aaddecb72a20d8c8419cff8bf8c7b80ad4d4f2191c9afa`。
 
-## 10. 主要官方资料
+## 10. 仿真执行器与硬件能力的一致性边界
+
+新增 CPU 审计
+`scripts/two_wheel_balance/audit_riser_hardware_sim_parity.py`，将以下四个
+当前事实绑定到同一份机器可读证据：
+
+- URDF 的 `riser_joint` 限制为 `300 N / 1.0 m/s`；
+- Isaac actuator 同样限制为 `300 N / 1.0 m/s`；
+- 当前电机为 1.27 N m 连续、3.81 N m 峰值，减速比 `3:1`；
+- 同步带导程 `70 mm/rev`，传动与减速综合效率按 `0.90*0.95`。
+
+由此得到：
+
+| 项目 | 计算值 |
+|---|---:|
+| 电机连续额定线性推力 | 292.397 N |
+| 电机峰值线性推力 | 877.191 N |
+| 300 N 仿真上限/连续额定推力 | 1.0260 |
+| 连续额定线速度 | 1.1667 m/s |
+| 1.0 m/s 时电机转速 | 2571.43 rpm |
+| 连续推力/8 kg 最不利急停设计力 | 1.0557 |
+
+因此，当前 `300 N` 仿真上限只能解释为**短时执行器峰值上限**，不能解释为
+400 W 电机可以长期输出的连续力。它比连续额定等效推力高约 2.6%，但仍远低于
+峰值能力；同时，8 kg 最不利急停设计力仍低于连续额定推力，不过裕量只有约
+5.6%。这一差异不要求立即把 Isaac 上限改成 292 N，因为当前轨迹评估还要观察
+短时峰值和饱和情况；但任何面向实机迁移的策略都必须额外加入连续电流/热力
+governor，不能只依赖 300 N 瞬时限幅。
+
+当前审计还明确：
+
+- 当前仿真和保守 8 kg 选型计算都没有依赖恒力弹簧才能通过，因此
+  `counterbalance_required_for_current_sizing_pass=false`；
+- 最终若安装 50--70 N 恒力弹簧，必须同时更新 Isaac 重力补偿、向上/向下净力、
+  摩擦和失电下坠模型，不能只在机械上增加而不重建仿真；
+- 在实测运动质量、摩擦、carriage 输出力、连续温升、再生、抱闸和独立防坠完成
+  前，`valid_for_hardware_transfer=false`；
+- 此审计不产生训练许可，`valid_for_training=false`。
+
+证据位于
+`artifacts/two_wheel_riser/20260717_hardware_sim_parity_v1/summary.json`，
+SHA-256 为
+`5d4247fc63e2875e1b2602753e58bdfbf6705187aff2e9674c0a307e637e7190`。
+加入该审计后，完整 CPU-only 仓库测试为 `239 passed`。
+
+2026-07-17 再次核对官方页面：Leadshine 仍列出该电机为 48 V、400 W、
+1.27 N m、3000 rpm、带抱闸；igus 当前技术表仍列出 ZLW-1040 Standard 为
+70 mm/rev、2 m 最大标准行程、最高 5 m/s，ZLW-1080 为 70 mm/rev、2 m、
+最高 5 m/s。这些是概念筛选参数，不替代厂家针对垂直移动机器人、偏心负载和
+急停工况的正式选型确认。
+
+## 11. 主要官方资料
 
 - Leadshine 400 W/48 V 带抱闸电机：
   https://www.leadshine.com/product-detail/ELVM6040V48EH-M17-HD.html

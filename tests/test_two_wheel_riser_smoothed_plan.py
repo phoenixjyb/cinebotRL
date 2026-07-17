@@ -1,4 +1,6 @@
+import importlib.util
 from pathlib import Path
+import string
 
 import numpy as np
 import pytest
@@ -127,3 +129,23 @@ def test_exporter_defaults_to_bounded_case_order_and_training_closed() -> None:
     assert '"bc_started": False' in source
     assert '"ppo_started": False' in source
     assert '"differential_session_work_started": False' in source
+
+
+def test_exporter_resolves_linked_worktree_git_identity() -> None:
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/export_riser_smoothed_plans.py"
+    )
+    spec = importlib.util.spec_from_file_location("riser_smoothed_export", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert (
+        module._windows_path_from_gitdir("/mnt/g/wSpace/repo/.git/worktrees/x")
+        == "G:/wSpace/repo/.git/worktrees/x"
+    )
+    head = module._git_output("rev-parse", "HEAD")
+    assert len(head) == 40
+    assert set(head) <= set(string.hexdigits)
+    if (module.PROJECT_ROOT / ".git").is_file():
+        assert "--git-dir" in module._git_command()

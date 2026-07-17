@@ -41,9 +41,33 @@ def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
+def _windows_path_from_gitdir(value: str) -> str:
+    if value.startswith("/mnt/") and len(value) >= 7 and value[6] == "/":
+        return f"{value[5].upper()}:{value[6:]}"
+    return value
+
+
+def _git_command() -> list[str]:
+    git_marker = PROJECT_ROOT / ".git"
+    if git_marker.is_file():
+        prefix, gitdir = git_marker.read_text(encoding="utf-8").strip().split(
+            ":", 1
+        )
+        if prefix != "gitdir" or not gitdir.strip():
+            raise ValueError("invalid linked-worktree .git marker")
+        return [
+            "git",
+            "--git-dir",
+            _windows_path_from_gitdir(gitdir.strip()),
+            "--work-tree",
+            str(PROJECT_ROOT),
+        ]
+    return ["git", "-C", str(PROJECT_ROOT)]
+
+
 def _git_output(*args: str) -> str:
     return subprocess.check_output(
-        ["git", *args], cwd=PROJECT_ROOT, text=True
+        [*_git_command(), *args], cwd=PROJECT_ROOT, text=True
     ).strip()
 
 

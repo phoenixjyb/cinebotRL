@@ -160,6 +160,34 @@ def test_git_output_uses_wsl_backend_for_windows_worktree(
     ]
 
 
+def test_gravity_recovery_settings_are_disabled_and_identity_bound_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "retarget_exact_source_v1_nonholonomic.py",
+            "--reference-package",
+            "reference",
+            "--integrity-seed-package",
+            "seed",
+            "--target-urdf",
+            "robot.urdf",
+            "--output-dir",
+            "output",
+        ],
+    )
+    args = exact_retarget.parse_args()
+    config = exact_retarget.retarget_cli_config(args)
+
+    assert config["enable_gravity_aware_base_arm_recovery_seed"] is False
+    assert config["gravity_aware_base_arm_finite_difference_step"] == 1e-5
+    assert config["gravity_aware_base_arm_maximum_step_fraction"] == 0.25
+    changed = {**config, "enable_gravity_aware_base_arm_recovery_seed": True}
+    assert canonical_json_sha256(changed) != canonical_json_sha256(config)
+
+
 @pytest.mark.parametrize(
     "field,replacement",
     [
@@ -476,3 +504,20 @@ def test_legacy_solver_without_checkpoint_remains_unchanged() -> None:
     for expected, actual in zip(first[:-1], second[:-1], strict=True):
         np.testing.assert_array_equal(actual, expected)
     assert first[-1] == second[-1]
+
+
+def test_disabled_gravity_recovery_matches_legacy_solver_outputs() -> None:
+    problem = stationary_problem()
+    legacy = retarget.retarget_semantic_full_pose(*problem, solver_args())
+    explicitly_disabled = retarget.retarget_semantic_full_pose(
+        *problem,
+        solver_args(
+            enable_gravity_aware_base_arm_recovery_seed=False,
+            gravity_aware_base_arm_finite_difference_step=3e-5,
+            gravity_aware_base_arm_maximum_step_fraction=0.75,
+        ),
+    )
+
+    for expected, actual in zip(legacy[:-1], explicitly_disabled[:-1], strict=True):
+        np.testing.assert_array_equal(actual, expected)
+    assert explicitly_disabled[-1] == legacy[-1]

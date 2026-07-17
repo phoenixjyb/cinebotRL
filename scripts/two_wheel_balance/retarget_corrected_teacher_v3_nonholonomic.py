@@ -14,6 +14,7 @@ import json
 import math
 from pathlib import Path
 import sys
+from typing import Callable
 
 import h5py
 import numpy as np
@@ -66,6 +67,9 @@ FORBIDDEN_EXPORT_KEYS = {
     "physical_gimbal_diagnostic",
     "target_cam_link_quat_wxyz",
 }
+GRAVITY_AWARE_BASE_ARM_RECOVERY_CONTRACT = (
+    "finite_difference_peak_gravity_descent_in_ee_position_nullspace_v1"
+)
 
 
 @dataclass(frozen=True)
@@ -546,6 +550,136 @@ def bounded_gimbal_recovery_deltas(
         ):
             bounded.append(candidate)
     return tuple(bounded)
+
+
+def gravity_aware_base_arm_recovery_seed(
+    baseline_control: np.ndarray,
+    lower_control: np.ndarray,
+    upper_control: np.ndarray,
+    control_to_position: Callable[[np.ndarray], np.ndarray],
+    control_to_gravity_effort: Callable[[np.ndarray], np.ndarray],
+    *,
+    finite_difference_step: float,
+    maximum_step_fraction: float,
+) -> np.ndarray | None:
+    """Return one bounded gravity-descent seed in the local EE-position nullspace."""
+
+    baseline = np.asarray(baseline_control, dtype=np.float64)
+    lower = np.asarray(lower_control, dtype=np.float64)
+    upper = np.asarray(upper_control, dtype=np.float64)
+    if baseline.shape != (8,) or lower.shape != (8,) or upper.shape != (8,):
+        raise ValueError("gravity-aware recovery controls must have shape (8,)")
+    if not np.all(np.isfinite(baseline)) or not np.all(np.isfinite(lower)) or not np.all(
+        np.isfinite(upper)
+    ):
+        raise ValueError("gravity-aware recovery controls must be finite")
+    if np.any(lower > upper):
+        raise ValueError("gravity-aware recovery control bounds are inverted")
+    if not np.isfinite(finite_difference_step) or finite_difference_step <= 0.0:
+        raise ValueError("gravity-aware finite-difference step must be positive")
+    if not np.isfinite(maximum_step_fraction) or not 0.0 < maximum_step_fraction <= 1.0:
+        raise ValueError("gravity-aware maximum step fraction must be in (0, 1]")
+
+    baseline = np.clip(baseline, lower, upper)
+    position_jacobian = np.zeros((3, 5), dtype=np.float64)
+    gravity_gradient = np.zeros(5, dtype=np.float64)
+
+    def peak_gravity(control: np.ndarray) -> float:
+        effort = np.asarray(control_to_gravity_effort(control), dtype=np.float64)
+        if effort.ndim != 1 or effort.size == 0 or not np.all(np.isfinite(effort)):
+            raise ValueError("gravity-aware static effort must be a finite vector")
+        return float(np.max(np.abs(effort)))
+
+    for axis in range(5):
+        plus = baseline.copy()
+        minus = baseline.copy()
+        plus[axis] = min(upper[axis], baseline[axis] + finite_difference_step)
+        minus[axis] = max(lower[axis], baseline[axis] - finite_difference_step)
+        span = plus[axis] - minus[axis]
+        if span <= np.finfo(np.float64).eps:
+            continue
+        plus_position = np.asarray(control_to_position(plus), dtype=np.float64)
+        minus_position = np.asarray(control_to_position(minus), dtype=np.float64)
+        if (
+            plus_position.shape != (3,)
+            or minus_position.shape != (3,)
+            or not np.all(np.isfinite(plus_position))
+            or not np.all(np.isfinite(minus_position))
+        ):
+            raise ValueError("gravity-aware EE positions must be finite 3-vectors")
+        position_jacobian[:, axis] = (plus_position - minus_position) / span
+        gravity_gradient[axis] = (peak_gravity(plus) - peak_gravity(minus)) / span
+
+    free = upper[:5] - lower[:5] > 1e-12
+    while np.any(free):
+        free_jacobian = position_jacobian[:, free]
+        projector = (
+            np.eye(np.count_nonzero(free))
+            - np.linalg.pinv(free_jacobian, rcond=1e-10) @ free_jacobian
+        )
+        direction = np.zeros(5, dtype=np.float64)
+        direction[free] = -(projector @ gravity_gradient[free])
+        if not np.all(np.isfinite(direction)):
+            raise ValueError("gravity-aware nullspace direction is not finite")
+        active = np.abs(direction) > 1e-12
+        if not np.any(active):
+            return None
+        capacity = np.where(
+            direction > 0.0,
+            upper[:5] - baseline[:5],
+            baseline[:5] - lower[:5],
+        )
+        blocked = active & (capacity <= 1e-12)
+        if not np.any(blocked):
+            break
+        # Recompute with outward-saturated axes fixed at zero. Clipping a
+        # projected direction after the fact would violate J @ dq == 0.
+        free[blocked] = False
+    else:
+        return None
+    positive_capacity = capacity[active] / np.abs(direction[active])
+    scale = maximum_step_fraction * float(np.min(positive_capacity))
+    seed = baseline.copy()
+    seed[:5] = np.clip(seed[:5] + scale * direction, lower[:5], upper[:5])
+    if not np.all(np.isfinite(seed)) or np.allclose(seed, baseline, atol=1e-12, rtol=0.0):
+        return None
+    return seed
+
+
+def append_gravity_aware_base_arm_recovery_seed(
+    seeds: list[np.ndarray],
+    *,
+    enabled: bool,
+    existing_solution_feasible: bool = False,
+    baseline_control: np.ndarray,
+    lower_control: np.ndarray,
+    upper_control: np.ndarray,
+    control_to_position: Callable[[np.ndarray], np.ndarray],
+    control_to_gravity_effort: Callable[[np.ndarray], np.ndarray],
+    finite_difference_step: float,
+    maximum_step_fraction: float,
+) -> str:
+    """Append the opt-in seed after existing seeds and report its disposition."""
+
+    if not enabled:
+        return "disabled"
+    if existing_solution_feasible:
+        return "skipped_existing_feasible"
+    seed = gravity_aware_base_arm_recovery_seed(
+        baseline_control,
+        lower_control,
+        upper_control,
+        control_to_position,
+        control_to_gravity_effort,
+        finite_difference_step=finite_difference_step,
+        maximum_step_fraction=maximum_step_fraction,
+    )
+    if seed is None:
+        return "unavailable"
+    if any(np.allclose(seed, existing, atol=1e-12, rtol=0.0) for existing in seeds):
+        return "deduplicated"
+    seeds.append(seed)
+    return "generated"
 
 
 def physical_camera_rotation(
@@ -1634,6 +1768,39 @@ def retarget_semantic_full_pose(
         retimed_interval_count = 0
         start_index = 1
 
+    gravity_seed_enabled = bool(
+        getattr(args, "enable_gravity_aware_base_arm_recovery_seed", False)
+    )
+    gravity_seed_finite_difference_step = float(
+        getattr(args, "gravity_aware_base_arm_finite_difference_step", 1e-5)
+    )
+    gravity_seed_maximum_step_fraction = float(
+        getattr(args, "gravity_aware_base_arm_maximum_step_fraction", 0.25)
+    )
+    if gravity_seed_enabled and (
+        not np.isfinite(gravity_seed_finite_difference_step)
+        or gravity_seed_finite_difference_step <= 0.0
+    ):
+        raise ValueError("gravity-aware finite-difference step must be positive")
+    if gravity_seed_enabled and (
+        not np.isfinite(gravity_seed_maximum_step_fraction)
+        or not 0.0 < gravity_seed_maximum_step_fraction <= 1.0
+    ):
+        raise ValueError("gravity-aware maximum step fraction must be in (0, 1]")
+    gravity_seed_diagnostics: dict[str, object] = {
+        "contract": GRAVITY_AWARE_BASE_ARM_RECOVERY_CONTRACT,
+        "enabled": gravity_seed_enabled,
+        "scope": (
+            "resumed_suffix_only" if resume_checkpoint else "complete_execution"
+        ),
+        "scope_start_source_interval": start_index,
+        "generated_count": 0,
+        "deduplicated_count": 0,
+        "unavailable_count": 0,
+        "skipped_existing_feasible_count": 0,
+        "selected_count": 0,
+    }
+
     for index in range(start_index, len(reference.time_s)):
         source_dt = float(reference.time_s[index] - reference.time_s[index - 1])
         segment_start_state = states[-1].copy()
@@ -1657,6 +1824,7 @@ def retarget_semantic_full_pose(
             trial_balance_pitch = []
             trial_source_arm_errors = []
             trial_gimbal_margins = []
+            trial_gravity_seed_selected_count = 0
             for substep in range(1, time_scale + 1):
                 fraction = substep / time_scale
                 target_position = (
@@ -1797,6 +1965,8 @@ def retarget_semantic_full_pose(
                     )
 
                 solutions = [solve(trial_control)]
+                solution_seed_families = ["previous_control"]
+                submitted_seeds = [trial_control.copy()]
 
                 def solution_metrics(
                     solution,
@@ -1839,6 +2009,46 @@ def retarget_semantic_full_pose(
                         next_state[6:9], camera_kinematics
                     )
                     return position_error, attitude_error, gravity, balance_pitch, margin
+
+                def rank(solution) -> tuple[bool, float]:
+                    (
+                        position_error,
+                        attitude_error,
+                        gravity,
+                        balance_pitch,
+                        gimbal_margin,
+                    ) = solution_metrics(solution)
+                    feasible = (
+                        position_error <= 0.05
+                        and attitude_error <= args.maximum_ik_error_deg
+                        and gravity
+                        <= args.maximum_arm_gravity_effort_nm
+                        + args.gravity_effort_tolerance_nm
+                        and balance_pitch
+                        <= args.maximum_equilibrium_pitch_deg
+                        + BALANCE_PITCH_SOLVER_TOLERANCE_DEG
+                        and gimbal_margin
+                        >= semantic_gimbal_margin_ratio(args)
+                    )
+                    score = (
+                        position_error / 0.02
+                        + attitude_error / args.maximum_ik_error_deg
+                        + max(
+                            0.0,
+                            gravity - args.maximum_arm_gravity_effort_nm,
+                        )
+                        + max(
+                            0.0,
+                            balance_pitch - args.maximum_equilibrium_pitch_deg,
+                        )
+                        + 10.0
+                        * max(
+                            0.0,
+                            semantic_gimbal_margin_ratio(args)
+                            - gimbal_margin,
+                        )
+                    )
+                    return feasible, score
 
                 initial_metrics = solution_metrics(solutions[0])
                 if not (
@@ -1906,51 +2116,56 @@ def retarget_semantic_full_pose(
                                 for existing in solutions
                             ):
                                 solutions.append(solve(seed))
+                                submitted_seeds.append(seed.copy())
+                                solution_seed_families.append("existing_recovery")
 
-                def rank(solution) -> tuple[bool, float]:
-                    (
-                        position_error,
-                        attitude_error,
-                        gravity,
-                        balance_pitch,
-                        gimbal_margin,
-                    ) = solution_metrics(solution)
-                    feasible = (
-                        position_error <= 0.05
-                        and attitude_error <= args.maximum_ik_error_deg
-                        and gravity
-                        <= args.maximum_arm_gravity_effort_nm
-                        + args.gravity_effort_tolerance_nm
-                        and balance_pitch
-                        <= args.maximum_equilibrium_pitch_deg
-                        + BALANCE_PITCH_SOLVER_TOLERANCE_DEG
-                        and gimbal_margin
-                        >= semantic_gimbal_margin_ratio(args)
+                    existing_recovery_feasible = any(
+                        rank(existing)[0] for existing in solutions
                     )
-                    score = (
-                        position_error / 0.02
-                        + attitude_error / args.maximum_ik_error_deg
-                        + max(
-                            0.0,
-                            gravity - args.maximum_arm_gravity_effort_nm,
+                    if gravity_seed_enabled:
+                        best_existing = min(
+                            solutions,
+                            key=lambda item: (not rank(item)[0], rank(item)[1]),
                         )
-                        + max(
-                            0.0,
-                            balance_pitch - args.maximum_equilibrium_pitch_deg,
+                        status = append_gravity_aware_base_arm_recovery_seed(
+                            submitted_seeds,
+                            enabled=True,
+                            existing_solution_feasible=existing_recovery_feasible,
+                            baseline_control=best_existing.x,
+                            lower_control=lower,
+                            upper_control=upper,
+                            control_to_position=lambda control: (
+                                position_kinematics.position(candidate(control)[:6])
+                            ),
+                            control_to_gravity_effort=lambda control: (
+                                position_kinematics.gravitational_effort_nm(
+                                    candidate(control)[:6]
+                                )
+                            ),
+                            finite_difference_step=(
+                                gravity_seed_finite_difference_step
+                            ),
+                            maximum_step_fraction=(
+                                gravity_seed_maximum_step_fraction
+                            ),
                         )
-                        + 10.0
-                        * max(
-                            0.0,
-                            semantic_gimbal_margin_ratio(args)
-                            - gimbal_margin,
-                        )
-                    )
-                    return feasible, score
+                        if status == "generated":
+                            solutions.append(solve(submitted_seeds[-1]))
+                            solution_seed_families.append("gravity_aware_base_arm")
+                        gravity_seed_diagnostics[f"{status}_count"] = int(
+                            gravity_seed_diagnostics[f"{status}_count"]
+                        ) + 1
 
-                solution = min(
-                    solutions,
-                    key=lambda item: (not rank(item)[0], rank(item)[1]),
+                solution_index = min(
+                    range(len(solutions)),
+                    key=lambda item: (
+                        not rank(solutions[item])[0],
+                        rank(solutions[item])[1],
+                    ),
                 )
+                solution = solutions[solution_index]
+                if solution_seed_families[solution_index] == "gravity_aware_base_arm":
+                    trial_gravity_seed_selected_count += 1
                 trial_control = solution.x
                 trial_state = candidate(solution.x)
                 position_error = float(
@@ -2059,6 +2274,7 @@ def retarget_semantic_full_pose(
                     trial_attitudes,
                     trial_position_errors,
                     trial_attitude_errors,
+                    trial_gravity_seed_selected_count,
                 )
             )
             if should_stop_semantic_retime_search(
@@ -2096,7 +2312,7 @@ def retarget_semantic_full_pose(
                 gimbal_limit_margin_ratio(state[6:9], camera_kinematics)
                 for state in best_states
             )
-            raise ValueError(
+            error = ValueError(
                 f"semantic interval {index} has no physical-gate-safe "
                 "nonholonomic solve: "
                 f"position_max={max(best[7]):.6f} m, "
@@ -2106,6 +2322,16 @@ def retarget_semantic_full_pose(
                 f"gimbal_margin_min_ratio={best_gimbal_margin:.9f}, "
                 f"gimbal_margin_required_ratio={semantic_gimbal_margin_ratio(args):.9f}"
             )
+            setattr(
+                error,
+                "retarget_seed_family_diagnostics",
+                {
+                    **gravity_seed_diagnostics,
+                    "rejected_source_interval": index,
+                    "best_attempt_selected_count": int(best[9]),
+                },
+            )
+            raise error
         selected = min(feasible_attempts, key=lambda item: item[1])
         (
             _,
@@ -2117,7 +2343,11 @@ def retarget_semantic_full_pose(
             selected_attitudes,
             selected_position_errors,
             selected_attitude_errors,
+            selected_gravity_seed_count,
         ) = selected
+        gravity_seed_diagnostics["selected_count"] = int(
+            gravity_seed_diagnostics["selected_count"]
+        ) + int(selected_gravity_seed_count)
         if len(selected_states) > 1:
             retimed_interval_count += 1
         print(
@@ -2178,6 +2408,7 @@ def retarget_semantic_full_pose(
                 expected_anchor=anchor,
             )
 
+    setattr(args, "semantic_seed_family_diagnostics", gravity_seed_diagnostics)
     state_array = np.asarray(states)
     return (
         np.asarray(time_s),
@@ -2275,10 +2506,28 @@ def retarget_case(
     )
     maximum_equilibrium_pitch_deg = float(np.max(equilibrium_pitches_deg))
     acquisition_steps = len(acquisition_time) - 1
+    seed_family_diagnostics = dict(
+        getattr(
+            args,
+            "semantic_seed_family_diagnostics",
+            {
+                "contract": GRAVITY_AWARE_BASE_ARM_RECOVERY_CONTRACT,
+                "enabled": False,
+                "scope": "complete_execution",
+                "scope_start_source_interval": 1,
+                "generated_count": 0,
+                "deduplicated_count": 0,
+                "unavailable_count": 0,
+                "skipped_existing_feasible_count": 0,
+                "selected_count": 0,
+            },
+        )
+    )
     gimbal = {
         "full_pose_anchor_position_error_m": anchor_position_error,
         "full_pose_anchor_attitude_error_deg": anchor_attitude_error,
         "semantic_retimed_interval_count": semantic_retimed_interval_count,
+        "semantic_seed_family_diagnostics": seed_family_diagnostics,
         **equilibrium_pitch_gimbal_diagnostics,
         **acquisition_diagnostics,
     }
@@ -2400,6 +2649,33 @@ def retarget_case(
             -1
             if semantic_gimbal_reserve_search_max_scale(args) is None
             else semantic_gimbal_reserve_search_max_scale(args)
+        ),
+        "gravity_aware_base_arm_recovery_contract": np.asarray(
+            seed_family_diagnostics["contract"]
+        ),
+        "gravity_aware_base_arm_recovery_enabled": np.bool_(
+            seed_family_diagnostics["enabled"]
+        ),
+        "gravity_aware_base_arm_recovery_diagnostics_scope": np.asarray(
+            seed_family_diagnostics["scope"]
+        ),
+        "gravity_aware_base_arm_recovery_scope_start_source_interval": np.int32(
+            seed_family_diagnostics["scope_start_source_interval"]
+        ),
+        "gravity_aware_base_arm_recovery_generated_count": np.int32(
+            seed_family_diagnostics["generated_count"]
+        ),
+        "gravity_aware_base_arm_recovery_deduplicated_count": np.int32(
+            seed_family_diagnostics["deduplicated_count"]
+        ),
+        "gravity_aware_base_arm_recovery_unavailable_count": np.int32(
+            seed_family_diagnostics["unavailable_count"]
+        ),
+        "gravity_aware_base_arm_recovery_skipped_existing_feasible_count": np.int32(
+            seed_family_diagnostics["skipped_existing_feasible_count"]
+        ),
+        "gravity_aware_base_arm_recovery_selected_count": np.int32(
+            seed_family_diagnostics["selected_count"]
         ),
         "time_s": time_s,
         "source_time_s": reference.time_s,

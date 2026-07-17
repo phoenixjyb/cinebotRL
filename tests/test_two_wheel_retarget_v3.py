@@ -14,9 +14,11 @@ from retarget_corrected_teacher_v3_nonholonomic import (  # noqa: E402
     BALANCE_PITCH_OUTPUT_TOLERANCE_DEG,
     BALANCE_PITCH_SOLVER_TOLERANCE_DEG,
     HOME_ARM,
+    append_gravity_aware_base_arm_recovery_seed,
     balance_pitch_optimization_margin_deg,
     bounded_gimbal_recovery_deltas,
     build_gravity_aware_arm_acquisition,
+    gravity_aware_base_arm_recovery_seed,
     physical_gimbal_interpolation_error,
     physical_camera_rotation,
     select_acquisition_base_route,
@@ -148,6 +150,182 @@ def test_gimbal_recovery_seeds_deduplicate_identical_branches() -> None:
 
     assert len(deltas) == 1
     np.testing.assert_allclose(deltas[0], 0.0)
+
+
+def _gravity_seed_fixture() -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    object,
+    object,
+]:
+    baseline = np.zeros(8)
+    lower = np.full(8, -0.4)
+    upper = np.full(8, 0.4)
+    position_jacobian = np.zeros((3, 5))
+    position_jacobian[:, :3] = np.eye(3)
+
+    def position(control: np.ndarray) -> np.ndarray:
+        return position_jacobian @ control[:5]
+
+    def gravity(control: np.ndarray) -> np.ndarray:
+        return np.array([29.503752 + control[3], 2.0, -1.0])
+
+    return baseline, lower, upper, position_jacobian, position, gravity
+
+
+def test_gravity_recovery_disabled_preserves_existing_seed_order() -> None:
+    existing = [np.arange(8, dtype=np.float64), np.arange(8, dtype=np.float64) + 10.0]
+    expected = [seed.copy() for seed in existing]
+
+    def unexpected(_: np.ndarray) -> np.ndarray:
+        pytest.fail("disabled gravity-aware recovery evaluated callbacks")
+
+    status = append_gravity_aware_base_arm_recovery_seed(
+        existing,
+        enabled=False,
+        baseline_control=np.zeros(8),
+        lower_control=np.full(8, -1.0),
+        upper_control=np.full(8, 1.0),
+        control_to_position=unexpected,
+        control_to_gravity_effort=unexpected,
+        finite_difference_step=1e-5,
+        maximum_step_fraction=0.25,
+    )
+
+    assert status == "disabled"
+    assert len(existing) == len(expected)
+    for actual, wanted in zip(existing, expected, strict=True):
+        np.testing.assert_array_equal(actual, wanted)
+
+
+def test_gravity_recovery_appends_deterministic_nullspace_boundary_seed() -> None:
+    baseline, lower, upper, jacobian, position, gravity = _gravity_seed_fixture()
+    target = np.array([0.051691, 0.0, 0.0])
+    assert np.linalg.norm(position(baseline) - target) == pytest.approx(0.051691)
+    assert np.max(np.abs(gravity(baseline))) == pytest.approx(29.503752)
+
+    first = [np.full(8, 0.123)]
+    second = [np.full(8, 0.123)]
+    common = {
+        "enabled": True,
+        "baseline_control": baseline,
+        "lower_control": lower,
+        "upper_control": upper,
+        "control_to_position": position,
+        "control_to_gravity_effort": gravity,
+        "finite_difference_step": 1e-5,
+        "maximum_step_fraction": 0.25,
+    }
+    assert append_gravity_aware_base_arm_recovery_seed(first, **common) == "generated"
+    assert append_gravity_aware_base_arm_recovery_seed(second, **common) == "generated"
+
+    np.testing.assert_array_equal(first[0], np.full(8, 0.123))
+    np.testing.assert_array_equal(first[1], second[1])
+    assert np.all(np.isfinite(first[1]))
+    np.testing.assert_allclose(jacobian @ (first[1][:5] - baseline[:5]), 0.0, atol=1e-10)
+    assert np.max(np.abs(gravity(first[1]))) < np.max(np.abs(gravity(baseline)))
+    assert np.linalg.norm(position(first[1]) - target) == pytest.approx(0.051691)
+
+
+def test_gravity_recovery_reprojects_around_saturated_axis_before_clipping() -> None:
+    baseline = np.zeros(8)
+    lower = np.full(8, -0.4)
+    upper = np.full(8, 0.4)
+    upper[3] = 0.0
+    jacobian = np.zeros((3, 5))
+    jacobian[0, 0] = 1.0
+    jacobian[1, 1] = 1.0
+    jacobian[2, 2:5] = 1.0
+
+    def position(control: np.ndarray) -> np.ndarray:
+        return jacobian @ control[:5]
+
+    def gravity(control: np.ndarray) -> np.ndarray:
+        return np.array([20.0 - control[3] + control[4], 1.0, -1.0])
+
+    seed = gravity_aware_base_arm_recovery_seed(
+        baseline,
+        lower,
+        upper,
+        position,
+        gravity,
+        finite_difference_step=1e-5,
+        maximum_step_fraction=1.0,
+    )
+
+    assert seed is not None
+    assert np.all(seed >= lower) and np.all(seed <= upper)
+    np.testing.assert_allclose(jacobian @ (seed[:5] - baseline[:5]), 0.0, atol=1e-10)
+    assert seed[3] <= upper[3]
+
+
+def test_gravity_recovery_deduplicates_existing_seed() -> None:
+    baseline, lower, upper, _, position, gravity = _gravity_seed_fixture()
+    seed = gravity_aware_base_arm_recovery_seed(
+        baseline,
+        lower,
+        upper,
+        position,
+        gravity,
+        finite_difference_step=1e-5,
+        maximum_step_fraction=0.25,
+    )
+    assert seed is not None
+    seeds = [np.ones(8), seed.copy()]
+
+    status = append_gravity_aware_base_arm_recovery_seed(
+        seeds,
+        enabled=True,
+        baseline_control=baseline,
+        lower_control=lower,
+        upper_control=upper,
+        control_to_position=position,
+        control_to_gravity_effort=gravity,
+        finite_difference_step=1e-5,
+        maximum_step_fraction=0.25,
+    )
+
+    assert status == "deduplicated"
+    assert len(seeds) == 2
+
+
+def test_gravity_recovery_rejects_nonfinite_local_model() -> None:
+    baseline, lower, upper, _, _, gravity = _gravity_seed_fixture()
+    with pytest.raises(ValueError, match="EE positions must be finite"):
+        gravity_aware_base_arm_recovery_seed(
+            baseline,
+            lower,
+            upper,
+            lambda _: np.full(3, np.nan),
+            gravity,
+            finite_difference_step=1e-5,
+            maximum_step_fraction=0.25,
+        )
+
+
+def test_gravity_recovery_is_not_attempted_after_existing_feasible_branch() -> None:
+    seeds = [np.zeros(8)]
+
+    def unexpected(_: np.ndarray) -> np.ndarray:
+        pytest.fail("feasible existing recovery evaluated gravity-aware callbacks")
+
+    status = append_gravity_aware_base_arm_recovery_seed(
+        seeds,
+        enabled=True,
+        existing_solution_feasible=True,
+        baseline_control=np.zeros(8),
+        lower_control=np.full(8, -1.0),
+        upper_control=np.full(8, 1.0),
+        control_to_position=unexpected,
+        control_to_gravity_effort=unexpected,
+        finite_difference_step=1e-5,
+        maximum_step_fraction=0.25,
+    )
+
+    assert status == "skipped_existing_feasible"
+    assert len(seeds) == 1
 
 
 def test_acquisition_route_chooses_reverse_when_it_reduces_yaw_travel() -> None:

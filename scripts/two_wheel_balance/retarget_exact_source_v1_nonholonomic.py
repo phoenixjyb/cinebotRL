@@ -83,6 +83,9 @@ RETARGET_CLI_CONFIG_FIELDS = (
     "minimum_semantic_gimbal_reserve_margin_ratio",
     "maximum_semantic_gimbal_reserve_search_scale",
     "semantic_gimbal_center_regularization",
+    "enable_gravity_aware_base_arm_recovery_seed",
+    "gravity_aware_base_arm_finite_difference_step",
+    "gravity_aware_base_arm_maximum_step_fraction",
     "position_scale_m",
     "control_regularization",
     "maximum_position_p95_m",
@@ -133,6 +136,21 @@ def parse_args() -> argparse.Namespace:
         default=24,
     )
     parser.add_argument("--semantic-gimbal-center-regularization", type=float, default=0.10)
+    parser.add_argument(
+        "--enable-gravity-aware-base-arm-recovery-seed",
+        action="store_true",
+        help="Append one bounded gravity-descent EE-nullspace seed after existing seeds.",
+    )
+    parser.add_argument(
+        "--gravity-aware-base-arm-finite-difference-step",
+        type=float,
+        default=1e-5,
+    )
+    parser.add_argument(
+        "--gravity-aware-base-arm-maximum-step-fraction",
+        type=float,
+        default=0.25,
+    )
     parser.add_argument("--position-scale-m", type=float, default=0.01)
     parser.add_argument("--control-regularization", type=float, default=0.01)
     parser.add_argument("--maximum-position-p95-m", type=float, default=0.10)
@@ -716,6 +734,11 @@ def main() -> int:
                 "error_type": type(error).__name__,
                 "error": str(error),
             }
+            seed_diagnostics = getattr(
+                error, "retarget_seed_family_diagnostics", None
+            )
+            if seed_diagnostics is not None:
+                result["semantic_seed_family_diagnostics"] = seed_diagnostics
             (args.output_dir / f"case_{case:04d}.result.json").write_text(
                 json.dumps(result, indent=2) + "\n", encoding="utf-8", newline="\n"
             )

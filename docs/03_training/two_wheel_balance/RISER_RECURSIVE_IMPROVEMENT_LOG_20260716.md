@@ -798,3 +798,30 @@ and must state whether its candidate was accepted or rejected.
 - Only after separate explicit GPU authorization and an empty ownership guard,
   run case 74 alone in a fresh namespace. Preserve all physical gates and stop
   on the first failure; dynamic success must be proven before case 77 starts.
+
+## Round 25: case-74-only launch contract
+
+- Added `run_riser_case74_recovery_canary.sh` as the only intended next GPU
+  entrypoint. It exits before the shared runner unless
+  `RISER_CASE74_GPU_AUTHORIZATION=AUTHORIZED_CASE74_RECOVERY_V4` is present.
+- The wrapper hardcodes case `74`; it cannot advance to case 77. Its default
+  namespace is
+  `20260717_gate_c_case74_recovery_direction_v4_exclusive`, and the existing
+  runner still rejects an existing namespace, dirty/unpushed code, a bad
+  portfolio hash, or another playback owner.
+- Strengthened runtime admission to require `structural_robust_v1`,
+  `riser_recovery_direction_v4`, and recovery range `[0.20,0.40] m`.
+  Summaries now report physical dynamic quality and runtime-contract admission
+  independently, so evidence from the wrong controller cannot be sealed as a
+  Gate C pass.
+- This round is CPU-only preparation. It creates no Gate C namespace, starts no
+  Isaac/GPU process, and creates no label, dataset, BC, or PPO run.
+- The complete CPU-only repository suite passes `236` tests.
+
+## Next round after Round 25
+
+- Commit and push the launch contract after the CPU suite passes.
+- Wait for a separate explicit case-74 GPU authorization.
+- On authorization, verify empty ownership and run only the new wrapper.
+- Admit case 77 only after case 74 passes both physical dynamic quality and the
+  runtime contract. Keep the accepted-71 batch and all learning closed.

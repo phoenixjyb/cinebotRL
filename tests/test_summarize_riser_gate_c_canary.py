@@ -15,6 +15,16 @@ def _gate(
         json.dumps(
             {
                 "passed": passed,
+                "dynamic_quality_passed": passed,
+                "training_started": False,
+                "ppo_authorized": False,
+                "trajectory_command_source": "deterministic_teacher",
+                "residual_policy": None,
+                "controller_profile": "structural_robust_v1",
+                "tracking_profile": "riser_recovery_direction_v4",
+                "tracking_direction_recovery_error_range_m": [0.2, 0.4],
+                "cases": [case],
+                "passed_case_count": 1 if passed else 0,
                 "results": [
                     {
                         "case": case,
@@ -27,6 +37,7 @@ def _gate(
                         "residual_label_admission_passed": (
                             passed and label_envelope_passed
                         ),
+                        "executed_residual_dataset": None,
                         "classification": (
                             None
                             if passed
@@ -106,3 +117,37 @@ def test_dynamic_pass_is_independent_of_label_envelope(tmp_path: Path) -> None:
     assert not summary["residual_label_envelope_passed"]
     assert not summary["residual_label_admission_passed"]
     assert not summary["valid_for_training"]
+
+
+def test_runtime_contract_rejects_wrong_tracking_profile(tmp_path: Path) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "admission.json").write_text("{}")
+    gate = tmp_path / "gates/case_0074.json"
+    _gate(gate, 74, True)
+    payload = json.loads(gate.read_text())
+    payload["tracking_profile"] = "riser_motion_direction_v3"
+    gate.write_text(json.dumps(payload))
+    output = tmp_path / "summary.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--git-commit",
+            "a" * 40,
+            "--cases",
+            "74",
+            "--output",
+            str(output),
+        ],
+        check=True,
+    )
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert summary["first_dynamic_reject"]["classification"] == (
+        "runtime_contract_rejection"
+    )
+    assert not summary["passed"]

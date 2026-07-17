@@ -364,3 +364,16 @@ This is compatibility and structural-recovery evidence, not dynamic proof.
 No GPU work, label capture, dataset, BC, or PPO was started. A new case-74-only
 canary still requires separate explicit GPU authorization; case 77 and all
 learning remain closed.
+
+The next launch is now fail-closed behind
+`run_riser_case74_recovery_canary.sh`. It requires the exact authorization
+token `RISER_CASE74_GPU_AUTHORIZATION=AUTHORIZED_CASE74_RECOVERY_V4`,
+hardcodes case `74`, and defaults to the fresh namespace
+`20260717_gate_c_case74_recovery_direction_v4_exclusive`. The shared runner
+still requires a clean pushed commit, the frozen portfolio hashes, and
+exclusive GPU ownership. Post-run admission now also requires controller
+`structural_robust_v1`, tracking profile `riser_recovery_direction_v4`, and
+the recovery range `[0.20,0.40] m`. A physical pass under another profile is
+reported separately as a runtime-contract rejection rather than admitted.
+Preparing this contract launches no Isaac process and authorizes no training.
+The complete CPU-only repository suite passes `236` tests.

@@ -73,6 +73,18 @@ def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
     assert "assert_exclusive_gpu" in source
     assert "refusing shared-GPU Gate C launch" in source
     assert "Gate C runtime JSON is not a sealed dynamic pass" in source
+    assert '"riser_recovery_direction_v4"' in source
+    assert '"tracking_direction_recovery_error_range_m"' in source
+
+
+def test_case74_recovery_wrapper_requires_explicit_one_case_authorization() -> None:
+    source = _read("run_riser_case74_recovery_canary.sh")
+    assert 'RISER_CASE74_GPU_AUTHORIZATION' in source
+    assert 'AUTHORIZED_CASE74_RECOVERY_V4' in source
+    assert 'RISER_GATE_C_CASES="74"' in source
+    assert 'case74_recovery_direction_v4_exclusive' in source
+    assert "run_riser_gate_c_canary.sh" in source
+    assert "1,52,74,77" not in source
 
 
 def test_runtime_evidence_separates_source_and_execution_clocks() -> None:

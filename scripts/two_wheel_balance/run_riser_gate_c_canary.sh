@@ -91,6 +91,9 @@ valid = (
     and payload.get("ppo_authorized") is False
     and payload.get("trajectory_command_source") == "deterministic_teacher"
     and payload.get("residual_policy") is None
+    and payload.get("controller_profile") == "structural_robust_v1"
+    and payload.get("tracking_profile") == "riser_recovery_direction_v4"
+    and payload.get("tracking_direction_recovery_error_range_m") == [0.2, 0.4]
     and payload.get("cases") == [case]
     and payload.get("passed_case_count") == 1
     and len(payload.get("results", [])) == 1

@@ -9,6 +9,11 @@ import json
 from pathlib import Path
 
 
+EXPECTED_CONTROLLER_PROFILE = "structural_robust_v1"
+EXPECTED_TRACKING_PROFILE = "riser_recovery_direction_v4"
+EXPECTED_RECOVERY_ERROR_RANGE_M = [0.2, 0.4]
+
+
 def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -37,11 +42,38 @@ def main() -> int:
             break
         payload = json.loads(gate.read_text(encoding="utf-8"))
         result = payload.get("results", [{}])[0]
+        physical_dynamic_passed = (
+            payload.get("passed") is True
+            and payload.get("dynamic_quality_passed") is True
+            and result.get("passed") is True
+            and result.get("dynamic_quality_passed") is True
+        )
+        runtime_contract_passed = (
+            payload.get("training_started") is False
+            and payload.get("ppo_authorized") is False
+            and payload.get("trajectory_command_source") == "deterministic_teacher"
+            and payload.get("residual_policy") is None
+            and payload.get("controller_profile") == EXPECTED_CONTROLLER_PROFILE
+            and payload.get("tracking_profile") == EXPECTED_TRACKING_PROFILE
+            and payload.get("tracking_direction_recovery_error_range_m")
+            == EXPECTED_RECOVERY_ERROR_RANGE_M
+            and payload.get("cases") == [case]
+            and payload.get("passed_case_count") == 1
+            and len(payload.get("results", [])) == 1
+            and result.get("executed_residual_dataset") is None
+        )
         row = {
             "case": case,
             "gate": str(gate.resolve()),
             "gate_sha256": sha256_file(gate),
-            "passed": payload.get("passed") is True and result.get("passed") is True,
+            "passed": physical_dynamic_passed and runtime_contract_passed,
+            "physical_dynamic_quality_passed": physical_dynamic_passed,
+            "runtime_contract_passed": runtime_contract_passed,
+            "controller_profile": payload.get("controller_profile"),
+            "tracking_profile": payload.get("tracking_profile"),
+            "tracking_direction_recovery_error_range_m": payload.get(
+                "tracking_direction_recovery_error_range_m"
+            ),
             "source_duration_s": result.get("source_duration_s"),
             "execution_duration_s": result.get("execution_duration_s"),
             "completed_steps": result.get("completed_steps"),
@@ -59,8 +91,14 @@ def main() -> int:
             continue
         first_reject = {
             "case": case,
-            "classification": result.get("classification", "dynamic_gate_rejection"),
+            "classification": (
+                "runtime_contract_rejection"
+                if physical_dynamic_passed and not runtime_contract_passed
+                else result.get("classification", "dynamic_gate_rejection")
+            ),
             "stage": result.get("stage", "dynamic_gate"),
+            "physical_dynamic_quality_passed": physical_dynamic_passed,
+            "runtime_contract_passed": runtime_contract_passed,
             "exception_type": result.get("exception_type"),
             "exception_message": result.get("exception_message"),
             "normalized_action": result.get("normalized_action"),
@@ -86,7 +124,17 @@ def main() -> int:
             and row["execution_duration_s"] is not None
             for row in gate_rows
         ),
-        "dynamic_quality_passed": passed,
+        "dynamic_quality_passed": bool(gate_rows)
+        and len(gate_rows) == len(requested)
+        and all(row["physical_dynamic_quality_passed"] for row in gate_rows),
+        "runtime_contract_passed": bool(gate_rows)
+        and len(gate_rows) == len(requested)
+        and all(row["runtime_contract_passed"] for row in gate_rows),
+        "expected_controller_profile": EXPECTED_CONTROLLER_PROFILE,
+        "expected_tracking_profile": EXPECTED_TRACKING_PROFILE,
+        "expected_tracking_direction_recovery_error_range_m": (
+            EXPECTED_RECOVERY_ERROR_RANGE_M
+        ),
         "residual_label_envelope_passed": bool(gate_rows)
         and all(row["residual_label_envelope_passed"] is True for row in gate_rows),
         "residual_label_admission_passed": bool(gate_rows)

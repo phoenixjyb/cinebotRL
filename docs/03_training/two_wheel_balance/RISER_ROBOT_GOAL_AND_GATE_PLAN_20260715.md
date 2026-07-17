@@ -4,6 +4,9 @@ Date: 2026-07-15
 Branch: `codex/two-wheel-riser-rl`
 Worktree: `/mnt/g/wSpace/cinebotRL-two-wheel-riser`
 
+Current operational status and continuation sequence:
+`RISER_PROJECT_STATUS_20260717.md`.
+
 ## 1. Goal
 
 Build and validate a new self-balancing two-wheel camera robot that removes the
@@ -111,17 +114,20 @@ The fixed-path candidate caps chassis yaw at `0.25 rad/s`. The complementary
 joint-adaptive candidate may use up to `0.4 rad/s`, but it is eligible only when
 all raw continuous proxy targets remain below the `24 deg/s` filming slew
 limit. The adaptive optimizer uses a `0.995` internal rate margin rather than
-relaxing that public limit. The accepted 62-case portfolio satisfies the gate
-with a worst raw proxy rate of `0.417392 rad/s`. These are reference-planning
-results, not a claim that the balance plant has passed the same motion in
-Isaac.
+relaxing that public limit. The earlier accepted 62-case portfolio was a
+reference-planning milestone only. It has been superseded by the
+`exact_source_v1` portfolio with 79/79 source-integrity passes and 71/79
+kinematic admissions. Neither portfolio proves dynamic tracking in Isaac.
 
 The first learned controller is a residual policy over the scripted baseline,
 not unrestricted PPO from scratch. Its initial residual action contract is:
 
-- common wheel effort correction;
-- differential wheel effort correction;
-- riser reference/force correction.
+- base linear-velocity delta;
+- base yaw-rate delta;
+- riser-target increment.
+
+Wheel torque remains the output of the frozen LQR. The learned policy does not
+directly command common or differential wheel effort.
 
 The semantic gimbal adapter remains deterministic. A learned gimbal residual is
 not permitted until the corrected teacher and holdout attitude gates pass.
@@ -182,7 +188,8 @@ using teacher data:
 - use only corrected Option-B exports and accepted teacher rows;
 - old NPZ exports affected by pose-transpose or physical-gimbal-index bugs stay
   quarantined;
-- run the accepted 62-case corpus first;
+- use only the sealed `exact_source_v1` portfolio; the accepted 62-case corpus
+  is a historical planning result and is not a training source;
 - rejected cases are not silently promoted to teacher labels.
 
 ### Gate 5: all 79 trajectories

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the CPU-only, non-authorizing case-74 recovery-v4 contract."""
+"""Validate the one-case runtime-v2 case-74 recovery-v4 contract."""
 
 from __future__ import annotations
 
@@ -10,10 +10,11 @@ from pathlib import Path
 import subprocess
 
 
-SCHEMA = "cinebotrl_case74_recovery_v4_contract_v1"
+SCHEMA = "cinebotrl_case74_recovery_v4_runtime_contract_v2"
+AUTHORIZATION = "AUTHORIZED_CASE74_RECOVERY_V4_RUNTIME_V2"
 REVIEWED_PARENT = "ba8f4e0b44dc15a60d61b8353a208032727ad0ae"
 CONTRACT_RELATIVE_PATH = (
-    "scripts/two_wheel_balance/case74_recovery_v4_contract_v1.json"
+    "scripts/two_wheel_balance/case74_recovery_v4_runtime_contract_v2.json"
 )
 
 
@@ -63,6 +64,7 @@ def validate(
     repo: Path,
     *,
     namespace: str,
+    authorization: str,
 ) -> dict[str, object]:
     repo = repo.resolve()
     contract_path = contract_path.resolve()
@@ -138,17 +140,18 @@ def validate(
         "all_identity_hashes_match": bool(rows)
         and len(rows) == len(identities)
         and all(row["passed"] for row in rows.values()),
-        "obsolete_authorization_absent": contract.get("runtime_authorization_token")
-        is None,
-        "runtime_not_authorized": contract.get("runtime_authorized") is False,
-        "gpu_launch_not_authorized": contract.get("gpu_launch_authorized") is False,
+        "authorization_matches": authorization == AUTHORIZATION
+        and contract.get("runtime_authorization_token_sha256")
+        == hashlib.sha256(AUTHORIZATION.encode()).hexdigest(),
+        "runtime_authorized": contract.get("runtime_authorized") is True,
+        "gpu_launch_authorized": contract.get("gpu_launch_authorized") is True,
         "training_disabled": contract.get("residual_capture_authorized") is False
         and contract.get("bc_authorized") is False
         and contract.get("ppo_authorized") is False,
     }
     identity_passed = all(checks.values())
     return {
-        "schema": "cinebotrl_case74_recovery_v4_contract_admission_v1",
+        "schema": "cinebotrl_case74_recovery_v4_runtime_contract_admission_v2",
         "contract": str(contract_path.resolve()),
         "contract_sha256": sha256_file(contract_path),
         "reviewed_controller_parent_commit": REVIEWED_PARENT,
@@ -163,8 +166,8 @@ def validate(
         "identities": rows,
         "checks": checks,
         "identity_passed": identity_passed,
-        "runtime_authorized": False,
-        "gate_c_execution_authorized": False,
+        "runtime_authorized": identity_passed,
+        "gate_c_execution_authorized": identity_passed,
         "residual_capture_authorized": False,
         "bc_authorized": False,
         "ppo_authorized": False,
@@ -178,12 +181,14 @@ def main() -> int:
     parser.add_argument("--contract", type=Path, required=True)
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--namespace", required=True)
+    parser.add_argument("--authorization", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     result = validate(
         args.contract,
         args.repo_root,
         namespace=args.namespace,
+        authorization=args.authorization,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

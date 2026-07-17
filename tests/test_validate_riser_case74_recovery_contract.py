@@ -81,22 +81,24 @@ def _fixture(tmp_path: Path):
         }
     contract = (
         repo
-        / "scripts/two_wheel_balance/case74_recovery_v4_contract_v1.json"
+        / "scripts/two_wheel_balance/case74_recovery_v4_runtime_contract_v2.json"
     )
     contract.parent.mkdir(parents=True)
     contract.write_text(
         json.dumps(
             {
-                "schema": "cinebotrl_case74_recovery_v4_contract_v1",
+                "schema": "cinebotrl_case74_recovery_v4_runtime_contract_v2",
                 "case": 74,
                 "reviewed_controller_parent_commit": reviewed_parent,
                 "namespace": "fresh-case74",
                 "tracking_profile": "riser_recovery_direction_v4",
                 "recovery_error_range_m": [0.2, 0.4],
                 "source_manifest_sha256": _sha(source),
-                "runtime_authorization_token": None,
-                "runtime_authorized": False,
-                "gpu_launch_authorized": False,
+                "runtime_authorization_token_sha256": hashlib.sha256(
+                    b"AUTHORIZED_CASE74_RECOVERY_V4_RUNTIME_V2"
+                ).hexdigest(),
+                "runtime_authorized": True,
+                "gpu_launch_authorized": True,
                 "residual_capture_authorized": False,
                 "bc_authorized": False,
                 "ppo_authorized": False,
@@ -111,10 +113,15 @@ def _fixture(tmp_path: Path):
 
 
 def _validate(module, repo: Path, contract: Path):
-    return module.validate(contract, repo, namespace="fresh-case74")
+    return module.validate(
+        contract,
+        repo,
+        namespace="fresh-case74",
+        authorization="AUTHORIZED_CASE74_RECOVERY_V4_RUNTIME_V2",
+    )
 
 
-def test_contract_resolves_upstream_and_keeps_runtime_closed(
+def test_contract_resolves_upstream_and_authorizes_only_gate_c_runtime(
     tmp_path: Path, monkeypatch
 ) -> None:
     repo, contract, reviewed_parent = _fixture(tmp_path)
@@ -127,8 +134,8 @@ def test_contract_resolves_upstream_and_keeps_runtime_closed(
     assert admission["contract_git_blob_sha1"] == _git(
         repo, "rev-parse", f"HEAD:{module.CONTRACT_RELATIVE_PATH}"
     )
-    assert not admission["runtime_authorized"]
-    assert not admission["gate_c_execution_authorized"]
+    assert admission["runtime_authorized"]
+    assert admission["gate_c_execution_authorized"]
     assert not admission["valid_for_training"]
 
 
@@ -195,3 +202,21 @@ def test_contract_rejects_dirty_runtime_or_existing_namespace(
     (repo / "artifacts/two_wheel_riser/fresh-case74").mkdir(parents=True)
     admission = _validate(module, repo, contract)
     assert not admission["checks"]["namespace_is_fresh"]
+
+
+def test_contract_rejects_wrong_runtime_authorization(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo, contract, reviewed_parent = _fixture(tmp_path)
+    module = _load_module()
+    monkeypatch.setattr(module, "REVIEWED_PARENT", reviewed_parent)
+
+    admission = module.validate(
+        contract,
+        repo,
+        namespace="fresh-case74",
+        authorization="forged-token",
+    )
+    assert not admission["checks"]["authorization_matches"]
+    assert not admission["runtime_authorized"]
+    assert not admission["gate_c_execution_authorized"]

@@ -37,7 +37,7 @@ def _admission(path: Path, commit: str, namespace: str) -> None:
     path.write_text(
         json.dumps(
             {
-                "schema": "cinebotrl_case74_recovery_v4_contract_admission_v1",
+                "schema": "cinebotrl_case74_recovery_v4_runtime_contract_admission_v2",
                 "contract_sha256": CONTRACT_SHA,
                 "reviewed_controller_parent_commit": (
                     "ba8f4e0b44dc15a60d61b8353a208032727ad0ae"
@@ -49,6 +49,8 @@ def _admission(path: Path, commit: str, namespace: str) -> None:
                 "tracking_profile": "riser_recovery_direction_v4",
                 "recovery_error_range_m": [0.2, 0.4],
                 "identity_passed": True,
+                "runtime_authorized": True,
+                "gate_c_execution_authorized": True,
                 "contract_git_blob_sha1": "d" * 40,
                 "identities": identities,
                 "checks": {"all_required_checks": True},

@@ -17,13 +17,34 @@ GAINS_WIN="${RISER_GAINS_WIN:-$WIN_ROOT\\docs\\03_training\\two_wheel_balance\\e
 VALIDATOR="$ROOT/scripts/two_wheel_balance/validate_riser_gate_c_portfolio.py"
 PLAYBACK_WIN="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 SUMMARIZER="$ROOT/scripts/two_wheel_balance/summarize_riser_gate_c_canary.py"
+CASE_TIMEOUT_SECONDS="${RISER_GATE_C_CASE_TIMEOUT_SECONDS:-1200}"
+CASE74_AUTHORIZATION="AUTHORIZED_CASE74_RECOVERY_V4_RUNTIME_V2"
+CASE74_CONTRACT_ADMISSION="${RISER_CASE74_CONTRACT_ADMISSION:-}"
+CASE74_CONTRACT="${RISER_CASE74_CONTRACT:-}"
+REQUIRE_CASE74_CONTRACT=false
 
 case ",$CASES," in
   *,74,*)
-    printf 'case 74 has no runtime authorization path in this revision\n' >&2
-    exit 7
+    if [[ "$CASES" != "74" ]]; then
+      printf 'case 74 is authorized only as an isolated one-case canary\n' >&2
+      exit 7
+    fi
+    if [[ "${RISER_CASE74_GPU_AUTHORIZATION:-}" != "$CASE74_AUTHORIZATION" ]]; then
+      printf 'case 74 requires the sealed runtime-v2 authorization\n' >&2
+      exit 7
+    fi
+    if [[ ! -s "$CASE74_CONTRACT_ADMISSION" || ! -s "$CASE74_CONTRACT" ]]; then
+      printf 'case 74 requires sealed contract admission evidence\n' >&2
+      exit 7
+    fi
+    REQUIRE_CASE74_CONTRACT=true
     ;;
 esac
+
+[[ "$CASE_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || {
+  printf 'invalid Gate C per-case timeout: %s\n' "$CASE_TIMEOUT_SECONDS" >&2
+  exit 2
+}
 
 assert_exclusive_gpu() {
   local owners
@@ -51,14 +72,24 @@ assert_exclusive_gpu || exit 5
 
 TEMP_ADMISSION="$(mktemp)"
 trap 'rm -f "$TEMP_ADMISSION"' EXIT
-python3 "$VALIDATOR" \
-  --manifest "$PORTFOLIO_WSL/manifest.json" \
-  --expected-manifest-sha256 "$EXPECTED_MANIFEST_SHA256" \
-  --expected-source-manifest-sha256 "$EXPECTED_SOURCE_SHA256" \
-  --expected-count 79 \
-  --minimum-candidates 70 \
-  --cases "$CASES" \
-  --output "$TEMP_ADMISSION" >/dev/null
+if [[ "$REQUIRE_CASE74_CONTRACT" == true ]]; then
+  cp "$CASE74_CONTRACT_ADMISSION" "$TEMP_ADMISSION"
+  CASE74_CONTRACT_SHA256="$(sha256sum "$CASE74_CONTRACT" | awk '{print $1}')"
+  SUMMARY_CONTRACT_ARGS=(
+    --require-case74-contract
+    --expected-case74-contract-sha256 "$CASE74_CONTRACT_SHA256"
+  )
+else
+  python3 "$VALIDATOR" \
+    --manifest "$PORTFOLIO_WSL/manifest.json" \
+    --expected-manifest-sha256 "$EXPECTED_MANIFEST_SHA256" \
+    --expected-source-manifest-sha256 "$EXPECTED_SOURCE_SHA256" \
+    --expected-count 79 \
+    --minimum-candidates 70 \
+    --cases "$CASES" \
+    --output "$TEMP_ADMISSION" >/dev/null
+  SUMMARY_CONTRACT_ARGS=()
+fi
 mkdir -p "$OUTPUT_WSL/gates" "$OUTPUT_WSL/logs"
 mv "$TEMP_ADMISSION" "$OUTPUT_WSL/admission.json"
 
@@ -68,7 +99,8 @@ for raw_case in "${case_list[@]}"; do
   padded="$(printf '%04d' "$case_number")"
   assert_exclusive_gpu || exit 5
   printf 'Gate C canary case %s\n' "$padded"
-  if ! "$PY" -u -X utf8 "$PLAYBACK_WIN" \
+  if ! timeout --signal=TERM --kill-after=30s "$CASE_TIMEOUT_SECONDS" \
+    "$PY" -u -X utf8 "$PLAYBACK_WIN" \
     --gains "$GAINS_WIN" \
     --plan-dir "$PORTFOLIO_WIN" \
     --plan-filename-template 'case_{case:04d}_exact_source_riser_playback_v1.npz' \
@@ -79,6 +111,7 @@ for raw_case in "${case_list[@]}"; do
         --root "$OUTPUT_WSL" \
         --git-commit "$COMMIT" \
         --cases "$CASES" \
+        "${SUMMARY_CONTRACT_ARGS[@]}" \
         --output "$OUTPUT_WSL/summary.json" >/dev/null
       tail -n 100 "$OUTPUT_WSL/logs/case_$padded.log" >&2
       printf 'Gate C stopped on first dynamic reject: case %s\n' "$padded" >&2
@@ -115,6 +148,7 @@ PY
       --root "$OUTPUT_WSL" \
       --git-commit "$COMMIT" \
       --cases "$CASES" \
+      "${SUMMARY_CONTRACT_ARGS[@]}" \
       --output "$OUTPUT_WSL/summary.json" >/dev/null
     printf 'Gate C runtime JSON is not a sealed dynamic pass: case %s\n' "$padded" >&2
     exit 4
@@ -125,6 +159,7 @@ python3 "$SUMMARIZER" \
   --root "$OUTPUT_WSL" \
   --git-commit "$COMMIT" \
   --cases "$CASES" \
+  "${SUMMARY_CONTRACT_ARGS[@]}" \
   --output "$OUTPUT_WSL/summary.json"
 
 printf 'Gate C canary passed without labels: %s\n' "$OUTPUT_WSL"

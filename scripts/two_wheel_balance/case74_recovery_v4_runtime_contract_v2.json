@@ -1,0 +1,89 @@
+{
+  "schema": "cinebotrl_case74_recovery_v4_runtime_contract_v2",
+  "case": 74,
+  "reviewed_controller_parent_commit": "ba8f4e0b44dc15a60d61b8353a208032727ad0ae",
+  "namespace": "20260717_gate_c_case74_recovery_v4_runtime_v2_exclusive",
+  "tracking_profile": "riser_recovery_direction_v4",
+  "recovery_error_range_m": [
+    0.2,
+    0.4
+  ],
+  "source_manifest_sha256": "f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d",
+  "runtime_authorized": true,
+  "gpu_launch_authorized": true,
+  "residual_capture_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "identities": {
+    "source_manifest": {
+      "path": "/mnt/g/wSpace/cinebotRL/data/gikWBC9DOF_exact_source_reference_all79_20260717/manifest.json",
+      "sha256": "f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d"
+    },
+    "portfolio_manifest": {
+      "path": "artifacts/two_wheel_riser/20260717_exact_source_all79_portfolio_v4_threshold71/manifest.json",
+      "sha256": "851a7b2751cd397ba35daf57d1a8c6971fb14ed0186683af48d3c6109090570a",
+      "git_blob_sha1": "7e1943875317dc722a5101ef5176c6fce23831e9"
+    },
+    "case74_plan": {
+      "path": "artifacts/two_wheel_riser/20260717_exact_source_all79_portfolio_v4_threshold71/case_0074_exact_source_riser_playback_v1.npz",
+      "sha256": "146ad72b0fd5a4010cd41231cc8c076cc29bea2d52de1cf1603550a617ee0f5f",
+      "git_blob_sha1": "3076fee1c86858550ad1bc5915df69283d5485d6"
+    },
+    "lqr_gains": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+      "sha256": "2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6",
+      "git_blob_sha1": "70ecdd8ae6b7ce09574a97a8581229cb90add623"
+    },
+    "robot_usd": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd",
+      "sha256": "89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0",
+      "git_blob_sha1": "b25242c27c781b5aad4fadefb0cbf54398a9a75a"
+    },
+    "tracking_controller": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/whole_body_tracking.py",
+      "sha256": "e4d6f4cf78c1a887701126fc5684f8dcb4756b5872b482d97d81a18230bf7726",
+      "git_blob_sha1": "0d88ce087f9055e7f3b59e3f00167234d1d0e4cb"
+    },
+    "riser_control": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_control.py",
+      "sha256": "1bbd9c892f565fcfdea2be3567038db14454bc9d2b864df1326cfac5adc16738",
+      "git_blob_sha1": "a56aaa6810f5e75ddbdd9f4897b183df4b1540ff"
+    },
+    "recovery_evidence": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_recovery_evidence.py",
+      "sha256": "59bbebb63b153d152ad183b7752a66892b83584cd14262154b237bdb98ab4764",
+      "git_blob_sha1": "ff8837b5a58877b582d8f84168ac42f40cea8226"
+    },
+    "playback": {
+      "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+      "sha256": "ebd696adbfcac098716280a25a363799d1467b06d612e90b40dc58637c7df51d",
+      "git_blob_sha1": "c651a9db39b4a42f39ff8668a381ebc350bd7b8b"
+    },
+    "case74_wrapper": {
+      "path": "scripts/two_wheel_balance/run_riser_case74_recovery_canary.sh",
+      "sha256": "3e150164330ca8f3ae9a0c892157cf5b866ec35ff1753f17dec7990af5f7ba28",
+      "git_blob_sha1": "691a18acccbbd64b1b6104c0dc2f9eafe09f3ea1"
+    },
+    "shared_runner": {
+      "path": "scripts/two_wheel_balance/run_riser_gate_c_canary.sh",
+      "sha256": "a9d48dafb1f9d61664fa830f4229aca6e88ff6a0cb7e7c2781e8b1e99c36356d",
+      "git_blob_sha1": "6eef225ae559980ad8134a6438cc62cf2f61efb2"
+    },
+    "summarizer": {
+      "path": "scripts/two_wheel_balance/summarize_riser_gate_c_canary.py",
+      "sha256": "7d65ea0e47fcd0572d9e8b491219aedaa13b72166694a6fc240839ac5d93724d",
+      "git_blob_sha1": "0e46f4e36494709b4288ef1cad59ec315dcdeccd"
+    },
+    "contract_validator": {
+      "path": "scripts/two_wheel_balance/validate_riser_case74_recovery_contract.py",
+      "sha256": "e306074543813a6fadb0a57b0d0b33a88dabc95c4b15435b7e37813556120f3c",
+      "git_blob_sha1": "01d0aba70100693885309ea49053aeb3cb5b1cf2"
+    },
+    "portfolio_validator": {
+      "path": "scripts/two_wheel_balance/validate_riser_gate_c_portfolio.py",
+      "sha256": "8ef892f39d5401f5f99f274cdc5e94947bb2663747881e16503fe3f76bbbbe84",
+      "git_blob_sha1": "3ec4c46bcc9bab2ede4d60d10397c2a4ebabd483"
+    }
+  },
+  "runtime_authorization_token_sha256": "f9d4538c4da0dd9ef72b19f1e4625ea19e3af6458bcc4ea539ffe6e01d6290f3"
+}

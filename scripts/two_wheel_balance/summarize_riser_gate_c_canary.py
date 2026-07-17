@@ -117,7 +117,7 @@ def main() -> int:
         requested == [74]
         and args.expected_case74_contract_sha256 is not None
         and admission_payload.get("schema")
-        == "cinebotrl_case74_recovery_v4_contract_admission_v1"
+        == "cinebotrl_case74_recovery_v4_runtime_contract_admission_v2"
         and admission_payload.get("contract_sha256")
         == args.expected_case74_contract_sha256
         and admission_payload.get("reviewed_controller_parent_commit")
@@ -131,6 +131,8 @@ def main() -> int:
         == EXPECTED_RECOVERY_ERROR_RANGE_M
         and admission_payload.get("identity_passed") is True
         and contract_identity_rows_passed(admission_payload)
+        and admission_payload.get("runtime_authorized") is True
+        and admission_payload.get("gate_c_execution_authorized") is True
         and admission_payload.get("residual_capture_authorized") is False
         and admission_payload.get("bc_authorized") is False
         and admission_payload.get("ppo_authorized") is False

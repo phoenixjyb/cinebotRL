@@ -8,6 +8,8 @@ import pytest
 from rl_platform.tasks.two_wheel_balance.riser_playback import RiserPlaybackPlan
 from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (
     MAXIMUM_PRE_DENSIFICATION_BRANCH_STEP_RAD,
+    PREVIEW_CONFIGURATIONS,
+    SMOOTHING_SIGMA_CANDIDATES,
     retime_smoothed_plan_from_demands,
     smooth_source_positions,
     smoothed_path_metrics,
@@ -113,6 +115,27 @@ def test_transition_metrics_reject_pre_densification_branch_jump() -> None:
         ]
         > MAXIMUM_PRE_DENSIFICATION_BRANCH_STEP_RAD
     )
+
+
+def test_recovery_candidates_are_appended_without_reordering_baseline() -> None:
+    assert SMOOTHING_SIGMA_CANDIDATES[:4] == (0.0, 4.0, 8.0, 12.0)
+    assert SMOOTHING_SIGMA_CANDIDATES[-1] == 16.0
+    assert PREVIEW_CONFIGURATIONS[:4] == (
+        (0.05, 2.75),
+        (0.10, 2.75),
+        (0.15, 2.75),
+        (0.25, 2.75),
+    )
+    assert PREVIEW_CONFIGURATIONS[-2:] == ((0.40, 1.00), (0.50, 1.00))
+
+
+@pytest.mark.parametrize(
+    "strategy",
+    ("smoothed_preview_0.40m_g1.00", "smoothed_preview_0.50m_g1.00"),
+)
+def test_recovery_strategy_names_validate(strategy: str) -> None:
+    plan = _plan(np.array([0.0, 0.5, 1.0]))
+    RiserPlaybackPlan(**{**plan.__dict__, "planning_strategy": strategy}).validate()
 
 
 def test_exporter_defaults_to_bounded_case_order_and_training_closed() -> None:

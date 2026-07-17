@@ -44,6 +44,9 @@ class TimeReparameterizationConfig:
     dense_source_anchor_start_0based: int | None = None
     dense_source_anchor_end_0based: int | None = None
     dense_waypoint_stride: int = 1
+    local_relaxation_start_0based: int | None = None
+    local_relaxation_end_0based: int | None = None
+    local_relaxation_max_m: float | None = None
     time_allocation_strategy: str = "minimum_l2"
     translation_speed_cap_mps: float = 0.40
     angular_speed_cap_radps: float = 0.35
@@ -140,6 +143,44 @@ def _waypoint_indices(
     if indices[-1] != count - 1:
         indices = np.append(indices, count - 1)
     return indices
+
+
+def _locally_relax_positions_toward_seed_base(
+    positions_m: np.ndarray,
+    base_arm_q: np.ndarray,
+    config: TimeReparameterizationConfig,
+) -> np.ndarray:
+    """Apply a smooth, endpoint-zero horizontal reach relief in one source window."""
+
+    positions = np.asarray(positions_m, dtype=np.float64)
+    base_arm_q = np.asarray(base_arm_q, dtype=np.float64)
+    _require(base_arm_q.shape == (len(positions), 6), "seed state/position shape mismatch")
+    values = (
+        config.local_relaxation_start_0based,
+        config.local_relaxation_end_0based,
+        config.local_relaxation_max_m,
+    )
+    enabled = any(value is not None for value in values)
+    _require(
+        not enabled or all(value is not None for value in values),
+        "local relaxation requires start, end, and maximum displacement",
+    )
+    relaxed = positions.copy()
+    if not enabled:
+        return relaxed
+    start = int(config.local_relaxation_start_0based)
+    end = int(config.local_relaxation_end_0based)
+    maximum = float(config.local_relaxation_max_m)
+    _require(0 <= start < end < len(positions), "local relaxation window is invalid")
+    _require(maximum > 0.0, "local relaxation maximum must be positive")
+    phase = np.linspace(0.0, 1.0, end - start + 1)
+    weight = np.sin(np.pi * phase) ** 2
+    toward_base = base_arm_q[start : end + 1, :2] - positions[start : end + 1, :2]
+    norm = np.linalg.norm(toward_base, axis=1)
+    _require(np.all(norm > 1.0e-9), "local relaxation direction is degenerate")
+    direction = toward_base / norm[:, None]
+    relaxed[start : end + 1, :2] += maximum * weight[:, None] * direction
+    return relaxed
 
 
 def _project_with_lower_bounds(
@@ -666,6 +707,7 @@ def _paired_seed_payload(
     raw_arrays: dict[str, np.ndarray],
     result: TimeReparameterizationResult,
     waypoint_indices: np.ndarray,
+    desired_positions_m: np.ndarray,
     *,
     raw_seed_sha256: str,
     raw_manifest_sha256: str,
@@ -710,7 +752,11 @@ def _paired_seed_payload(
     transition_rows = waypoint_indices[1:] - 1
     derived_actions = raw_actions[transition_rows].copy()
     derived_actions[:, 3:] = base_actions
-    desired_position = np.asarray(raw_arrays["desired_position_full_m"])[waypoint_indices]
+    desired_position = np.asarray(desired_positions_m, dtype=np.float64)
+    _require(
+        desired_position.shape == (len(waypoint_indices), 3),
+        "derived desired-position shape mismatch",
+    )
     desired_attitude = np.asarray(
         raw_arrays["desired_attitude_full_world_dfr_quat_wxyz"]
     )[waypoint_indices]
@@ -818,7 +864,13 @@ def derive_ep4_time_warp_package(
         config.dense_waypoint_stride,
     )
     derived_source_time = reference.time_s[waypoint_indices]
-    derived_positions = source_positions[waypoint_indices]
+    raw_current = np.asarray(raw_seed_arrays["q_current_base_arm_6"], dtype=np.float32)
+    raw_next = np.asarray(raw_seed_arrays["q_next_base_arm_6"], dtype=np.float32)
+    raw_base_arm_q = np.vstack((raw_current, raw_next[-1]))
+    relaxed_source_positions = _locally_relax_positions_toward_seed_base(
+        source_positions, raw_base_arm_q, config
+    )
+    derived_positions = relaxed_source_positions[waypoint_indices]
     derived_attitudes = source_attitudes[waypoint_indices]
     result = derive_time_reparameterization(
         derived_source_time,
@@ -826,13 +878,12 @@ def derive_ep4_time_warp_package(
         derived_attitudes,
         config,
     )
-    raw_current = np.asarray(raw_seed_arrays["q_current_base_arm_6"], dtype=np.float32)
-    raw_next = np.asarray(raw_seed_arrays["q_next_base_arm_6"], dtype=np.float32)
-    raw_base_arm_q = np.vstack((raw_current, raw_next[-1]))
-
     derived_payload = json.loads(reference.source_json.read_text(encoding="utf-8"))
-    derived_payload["poses"] = [source_poses[int(index)] for index in waypoint_indices]
-    for pose, timestamp in zip(derived_payload["poses"], result.derived_time_s, strict=True):
+    derived_payload["poses"] = [dict(source_poses[int(index)]) for index in waypoint_indices]
+    for pose, position, timestamp in zip(
+        derived_payload["poses"], derived_positions, result.derived_time_s, strict=True
+    ):
+        pose["position"] = position.tolist()
         pose["time"] = float(timestamp)
     derived_source_bytes = (
         json.dumps(derived_payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
@@ -866,6 +917,7 @@ def derive_ep4_time_warp_package(
         raw_seed_arrays,
         result,
         waypoint_indices,
+        derived_positions,
         raw_seed_sha256=expected_raw_seed_sha256,
         raw_manifest_sha256=expected_raw_seed_manifest_sha256,
         raw_source_json_sha256=reference.source_json_sha256,
@@ -880,6 +932,14 @@ def derive_ep4_time_warp_package(
     source_path_length = float(np.sum(source_segment_distance))
     derived_path_length = float(np.sum(result.segment_distance_m))
     path_length_relative_error = derived_path_length / source_path_length - 1.0
+    source_position_deviation = np.linalg.norm(
+        relaxed_source_positions - source_positions, axis=1
+    )
+    metrics["position_deviation_max_m"] = float(np.max(source_position_deviation))
+    metrics["position_deviation_rms_m"] = float(
+        np.sqrt(np.mean(source_position_deviation**2))
+    )
+    metrics["cartesian_arc_length_relative_error"] = path_length_relative_error
     metrics["waypoint_reduction"] = {
         "source_pose_count": len(reference.time_s),
         "derived_pose_count": len(waypoint_indices),
@@ -934,7 +994,9 @@ def derive_ep4_time_warp_package(
         "constraints": {
             "pose_count_preserved": config.waypoint_stride == 1,
             "waypoint_order_preserved": True,
-            "derived_positions_are_exact_source_subset": True,
+            "derived_positions_are_exact_source_subset": (
+                config.local_relaxation_max_m is None
+            ),
             "derived_orientations_are_exact_source_subset": True,
             "first_pose_preserved": True,
             "last_pose_preserved": True,
@@ -943,6 +1005,7 @@ def derive_ep4_time_warp_package(
             "total_duration_preserved": True,
             "timestamps_strictly_increasing": True,
             "cartesian_arc_length_relative_error": path_length_relative_error,
+            "position_deviation_max_m": float(np.max(source_position_deviation)),
             "derivation_translation_speed_cap_mps": config.translation_speed_cap_mps,
             "localized_transition_start_1based": (
                 config.localized_transition_start_1based
@@ -1002,7 +1065,9 @@ def derive_ep4_time_warp_package(
             "output_npz": f"episode_{config.episode_index:04d}/{seed_name}",
             "output_npz_sha256": paired_seed_sha256,
             "state_arrays_are_exact_source_subset": True,
-            "pose_arrays_are_exact_source_subset": True,
+            "pose_arrays_are_exact_source_subset": (
+                config.local_relaxation_max_m is None
+            ),
             "waypoint_source_index_sha256": waypoint_index_sha256,
             "time_dependent_base_actions_recomputed": True,
             "base_action_transition_count": len(paired_base_actions),
@@ -1124,6 +1189,28 @@ def verify_ep4_time_warp_package(
     _require(isinstance(source_poses, list) and isinstance(derived_poses, list), "poses missing")
     source_positions = np.asarray([pose["position"] for pose in source_poses], dtype=np.float64)
     source_attitudes = np.asarray([pose["orientation"] for pose in source_poses], dtype=np.float64)
+    config_record = manifest.get("config")
+    _require(isinstance(config_record, dict), "derived config is missing")
+    try:
+        config = TimeReparameterizationConfig(**config_record)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid derived config") from exc
+    paired_record = manifest.get("paired_integrity_seed")
+    _require(isinstance(paired_record, dict), "paired integrity-seed provenance is missing")
+    raw_seed_path, raw_arrays = _load_raw_integrity_seed(
+        raw_integrity_seed_package_dir,
+        episode_index,
+        expected_manifest_sha256=str(
+            paired_record.get("raw_integrity_seed_manifest_sha256", "")
+        ),
+        expected_seed_sha256=str(paired_record.get("raw_integrity_seed_sha256", "")),
+    )
+    raw_current = np.asarray(raw_arrays["q_current_base_arm_6"], dtype=np.float32)
+    raw_next = np.asarray(raw_arrays["q_next_base_arm_6"], dtype=np.float32)
+    raw_base_arm_q = np.vstack((raw_current, raw_next[-1]))
+    expected_source_positions = _locally_relax_positions_toward_seed_base(
+        source_positions, raw_base_arm_q, config
+    )
     waypoint_indices = np.asarray(
         derived_record.get("waypoint_source_index_0based", []), dtype=np.int64
     )
@@ -1155,8 +1242,9 @@ def verify_ep4_time_warp_package(
         "source orientation provenance hash changed",
     )
     _require(
-        source_positions[waypoint_indices].tobytes() == derived_positions.tobytes(),
-        "derived positions are not an exact source subset",
+        expected_source_positions[waypoint_indices].tobytes()
+        == derived_positions.tobytes(),
+        "derived positions differ from the deterministic local relaxation",
     )
     _require(
         source_attitudes[waypoint_indices].tobytes() == derived_attitudes.tobytes(),
@@ -1184,12 +1272,6 @@ def verify_ep4_time_warp_package(
         "derived timestamp hash mismatch",
     )
 
-    config_record = manifest.get("config")
-    _require(isinstance(config_record, dict), "derived config is missing")
-    try:
-        config = TimeReparameterizationConfig(**config_record)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("invalid derived config") from exc
     expected = derive_time_reparameterization(
         reference.time_s[waypoint_indices],
         derived_positions,
@@ -1204,8 +1286,6 @@ def verify_ep4_time_warp_package(
     _require(derived_time[-1] == reference.time_s[waypoint_indices[-1]], "derived duration changed")
     _require(np.all(np.diff(derived_time) > 0.0), "derived timestamps are not strict")
 
-    paired_record = manifest.get("paired_integrity_seed")
-    _require(isinstance(paired_record, dict), "paired integrity-seed provenance is missing")
     expected_identity = {
         "derivation_contract": DERIVATION_CONTRACT,
         "implementation_file_sha256": sha256(Path(__file__).resolve()),
@@ -1254,14 +1334,6 @@ def verify_ep4_time_warp_package(
         sha256(bundled_seed_source) == seed_manifest.get("bundled_source_json_sha256"),
         "paired seed bundled source hash mismatch",
     )
-    raw_seed_path, raw_arrays = _load_raw_integrity_seed(
-        raw_integrity_seed_package_dir,
-        episode_index,
-        expected_manifest_sha256=str(
-            paired_record.get("raw_integrity_seed_manifest_sha256", "")
-        ),
-        expected_seed_sha256=str(paired_record.get("raw_integrity_seed_sha256", "")),
-    )
     paired_seed_path = seed_package_dir / str(seed_manifest.get("output_npz", ""))
     _require(paired_seed_path.is_file(), "paired integrity-seed NPZ is missing")
     _require(
@@ -1273,16 +1345,11 @@ def verify_ep4_time_warp_package(
             paired_arrays = {key: np.asarray(data[key]) for key in data.files}
     except Exception as exc:
         raise ValueError("paired integrity seed is unreadable") from exc
-    raw_current = np.asarray(raw_arrays["q_current_base_arm_6"], dtype=np.float32)
-    raw_next = np.asarray(raw_arrays["q_next_base_arm_6"], dtype=np.float32)
-    raw_base_arm_q = np.vstack((raw_current, raw_next[-1]))
     transition_rows = waypoint_indices[1:] - 1
     expected_subset_arrays = {
         "q_current_base_arm_6": raw_base_arm_q[waypoint_indices[:-1]],
         "q_next_base_arm_6": raw_base_arm_q[waypoint_indices[1:]],
-        "desired_position_full_m": np.asarray(raw_arrays["desired_position_full_m"])[
-            waypoint_indices
-        ],
+        "desired_position_full_m": derived_positions,
         "desired_attitude_full_world_dfr_quat_wxyz": np.asarray(
             raw_arrays["desired_attitude_full_world_dfr_quat_wxyz"]
         )[waypoint_indices],

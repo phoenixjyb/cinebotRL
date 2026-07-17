@@ -434,6 +434,50 @@ def test_adaptive_dense_stride_smooths_micro_transitions_without_changing_durati
     assert manifest["derived"]["duration_s"] == manifest["source"]["duration_s"]
 
 
+def test_local_relaxation_is_smooth_bounded_and_verifiable(tmp_path: Path) -> None:
+    reference_dir = tmp_path / "reference"
+    reference_digest = write_reference_package(reference_dir)
+    raw_seed_dir = tmp_path / "raw_seed"
+    raw_seed_manifest_digest, raw_seed_digest = write_raw_seed_package(
+        raw_seed_dir, reference_dir
+    )
+    output_dir = tmp_path / "derived_relaxed"
+    manifest = derive_ep4_time_warp_package(
+        reference_dir,
+        raw_seed_dir,
+        output_dir,
+        config=TimeReparameterizationConfig(
+            episode_index=1,
+            waypoint_stride=2,
+            time_allocation_strategy="proportional_lower_bounds",
+            local_relaxation_start_0based=2,
+            local_relaxation_end_0based=8,
+            local_relaxation_max_m=0.01,
+            diagnostic_transition_start_1based=1,
+            diagnostic_transition_end_1based=5,
+        ),
+        expected_manifest_sha256=reference_digest,
+        expected_episodes=1,
+        expected_raw_seed_manifest_sha256=raw_seed_manifest_digest,
+        expected_raw_seed_sha256=raw_seed_digest,
+    )
+    verified = verify_ep4_time_warp_package(
+        reference_dir, raw_seed_dir, output_dir, expected_episodes=1
+    )
+    assert verified == manifest
+    assert manifest["constraints"]["derived_positions_are_exact_source_subset"] is False
+    assert manifest["constraints"]["position_deviation_max_m"] == pytest.approx(0.01)
+    assert manifest["derived"]["duration_s"] == manifest["source"]["duration_s"]
+    source = json.loads((reference_dir / "episode_0001/source.json").read_text())
+    derived = json.loads((output_dir / "source.json").read_text())
+    np.testing.assert_array_equal(
+        derived["poses"][0]["position"], source["poses"][0]["position"]
+    )
+    np.testing.assert_array_equal(
+        derived["poses"][-1]["position"], source["poses"][-1]["position"]
+    )
+
+
 def test_derived_reference_and_seed_load_together_but_raw_seed_is_rejected(
     tmp_path: Path,
 ) -> None:

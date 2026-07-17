@@ -28,6 +28,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dense-source-anchor-start-0based", type=int)
     parser.add_argument("--dense-source-anchor-end-0based", type=int)
     parser.add_argument("--dense-waypoint-stride", type=int, default=1)
+    parser.add_argument("--local-relaxation-start-0based", type=int)
+    parser.add_argument("--local-relaxation-end-0based", type=int)
+    parser.add_argument("--local-relaxation-max-m", type=float)
     parser.add_argument(
         "--time-allocation-strategy",
         choices=("minimum_l2", "proportional_lower_bounds"),
@@ -51,6 +54,9 @@ def main() -> int:
         dense_source_anchor_start_0based=args.dense_source_anchor_start_0based,
         dense_source_anchor_end_0based=args.dense_source_anchor_end_0based,
         dense_waypoint_stride=args.dense_waypoint_stride,
+        local_relaxation_start_0based=args.local_relaxation_start_0based,
+        local_relaxation_end_0based=args.local_relaxation_end_0based,
+        local_relaxation_max_m=args.local_relaxation_max_m,
         time_allocation_strategy=args.time_allocation_strategy,
         translation_speed_cap_mps=args.translation_speed_cap_mps,
         angular_speed_cap_radps=args.angular_speed_cap_radps,

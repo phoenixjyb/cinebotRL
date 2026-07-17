@@ -3,6 +3,9 @@ import pytest
 
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     ACTION_SCALES,
+    BASE_OBSERVATION_NAMES,
+    LOOKAHEAD_CHANNEL_NAMES,
+    LOOKAHEAD_HORIZONS_S,
     OBSERVATION_NAMES,
     apply_residual_action,
     build_executed_observation,
@@ -95,10 +98,44 @@ def test_executed_observation_uses_body_frame_errors() -> None:
         phase_fraction=0.25,
         progress_scale=0.8,
         previous_residual_action=np.zeros(3),
+        lookahead_base_xy_yaw=np.array(
+            [
+                [1.0, 3.5, np.pi / 2 + 0.2],
+                [1.0, 4.0, np.pi / 2 + 0.3],
+                [1.0, 5.0, np.pi / 2 + 0.4],
+            ]
+        ),
+        lookahead_camera_position_world_m=np.array(
+            [
+                [1.0, 3.5, 1.3],
+                [1.0, 4.0, 1.4],
+                [1.0, 5.0, 1.5],
+            ]
+        ),
+        lookahead_camera_quat_wxyz=np.tile(
+            np.array([1.0, 0.0, 0.0, 0.0]), (3, 1)
+        ),
+        lookahead_riser_target_m=np.array([0.50, 0.55, 0.60]),
+        lookahead_feedforward_v_wz_riser=np.array(
+            [
+                [0.25, 0.11, 0.31],
+                [0.30, 0.12, 0.32],
+                [0.35, 0.13, 0.33],
+            ]
+        ),
     )
     assert observation.shape == (len(OBSERVATION_NAMES),)
     np.testing.assert_allclose(observation[6:9], [1.0, 0.0, 0.1], atol=1e-6)
     np.testing.assert_allclose(observation[9:12], [1.0, 0.0, 0.2], atol=1e-6)
+    assert len(LOOKAHEAD_HORIZONS_S) == 3
+    assert len(LOOKAHEAD_CHANNEL_NAMES) == 13
+    assert len(OBSERVATION_NAMES) == 65
+    start = len(BASE_OBSERVATION_NAMES)
+    np.testing.assert_allclose(
+        observation[start : start + len(LOOKAHEAD_CHANNEL_NAMES)],
+        [1.5, 0.0, 0.2, 1.5, 0.0, 0.3, 0.0, 0.0, 0.0, 0.1, 0.25, 0.11, 0.31],
+        atol=1e-6,
+    )
 
 
 def test_case_dataset_round_trip_and_rejects_mixed_cases(tmp_path) -> None:
@@ -116,6 +153,8 @@ def test_case_dataset_round_trip_and_rejects_mixed_cases(tmp_path) -> None:
     save_case_dataset(path, 18, payload)
     metadata, restored = load_case_dataset(path)
     assert metadata["case"] == 18
+    assert metadata["schema"] == "cinebotrl_two_wheel_riser_executed_residual_v2"
+    assert metadata["lookahead_horizons_s"] == [0.25, 0.5, 1.0]
     np.testing.assert_array_equal(restored["case_ids"], payload["case_ids"])
 
     payload["case_ids"][2] = 19

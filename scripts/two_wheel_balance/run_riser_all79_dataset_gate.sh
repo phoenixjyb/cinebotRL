@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="${RISER_ROOT:-/mnt/g/wSpace/cinebotRL-two-wheel-riser}"
 WIN_ROOT="${RISER_WIN_ROOT:-G:\\wSpace\\cinebotRL-two-wheel-riser}"
 PY="${ISAAC_PYTHON:-/mnt/g/isaaclab_venv/Scripts/python.exe}"
-STAMP="${RISER_ALL79_STAMP:-20260717_residual_all79_exact_source_v1}"
+STAMP="${RISER_ALL79_STAMP:-20260717_residual_all79_exact_source_lookahead_v2}"
 ARTIFACTS_WSL="$ROOT/artifacts/two_wheel_riser/$STAMP"
 ARTIFACTS_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$STAMP"
 PLAN_STAMP="${RISER_ALL79_PLAN_STAMP:-20260717_all79_playback_exact_source_v1}"
@@ -88,6 +88,8 @@ expected = {
     "cases": list(range(1, 80)),
     "tracking_profile": "riser_phase_consistent_v2",
     "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
+    "observation_contract": "executed_state_with_execution_time_lookahead_v2",
+    "lookahead_horizons_s": [0.25, 0.5, 1.0],
 }
 if path.exists():
     if json.loads(path.read_text(encoding="utf-8")) != expected:
@@ -100,7 +102,7 @@ gate_is_resumable() {
   local case_number="$1"
   local padded="$2"
   local gate="$ARTIFACTS_WSL/gates/case_$padded.json"
-  local dataset="$ARTIFACTS_WSL/cases/case_${padded}_executed_residual_v1.npz"
+  local dataset="$ARTIFACTS_WSL/cases/case_${padded}_executed_residual_v2.npz"
   [[ -s "$gate" && -s "$dataset" ]] || return 1
   python3 - "$gate" "$case_number" <<'PY'
 import json
@@ -151,7 +153,7 @@ done
 
 "$PY" -u -X utf8 "$MERGER_WIN" \
   --case-dir "$ARTIFACTS_WIN\\cases" \
-  --output "$ARTIFACTS_WIN\\all79_residual_dataset_v1.npz" \
+  --output "$ARTIFACTS_WIN\\all79_residual_dataset_v2.npz" \
   --expected-count 79 >"$ARTIFACTS_WSL/merge.log" 2>&1
 
 python3 - "$ARTIFACTS_WSL" "$CAPTURE_COMMIT" "$PLAN_DIR_WSL/manifest.json" "$ADMISSION" "$SOURCE_MANIFEST" "$EXACT_SOURCE_AUDIT" <<'PY'
@@ -185,7 +187,7 @@ for path in sorted((root / "gates").glob("case_*.json")):
         }
     )
 dataset_summary = json.loads(
-    (root / "all79_residual_dataset_v1.summary.json").read_text(encoding="utf-8")
+    (root / "all79_residual_dataset_v2.summary.json").read_text(encoding="utf-8")
 )
 summary = {
     "schema": "cinebotrl_two_wheel_riser_all79_dynamic_dataset_gate_v1",

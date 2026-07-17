@@ -858,3 +858,41 @@ and must state whether its candidate was accepted or rejected.
   model.
 - Do not reinterpret the 300 N transient simulation cap as a continuous motor
   guarantee or relax any trajectory/safety gate.
+
+## Round 27: trajectory-conditioned residual policy contract
+
+- Audited the pre-training residual network contract before any valid capture.
+  The original 26-dimensional instantaneous observation was reactive and could
+  not distinguish trajectories with the same current state but different
+  upcoming base turns, riser motion, or camera attitude.
+- Replaced it with a versioned 65-dimensional observation contract: the
+  original 26 executed-state features plus three 13-dimensional reference
+  lookaheads at `0.25`, `0.50`, and `1.00 s` on the retimed execution clock.
+  Endpoint queries clamp to the immutable final plan anchor.
+- Each lookahead carries body-frame future base error, body-frame physical
+  `cam_link` position error, physical-camera attitude error, riser target
+  error, and progress-scaled base/riser feed-forward. Semantic DFR attitude is
+  converted with `R_world_cam = R_world_DFR * Rz(+pi/2)` before comparison.
+- Preserved the 3-dimensional action contract exactly: bounded residual
+  `delta-vx`, `delta-wz`, and riser-target increment. Wheel torque remains under
+  frozen LQR; DJI attitude adaptation remains deterministic; no arm or physical
+  gimbal-joint action was added.
+- Versioned per-case data, merged data, checkpoints, artifact namespaces, and
+  downstream admissions to v2. Holdout and all-79 gates now independently
+  reject checkpoints that do not declare the v2 policy schema, observation
+  contract, and exact lookahead horizons.
+- Historical v1 NPZs and checkpoints remain quarantined; they are neither
+  upgraded nor silently mixed into v2. No Isaac/GPU run, residual capture,
+  BC, PPO, learned rollout, source plan, threshold, LQR gain, or residual scale
+  was changed or started in this round.
+- The complete CPU-only repository suite passes `240` tests.
+
+## Next round after Round 27
+
+- Keep the case-74-only deterministic canary separate and authorization-gated;
+  this DNN contract change does not make its physical failure pass.
+- Do not open residual capture until the deterministic dynamic admission is
+  satisfied under the unchanged safety and quality gates.
+- When capture is eventually authorized, start only in the empty lookahead-v2
+  namespace and prove one bounded per-case artifact before any all-79 batch or
+  BC run.

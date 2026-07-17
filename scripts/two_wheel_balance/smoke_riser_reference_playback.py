@@ -117,6 +117,7 @@ from rl_platform.tasks.two_wheel_balance.riser_kinematics import (
 )
 from rl_platform.tasks.two_wheel_balance.riser_control import balance_progress_scale
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
+    LOOKAHEAD_HORIZONS_S,
     apply_residual_action,
     build_raw_residual_command,
     build_executed_observation,
@@ -376,6 +377,20 @@ def evaluate_case(
             )
         else:
             teacher_residual_action = normalized_residual_label.astype(np.float32)
+        lookahead_samples = [
+            interpolate_riser_playback_plan(
+                plan,
+                min(execution_duration_s, phase_time_s + horizon_s),
+            )
+            for horizon_s in LOOKAHEAD_HORIZONS_S
+        ]
+        lookahead_feedforward = np.asarray(
+            [
+                phase_scaled_feedforward(future, progress_scale)[:3]
+                for future in lookahead_samples
+            ],
+            dtype=np.float64,
+        )
         executed_observation = build_executed_observation(
             lqr_state=current_states[0],
             actual_base_xy_yaw=actual_base,
@@ -393,6 +408,27 @@ def evaluate_case(
             phase_fraction=phase_time_s / execution_duration_s,
             progress_scale=progress_scale,
             previous_residual_action=previous_residual_action,
+            lookahead_base_xy_yaw=np.asarray(
+                [future.base_xy_yaw for future in lookahead_samples]
+            ),
+            lookahead_camera_position_world_m=np.asarray(
+                [
+                    future.target_position_world_m
+                    for future in lookahead_samples
+                ]
+            ),
+            lookahead_camera_quat_wxyz=np.asarray(
+                [
+                    semantic_dfr_to_physical_cam_quat_wxyz(
+                        future.target_semantic_dfr_quat_wxyz
+                    )
+                    for future in lookahead_samples
+                ]
+            ),
+            lookahead_riser_target_m=np.asarray(
+                [future.riser_q for future in lookahead_samples]
+            ),
+            lookahead_feedforward_v_wz_riser=lookahead_feedforward,
         )
         if residual_policy is None and not zero_policy_action:
             applied_residual_action = (
@@ -789,7 +825,7 @@ def evaluate_case(
     )
     dataset_path = None
     if dataset_dir is not None and dynamic_quality_passed:
-        dataset_path = dataset_dir / f"case_{plan.case:04d}_executed_residual_v1.npz"
+        dataset_path = dataset_dir / f"case_{plan.case:04d}_executed_residual_v2.npz"
         count = len(dataset_observations)
         save_case_dataset(
             dataset_path,

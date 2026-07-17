@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT="${RISER_ROOT:-/mnt/g/wSpace/cinebotRL-two-wheel-riser}"
 WIN_ROOT="${RISER_WIN_ROOT:-G:\\wSpace\\cinebotRL-two-wheel-riser}"
 PY="${RISER_TRAIN_PYTHON:-/mnt/g/isaaclab_venv/Scripts/python.exe}"
-DATASET_STAMP="${RISER_DATASET_STAMP:-20260717_residual_all79_exact_source_v1}"
-POLICY_STAMP="${RISER_POLICY_STAMP:-20260717_residual_bc_exact_source_v1}"
+DATASET_STAMP="${RISER_DATASET_STAMP:-20260717_residual_all79_exact_source_lookahead_v2}"
+POLICY_STAMP="${RISER_POLICY_STAMP:-20260717_residual_bc_exact_source_lookahead_v2}"
 DATASET_ROOT="$ROOT/artifacts/two_wheel_riser/$DATASET_STAMP"
-DATASET_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$DATASET_STAMP\\all79_residual_dataset_v1.npz"
+DATASET_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$DATASET_STAMP\\all79_residual_dataset_v2.npz"
 POLICY_ROOT="$ROOT/artifacts/two_wheel_riser/$POLICY_STAMP"
 POLICY_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$POLICY_STAMP"
 SUMMARY="$DATASET_ROOT/summary.json"
-DATASET="$DATASET_ROOT/all79_residual_dataset_v1.npz"
+DATASET="$DATASET_ROOT/all79_residual_dataset_v2.npz"
 TRAINER_WIN="$WIN_ROOT\\scripts\\two_wheel_balance\\train_riser_residual_bc.py"
 
 [[ -x "$PY" ]] || { printf 'missing training Python: %s\n' "$PY" >&2; exit 2; }
@@ -86,6 +86,12 @@ checks = {
     )
     == summary.get("exact_source_admission_sha256"),
     "dataset_case_count": dataset.get("case_count") == 79,
+    "dataset_schema": dataset.get("schema")
+    == "cinebotrl_two_wheel_riser_residual_merged_v2",
+    "observation_contract": dataset.get("observation_contract")
+    == "executed_state_with_execution_time_lookahead_v2",
+    "lookahead_horizons": dataset.get("lookahead_horizons_s")
+    == [0.25, 0.5, 1.0],
     "dataset_no_leakage": dataset.get("trajectory_leakage") is False,
     "dataset_finite": dataset.get("finite_values") is True,
     "dataset_zero_clip": dataset.get("action_clip_ratio") == [0.0, 0.0, 0.0],

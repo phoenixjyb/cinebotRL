@@ -26,6 +26,7 @@ from torch.utils.data import DataLoader, TensorDataset  # noqa: E402
 
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
     ACTION_NAMES,
+    LOOKAHEAD_HORIZONS_S,
     OBSERVATION_NAMES,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa: E402
@@ -33,7 +34,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa:
 )
 
 
-EXPECTED_DATASET_SCHEMA = "cinebotrl_two_wheel_riser_residual_merged_v1"
+EXPECTED_DATASET_SCHEMA = "cinebotrl_two_wheel_riser_residual_merged_v2"
 SPLIT_CODES = {"train": 0, "validation": 1, "holdout": 2}
 
 
@@ -75,6 +76,14 @@ def load_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarray]]:
         arrays = {name: np.asarray(data[name]) for name in required}
     if metadata.get("schema") != EXPECTED_DATASET_SCHEMA:
         raise ValueError("wrong merged dataset schema")
+    if metadata.get("observation_names") != list(OBSERVATION_NAMES):
+        raise ValueError("merged observation contract mismatch")
+    if metadata.get("observation_contract") != (
+        "executed_state_with_execution_time_lookahead_v2"
+    ):
+        raise ValueError("merged observation contract version mismatch")
+    if metadata.get("lookahead_horizons_s") != list(LOOKAHEAD_HORIZONS_S):
+        raise ValueError("merged lookahead horizon mismatch")
     observations = arrays["observations"]
     actions = arrays["actions"]
     labels = arrays["split_labels"]
@@ -332,7 +341,7 @@ def main() -> int:
         checkpoint = args.output_dir / "residual_policy.pt"
         torch.save(
             {
-                "schema": "cinebotrl_two_wheel_riser_residual_policy_v1",
+                "schema": "cinebotrl_two_wheel_riser_residual_policy_v2",
                 "model_state_dict": model.state_dict(),
                 "hidden_sizes": hidden_sizes,
                 "observation_names": OBSERVATION_NAMES,
@@ -358,6 +367,9 @@ def main() -> int:
         "dataset_case_count": metadata["case_count"],
         "dataset_row_count": metadata["row_count"],
         "hidden_sizes": list(hidden_sizes),
+        "observation_count": len(OBSERVATION_NAMES),
+        "observation_contract": "executed_state_with_execution_time_lookahead_v2",
+        "lookahead_horizons_s": list(LOOKAHEAD_HORIZONS_S),
         "best_epoch": best_epoch,
         "epochs_run": len(history),
         "observation_normalization_from_train_only": True,

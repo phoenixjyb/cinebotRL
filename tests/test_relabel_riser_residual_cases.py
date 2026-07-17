@@ -45,7 +45,7 @@ def test_relabel_recovers_unclipped_action_from_raw_commands(tmp_path: Path) -> 
         "baseline_wheel_actions": np.zeros((count, 2), dtype=np.float32),
         "teacher_commands": teacher_commands,
     }
-    source_file = source / "case_0020_executed_residual_v1.npz"
+    source_file = source / "case_0020_executed_residual_v2.npz"
     save_case_dataset(source_file, 20, payload)
     result = subprocess.run(
         [
@@ -91,7 +91,7 @@ def test_capture_audit_separates_physics_from_clipped_labels(tmp_path: Path) -> 
     teacher_commands = np.zeros((count, 3), dtype=np.float32)
     teacher_commands[:, 0] = [-0.18, -0.16, 0.05]
     save_case_dataset(
-        cases / "case_0001_executed_residual_v1.npz",
+        cases / "case_0001_executed_residual_v2.npz",
         1,
         {
             "observations": observations,

@@ -19,6 +19,8 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
     ACTION_NAMES,
     ACTION_SCALES,
     DATASET_SCHEMA,
+    LOOKAHEAD_HORIZONS_S,
+    OBSERVATION_INDEX,
     OBSERVATION_NAMES,
     load_case_dataset,
 )
@@ -72,7 +74,7 @@ def grouped_split(
 
 def main() -> int:
     args = parse_args()
-    paths = sorted(args.case_dir.glob("case_*_executed_residual_v1.npz"))
+    paths = sorted(args.case_dir.glob("case_*_executed_residual_v2.npz"))
     if len(paths) != args.expected_count:
         raise ValueError(f"expected {args.expected_count} captures, found {len(paths)}")
     entries = []
@@ -126,11 +128,15 @@ def main() -> int:
     merged["action_valid_mask"] = np.ones_like(merged["actions"], dtype=np.float32)
     reconstructed_commands = np.column_stack(
         (
-            merged["observations"][:, 18]
+            merged["observations"][
+                :, OBSERVATION_INDEX["feedforward_vx_m_s"]
+            ]
             + ACTION_SCALES[0] * merged["actions"][:, 0],
-            merged["observations"][:, 19]
+            merged["observations"][
+                :, OBSERVATION_INDEX["feedforward_wz_rad_s"]
+            ]
             + ACTION_SCALES[1] * merged["actions"][:, 1],
-            merged["observations"][:, 15]
+            merged["observations"][:, OBSERVATION_INDEX["riser_position_m"]]
             + ACTION_SCALES[2] * merged["actions"][:, 2],
         )
     )
@@ -150,9 +156,12 @@ def main() -> int:
         for name, code in split_code.items()
     }
     metadata = {
-        "schema": "cinebotrl_two_wheel_riser_residual_merged_v1",
+        "schema": "cinebotrl_two_wheel_riser_residual_merged_v2",
         "source_case_schema": DATASET_SCHEMA,
         "observation_names": list(OBSERVATION_NAMES),
+        "observation_contract": "executed_state_with_execution_time_lookahead_v2",
+        "lookahead_horizons_s": list(LOOKAHEAD_HORIZONS_S),
+        "lookahead_reference_clock": "execution_time_s",
         "action_names": list(ACTION_NAMES),
         "action_scales": ACTION_SCALES.tolist(),
         "action_contract": "trajectory_command_residual_above_frozen_balance_lqr_v1",

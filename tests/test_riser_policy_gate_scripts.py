@@ -11,6 +11,10 @@ def _read(name: str) -> str:
 
 def test_bc_gate_requires_complete_quality_qualified_exact_source_dataset() -> None:
     source = _read("run_riser_residual_bc_gate.sh")
+    assert "all79_residual_dataset_v2.npz" in source
+    assert "all79_residual_dataset_v1.npz" not in source
+    assert "20260717_residual_all79_exact_source_lookahead_v2" in source
+    assert "20260717_residual_bc_exact_source_lookahead_v2" in source
     assert 'summary.get("passed_case_count") == 79' in source
     assert 'dataset.get("action_clip_ratio") == [0.0, 0.0, 0.0]' in source
     assert 'dataset.get("trajectory_leakage") is False' in source
@@ -30,11 +34,14 @@ def test_bc_gate_requires_complete_quality_qualified_exact_source_dataset() -> N
     assert 'report.get("holdout_metrics_computed") is False' in source
     assert 'report.get("case_balanced_training_loss") is True' in source
     assert 'report.get("case_balanced_validation_gate") is True' in source
+    assert '"cinebotrl_two_wheel_riser_residual_merged_v2"' in source
+    assert '"executed_state_with_execution_time_lookahead_v2"' in source
+    assert '== [0.25, 0.5, 1.0]' in source
 
 
 def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
     source = _read("run_riser_all79_dataset_gate.sh")
-    assert "20260717_residual_all79_exact_source_v1" in source
+    assert "20260717_residual_all79_exact_source_lookahead_v2" in source
     assert "20260717_all79_playback_exact_source_v1" in source
     assert "20260716_residual_all79_phase_v2" not in source
     assert "RISER_EXACT_SOURCE_MANIFEST_WSL" in source
@@ -50,6 +57,9 @@ def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
     assert '"cinebotrl_two_wheel_riser_capture_admission_v1"' in source
     assert '"plan_manifest_sha256"' in source
     assert '"$CAPTURE_COMMIT"' in source
+    assert "executed_residual_v2.npz" in source
+    assert "executed_state_with_execution_time_lookahead_v2" in source
+    assert '"lookahead_horizons_s": [0.25, 0.5, 1.0]' in source
 
 
 def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
@@ -111,6 +121,10 @@ def test_runtime_evidence_separates_source_and_execution_clocks() -> None:
 def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:
     source = _read("run_riser_residual_holdout_gate.sh")
     assert "exact_source_v1" in source
+    assert "20260717_residual_holdout_exact_source_lookahead_v2" in source
+    assert '"cinebotrl_two_wheel_riser_residual_policy_v2"' in source
+    assert '"executed_state_with_execution_time_lookahead_v2"' in source
+    assert '== [0.25, 0.5, 1.0]' in source
     assert "20260717_all79_playback_exact_source_v1" in source
     assert "zero_policy_action_baseline" in source
     assert "torchscript_residual_policy" in source
@@ -126,6 +140,10 @@ def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:
 def test_all79_policy_gate_requires_holdout_and_all_cases() -> None:
     source = _read("run_riser_residual_all79_policy_gate.sh")
     assert "exact_source_v1" in source
+    assert "20260717_residual_policy_all79_exact_source_lookahead_v2" in source
+    assert '"cinebotrl_two_wheel_riser_residual_policy_v2"' in source
+    assert '"executed_state_with_execution_time_lookahead_v2"' in source
+    assert '== [0.25, 0.5, 1.0]' in source
     assert "20260717_all79_playback_exact_source_v1" in source
     assert 'holdout.get("passed") is True' in source
     assert "for case_number in $(seq 1 79)" in source

@@ -4,9 +4,9 @@ set -euo pipefail
 ROOT="${RISER_ROOT:-/mnt/g/wSpace/cinebotRL-two-wheel-riser}"
 WIN_ROOT="${RISER_WIN_ROOT:-G:\\wSpace\\cinebotRL-two-wheel-riser}"
 PY="${ISAAC_PYTHON:-/mnt/g/isaaclab_venv/Scripts/python.exe}"
-DATASET_STAMP="${RISER_DATASET_STAMP:-20260717_residual_all79_exact_source_v1}"
-POLICY_STAMP="${RISER_POLICY_STAMP:-20260717_residual_bc_exact_source_v1}"
-ROLLOUT_STAMP="${RISER_ROLLOUT_STAMP:-20260717_residual_holdout_exact_source_v1}"
+DATASET_STAMP="${RISER_DATASET_STAMP:-20260717_residual_all79_exact_source_lookahead_v2}"
+POLICY_STAMP="${RISER_POLICY_STAMP:-20260717_residual_bc_exact_source_lookahead_v2}"
+ROLLOUT_STAMP="${RISER_ROLLOUT_STAMP:-20260717_residual_holdout_exact_source_lookahead_v2}"
 PLAN_STAMP="${RISER_ALL79_PLAN_STAMP:-20260717_all79_playback_exact_source_v1}"
 DATASET_ROOT="$ROOT/artifacts/two_wheel_riser/$DATASET_STAMP"
 POLICY_ROOT="$ROOT/artifacts/two_wheel_riser/$POLICY_STAMP"
@@ -42,6 +42,12 @@ checks = {
     "dataset_79": dataset.get("passed_case_count") == 79,
     "offline_gate": report.get("offline_gate_passed") is True,
     "rollout_authorized": report.get("learned_rollout_authorized") is True,
+    "policy_schema": report.get("schema")
+    == "cinebotrl_two_wheel_riser_residual_policy_v2",
+    "observation_contract": report.get("observation_contract")
+    == "executed_state_with_execution_time_lookahead_v2",
+    "lookahead_horizons": report.get("lookahead_horizons_s")
+    == [0.25, 0.5, 1.0],
     "policy_hash": report.get("torchscript_sha256")
     == hashlib.sha256(policy.read_bytes()).hexdigest(),
     "eval_case_count": len(cases) == 8,

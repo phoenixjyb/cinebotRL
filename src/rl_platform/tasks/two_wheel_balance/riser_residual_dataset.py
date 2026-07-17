@@ -11,8 +11,9 @@ import numpy as np
 from .camera_attitude import quaternion_matrix_wxyz, rotation_error_vector
 
 
-DATASET_SCHEMA = "cinebotrl_two_wheel_riser_executed_residual_v1"
-OBSERVATION_NAMES = (
+DATASET_SCHEMA = "cinebotrl_two_wheel_riser_executed_residual_v2"
+LOOKAHEAD_HORIZONS_S = (0.25, 0.50, 1.00)
+BASE_OBSERVATION_NAMES = (
     "pitch_rad",
     "pitch_rate_rad_s",
     "mean_wheel_position_rad",
@@ -40,6 +41,35 @@ OBSERVATION_NAMES = (
     "previous_residual_wz_normalized",
     "previous_residual_riser_target_normalized",
 )
+LOOKAHEAD_CHANNEL_NAMES = (
+    "base_target_longitudinal_error_m",
+    "base_target_lateral_error_m",
+    "base_target_yaw_error_rad",
+    "camera_target_longitudinal_error_m",
+    "camera_target_lateral_error_m",
+    "camera_target_vertical_error_m",
+    "camera_attitude_error_x_rad",
+    "camera_attitude_error_y_rad",
+    "camera_attitude_error_z_rad",
+    "riser_target_error_m",
+    "feedforward_vx_m_s",
+    "feedforward_wz_rad_s",
+    "feedforward_riser_velocity_m_s",
+)
+
+
+def _lookahead_prefix(horizon_s: float) -> str:
+    return f"lookahead_{horizon_s:.2f}s".replace(".", "p")
+
+
+OBSERVATION_NAMES = BASE_OBSERVATION_NAMES + tuple(
+    f"{_lookahead_prefix(horizon)}_{channel}"
+    for horizon in LOOKAHEAD_HORIZONS_S
+    for channel in LOOKAHEAD_CHANNEL_NAMES
+)
+OBSERVATION_INDEX = {
+    name: index for index, name in enumerate(OBSERVATION_NAMES)
+}
 ACTION_NAMES = (
     "residual_vx_normalized",
     "residual_wz_normalized",
@@ -80,6 +110,11 @@ def build_executed_observation(
     phase_fraction: float,
     progress_scale: float,
     previous_residual_action: np.ndarray,
+    lookahead_base_xy_yaw: np.ndarray,
+    lookahead_camera_position_world_m: np.ndarray,
+    lookahead_camera_quat_wxyz: np.ndarray,
+    lookahead_riser_target_m: np.ndarray,
+    lookahead_feedforward_v_wz_riser: np.ndarray,
 ) -> np.ndarray:
     """Build one deployable pre-action observation from physical state."""
 
@@ -89,10 +124,30 @@ def build_executed_observation(
     actual_camera = np.asarray(actual_camera_position_world_m, dtype=np.float64)
     target_camera = np.asarray(target_camera_position_world_m, dtype=np.float64)
     previous = np.asarray(previous_residual_action, dtype=np.float64)
+    future_base = np.asarray(lookahead_base_xy_yaw, dtype=np.float64)
+    future_camera = np.asarray(
+        lookahead_camera_position_world_m, dtype=np.float64
+    )
+    future_camera_quat = np.asarray(
+        lookahead_camera_quat_wxyz, dtype=np.float64
+    )
+    future_riser = np.asarray(lookahead_riser_target_m, dtype=np.float64)
+    future_feedforward = np.asarray(
+        lookahead_feedforward_v_wz_riser, dtype=np.float64
+    )
     if lqr_state.shape != (6,) or actual_base.shape != (3,) or target_base.shape != (3,):
         raise ValueError("invalid LQR/base observation shape")
     if actual_camera.shape != (3,) or target_camera.shape != (3,) or previous.shape != (3,):
         raise ValueError("invalid camera/action-history observation shape")
+    count = len(LOOKAHEAD_HORIZONS_S)
+    if (
+        future_base.shape != (count, 3)
+        or future_camera.shape != (count, 3)
+        or future_camera_quat.shape != (count, 4)
+        or future_riser.shape != (count,)
+        or future_feedforward.shape != (count, 3)
+    ):
+        raise ValueError("invalid lookahead observation shape")
     base_error = _world_xy_to_base(target_base[:2] - actual_base[:2], actual_base[2])
     camera_delta = target_camera - actual_camera
     camera_xy_error = _world_xy_to_base(camera_delta[:2], actual_base[2])
@@ -100,6 +155,33 @@ def build_executed_observation(
         quaternion_matrix_wxyz(np.asarray(actual_camera_quat_wxyz, dtype=np.float64)),
         quaternion_matrix_wxyz(np.asarray(target_camera_quat_wxyz, dtype=np.float64)),
     )
+    lookahead_features = []
+    actual_camera_rotation = quaternion_matrix_wxyz(
+        np.asarray(actual_camera_quat_wxyz, dtype=np.float64)
+    )
+    for index in range(count):
+        future_base_error = _world_xy_to_base(
+            future_base[index, :2] - actual_base[:2], actual_base[2]
+        )
+        future_camera_delta = future_camera[index] - actual_camera
+        future_camera_xy_error = _world_xy_to_base(
+            future_camera_delta[:2], actual_base[2]
+        )
+        future_attitude_error = rotation_error_vector(
+            actual_camera_rotation,
+            quaternion_matrix_wxyz(future_camera_quat[index]),
+        )
+        lookahead_features.extend(
+            (
+                *future_base_error,
+                _wrap_angle(future_base[index, 2] - actual_base[2]),
+                *future_camera_xy_error,
+                future_camera_delta[2],
+                *future_attitude_error,
+                future_riser[index] - riser_position_m,
+                *future_feedforward[index],
+            )
+        )
     observation = np.concatenate(
         (
             lqr_state,
@@ -112,6 +194,7 @@ def build_executed_observation(
             [feedforward_vx_m_s, feedforward_wz_rad_s, feedforward_riser_velocity_m_s],
             [phase_fraction, progress_scale],
             previous,
+            lookahead_features,
         )
     )
     if observation.shape != (len(OBSERVATION_NAMES),) or not np.isfinite(observation).all():
@@ -260,6 +343,9 @@ def save_case_dataset(path: Path, case: int, payload: dict[str, np.ndarray]) -> 
         "action_names": list(ACTION_NAMES),
         "action_scales": ACTION_SCALES.tolist(),
         "action_contract": "trajectory_command_residual_above_frozen_balance_lqr_v1",
+        "observation_contract": "executed_state_with_execution_time_lookahead_v2",
+        "lookahead_horizons_s": list(LOOKAHEAD_HORIZONS_S),
+        "lookahead_reference_clock": "execution_time_s",
         "camera_observation_frame": "physical_cam_link_fk",
         "target_attitude_contract": "semantic_dfr_to_physical_cam_v1",
         "source_action_labels_used": False,
@@ -277,6 +363,14 @@ def load_case_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarr
         payload = {name: np.asarray(data[name]) for name in data.files if name != "metadata_json"}
     if metadata.get("schema") != DATASET_SCHEMA:
         raise ValueError(f"wrong residual dataset schema in {path}")
+    if metadata.get("observation_names") != list(OBSERVATION_NAMES):
+        raise ValueError(f"observation contract mismatch in {path}")
+    if metadata.get("observation_contract") != (
+        "executed_state_with_execution_time_lookahead_v2"
+    ):
+        raise ValueError(f"observation contract version mismatch in {path}")
+    if metadata.get("lookahead_horizons_s") != list(LOOKAHEAD_HORIZONS_S):
+        raise ValueError(f"lookahead horizon mismatch in {path}")
     if not np.allclose(metadata.get("action_scales"), ACTION_SCALES, atol=1e-12):
         raise ValueError(f"residual action scale mismatch in {path}")
     case = int(metadata["case"])

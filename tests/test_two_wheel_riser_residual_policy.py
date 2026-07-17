@@ -13,6 +13,8 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa:
 
 
 def test_residual_policy_is_dimensioned_and_bounded() -> None:
+    assert len(OBSERVATION_NAMES) == 65
+    assert len(ACTION_NAMES) == 3
     policy = RiserResidualPolicy(
         torch.zeros(len(OBSERVATION_NAMES)),
         torch.ones(len(OBSERVATION_NAMES)),

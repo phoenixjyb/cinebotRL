@@ -16,6 +16,8 @@
 
 DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由冻结的 LQR 控制；DJI 云台姿态适配仍是确定性模块。物理云台电机关节角、旧版隔离 NPZ 和源 GIK 动作都不能作为策略标签。PPO 在本流程中保持未授权。
 
+早期 26 维瞬时观测合同已在正式采集前废弃。它只描述“现在发生了什么”，无法区分当前状态相同、但随后转弯、升降或改变相机姿态的轨迹，因此不具备完整轨迹跟踪所需的前视信息。任何 `executed_residual_v1`、`residual_merged_v1` 或 `residual_policy_v1` 文件都只能作为历史审计，不能升级、拼接或静默转换为当前训练数据。
+
 最终归一化动作范围为 `0.30 m/s`、`0.40 rad/s`、`0.10 m`。该范围来自全部诊断轨迹的原始教师命令审计、`1.10x` 余量和 `0.05` 量化，不得从旧 NPZ 的裁剪动作反推。
 
 ## 固定运行合同
@@ -32,9 +34,23 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 - 相位合同：`derivatives_scaled_by_progress_v1`；
 - 默认规划偏航上限为 `0.25 rad/s`；case 15 单独为 `0.20 rad/s`，case 45 单独为 `0.325 rad/s`，case 78 单独为 `0.35 rad/s`。所有值都低于不变的 `0.40 rad/s` 公共上限，且各自的云台代理速率仍必须通过 `24 deg/s` gate。
 
+## DNN v2 观测与动作合同
+
+策略输入固定为 65 维：原 26 维已执行物理状态前缀，加上 `0.25 s`、`0.50 s`、`1.00 s` 三个前视点，每个前视点 13 维。前视时钟使用重定时后的 `execution_time_s`，查询超过终点时固定在最后一个不可变 source anchor，不使用 source clock 冒充执行时钟。
+
+每个前视点包含：
+
+- 机体坐标系中的未来 base 目标 `x/y/yaw` 误差；
+- 机体坐标系中的未来物理 `cam_link` 目标 `x/y/z` 误差；
+- 未来物理相机姿态误差向量；
+- 未来升降目标误差；
+- 按当前 progress scale 缩放的未来 `vx/wz/riser_velocity` 前馈。
+
+相机目标先按 `R_world_cam = R_world_DFR * Rz(+pi/2)` 从语义 DFR 转为物理 `cam_link`，再与物理 FK 比较。策略动作仍严格为 3 维，不增加机械臂动作、轮端力矩动作或 DJI 物理电机关节动作。数据、模型和 gate 必须分别声明 `executed_residual_v2`、`residual_merged_v2`、`residual_policy_v2` 以及 `executed_state_with_execution_time_lookahead_v2`；任一声明缺失或不一致即 fail closed。
+
 ## Gate A：79 条确定性稠密采集
 
-`20260716_residual_all79_phase_v2` 和隔离后的 `phase_v3_clean` 都只能作为控制器诊断。正式采集必须使用新的 `20260717_all79_playback_exact_source_v1` 和空的 `20260717_residual_all79_exact_source_v1`，不得复用旧 gate/NPZ。
+`20260716_residual_all79_phase_v2` 和隔离后的 `phase_v3_clean` 都只能作为控制器诊断。正式采集必须使用新的 `20260717_all79_playback_exact_source_v1` 和空的 `20260717_residual_all79_exact_source_lookahead_v2`，不得复用旧 gate/NPZ。
 
 启动 Gate A 前必须设置 `RISER_EXACT_SOURCE_MANIFEST_WSL`。该 manifest 必须声明 `exact_source_v1`，包含连续 1--79 case，并对每个 case 证明 `N` 源姿态、`N` 源时间戳、`N` retarget waypoint states、`N-1` transitions、顺序几何保持、初始化分离、完整性通过、独立质量 gate 通过和 `valid_for_training=true`。完整性 canary 的 `valid_for_training=false`，因此不能启动采集。
 
@@ -51,7 +67,7 @@ bash scripts/two_wheel_balance/run_riser_all79_dataset_gate.sh
 - 动态 gate 全部通过；
 - NPZ 与 JSON 同时存在。
 
-合并前必须满足：上游 exact-source/quality admission 通过、`79/79`、无终止、标签无裁剪、有限数值、教师命令重建误差不超过 `2e-6`、按完整 case 分割且无轨迹泄漏。最终 summary 记录上游 manifest/admission SHA-256、运行 commit、capture admission SHA-256、规划 manifest SHA-256、所有源 NPZ SHA-256。BC 入口会再次验证整条 provenance 链。
+合并前必须满足：上游 exact-source/quality admission 通过、`79/79`、无终止、标签无裁剪、有限数值、教师命令重建误差不超过 `2e-6`、按完整 case 分割且无轨迹泄漏。每个样本必须在相同执行时刻从不可变 plan 在线构造三个前视点；不得从旧 NPZ 猜测或回填未来目标。最终 summary 记录上游 manifest/admission SHA-256、运行 commit、capture admission SHA-256、规划 manifest SHA-256、观测合同、前视时域和所有源 NPZ SHA-256。BC 入口会再次验证整条 provenance 链。
 
 任一 case 失败即停止。禁止用已通过的部分数据提前训练。
 

@@ -141,5 +141,11 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert "float(np.max(np.abs(teacher_residual_values))) < 1.0 - 1e-6" in source
     assert '"source_duration_s": source_duration_s' in source
     assert '"execution_duration_s": execution_duration_s' in source
+    assert "LOOKAHEAD_HORIZONS_S" in source
+    assert "phase_time_s + horizon_s" in source
+    assert "lookahead_base_xy_yaw=np.asarray(" in source
+    assert "lookahead_camera_position_world_m=np.asarray(" in source
+    assert "lookahead_camera_quat_wxyz=np.asarray(" in source
+    assert "lookahead_feedforward_v_wz_riser=lookahead_feedforward" in source
     assert "phase_time_s >= execution_duration_s" in source
     assert "phase_time_s >= source_duration_s" not in source

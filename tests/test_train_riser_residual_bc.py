@@ -15,6 +15,7 @@ from scripts.two_wheel_balance.train_riser_residual_bc import (  # noqa: E402
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
     ACTION_NAMES,
+    LOOKAHEAD_HORIZONS_S,
     OBSERVATION_NAMES,
 )
 
@@ -22,10 +23,13 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
 def _write_dataset(path, split_labels: np.ndarray) -> None:
     row_count = len(split_labels)
     metadata = {
-        "schema": "cinebotrl_two_wheel_riser_residual_merged_v1",
+        "schema": "cinebotrl_two_wheel_riser_residual_merged_v2",
         "case_count": 3,
         "row_count": row_count,
         "trajectory_leakage": False,
+        "observation_names": list(OBSERVATION_NAMES),
+        "observation_contract": "executed_state_with_execution_time_lookahead_v2",
+        "lookahead_horizons_s": list(LOOKAHEAD_HORIZONS_S),
         "split_cases": {"train": [1], "validation": [2], "holdout": [3]},
     }
     np.savez_compressed(
@@ -55,10 +59,13 @@ def _write_learnable_dataset(path: Path) -> np.ndarray:
         )
     ).astype(np.float32)
     metadata = {
-        "schema": "cinebotrl_two_wheel_riser_residual_merged_v1",
+        "schema": "cinebotrl_two_wheel_riser_residual_merged_v2",
         "case_count": 3,
         "row_count": len(observations),
         "trajectory_leakage": False,
+        "observation_names": list(OBSERVATION_NAMES),
+        "observation_contract": "executed_state_with_execution_time_lookahead_v2",
+        "lookahead_horizons_s": list(LOOKAHEAD_HORIZONS_S),
         "split_cases": {"train": [1], "validation": [2], "holdout": [3]},
     }
     np.savez_compressed(
@@ -93,6 +100,19 @@ def test_bc_loader_rejects_source_leakage(tmp_path) -> None:
     path = tmp_path / "leaking.npz"
     _write_dataset(path, np.array([0, 1, 1, 1, 2, 2], dtype=np.int8))
     with pytest.raises(ValueError, match="source leakage"):
+        load_dataset(path)
+
+
+def test_bc_loader_rejects_old_observation_schema(tmp_path) -> None:
+    path = tmp_path / "old_v1.npz"
+    _write_dataset(path, np.repeat(np.arange(3, dtype=np.int8), 2))
+    with np.load(path, allow_pickle=False) as data:
+        payload = {name: np.asarray(data[name]) for name in data.files}
+    metadata = json.loads(str(payload["metadata_json"].item()))
+    metadata["schema"] = "cinebotrl_two_wheel_riser_residual_merged_v1"
+    payload["metadata_json"] = np.array(json.dumps(metadata))
+    np.savez_compressed(path, **payload)
+    with pytest.raises(ValueError, match="wrong merged dataset schema"):
         load_dataset(path)
 
 

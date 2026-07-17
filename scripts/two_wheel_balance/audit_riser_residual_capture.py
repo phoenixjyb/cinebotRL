@@ -22,6 +22,9 @@ from scripts.two_wheel_balance.relabel_riser_residual_cases import (  # noqa: E4
     raw_residual,
     sha256,
 )
+from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
+    OBSERVATION_INDEX,
+)
 
 
 TRACKING_PROFILE = "riser_phase_consistent_v2"
@@ -74,7 +77,7 @@ def main() -> int:
         raise ValueError("source commit must be a full lowercase Git SHA-1")
 
     gate_paths = sorted(args.gate_dir.glob("case_*.json"))
-    case_paths = sorted(args.case_dir.glob("case_*_executed_residual_v1.npz"))
+    case_paths = sorted(args.case_dir.glob("case_*_executed_residual_v2.npz"))
     if len(gate_paths) != args.expected_count or len(case_paths) != args.expected_count:
         raise ValueError(
             f"expected {args.expected_count} gates/cases, found "
@@ -110,11 +113,17 @@ def main() -> int:
         residual_chunks.append(residual)
         stored_reconstructed = np.column_stack(
             (
-                payload["observations"][:, 18]
+                payload["observations"][
+                    :, OBSERVATION_INDEX["feedforward_vx_m_s"]
+                ]
                 + source_scales[0] * payload["actions"][:, 0],
-                payload["observations"][:, 19]
+                payload["observations"][
+                    :, OBSERVATION_INDEX["feedforward_wz_rad_s"]
+                ]
                 + source_scales[1] * payload["actions"][:, 1],
-                payload["observations"][:, 15]
+                payload["observations"][
+                    :, OBSERVATION_INDEX["riser_position_m"]
+                ]
                 + source_scales[2] * payload["actions"][:, 2],
             )
         )

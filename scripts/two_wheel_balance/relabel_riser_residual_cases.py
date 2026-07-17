@@ -17,6 +17,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
     DATASET_SCHEMA,
+    OBSERVATION_INDEX,
     validate_case_dataset,
 )
 
@@ -53,9 +54,18 @@ def load_source(path: Path) -> tuple[dict, dict[str, np.ndarray]]:
 def raw_residual(payload: dict[str, np.ndarray]) -> np.ndarray:
     return np.column_stack(
         (
-            payload["teacher_commands"][:, 0] - payload["observations"][:, 18],
-            payload["teacher_commands"][:, 1] - payload["observations"][:, 19],
-            payload["teacher_commands"][:, 2] - payload["observations"][:, 15],
+            payload["teacher_commands"][:, 0]
+            - payload["observations"][
+                :, OBSERVATION_INDEX["feedforward_vx_m_s"]
+            ],
+            payload["teacher_commands"][:, 1]
+            - payload["observations"][
+                :, OBSERVATION_INDEX["feedforward_wz_rad_s"]
+            ],
+            payload["teacher_commands"][:, 2]
+            - payload["observations"][
+                :, OBSERVATION_INDEX["riser_position_m"]
+            ],
         )
     ).astype(np.float64)
 
@@ -67,7 +77,7 @@ def main() -> int:
     parser.add_argument("--action-scales", type=parse_scales, required=True)
     parser.add_argument("--expected-count", type=int, required=True)
     args = parser.parse_args()
-    paths = sorted(args.source_case_dir.glob("case_*_executed_residual_v1.npz"))
+    paths = sorted(args.source_case_dir.glob("case_*_executed_residual_v2.npz"))
     if len(paths) != args.expected_count:
         raise ValueError(f"expected {args.expected_count} source cases, found {len(paths)}")
     if args.output_case_dir.exists():
@@ -89,11 +99,17 @@ def main() -> int:
         validate_case_dataset(relabeled, expected_case=int(metadata["case"]))
         reconstructed = np.column_stack(
             (
-                relabeled["observations"][:, 18]
+                relabeled["observations"][
+                    :, OBSERVATION_INDEX["feedforward_vx_m_s"]
+                ]
                 + args.action_scales[0] * relabeled["actions"][:, 0],
-                relabeled["observations"][:, 19]
+                relabeled["observations"][
+                    :, OBSERVATION_INDEX["feedforward_wz_rad_s"]
+                ]
                 + args.action_scales[1] * relabeled["actions"][:, 1],
-                relabeled["observations"][:, 15]
+                relabeled["observations"][
+                    :, OBSERVATION_INDEX["riser_position_m"]
+                ]
                 + args.action_scales[2] * relabeled["actions"][:, 2],
             )
         )
@@ -131,7 +147,7 @@ def main() -> int:
     if len(cases) != len(set(cases)):
         raise ValueError("duplicate cases in source corpus")
     summary = {
-        "schema": "cinebotrl_two_wheel_riser_residual_relabel_v1",
+        "schema": "cinebotrl_two_wheel_riser_residual_relabel_v2",
         "case_count": len(rows),
         "action_scales": args.action_scales.tolist(),
         "raw_residual_abs_max": np.max(

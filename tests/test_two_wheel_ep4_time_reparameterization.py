@@ -396,6 +396,44 @@ def test_adaptive_waypoint_stride_keeps_exact_ordered_subset_and_paired_seed_con
     assert teacher.base_arm_q.shape == (8, 6)
 
 
+def test_adaptive_dense_stride_smooths_micro_transitions_without_changing_duration(
+    tmp_path: Path,
+) -> None:
+    reference_dir = tmp_path / "reference"
+    reference_digest = write_reference_package(reference_dir)
+    raw_seed_dir = tmp_path / "raw_seed"
+    raw_seed_manifest_digest, raw_seed_digest = write_raw_seed_package(
+        raw_seed_dir, reference_dir
+    )
+    output_dir = tmp_path / "derived_dense_stride"
+    manifest = derive_ep4_time_warp_package(
+        reference_dir,
+        raw_seed_dir,
+        output_dir,
+        config=TimeReparameterizationConfig(
+            episode_index=1,
+            waypoint_stride=4,
+            dense_source_anchor_start_0based=2,
+            dense_source_anchor_end_0based=8,
+            dense_waypoint_stride=2,
+            time_allocation_strategy="proportional_lower_bounds",
+            diagnostic_transition_start_1based=2,
+            diagnostic_transition_end_1based=5,
+        ),
+        expected_manifest_sha256=reference_digest,
+        expected_episodes=1,
+        expected_raw_seed_manifest_sha256=raw_seed_manifest_digest,
+        expected_raw_seed_sha256=raw_seed_digest,
+    )
+    verified = verify_ep4_time_warp_package(
+        reference_dir, raw_seed_dir, output_dir, expected_episodes=1
+    )
+    assert verified == manifest
+    assert manifest["derived"]["waypoint_source_index_0based"] == [0, 2, 4, 6, 8, 10]
+    assert manifest["metrics"]["waypoint_reduction"]["dense_waypoint_stride"] == 2
+    assert manifest["derived"]["duration_s"] == manifest["source"]["duration_s"]
+
+
 def test_derived_reference_and_seed_load_together_but_raw_seed_is_rejected(
     tmp_path: Path,
 ) -> None:

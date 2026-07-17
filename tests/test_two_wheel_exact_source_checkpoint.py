@@ -107,6 +107,52 @@ def test_checkpoint_atomic_round_trip_preserves_complete_prefix(tmp_path: Path) 
     assert not list(tmp_path.glob(".ep7.checkpoint.npz.*.tmp"))
 
 
+def test_semantic_branch_lookback_truncates_complete_prefix_and_control() -> None:
+    states = np.arange(63, dtype=np.float64).reshape(7, 9) / 100.0
+    controls = np.arange(30, dtype=np.float64).reshape(6, 5) / 10.0
+    prefix = ExactSourceRetargetPrefix(
+        states=states,
+        controls=controls,
+        target_positions=np.arange(21, dtype=np.float64).reshape(7, 3),
+        target_attitudes=np.tile([1.0, 0.0, 0.0, 0.0], (7, 1)),
+        execution_time_s=np.arange(7, dtype=np.float64) * 0.2,
+        position_errors_m=np.arange(7, dtype=np.float64) / 100.0,
+        attitude_errors_deg=np.arange(7, dtype=np.float64) / 10.0,
+        previous_control=np.full(8, 99.0),
+        source_anchor_execution_index_prefix=np.array([0, 2, 4, 6]),
+        retimed_interval_count=3,
+        next_source_interval=4,
+    )
+
+    rewound = retarget.truncate_exact_source_prefix_for_semantic_lookback(
+        prefix, lookback_source_intervals=2
+    )
+
+    assert rewound.next_source_interval == 2
+    assert rewound.retimed_interval_count == 1
+    np.testing.assert_array_equal(
+        rewound.source_anchor_execution_index_prefix, [0, 2]
+    )
+    np.testing.assert_array_equal(rewound.states, states[:3])
+    np.testing.assert_array_equal(rewound.controls, controls[:2])
+    np.testing.assert_array_equal(rewound.previous_control[:5], controls[1])
+    np.testing.assert_array_equal(
+        rewound.previous_control[5:8], states[2, 6:9] - states[1, 6:9]
+    )
+
+
+def test_semantic_branch_lookback_rejects_anchor_zero_and_bad_map() -> None:
+    prefix = checkpoint_fixture()[0]
+    with pytest.raises(ValueError, match="anchor zero"):
+        retarget.truncate_exact_source_prefix_for_semantic_lookback(prefix, 1)
+    bad = replace(
+        prefix,
+        source_anchor_execution_index_prefix=np.array([0]),
+    )
+    with pytest.raises(ValueError, match="map is incomplete"):
+        retarget.truncate_exact_source_prefix_for_semantic_lookback(bad, 1)
+
+
 def test_windows_project_root_uses_wsl_git_path() -> None:
     assert (
         exact_retarget._windows_project_root_to_wsl(

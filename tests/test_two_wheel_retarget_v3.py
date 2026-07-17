@@ -14,6 +14,7 @@ from retarget_corrected_teacher_v3_nonholonomic import (  # noqa: E402
     BALANCE_PITCH_OUTPUT_TOLERANCE_DEG,
     BALANCE_PITCH_SOLVER_TOLERANCE_DEG,
     HOME_ARM,
+    SemanticBranchAlternative,
     append_gravity_aware_base_arm_recovery_seed,
     balance_pitch_optimization_margin_deg,
     bounded_gimbal_recovery_deltas,
@@ -21,6 +22,7 @@ from retarget_corrected_teacher_v3_nonholonomic import (  # noqa: E402
     gravity_aware_base_arm_recovery_seed,
     physical_gimbal_interpolation_error,
     physical_camera_rotation,
+    select_semantic_branch_beam,
     select_acquisition_base_route,
     semantic_gimbal_reserve_margin_ratio,
     semantic_gimbal_reserve_search_max_scale,
@@ -36,6 +38,84 @@ from rl_platform.tasks.two_wheel_balance.camera_attitude import (  # noqa: E402
 from rl_platform.tasks.two_wheel_balance.whole_body_kinematics import (  # noqa: E402
     UrdfPositionKinematics,
 )
+
+
+def _branch(
+    marker: float,
+    *,
+    feasible: bool = True,
+    local: float = 0.0,
+    future: float = 0.0,
+    lineage: tuple[int, ...] = (),
+) -> SemanticBranchAlternative:
+    return SemanticBranchAlternative(
+        state=np.full(9, marker),
+        previous_control=np.full(8, marker),
+        hard_feasible=feasible,
+        local_score=local,
+        future_score=future,
+        lineage=lineage,
+        payload_index=int(marker),
+    )
+
+
+def test_semantic_branch_beam_keeps_future_reachable_alternative() -> None:
+    greedy = _branch(0.0, local=0.1, future=10.0, lineage=(0,))
+    reachable = _branch(1.0, local=0.2, future=0.1, lineage=(1,))
+
+    selected = select_semantic_branch_beam([greedy, reachable], beam_width=2)
+
+    assert [item.payload_index for item in selected] == [1, 0]
+    second_step = select_semantic_branch_beam(
+        [
+            _branch(2.0, feasible=False, lineage=(0, 2)),
+            _branch(3.0, local=0.3, future=0.0, lineage=(1, 3)),
+        ],
+        beam_width=2,
+    )
+    assert [item.payload_index for item in second_step] == [3]
+
+
+def test_semantic_branch_beam_is_deterministic_and_deduplicates() -> None:
+    first = _branch(1.0, local=0.2, future=0.1, lineage=(1,))
+    duplicate = SemanticBranchAlternative(
+        state=first.state + 1e-12,
+        previous_control=first.previous_control.copy(),
+        hard_feasible=True,
+        local_score=0.1,
+        future_score=0.1,
+        lineage=(0,),
+        payload_index=9,
+    )
+    other = _branch(2.0, local=0.4, future=0.2, lineage=(2,))
+
+    selected = select_semantic_branch_beam(
+        [other, first, duplicate], beam_width=3
+    )
+
+    assert len(selected) == 2
+    assert selected[0].payload_index == 9
+    assert selected[1].payload_index == 2
+
+
+def test_semantic_branch_beam_rejects_bad_contract() -> None:
+    with pytest.raises(ValueError, match="beam width"):
+        select_semantic_branch_beam([], beam_width=0)
+    with pytest.raises(ValueError, match="shape"):
+        select_semantic_branch_beam(
+            [
+                SemanticBranchAlternative(
+                    state=np.zeros(8),
+                    previous_control=np.zeros(8),
+                    hard_feasible=True,
+                    local_score=0.0,
+                    future_score=0.0,
+                    lineage=(),
+                    payload_index=0,
+                )
+            ],
+            beam_width=1,
+        )
 
 
 def test_balance_pitch_solver_and_output_tolerances_are_separate() -> None:

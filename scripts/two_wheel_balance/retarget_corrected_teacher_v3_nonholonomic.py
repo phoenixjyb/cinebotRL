@@ -70,6 +70,150 @@ FORBIDDEN_EXPORT_KEYS = {
 GRAVITY_AWARE_BASE_ARM_RECOVERY_CONTRACT = (
     "finite_difference_peak_gravity_descent_in_ee_position_nullspace_v1"
 )
+SEMANTIC_BRANCH_LOOKBACK_CONTRACT = (
+    "bounded_hard_feasible_semantic_branch_lookback_v1"
+)
+
+
+@dataclass(frozen=True)
+class SemanticBranchAlternative:
+    """One hard-gate-evaluated branch at a deterministic beam boundary."""
+
+    state: np.ndarray
+    previous_control: np.ndarray
+    hard_feasible: bool
+    local_score: float
+    future_score: float
+    lineage: tuple[int, ...]
+    payload_index: int
+
+
+def select_semantic_branch_beam(
+    alternatives: list[SemanticBranchAlternative],
+    beam_width: int,
+    *,
+    state_atol: float = 1e-10,
+) -> list[SemanticBranchAlternative]:
+    """Retain distinct hard-feasible branches without changing any gate."""
+
+    if beam_width < 1:
+        raise ValueError("semantic branch beam width must be positive")
+    if not np.isfinite(state_atol) or state_atol <= 0.0:
+        raise ValueError("semantic branch state tolerance must be positive")
+    ordered: list[SemanticBranchAlternative] = []
+    for alternative in alternatives:
+        state = np.asarray(alternative.state, dtype=np.float64)
+        control = np.asarray(alternative.previous_control, dtype=np.float64)
+        if state.shape != (9,) or control.shape != (8,):
+            raise ValueError("semantic branch state/control shape differs")
+        if not np.isfinite(state).all() or not np.isfinite(control).all():
+            raise ValueError("semantic branch state/control is non-finite")
+        if not np.isfinite(alternative.local_score) or not np.isfinite(
+            alternative.future_score
+        ):
+            raise ValueError("semantic branch score is non-finite")
+        if alternative.payload_index < 0 or any(
+            index < 0 for index in alternative.lineage
+        ):
+            raise ValueError("semantic branch lineage is invalid")
+        if alternative.hard_feasible:
+            ordered.append(
+                SemanticBranchAlternative(
+                    state=state.copy(),
+                    previous_control=control.copy(),
+                    hard_feasible=True,
+                    local_score=float(alternative.local_score),
+                    future_score=float(alternative.future_score),
+                    lineage=tuple(alternative.lineage),
+                    payload_index=int(alternative.payload_index),
+                )
+            )
+    ordered.sort(
+        key=lambda item: (
+            item.future_score,
+            item.local_score,
+            item.lineage,
+            item.payload_index,
+        )
+    )
+    selected: list[SemanticBranchAlternative] = []
+    for alternative in ordered:
+        if any(
+            np.allclose(
+                alternative.state,
+                existing.state,
+                atol=state_atol,
+                rtol=0.0,
+            )
+            and np.allclose(
+                alternative.previous_control,
+                existing.previous_control,
+                atol=state_atol,
+                rtol=0.0,
+            )
+            for existing in selected
+        ):
+            continue
+        selected.append(alternative)
+        if len(selected) == beam_width:
+            break
+    return selected
+
+
+def truncate_exact_source_prefix_for_semantic_lookback(
+    prefix: ExactSourceRetargetPrefix,
+    lookback_source_intervals: int,
+) -> ExactSourceRetargetPrefix:
+    """Rewind only complete source intervals from an already validated prefix."""
+
+    if lookback_source_intervals < 1:
+        raise ValueError("semantic branch lookback must be positive")
+    mapping = np.asarray(
+        prefix.source_anchor_execution_index_prefix, dtype=np.int64
+    )
+    if mapping.shape != (prefix.next_source_interval,):
+        raise ValueError("semantic branch lookback prefix map is incomplete")
+    restart_interval = prefix.next_source_interval - lookback_source_intervals
+    if restart_interval <= 1:
+        raise ValueError("semantic branch lookback crosses source anchor zero")
+    retained_mapping = mapping[:restart_interval].copy()
+    if (
+        retained_mapping[0] != 0
+        or np.any(np.diff(retained_mapping) <= 0)
+        or retained_mapping[-1] >= len(prefix.states)
+    ):
+        raise ValueError("semantic branch lookback prefix map is invalid")
+    sample_count = int(retained_mapping[-1]) + 1
+    if sample_count < 2:
+        raise ValueError("semantic branch lookback cannot reconstruct prior control")
+    states = np.asarray(prefix.states[:sample_count], dtype=np.float64).copy()
+    controls = np.asarray(prefix.controls[: sample_count - 1], dtype=np.float64).copy()
+    previous_control = np.empty(8, dtype=np.float64)
+    previous_control[:5] = controls[-1]
+    previous_control[5:8] = states[-1, 6:9] - states[-2, 6:9]
+    return ExactSourceRetargetPrefix(
+        states=states,
+        controls=controls,
+        target_positions=np.asarray(
+            prefix.target_positions[:sample_count], dtype=np.float64
+        ).copy(),
+        target_attitudes=np.asarray(
+            prefix.target_attitudes[:sample_count], dtype=np.float64
+        ).copy(),
+        execution_time_s=np.asarray(
+            prefix.execution_time_s[:sample_count], dtype=np.float64
+        ).copy(),
+        position_errors_m=np.asarray(
+            prefix.position_errors_m[:sample_count], dtype=np.float64
+        ).copy(),
+        attitude_errors_deg=np.asarray(
+            prefix.attitude_errors_deg[:sample_count], dtype=np.float64
+        ).copy(),
+        previous_control=previous_control,
+        source_anchor_execution_index_prefix=retained_mapping,
+        retimed_interval_count=int(np.count_nonzero(np.diff(retained_mapping) > 1)),
+        next_source_interval=restart_interval,
+    )
 
 
 @dataclass(frozen=True)

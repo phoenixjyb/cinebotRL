@@ -5,12 +5,46 @@ import pytest
 
 from rl_platform.tasks.two_wheel_balance.riser_control import (
     RiserLimits,
+    RiserMotorThermalMonitor,
     QuinticRiserMove,
     balance_progress_scale,
     required_stopping_distance,
     safe_riser_velocity_bounds,
     safe_velocity_for_stopping_distance,
 )
+
+
+def test_motor_thermal_monitor_accepts_continuous_force_and_cools() -> None:
+    monitor = RiserMotorThermalMonitor()
+    for _ in range(60_000):
+        monitor.step(monitor.continuous_force_n, 0.005)
+    assert monitor.maximum_thermal_load < 1.0
+    hot_load = monitor.thermal_load
+    for _ in range(6_000):
+        monitor.step(0.0, 0.005)
+    assert monitor.thermal_load < hot_load
+    assert monitor.passed
+
+
+def test_motor_thermal_monitor_rejects_sustained_peak_or_peak_violation() -> None:
+    monitor = RiserMotorThermalMonitor()
+    for _ in range(1_000):
+        monitor.step(monitor.peak_force_n, 0.005)
+    assert monitor.maximum_thermal_load > 1.0
+    assert not monitor.passed
+
+    peak_violation = RiserMotorThermalMonitor()
+    peak_violation.step(peak_violation.peak_force_n + 1.0, 0.005)
+    assert peak_violation.peak_force_violation_count == 1
+    assert not peak_violation.passed
+
+
+def test_motor_thermal_monitor_rejects_invalid_parameters_and_samples() -> None:
+    with pytest.raises(ValueError, match="thermal monitor"):
+        RiserMotorThermalMonitor(continuous_force_n=0.0)
+    monitor = RiserMotorThermalMonitor()
+    with pytest.raises(ValueError, match="positive dt"):
+        monitor.step(1.0, 0.0)
 
 
 def test_riser_reference_completes_move_with_all_limits() -> None:

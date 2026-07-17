@@ -38,6 +38,69 @@ class RiserReferenceState:
     jerk_mps3: float
 
 
+RISER_THERMAL_FORCE_CONTRACT = "leadshine_400w_first_order_monitor_v1"
+
+
+@dataclass
+class RiserMotorThermalMonitor:
+    """Estimate normalized winding load from measured linear actuator force."""
+
+    continuous_force_n: float = 292.3970042486123
+    peak_force_n: float = 877.1910127458367
+    thermal_time_constant_s: float = 30.0
+    thermal_load: float = 0.0
+    maximum_thermal_load: float = 0.0
+    maximum_abs_force_n: float = 0.0
+    peak_force_violation_count: int = 0
+    sample_count: int = 0
+
+    def __post_init__(self) -> None:
+        values = (
+            self.continuous_force_n,
+            self.peak_force_n,
+            self.thermal_time_constant_s,
+            self.thermal_load,
+        )
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("thermal monitor parameters must be finite")
+        if (
+            self.continuous_force_n <= 0.0
+            or self.peak_force_n <= self.continuous_force_n
+            or self.thermal_time_constant_s <= 0.0
+            or self.thermal_load < 0.0
+        ):
+            raise ValueError("invalid thermal monitor parameters")
+        self.maximum_thermal_load = max(
+            self.maximum_thermal_load, self.thermal_load
+        )
+
+    def step(self, applied_force_n: float, dt_s: float) -> float:
+        """Advance the first-order I-squared thermal state by one sample."""
+
+        force = abs(float(applied_force_n))
+        dt = float(dt_s)
+        if not math.isfinite(force) or not math.isfinite(dt) or dt <= 0.0:
+            raise ValueError("thermal monitor sample must be finite with positive dt")
+        alpha = -math.expm1(-dt / self.thermal_time_constant_s)
+        normalized_heating = (force / self.continuous_force_n) ** 2
+        self.thermal_load += alpha * (normalized_heating - self.thermal_load)
+        self.maximum_thermal_load = max(
+            self.maximum_thermal_load, self.thermal_load
+        )
+        self.maximum_abs_force_n = max(self.maximum_abs_force_n, force)
+        self.peak_force_violation_count += int(force > self.peak_force_n + 1e-9)
+        self.sample_count += 1
+        return self.thermal_load
+
+    @property
+    def passed(self) -> bool:
+        return (
+            self.sample_count > 0
+            and self.maximum_thermal_load <= 1.0 + 1e-9
+            and self.peak_force_violation_count == 0
+        )
+
+
 def balance_progress_scale(
     absolute_pitch_rad: float,
     *,

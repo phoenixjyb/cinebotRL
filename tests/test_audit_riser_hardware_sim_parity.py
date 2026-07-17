@@ -33,6 +33,8 @@ def test_current_300n_plant_is_transient_not_continuous_motor_force() -> None:
     )
     assert classification["concept_screening_passed"]
     assert not classification["continuous_rated_force_parity_passed"]
+    assert classification["training_admission_thermal_monitor_present"]
+    assert not classification["active_thermal_force_derater_present"]
     assert not classification["valid_for_hardware_transfer"]
     assert not classification["valid_for_training"]
 
@@ -64,7 +66,7 @@ def test_cli_writes_a_non_training_parity_report(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert report["schema"] == (
-        "cinebotrl_two_wheel_riser_hardware_sim_parity_v1"
+        "cinebotrl_two_wheel_riser_hardware_sim_parity_v2"
     )
     assert report["plant"]["camera_height_range_m"] == [0.6, 1.8]
     assert report["classification"]["simulated_300n_interpretation"] == (
@@ -74,3 +76,19 @@ def test_cli_writes_a_non_training_parity_report(tmp_path: Path) -> None:
     assert not report["residual_capture_started"]
     assert not report["bc_started"]
     assert not report["ppo_started"]
+
+
+def test_thermal_admission_matches_drive_but_is_not_an_active_derater() -> None:
+    report = _load_module().build_report()
+    thermal = report["thermal_admission"]
+
+    assert thermal["contract"] == "leadshine_400w_first_order_monitor_v1"
+    assert thermal["continuous_force_n"] == pytest.approx(
+        report["drive"]["rated_linear_force_n"]
+    )
+    assert thermal["peak_force_n"] == pytest.approx(
+        report["drive"]["peak_linear_force_n"]
+    )
+    assert thermal["thermal_time_constant_s"] == 30.0
+    assert all(thermal["runner_checks"].values())
+    assert not thermal["active_force_derating"]

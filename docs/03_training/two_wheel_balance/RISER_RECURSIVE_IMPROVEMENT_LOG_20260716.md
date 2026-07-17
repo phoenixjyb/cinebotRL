@@ -934,3 +934,45 @@ and must state whether its candidate was accepted or rejected.
   authorization token; do not infer authorization from this CPU work.
 - Only after deterministic admission may the empty lookahead-v2 capture
   namespace, BC, holdout, and learned all-79 sequence open in order.
+
+## Round 29: riser motor thermal-force admission
+
+- Closed a known hardware-transfer gap without changing the pending controller
+  candidate. The Isaac riser drive retains its existing 300 N transient cap,
+  but dynamic evaluation now integrates the measured applied force through
+  `leadshine_400w_first_order_monitor_v1`.
+- The provisional model uses the selected drive's `292.397 N` continuous and
+  `877.191 N` peak linear-force equivalents. It integrates normalized
+  force-squared load with a documented provisional `30 s` first-order thermal
+  time constant at every 200 Hz physics step.
+- Dynamic admission now fails closed unless applied force is observed for every
+  completed step, maximum thermal load remains at or below `1.0`, and no peak
+  force violation occurs. Runtime JSON exposes the force/thermal maxima, final
+  load, sample count, and model parameters.
+- Gate C sealing independently requires the thermal-force contract and all
+  three thermal checks. A dynamically unsafe run cannot become a dataset even
+  if camera tracking metrics pass.
+- This is a qualification monitor, not an active force clamp. It prevents
+  training admission from relying on sustained over-continuous force while
+  preserving recovery-v4 commands for an unconfounded canary. Bench-identified
+  motor temperature/current constants and an active hardware current derater
+  remain required before hardware transfer.
+- Sealed the CPU parity report at
+  `20260717_hardware_sim_parity_v2/summary.json`, SHA-256
+  `ed2d332fd8caef27368f57255db9c62af2aeb4b53670f76c0a32968115675f8f`.
+  It proves drive/monitor parameter parity and runner gate wiring while
+  explicitly keeping active derating, hardware transfer, and training false.
+- No Isaac/GPU run, residual capture, BC, PPO, learned rollout, source plan,
+  tracking threshold, LQR gain, or residual action scale was changed or
+  started in this round.
+- The complete CPU-only repository suite passes `246` tests.
+
+## Next round after Round 29
+
+- Run the complete CPU suite and publish the thermal admission as a scoped
+  hardware-realism change.
+- Keep case 74 as the only next GPU canary behind its explicit authorization;
+  its result must now pass both the unchanged physical tracking gates and the
+  new thermal-force admission.
+- Replace the provisional 30 s model only from measured bench evidence, never
+  by tuning it to make a trajectory pass.

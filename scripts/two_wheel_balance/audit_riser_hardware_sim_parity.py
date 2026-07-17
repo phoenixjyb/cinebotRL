@@ -21,6 +21,12 @@ DEFAULT_BUILD_AUDIT = DEFAULT_URDF.with_name("build_audit.json")
 DEFAULT_CONFIG = (
     PROJECT_ROOT / "src/rl_platform/robots/two_wheel_balance/config.py"
 )
+DEFAULT_THERMAL_CONTROL = (
+    PROJECT_ROOT / "src/rl_platform/tasks/two_wheel_balance/riser_control.py"
+)
+DEFAULT_PLAYBACK_RUNNER = (
+    PROJECT_ROOT / "scripts/two_wheel_balance/smoke_riser_reference_playback.py"
+)
 DEFAULT_HARDWARE_ENVELOPE = (
     PROJECT_ROOT
     / "artifacts/two_wheel_riser/20260717_hardware_envelope_v1/summary.json"
@@ -80,6 +86,56 @@ def _riser_urdf_values(path: Path) -> dict[str, float]:
     }
 
 
+def _thermal_monitor_values(path: Path) -> dict[str, float | str]:
+    module = ast.parse(path.read_text(encoding="utf-8"))
+    contract = None
+    monitor = None
+    for statement in module.body:
+        if (
+            isinstance(statement, ast.Assign)
+            and len(statement.targets) == 1
+            and isinstance(statement.targets[0], ast.Name)
+            and statement.targets[0].id == "RISER_THERMAL_FORCE_CONTRACT"
+        ):
+            contract = ast.literal_eval(statement.value)
+        if isinstance(statement, ast.ClassDef) and statement.name == (
+            "RiserMotorThermalMonitor"
+        ):
+            monitor = statement
+    if not isinstance(contract, str) or monitor is None:
+        raise ValueError("riser thermal monitor contract was not found")
+    defaults = {
+        statement.target.id: ast.literal_eval(statement.value)
+        for statement in monitor.body
+        if isinstance(statement, ast.AnnAssign)
+        and isinstance(statement.target, ast.Name)
+        and statement.value is not None
+    }
+    return {
+        "contract": contract,
+        "continuous_force_n": float(defaults["continuous_force_n"]),
+        "peak_force_n": float(defaults["peak_force_n"]),
+        "thermal_time_constant_s": float(defaults["thermal_time_constant_s"]),
+    }
+
+
+def _runner_thermal_checks(path: Path) -> dict[str, bool]:
+    source = path.read_text(encoding="utf-8")
+    return {
+        "monitor_is_instantiated": "RiserMotorThermalMonitor()" in source,
+        "applied_force_is_sampled_each_step": (
+            "riser_thermal_monitor.step(riser_effort, 1.0 / POLICY_HZ)" in source
+        ),
+        "force_observation_is_gated": '"riser_thermal_force_observed"' in source,
+        "thermal_load_is_gated": '"riser_thermal_load_bounded"' in source,
+        "peak_force_is_gated": '"riser_peak_force_bounded"' in source,
+        "contract_is_reported": (
+            '"riser_thermal_force_contract": RISER_THERMAL_FORCE_CONTRACT'
+            in source
+        ),
+    }
+
+
 def _case(report: dict, section: str, ratio: float, mass: float) -> dict:
     for row in report[section]:
         if (
@@ -95,11 +151,15 @@ def build_report(
     build_audit_path: Path = DEFAULT_BUILD_AUDIT,
     config_path: Path = DEFAULT_CONFIG,
     hardware_envelope_path: Path = DEFAULT_HARDWARE_ENVELOPE,
+    thermal_control_path: Path = DEFAULT_THERMAL_CONTROL,
+    playback_runner_path: Path = DEFAULT_PLAYBACK_RUNNER,
 ) -> dict:
     urdf = _riser_urdf_values(urdf_path)
     config = _riser_config_values(config_path)
     build_audit = json.loads(build_audit_path.read_text(encoding="utf-8"))
     hardware = json.loads(hardware_envelope_path.read_text(encoding="utf-8"))
+    thermal = _thermal_monitor_values(thermal_control_path)
+    thermal_runner_checks = _runner_thermal_checks(playback_runner_path)
 
     inputs = hardware["inputs"]
     motor = hardware["motor_candidate"]
@@ -165,11 +225,22 @@ def build_report(
             rated_force >= float(heavy_normal["design_force_n"])
             and rated_force >= float(heavy_emergency["design_force_n"])
         ),
+        "thermal_monitor_continuous_force_matches_drive": math.isclose(
+            float(thermal["continuous_force_n"]), rated_force, rel_tol=1e-12
+        ),
+        "thermal_monitor_peak_force_matches_drive": math.isclose(
+            float(thermal["peak_force_n"]), peak_force, rel_tol=1e-12
+        ),
+        "thermal_monitor_contract_matches": thermal["contract"]
+        == "leadshine_400w_first_order_monitor_v1",
+        "thermal_monitor_is_wired_into_dynamic_admission": all(
+            thermal_runner_checks.values()
+        ),
     }
     continuous_force_parity = urdf["effort_limit_n"] <= rated_force
     concept_screening_passed = all(checks.values())
     return {
-        "schema": "cinebotrl_two_wheel_riser_hardware_sim_parity_v1",
+        "schema": "cinebotrl_two_wheel_riser_hardware_sim_parity_v2",
         "sources": {
             "urdf": str(urdf_path.resolve()),
             "urdf_sha256": sha256_file(urdf_path),
@@ -179,6 +250,10 @@ def build_report(
             "isaac_config_sha256": sha256_file(config_path),
             "hardware_envelope": str(hardware_envelope_path.resolve()),
             "hardware_envelope_sha256": sha256_file(hardware_envelope_path),
+            "thermal_control": str(thermal_control_path.resolve()),
+            "thermal_control_sha256": sha256_file(thermal_control_path),
+            "playback_runner": str(playback_runner_path.resolve()),
+            "playback_runner_sha256": sha256_file(playback_runner_path),
         },
         "plant": {
             "urdf": urdf,
@@ -205,6 +280,12 @@ def build_report(
                 rated_force / float(heavy_emergency["design_force_n"])
             ),
         },
+        "thermal_admission": {
+            **thermal,
+            "runner_checks": thermal_runner_checks,
+            "active_force_derating": False,
+            "model_parameter_status": "provisional_until_bench_identification",
+        },
         "classification": {
             "concept_screening_passed": concept_screening_passed,
             "continuous_rated_force_parity_passed": continuous_force_parity,
@@ -213,6 +294,10 @@ def build_report(
             ),
             "counterbalance_modeled": False,
             "counterbalance_required_for_current_sizing_pass": False,
+            "training_admission_thermal_monitor_present": all(
+                thermal_runner_checks.values()
+            ),
+            "active_thermal_force_derater_present": False,
             "valid_for_procurement": False,
             "valid_for_hardware_transfer": False,
             "valid_for_training": False,
@@ -221,7 +306,8 @@ def build_report(
             "measure complete moving mass and carriage friction",
             "measure continuous and transient output force at the carriage",
             "model or disable the final counterbalance design consistently",
-            "add a continuous-current or thermal force governor",
+            "replace provisional thermal constants from bench measurements",
+            "add an active continuous-current or thermal force derater",
             "validate regeneration, brake, hard limits, and independent anti-fall",
         ],
         "checks": checks,
@@ -241,6 +327,12 @@ def main() -> int:
     parser.add_argument(
         "--hardware-envelope", type=Path, default=DEFAULT_HARDWARE_ENVELOPE
     )
+    parser.add_argument(
+        "--thermal-control", type=Path, default=DEFAULT_THERMAL_CONTROL
+    )
+    parser.add_argument(
+        "--playback-runner", type=Path, default=DEFAULT_PLAYBACK_RUNNER
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     report = build_report(
@@ -248,6 +340,8 @@ def main() -> int:
         args.build_audit,
         args.config,
         args.hardware_envelope,
+        args.thermal_control,
+        args.playback_runner,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

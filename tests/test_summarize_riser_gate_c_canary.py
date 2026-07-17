@@ -23,6 +23,9 @@ def _gate(
                 "controller_profile": "structural_robust_v1",
                 "tracking_profile": "riser_recovery_direction_v4",
                 "tracking_direction_recovery_error_range_m": [0.2, 0.4],
+                "riser_thermal_force_contract": (
+                    "leadshine_400w_first_order_monitor_v1"
+                ),
                 "cases": [case],
                 "passed_case_count": 1 if passed else 0,
                 "results": [
@@ -37,6 +40,13 @@ def _gate(
                         "residual_label_admission_passed": (
                             passed and label_envelope_passed
                         ),
+                        "riser_thermal_load_max": 0.4,
+                        "riser_effort_max_n": 100.0,
+                        "checks": {
+                            "riser_thermal_force_observed": True,
+                            "riser_thermal_load_bounded": True,
+                            "riser_peak_force_bounded": True,
+                        },
                         "executed_residual_dataset": None,
                         "classification": (
                             None
@@ -83,6 +93,7 @@ def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path)
     assert not summary["bc_started"]
     assert not summary["ppo_started"]
     assert not summary["passed"]
+    assert summary["gate_rows"][0]["riser_thermal_load_max"] == 0.4
 
 
 def test_dynamic_pass_is_independent_of_label_envelope(tmp_path: Path) -> None:
@@ -151,3 +162,36 @@ def test_runtime_contract_rejects_wrong_tracking_profile(tmp_path: Path) -> None
         "runtime_contract_rejection"
     )
     assert not summary["passed"]
+
+
+def test_runtime_contract_rejects_missing_thermal_force_gate(tmp_path: Path) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "admission.json").write_text("{}")
+    gate = tmp_path / "gates/case_0074.json"
+    _gate(gate, 74, True)
+    payload = json.loads(gate.read_text())
+    payload["results"][0]["checks"]["riser_thermal_load_bounded"] = False
+    gate.write_text(json.dumps(payload))
+    output = tmp_path / "summary.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--git-commit",
+            "a" * 40,
+            "--cases",
+            "74",
+            "--output",
+            str(output),
+        ],
+        check=True,
+    )
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert summary["first_dynamic_reject"]["classification"] == (
+        "runtime_contract_rejection"
+    )

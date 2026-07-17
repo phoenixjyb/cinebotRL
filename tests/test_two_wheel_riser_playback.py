@@ -133,6 +133,12 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert '"tracking_profile": "riser_recovery_direction_v4"' in source
     assert '"tracking_direction_blend_speed_mps"' in source
     assert '"tracking_direction_recovery_error_range_m"' in source
+    assert "RiserMotorThermalMonitor" in source
+    assert "riser_thermal_monitor.step(riser_effort, 1.0 / POLICY_HZ)" in source
+    assert '"riser_thermal_force_observed"' in source
+    assert '"riser_thermal_load_bounded"' in source
+    assert '"riser_peak_force_bounded"' in source
+    assert '"riser_thermal_force_contract": RISER_THERMAL_FORCE_CONTRACT' in source
     assert '"motion_direction": base_tracking_diagnostics[' in source
     assert '"direction_recovery_blend": base_tracking_diagnostics[' in source
     assert '"feedforward_direction": base_tracking_diagnostics[' in source

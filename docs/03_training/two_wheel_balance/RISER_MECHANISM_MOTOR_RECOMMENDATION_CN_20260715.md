@@ -284,6 +284,37 @@ SHA-256 为
 `5d4247fc63e2875e1b2602753e58bdfbf6705187aff2e9674c0a307e637e7190`。
 加入该审计后，完整 CPU-only 仓库测试为 `239 passed`。
 
+### 10.1 动态热负载准入
+
+参考轨迹 runner 现加入 `leadshine_400w_first_order_monitor_v1`。它不修改 Isaac
+隐式位置执行器的目标或力输出，而是按每个 `200 Hz` 仿真步读取实际
+`riser_joint` applied force，并以连续推力 `292.397 N` 为单位积分一阶
+`I^2` 热负载：
+
+```text
+heating = (abs(force) / 292.397)^2
+d(load)/dt = (heating - load) / tau
+```
+
+当前 `tau=30 s` 只是缺少实测绕组热模型时的保守开发假设，不是 Leadshine
+官方热常数。动态 gate 新增三项 fail-closed 检查：每步均成功观测力、归一化热负载
+始终不超过 `1.0`、瞬时推力不超过 `877.191 N`。JSON 同时保留最大/最终热负载、
+最大推力、样本数和模型参数。任一检查失败时，该 case 不能进入残差数据集、BC 或
+PPO。
+
+这一步修复的是“仿真可长期使用 300 N 却仍被训练接受”的准入漏洞，不等于实机
+电流控制器：命令本身仍由隐式位置 drive 产生。台架数据到位后必须用实测电机电流、
+驱动器温度、环境温度和 carriage 输出力辨识 `tau` 与连续/峰值边界，并在最终实机
+控制器中实施主动限流/降额。完成前仍保持 `valid_for_hardware_transfer=false`。
+
+机器可读 v2 审计位于
+`artifacts/two_wheel_riser/20260717_hardware_sim_parity_v2/summary.json`，
+SHA-256 为
+`ed2d332fd8caef27368f57255db9c62af2aeb4b53670f76c0a32968115675f8f`。
+它证明 monitor 的连续/峰值参数与选定传动计算一致、动态 runner 已接入三项 gate，
+同时明确 `active_thermal_force_derater_present=false`、
+`valid_for_hardware_transfer=false` 和 `valid_for_training=false`。
+
 2026-07-17 再次核对官方页面：Leadshine 仍列出该电机为 48 V、400 W、
 1.27 N m、3000 rpm、带抱闸；igus 当前技术表仍列出 ZLW-1040 Standard 为
 70 mm/rev、2 m 最大标准行程、最高 5 m/s，ZLW-1080 为 70 mm/rev、2 m、

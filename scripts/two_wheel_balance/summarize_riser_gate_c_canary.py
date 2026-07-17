@@ -12,6 +12,7 @@ from pathlib import Path
 EXPECTED_CONTROLLER_PROFILE = "structural_robust_v1"
 EXPECTED_TRACKING_PROFILE = "riser_recovery_direction_v4"
 EXPECTED_RECOVERY_ERROR_RANGE_M = [0.2, 0.4]
+EXPECTED_RISER_THERMAL_FORCE_CONTRACT = "leadshine_400w_first_order_monitor_v1"
 
 
 def sha256_file(path: Path) -> str:
@@ -57,6 +58,11 @@ def main() -> int:
             and payload.get("tracking_profile") == EXPECTED_TRACKING_PROFILE
             and payload.get("tracking_direction_recovery_error_range_m")
             == EXPECTED_RECOVERY_ERROR_RANGE_M
+            and payload.get("riser_thermal_force_contract")
+            == EXPECTED_RISER_THERMAL_FORCE_CONTRACT
+            and result.get("checks", {}).get("riser_thermal_force_observed") is True
+            and result.get("checks", {}).get("riser_thermal_load_bounded") is True
+            and result.get("checks", {}).get("riser_peak_force_bounded") is True
             and payload.get("cases") == [case]
             and payload.get("passed_case_count") == 1
             and len(payload.get("results", [])) == 1
@@ -74,6 +80,11 @@ def main() -> int:
             "tracking_direction_recovery_error_range_m": payload.get(
                 "tracking_direction_recovery_error_range_m"
             ),
+            "riser_thermal_force_contract": payload.get(
+                "riser_thermal_force_contract"
+            ),
+            "riser_thermal_load_max": result.get("riser_thermal_load_max"),
+            "riser_effort_max_n": result.get("riser_effort_max_n"),
             "source_duration_s": result.get("source_duration_s"),
             "execution_duration_s": result.get("execution_duration_s"),
             "completed_steps": result.get("completed_steps"),
@@ -134,6 +145,9 @@ def main() -> int:
         "expected_tracking_profile": EXPECTED_TRACKING_PROFILE,
         "expected_tracking_direction_recovery_error_range_m": (
             EXPECTED_RECOVERY_ERROR_RANGE_M
+        ),
+        "expected_riser_thermal_force_contract": (
+            EXPECTED_RISER_THERMAL_FORCE_CONTRACT
         ),
         "residual_label_envelope_passed": bool(gate_rows)
         and all(row["residual_label_envelope_passed"] is True for row in gate_rows),

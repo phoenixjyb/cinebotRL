@@ -87,6 +87,10 @@ def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
     assert "Gate C runtime JSON is not a sealed dynamic pass" in source
     assert '"riser_recovery_direction_v4"' in source
     assert '"tracking_direction_recovery_error_range_m"' in source
+    assert '"leadshine_400w_first_order_monitor_v1"' in summarizer
+    assert '"riser_thermal_force_observed"' in summarizer
+    assert '"riser_thermal_load_bounded"' in summarizer
+    assert '"riser_peak_force_bounded"' in summarizer
 
 
 def test_case74_recovery_wrapper_requires_explicit_one_case_authorization() -> None:

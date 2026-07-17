@@ -115,7 +115,11 @@ from rl_platform.tasks.two_wheel_balance.riser_playback import (
 from rl_platform.tasks.two_wheel_balance.riser_kinematics import (
     UrdfRiserCameraKinematics,
 )
-from rl_platform.tasks.two_wheel_balance.riser_control import balance_progress_scale
+from rl_platform.tasks.two_wheel_balance.riser_control import (
+    RISER_THERMAL_FORCE_CONTRACT,
+    RiserMotorThermalMonitor,
+    balance_progress_scale,
+)
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     LOOKAHEAD_HORIZONS_S,
     apply_residual_action,
@@ -280,6 +284,7 @@ def evaluate_case(
     action_count = 0
     saturated_riser = 0
     riser_effort_count = 0
+    riser_thermal_monitor = RiserMotorThermalMonitor()
     saturated_proxy = 0
     proxy_effort_count = 0
     proxy_axis_saturated = np.zeros(len(PROXY_JOINTS), dtype=np.int64)
@@ -675,6 +680,7 @@ def evaluate_case(
             proxy_effort_samples_nm.append(proxy_effort_np)
             saturated_riser += int(riser_effort >= 300.0 - 1e-3)
             riser_effort_count += 1
+            riser_thermal_monitor.step(riser_effort, 1.0 / POLICY_HZ)
             saturated_proxy += int(torch.count_nonzero(proxy_effort >= 10.0 - 1e-3))
             proxy_axis_saturated += proxy_effort_np >= 10.0 - 1e-3
             proxy_effort_count += len(proxy_ids)
@@ -697,6 +703,7 @@ def evaluate_case(
                     "attitude_error_deg": attitude_error_deg,
                     "pitch_deg": pitch_deg,
                     "riser_error_m": riser_error,
+                    "riser_thermal_load": riser_thermal_monitor.thermal_load,
                     "proxy_error_deg": proxy_error_deg.tolist(),
                     "proxy_signed_error_deg": signed_proxy_error_deg.tolist(),
                     "proxy_target_deg": np.rad2deg(proxy_sim_command).tolist(),
@@ -810,6 +817,15 @@ def evaluate_case(
         <= args.maximum_saturation_ratio,
         "riser_saturation_bounded": riser_saturation_ratio
         <= args.maximum_saturation_ratio,
+        "riser_thermal_force_observed": (
+            riser_thermal_monitor.sample_count == completed_steps
+        ),
+        "riser_thermal_load_bounded": (
+            riser_thermal_monitor.maximum_thermal_load <= 1.0 + 1e-9
+        ),
+        "riser_peak_force_bounded": (
+            riser_thermal_monitor.peak_force_violation_count == 0
+        ),
         "proxy_saturation_bounded": proxy_saturation_ratio
         <= args.maximum_saturation_ratio,
         "internal_attitude_ik_converged": internal_attitude_ik_failures == 0,
@@ -881,6 +897,18 @@ def evaluate_case(
         ).tolist(),
         "action_saturation_ratio": action_saturation_ratio,
         "riser_saturation_ratio": riser_saturation_ratio,
+        "riser_effort_max_n": riser_thermal_monitor.maximum_abs_force_n,
+        "riser_thermal_load_final": riser_thermal_monitor.thermal_load,
+        "riser_thermal_load_max": riser_thermal_monitor.maximum_thermal_load,
+        "riser_thermal_sample_count": riser_thermal_monitor.sample_count,
+        "riser_peak_force_violation_count": (
+            riser_thermal_monitor.peak_force_violation_count
+        ),
+        "riser_continuous_force_n": riser_thermal_monitor.continuous_force_n,
+        "riser_peak_force_n": riser_thermal_monitor.peak_force_n,
+        "riser_thermal_time_constant_s": (
+            riser_thermal_monitor.thermal_time_constant_s
+        ),
         "proxy_saturation_ratio": proxy_saturation_ratio,
         "residual_action_abs_max": np.max(
             np.abs(applied_residual_values), axis=0
@@ -1051,6 +1079,7 @@ def main() -> int:
             riser_tracking_config().direction_recovery_error_full_m,
         ],
         "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
+        "riser_thermal_force_contract": RISER_THERMAL_FORCE_CONTRACT,
         "controller_overrides": {
             name: value
             for name, value in {

@@ -43,6 +43,35 @@ def test_yaw_and_base_feedback_signs() -> None:
     assert diagnostics["cross_track_error_m"] > 0.0
 
 
+def test_cross_track_direction_follows_feedback_reverse_command() -> None:
+    velocity, yaw_rate, diagnostics = bounded_base_references(
+        desired_base_q=np.array([-0.2, 0.2, -0.25]),
+        actual_base_q=np.zeros(3),
+        feedforward_v_mps=0.01,
+        feedforward_wz_radps=0.0,
+        config=riser_tracking_config(),
+    )
+
+    assert velocity == pytest.approx(-0.31)
+    assert yaw_rate == pytest.approx(-0.4)
+    assert diagnostics["feedforward_direction"] == 1.0
+    assert diagnostics["motion_direction"] == -1.0
+
+
+def test_cross_track_direction_blends_smoothly_near_zero_speed() -> None:
+    velocity, yaw_rate, diagnostics = bounded_base_references(
+        desired_base_q=np.array([0.009375, 0.1, 0.0]),
+        actual_base_q=np.zeros(3),
+        feedforward_v_mps=0.01,
+        feedforward_wz_radps=0.0,
+        config=riser_tracking_config(),
+    )
+
+    assert velocity == pytest.approx(0.025)
+    assert yaw_rate == pytest.approx(0.075)
+    assert diagnostics["motion_direction"] == pytest.approx(0.5)
+
+
 def test_continuous_joint_target_uses_nearest_physical_branch() -> None:
     target = np.deg2rad(401.749127557215)
     measured = np.deg2rad(-317.9332275390625)

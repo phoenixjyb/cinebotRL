@@ -717,3 +717,49 @@ and must state whether its candidate was accepted or rejected.
   at its first unchanged physical gate and diagnose structurally.
 - Keep the accepted-71 batch and all learning stages closed until both canaries
   satisfy the unchanged Gate C contract.
+
+## Round 23: corrected-yaw canary and motion-direction recovery
+
+- With explicit authorization and an empty GPU ownership check, ran case 74
+  alone from pushed commit `f07669c` in the fresh guarded namespace
+  `20260717_gate_c_case74_continuous_yaw_fix_v4_exclusive`. Case 77 was not
+  requested and no other playback owner overlapped the run.
+- The continuous-yaw correction removed the original physical precursor:
+  no forbidden contact occurred, proxy servo p95/max fell to
+  `0.114312/0.500490 deg`, proxy saturation fell to `0.000044197`, pitch max
+  was `7.645328 deg`, and attitude max was `0.458524 deg`.
+- Case 74 still fails Gate C. The fixed `377.1 s` horizon ended at phase
+  `159.901892/188.546638 s`; position p95/max was
+  `1.065665/1.094696 m`. The run did not terminate, but it did not complete the
+  reference. No labels were applied and no dataset or training was created.
+- Sealed hashes are admission
+  `37371f47cac9d4056877c4c468fa60598f8d263300c86da00ea7f8d496b27040`,
+  case JSON
+  `f5686d491cc3dff069a58f54fb974e718057993261a1924976e907b737fff65d`,
+  log `8f02ad60c1d81fad32fa3a70274f1d8c00ce736950cab2df8d9631d93fa8f2cb`,
+  and summary
+  `3deb477ab7ee45cca9aafaac801b05ce4935523460d32f3cfd9e6b94cb37535f`.
+- Added a hash-bound CPU recovery audit. Its summary SHA-256 is
+  `39306409b323a8c6849d7d8de84e92641e20044e14a6c8b903330e3de5e524f5`.
+  It finds feedforward/command direction conflict in `206/378` trace samples
+  and `155/176` samples outside the `0.25 m` position gate.
+- At peak error, feedforward was `+0.004799 m/s`, velocity command was
+  `-0.054150 m/s`, cross-track error was `0.976531 m`, and yaw error was
+  `-1.152521 rad`. Feedforward-sign steering commanded only
+  `+0.107292 rad/s`; the bounded motion-direction candidate requests
+  `-0.4 rad/s`.
+- Implemented `riser_motion_direction_v3`: cross-track direction now follows
+  commanded velocity with a smooth `0.05 m/s` zero-speed blend. Added direct
+  trace diagnostics and regression tests. This candidate is CPU-only and not
+  yet dynamically validated.
+- The full CPU-only riser/two-wheel suite passes `157` tests. No threshold,
+  plan, source anchor, LQR gain, residual scale, label, dataset, BC, or PPO was
+  changed or started.
+
+## Next round after Round 23
+
+- Review, commit, and push the motion-direction candidate as one scoped change.
+- Keep case 77 and all learning closed.
+- Only after separate explicit GPU authorization, run case 74 alone in a fresh
+  guarded namespace. Stop on the first unchanged dynamic gate and use the new
+  direction diagnostics to accept or reject the candidate structurally.

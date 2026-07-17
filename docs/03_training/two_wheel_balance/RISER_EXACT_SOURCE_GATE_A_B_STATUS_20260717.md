@@ -300,9 +300,43 @@ was at most `0.182615 m`. After the fault, `7/11` sampled commands saturated at
 the primary observed precursor and full-scale bidirectional recovery as a
 downstream response. It does not authorize a reverse-controller change; a
 corrected-yaw dynamic canary is required first. The expanded CPU-only
-riser/two-wheel suite passes `147` tests.
+riser/two-wheel suite now passes `157` tests.
 
-This repair is not dynamically validated. All riser GPU work remains stopped.
-The next admissible runtime step is one fresh exclusive case-74 structural
-canary after code review, commit/push, and explicit GPU authorization. Case 77,
-the accepted-71 batch, residual capture, Gate D, BC, and PPO remain closed.
+After explicit authorization, corrected case 74 ran alone from pushed commit
+`f07669c` in
+`20260717_gate_c_case74_continuous_yaw_fix_v4_exclusive`. Evidence hashes are:
+
+```text
+admission   37371f47cac9d4056877c4c468fa60598f8d263300c86da00ea7f8d496b27040
+case JSON   f5686d491cc3dff069a58f54fb974e718057993261a1924976e907b737fff65d
+runtime log 8f02ad60c1d81fad32fa3a70274f1d8c00ce736950cab2df8d9631d93fa8f2cb
+summary     3deb477ab7ee45cca9aafaac801b05ce4935523460d32f3cfd9e6b94cb37535f
+```
+
+The yaw repair is physically effective: forbidden contact is absent, proxy
+servo p95/max is `0.114312/0.500490 deg`, proxy saturation is
+`0.000044197`, pitch max is `7.645328 deg`, and attitude max is
+`0.458524 deg`. Case 74 nevertheless remains a final Gate C reject. The
+`377.1 s` bounded horizon ends at phase `159.901892/188.546638 s`; position
+p95/max is `1.065665/1.094696 m`. There is no termination or dataset. Raw
+residual labels remain unapplied, and case 77, residual capture, BC, and PPO
+remain closed.
+
+A new CPU audit at
+`20260717_gate_c_case74_v4_motion_direction_audit/summary.json`, SHA-256
+`39306409b323a8c6849d7d8de84e92641e20044e14a6c8b903330e3de5e524f5`,
+localizes the remaining failure. In `206/378` sampled states, position
+feedback commands motion opposite to the feedforward sign; this includes
+`155/176` samples above the `0.25 m` position gate. At the `1.090352 m` peak,
+feedforward is `+0.004799 m/s` while commanded velocity is `-0.054150 m/s`.
+The legacy cross-track sign nearly cancels yaw recovery and commands only
+`+0.107292 rad/s`; motion-command-aware steering requests the bounded
+`-0.4 rad/s` direction instead.
+
+The CPU-only candidate uses commanded velocity, smoothly blended over
+`0.05 m/s`, to choose cross-track steering direction. Future traces expose
+the reconstructed along/cross/yaw errors and both direction values directly.
+This candidate changes no plan, source anchor, gate, LQR gain, residual scale,
+or learned action and is not dynamically validated. A new case-74-only canary
+requires separate explicit GPU authorization; case 77 and all learning remain
+closed.

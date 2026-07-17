@@ -130,6 +130,11 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert "np.abs(actual_proxy - sample.proxy_gimbal_q)" not in source
     assert "set_joint_velocity_target(proxy_velocity_target" not in source
     assert 'parser.add_argument("--video-fps", type=int, default=200)' in source
+    assert '"tracking_profile": "riser_motion_direction_v3"' in source
+    assert '"tracking_direction_blend_speed_mps"' in source
+    assert '"motion_direction": base_tracking_diagnostics[' in source
+    assert '"feedforward_direction": base_tracking_diagnostics[' in source
+    assert '"cross_track_error_m": base_tracking_diagnostics[' in source
     assert '"residual_teacher_unclipped"' in source
     assert "float(np.max(np.abs(teacher_residual_values))) < 1.0 - 1e-6" in source
     assert '"source_duration_s": source_duration_s' in source

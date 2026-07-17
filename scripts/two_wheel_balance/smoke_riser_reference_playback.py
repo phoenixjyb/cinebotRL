@@ -338,7 +338,7 @@ def evaluate_case(
         actual_camera_quaternion_pre = (
             robot.data.body_quat_w[0, cam_id].detach().cpu().numpy()
         )
-        vx_ref, wz_ref, _ = bounded_base_references(
+        vx_ref, wz_ref, base_tracking_diagnostics = bounded_base_references(
             sample.base_xy_yaw,
             actual_base,
             phase_feedforward_v_mps,
@@ -687,6 +687,24 @@ def evaluate_case(
                     "phase_feedforward_wz_rad_s": phase_feedforward_wz_rad_s,
                     "vx_reference_mps": vx_ref,
                     "wz_reference_rad_s": wz_ref,
+                    "along_track_error_m": base_tracking_diagnostics[
+                        "along_track_error_m"
+                    ],
+                    "cross_track_error_m": base_tracking_diagnostics[
+                        "cross_track_error_m"
+                    ],
+                    "base_yaw_error_rad": base_tracking_diagnostics[
+                        "yaw_error_rad"
+                    ],
+                    "raw_velocity_reference_mps": base_tracking_diagnostics[
+                        "raw_velocity_reference_mps"
+                    ],
+                    "feedforward_direction": base_tracking_diagnostics[
+                        "feedforward_direction"
+                    ],
+                    "motion_direction": base_tracking_diagnostics[
+                        "motion_direction"
+                    ],
                 }
             )
         completed_steps = step + 1
@@ -979,7 +997,10 @@ def main() -> int:
         "training_started": False,
         "ppo_authorized": False,
         "controller_profile": "structural_robust_v1",
-        "tracking_profile": "riser_phase_consistent_v2",
+        "tracking_profile": "riser_motion_direction_v3",
+        "tracking_direction_blend_speed_mps": (
+            riser_tracking_config().direction_blend_speed_mps
+        ),
         "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
         "controller_overrides": {
             name: value

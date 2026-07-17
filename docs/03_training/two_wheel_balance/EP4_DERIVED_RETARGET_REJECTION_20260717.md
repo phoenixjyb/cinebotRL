@@ -97,3 +97,39 @@ The next bounded task should be read-only structural diagnosis of derived
 interval 50 and its corresponding raw ep4 neighborhood. Do not increase local
 relief, decimate more anchors, relax the 0.05 m gate, or rerun the same search
 without evidence identifying a distinct feasible branch.
+
+## Read-only structural diagnosis
+
+The derived waypoint map is explicit and hash-bound. Derived transition 50 is
+derived anchor `49 -> 50`, which maps to authoritative raw anchors
+`188 -> 190`. It is therefore earlier than the historical raw
+`197 -> 198` hard transition; the current reduction/relief did not remove the
+structural boundary, but moved the first rejection earlier.
+
+At accepted derived anchor 49:
+
+- physical-gate-safe state EE position error is `0.0473395 m`;
+- peak arm gravity is `29.503574 Nm`;
+- the next target displacement is `0.0174841 m` over `0.0609351 s`;
+- derived Cartesian target speed is only `0.286930 m/s`.
+
+The paired holonomic prior is not a connected escape branch. Its anchor-49 and
+anchor-50 FK errors are `0.0876381 m` and `0.0880647 m`, and peak gravity is
+`33.6457 Nm` and `33.6420 Nm`, respectively. Moving from the accepted state to
+that branch in one interval would also require arm and chassis rates far above
+the unchanged limits.
+
+This evidence classifies the rejection as accumulated greedy branch continuity
+at the gravity-position boundary. The current state is still gate-feasible but
+has too little position/gravity slack for the next target. Gimbal margin,
+camera attitude, target speed, and geometric smoothness are not the active
+blockers.
+
+The smallest justified solver experiment is an opt-in bounded multi-branch
+lookback around this neighborhood: retain several hard-feasible base/arm states
+for the preceding small window and rank them by future position reachability
+plus gravity slack before committing a single prefix. It must preserve the
+existing source/derived geometry, timestamps, rate limits, 0.05 m position
+gate, gravity/pitch/gimbal gates, and deterministic ordering. It should first
+be implemented and unit-tested as a CPU-only diagnostic; no new ep4 run is
+authorized by this note alone.

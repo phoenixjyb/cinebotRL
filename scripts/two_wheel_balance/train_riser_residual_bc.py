@@ -30,6 +30,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
     OBSERVATION_NAMES,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa: E402
+    POLICY_ARCHITECTURE,
     RiserResidualPolicy,
 )
 
@@ -48,7 +49,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-5)
     parser.add_argument("--patience", type=int, default=12)
-    parser.add_argument("--hidden-sizes", default="256,256,128")
+    parser.add_argument("--state-hidden-sizes", default="128,128")
+    parser.add_argument("--lookahead-hidden-sizes", default="64,64")
+    parser.add_argument("--fusion-hidden-sizes", default="256,128")
     parser.add_argument("--seed", type=int, default=20260716)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--minimum-improvement-fraction", type=float, default=0.05)
@@ -193,7 +196,15 @@ def main() -> int:
         raise ValueError("training counts must be positive")
     if not 0.0 < args.minimum_improvement_fraction < 1.0:
         raise ValueError("minimum improvement fraction must be in (0, 1)")
-    hidden_sizes = tuple(int(item) for item in args.hidden_sizes.split(",") if item)
+    state_hidden_sizes = tuple(
+        int(item) for item in args.state_hidden_sizes.split(",") if item
+    )
+    lookahead_hidden_sizes = tuple(
+        int(item) for item in args.lookahead_hidden_sizes.split(",") if item
+    )
+    fusion_hidden_sizes = tuple(
+        int(item) for item in args.fusion_hidden_sizes.split(",") if item
+    )
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -221,7 +232,9 @@ def main() -> int:
     model = RiserResidualPolicy(
         torch.from_numpy(observation_mean),
         torch.from_numpy(observation_std),
-        hidden_sizes,
+        state_hidden_sizes,
+        lookahead_hidden_sizes,
+        fusion_hidden_sizes,
     ).to(device)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
@@ -342,8 +355,11 @@ def main() -> int:
         torch.save(
             {
                 "schema": "cinebotrl_two_wheel_riser_residual_policy_v2",
+                "policy_architecture": POLICY_ARCHITECTURE,
                 "model_state_dict": model.state_dict(),
-                "hidden_sizes": hidden_sizes,
+                "state_hidden_sizes": state_hidden_sizes,
+                "lookahead_hidden_sizes": lookahead_hidden_sizes,
+                "fusion_hidden_sizes": fusion_hidden_sizes,
                 "observation_names": OBSERVATION_NAMES,
                 "action_names": ACTION_NAMES,
                 "dataset_sha256": sha256(args.dataset),
@@ -357,8 +373,9 @@ def main() -> int:
         torchscript = args.output_dir / "residual_policy.torchscript.pt"
         scripted.save(str(torchscript))
     report = {
-        "schema": "cinebotrl_two_wheel_riser_residual_bc_gate_v1",
+        "schema": "cinebotrl_two_wheel_riser_residual_bc_gate_v2",
         "training_method": "offline_behavior_cloning",
+        "policy_architecture": POLICY_ARCHITECTURE,
         "source_commit": args.source_commit,
         "ppo_started": False,
         "learned_rollout_started": False,
@@ -366,7 +383,9 @@ def main() -> int:
         "dataset_sha256": sha256(args.dataset),
         "dataset_case_count": metadata["case_count"],
         "dataset_row_count": metadata["row_count"],
-        "hidden_sizes": list(hidden_sizes),
+        "state_hidden_sizes": list(state_hidden_sizes),
+        "lookahead_hidden_sizes": list(lookahead_hidden_sizes),
+        "fusion_hidden_sizes": list(fusion_hidden_sizes),
         "observation_count": len(OBSERVATION_NAMES),
         "observation_contract": "executed_state_with_execution_time_lookahead_v2",
         "lookahead_horizons_s": list(LOOKAHEAD_HORIZONS_S),

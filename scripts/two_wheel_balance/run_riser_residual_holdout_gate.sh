@@ -43,7 +43,9 @@ checks = {
     "offline_gate": report.get("offline_gate_passed") is True,
     "rollout_authorized": report.get("learned_rollout_authorized") is True,
     "policy_schema": report.get("schema")
-    == "cinebotrl_two_wheel_riser_residual_policy_v2",
+    == "cinebotrl_two_wheel_riser_residual_bc_gate_v2",
+    "policy_architecture": report.get("policy_architecture")
+    == "state_shared_lookahead_fusion_v1",
     "observation_contract": report.get("observation_contract")
     == "executed_state_with_execution_time_lookahead_v2",
     "lookahead_horizons": report.get("lookahead_horizons_s")

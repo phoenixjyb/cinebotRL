@@ -162,7 +162,11 @@ def test_failed_offline_gate_does_not_emit_policy_artifacts(tmp_path: Path) -> N
             "1",
             "--batch-size",
             "2",
-            "--hidden-sizes",
+            "--state-hidden-sizes",
+            "8",
+            "--lookahead-hidden-sizes",
+            "4",
+            "--fusion-hidden-sizes",
             "8",
             "--device",
             "cpu",
@@ -188,6 +192,8 @@ def test_failed_offline_gate_does_not_emit_policy_artifacts(tmp_path: Path) -> N
     assert report["case_balanced_training_loss"]
     assert report["case_balanced_validation_gate"]
     assert report["seed"] == 20260716
+    assert report["schema"] == "cinebotrl_two_wheel_riser_residual_bc_gate_v2"
+    assert report["policy_architecture"] == "state_shared_lookahead_fusion_v1"
 
 
 def test_admitted_bc_is_reproducible_for_the_same_seed(tmp_path: Path) -> None:
@@ -215,7 +221,11 @@ def test_admitted_bc_is_reproducible_for_the_same_seed(tmp_path: Path) -> None:
                 "64",
                 "--learning-rate",
                 "0.003",
-                "--hidden-sizes",
+                "--state-hidden-sizes",
+                "32,32",
+                "--lookahead-hidden-sizes",
+                "16,16",
+                "--fusion-hidden-sizes",
                 "32,32",
                 "--device",
                 "cpu",
@@ -235,6 +245,9 @@ def test_admitted_bc_is_reproducible_for_the_same_seed(tmp_path: Path) -> None:
         assert "holdout" not in report["split_results"]
         assert report["case_balanced_training_loss"]
         assert report["case_balanced_validation_gate"]
+        assert report["policy_architecture"] == (
+            "state_shared_lookahead_fusion_v1"
+        )
         assert (output / "residual_policy.pt").is_file()
         scripted = torch.jit.load(str(output / "residual_policy.torchscript.pt"))
         with torch.inference_mode():

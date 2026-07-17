@@ -48,6 +48,16 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 
 相机目标先按 `R_world_cam = R_world_DFR * Rz(+pi/2)` 从语义 DFR 转为物理 `cam_link`，再与物理 FK 比较。策略动作仍严格为 3 维，不增加机械臂动作、轮端力矩动作或 DJI 物理电机关节动作。数据、模型和 gate 必须分别声明 `executed_residual_v2`、`residual_merged_v2`、`residual_policy_v2` 以及 `executed_state_with_execution_time_lookahead_v2`；任一声明缺失或不一致即 fail closed。
 
+网络结构固定为 `state_shared_lookahead_fusion_v1`，而不是把 65 维输入直接送入一个无结构的平坦 MLP：
+
+- 26 维已执行状态由 `128,128` 状态编码器处理；
+- 三个 13 维前视点使用同一个权重共享的 `64,64` 编码器，确保相同物理量在不同前视时域具有一致特征提取规则；
+- 三个按时间顺序排列的前视 embedding 与状态 embedding 拼接，再经 `256,128` 融合网络输出 3 维 `tanh` 动作；
+- 所有 encoder 使用正交初始化、LayerNorm 和 SiLU；观测归一化只从 train case 计算；
+- checkpoint、离线报告、holdout 和全 79 gate 都必须声明并核验该结构，禁止用旧平坦 MLP 冒充当前策略。
+
+该结构保留前视时域顺序，同时共享每个时域的局部编码参数，目的是在只有 79 条轨迹时减少不必要的时域专用拟合。它不是训练成功的证明；仍须通过完整 BC 和动态 gate。
+
 ## Gate A：79 条确定性稠密采集
 
 `20260716_residual_all79_phase_v2` 和隔离后的 `phase_v3_clean` 都只能作为控制器诊断。正式采集必须使用新的 `20260717_all79_playback_exact_source_v1` 和空的 `20260717_residual_all79_exact_source_lookahead_v2`，不得复用旧 gate/NPZ。

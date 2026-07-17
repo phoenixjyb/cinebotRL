@@ -37,6 +37,8 @@ def test_bc_gate_requires_complete_quality_qualified_exact_source_dataset() -> N
     assert '"cinebotrl_two_wheel_riser_residual_merged_v2"' in source
     assert '"executed_state_with_execution_time_lookahead_v2"' in source
     assert '== [0.25, 0.5, 1.0]' in source
+    assert '"cinebotrl_two_wheel_riser_residual_bc_gate_v2"' in source
+    assert '"state_shared_lookahead_fusion_v1"' in source
 
 
 def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
@@ -122,7 +124,8 @@ def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:
     source = _read("run_riser_residual_holdout_gate.sh")
     assert "exact_source_v1" in source
     assert "20260717_residual_holdout_exact_source_lookahead_v2" in source
-    assert '"cinebotrl_two_wheel_riser_residual_policy_v2"' in source
+    assert '"cinebotrl_two_wheel_riser_residual_bc_gate_v2"' in source
+    assert '"state_shared_lookahead_fusion_v1"' in source
     assert '"executed_state_with_execution_time_lookahead_v2"' in source
     assert '== [0.25, 0.5, 1.0]' in source
     assert "20260717_all79_playback_exact_source_v1" in source
@@ -141,7 +144,8 @@ def test_all79_policy_gate_requires_holdout_and_all_cases() -> None:
     source = _read("run_riser_residual_all79_policy_gate.sh")
     assert "exact_source_v1" in source
     assert "20260717_residual_policy_all79_exact_source_lookahead_v2" in source
-    assert '"cinebotrl_two_wheel_riser_residual_policy_v2"' in source
+    assert '"cinebotrl_two_wheel_riser_residual_bc_gate_v2"' in source
+    assert '"state_shared_lookahead_fusion_v1"' in source
     assert '"executed_state_with_execution_time_lookahead_v2"' in source
     assert '== [0.25, 0.5, 1.0]' in source
     assert "20260717_all79_playback_exact_source_v1" in source

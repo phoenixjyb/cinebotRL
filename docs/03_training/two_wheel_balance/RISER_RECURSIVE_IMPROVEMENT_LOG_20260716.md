@@ -896,3 +896,41 @@ and must state whether its candidate was accepted or rejected.
 - When capture is eventually authorized, start only in the empty lookahead-v2
   namespace and prove one bounded per-case artifact before any all-79 batch or
   BC run.
+
+## Round 28: shared-horizon residual network architecture
+
+- Audited the actual v2 policy network before capture. The previous flat
+  `65-256-256-128-3` MLP was bounded and deployable, but assigned unrelated
+  first-layer weights to the same 13 physical features at the three lookahead
+  horizons. That is weak structure for a corpus of only 79 trajectories.
+- Replaced it with `state_shared_lookahead_fusion_v1`: a `128,128` encoder for
+  the 26 executed-state features, one weight-shared `64,64` encoder applied to
+  each ordered 13-dimensional lookahead, and a `256,128` fusion encoder before
+  the unchanged three-channel tanh action head.
+- Preserved train-only observation normalization, orthogonal initialization,
+  LayerNorm, SiLU, deterministic training, case-balanced loss, TorchScript
+  export, the 65-dimensional observation contract, and the bounded 3D action
+  contract.
+- Versioned the BC report to v2 and added fail-closed architecture admission
+  to BC, holdout, and all-79 scripts. This also corrects a pre-training schema
+  mismatch where downstream gates had compared the BC report schema against
+  the checkpoint schema; no historical policy had been admitted through that
+  impossible check.
+- The sealed case-74 trace was re-read without changing it. Its main reverse
+  recovery incident is localized to approximately `89--166 s` wall time and
+  `52.1--59.8 s` plan time. Recovery-v4 remains the only pending controller
+  candidate; no second controller tweak was introduced before its canary.
+- No Isaac/GPU run, residual capture, BC, PPO, learned rollout, source plan,
+  physical threshold, LQR gain, or residual action scale was changed or
+  started in this round.
+- The complete CPU-only repository suite passes `241` tests, including eager
+  versus TorchScript parity and repeated-seed BC prediction equality.
+
+## Next round after Round 28
+
+- Run the complete CPU suite and publish this architecture as one scoped
+  pre-capture change.
+- Keep case 74 as the only next deterministic GPU canary behind its explicit
+  authorization token; do not infer authorization from this CPU work.
+- Only after deterministic admission may the empty lookahead-v2 capture
+  namespace, BC, holdout, and learned all-79 sequence open in order.

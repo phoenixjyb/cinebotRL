@@ -141,6 +141,10 @@ import sys
 
 report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 checks = {
+    "report_schema": report.get("schema")
+    == "cinebotrl_two_wheel_riser_residual_bc_gate_v2",
+    "policy_architecture": report.get("policy_architecture")
+    == "state_shared_lookahead_fusion_v1",
     "source_commit": report.get("source_commit") == sys.argv[2],
     "offline_gate": report.get("offline_gate_passed") is True,
     "rollout_authorized": report.get("learned_rollout_authorized") is True,

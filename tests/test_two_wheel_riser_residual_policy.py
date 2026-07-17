@@ -5,9 +5,13 @@ torch = pytest.importorskip("torch")
 
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
     ACTION_NAMES,
+    BASE_OBSERVATION_NAMES,
+    LOOKAHEAD_CHANNEL_NAMES,
+    LOOKAHEAD_HORIZONS_S,
     OBSERVATION_NAMES,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa: E402
+    POLICY_ARCHITECTURE,
     RiserResidualPolicy,
 )
 
@@ -18,12 +22,32 @@ def test_residual_policy_is_dimensioned_and_bounded() -> None:
     policy = RiserResidualPolicy(
         torch.zeros(len(OBSERVATION_NAMES)),
         torch.ones(len(OBSERVATION_NAMES)),
-        hidden_sizes=(32, 16),
+        state_hidden_sizes=(32, 16),
+        lookahead_hidden_sizes=(16, 8),
+        fusion_hidden_sizes=(32, 16),
     )
     output = policy(torch.randn(7, len(OBSERVATION_NAMES)))
     assert output.shape == (7, len(ACTION_NAMES))
     assert torch.isfinite(output).all()
     assert torch.max(torch.abs(output)).item() <= 1.0
+    assert POLICY_ARCHITECTURE == "state_shared_lookahead_fusion_v1"
+    assert policy.state_observation_count == len(BASE_OBSERVATION_NAMES)
+    assert policy.lookahead_count == len(LOOKAHEAD_HORIZONS_S)
+    assert policy.lookahead_channel_count == len(LOOKAHEAD_CHANNEL_NAMES)
+
+
+def test_residual_policy_torchscript_matches_eager_shared_lookahead() -> None:
+    policy = RiserResidualPolicy(
+        torch.zeros(len(OBSERVATION_NAMES)),
+        torch.ones(len(OBSERVATION_NAMES)),
+        state_hidden_sizes=(16,),
+        lookahead_hidden_sizes=(8,),
+        fusion_hidden_sizes=(16,),
+    ).eval()
+    scripted = torch.jit.script(policy)
+    observations = torch.randn(4, len(OBSERVATION_NAMES))
+    with torch.inference_mode():
+        torch.testing.assert_close(scripted(observations), policy(observations))
 
 
 def test_residual_policy_rejects_bad_normalization() -> None:

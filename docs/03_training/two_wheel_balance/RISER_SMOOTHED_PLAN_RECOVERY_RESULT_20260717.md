@@ -89,12 +89,39 @@ by raising that limit. Cases 1, 35, 45, and 71 remain broad structural rejects.
 
 ## Exact continuation
 
-Recover one more case before any runtime work. Case 20 is the closest remaining
-structural candidate, but bounded parameter search stopped at a position p95 of
-about `0.185 m` under an admissible `1.9998x` duration. The next change should
-be a CPU-only curvature-feedforward or nonholonomic path decomposition change,
-with explicit regression coverage and unchanged thresholds. Do not perform
-another blind preview/smoothing sweep.
+Recover one more case before any runtime work. The post-checkpoint CPU audit
+closed the previously proposed local recovery paths without changing code:
+
+- Case 20 remains at `0.185358 m` position p95 with `1.999788x` duration for
+  the best causal preview candidate. Its error is predominantly cross-track
+  (`0.179272 m` p95, versus `0.062042 m` along-track), while both base linear
+  speed and yaw rate reach their frozen limits.
+- Blending an exact Cartesian correction into case 20 first meets the position
+  gate at blend `0.20`, but requires `2.557315x` duration and saturates the
+  permitted lateral-slip rate on `40.21%` of transitions. This is not a valid
+  two-wheel recovery and must not be implemented.
+- Exact fixed-point decomposition reaches near-zero Cartesian error only at
+  `17.870599x` to `21.047178x` duration with lateral saturation on `79%` to
+  `86%` of transitions. The existing joint-adaptive and short-horizon MPC
+  prototypes also diverged above `1.9 m` p95; none is an admissible candidate.
+- Cases 38/39/40 remain a shared duration-only family. A wider reset-yaw and
+  preview scan improved the best ratio to `2.058564x` while retaining position
+  p95/max of `0.141703/0.225114 m`, but still cannot meet the frozen `2.0x`
+  limit. Proxy pitch contributes `39.894797 s` of motion and wins `34.523234 s`
+  of the interval lower bound; non-overlapping roll/yaw/base demands raise the
+  complete minimum schedule to `42.500894 s` versus the `41.291786 s` budget.
+- Case 29 has duration headroom. A coarse reset-yaw scan improved its p95 from
+  `0.330248 m` to `0.236754 m`; refinement plus admissible smoothing reached
+  `0.220182 m` with max error and duration passing. Candidates below `0.20 m`
+  violated the unchanged source-motion-direction gate.
+
+The next bounded change is therefore not another scalar preview/smoothing
+sweep. Implement and test a globally branch-consistent, RS4-aware nonholonomic
+optimizer that carries the globally selected Euler branch through its horizon,
+optimizes only legal signed base velocity/yaw rate and riser motion, and rejects
+any lateral-slip shortcut. Prototype it first on cases 20, 29, and the healthy
+case 52 regression. Preserve source anchors, all physical limits, and all gate
+thresholds.
 
 Only after a fresh single-commit all-79 export proves `>=70` may the session
 prepare a bounded deterministic Gate-C canary. That later step still requires

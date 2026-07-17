@@ -16,6 +16,9 @@ from rl_platform.tasks.two_wheel_balance.ep4_time_reparameterization import (
     load_ep4_time_warp_reference,
     verify_ep4_time_warp_package,
 )
+from rl_platform.tasks.two_wheel_balance.exact_source_checkpoint import (
+    _validate_identity,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -386,3 +389,52 @@ def test_runner_default_cli_keeps_time_warp_disabled_and_identity_bound(
     assert Path(
         "src/rl_platform/tasks/two_wheel_balance/ep4_time_reparameterization.py"
     ) in exact_retarget.CHECKPOINT_CODE_CONTRACT_PATHS
+
+
+def test_time_warp_checkpoint_identity_uses_existing_fail_closed_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "retarget_exact_source_v1_nonholonomic.py",
+            "--reference-package",
+            "reference",
+            "--integrity-seed-package",
+            "derived/paired_integrity_seed",
+            "--ep4-time-warp-package",
+            "derived",
+            "--ep4-time-warp-raw-integrity-seed-package",
+            "raw-seed",
+            "--target-urdf",
+            "robot.urdf",
+            "--output-dir",
+            "output",
+            "--cases",
+            "4",
+        ],
+    )
+    args = exact_retarget.parse_args()
+    args.verified_ep4_time_warp_identity = {"time_warp_sha256": "d" * 64}
+    monkeypatch.setattr(
+        exact_retarget,
+        "checkpoint_code_contract",
+        lambda: ("a" * 40, "b" * 64),
+    )
+    monkeypatch.setattr(exact_retarget, "sha256", lambda _path: "c" * 64)
+    reference = SimpleNamespace(
+        episode_index=4,
+        manifest_sha256="e" * 64,
+        source_json_sha256="f" * 64,
+        time_s=np.asarray([0.0, 0.1], dtype=np.float64),
+    )
+
+    identity = exact_retarget.build_checkpoint_identity(
+        reference,
+        args,
+        "1" * 64,
+    )
+
+    assert _validate_identity(identity) == identity
+    assert "ep4_time_warp" not in identity

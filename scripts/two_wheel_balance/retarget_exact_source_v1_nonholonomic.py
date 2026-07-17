@@ -342,9 +342,6 @@ def build_checkpoint_identity(
         "source_pose_count": len(reference.time_s),
         "source_time_sha256": source_time_sha256(reference.time_s),
     }
-    verified_time_warp = getattr(args, "verified_ep4_time_warp_identity", None)
-    if verified_time_warp is not None:
-        identity["ep4_time_warp"] = verified_time_warp
     return identity
 
 

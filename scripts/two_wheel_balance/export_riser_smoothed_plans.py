@@ -118,8 +118,11 @@ def main() -> int:
         row = {
             **audit,
             "selected_smoothing_sigma_samples": result.smoothing_sigma_samples,
+            "selected_smoothing_blend_factor": result.smoothing_blend_factor,
             "selected_lookahead_distance_m": result.lookahead_distance_m,
             "selected_heading_gain": result.heading_gain,
+            "selected_reset_yaw_mode": result.reset_yaw_mode,
+            "selected_reset_yaw_rad": result.reset_yaw_rad,
             "attempt_count": len(result.attempts),
             "attempts": list(result.attempts),
         }

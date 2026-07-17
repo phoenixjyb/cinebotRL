@@ -9,7 +9,9 @@ from rl_platform.tasks.two_wheel_balance.riser_playback import RiserPlaybackPlan
 from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (
     MAXIMUM_PRE_DENSIFICATION_BRANCH_STEP_RAD,
     PREVIEW_CONFIGURATIONS,
+    RECOVERY_CONFIGURATIONS,
     SMOOTHING_SIGMA_CANDIDATES,
+    derived_reset_yaw_rad,
     retime_smoothed_plan_from_demands,
     smooth_source_positions,
     smoothed_path_metrics,
@@ -65,6 +67,20 @@ def test_smoothing_preserves_endpoints_and_separate_source_array() -> None:
     np.testing.assert_array_equal(smoothed[-1], source[-1])
     np.testing.assert_array_equal(smoothed[:, 2], source[:, 2])
     assert not np.array_equal(smoothed[1:-1, :2], source[1:-1, :2])
+
+    blended = smooth_source_positions(source, 1.5, 0.45)
+    np.testing.assert_allclose(blended, source + 0.45 * (smoothed - source))
+
+
+def test_reset_yaw_is_derived_from_immutable_source_direction() -> None:
+    source = np.array([[0.0, 0.0, 1.0], [0.6, 0.0, 1.0]])
+    assert derived_reset_yaw_rad(source, 0.3, "source") == pytest.approx(0.3)
+    assert derived_reset_yaw_rad(source, 0.3, "forward_path") == pytest.approx(0.0)
+    assert derived_reset_yaw_rad(source, 0.3, "reverse_path") == pytest.approx(
+        np.pi
+    )
+    with pytest.raises(ValueError, match="invalid reset yaw mode"):
+        derived_reset_yaw_rad(source, 0.3, "sideways")
 
 
 def test_path_metrics_measure_length_drift_and_polyline_deviation() -> None:
@@ -127,11 +143,22 @@ def test_recovery_candidates_are_appended_without_reordering_baseline() -> None:
         (0.25, 2.75),
     )
     assert PREVIEW_CONFIGURATIONS[-2:] == ((0.40, 1.00), (0.50, 1.00))
+    assert RECOVERY_CONFIGURATIONS[-1] == (
+        16.0,
+        0.45,
+        0.65,
+        1.00,
+        "forward_path",
+    )
 
 
 @pytest.mark.parametrize(
     "strategy",
-    ("smoothed_preview_0.40m_g1.00", "smoothed_preview_0.50m_g1.00"),
+    (
+        "smoothed_preview_0.40m_g1.00",
+        "smoothed_preview_0.50m_g1.00",
+        "smoothed_preview_0.65m_g1.00",
+    ),
 )
 def test_recovery_strategy_names_validate(strategy: str) -> None:
     plan = _plan(np.array([0.0, 0.5, 1.0]))
@@ -147,6 +174,8 @@ def test_exporter_defaults_to_bounded_case_order_and_training_closed() -> None:
     assert 'if value.strip().lower() == "all"' in source
     assert '"code_commit": code_commit' in source
     assert '"minimum_pass_count_met": minimum_pass_count_met' in source
+    assert '"selected_smoothing_blend_factor"' in source
+    assert '"selected_reset_yaw_mode"' in source
     assert '"isaac_started": False' in source
     assert '"residual_capture_started": False' in source
     assert '"bc_started": False' in source

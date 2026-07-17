@@ -55,6 +55,14 @@ PREVIEW_CONFIGURATIONS = (
     (0.40, 1.00),
     (0.50, 1.00),
 )
+RESET_YAW_LOOKAHEAD_M = 0.50
+RECOVERY_CONFIGURATIONS = (
+    (16.0, 1.0, 0.25, 2.75, "reverse_path"),
+    (0.0, 1.0, 0.25, 2.75, "forward_path"),
+    (0.0, 1.0, 0.25, 2.75, "reverse_path"),
+    (0.0, 1.0, 0.50, 1.00, "reverse_path"),
+    (16.0, 0.45, 0.65, 1.00, "forward_path"),
+)
 
 
 def _require(condition: bool, message: str) -> None:
@@ -67,7 +75,9 @@ def _path_length(position_m: np.ndarray) -> float:
 
 
 def smooth_source_positions(
-    source_position_m: np.ndarray, sigma_samples: float
+    source_position_m: np.ndarray,
+    sigma_samples: float,
+    blend_factor: float = 1.0,
 ) -> np.ndarray:
     """Smooth horizontal geometry while pinning both source endpoints exactly."""
 
@@ -83,6 +93,10 @@ def smooth_source_positions(
         math.isfinite(sigma_samples) and sigma_samples >= 0.0,
         "smoothing sigma must be finite and non-negative",
     )
+    _require(
+        math.isfinite(blend_factor) and 0.0 <= blend_factor <= 1.0,
+        "smoothing blend factor must be finite and in [0,1]",
+    )
     if sigma_samples == 0.0:
         return source.copy()
     result = source.copy()
@@ -93,9 +107,34 @@ def smooth_source_positions(
     result += (1.0 - progress)[:, None] * (source[0] - result[0])
     result += progress[:, None] * (source[-1] - result[-1])
     result[:, 2] = source[:, 2]
+    result = source + blend_factor * (result - source)
     result[0] = source[0]
     result[-1] = source[-1]
     return result
+
+
+def derived_reset_yaw_rad(
+    source_position_m: np.ndarray,
+    source_initial_yaw_rad: float,
+    mode: str,
+) -> float:
+    """Choose a reset yaw from the first 0.5 m of immutable source motion."""
+
+    if mode == "source":
+        return float(source_initial_yaw_rad)
+    _require(mode in {"forward_path", "reverse_path"}, "invalid reset yaw mode")
+    position = np.asarray(source_position_m, dtype=np.float64)
+    arc_length = np.r_[
+        0.0,
+        np.cumsum(np.linalg.norm(np.diff(position[:, :2], axis=0), axis=1)),
+    ]
+    index = min(
+        int(np.searchsorted(arc_length, RESET_YAW_LOOKAHEAD_M)), len(position) - 1
+    )
+    delta = position[index, :2] - position[0, :2]
+    _require(float(np.linalg.norm(delta)) > 1e-8, "source has no reset-yaw motion")
+    yaw = math.atan2(float(delta[1]), float(delta[0]))
+    return yaw if mode == "forward_path" else yaw + math.pi
 
 
 def _point_to_polyline_distances(
@@ -266,8 +305,11 @@ class SmoothedPlanResult:
     plan: RiserPlaybackPlan
     smoothed_position_source_frame_m: np.ndarray
     smoothing_sigma_samples: float
+    smoothing_blend_factor: float
     lookahead_distance_m: float
     heading_gain: float
+    reset_yaw_mode: str
+    reset_yaw_rad: float
     path_metrics: dict[str, float]
     transition_metrics: dict[str, float]
     kinematic_metrics: dict[str, float]
@@ -285,24 +327,31 @@ def _build_candidate(
     kinematics: UrdfRiserCameraKinematics,
     *,
     sigma_samples: float,
+    smoothing_blend_factor: float = 1.0,
     lookahead_distance_m: float,
     heading_gain: float,
+    reset_yaw_mode: str = "source",
 ) -> SmoothedPlanResult:
     smoothed = smooth_source_positions(
-        source.source_position_world_m, sigma_samples
+        source.source_position_world_m, sigma_samples, smoothing_blend_factor
     )
     path = smoothed_path_metrics(source.source_position_world_m, smoothed)
     provisional_time = _provisional_schedule(smoothed, source.source_time_s)
     source_attitude_wxyz = source.planning_reference(
         source.source_time_s
     ).semantic_dfr_quat_wxyz
+    reset_yaw = derived_reset_yaw_rad(
+        source.source_position_world_m,
+        source.initial_base_yaw_rad,
+        reset_yaw_mode,
+    )
     reference = CorrectedRiserReference(
         case=source.case,
         path=source.source_json_path,
         positions_m=smoothed,
         semantic_dfr_quat_wxyz=source_attitude_wxyz,
         time_s=provisional_time,
-        initial_base_yaw_rad=source.initial_base_yaw_rad,
+        initial_base_yaw_rad=reset_yaw,
         metadata={
             "source": SMOOTHED_TARGET_SCHEMA,
             "source_manifest_sha256": source.package_manifest_sha256,
@@ -403,8 +452,11 @@ def _build_candidate(
         plan=plan,
         smoothed_position_source_frame_m=smoothed,
         smoothing_sigma_samples=float(sigma_samples),
+        smoothing_blend_factor=float(smoothing_blend_factor),
         lookahead_distance_m=float(lookahead_distance_m),
         heading_gain=float(heading_gain),
+        reset_yaw_mode=reset_yaw_mode,
+        reset_yaw_rad=reset_yaw,
         path_metrics=path,
         transition_metrics=transitions,
         kinematic_metrics=kinematic_metrics,
@@ -433,13 +485,18 @@ def build_smoothed_riser_plan(
                 source,
                 kinematics,
                 sigma_samples=sigma_samples,
+                smoothing_blend_factor=1.0,
                 lookahead_distance_m=lookahead_distance_m,
                 heading_gain=heading_gain,
+                reset_yaw_mode="source",
             )
             summary = {
                 "smoothing_sigma_samples": float(sigma_samples),
+                "smoothing_blend_factor": result.smoothing_blend_factor,
                 "lookahead_distance_m": float(lookahead_distance_m),
                 "heading_gain": float(heading_gain),
+                "reset_yaw_mode": result.reset_yaw_mode,
+                "reset_yaw_rad": result.reset_yaw_rad,
                 "execution_source_duration_ratio": float(
                     result.plan.time_s[-1] / source.source_time_s[-1]
                 ),
@@ -467,6 +524,51 @@ def build_smoothed_riser_plan(
             results.append(result)
             if result.passed:
                 return result
+
+    for sigma_samples, blend, lookahead, gain, yaw_mode in RECOVERY_CONFIGURATIONS:
+        result = _build_candidate(
+            source,
+            kinematics,
+            sigma_samples=sigma_samples,
+            smoothing_blend_factor=blend,
+            lookahead_distance_m=lookahead,
+            heading_gain=gain,
+            reset_yaw_mode=yaw_mode,
+        )
+        summary = {
+            "smoothing_sigma_samples": sigma_samples,
+            "smoothing_blend_factor": blend,
+            "lookahead_distance_m": lookahead,
+            "heading_gain": gain,
+            "reset_yaw_mode": yaw_mode,
+            "reset_yaw_rad": result.reset_yaw_rad,
+            "execution_source_duration_ratio": float(
+                result.plan.time_s[-1] / source.source_time_s[-1]
+            ),
+            "path_length_relative_drift": result.path_metrics[
+                "path_length_relative_drift"
+            ],
+            "position_error_p95_m": result.kinematic_metrics[
+                "position_error_p95_m"
+            ],
+            "position_error_max_m": result.kinematic_metrics[
+                "position_error_max_m"
+            ],
+            "failed_checks": [
+                key for key, value in result.checks.items() if not value
+            ]
+            + [
+                key
+                for key, value in result.kinematic_checks.items()
+                if not value
+            ],
+            "passed": result.passed,
+        }
+        attempts.append(summary)
+        result = replace(result, attempts=tuple(attempts))
+        results.append(result)
+        if result.passed:
+            return result
 
     def rank(result: SmoothedPlanResult) -> tuple[float, ...]:
         failed = sum(not value for value in result.checks.values()) + sum(
@@ -529,8 +631,12 @@ def save_smoothed_riser_plan(
             "schema": SMOOTHED_TARGET_SCHEMA,
             "state_count": len(plan.time_s),
             "smoothing_sigma_samples": result.smoothing_sigma_samples,
+            "smoothing_blend_factor": result.smoothing_blend_factor,
             "lookahead_distance_m": result.lookahead_distance_m,
             "heading_gain": result.heading_gain,
+            "reset_yaw_mode": result.reset_yaw_mode,
+            "source_initial_base_yaw_rad": source.initial_base_yaw_rad,
+            "planned_reset_base_yaw_rad": result.reset_yaw_rad,
             "planning_strategy": plan.planning_strategy,
             "vertical_shift_m": plan.vertical_shift_m,
             "execution_duration_s": float(plan.time_s[-1]),

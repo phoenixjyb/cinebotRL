@@ -1,5 +1,6 @@
 from dataclasses import replace
 from pathlib import Path
+import subprocess
 import sys
 from types import SimpleNamespace
 
@@ -104,6 +105,59 @@ def test_checkpoint_atomic_round_trip_preserves_complete_prefix(tmp_path: Path) 
     for key, value in expected.arrays().items():
         np.testing.assert_array_equal(loaded.arrays()[key], value)
     assert not list(tmp_path.glob(".ep7.checkpoint.npz.*.tmp"))
+
+
+def test_windows_project_root_uses_wsl_git_path() -> None:
+    assert (
+        exact_retarget._windows_project_root_to_wsl(
+            Path(r"G:\wSpace\cinebotRL-two-wheel-balance")
+        )
+        == "/mnt/g/wSpace/cinebotRL-two-wheel-balance"
+    )
+
+
+def test_git_output_uses_wsl_backend_for_windows_worktree(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], object, bool, bool, bool]] = []
+    outputs = iter(["a" * 40 + "\n", " M tracked.py\n"])
+
+    def fake_run(
+        command: list[str],
+        *,
+        cwd: object,
+        check: bool,
+        capture_output: bool,
+        text: bool,
+    ) -> SimpleNamespace:
+        calls.append((command, cwd, check, capture_output, text))
+        return SimpleNamespace(stdout=next(outputs))
+
+    monkeypatch.setattr(
+        exact_retarget, "PROJECT_ROOT", Path(r"G:\wSpace\cinebotRL-two-wheel-balance")
+    )
+    monkeypatch.setenv("SystemRoot", r"C:\Windows")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    assert exact_retarget._git_output("rev-parse", "HEAD") == "a" * 40
+    assert (
+        exact_retarget._git_output(
+            "status", "--porcelain", "--untracked-files=no"
+        )
+        == "M tracked.py"
+    )
+    executable = str(Path(r"C:\Windows") / "System32" / "wsl.exe")
+    common = [executable, "git", "-C", "/mnt/g/wSpace/cinebotRL-two-wheel-balance"]
+    assert calls == [
+        ([*common, "rev-parse", "HEAD"], None, True, True, True),
+        (
+            [*common, "status", "--porcelain", "--untracked-files=no"],
+            None,
+            True,
+            True,
+            True,
+        ),
+    ]
 
 
 @pytest.mark.parametrize(

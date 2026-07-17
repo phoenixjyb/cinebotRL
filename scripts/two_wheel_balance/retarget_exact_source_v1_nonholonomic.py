@@ -241,21 +241,42 @@ def retarget_cli_config(args: argparse.Namespace) -> dict[str, object]:
     }
 
 
+def _windows_project_root_to_wsl(path: Path) -> str | None:
+    value = str(path).replace("\\", "/")
+    if len(value) < 3 or value[1:3] != ":/":
+        value = str(path.resolve()).replace("\\", "/")
+    if len(value) < 3 or value[1:3] != ":/" or not value[0].isalpha():
+        return None
+    return f"/mnt/{value[0].lower()}/{value[3:]}"
+
+
+def _git_output(*arguments: str) -> str:
+    wsl_root = _windows_project_root_to_wsl(PROJECT_ROOT)
+    if wsl_root is None:
+        command = ["git", *arguments]
+        cwd = PROJECT_ROOT
+    else:
+        system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+        command = [
+            str(system_root / "System32" / "wsl.exe"),
+            "git",
+            "-C",
+            wsl_root,
+            *arguments,
+        ]
+        cwd = None
+    return subprocess.run(
+        command,
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
 def checkpoint_code_contract() -> tuple[str, str]:
-    git_commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=PROJECT_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    dirty = subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=no"],
-        cwd=PROJECT_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    git_commit = _git_output("rev-parse", "HEAD")
+    dirty = _git_output("status", "--porcelain", "--untracked-files=no")
     if dirty:
         raise ValueError("refusing exact-source checkpoint from a dirty code contract")
     files = {

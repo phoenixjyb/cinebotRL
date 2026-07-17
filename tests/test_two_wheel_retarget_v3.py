@@ -105,12 +105,49 @@ def test_gimbal_recovery_seeds_include_bounded_center_step() -> None:
         upper,
     )
 
-    assert len(deltas) == 3
+    assert len(deltas) == 6
     np.testing.assert_allclose(deltas[0], previous)
     np.testing.assert_allclose(deltas[1], 0.0)
     np.testing.assert_allclose(deltas[2], [-0.05, 0.05, -0.05])
+    np.testing.assert_allclose(deltas[3], [-0.05, 0.0, 0.0])
+    np.testing.assert_allclose(deltas[4], [0.0, 0.05, 0.0])
+    np.testing.assert_allclose(deltas[5], [0.0, 0.0, -0.05])
     assert all(np.all(delta >= lower_delta) for delta in deltas)
     assert all(np.all(delta <= upper_delta) for delta in deltas)
+
+
+def test_gimbal_recovery_seeds_isolate_ep557_limiting_axis() -> None:
+    current = np.array([2.5615494352, 1.5417994518, -1.7156941216])
+    previous = np.array([1.973999e-5, 2.525e-5, -2.525e-5])
+    lower_delta = np.full(3, -0.005)
+    upper_delta = np.full(3, 0.005)
+    lower = np.array([-3.1416, -3.2, -3.2])
+    upper = np.array([3.1416, 1.57, 1.57])
+
+    deltas = bounded_gimbal_recovery_deltas(
+        current,
+        previous,
+        lower_delta,
+        upper_delta,
+        lower,
+        upper,
+    )
+
+    assert any(np.allclose(delta, [0.0, -0.005, 0.0]) for delta in deltas)
+
+
+def test_gimbal_recovery_seeds_deduplicate_identical_branches() -> None:
+    deltas = bounded_gimbal_recovery_deltas(
+        np.zeros(3),
+        np.zeros(3),
+        np.full(3, -0.05),
+        np.full(3, 0.05),
+        np.full(3, -1.0),
+        np.full(3, 1.0),
+    )
+
+    assert len(deltas) == 1
+    np.testing.assert_allclose(deltas[0], 0.0)
 
 
 def test_acquisition_route_chooses_reverse_when_it_reduces_yaw_travel() -> None:

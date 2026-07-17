@@ -521,19 +521,30 @@ def bounded_gimbal_recovery_deltas(
     """Return local branch seeds without changing actuator limits."""
 
     center = 0.5 * (gimbal_lower + gimbal_upper)
-    candidates = (
-        np.asarray(previous_delta, dtype=np.float64),
-        np.zeros(3, dtype=np.float64),
-        np.asarray(center - current_q, dtype=np.float64),
+    previous = np.clip(
+        np.asarray(previous_delta, dtype=np.float64), lower_delta, upper_delta
     )
+    zero = np.clip(np.zeros(3, dtype=np.float64), lower_delta, upper_delta)
+    center_delta = np.clip(
+        np.asarray(center - current_q, dtype=np.float64),
+        lower_delta,
+        upper_delta,
+    )
+    candidates = [previous, zero, center_delta]
+    # A simultaneous center step can force unrelated axes off a good local
+    # branch. Seed each axis independently without adding a combinatorial
+    # lattice over the other axes.
+    for axis in range(3):
+        mixed = zero.copy()
+        mixed[axis] = center_delta[axis]
+        candidates.append(mixed)
     bounded: list[np.ndarray] = []
     for candidate in candidates:
-        clipped = np.clip(candidate, lower_delta, upper_delta)
         if not any(
-            np.allclose(clipped, existing, atol=1e-12, rtol=0.0)
+            np.allclose(candidate, existing, atol=1e-12, rtol=0.0)
             for existing in bounded
         ):
-            bounded.append(clipped)
+            bounded.append(candidate)
     return tuple(bounded)
 
 

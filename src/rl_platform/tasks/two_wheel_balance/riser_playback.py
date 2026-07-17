@@ -77,6 +77,10 @@ class RiserPlaybackPlan:
                 "preview_0.10m_g1.50",
                 "preview_0.25m_g1.50",
                 "preview_0.50m_g1.50",
+                "smoothed_preview_0.05m_g2.75",
+                "smoothed_preview_0.10m_g2.75",
+                "smoothed_preview_0.15m_g2.75",
+                "smoothed_preview_0.25m_g2.75",
             },
         }
         if self.source_time_s is not None:

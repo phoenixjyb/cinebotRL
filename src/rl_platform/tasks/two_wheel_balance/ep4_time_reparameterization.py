@@ -41,6 +41,8 @@ RETARGET_MAXIMUM_ARM_RATE_RADPS = 0.5
 class TimeReparameterizationConfig:
     episode_index: int = 4
     waypoint_stride: int = 1
+    dense_source_anchor_start_0based: int | None = None
+    dense_source_anchor_end_0based: int | None = None
     time_allocation_strategy: str = "minimum_l2"
     translation_speed_cap_mps: float = 0.40
     angular_speed_cap_radps: float = 0.35
@@ -105,9 +107,31 @@ def _quaternion_interval_angles(attitudes_xyzw: np.ndarray) -> np.ndarray:
     return 2.0 * np.arccos(np.clip(dots, -1.0, 1.0))
 
 
-def _waypoint_indices(count: int, stride: int) -> np.ndarray:
+def _waypoint_indices(
+    count: int,
+    stride: int,
+    dense_start_0based: int | None = None,
+    dense_end_0based: int | None = None,
+) -> np.ndarray:
     _require(stride >= 1, "waypoint stride must be positive")
     indices = np.arange(0, count, stride, dtype=np.int64)
+    dense_values = (dense_start_0based, dense_end_0based)
+    dense_enabled = any(value is not None for value in dense_values)
+    _require(
+        not dense_enabled or all(value is not None for value in dense_values),
+        "dense source-anchor window requires start and end",
+    )
+    if dense_enabled:
+        dense_start = int(dense_start_0based)
+        dense_end = int(dense_end_0based)
+        _require(
+            0 <= dense_start <= dense_end < count,
+            "dense source-anchor window is outside the trajectory",
+        )
+        indices = np.union1d(
+            indices,
+            np.arange(dense_start, dense_end + 1, dtype=np.int64),
+        )
     if indices[-1] != count - 1:
         indices = np.append(indices, count - 1)
     return indices
@@ -780,7 +804,12 @@ def derive_ep4_time_warp_package(
     source_attitudes = np.asarray(
         [pose["orientation"] for pose in source_poses], dtype=np.float64
     )
-    waypoint_indices = _waypoint_indices(len(reference.time_s), config.waypoint_stride)
+    waypoint_indices = _waypoint_indices(
+        len(reference.time_s),
+        config.waypoint_stride,
+        config.dense_source_anchor_start_0based,
+        config.dense_source_anchor_end_0based,
+    )
     derived_source_time = reference.time_s[waypoint_indices]
     derived_positions = source_positions[waypoint_indices]
     derived_attitudes = source_attitudes[waypoint_indices]
@@ -848,6 +877,8 @@ def derive_ep4_time_warp_package(
         "source_pose_count": len(reference.time_s),
         "derived_pose_count": len(waypoint_indices),
         "waypoint_stride": config.waypoint_stride,
+        "dense_source_anchor_start_0based": config.dense_source_anchor_start_0based,
+        "dense_source_anchor_end_0based": config.dense_source_anchor_end_0based,
         "source_transition_count": len(reference.time_s) - 1,
         "derived_transition_count": len(waypoint_indices) - 1,
         "cartesian_arc_length_relative_error": path_length_relative_error,
@@ -1091,7 +1122,12 @@ def verify_ep4_time_warp_package(
     _require(
         np.array_equal(
             waypoint_indices,
-            _waypoint_indices(len(source_poses), int(manifest["config"]["waypoint_stride"])),
+            _waypoint_indices(
+                len(source_poses),
+                int(manifest["config"]["waypoint_stride"]),
+                manifest["config"].get("dense_source_anchor_start_0based"),
+                manifest["config"].get("dense_source_anchor_end_0based"),
+            ),
         ),
         "derived waypoint index mapping changed",
     )

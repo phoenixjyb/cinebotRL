@@ -25,6 +25,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--raw-integrity-seed-package", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--waypoint-stride", type=int, default=1)
+    parser.add_argument("--dense-source-anchor-start-0based", type=int)
+    parser.add_argument("--dense-source-anchor-end-0based", type=int)
     parser.add_argument(
         "--time-allocation-strategy",
         choices=("minimum_l2", "proportional_lower_bounds"),
@@ -45,6 +47,8 @@ def main() -> int:
     args = parse_args()
     config = TimeReparameterizationConfig(
         waypoint_stride=args.waypoint_stride,
+        dense_source_anchor_start_0based=args.dense_source_anchor_start_0based,
+        dense_source_anchor_end_0based=args.dense_source_anchor_end_0based,
         time_allocation_strategy=args.time_allocation_strategy,
         translation_speed_cap_mps=args.translation_speed_cap_mps,
         angular_speed_cap_radps=args.angular_speed_cap_radps,

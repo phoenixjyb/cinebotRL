@@ -1477,3 +1477,38 @@ and must state whether its candidate was accepted or rejected.
   physical gates, camera correction, thermal model, or residual scales.
 - Count case 13 only from sealed dynamic evidence. Keep residual capture, BC,
   PPO, and training closed regardless of outcome.
+
+## Round 43: case-13 fixed wall-time bound exhaustion
+
+- Published the v10 case-13-only runtime contract at commit
+  `e566c137bf8c6c38bb9cf2716d37e25ecddb1b76` and launched it detached in
+  `20260718_gate_c_smoothed_case13_v10_camera_lever_arm_v1_exclusive`.
+- Static admission passed and bound only case 13 plan
+  `0451bc312420b1d1a026afb89c23ddb0b325a8b9da10246918e42a067494a228`.
+  The plan preserves `1713` source anchors with `33.821283 s` source and
+  `40.269133 s` execution clocks.
+- The generic `480 s` shell wall timeout expired with exit code `124` after
+  Isaac initialization and dynamic execution had started. No gate JSON was
+  written, so this is an infrastructure-bound `missing_runtime_json` result,
+  not a trajectory-quality rejection or pass.
+- The wrapper wrote a fail-closed summary, started no later case, and left no
+  playback or GPU owner. No residual action, dataset, capture, BC, PPO, or
+  training stage was admitted.
+- Evidence hashes:
+  - runtime admission: `71dc7d747f76329fd4292bf32db3717a0fc9c38cbd657f135701b0a12433cbcc`;
+  - case-13 log: `0756363039ed0d9e6f15f5310fd9ea36e647b723ec040dd1ed740b0c9493b7a0`;
+  - exit-code file: `ca2ebdf97d7469496b1f4b78958f9dc8447efdcb623953fee7b6996b762f6fff`;
+  - fail-closed summary: `10834ccd7cf17ab7de3570a583cc907371b6e737b071000d14e592e3f240d5fb`.
+- Prior successful retimed cases required approximately `244-304 s` wall
+  time for about `33 s` simulated time. Case 13 permits up to
+  `3 * 40.269133 = 120.807399 s` simulated time, so the fixed wall cap was not
+  sufficient to observe its existing simulation horizon.
+
+## Next round after Round 43
+
+- Use a fresh case-13-only retry namespace with a bounded `1600 s` shell wall
+  timeout recorded in the hashed runtime admission. Preserve the simulation's
+  existing `3.0` duration-scale horizon and every physical/quality gate.
+- This retry is an orchestration/evidence correction only. Do not change the
+  source plan, LQR, controller, camera correction, thermal model, residual
+  scales, or deterministic commands.

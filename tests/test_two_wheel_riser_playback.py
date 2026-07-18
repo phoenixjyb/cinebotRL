@@ -70,6 +70,13 @@ def test_playback_plan_roundtrip_and_interpolation(tmp_path: Path) -> None:
     assert sample.feedforward_v_mps == pytest.approx(0.1)
 
 
+def test_playback_plan_accepts_geometry_preserving_explicit_preview() -> None:
+    plan = RiserPlaybackPlan(
+        **{**_plan().__dict__, "planning_strategy": "smoothed_explicit_preview_v1"}
+    )
+    plan.validate()
+
+
 def test_playback_roundtrip_preserves_unequal_source_and_execution_clocks(
     tmp_path: Path,
 ) -> None:

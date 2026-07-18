@@ -90,6 +90,7 @@ class RiserPlaybackPlan:
                 "smoothed_preview_0.50m_g1.00",
                 "smoothed_preview_0.65m_g1.00",
                 "smoothed_preview_0.90m_g1.00",
+                "smoothed_explicit_preview_v1",
                 "smoothed_batch_unicycle_v1",
                 "case74_localized_heading_relief_v1",
             },

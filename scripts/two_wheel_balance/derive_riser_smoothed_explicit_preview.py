@@ -228,7 +228,9 @@ def main() -> int:
     output = args.output_dir / f"case_{args.case:04d}_{suffix}.npz"
     save_smoothed_riser_plan(output, result, source)
     audit = audit_smoothed_riser_plan(output, source, kinematics)
-    with np.load(output, allow_pickle=False) as data:
+    with np.load(output, allow_pickle=False) as data, np.load(
+        args.parent_plan, allow_pickle=False
+    ) as parent_data:
         source_arrays_immutable = (
             np.array_equal(data["source_time_s"], source.source_time_s)
             and np.array_equal(
@@ -249,11 +251,37 @@ def main() -> int:
             data["smoothed_target_position_source_frame_m"],
             expected_smoothed_geometry,
         )
+        candidate_parent_deltas = {
+            "base_state_abs_max": float(
+                np.max(np.abs(data["base_xy_yaw"] - parent_data["base_xy_yaw"]))
+            ),
+            "base_feedforward_abs_max": float(
+                np.max(
+                    np.abs(
+                        data["feedforward_v_wz"]
+                        - parent_data["feedforward_v_wz"]
+                    )
+                )
+            ),
+            "riser_state_abs_max": float(
+                np.max(np.abs(data["riser_q"] - parent_data["riser_q"]))
+            ),
+            "proxy_state_abs_max": float(
+                np.max(
+                    np.abs(data["proxy_gimbal_q"] - parent_data["proxy_gimbal_q"])
+                )
+            ),
+        }
+        base_allocation_changed = (
+            candidate_parent_deltas["base_state_abs_max"] > 1e-12
+            or candidate_parent_deltas["base_feedforward_abs_max"] > 1e-12
+        )
     passed = (
         result.passed
         and audit.get("passed") is True
         and source_arrays_immutable
         and parent_smoothed_geometry_preserved
+        and (not args.batch_unicycle_recovery or base_allocation_changed)
     )
     row = {
         **audit,
@@ -280,6 +308,8 @@ def main() -> int:
             "maximum_control_delta": result.kinematic_metrics.get(
                 "batch_maximum_control_delta"
             ),
+            "candidate_parent_deltas": candidate_parent_deltas,
+            "base_allocation_changed": base_allocation_changed,
             "source_geometry_changed": False,
             "controller_changed": False,
             "thresholds_changed": False,

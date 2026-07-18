@@ -491,6 +491,9 @@ def test_explicit_preview_derivation_is_hash_bound_and_training_closed(
     assert "build_smoothed_riser_plan_from_geometry" in source
     assert "build_smoothed_riser_batch_recovery_from_geometry" in source
     assert "--batch-unicycle-recovery" in source
+    assert '"candidate_parent_deltas"' in source
+    assert '"base_allocation_changed"' in source
+    assert "not args.batch_unicycle_recovery or base_allocation_changed" in source
     assert '"parent_smoothed_geometry_preserved"' in source
     assert '_require(result.passed, "explicit preview candidate failed static admission")' not in source
     assert "result.passed" in source

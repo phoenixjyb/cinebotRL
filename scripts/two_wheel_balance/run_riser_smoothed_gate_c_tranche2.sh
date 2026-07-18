@@ -139,11 +139,11 @@ import sys
 import numpy as np
 
 expected = {
-    24: (506, 9.929694, 9.929693999999998),
-    19: (432, 8.338212, 12.028270780335086),
-    28: (382, 7.272057, 12.408033674341521),
-    70: (378, 7.070713, 12.763227468955776),
-    26: (420, 8.097697, 13.159482653904575),
+    24: (506, 9.929694, 9.929693999999998, "smoothed_preview_0.05m_g2.75"),
+    19: (432, 8.338212, 12.028270780335086, "smoothed_preview_0.05m_g2.75"),
+    28: (382, 7.272057, 12.408033674341521, "smoothed_preview_0.25m_g2.75"),
+    70: (378, 7.070713, 12.763227468955776, "smoothed_preview_0.05m_g2.75"),
+    26: (420, 8.097697, 13.159482653904575, "smoothed_preview_0.05m_g2.75"),
 }
 for path, case in zip(sys.argv[1:], (24, 19, 28, 70, 26), strict=True):
     with np.load(path, allow_pickle=False) as data:
@@ -151,13 +151,13 @@ for path, case in zip(sys.argv[1:], (24, 19, 28, 70, 26), strict=True):
         source_time = np.asarray(data["source_time_s"], dtype=np.float64)
         execution_time = np.asarray(data["execution_time_s"], dtype=np.float64)
         time_alias = np.asarray(data["time_s"], dtype=np.float64)
-    states, source_duration, execution_duration = expected[case]
+    states, source_duration, execution_duration, strategy = expected[case]
     checks = {
         "schema": metadata.get("schema")
         == "cinebotrl_two_wheel_riser_smoothed_plan_v1",
         "case": metadata.get("case") == case,
         "strategy": metadata.get("smoothed_target", {}).get("planning_strategy")
-        == "smoothed_preview_0.05m_g2.75",
+        == strategy,
         "states": len(source_time) == len(execution_time) == states,
         "source_clock": source_time[0] == 0.0
         and abs(float(source_time[-1]) - source_duration) <= 1e-9

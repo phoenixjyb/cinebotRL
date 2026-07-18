@@ -818,3 +818,11 @@ remaining cases `(24, 19, 28, 70, 26)`, with a combined execution clock of
 approximately `60.288709 s`. Use the same 3.0x outer completion horizon,
 `wz_kp=1.05`, source/plan/controller identities, independent label admission,
 and no dataset or training.
+
+The first tranche-2 invocation at `eac5f4d` failed before admission or Isaac
+because its static preflight assumed every case used the 0.05 m preview. The
+sealed case-28 plan instead uses `smoothed_preview_0.25m_g2.75`; its plan hash,
+clocks, reverse-path reset, 16-sample smoothing, and `0.642741 m` vertical shift
+were unchanged. No namespace or trajectory result was created. The corrected
+preflight pins each case's exact planning strategy rather than weakening the
+strategy check.

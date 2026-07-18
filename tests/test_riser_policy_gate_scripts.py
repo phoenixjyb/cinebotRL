@@ -342,6 +342,9 @@ def test_smoothed_tranche2_gate_is_ordered_hash_bound_and_fail_fast() -> None:
         "13.159482653904575",
     ):
         assert duration in source
+    assert '28: (382, 7.272057, 12.408033674341521, "smoothed_preview_0.25m_g2.75")' in source
+    assert '24: (506, 9.929694, 9.929693999999998, "smoothed_preview_0.05m_g2.75")' in source
+    assert '== strategy' in source
     assert 'summary.get("dynamically_passed_cases") == [24, 19, 28, 70, 26]' in source
     assert 'gate.get("maximum_duration_scale") == 3.0' in source
     assert "case_gate_passed" in source

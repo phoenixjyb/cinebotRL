@@ -1724,3 +1724,44 @@ and must state whether its candidate was accepted or rejected.
   duration-derived wall timeout and run only that canary.
 - Keep exact-source provenance, LQR/controller settings, all physical gates,
   and the learning closure unchanged.
+
+## Round 50: case-17 dynamic qualification
+
+- CPU inspection confirmed that v12 case 17 is unchanged, statically admitted,
+  and hash-bound to plan
+  `e38228121caf797546ac0936fc522e84f61f04cd3740438e0b93469665fa938d`.
+  Its source/execution clocks are `17.376415/31.450542 s`; static position
+  p95/max are `0.093125/0.238651 m`, with no failed timing, path, transition,
+  or kinematic check.
+- Published the fresh case-only runtime route at
+  `2b06d9a7d4803326b4aceae266be96b3200c7691`, using the unchanged v12
+  portfolio and a `1500 s` wall bound. The authoritative remote suite passed
+  all `325` tests before launch.
+- Ran only case 17 in
+  `20260719_gate_c_smoothed_case17_v12_camera_lever_arm_v1_exclusive`. It
+  completed `16305` steps and both clocks. Dynamic position p95/max passed at
+  `0.143606/0.216037 m`; attitude p95/max passed at
+  `0.131835/0.234283 deg`; pitch max was `7.226670 deg`.
+- Internal attitude IK had zero failures, proxy rate max was
+  `42.988322 deg/s`, action saturation was `0.000123`, and proxy/riser
+  saturation were zero. Riser effort/thermal maxima were `26.933525 N` and
+  `0.001342`; no termination occurred.
+- Dynamic, thermal, runtime, controller-evidence, and residual-envelope gates
+  all passed. Normalized prospective residual maxima were
+  `[0.911113, 0.420583, 0.147586]`; residual actions remained zero and
+  unapplied, and no dataset, capture, BC, PPO, or training was started. The
+  uniquely dynamically qualified set is now `30/70`.
+- Evidence hashes: admission
+  `dc1307559e4ea3ae4fcf283c3d4f1dc35cf538a24905495b2d60ff4b17c6ec9f`,
+  gate `eb9da572b528d74119b957200ad21461e94637ac4a83a069bcb7ca0b7e12ee71`,
+  log `65d5f2cb2aaa1c5254aa50fe3da5499a309ea64119285e6ed064caa077782703`,
+  summary `c437491992e671c101aae2c5b03b9b02a50cb656c2b33994089f29f6a5a0278c`.
+  GPU and playback ownership were empty after closure.
+
+## Next round after Round 50
+
+- Inspect v12 case 18 on CPU and compare its static margin and execution clock
+  with the now-qualified cases. If admitted, create a fresh case-only runtime
+  route and run no other case in parallel.
+- Preserve all controller, source, correction, gate, and learning-closure
+  invariants.

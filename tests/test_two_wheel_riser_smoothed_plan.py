@@ -421,7 +421,8 @@ def test_dynamic_retime_derivation_is_cpu_only_evidence_bound_and_closed() -> No
     assert '"completed_position_p95_only": ["position_p95_bounded"]' in source
     assert '"--gate-reject-mode"' in source
     assert 'checks.get("completed_reference") is True' in source
-    assert 'summary.get("runtime_contract_passed") is True' in source
+    assert 'first_reject.get("runtime_contract_passed") is True' in source
+    assert 'not_started_cases == requested_cases[reject_index + 1 :]' in source
     assert '"--target-ratio", type=float, default=1.4' in source
     assert '"--maximum-portfolio-median", type=float, default=1.5' in source
     assert '"controller_changed": False' in source

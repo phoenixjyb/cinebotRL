@@ -168,10 +168,25 @@ def _gate_c_rejection(
         "learning stage was not closed",
     )
     if reject_mode == "completed_position_p95_only":
+        requested_cases = summary.get("requested_cases")
+        passed_cases = summary.get("dynamically_passed_cases")
+        not_started_cases = summary.get("not_started_cases")
         _require(
-            summary.get("thermal_admission_passed") is True
-            and summary.get("runtime_contract_passed") is True
-            and summary.get("controller_evidence_passed") is True,
+            isinstance(requested_cases, list)
+            and case in requested_cases
+            and isinstance(passed_cases, list)
+            and isinstance(not_started_cases, list),
+            "completed p95-only reject lacks ordered fail-fast evidence",
+        )
+        reject_index = requested_cases.index(case)
+        _require(
+            passed_cases == requested_cases[:reject_index]
+            and not_started_cases == requested_cases[reject_index + 1 :]
+            and first_reject.get("stage") == "dynamic_gate"
+            and first_reject.get("physical_dynamic_quality_passed") is False
+            and first_reject.get("thermal_admission_passed") is True
+            and first_reject.get("runtime_contract_passed") is True
+            and row.get("controller_evidence_passed") is True,
             "completed p95-only reject lacks healthy runtime evidence",
         )
     return row

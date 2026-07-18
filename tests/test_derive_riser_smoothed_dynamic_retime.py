@@ -29,6 +29,7 @@ def _write_evidence(tmp_path: Path) -> tuple[Path, Path]:
         "execution_duration_s": 13.5,
         "dynamic_quality_passed": False,
         "thermal_admission_passed": True,
+        "controller_evidence_passed": True,
         "termination": None,
         "executed_residual_dataset": None,
         "raw_residual_label_applied_to_commands": False,
@@ -39,7 +40,14 @@ def _write_evidence(tmp_path: Path) -> tuple[Path, Path]:
         "first_dynamic_reject": {
             "case": 7,
             "classification": "dynamic_gate_rejection",
+            "stage": "dynamic_gate",
+            "physical_dynamic_quality_passed": False,
+            "thermal_admission_passed": True,
+            "runtime_contract_passed": True,
         },
+        "requested_cases": [7],
+        "dynamically_passed_cases": [],
+        "not_started_cases": [],
         "thermal_admission_passed": True,
         "runtime_contract_passed": True,
         "controller_evidence_passed": True,
@@ -87,7 +95,7 @@ def test_completed_position_p95_mode_requires_healthy_runtime_summary(
 ) -> None:
     gate, summary = _write_evidence(tmp_path)
     payload = json.loads(summary.read_text(encoding="utf-8"))
-    payload["controller_evidence_passed"] = False
+    payload["first_dynamic_reject"]["runtime_contract_passed"] = False
     summary.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ValueError, match="healthy runtime evidence"):
         MODULE._gate_c_rejection(
@@ -96,3 +104,28 @@ def test_completed_position_p95_mode_requires_healthy_runtime_summary(
             case=7,
             reject_mode="completed_position_p95_only",
         )
+
+
+def test_completed_position_p95_mode_accepts_trailing_unstarted_cases(
+    tmp_path: Path,
+) -> None:
+    gate, summary = _write_evidence(tmp_path)
+    payload = json.loads(summary.read_text(encoding="utf-8"))
+    payload.update(
+        {
+            "requested_cases": [7, 13],
+            "dynamically_passed_cases": [],
+            "not_started_cases": [13],
+            "thermal_admission_passed": False,
+            "runtime_contract_passed": False,
+            "controller_evidence_passed": False,
+        }
+    )
+    summary.write_text(json.dumps(payload), encoding="utf-8")
+    row = MODULE._gate_c_rejection(
+        gate,
+        summary,
+        case=7,
+        reject_mode="completed_position_p95_only",
+    )
+    assert row["case"] == 7

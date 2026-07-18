@@ -730,3 +730,46 @@ from `2.05x` to `3.00x`; preserve the source and execution clocks, plan hash,
 phase governor, `wz_kp=1.05`, robot/gains identities, and every physical gate.
 If case 10 still does not complete, do not increase the horizon again without a
 new structural diagnosis. Capture, BC, PPO, and training remain closed.
+
+## Case-10 bounded-horizon result
+
+The repaired wrapper and independent label/dynamic admission were committed and
+pushed at `bd4b17534cf2bff0b6c6b110cbdc54fb8c69f464`. The complete `.98`
+CPU suite passed `303/303` before launch. The single authorized 3.0x canary then
+completed the full immutable execution clock and passed every physical,
+thermal, and runtime check:
+
+```text
+20260718_gate_c_smoothed_case10_horizon300_wzkp105_v1_exclusive
+
+f9d159d9b54e9d7f9d760431be5b9aa348792d115c07c49e830396011026ebe7  admission.json
+0f741e6a864dba49206459a817ca95378eada77e019cfe14a9b019a320250717  gates/case_0010.json
+39505217365f6a384a1457c01f17ecb3d8992697f4315e8942e5ccf1ab0c7782  logs/case_0010.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  logs/case_0010.exit_code
+31c33cf9978d8bbf41a93a8f10f445332fe76feefe2cdc4e6c2381b0f777002a  summary.json
+
+source / execution / completed phase:       5.101357 / 7.874601 / 7.874601 s
+completed steps / wall:                     4333 / 21.665 s
+bounded maximum runtime:                    23.623804 s
+position p95 / max:                         0.106099 / 0.131853 m
+pitch / attitude max:                       7.146952 / 0.205674 deg
+proxy error / rate max:                     0.220176 / 41.057193 deg(/s)
+action / proxy / riser saturation:          0 / 0 / 0
+raw residual command abs max:               [0.313672, 0.089366, 0.013123]
+normalized residual label abs max:          [1.045573, 0.223415, 0.131227]
+dynamic / thermal / runtime:                pass / pass / pass
+label envelope / label admission:           fail / fail
+dataset / residual applied / training:      none / false / false
+```
+
+The deterministic pass set is now `{10, 52, 53, 74, 77}`. Case 10 proves the
+2.05x result was a bounded runtime-horizon reject rather than a trajectory or
+controller failure. The unchanged 4.56% first-channel label overflow remains a
+Gate-D blocker but was not applied to deterministic commands.
+
+Cases 12, 11, and 23 from the defective first tranche remain diagnostic-only.
+Their fresh qualification must use a new namespace and the repaired JSON-based
+fail-fast path. Use the same outer 3.0x runtime horizon established by case 10,
+without changing source/execution clocks, plans, controller, governor, gains,
+model, or thresholds. Execute in order `(12, 11, 23)` and stop on the first
+physical, thermal, runtime, or ownership reject. Training remains closed.

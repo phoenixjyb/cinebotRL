@@ -97,17 +97,25 @@ def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
 
 def test_smoothed_case74_gate_c_is_isolated_hash_bound_and_label_free() -> None:
     source = _read("run_riser_smoothed_gate_c_case74.sh")
-    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE74_V1" in source
-    assert "73121d240ccf54fa65783fc1cf47eed4d805af3e6bedbdfff847719c92f2130b" in source
-    assert "fee7fd2c2d9cccca8fa19b0141996a4c530840ef427513d941b57e3ff773c1a3" in source
-    assert "20260718_gate_c_smoothed_case74_v1_representative_exclusive" in source
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE74_RELIEF_V2" in source
+    assert "0fe4b517d2629a1bca413162378708c2985cf5a42a1da8746de0a662f2fab00c" in source
+    assert "0acc088a695ff53f9eccfde73107b0748e5de12ffbb6b048efa467455071bf90" in source
+    assert "20260718_gate_c_smoothed_case74_relief_v2_exclusive" in source
     assert "TIMEOUT_SECONDS=360" in source
     assert "--cases \"$CASE\"" in source
     assert "smoothed_riser_plan_v1.npz" in source
     assert "cinebotrl_two_wheel_riser_smoothed_plan_v1" in source
-    assert '"dynamic_margin_retime_absent"' in source
-    assert "22.446453095094938" in source
-    assert '== 12.0' in source
+    assert '"dynamic_margin_retime_not_applied"' in source
+    assert "22.29452723780125" in source
+    assert '== 24.0' in source
+    assert '== 0.75' in source
+    assert '"localized_heading_relief"' in source
+    assert '"case74_localized_heading_relief_v1"' in source
+    assert 'relief.get("start_anchor") == 394' in source
+    assert 'relief.get("end_anchor") == 572' in source
+    assert 'relief.get("controller_changed") is False' in source
+    assert 'relief.get("phase_governor_changed") is False' in source
+    assert 'relief.get("thresholds_changed") is False' in source
     assert 'MAXIMUM_DURATION_SCALE="2.05"' in source
     assert '--maximum-duration-scale "$MAXIMUM_DURATION_SCALE"' in source
     assert 'gate.get("maximum_duration_scale") == 2.05' in source
@@ -132,6 +140,7 @@ def test_smoothed_case74_gate_c_rejects_missing_authorization_before_runtime() -
         None,
         "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V5",
         "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE52_V2",
+        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE74_V1",
         "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE74_V0",
     ):
         env = os.environ.copy()

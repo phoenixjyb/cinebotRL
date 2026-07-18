@@ -5,14 +5,14 @@ ROOT="/mnt/g/wSpace/cinebotRL-two-wheel-riser"
 WIN_ROOT='G:\wSpace\cinebotRL-two-wheel-riser'
 PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
-AUTHORIZATION="AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE74_V1"
+AUTHORIZATION="AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE74_RELIEF_V2"
 CASE=74
-STAMP="20260718_gate_c_smoothed_case74_v1_representative_exclusive"
-PORTFOLIO_STAMP="20260718_smoothed_plan_all79_v6_case77_1p499_cpu"
-MANIFEST_SHA256="73121d240ccf54fa65783fc1cf47eed4d805af3e6bedbdfff847719c92f2130b"
+STAMP="20260718_gate_c_smoothed_case74_relief_v2_exclusive"
+PORTFOLIO_STAMP="20260718_smoothed_plan_all79_v7_case74_relief_cpu"
+MANIFEST_SHA256="0fe4b517d2629a1bca413162378708c2985cf5a42a1da8746de0a662f2fab00c"
 SOURCE_SHA256="f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d"
-PLANNER_COMMIT="b95371b169a100416c3cfdb5933e9bd2c3838a0d"
-PLAN_SHA256="fee7fd2c2d9cccca8fa19b0141996a4c530840ef427513d941b57e3ff773c1a3"
+PLANNER_COMMIT="b0b0f300543bbc0e140f472ee4c9d3142284a906"
+PLAN_SHA256="0acc088a695ff53f9eccfde73107b0748e5de12ffbb6b048efa467455071bf90"
 GAINS_SHA256="2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6"
 ROBOT_USD_SHA256="89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0"
 TIMEOUT_SECONDS=360
@@ -85,6 +85,7 @@ with np.load(sys.argv[1], allow_pickle=False) as data:
     source_time = np.asarray(data["source_time_s"], dtype=np.float64)
     execution_time = np.asarray(data["execution_time_s"], dtype=np.float64)
     time_alias = np.asarray(data["time_s"], dtype=np.float64)
+relief = metadata.get("localized_heading_relief", {})
 checks = {
     "schema": metadata.get("schema") == "cinebotrl_two_wheel_riser_smoothed_plan_v1",
     "case": metadata.get("case") == 74,
@@ -95,21 +96,37 @@ checks = {
     "planning_strategy": metadata.get("smoothed_target", {}).get(
         "planning_strategy"
     )
-    == "smoothed_preview_0.25m_g2.75",
+    == "case74_localized_heading_relief_v1",
     "smoothing_sigma": metadata.get("smoothed_target", {}).get(
         "smoothing_sigma_samples"
     )
-    == 12.0,
+    == 24.0,
+    "smoothing_blend": metadata.get("smoothed_target", {}).get(
+        "smoothing_blend_factor"
+    )
+    == 0.75,
+    "localized_heading_relief": relief.get("schema")
+    == "case74_localized_heading_relief_v1"
+    and relief.get("applied") is True
+    and relief.get("start_anchor") == 394
+    and relief.get("end_anchor") == 572
+    and relief.get("source_geometry_changed") is False
+    and relief.get("outside_window_parent_geometry_unchanged") is True
+    and relief.get("controller_changed") is False
+    and relief.get("phase_governor_changed") is False
+    and relief.get("thresholds_changed") is False,
     "source_clock": len(source_time) == 590
     and source_time[0] == 0.0
     and abs(float(source_time[-1]) - 11.373883) <= 1e-9
     and bool(np.all(np.diff(source_time) > 0.0)),
     "execution_clock": len(execution_time) == 590
     and execution_time[0] == 0.0
-    and abs(float(execution_time[-1]) - 22.446453095094938) <= 1e-9
+    and abs(float(execution_time[-1]) - 22.29452723780125) <= 1e-9
     and bool(np.all(np.diff(execution_time) > 0.0)),
     "time_alias_unambiguous": np.array_equal(time_alias, execution_time),
-    "dynamic_margin_retime_absent": metadata.get("dynamic_margin_retime") is None,
+    "dynamic_margin_retime_not_applied": metadata.get(
+        "dynamic_margin_retime", {}
+    ).get("applied") is False,
 }
 if not all(checks.values()):
     raise SystemExit(f"invalid case74 playback payload: {checks}")

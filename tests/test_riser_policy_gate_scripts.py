@@ -441,6 +441,10 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert "0.0 <= correction_max <= 0.05 + 1e-9" in source
     assert "assert_exclusive_resources" in source
     assert "rev-parse '@{u}'" in source
+    assert 'tracking_controller "$TRACKING"' in source
+    assert 'riser_control "$RISER_CONTROL"' in source
+    assert 'recovery_evidence "$RECOVERY_EVIDENCE"' in source
+    assert 'playback_loader "$LOADER"' in source
     assert "camera lever-arm Gate C stopped on case %s" in source
     assert 'summary.get("dynamically_passed_cases") == [68, 66]' in source
     assert "--dataset-dir" not in source

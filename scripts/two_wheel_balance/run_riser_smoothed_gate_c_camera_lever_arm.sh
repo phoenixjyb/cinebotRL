@@ -41,6 +41,10 @@ PLAYBACK="$ROOT/scripts/two_wheel_balance/smoke_riser_reference_playback.py"
 PLAYBACK_WIN="$WIN_ROOT\scripts\two_wheel_balance\smoke_riser_reference_playback.py"
 SUMMARIZER="$ROOT/scripts/two_wheel_balance/summarize_riser_gate_c_canary.py"
 RUNNER="$ROOT/scripts/two_wheel_balance/run_riser_smoothed_gate_c_camera_lever_arm.sh"
+LOADER="$ROOT/src/rl_platform/tasks/two_wheel_balance/riser_playback.py"
+TRACKING="$ROOT/src/rl_platform/tasks/two_wheel_balance/whole_body_tracking.py"
+RISER_CONTROL="$ROOT/src/rl_platform/tasks/two_wheel_balance/riser_control.py"
+RECOVERY_EVIDENCE="$ROOT/src/rl_platform/tasks/two_wheel_balance/riser_recovery_evidence.py"
 
 assert_gpu_free() {
   local playback_owners compute_owners
@@ -161,6 +165,8 @@ python3 - "$TEMP_ADMISSION" "$COMMIT" "$STAMP" \
   case68_plan "$PORTFOLIO/case_0068_smoothed_riser_plan_v1.npz" \
   case66_plan "$PORTFOLIO/case_0066_smoothed_riser_plan_v1.npz" \
   lqr_gains "$GAINS" robot_usd "$ROBOT_USD" playback "$PLAYBACK" \
+  tracking_controller "$TRACKING" riser_control "$RISER_CONTROL" \
+  recovery_evidence "$RECOVERY_EVIDENCE" playback_loader "$LOADER" \
   wrapper "$RUNNER" summarizer "$SUMMARIZER" validator "$VALIDATOR" <<'PY'
 import hashlib
 import json

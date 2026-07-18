@@ -17,6 +17,7 @@ PORTFOLIO_SCHEMA = "cinebotrl_two_wheel_riser_smoothed_plan_export_v1"
 PLAN_SCHEMA = "cinebotrl_two_wheel_riser_smoothed_plan_v1"
 REPLACEMENT_SCHEMAS = {
     "cinebotrl_two_wheel_riser_dynamic_margin_retime_v1",
+    "cinebotrl_two_wheel_riser_localized_reversal_retime_v1",
     "cinebotrl_two_wheel_riser_case74_localized_heading_relief_v1",
     "cinebotrl_two_wheel_riser_explicit_preview_derivation_v1",
 }

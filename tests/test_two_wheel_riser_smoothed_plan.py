@@ -514,6 +514,14 @@ def test_dynamic_retime_derivation_is_cpu_only_evidence_bound_and_closed() -> No
     assert "--headless" not in source
 
 
+def test_portfolio_composer_accepts_localized_reversal_retime_schema() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/compose_riser_smoothed_plan_portfolio.py"
+    ).read_text(encoding="utf-8")
+    assert '"cinebotrl_two_wheel_riser_localized_reversal_retime_v1"' in source
+
+
 def test_smoothed_portfolio_composer_is_hash_bound_and_runtime_closed() -> None:
     script = (
         Path(__file__).resolve().parents[1]

@@ -41,10 +41,29 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _windows_path_from_gitdir(value: str) -> str:
+    if value.startswith("/mnt/") and len(value) >= 7 and value[6] == "/":
+        return f"{value[5].upper()}:{value[6:]}"
+    return value
+
+
+def _git_command() -> list[str]:
+    marker = PROJECT_ROOT / ".git"
+    if marker.is_file():
+        prefix, gitdir = marker.read_text(encoding="utf-8").strip().split(":", 1)
+        _require(prefix == "gitdir" and bool(gitdir.strip()), "invalid .git marker")
+        return [
+            "git",
+            "--git-dir",
+            _windows_path_from_gitdir(gitdir.strip()),
+            "--work-tree",
+            str(PROJECT_ROOT),
+        ]
+    return ["git", "-C", str(PROJECT_ROOT)]
+
+
 def _git_output(*args: str) -> str:
-    return subprocess.check_output(
-        ["git", "-C", str(PROJECT_ROOT), *args], text=True
-    ).strip()
+    return subprocess.check_output([*_git_command(), *args], text=True).strip()
 
 
 def _load_hash_bound(path: Path, expected: str) -> dict[str, object]:

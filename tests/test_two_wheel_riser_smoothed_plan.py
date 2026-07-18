@@ -496,3 +496,16 @@ def test_explicit_preview_derivation_is_hash_bound_and_training_closed() -> None
     assert '"valid_for_training": False' in source
     assert "AppLauncher" not in source
     assert "--headless" not in source
+
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/derive_riser_smoothed_explicit_preview.py"
+    )
+    spec = importlib.util.spec_from_file_location("explicit_preview", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert (
+        module._windows_path_from_gitdir("/mnt/g/wSpace/repo/.git/worktrees/x")
+        == "G:/wSpace/repo/.git/worktrees/x"
+    )

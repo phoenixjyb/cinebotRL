@@ -1877,3 +1877,41 @@ and must state whether its candidate was accepted or rejected.
   controller, `0.05 m` correction cap, and all physical thresholds.
 - Do not run case 20 again or advance to case 21 until a fresh candidate passes
   duration, path, transition, and kinematic gates. Keep learning closed.
+
+## Round 54: geometry-preserving preview bracket exhausted
+
+- Added a hash-bound CPU derivation path that reuses the parent NPZ's selected
+  smoothed target positions byte-for-byte while changing only preview. It pins
+  parent smoothing sigma/blend/reset-yaw identity and proves source arrays,
+  parent smoothed geometry, controller, and thresholds unchanged. Implementation
+  commit: `3a28480`; explicit playback strategy integration: `8cb57f4`.
+- Repaired the derivation to preserve rejected candidates as machine-readable
+  CPU evidence rather than raising before output (`53b6188`). The authoritative
+  remote suite is now `327 passed`.
+- Evaluated a bounded bracket around the parent `0.90 m` preview, all with
+  heading gain `1.0`, sigma `64`, blend `0.1276273593606172`, and forward-path
+  reset yaw:
+  - `0.875 m`: ratio `2.002022`, p95/max `0.183379/0.205045 m`; failed duration
+    and position p95. Manifest/summary
+    `c276309c0bdd2fd9e32ecd1dd9356491247d63fff69802014128ab890129e31a` /
+    `0f33466562b7c9f10af908a09d3e20bc60e97c20e325fe30608e6686f1da0ad7`.
+  - `0.95 m`: ratio `1.993704`, p95/max `0.190707/0.211959 m`; failed position
+    p95. Manifest
+    `696d8efbb78ebbdd95f802ea6f3742dfd8ce88449b32ebf67362931e40c2a0e5`.
+  - `1.00 m`: ratio `1.988732`, p95/max `0.200773/0.216067 m`; failed position
+    p95. Manifest/summary
+    `c0ddda3917a9025d5c069542dd24e40b88f7df9a94c36c7ee51a19dadb27d46c` /
+    `d504ec8221d37a4bada86c47646139de04ff9044d9872fa005b948f9db432565`.
+- Every candidate preserved parent smoothed geometry and all source arrays;
+  Isaac, residual capture, BC, PPO, and training remained closed. The original
+  `0.90 m` parent remains the best admissible preview, so preview-only recovery
+  is exhausted and no dynamic retry is authorized.
+
+## Next round after Round 54
+
+- Perform CPU-only localization of case 20's base-path/yaw allocation around
+  the two sealed XY error intervals. Evaluate one bounded geometry-preserving
+  base-state/heading allocation change with explicit command-delta, duration,
+  transition, and kinematic evidence.
+- Do not widen the camera correction cap or residual scales, relax thresholds,
+  launch Isaac, or advance to case 21 before that CPU candidate passes.

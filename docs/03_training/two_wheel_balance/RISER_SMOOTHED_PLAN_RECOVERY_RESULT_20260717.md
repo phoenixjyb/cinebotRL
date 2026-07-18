@@ -541,3 +541,47 @@ commit/upstream, full CPU-suite, GPU/process, namespace, and thermal preflight.
 
 Regardless of the v4 result, do not start accepted-corpus qualification,
 residual capture, BC, or PPO automatically.
+
+## Second yaw-authority result
+
+The v4 contract was committed and pushed at
+`5a890e0314c89e02dd12cb9c6606b878da0872fd`. After the competing CPU job
+released, the worktree was synchronized by a verified bundle, the full `.98`
+suite passed `294/294`, and the canary ran with exclusive GPU ownership. The
+process completed both clocks and released the GPU before the separate task
+started its next CPU job.
+
+```text
+20260718_gate_c_smoothed_case74_relief_wzkp090_v4_exclusive
+
+fc42ac44af6dea84d10dfa4ba328b06eedf30e367794295a1b4b9d6807d955ef  admission.json
+9a0011840a61b47092dda0200d09ccaae0b7b752d724f4f7e7f73bf6b55a2656  gates/case_0074.json
+75680f2684d004f1e2b919d18acfa6cfb13308e2031247338e45ee39829e9183  logs/case_0074.log
+5ba450473bbbcb4768c52982a64a5ac72f466426aca78f46256d86b560db4c87  summary.json
+
+source / execution / wall:                 11.373883 / 22.294527 / 43.310 s
+completed steps:                           8662
+position p95 / max:                        0.151237 / 0.158396 m
+peak base XY / yaw error:                  0.176031 m / 6.593954 deg
+pitch p95 / max:                           6.425590 / 6.516095 deg
+attitude p95 / max:                        0.161617 / 0.233215 deg
+dynamic / thermal / label envelope:        fail / pass / pass
+termination / action saturation:           none / zero
+dataset / residual applied:                none / false
+```
+
+The same sole check misses by `0.001237 m`. In the dominant trace interval,
+base XY error remains approximately `0.050 m`, while yaw lag remains
+`4.3..4.8 deg`; the residual camera-position error is therefore still
+yaw-limited rather than translation-limited. Across v3 to v4, the p95 response
+to `wz_kp` is monotonic and predicts that a final small step from `0.90` to
+`1.05` should cross the unchanged gate with a narrow margin. CPU checks bind
+the sealed initial, hard-turn, and reverse-turn states and keep yaw action below
+`0.57`, with common/balance action unchanged and the `0.8` limit untouched.
+
+The v4 token is retired. Only the fresh namespace
+`20260718_gate_c_smoothed_case74_relief_wzkp105_v5_exclusive` may be used after
+the same clean-pushed, full-suite, ownership, namespace, and thermal preflight.
+If v5 does not pass, stop scalar gain stepping and perform a structural
+controller diagnosis. Accepted-corpus qualification, capture, BC, and PPO
+remain closed.

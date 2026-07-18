@@ -215,6 +215,15 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert '"recovery_telemetry": recovery_telemetry_summary' in source
     assert '"recovery_telemetry_observed"' in source
     assert '"execution_duration_s": execution_duration_s' in source
+    assert '"maximum_duration_scale": args.maximum_duration_scale' in source
+    assert (
+        '"maximum_runtime_s": execution_duration_s * args.maximum_duration_scale'
+        in source
+    )
+    assert (
+        '"completion_horizon_contract": "bounded_execution_duration_scale_v1"'
+        in source
+    )
     assert "LOOKAHEAD_HORIZONS_S" in source
     assert "phase_time_s + horizon_s" in source
     assert "lookahead_base_xy_yaw=np.asarray(" in source

@@ -903,6 +903,8 @@ def evaluate_case(
         "planning_strategy": plan.planning_strategy,
         "source_duration_s": source_duration_s,
         "execution_duration_s": execution_duration_s,
+        "maximum_duration_scale": args.maximum_duration_scale,
+        "maximum_runtime_s": execution_duration_s * args.maximum_duration_scale,
         "completed_phase_time_s": phase_time_s,
         "completed_steps": completed_steps,
         "wall_duration_s": completed_steps / POLICY_HZ,
@@ -1150,6 +1152,8 @@ def main() -> int:
         ),
         "phase_governor_enabled": not args.disable_phase_governor,
         "com_pitch_feedforward_enabled": not args.disable_com_pitch_feedforward,
+        "maximum_duration_scale": args.maximum_duration_scale,
+        "completion_horizon_contract": "bounded_execution_duration_scale_v1",
         "trajectory_command_source": (
             "deterministic_teacher"
             if residual_policy is None and not args.zero_policy_action
@@ -1240,6 +1244,13 @@ def write_runtime_failure(exc: Exception) -> None:
                 ),
                 "execution_duration_s": (
                     None if failure_plan is None else float(failure_plan.time_s[-1])
+                ),
+                "maximum_duration_scale": args.maximum_duration_scale,
+                "maximum_runtime_s": (
+                    None
+                    if failure_plan is None
+                    else float(failure_plan.time_s[-1])
+                    * args.maximum_duration_scale
                 ),
                 "executed_residual_dataset": None,
             }

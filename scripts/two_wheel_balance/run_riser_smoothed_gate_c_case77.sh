@@ -5,9 +5,9 @@ ROOT="/mnt/g/wSpace/cinebotRL-two-wheel-riser"
 WIN_ROOT='G:\wSpace\cinebotRL-two-wheel-riser'
 PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
-AUTHORIZATION="AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V4"
+AUTHORIZATION="AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V5"
 CASE=77
-STAMP="20260718_gate_c_smoothed_case77_v4_dynamic_margin_exclusive"
+STAMP="20260718_gate_c_smoothed_case77_v5_completion_grace_exclusive"
 PORTFOLIO_STAMP="20260718_smoothed_plan_all79_v6_case77_1p499_cpu"
 MANIFEST_SHA256="73121d240ccf54fa65783fc1cf47eed4d805af3e6bedbdfff847719c92f2130b"
 SOURCE_SHA256="f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d"
@@ -16,6 +16,7 @@ PLAN_SHA256="a45892c98311cdd6e6f2096b6821ef760759504138edc2f9c7caa9b1ac90f559"
 GAINS_SHA256="2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6"
 ROBOT_USD_SHA256="89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0"
 TIMEOUT_SECONDS=300
+MAXIMUM_DURATION_SCALE="2.05"
 
 if [[ "${RISER_SMOOTHED_GATE_C_AUTHORIZATION:-}" != "$AUTHORIZATION" ]]; then
   printf 'smoothed Gate C case77 authorization is absent or unknown\n' >&2
@@ -185,6 +186,7 @@ if ! timeout --signal=TERM --kill-after=30s "$TIMEOUT_SECONDS" \
   --plan-dir "$PORTFOLIO_WIN" \
   --plan-filename-template 'case_{case:04d}_smoothed_riser_plan_v1.npz' \
   --cases "$CASE" \
+  --maximum-duration-scale "$MAXIMUM_DURATION_SCALE" \
   --output "$OUTPUT_WIN\\gates\\case_0077.json" \
   --headless >"$OUTPUT_WSL/logs/case_0077.log" 2>&1; then
   python3 "$SUMMARIZER" --root "$OUTPUT_WSL" --git-commit "$COMMIT" \
@@ -207,6 +209,9 @@ summary = json.loads(Path(sys.argv[2]).read_text())
 result = gate.get("results", [{}])[0]
 ok = (
     gate.get("cases") == [77]
+    and gate.get("maximum_duration_scale") == 2.05
+    and gate.get("completion_horizon_contract")
+    == "bounded_execution_duration_scale_v1"
     and gate.get("trajectory_command_source") == "deterministic_teacher"
     and gate.get("residual_policy") is None
     and result.get("executed_residual_dataset") is None
@@ -215,6 +220,12 @@ ok = (
     and summary.get("residual_capture_started") is False
     and summary.get("bc_started") is False
     and summary.get("ppo_started") is False
+    and result.get("maximum_duration_scale") == 2.05
+    and abs(
+        result.get("maximum_runtime_s", 0.0)
+        - result.get("execution_duration_s", 0.0) * 2.05
+    )
+    <= 1e-9
 )
 raise SystemExit(0 if ok else 6)
 PY

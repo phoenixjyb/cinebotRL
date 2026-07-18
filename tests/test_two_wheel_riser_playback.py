@@ -178,6 +178,7 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
         PROJECT_ROOT
         / "scripts/two_wheel_balance/smoke_riser_reference_playback.py"
     ).read_text(encoding="utf-8")
+    pre_app_source = source.split("app = AppLauncher(args).app", 1)[0]
 
     assert (
         '"hardware_proxy_command_contract": "semantic_attitude_position_only"'
@@ -194,7 +195,25 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert "np.abs(actual_proxy - sample.proxy_gimbal_q)" not in source
     assert "set_joint_velocity_target(proxy_velocity_target" not in source
     assert 'parser.add_argument("--video-fps", type=int, default=200)' in source
-    assert '"tracking_profile": "riser_recovery_direction_v4"' in source
+    assert '"riser_recovery_direction_v4"' in source
+    assert '"--enable-camera-lever-arm-compensation"' in source
+    assert '"--camera-lever-arm-compensation-gain"' in source
+    assert '"--maximum-camera-lever-arm-correction-m"' in source
+    assert "math.isfinite(args.camera_lever_arm_compensation_gain)" in pre_app_source
+    assert "math.isfinite(args.maximum_camera_lever_arm_correction_m)" in pre_app_source
+    assert "bounded_camera_lever_arm_base_target(" in source
+    assert '"camera_lever_arm_compensation_contract"' in source
+    assert '"camera_lever_arm_compensation_enabled"' in source
+    assert '"camera_lever_arm_telemetry_observed"' in source
+    assert "controller_evidence_checks" in source
+    assert '"controller_evidence_passed"' in source
+    assert '"camera_lever_arm_correction_max_m"' in source
+    assert '"camera_lever_arm_raw_correction_max_m"' in source
+    assert '"camera_lever_arm_correction_saturation_ratio"' in source
+    assert '"commanded_base_xy_yaw"' in source
+    assert '"camera_lever_arm_compensation_enabled"' in source.split(
+        "def write_runtime_failure", 1
+    )[1]
     assert '"tracking_direction_blend_speed_mps"' in source
     assert '"tracking_direction_recovery_error_range_m"' in source
     assert "RiserMotorThermalMonitor" in source

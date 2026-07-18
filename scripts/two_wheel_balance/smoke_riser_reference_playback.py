@@ -51,6 +51,13 @@ parser.add_argument("--controller-wheel-difference-kp", type=float)
 parser.add_argument("--tracking-along-kp", type=float)
 parser.add_argument("--tracking-cross-kp", type=float)
 parser.add_argument("--tracking-yaw-kp", type=float)
+parser.add_argument(
+    "--enable-camera-lever-arm-compensation",
+    action="store_true",
+    help="Apply bounded camera-to-base lever displacement feedback to base XY.",
+)
+parser.add_argument("--camera-lever-arm-compensation-gain", type=float, default=1.0)
+parser.add_argument("--maximum-camera-lever-arm-correction-m", type=float, default=0.05)
 parser.add_argument("--video-dir", type=Path)
 parser.add_argument(
     "--dataset-dir",
@@ -82,6 +89,16 @@ for name in ("tracking_along_kp", "tracking_cross_kp", "tracking_yaw_kp"):
     value = getattr(args, name)
     if value is not None and value < 0.0:
         parser.error(f"--{name.replace('_', '-')} must be non-negative")
+if not (
+    math.isfinite(args.camera_lever_arm_compensation_gain)
+    and 0.0 <= args.camera_lever_arm_compensation_gain <= 1.0
+):
+    parser.error("--camera-lever-arm-compensation-gain must be in [0, 1]")
+if not (
+    math.isfinite(args.maximum_camera_lever_arm_correction_m)
+    and args.maximum_camera_lever_arm_correction_m > 0.0
+):
+    parser.error("--maximum-camera-lever-arm-correction-m must be positive")
 app = AppLauncher(args).app
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -136,6 +153,7 @@ from rl_platform.tasks.two_wheel_balance.riser_recovery_evidence import (
 )
 from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     bounded_base_references,
+    bounded_camera_lever_arm_base_target,
     bounded_progress_scale,
     continuous_joint_error,
     equilibrium_pitch_from_world_com,
@@ -279,6 +297,9 @@ def evaluate_case(
     phase_time_s = 0.0
     progress_scale = 1.0
     progress_samples = []
+    camera_lever_arm_correction_norm_samples = []
+    camera_lever_arm_raw_correction_norm_samples = []
+    camera_lever_arm_saturated_samples = []
     position_errors = []
     attitude_errors_deg = []
     riser_errors = []
@@ -349,8 +370,33 @@ def evaluate_case(
         actual_camera_quaternion_pre = (
             robot.data.body_quat_w[0, cam_id].detach().cpu().numpy()
         )
+        commanded_base_xy_yaw, camera_lever_arm_diagnostics = (
+            bounded_camera_lever_arm_base_target(
+                sample.base_xy_yaw,
+                actual_base,
+                sample.target_position_world_m,
+                actual_camera_position_pre,
+                gain=(
+                    args.camera_lever_arm_compensation_gain
+                    if args.enable_camera_lever_arm_compensation
+                    else 0.0
+                ),
+                maximum_correction_m=(
+                    args.maximum_camera_lever_arm_correction_m
+                ),
+            )
+        )
+        camera_lever_arm_correction_norm_samples.append(
+            camera_lever_arm_diagnostics["correction_norm_m"]
+        )
+        camera_lever_arm_raw_correction_norm_samples.append(
+            camera_lever_arm_diagnostics["raw_correction_norm_m"]
+        )
+        camera_lever_arm_saturated_samples.append(
+            camera_lever_arm_diagnostics["saturated"]
+        )
         vx_ref, wz_ref, base_tracking_diagnostics = bounded_base_references(
-            sample.base_xy_yaw,
+            commanded_base_xy_yaw,
             actual_base,
             phase_feedforward_v_mps,
             phase_feedforward_wz_rad_s,
@@ -745,6 +791,22 @@ def evaluate_case(
                     "base_yaw_error_deg": math.degrees(base_yaw_error),
                     "actual_base_xy_yaw": actual_base_post.tolist(),
                     "target_base_xy_yaw": sample.base_xy_yaw.tolist(),
+                    "commanded_base_xy_yaw": commanded_base_xy_yaw.tolist(),
+                    "camera_lever_arm_target_xy_m": (
+                        camera_lever_arm_diagnostics["target_lever_xy_m"].tolist()
+                    ),
+                    "camera_lever_arm_actual_xy_m": (
+                        camera_lever_arm_diagnostics["actual_lever_xy_m"].tolist()
+                    ),
+                    "camera_lever_arm_error_xy_m": (
+                        camera_lever_arm_diagnostics["lever_error_xy_m"].tolist()
+                    ),
+                    "camera_lever_arm_correction_xy_m": (
+                        camera_lever_arm_diagnostics["correction_xy_m"].tolist()
+                    ),
+                    "camera_lever_arm_correction_saturated": (
+                        camera_lever_arm_diagnostics["saturated"]
+                    ),
                     "camera_position_error_xyz_m": (
                         camera_position_error_vector.tolist()
                     ),
@@ -830,6 +892,11 @@ def evaluate_case(
         and recovery_telemetry_summary["policy_rate_sample_count"]
         == completed_steps
     )
+    camera_lever_arm_telemetry_observed = (
+        len(camera_lever_arm_correction_norm_samples) == completed_steps
+        and len(camera_lever_arm_raw_correction_norm_samples) == completed_steps
+        and len(camera_lever_arm_saturated_samples) == completed_steps
+    )
     dynamic_checks = {
         "completed_reference": phase_time_s >= execution_duration_s,
         "no_termination": termination is None,
@@ -869,10 +936,20 @@ def evaluate_case(
             riser_thermal_monitor.peak_force_violation_count == 0
         ),
     }
-    checks = dynamic_checks | thermal_checks
+    controller_evidence_checks = {
+        "camera_lever_arm_telemetry_observed": (
+            camera_lever_arm_telemetry_observed
+        ),
+    }
+    checks = dynamic_checks | thermal_checks | controller_evidence_checks
     dynamic_quality_passed = all(dynamic_checks.values())
     thermal_admission_passed = all(thermal_checks.values())
-    case_admission_passed = dynamic_quality_passed and thermal_admission_passed
+    controller_evidence_passed = all(controller_evidence_checks.values())
+    case_admission_passed = (
+        dynamic_quality_passed
+        and thermal_admission_passed
+        and controller_evidence_passed
+    )
     residual_label_envelope_ok = all(
         residual_action_envelope_passed(value)
         for value in normalized_residual_values
@@ -951,6 +1028,30 @@ def evaluate_case(
         ),
         "recovery_telemetry": recovery_telemetry_summary,
         "recovery_telemetry_observed": recovery_telemetry_observed,
+        "camera_lever_arm_compensation_enabled": (
+            args.enable_camera_lever_arm_compensation
+        ),
+        "camera_lever_arm_compensation_gain": (
+            args.camera_lever_arm_compensation_gain
+        ),
+        "maximum_camera_lever_arm_correction_m": (
+            args.maximum_camera_lever_arm_correction_m
+        ),
+        "camera_lever_arm_telemetry_sample_count": len(
+            camera_lever_arm_correction_norm_samples
+        ),
+        "camera_lever_arm_telemetry_observed": (
+            camera_lever_arm_telemetry_observed
+        ),
+        "camera_lever_arm_correction_max_m": float(
+            np.max(camera_lever_arm_correction_norm_samples)
+        ),
+        "camera_lever_arm_raw_correction_max_m": float(
+            np.max(camera_lever_arm_raw_correction_norm_samples)
+        ),
+        "camera_lever_arm_correction_saturation_ratio": float(
+            np.mean(camera_lever_arm_saturated_samples)
+        ),
         "proxy_saturation_ratio": proxy_saturation_ratio,
         "residual_action_abs_max": np.max(
             np.abs(applied_residual_values), axis=0
@@ -964,6 +1065,7 @@ def evaluate_case(
         "raw_residual_label_applied_to_commands": False,
         "dynamic_quality_passed": dynamic_quality_passed,
         "thermal_admission_passed": thermal_admission_passed,
+        "controller_evidence_passed": controller_evidence_passed,
         "residual_label_envelope_passed": residual_label_envelope_ok,
         "residual_label_admission_passed": (
             case_admission_passed and residual_label_envelope_ok
@@ -1113,7 +1215,23 @@ def main() -> int:
         "training_started": False,
         "ppo_authorized": False,
         "controller_profile": "structural_robust_v1",
-        "tracking_profile": "riser_recovery_direction_v4",
+        "tracking_profile": (
+            "riser_recovery_direction_v4_camera_lever_arm_v1"
+            if args.enable_camera_lever_arm_compensation
+            else "riser_recovery_direction_v4"
+        ),
+        "camera_lever_arm_compensation_contract": (
+            "measured_camera_to_base_xy_offset_v1"
+        ),
+        "camera_lever_arm_compensation_enabled": (
+            args.enable_camera_lever_arm_compensation
+        ),
+        "camera_lever_arm_compensation_gain": (
+            args.camera_lever_arm_compensation_gain
+        ),
+        "maximum_camera_lever_arm_correction_m": (
+            args.maximum_camera_lever_arm_correction_m
+        ),
         "tracking_direction_blend_speed_mps": (
             riser_tracking_config().direction_blend_speed_mps
         ),
@@ -1174,6 +1292,9 @@ def main() -> int:
         "thermal_admission_passed": all(
             item["thermal_admission_passed"] for item in results
         ),
+        "controller_evidence_passed": all(
+            item["controller_evidence_passed"] for item in results
+        ),
         "residual_label_envelope_passed": all(
             item["residual_label_envelope_passed"] for item in results
         ),
@@ -1220,8 +1341,25 @@ def write_runtime_failure(exc: Exception) -> None:
         "ppo_authorized": False,
         "trajectory_command_source": "deterministic_teacher",
         "residual_policy": None,
+        "camera_lever_arm_compensation_contract": (
+            "measured_camera_to_base_xy_offset_v1"
+        ),
+        "camera_lever_arm_compensation_enabled": (
+            args.enable_camera_lever_arm_compensation
+        ),
+        "camera_lever_arm_compensation_gain": (
+            args.camera_lever_arm_compensation_gain
+        ),
+        "maximum_camera_lever_arm_correction_m": (
+            args.maximum_camera_lever_arm_correction_m
+        ),
         "cases": cases,
         "passed_case_count": 0,
+        "dynamic_quality_passed": False,
+        "thermal_admission_passed": False,
+        "controller_evidence_passed": False,
+        "residual_label_envelope_passed": False,
+        "residual_label_admission_passed": False,
         "results": [
             {
                 "case": cases[0] if len(cases) == 1 else None,

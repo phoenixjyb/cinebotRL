@@ -9,6 +9,7 @@ from rl_platform.tasks.two_wheel_balance.whole_body_kinematics import (
 from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     WholeBodyTrackingConfig,
     bounded_base_references,
+    bounded_camera_lever_arm_base_target,
     bounded_dls_arm_target,
     bounded_progress_scale,
     continuous_joint_error,
@@ -148,6 +149,86 @@ def test_progress_governor_slows_on_tracking_error() -> None:
     np.testing.assert_allclose(bounded_progress_scale(0.25, 0.0, config), 0.1)
     middle = bounded_progress_scale(0.15, 0.0, config)
     assert 0.1 < middle < 1.0
+
+
+def test_camera_lever_arm_compensation_is_zero_when_offsets_match() -> None:
+    target, diagnostics = bounded_camera_lever_arm_base_target(
+        desired_base_q=np.array([1.0, 2.0, 0.3]),
+        actual_base_q=np.array([3.0, 4.0, -0.2]),
+        target_camera_position_world_m=np.array([1.1, 1.9, 1.8]),
+        actual_camera_position_world_m=np.array([3.1, 3.9, 1.6]),
+        gain=1.0,
+        maximum_correction_m=0.05,
+    )
+
+    np.testing.assert_allclose(target, [1.0, 2.0, 0.3])
+    assert diagnostics["correction_norm_m"] == pytest.approx(0.0)
+    assert diagnostics["saturated"] is False
+
+
+def test_disabled_camera_lever_arm_compensation_preserves_planned_base() -> None:
+    desired = np.array([0.4, -0.2, 0.7])
+    target, diagnostics = bounded_camera_lever_arm_base_target(
+        desired_base_q=desired,
+        actual_base_q=np.array([1.0, 1.0, -0.4]),
+        target_camera_position_world_m=np.array([0.4, -0.2, 1.8]),
+        actual_camera_position_world_m=np.array([1.08, 0.94, 1.6]),
+        gain=0.0,
+        maximum_correction_m=0.05,
+    )
+
+    np.testing.assert_array_equal(target, desired)
+    assert diagnostics["lever_error_norm_m"] == pytest.approx(0.1)
+    assert diagnostics["raw_correction_norm_m"] == pytest.approx(0.0)
+    assert diagnostics["correction_norm_m"] == pytest.approx(0.0)
+    assert diagnostics["saturated"] is False
+
+
+def test_camera_lever_arm_compensation_preserves_yaw_and_norm_bounds_xy() -> None:
+    target, diagnostics = bounded_camera_lever_arm_base_target(
+        desired_base_q=np.array([0.0, 0.0, 0.7]),
+        actual_base_q=np.array([1.0, 1.0, -0.4]),
+        target_camera_position_world_m=np.array([0.0, 0.0, 1.8]),
+        actual_camera_position_world_m=np.array([1.08, 0.94, 1.6]),
+        gain=1.0,
+        maximum_correction_m=0.05,
+    )
+
+    np.testing.assert_allclose(target, [-0.04, 0.03, 0.7], atol=1e-12)
+    np.testing.assert_allclose(
+        diagnostics["lever_error_xy_m"], [0.08, -0.06], atol=1e-12
+    )
+    assert diagnostics["raw_correction_norm_m"] == pytest.approx(0.1)
+    assert diagnostics["correction_norm_m"] == pytest.approx(0.05)
+    assert diagnostics["saturated"] is True
+
+
+@pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        ({"gain": 1.01}, "gain"),
+        ({"maximum_correction_m": 0.0}, "maximum"),
+        ({"actual_camera_position_world_m": np.ones(2)}, "shape"),
+        (
+            {"actual_camera_position_world_m": np.array([np.nan, 0.0, 1.0])},
+            "finite",
+        ),
+    ],
+)
+def test_camera_lever_arm_compensation_rejects_invalid_contract(
+    updates: dict[str, object], message: str
+) -> None:
+    values: dict[str, object] = {
+        "desired_base_q": np.zeros(3),
+        "actual_base_q": np.zeros(3),
+        "target_camera_position_world_m": np.array([0.0, 0.0, 1.0]),
+        "actual_camera_position_world_m": np.array([0.0, 0.0, 1.0]),
+        "gain": 1.0,
+        "maximum_correction_m": 0.05,
+    }
+    values.update(updates)
+    with pytest.raises(ValueError, match=message):
+        bounded_camera_lever_arm_base_target(**values)
 
 
 def test_equilibrium_pitch_opposes_forward_com_offset() -> None:

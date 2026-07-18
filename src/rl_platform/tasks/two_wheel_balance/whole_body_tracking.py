@@ -132,6 +132,69 @@ def bounded_progress_scale(
     return float(1.0 - severity * (1.0 - config.minimum_progress_scale))
 
 
+def bounded_camera_lever_arm_base_target(
+    desired_base_q: np.ndarray,
+    actual_base_q: np.ndarray,
+    target_camera_position_world_m: np.ndarray,
+    actual_camera_position_world_m: np.ndarray,
+    *,
+    gain: float,
+    maximum_correction_m: float,
+) -> tuple[np.ndarray, dict[str, np.ndarray | float | bool]]:
+    """Offset the base target to cancel measured camera lever-arm displacement."""
+
+    desired_base_q = np.asarray(desired_base_q, dtype=np.float64)
+    actual_base_q = np.asarray(actual_base_q, dtype=np.float64)
+    target_camera_position_world_m = np.asarray(
+        target_camera_position_world_m, dtype=np.float64
+    )
+    actual_camera_position_world_m = np.asarray(
+        actual_camera_position_world_m, dtype=np.float64
+    )
+    arrays = (
+        desired_base_q,
+        actual_base_q,
+        target_camera_position_world_m,
+        actual_camera_position_world_m,
+    )
+    if any(value.shape != (3,) for value in arrays):
+        raise ValueError("base poses and camera positions must have shape (3,)")
+    if not all(np.isfinite(value).all() for value in arrays):
+        raise ValueError("base poses and camera positions must be finite")
+    if not math.isfinite(gain) or not 0.0 <= gain <= 1.0:
+        raise ValueError("camera lever-arm compensation gain must be in [0, 1]")
+    if not math.isfinite(maximum_correction_m) or maximum_correction_m <= 0.0:
+        raise ValueError("maximum camera lever-arm correction must be positive")
+
+    target_lever_xy = (
+        target_camera_position_world_m[:2] - desired_base_q[:2]
+    )
+    actual_lever_xy = (
+        actual_camera_position_world_m[:2] - actual_base_q[:2]
+    )
+    lever_error_xy = actual_lever_xy - target_lever_xy
+    raw_correction_xy = -gain * lever_error_xy
+    raw_norm = float(np.linalg.norm(raw_correction_xy))
+    correction_scale = (
+        min(1.0, maximum_correction_m / raw_norm) if raw_norm > 0.0 else 1.0
+    )
+    correction_xy = raw_correction_xy * correction_scale
+    compensated_base_q = desired_base_q.copy()
+    compensated_base_q[:2] += correction_xy
+    return compensated_base_q, {
+        "target_lever_xy_m": target_lever_xy,
+        "actual_lever_xy_m": actual_lever_xy,
+        "lever_error_xy_m": lever_error_xy,
+        "lever_error_norm_m": float(np.linalg.norm(lever_error_xy)),
+        "raw_correction_xy_m": raw_correction_xy,
+        "raw_correction_norm_m": raw_norm,
+        "correction_xy_m": correction_xy,
+        "correction_norm_m": float(np.linalg.norm(correction_xy)),
+        "correction_scale": correction_scale,
+        "saturated": raw_norm > maximum_correction_m + 1e-12,
+    }
+
+
 def bounded_base_references(
     desired_base_q: np.ndarray,
     actual_base_q: np.ndarray,

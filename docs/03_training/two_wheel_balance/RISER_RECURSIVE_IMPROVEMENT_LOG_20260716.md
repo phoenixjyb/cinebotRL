@@ -976,3 +976,53 @@ and must state whether its candidate was accepted or rejected.
   new thermal-force admission.
 - Replace the provisional 30 s model only from measured bench evidence, never
   by tuning it to make a trajectory pass.
+
+## Round 30: smoothed-plan tranches and bounded camera lever-arm candidate
+
+- Replaced the obsolete long-duration exact-anchor execution portfolio with
+  the explicit smoothed-plan contract. The current sealed CPU portfolio admits
+  `70/79` cases while preserving immutable source arrays, separate source and
+  execution clocks, endpoint/order provenance, path/deviation bounds, and the
+  `2.0x` duration ceiling.
+- Deterministic Gate C qualification has passed cases
+  `[10, 11, 12, 19, 23, 24, 25, 26, 28, 52, 53, 66, 70, 74, 77]` under the
+  current smoothed-plan lineage. This is `15/70`, not corpus completion.
+- The third tranche stopped correctly at case 68. Case 68 completed its full
+  `13.562891 s` execution clock with no termination, saturation, thermal,
+  attitude, riser, proxy, or balance failure. Its only physical rejection was
+  camera-position p95 `0.172847 m` against the unchanged `0.15 m` limit;
+  maximum error `0.175031 m` remained below `0.25 m`.
+- Comparison with the dynamically passing case 66 localized the gap. Both
+  cases use effectively the same base path and timing, while case 68 carries
+  the camera higher. The existing outer loop tracks planned chassis XY/yaw and
+  uses camera error only to slow phase progress; it does not cancel the
+  camera-to-base XY offset caused by chassis pitch at the taller lever arm.
+- Added an opt-in `measured_camera_to_base_xy_offset_v1` controller candidate.
+  It compares planned and measured camera-to-base XY lever vectors and offsets
+  the commanded chassis XY target in the opposite direction. The correction
+  is norm-bounded to `0.05 m`; source targets, planned chassis yaw, execution
+  clocks, LQR gains, physical gates, and residual scales remain unchanged.
+- Added policy-rate aggregate and 1 Hz trace telemetry for raw/bounded
+  correction, saturation, commanded-versus-planned base targets, and fail-fast
+  CLI validation before `AppLauncher`. The candidate is disabled unless an
+  explicit runtime flag enables it.
+- A read-only calculation over existing 1 Hz traces estimates case 68 camera
+  p95 changing from `0.172907 m` to `0.124078 m` under ideal translation, and
+  case 66 from `0.139314 m` to `0.093109 m`. This is geometric canary
+  justification only; it is not a dynamic result because it does not replay
+  the altered closed loop.
+- No Isaac/GPU process, new namespace, source plan, label dataset, residual
+  capture, BC, PPO, or other training was started in this CPU-only round.
+
+## Next round after Round 30
+
+- Run the authoritative CPU suite and publish the opt-in controller candidate
+  as a scoped change only if the diff proves no source-plan, threshold, LQR,
+  or residual-scale mutation.
+- Prepare a fresh hash-bound, ownership-guarded wrapper for case 68 followed by
+  the previously passing case 66. Stop at case 68 if any physical, thermal, or
+  runtime-contract check fails.
+- Treat case 68 as recovered only from sealed dynamic evidence. Case 66 must
+  independently prove non-regression before this candidate can be considered
+  for the remaining corpus.
+- Keep residual capture, BC, PPO, and all other training closed.

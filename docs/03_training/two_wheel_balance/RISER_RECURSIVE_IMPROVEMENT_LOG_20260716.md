@@ -1116,3 +1116,48 @@ and must state whether its candidate was accepted or rejected.
   before preparing any runtime wrapper. Do not launch Isaac from this step.
 - Keep capture, BC, PPO, and all training closed. A CPU pass authorizes only a
   reviewable case-7 canary candidate, not dynamic admission.
+
+## Round 33: case-7 source-preserving dynamic-margin retime
+
+- Extended the CPU derivation contract with an explicit
+  `completed_position_p95_only` mode. It requires the sealed case to have
+  completed both clocks, failed only the p95 gate, passed thermal/runtime/
+  controller evidence, terminated normally, applied no residual action, and
+  kept all learning stages closed. The prior completion-only mode remains the
+  default.
+- Derived case 7 at execution/source ratio `1.4` from the unchanged v7 plan.
+  The execution clock changed from `13.582122` to `18.117317 s`; all `663`
+  source poses, authoritative source timestamps, target states, base/riser/
+  proxy states, endpoints, ordering, and initialization arrays are byte-equal
+  to the parent. Only the execution clock and its derived feed-forward rates
+  changed.
+- Static maximum rates dropped from approximately `0.4` to `0.299870 m/s`
+  base linear, `0.299870 rad/s` base yaw, `0.685982 m/s` riser, and
+  `0.314024 rad/s` proxy. Every duration, path, transition, kinematic, camera
+  height, and training-closure check passed.
+- Composed the fresh all-79 v8 portfolio with exactly this one replacement.
+  It retains `70/79` admitted plans and accepted duration median
+  `1.499794`, below the unchanged `1.5` ceiling. The case-7 static Gate C
+  admission passes, but `valid_for_training` remains false.
+- CPU artifact hashes:
+  - derived plan: `a83934dab6e4293cd830397d3c2ffb41d4f4d78545dddec7fdfa630fa0d22f41`;
+  - derivation manifest: `f2557bc31afd0f15aa5f57bb340d1e6d0bad81b0514a264f408da28664b0db2d`;
+  - v8 portfolio manifest: `0a6a9361095e3045b2835f2ea96520f2b6e1c378df4feaa394fb87627bc165b2`;
+  - v8 portfolio summary: `ad4f509941653faa70778d70ee4684e30f383e30b2ba056976600890534565ce`;
+  - case-7 static admission: `86a0d66d41d39f809463aefdac51a90850de46c9dc78a9c77b8ef084cb349c93`.
+- The linked-worktree portfolio composer was repaired to resolve its committed
+  Git directory correctly under Windows Python. The authoritative suite at
+  the preceding derivation commit passed `323` tests with two existing pytest
+  configuration warnings.
+- No Isaac/GPU process, label dataset, residual capture, BC, PPO, or training
+  was started in this round.
+
+## Next round after Round 33
+
+- Run one hash-bound case-7-only canary from the v8 portfolio in a fresh
+  namespace, with the same LQR, camera lever-arm compensation, thermal model,
+  physical thresholds, and ownership guard.
+- A dynamic pass adds case 7 to the qualified set; a failure stops immediately
+  and must be classified from the sealed evidence. Do not tune during the run.
+- Keep residual capture, BC, PPO, and all training closed regardless of the
+  canary outcome.

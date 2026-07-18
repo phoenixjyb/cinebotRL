@@ -33,12 +33,24 @@ case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
     CASE_B_PLAN_SHA256="421f9f74a9f56cb79b49611355d9520489bf0bbe7204212ba169b84591fa4cd0"
     STAMP="20260718_gate_c_smoothed_case67_7_camera_lever_arm_v1_exclusive"
     ;;
+  AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE7_DYNAMIC_RETIME_V1)
+    PORTFOLIO_STAMP="20260718_smoothed_plan_all79_v8_case7_dynamic_retime_cpu"
+    MANIFEST_SHA256="0a6a9361095e3045b2835f2ea96520f2b6e1c378df4feaa394fb87627bc165b2"
+    PLANNER_COMMIT="cbd4074d5caa76cc7dcb2277868e69430ad299e3"
+    CASE_A=7
+    CASE_B=""
+    CASE_A_PLAN_SHA256="a83934dab6e4293cd830397d3c2ffb41d4f4d78545dddec7fdfa630fa0d22f41"
+    CASE_B_PLAN_SHA256=""
+    STAMP="20260718_gate_c_smoothed_case7_dynamic_retime_v1_exclusive"
+    ;;
   *)
     printf 'camera lever-arm Gate C authorization is absent or unknown\n' >&2
     exit 7
     ;;
 esac
-CASES="$CASE_A,$CASE_B"
+CASE_LIST=("$CASE_A")
+[[ -z "$CASE_B" ]] || CASE_LIST+=("$CASE_B")
+CASES="$(IFS=,; printf '%s' "${CASE_LIST[*]}")"
 
 PORTFOLIO="$ROOT/artifacts/two_wheel_riser/$PORTFOLIO_STAMP"
 PORTFOLIO_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${PORTFOLIO_STAMP}"
@@ -149,9 +161,11 @@ PY
 [[ "$(sha256sum "$SOURCE_MANIFEST" | awk '{print $1}')" == "$SOURCE_SHA256" ]] || exit 2
 [[ "$(sha256sum "$PORTFOLIO/manifest.json" | awk '{print $1}')" == "$MANIFEST_SHA256" ]] || exit 2
 CASE_A_FILE="case_$(printf '%04d' "$CASE_A")_smoothed_riser_plan_v1.npz"
-CASE_B_FILE="case_$(printf '%04d' "$CASE_B")_smoothed_riser_plan_v1.npz"
 [[ "$(sha256sum "$PORTFOLIO/$CASE_A_FILE" | awk '{print $1}')" == "$CASE_A_PLAN_SHA256" ]] || exit 2
-[[ "$(sha256sum "$PORTFOLIO/$CASE_B_FILE" | awk '{print $1}')" == "$CASE_B_PLAN_SHA256" ]] || exit 2
+if [[ -n "$CASE_B" ]]; then
+  CASE_B_FILE="case_$(printf '%04d' "$CASE_B")_smoothed_riser_plan_v1.npz"
+  [[ "$(sha256sum "$PORTFOLIO/$CASE_B_FILE" | awk '{print $1}')" == "$CASE_B_PLAN_SHA256" ]] || exit 2
+fi
 [[ "$(sha256sum "$GAINS" | awk '{print $1}')" == "$GAINS_SHA256" ]] || exit 2
 [[ "$(sha256sum "$ROBOT_USD" | awk '{print $1}')" == "$ROBOT_USD_SHA256" ]] || exit 2
 
@@ -174,13 +188,25 @@ python3 "$VALIDATOR" \
   --expected-count 79 --minimum-candidates 70 --cases "$CASES" \
   --output "$TEMP_ADMISSION" >/dev/null
 
-python3 - "$TEMP_ADMISSION" "$COMMIT" "$STAMP" \
-  source_manifest "$SOURCE_MANIFEST" portfolio_manifest "$PORTFOLIO/manifest.json" \
-  case_a_plan "$PORTFOLIO/$CASE_A_FILE" case_b_plan "$PORTFOLIO/$CASE_B_FILE" \
-  lqr_gains "$GAINS" robot_usd "$ROBOT_USD" playback "$PLAYBACK" \
-  tracking_controller "$TRACKING" riser_control "$RISER_CONTROL" \
-  recovery_evidence "$RECOVERY_EVIDENCE" playback_loader "$LOADER" \
-  wrapper "$RUNNER" summarizer "$SUMMARIZER" validator "$VALIDATOR" <<'PY'
+IDENTITY_ARGS=(
+  source_manifest "$SOURCE_MANIFEST"
+  portfolio_manifest "$PORTFOLIO/manifest.json"
+  case_a_plan "$PORTFOLIO/$CASE_A_FILE"
+  lqr_gains "$GAINS"
+  robot_usd "$ROBOT_USD"
+  playback "$PLAYBACK"
+  tracking_controller "$TRACKING"
+  riser_control "$RISER_CONTROL"
+  recovery_evidence "$RECOVERY_EVIDENCE"
+  playback_loader "$LOADER"
+  wrapper "$RUNNER"
+  summarizer "$SUMMARIZER"
+  validator "$VALIDATOR"
+)
+if [[ -n "$CASE_B" ]]; then
+  IDENTITY_ARGS+=(case_b_plan "$PORTFOLIO/$CASE_B_FILE")
+fi
+python3 - "$TEMP_ADMISSION" "$COMMIT" "$STAMP" "${IDENTITY_ARGS[@]}" <<'PY'
 import hashlib
 import json
 from pathlib import Path
@@ -209,7 +235,7 @@ PY
 mkdir -p "$OUTPUT/gates" "$OUTPUT/logs"
 mv "$TEMP_ADMISSION" "$OUTPUT/admission.json"
 
-for CASE in "$CASE_A" "$CASE_B"; do
+for CASE in "${CASE_LIST[@]}"; do
   assert_exclusive_resources || exit 5
   STATUS=0
   timeout --signal=TERM --kill-after=30s "$TIMEOUT_SECONDS" \

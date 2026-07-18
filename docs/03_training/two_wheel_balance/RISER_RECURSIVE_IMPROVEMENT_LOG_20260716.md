@@ -1972,3 +1972,44 @@ and must state whether its candidate was accepted or rejected.
   and preserve the first reject. If it passes physical dynamics, keep residual
   admission independent and do not advance to case 21 until the evidence is
   sealed.
+
+## Round 57: case-20 bounded camera-error governor passes Gate C
+
+- Published the fresh case-only, hash-bound runtime route at `7ab2959`; the
+  authoritative `.98` CPU suite passed `334/334` tests before launch. The route
+  pinned v12 plan
+  `ec0bb2845c948d17daec8abef6b00b205f6f56fe6cb9e4c42aa9395c6b66336d`,
+  the `0.13/0.155/0.20` governor, unchanged `0.05 m` correction cap and
+  physical gates, clean `HEAD==upstream`, and exclusive GPU ownership.
+- Ran only case 20 in
+  `20260719_gate_c_smoothed_case20_v12_camera_error_governor_v1_exclusive`.
+  Both source/execution clocks completed in `7486` steps. Position p95/max
+  passed at `0.149128/0.155961 m`, improving from the sealed reject's
+  `0.154389/0.163111 m` without changing the plan, LQR, gains, correction cap,
+  horizon, or thresholds.
+- Attitude p95/max passed at `0.135390/0.257223 deg`; pitch max was
+  `7.851979 deg`. Dynamic, thermal, controller-evidence, and runtime-contract
+  outcomes all passed. The governor activated for `21.6805%` of policy-rate
+  samples with minimum/mean cap `0.20/0.914336`; total wall duration was
+  `37.43 s`, still below the unchanged `43.407577 s` bound.
+- The independently evaluated prospective residual envelope also passed:
+  normalized maxima were `[0.988451, 0.541243, 0.153122]`. Residual actions
+  remained zero and unapplied; no dataset, capture, BC, PPO, or training was
+  started. The uniquely dynamically qualified set is now `33/70`.
+- Evidence hashes: admission
+  `2c0baa1d4dd1a5056db920a52575d6448ec30ecfb0de93b66712a7ed5449a9b0`,
+  gate `ffbd741b8a4423b988ab7a13c075fb8726edc8d2cd47b41fe8def9442a96f792`,
+  log `29af97c04354b6833676873bb081062e6f627718a7b600df092b6cb6a1d748f1`,
+  and summary
+  `c00896e0b13eaab5fb18cbf338f01c78e431707e49177618d9c04633d2e13860`.
+  GPU and playback ownership were empty after closure.
+
+## Next round after Round 57
+
+- Resume source-order CPU inspection with v12 case 21. Do not automatically
+  apply the case-20 recovery profile: first inspect its static margin and only
+  use the default accepted controller unless case-specific evidence justifies
+  otherwise.
+- Keep fail-fast dynamic execution and all learning stages closed. The case-20
+  result qualifies one deterministic trajectory; it does not authorize
+  residual capture or establish a universal teacher transformation.

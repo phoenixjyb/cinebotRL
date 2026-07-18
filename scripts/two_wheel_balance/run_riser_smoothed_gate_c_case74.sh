@@ -5,9 +5,9 @@ ROOT="/mnt/g/wSpace/cinebotRL-two-wheel-riser"
 WIN_ROOT='G:\wSpace\cinebotRL-two-wheel-riser'
 PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
-AUTHORIZATION="AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE74_RELIEF_V2"
+AUTHORIZATION="AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE74_RELIEF_WZKP040_V3"
 CASE=74
-STAMP="20260718_gate_c_smoothed_case74_relief_v2_exclusive"
+STAMP="20260718_gate_c_smoothed_case74_relief_wzkp040_v3_exclusive"
 PORTFOLIO_STAMP="20260718_smoothed_plan_all79_v7_case74_relief_cpu"
 MANIFEST_SHA256="0fe4b517d2629a1bca413162378708c2985cf5a42a1da8746de0a662f2fab00c"
 SOURCE_SHA256="f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d"
@@ -17,6 +17,7 @@ GAINS_SHA256="2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6"
 ROBOT_USD_SHA256="89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0"
 TIMEOUT_SECONDS=360
 MAXIMUM_DURATION_SCALE="2.05"
+CONTROLLER_WZ_KP="0.40"
 
 if [[ "${RISER_SMOOTHED_GATE_C_AUTHORIZATION:-}" != "$AUTHORIZATION" ]]; then
   printf 'smoothed Gate C case74 authorization is absent or unknown\n' >&2
@@ -193,6 +194,7 @@ if ! timeout --signal=TERM --kill-after=30s "$TIMEOUT_SECONDS" \
   --plan-dir "$PORTFOLIO_WIN" \
   --plan-filename-template 'case_{case:04d}_smoothed_riser_plan_v1.npz' \
   --cases "$CASE" \
+  --controller-wz-kp "$CONTROLLER_WZ_KP" \
   --maximum-duration-scale "$MAXIMUM_DURATION_SCALE" \
   --output "$OUTPUT_WIN\\gates\\case_0074.json" \
   --headless >"$OUTPUT_WSL/logs/case_0074.log" 2>&1; then
@@ -216,6 +218,7 @@ summary = json.loads(Path(sys.argv[2]).read_text())
 result = gate.get("results", [{}])[0]
 ok = (
     gate.get("cases") == [74]
+    and gate.get("controller_overrides") == {"wz_kp": 0.4}
     and gate.get("maximum_duration_scale") == 2.05
     and gate.get("completion_horizon_contract")
     == "bounded_execution_duration_scale_v1"

@@ -13,8 +13,11 @@ import heapq
 from itertools import permutations
 import json
 import math
+import os
 from pathlib import Path
+import shutil
 import sys
+import tempfile
 from typing import Callable
 
 import h5py
@@ -73,6 +76,12 @@ GRAVITY_AWARE_BASE_ARM_RECOVERY_CONTRACT = (
 )
 SEMANTIC_BRANCH_LOOKBACK_CONTRACT = (
     "bounded_hard_feasible_semantic_branch_lookback_v1"
+)
+SEMANTIC_BRANCH_JOURNAL_SCHEMA = (
+    "cinebotrl_two_wheel_semantic_branch_search_journal_v1"
+)
+SEMANTIC_BRANCH_JOURNAL_CONTRACT = (
+    "identity_bound_atomic_rank_history_v1"
 )
 SEMANTIC_BRANCH_RANK_VARIANT_COUNT = 4
 
@@ -359,6 +368,326 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def semantic_branch_journal_path(checkpoint_path: Path) -> Path:
+    checkpoint_path = checkpoint_path.resolve()
+    return checkpoint_path.with_name(
+        f"{checkpoint_path.name}.semantic_branch_journal.json"
+    )
+
+
+def semantic_branch_variant_checkpoint_path(
+    checkpoint_path: Path, rank_variant: int
+) -> Path:
+    if not 0 <= rank_variant < SEMANTIC_BRANCH_RANK_VARIANT_COUNT:
+        raise ValueError("semantic branch rank variant is unsupported")
+    checkpoint_path = checkpoint_path.resolve()
+    return checkpoint_path.with_name(
+        f"{checkpoint_path.name}.semantic_branch_rank_{rank_variant}.npz"
+    )
+
+
+def _fsync_parent_directory(path: Path) -> None:
+    if os.name != "posix":
+        return
+    directory_fd = os.open(path.resolve().parent, os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def _atomic_write_semantic_branch_json(path: Path, value: object) -> None:
+    path = path.resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(
+                json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n"
+            )
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        temporary = None
+        _fsync_parent_directory(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _atomic_copy_semantic_branch_checkpoint(source: Path, target: Path) -> None:
+    source = source.resolve()
+    target = target.resolve()
+    if not source.is_file():
+        raise ValueError(f"missing semantic branch checkpoint: {source}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with source.open("rb") as input_stream, tempfile.NamedTemporaryFile(
+            mode="w+b",
+            prefix=f".{target.name}.",
+            suffix=".tmp",
+            dir=target.parent,
+            delete=False,
+        ) as output_stream:
+            temporary = Path(output_stream.name)
+            shutil.copyfileobj(input_stream, output_stream)
+            output_stream.flush()
+            os.fsync(output_stream.fileno())
+        os.replace(temporary, target)
+        temporary = None
+        _fsync_parent_directory(target)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _json_safe_semantic_branch_value(value: object) -> object:
+    if isinstance(value, dict):
+        return {
+            str(key): _json_safe_semantic_branch_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_semantic_branch_value(item) for item in value]
+    if isinstance(value, np.ndarray):
+        return _json_safe_semantic_branch_value(value.tolist())
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    raise ValueError(
+        f"semantic branch journal value is not serializable: {type(value).__name__}"
+    )
+
+
+def _new_semantic_branch_journal(
+    *,
+    checkpoint_identity: dict[str, object],
+    original_checkpoint_sha256: str,
+    rejection_source_interval: int,
+    replay_start_source_interval: int,
+    lookback_source_intervals: int,
+    beam_width: int,
+) -> dict[str, object]:
+    return {
+        "schema": SEMANTIC_BRANCH_JOURNAL_SCHEMA,
+        "contract": SEMANTIC_BRANCH_JOURNAL_CONTRACT,
+        "checkpoint_identity": _json_safe_semantic_branch_value(
+            checkpoint_identity
+        ),
+        "original_checkpoint_sha256": original_checkpoint_sha256,
+        "rejection_source_interval": int(rejection_source_interval),
+        "replay_start_source_interval": int(replay_start_source_interval),
+        "lookback_source_intervals": int(lookback_source_intervals),
+        "beam_width": int(beam_width),
+        "histories": [],
+        "selection": None,
+        "valid_for_training": False,
+        "training_started": False,
+    }
+
+
+def _validate_semantic_branch_journal(
+    value: object,
+    *,
+    checkpoint_identity: dict[str, object],
+    original_checkpoint_sha256: str | None,
+    rejection_source_interval: int,
+    replay_start_source_interval: int,
+    lookback_source_intervals: int,
+    beam_width: int,
+) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ValueError("semantic branch journal is not an object")
+    required = {
+        "schema",
+        "contract",
+        "checkpoint_identity",
+        "original_checkpoint_sha256",
+        "rejection_source_interval",
+        "replay_start_source_interval",
+        "lookback_source_intervals",
+        "beam_width",
+        "histories",
+        "selection",
+        "valid_for_training",
+        "training_started",
+    }
+    if set(value) != required:
+        raise ValueError("semantic branch journal fields differ")
+    if value["schema"] != SEMANTIC_BRANCH_JOURNAL_SCHEMA:
+        raise ValueError("semantic branch journal schema differs")
+    if value["contract"] != SEMANTIC_BRANCH_JOURNAL_CONTRACT:
+        raise ValueError("semantic branch journal contract differs")
+    expected_identity = _json_safe_semantic_branch_value(checkpoint_identity)
+    if value["checkpoint_identity"] != expected_identity:
+        raise ValueError("semantic branch journal checkpoint identity mismatch")
+    original_sha = value["original_checkpoint_sha256"]
+    if (
+        not isinstance(original_sha, str)
+        or len(original_sha) != 64
+        or any(character not in "0123456789abcdef" for character in original_sha)
+    ):
+        raise ValueError("semantic branch journal original checkpoint hash is invalid")
+    if (
+        original_checkpoint_sha256 is not None
+        and original_sha != original_checkpoint_sha256
+    ):
+        raise ValueError("semantic branch journal original checkpoint hash mismatch")
+    expected_scalars = {
+        "rejection_source_interval": rejection_source_interval,
+        "replay_start_source_interval": replay_start_source_interval,
+        "lookback_source_intervals": lookback_source_intervals,
+        "beam_width": beam_width,
+    }
+    for key, expected in expected_scalars.items():
+        if value[key] != int(expected):
+            raise ValueError(f"semantic branch journal {key} mismatch")
+    if value["valid_for_training"] is not False:
+        raise ValueError("semantic branch journal claims training validity")
+    if value["training_started"] is not False:
+        raise ValueError("semantic branch journal claims training started")
+    histories = value["histories"]
+    if not isinstance(histories, list) or len(histories) > beam_width:
+        raise ValueError("semantic branch journal histories are invalid")
+    for rank_variant, history in enumerate(histories):
+        if not isinstance(history, dict) or history.get("rank_variant") != rank_variant:
+            raise ValueError("semantic branch journal history order differs")
+        status = history.get("status")
+        if status == "rejected":
+            if set(history) != {
+                "rank_variant",
+                "status",
+                "error_type",
+                "error",
+                "seed_family_diagnostics",
+            }:
+                raise ValueError("semantic branch rejected history fields differ")
+            if not isinstance(history["error_type"], str) or not isinstance(
+                history["error"], str
+            ):
+                raise ValueError("semantic branch rejected history error is invalid")
+            if not isinstance(history["seed_family_diagnostics"], dict):
+                raise ValueError("semantic branch rejected seed diagnostics are invalid")
+        elif status == "crossed_prior_rejection":
+            expected_history_fields = {
+                "rank_variant",
+                "status",
+                "prefix_checkpoint_name",
+                "prefix_checkpoint_sha256",
+                "next_source_interval",
+                "local_score",
+                "future_score",
+                "seed_family_diagnostics",
+            }
+            if set(history) != expected_history_fields:
+                raise ValueError("semantic branch successful history fields differ")
+            prefix_sha = history["prefix_checkpoint_sha256"]
+            if (
+                not isinstance(prefix_sha, str)
+                or len(prefix_sha) != 64
+                or any(character not in "0123456789abcdef" for character in prefix_sha)
+            ):
+                raise ValueError("semantic branch history checkpoint hash is invalid")
+            if history["next_source_interval"] != rejection_source_interval + 1:
+                raise ValueError("semantic branch history interval differs")
+            if not np.isfinite(
+                [float(history["local_score"]), float(history["future_score"])]
+            ).all():
+                raise ValueError("semantic branch history score is non-finite")
+            if not isinstance(history["seed_family_diagnostics"], dict):
+                raise ValueError("semantic branch seed diagnostics are invalid")
+        else:
+            raise ValueError("semantic branch journal history status is invalid")
+    selection = value["selection"]
+    if selection is not None:
+        if not isinstance(selection, dict):
+            raise ValueError("semantic branch journal selection is invalid")
+        status = selection.get("status")
+        if status == "exhausted":
+            if set(selection) != {"status"} or len(histories) != beam_width:
+                raise ValueError("semantic branch exhausted selection is invalid")
+        elif status in {"pending", "selected"}:
+            required_selection = {
+                "status",
+                "rank_variant",
+                "prefix_checkpoint_name",
+                "prefix_checkpoint_sha256",
+                "next_source_interval",
+            }
+            if status == "selected":
+                required_selection.add("main_checkpoint_sha256_at_selection")
+            if set(selection) != required_selection:
+                raise ValueError("semantic branch selection fields differ")
+            rank_variant = selection["rank_variant"]
+            if not isinstance(rank_variant, int) or not 0 <= rank_variant < len(
+                histories
+            ):
+                raise ValueError("semantic branch selected rank is invalid")
+            history = histories[rank_variant]
+            if history.get("status") != "crossed_prior_rejection":
+                raise ValueError("semantic branch selected history is not feasible")
+            for key in (
+                "prefix_checkpoint_name",
+                "prefix_checkpoint_sha256",
+                "next_source_interval",
+            ):
+                if selection[key] != history[key]:
+                    raise ValueError("semantic branch selected history differs")
+            if status == "selected" and selection[
+                "main_checkpoint_sha256_at_selection"
+            ] != selection["prefix_checkpoint_sha256"]:
+                raise ValueError("semantic branch selected main checkpoint hash differs")
+        else:
+            raise ValueError("semantic branch journal selection status is invalid")
+    return json.loads(json.dumps(value, sort_keys=True))
+
+
+def _load_semantic_branch_journal(
+    path: Path,
+    **expected: object,
+) -> dict[str, object]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ValueError(f"invalid semantic branch journal: {error}") from error
+    return _validate_semantic_branch_journal(value, **expected)
+
+
+def _prefix_extends_semantic_branch_selection(
+    current: ExactSourceRetargetPrefix,
+    selected: ExactSourceRetargetPrefix,
+) -> bool:
+    if current.next_source_interval < selected.next_source_interval:
+        return False
+    for key, selected_value in selected.arrays().items():
+        current_value = current.arrays()[key]
+        if key == "previous_control":
+            if current.next_source_interval == selected.next_source_interval and not np.array_equal(
+                current_value, selected_value
+            ):
+                return False
+            continue
+        prefix_shape = selected_value.shape
+        slices = tuple(slice(0, size) for size in prefix_shape)
+        if any(
+            current_value.shape[index] < size
+            for index, size in enumerate(prefix_shape)
+        ) or not np.array_equal(current_value[slices], selected_value):
+            return False
+    return True
 
 
 def balance_pitch_optimization_margin_deg(args: argparse.Namespace) -> float:
@@ -2797,6 +3126,219 @@ def retarget_semantic_full_pose(
             f"{SEMANTIC_BRANCH_RANK_VARIANT_COUNT}"
         )
 
+    checkpoint_path = Path(checkpoint_path).resolve()
+    journal_path = semantic_branch_journal_path(checkpoint_path)
+    if journal_path.exists():
+        try:
+            raw_journal = json.loads(journal_path.read_text(encoding="utf-8"))
+            rejection_interval = int(raw_journal["rejection_source_interval"])
+            replay_start_interval = int(
+                raw_journal["replay_start_source_interval"]
+            )
+        except (
+            OSError,
+            UnicodeError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ) as error:
+            raise ValueError(f"invalid semantic branch journal: {error}") from error
+        journal = _load_semantic_branch_journal(
+            journal_path,
+            checkpoint_identity=checkpoint_identity,
+            original_checkpoint_sha256=None,
+            rejection_source_interval=rejection_interval,
+            replay_start_source_interval=replay_start_interval,
+            lookback_source_intervals=lookback,
+            beam_width=beam_width,
+        )
+        if replay_start_interval != rejection_interval - lookback:
+            raise ValueError("semantic branch journal replay interval differs")
+    else:
+        original_prefix = load_exact_source_checkpoint(
+            checkpoint_path,
+            checkpoint_identity,
+            source_time_s=reference.time_s,
+            source_positions_m=reference.positions_m,
+            source_attitudes_wxyz=reference.attitudes_wxyz,
+            expected_anchor=anchor,
+        )
+        rejection_interval = original_prefix.next_source_interval
+        if rejection_interval >= len(reference.time_s):
+            raise ValueError("semantic branch lookback checkpoint is already complete")
+        rewound_prefix = truncate_exact_source_prefix_for_semantic_lookback(
+            original_prefix, lookback
+        )
+        replay_start_interval = rewound_prefix.next_source_interval
+        stray_paths = [
+            semantic_branch_variant_checkpoint_path(checkpoint_path, variant)
+            for variant in range(beam_width)
+            if semantic_branch_variant_checkpoint_path(
+                checkpoint_path, variant
+            ).exists()
+        ]
+        if stray_paths:
+            raise ValueError(
+                "semantic branch checkpoints exist without a bound journal: "
+                + ", ".join(str(path) for path in stray_paths)
+            )
+        journal = _new_semantic_branch_journal(
+            checkpoint_identity=checkpoint_identity,
+            original_checkpoint_sha256=sha256(checkpoint_path),
+            rejection_source_interval=rejection_interval,
+            replay_start_source_interval=replay_start_interval,
+            lookback_source_intervals=lookback,
+            beam_width=beam_width,
+        )
+        _atomic_write_semantic_branch_json(journal_path, journal)
+
+    def load_history_prefix(history: dict[str, object]) -> ExactSourceRetargetPrefix:
+        rank_variant = int(history["rank_variant"])
+        variant_path = semantic_branch_variant_checkpoint_path(
+            checkpoint_path, rank_variant
+        )
+        if history["prefix_checkpoint_name"] != variant_path.name:
+            raise ValueError("semantic branch history checkpoint name differs")
+        if not variant_path.is_file() or sha256(variant_path) != history[
+            "prefix_checkpoint_sha256"
+        ]:
+            raise ValueError("semantic branch history checkpoint hash mismatch")
+        prefix = load_exact_source_checkpoint(
+            variant_path,
+            checkpoint_identity,
+            source_time_s=reference.time_s,
+            source_positions_m=reference.positions_m,
+            source_attitudes_wxyz=reference.attitudes_wxyz,
+            expected_anchor=anchor,
+        )
+        if prefix.next_source_interval != history["next_source_interval"]:
+            raise ValueError("semantic branch history checkpoint interval differs")
+        return prefix
+
+    histories = journal["histories"]
+    for variant in range(beam_width):
+        variant_path = semantic_branch_variant_checkpoint_path(
+            checkpoint_path, variant
+        )
+        if variant < len(histories):
+            history = histories[variant]
+            if history["status"] == "rejected" and variant_path.exists():
+                raise ValueError(
+                    "semantic branch rejected history has a stray checkpoint"
+                )
+        elif variant_path.exists():
+            raise ValueError(
+                "semantic branch unfinished history has an orphan checkpoint"
+            )
+
+    selection = journal["selection"]
+    if isinstance(selection, dict) and selection["status"] in {
+        "pending",
+        "selected",
+    }:
+        selected_history = histories[int(selection["rank_variant"])]
+        selected_prefix = load_history_prefix(selected_history)
+        selected_sha = str(selection["prefix_checkpoint_sha256"])
+        current_sha = sha256(checkpoint_path)
+        if selection["status"] == "pending":
+            if current_sha == journal["original_checkpoint_sha256"]:
+                _atomic_copy_semantic_branch_checkpoint(
+                    semantic_branch_variant_checkpoint_path(
+                        checkpoint_path, int(selection["rank_variant"])
+                    ),
+                    checkpoint_path,
+                )
+                current_sha = sha256(checkpoint_path)
+            if current_sha != selected_sha:
+                raise ValueError(
+                    "semantic branch pending selection main checkpoint differs"
+                )
+            selection = {
+                **selection,
+                "status": "selected",
+                "main_checkpoint_sha256_at_selection": current_sha,
+            }
+            journal["selection"] = selection
+            _atomic_write_semantic_branch_json(journal_path, journal)
+        current_prefix = load_exact_source_checkpoint(
+            checkpoint_path,
+            checkpoint_identity,
+            source_time_s=reference.time_s,
+            source_positions_m=reference.positions_m,
+            source_attitudes_wxyz=reference.attitudes_wxyz,
+            expected_anchor=anchor,
+        )
+        if not _prefix_extends_semantic_branch_selection(
+            current_prefix, selected_prefix
+        ):
+            raise ValueError(
+                "semantic branch current checkpoint does not extend selection"
+            )
+        diagnostics = {
+            "contract": SEMANTIC_BRANCH_LOOKBACK_CONTRACT,
+            "journal_contract": SEMANTIC_BRANCH_JOURNAL_CONTRACT,
+            "enabled": True,
+            "lookback_source_intervals": lookback,
+            "beam_width": beam_width,
+            "checkpoint_next_source_interval_before_replay": rejection_interval,
+            "replay_start_source_interval": replay_start_interval,
+            "history_diagnostics": histories,
+            "hard_feasible_distinct_history_count": sum(
+                history["status"] == "crossed_prior_rejection"
+                for history in histories
+            ),
+            "selected_rank_variant": int(selection["rank_variant"]),
+            "selected_next_source_interval": selected_prefix.next_source_interval,
+            "selected_local_score": float(selected_history["local_score"]),
+            "selected_future_score": float(selected_history["future_score"]),
+            "resumed_after_persisted_selection": True,
+        }
+        try:
+            result = _retarget_semantic_full_pose_single_branch(
+                reference,
+                anchor,
+                source_base_arm_q,
+                position_kinematics,
+                camera_kinematics,
+                args,
+            )
+        except ValueError as error:
+            setattr(error, "semantic_branch_lookback_diagnostics", diagnostics)
+            raise
+        setattr(
+            args,
+            "semantic_seed_family_diagnostics",
+            _combine_seed_family_diagnostics(
+                selected_history["seed_family_diagnostics"],
+                args.semantic_seed_family_diagnostics,
+            ),
+        )
+        setattr(args, "semantic_branch_lookback_diagnostics", diagnostics)
+        return result
+
+    if isinstance(selection, dict) and selection["status"] == "exhausted":
+        diagnostics = {
+            "contract": SEMANTIC_BRANCH_LOOKBACK_CONTRACT,
+            "journal_contract": SEMANTIC_BRANCH_JOURNAL_CONTRACT,
+            "enabled": True,
+            "lookback_source_intervals": lookback,
+            "beam_width": beam_width,
+            "checkpoint_next_source_interval_before_replay": rejection_interval,
+            "replay_start_source_interval": replay_start_interval,
+            "history_diagnostics": histories,
+            "hard_feasible_distinct_history_count": 0,
+            "resumed_after_exhausted_search": True,
+        }
+        error = ValueError(
+            "semantic branch lookback found no hard-feasible history across "
+            f"source interval {rejection_interval}"
+        )
+        setattr(error, "semantic_branch_lookback_diagnostics", diagnostics)
+        raise error
+
+    if sha256(checkpoint_path) != journal["original_checkpoint_sha256"]:
+        raise ValueError("semantic branch search main checkpoint hash mismatch")
     original_prefix = load_exact_source_checkpoint(
         checkpoint_path,
         checkpoint_identity,
@@ -2805,17 +3347,35 @@ def retarget_semantic_full_pose(
         source_attitudes_wxyz=reference.attitudes_wxyz,
         expected_anchor=anchor,
     )
-    rejection_interval = original_prefix.next_source_interval
-    if rejection_interval >= len(reference.time_s):
-        raise ValueError("semantic branch lookback checkpoint is already complete")
+    if original_prefix.next_source_interval != rejection_interval:
+        raise ValueError("semantic branch search rejection interval differs")
     rewound_prefix = truncate_exact_source_prefix_for_semantic_lookback(
         original_prefix, lookback
     )
+    if rewound_prefix.next_source_interval != replay_start_interval:
+        raise ValueError("semantic branch search replay prefix differs")
     alternatives: list[SemanticBranchAlternative] = []
     prefixes: list[ExactSourceRetargetPrefix] = []
     seed_diagnostics: list[dict[str, object]] = []
-    history_diagnostics: list[dict[str, object]] = []
-    for variant in range(beam_width):
+    for history in histories:
+        if history["status"] != "crossed_prior_rejection":
+            continue
+        branch_prefix = load_history_prefix(history)
+        payload_index = len(prefixes)
+        prefixes.append(branch_prefix)
+        seed_diagnostics.append(history["seed_family_diagnostics"])
+        alternatives.append(
+            SemanticBranchAlternative(
+                state=branch_prefix.states[-1],
+                previous_control=branch_prefix.previous_control,
+                hard_feasible=True,
+                local_score=float(history["local_score"]),
+                future_score=float(history["future_score"]),
+                lineage=(int(history["rank_variant"]),),
+                payload_index=payload_index,
+            )
+        )
+    for variant in range(len(histories), beam_width):
         branch_args = copy.copy(args)
         branch_args.exact_source_checkpoint_path = None
         branch_args.exact_source_checkpoint_identity = None
@@ -2854,23 +3414,51 @@ def retarget_semantic_full_pose(
                     payload_index=payload_index,
                 )
             )
-            history_diagnostics.append(
-                {
-                    "rank_variant": variant,
-                    "status": "crossed_prior_rejection",
-                    "next_source_interval": branch_prefix.next_source_interval,
-                    "local_score": local_score,
-                    "future_score": future_score,
-                }
-            )
         except ValueError as error:
-            history_diagnostics.append(
+            histories.append(
                 {
                     "rank_variant": variant,
                     "status": "rejected",
+                    "error_type": type(error).__name__,
                     "error": str(error),
+                    "seed_family_diagnostics": _json_safe_semantic_branch_value(
+                        getattr(error, "retarget_seed_family_diagnostics", {})
+                    ),
                 }
             )
+            _atomic_write_semantic_branch_json(journal_path, journal)
+            continue
+
+        variant_path = semantic_branch_variant_checkpoint_path(
+            checkpoint_path, variant
+        )
+        if variant_path.exists():
+            raise ValueError(
+                "refusing to overwrite semantic branch history checkpoint"
+            )
+        save_exact_source_checkpoint(
+            variant_path,
+            checkpoint_identity,
+            branch_prefix,
+            source_time_s=reference.time_s,
+            source_positions_m=reference.positions_m,
+            source_attitudes_wxyz=reference.attitudes_wxyz,
+            expected_anchor=anchor,
+        )
+        history = {
+            "rank_variant": variant,
+            "status": "crossed_prior_rejection",
+            "prefix_checkpoint_name": variant_path.name,
+            "prefix_checkpoint_sha256": sha256(variant_path),
+            "next_source_interval": branch_prefix.next_source_interval,
+            "local_score": local_score,
+            "future_score": future_score,
+            "seed_family_diagnostics": _json_safe_semantic_branch_value(
+                branch_args.semantic_seed_family_diagnostics
+            ),
+        }
+        histories.append(history)
+        _atomic_write_semantic_branch_json(journal_path, journal)
 
     selected = select_semantic_branch_beam(alternatives, beam_width)
     diagnostics: dict[str, object] = {
@@ -2880,10 +3468,13 @@ def retarget_semantic_full_pose(
         "beam_width": beam_width,
         "checkpoint_next_source_interval_before_replay": rejection_interval,
         "replay_start_source_interval": rewound_prefix.next_source_interval,
-        "history_diagnostics": history_diagnostics,
+        "journal_contract": SEMANTIC_BRANCH_JOURNAL_CONTRACT,
+        "history_diagnostics": histories,
         "hard_feasible_distinct_history_count": len(selected),
     }
     if not selected:
+        journal["selection"] = {"status": "exhausted"}
+        _atomic_write_semantic_branch_json(journal_path, journal)
         error = ValueError(
             "semantic branch lookback found no hard-feasible history across "
             f"source interval {rejection_interval}"
@@ -2901,15 +3492,32 @@ def retarget_semantic_full_pose(
             "selected_future_score": selected_alternative.future_score,
         }
     )
-    save_exact_source_checkpoint(
+    selected_history = histories[int(selected_alternative.lineage[0])]
+    journal["selection"] = {
+        "status": "pending",
+        "rank_variant": int(selected_alternative.lineage[0]),
+        "prefix_checkpoint_name": selected_history["prefix_checkpoint_name"],
+        "prefix_checkpoint_sha256": selected_history[
+            "prefix_checkpoint_sha256"
+        ],
+        "next_source_interval": selected_prefix.next_source_interval,
+    }
+    _atomic_write_semantic_branch_json(journal_path, journal)
+    _atomic_copy_semantic_branch_checkpoint(
+        semantic_branch_variant_checkpoint_path(
+            checkpoint_path, int(selected_alternative.lineage[0])
+        ),
         checkpoint_path,
-        checkpoint_identity,
-        selected_prefix,
-        source_time_s=reference.time_s,
-        source_positions_m=reference.positions_m,
-        source_attitudes_wxyz=reference.attitudes_wxyz,
-        expected_anchor=anchor,
     )
+    selected_main_sha = sha256(checkpoint_path)
+    if selected_main_sha != selected_history["prefix_checkpoint_sha256"]:
+        raise ValueError("semantic branch selected main checkpoint hash differs")
+    journal["selection"] = {
+        **journal["selection"],
+        "status": "selected",
+        "main_checkpoint_sha256_at_selection": selected_main_sha,
+    }
+    _atomic_write_semantic_branch_json(journal_path, journal)
 
     continuation_args = copy.copy(args)
     continuation_args.exact_source_resume_checkpoint = False

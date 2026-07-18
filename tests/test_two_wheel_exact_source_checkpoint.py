@@ -1,4 +1,5 @@
 from dataclasses import replace
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -433,6 +434,22 @@ def stationary_problem() -> tuple[object, np.ndarray, np.ndarray, object, object
     )
 
 
+def stationary_checkpoint_prefix() -> ExactSourceRetargetPrefix:
+    return ExactSourceRetargetPrefix(
+        states=np.zeros((3, 9)),
+        controls=np.zeros((2, 5)),
+        target_positions=np.zeros((3, 3)),
+        target_attitudes=np.tile([1.0, 0.0, 0.0, 0.0], (3, 1)),
+        execution_time_s=np.array([0.0, 0.1, 0.2]),
+        position_errors_m=np.zeros(3),
+        attitude_errors_deg=np.zeros(3),
+        previous_control=np.zeros(8),
+        source_anchor_execution_index_prefix=np.array([0, 1, 2]),
+        retimed_interval_count=0,
+        next_source_interval=3,
+    )
+
+
 def _seed_diagnostics(start_interval: int) -> dict[str, object]:
     return {
         "contract": retarget.GRAVITY_AWARE_BASE_ARM_RECOVERY_CONTRACT,
@@ -449,6 +466,7 @@ def _seed_diagnostics(start_interval: int) -> dict[str, object]:
 
 def test_semantic_branch_lookback_disabled_calls_single_branch_unchanged(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     sentinel = tuple(range(9))
     calls: list[object] = []
@@ -460,7 +478,11 @@ def test_semantic_branch_lookback_disabled_calls_single_branch_unchanged(
     monkeypatch.setattr(
         retarget, "_retarget_semantic_full_pose_single_branch", fake_single
     )
-    args = solver_args(enable_semantic_branch_lookback=False)
+    checkpoint_path = tmp_path / "disabled.npz"
+    args = solver_args(
+        enable_semantic_branch_lookback=False,
+        exact_source_checkpoint_path=checkpoint_path,
+    )
 
     assert retarget.retarget_semantic_full_pose(*stationary_problem(), args) == sentinel
     assert calls == [args]
@@ -468,9 +490,85 @@ def test_semantic_branch_lookback_disabled_calls_single_branch_unchanged(
         "contract": retarget.SEMANTIC_BRANCH_LOOKBACK_CONTRACT,
         "enabled": False,
     }
+    assert not retarget.semantic_branch_journal_path(checkpoint_path).exists()
 
 
-def test_semantic_branch_lookback_replays_without_speculative_checkpoint_writes(
+def test_semantic_branch_journal_atomic_round_trip(tmp_path: Path) -> None:
+    checkpoint = tmp_path / "main.npz"
+    checkpoint.write_bytes(b"main")
+    identity = {"bound": True}
+    journal = retarget._new_semantic_branch_journal(
+        checkpoint_identity=identity,
+        original_checkpoint_sha256=retarget.sha256(checkpoint),
+        rejection_source_interval=50,
+        replay_start_source_interval=44,
+        lookback_source_intervals=6,
+        beam_width=4,
+    )
+    path = retarget.semantic_branch_journal_path(checkpoint)
+
+    retarget._atomic_write_semantic_branch_json(path, journal)
+    loaded = retarget._load_semantic_branch_journal(
+        path,
+        checkpoint_identity=identity,
+        original_checkpoint_sha256=retarget.sha256(checkpoint),
+        rejection_source_interval=50,
+        replay_start_source_interval=44,
+        lookback_source_intervals=6,
+        beam_width=4,
+    )
+
+    assert loaded == journal
+    assert loaded["valid_for_training"] is False
+    assert loaded["training_started"] is False
+    assert not list(tmp_path.glob(".main.npz.semantic_branch_journal.json.*.tmp"))
+
+
+def test_semantic_branch_journal_rejects_identity_hash_and_corruption(
+    tmp_path: Path,
+) -> None:
+    checkpoint = tmp_path / "main.npz"
+    checkpoint.write_bytes(b"main")
+    identity = {"bound": True}
+    path = retarget.semantic_branch_journal_path(checkpoint)
+    retarget._atomic_write_semantic_branch_json(
+        path,
+        retarget._new_semantic_branch_journal(
+            checkpoint_identity=identity,
+            original_checkpoint_sha256=retarget.sha256(checkpoint),
+            rejection_source_interval=50,
+            replay_start_source_interval=44,
+            lookback_source_intervals=6,
+            beam_width=4,
+        ),
+    )
+    expected = {
+        "original_checkpoint_sha256": retarget.sha256(checkpoint),
+        "rejection_source_interval": 50,
+        "replay_start_source_interval": 44,
+        "lookback_source_intervals": 6,
+        "beam_width": 4,
+    }
+
+    with pytest.raises(ValueError, match="identity mismatch"):
+        retarget._load_semantic_branch_journal(
+            path, checkpoint_identity={"bound": False}, **expected
+        )
+    with pytest.raises(ValueError, match="original checkpoint hash mismatch"):
+        retarget._load_semantic_branch_journal(
+            path,
+            checkpoint_identity=identity,
+            **{**expected, "original_checkpoint_sha256": "0" * 64},
+        )
+
+    path.write_text("{truncated", encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid semantic branch journal"):
+        retarget._load_semantic_branch_journal(
+            path, checkpoint_identity=identity, **expected
+        )
+
+
+def test_semantic_branch_lookback_persists_histories_and_bypasses_replay_after_selection(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -500,11 +598,28 @@ def test_semantic_branch_lookback_replays_without_speculative_checkpoint_writes(
         source_anchor_execution_index_prefix=np.array([0, 1]),
         next_source_interval=2,
     )
-    saved: list[ExactSourceRetargetPrefix] = []
+    saved: dict[Path, ExactSourceRetargetPrefix] = {}
     continuation_prefixes: list[ExactSourceRetargetPrefix] = []
+    speculative_variants: list[int] = []
     sentinel = tuple(range(9))
 
-    monkeypatch.setattr(retarget, "load_exact_source_checkpoint", lambda *a, **k: original)
+    checkpoint_path = tmp_path / "checkpoint.npz"
+    checkpoint_path.write_bytes(b"original-checkpoint")
+
+    def fake_load(path: Path, *unused: object, **keywords: object) -> ExactSourceRetargetPrefix:
+        path = Path(path).resolve()
+        if path in saved:
+            return saved[path]
+        if path == checkpoint_path.resolve() and path.read_bytes().startswith(b"variant-"):
+            marker = int(path.read_bytes().decode().split("-")[1])
+            return next(
+                prefix
+                for prefix in saved.values()
+                if int(prefix.states[-1, 0]) == marker
+            )
+        return original
+
+    monkeypatch.setattr(retarget, "load_exact_source_checkpoint", fake_load)
     monkeypatch.setattr(
         retarget,
         "truncate_exact_source_prefix_for_semantic_lookback",
@@ -517,10 +632,13 @@ def test_semantic_branch_lookback_replays_without_speculative_checkpoint_writes(
             branch_args, "_semantic_branch_stop_after_source_interval", None
         )
         if stop_after is None:
-            continuation_prefixes.append(branch_args._semantic_branch_prefix_override)
+            continuation_prefixes.append(
+                getattr(branch_args, "_semantic_branch_prefix_override", original)
+            )
             branch_args.semantic_seed_family_diagnostics = _seed_diagnostics(4)
             return sentinel
         variant = branch_args._semantic_branch_rank_variant
+        speculative_variants.append(variant)
         assert branch_args.exact_source_checkpoint_path is None
         if variant == 0:
             raise ValueError("greedy history rejected")
@@ -552,14 +670,18 @@ def test_semantic_branch_lookback_replays_without_speculative_checkpoint_writes(
     )
 
     def fake_save(*arguments: object, **keywords: object) -> None:
-        saved.append(arguments[2])
+        path = Path(arguments[0]).resolve()
+        prefix = arguments[2]
+        saved[path] = prefix
+        marker = int(prefix.states[-1, 0])
+        path.write_bytes(f"variant-{marker}".encode())
 
     monkeypatch.setattr(retarget, "save_exact_source_checkpoint", fake_save)
     args = solver_args(
         enable_semantic_branch_lookback=True,
         semantic_branch_lookback_source_intervals=1,
         semantic_branch_beam_width=3,
-        exact_source_checkpoint_path=tmp_path / "checkpoint.npz",
+        exact_source_checkpoint_path=checkpoint_path,
         exact_source_checkpoint_identity={"bound": True},
         exact_source_resume_checkpoint=True,
     )
@@ -567,10 +689,11 @@ def test_semantic_branch_lookback_replays_without_speculative_checkpoint_writes(
     result = retarget.retarget_semantic_full_pose(*problem, args)
 
     assert result == sentinel
-    assert len(saved) == 1
-    assert saved[0].states[-1, 0] == 2.0
+    assert len(saved) == 2
+    assert checkpoint_path.read_bytes() == b"variant-2"
     assert len(continuation_prefixes) == 1
-    assert continuation_prefixes[0] is saved[0]
+    assert continuation_prefixes[0].states[-1, 0] == 2.0
+    assert speculative_variants == [0, 1, 2]
     diagnostics = args.semantic_branch_lookback_diagnostics
     assert diagnostics["selected_rank_variant"] == 2
     assert diagnostics["hard_feasible_distinct_history_count"] == 2
@@ -579,6 +702,250 @@ def test_semantic_branch_lookback_replays_without_speculative_checkpoint_writes(
         "crossed_prior_rejection",
         "crossed_prior_rejection",
     ]
+
+    result = retarget.retarget_semantic_full_pose(*problem, args)
+
+    assert result == sentinel
+    assert speculative_variants == [0, 1, 2]
+    assert len(continuation_prefixes) == 2
+    assert args.semantic_branch_lookback_diagnostics[
+        "resumed_after_persisted_selection"
+    ] is True
+    journal_path = retarget.semantic_branch_journal_path(checkpoint_path)
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert journal["selection"]["status"] == "selected"
+    assert journal["selection"]["rank_variant"] == 2
+    assert journal["valid_for_training"] is False
+
+
+def test_semantic_branch_lookback_skips_completed_rejected_history(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    problem = stationary_problem()
+    original = ExactSourceRetargetPrefix(
+        states=np.zeros((3, 9)),
+        controls=np.zeros((2, 5)),
+        target_positions=np.zeros((3, 3)),
+        target_attitudes=np.tile([1.0, 0.0, 0.0, 0.0], (3, 1)),
+        execution_time_s=np.array([0.0, 0.1, 0.2]),
+        position_errors_m=np.zeros(3),
+        attitude_errors_deg=np.zeros(3),
+        previous_control=np.zeros(8),
+        source_anchor_execution_index_prefix=np.array([0, 1, 2]),
+        retimed_interval_count=0,
+        next_source_interval=3,
+    )
+    rewound = replace(
+        original,
+        states=original.states[:2],
+        controls=original.controls[:1],
+        target_positions=original.target_positions[:2],
+        target_attitudes=original.target_attitudes[:2],
+        execution_time_s=original.execution_time_s[:2],
+        position_errors_m=original.position_errors_m[:2],
+        attitude_errors_deg=original.attitude_errors_deg[:2],
+        source_anchor_execution_index_prefix=np.array([0, 1]),
+        next_source_interval=2,
+    )
+    checkpoint_path = tmp_path / "checkpoint.npz"
+    checkpoint_path.write_bytes(b"original")
+    saved: dict[Path, ExactSourceRetargetPrefix] = {}
+    calls: list[int] = []
+    phase = {"value": 1}
+    sentinel = tuple(range(9))
+
+    def successful_prefix(marker: int) -> ExactSourceRetargetPrefix:
+        return replace(
+            original,
+            states=np.vstack((original.states, np.full((1, 9), marker))),
+            controls=np.vstack((original.controls, np.zeros((1, 5)))),
+            target_positions=np.vstack((original.target_positions, np.zeros((1, 3)))),
+            target_attitudes=np.vstack(
+                (original.target_attitudes, [[1.0, 0.0, 0.0, 0.0]])
+            ),
+            execution_time_s=np.append(original.execution_time_s, 0.3),
+            position_errors_m=np.append(original.position_errors_m, 0.01),
+            attitude_errors_deg=np.append(original.attitude_errors_deg, 0.01),
+            source_anchor_execution_index_prefix=np.array([0, 1, 2, 3]),
+            next_source_interval=4,
+        )
+
+    def fake_load(path: Path, *unused: object, **keywords: object) -> ExactSourceRetargetPrefix:
+        path = Path(path).resolve()
+        if path in saved:
+            return saved[path]
+        if path == checkpoint_path.resolve() and path.read_bytes() == b"variant-1":
+            return successful_prefix(1)
+        return original
+
+    def fake_single(*arguments: object) -> tuple[int, ...]:
+        branch_args = arguments[-1]
+        stop_after = getattr(
+            branch_args, "_semantic_branch_stop_after_source_interval", None
+        )
+        if stop_after is None:
+            branch_args.semantic_seed_family_diagnostics = _seed_diagnostics(4)
+            return sentinel
+        variant = branch_args._semantic_branch_rank_variant
+        calls.append(variant)
+        if variant == 0:
+            raise ValueError("rank zero rejected")
+        if variant == 1 and phase["value"] == 1:
+            raise RuntimeError("bounded interruption")
+        if variant == 2:
+            raise ValueError("rank two rejected")
+        branch_args._semantic_branch_prefix_result = successful_prefix(variant)
+        branch_args.semantic_seed_family_diagnostics = _seed_diagnostics(2)
+        return sentinel
+
+    def fake_save(*arguments: object, **keywords: object) -> None:
+        path = Path(arguments[0]).resolve()
+        prefix = arguments[2]
+        saved[path] = prefix
+        path.write_bytes(f"variant-{int(prefix.states[-1, 0])}".encode())
+
+    monkeypatch.setattr(retarget, "load_exact_source_checkpoint", fake_load)
+    monkeypatch.setattr(
+        retarget,
+        "truncate_exact_source_prefix_for_semantic_lookback",
+        lambda prefix, lookback: rewound,
+    )
+    monkeypatch.setattr(
+        retarget, "_retarget_semantic_full_pose_single_branch", fake_single
+    )
+    monkeypatch.setattr(
+        retarget,
+        "_semantic_branch_prefix_scores",
+        lambda prefix, *unused: (1.0, 1.0),
+    )
+    monkeypatch.setattr(retarget, "save_exact_source_checkpoint", fake_save)
+    args = solver_args(
+        enable_semantic_branch_lookback=True,
+        semantic_branch_lookback_source_intervals=1,
+        semantic_branch_beam_width=3,
+        exact_source_checkpoint_path=checkpoint_path,
+        exact_source_checkpoint_identity={"bound": True},
+        exact_source_resume_checkpoint=True,
+    )
+
+    with pytest.raises(RuntimeError, match="bounded interruption"):
+        retarget.retarget_semantic_full_pose(*problem, args)
+    journal = json.loads(
+        retarget.semantic_branch_journal_path(checkpoint_path).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert [row["rank_variant"] for row in journal["histories"]] == [0]
+    assert journal["histories"][0]["status"] == "rejected"
+
+    phase["value"] = 2
+    assert retarget.retarget_semantic_full_pose(*problem, args) == sentinel
+    assert calls == [0, 1, 1, 2]
+    assert args.semantic_branch_lookback_diagnostics["selected_rank_variant"] == 1
+
+
+def test_semantic_branch_pending_selection_recovers_with_valid_checkpoints(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    problem = stationary_problem()
+    source_time = problem[0].time_s
+    identity = checkpoint_identity(source_time)
+    checkpoint_path = tmp_path / "checkpoint.npz"
+    save_exact_source_checkpoint(
+        checkpoint_path,
+        identity,
+        stationary_checkpoint_prefix(),
+        source_time_s=source_time,
+        source_positions_m=problem[0].positions_m,
+        source_attitudes_wxyz=problem[0].attitudes_wxyz,
+        expected_anchor=problem[1],
+    )
+    original_sha = retarget.sha256(checkpoint_path)
+    args = solver_args(
+        enable_semantic_branch_lookback=True,
+        semantic_branch_lookback_source_intervals=1,
+        semantic_branch_beam_width=2,
+        exact_source_checkpoint_path=checkpoint_path,
+        exact_source_checkpoint_identity=identity,
+        exact_source_resume_checkpoint=True,
+    )
+    real_copy = retarget._atomic_copy_semantic_branch_checkpoint
+
+    def fail_copy(source: Path, target: Path) -> None:
+        raise OSError("simulated selection install interruption")
+
+    monkeypatch.setattr(
+        retarget, "_atomic_copy_semantic_branch_checkpoint", fail_copy
+    )
+    with pytest.raises(OSError, match="selection install interruption"):
+        retarget.retarget_semantic_full_pose(*problem, args)
+
+    journal_path = retarget.semantic_branch_journal_path(checkpoint_path)
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert journal["selection"]["status"] == "pending"
+    assert retarget.sha256(checkpoint_path) == original_sha
+    selected_variant_path = retarget.semantic_branch_variant_checkpoint_path(
+        checkpoint_path, journal["selection"]["rank_variant"]
+    )
+    assert selected_variant_path.is_file()
+    assert retarget.sha256(selected_variant_path) == journal["selection"][
+        "prefix_checkpoint_sha256"
+    ]
+
+    monkeypatch.setattr(
+        retarget, "_atomic_copy_semantic_branch_checkpoint", real_copy
+    )
+    result = retarget.retarget_semantic_full_pose(*problem, args)
+
+    assert result[1].shape[0] == 4
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert journal["selection"]["status"] == "selected"
+    assert retarget.sha256(checkpoint_path) == retarget.sha256(
+        selected_variant_path
+    )
+    loaded = load_exact_source_checkpoint(
+        checkpoint_path,
+        identity,
+        source_time_s=source_time,
+        source_positions_m=problem[0].positions_m,
+        source_attitudes_wxyz=problem[0].attitudes_wxyz,
+        expected_anchor=problem[1],
+    )
+    assert loaded.next_source_interval == len(source_time)
+
+
+def test_semantic_branch_rejects_orphan_checkpoint_without_journal(
+    tmp_path: Path,
+) -> None:
+    problem = stationary_problem()
+    source_time = problem[0].time_s
+    identity = checkpoint_identity(source_time)
+    checkpoint_path = tmp_path / "checkpoint.npz"
+    save_exact_source_checkpoint(
+        checkpoint_path,
+        identity,
+        stationary_checkpoint_prefix(),
+        source_time_s=source_time,
+        source_positions_m=problem[0].positions_m,
+        source_attitudes_wxyz=problem[0].attitudes_wxyz,
+        expected_anchor=problem[1],
+    )
+    retarget.semantic_branch_variant_checkpoint_path(
+        checkpoint_path, 0
+    ).write_bytes(b"orphan")
+    args = solver_args(
+        enable_semantic_branch_lookback=True,
+        semantic_branch_lookback_source_intervals=1,
+        semantic_branch_beam_width=2,
+        exact_source_checkpoint_path=checkpoint_path,
+        exact_source_checkpoint_identity=identity,
+        exact_source_resume_checkpoint=True,
+    )
+
+    with pytest.raises(ValueError, match="without a bound journal"):
+        retarget.retarget_semantic_full_pose(*problem, args)
 
 
 def test_semantic_branch_lookback_requires_bound_resume() -> None:

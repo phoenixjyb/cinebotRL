@@ -1204,3 +1204,43 @@ and must state whether its candidate was accepted or rejected.
   corpus qualification from `18/70` passes.
 - On the first rejection, stop and classify it before proposing any bounded
   plan/controller change. Keep residual capture, BC, PPO, and training closed.
+
+## Round 35: v8 corpus expansion through cases 2 and 3
+
+- Published the next ordered fail-fast tranche at commit
+  `c2b896a3d8a047cef7b470d0900cf02dd02845d2` and ran only cases `[2,3]` from
+  the immutable v8 portfolio. Case 3 could start only after case 2 passed.
+- Case 2 completed `9199` steps and its full `18.241928/9.439314 s`
+  execution/source clocks. Position p95/max passed at
+  `0.139830/0.153514 m`; attitude p95/max were
+  `0.137239/0.175777 deg`; action saturation was zero; no termination
+  occurred. Riser effort/thermal maxima were `20.321682 N` and `0.000931`.
+- Case 3 completed `8478` steps and its full `19.343648/11.873175 s`
+  execution/source clocks. Position p95/max passed at
+  `0.093561/0.095761 m`; attitude p95/max were
+  `0.123540/0.225890 deg`; action saturation ratio was `0.000236`; no
+  termination occurred. Riser effort/thermal maxima were `21.518591 N` and
+  `0.001359`.
+- Both cases passed dynamic, thermal, controller-evidence, runtime, and frozen
+  residual-envelope checks. The camera correction remained bounded to
+  `0.05 m`; residual actions remained exactly zero and were not applied; no
+  dataset, capture, BC, PPO, or training stage opened.
+- This raises the uniquely dynamically qualified set to `20/70` CPU-admitted
+  plans. It does not qualify the remaining 50 plans or open learning.
+- Evidence hashes:
+  - runtime admission: `75f6de15b41e49fbd3f8eae02bc12b4b8aec87e4f7bf9aa92d2a49404ad0f582`;
+  - case-2 gate/log: `a6479130ef95d0cc1ea48d723f35c858638f2ca776fc6069863019de9b086e68` /
+    `2b0eda22b7f3f037c1662c03e3bff75b3eeb08200f3a9b6f3d7640b3162335b3`;
+  - case-3 gate/log: `56a0cf3d61f943b9f5d92a51112c11e43f920b5fdc34fbfd9d7fad173df79ddc` /
+    `9fc19f840e2d9300dcabf3e1c339668afa1edc5b095b2a60f5a560982e01fd95`;
+  - final summary: `0eb9ca95f76487805d25164afdda014ea73ebc6460dc426e479e3bdbf8206a7b`.
+- Both wrappers exited `0`; GPU and playback ownership were empty after the
+  tranche closed.
+
+## Next round after Round 35
+
+- Continue in source order with cases `[4,5]` under the unchanged v8 plan,
+  controller, LQR, camera correction, thermal monitor, and gates.
+- Preserve the same ordered fail-fast rule. If case 4 rejects, case 5 must not
+  start; classify the first failed check before any change.
+- Keep residual capture, BC, PPO, and all training closed.

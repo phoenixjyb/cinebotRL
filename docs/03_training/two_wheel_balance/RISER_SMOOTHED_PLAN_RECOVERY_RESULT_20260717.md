@@ -310,16 +310,69 @@ No residual was applied, no dataset was written, and residual capture, BC, and
 PPO remain false. The GPU was empty after the run. This is one qualified
 episode, not an all-70 dynamic qualification and not training admission.
 
+## Representative Gate C results
+
+Case 52's first namespace is an infrastructure timeout audit, not physical
+evidence. Its fixed 300-second wall timeout expired exactly from `12:00:00` to
+`12:05:00` after normal Isaac setup, before any runtime JSON was written:
+
+```text
+20260718_gate_c_smoothed_case52_v1_completion_grace_exclusive
+classification: missing_runtime_json
+GPU owner after cleanup: none
+```
+
+The fresh 420-second-bounded retry at commit
+`f4fee5fe73fc8704afeda4164a4417ebc78cee35` produced complete evidence and
+passed:
+
+```text
+20260718_gate_c_smoothed_case52_v2_timeout420_exclusive
+
+d4c1c785ecf46c0d841ebdcdfdeb00e419048b79f35c029b2f4432ce204660f8  admission.json
+3a8a52f3b2f6b4ec4ab4cd1d8b4e0b1195b87a438749e82c0a1bbe22cabef64a  gates/case_0052.json
+13d919d60b5c6355448124d24ac2b6408a71bd9da4ceb08b80fb01d70f5a10e9  logs/case_0052.log
+10f5f508b52ceaaac0d215ad32933368b00dedc7b4bef4da4f2046f5523a1b6a  summary.json
+
+source / execution / runtime:            22.924931 / 31.407182 / 51.130000 s
+position p95 / max:                       0.137522 / 0.146467 m
+pitch p95 / max:                          6.354373 / 6.673738 deg
+dynamic / thermal / label envelope:       pass / pass / pass
+```
+
+Case 74 then ran alone under the same deterministic contract and became the
+first representative dynamic reject:
+
+```text
+20260718_gate_c_smoothed_case74_v1_representative_exclusive
+
+703d9afa2f2493b81894f65b53be798a305c1da1967305e64901e2aad2b6aa4b  admission.json
+ad900914351809a96b4cd34298daa9b57c981218d324ebcf0027fe721164f3c3  gates/case_0074.json
+87ca442f4e76204673a26751e8044b1ef799bf6ba2b8b5e932dfb5781db12174  logs/case_0074.log
+c1f3ee2470d3b825b2406bb056b1a023da1e702578202011780206d336ac1a9e  summary.json
+
+source / execution / runtime:            11.373883 / 22.446453 / 43.760000 s
+completed reference:                      pass
+position p95 / 0.15 m gate:               0.163698 / fail
+position max / 0.25 m gate:               0.171750 / pass
+pitch max / attitude max:                 6.673746 / 0.218295 deg
+termination / saturation:                 none / zero
+thermal / label envelope:                 pass / pass
+```
+
+The miss is position-p95 only by `0.013698 m`. No residual was applied and no
+dataset was written in either case. The fail-fast representative sequence
+therefore stops at case 74; the accepted-70 batch remains closed.
+
 ## Exact continuation
 
-Preserve all consumed namespaces and the v6 portfolio hashes. The next bounded
-task is to define and run a small representative deterministic Gate C expansion
-from the accepted v6 plans, beginning with the already important cases 52 and
-74. It must use fresh authorization and namespaces, stop on the first dynamic
-reject, retain the 2.05x completion-horizon evidence contract, and write no
-residual dataset. Only after representative canaries pass should the accepted
-70 be qualified sequentially.
+Perform CPU-only localization of case 74's tracking error against phase,
+source/execution clocks, base XY/yaw error, camera XYZ error, direction-recovery
+telemetry, and the 0.25 m preview/sigma-12 plan. Compare it with passing cases
+52 and 77 and propose one bounded plan/controller change. Do not relax the
+`0.15 m` p95 gate or launch another canary until that diagnosis is reviewed and
+covered by tests.
 
 Do not start residual capture, BC, or PPO. `valid_for_training` remains false
-until the required deterministic dynamic corpus and subsequent capture gates
-are complete.
+until representative and then accepted-corpus deterministic qualification is
+complete.

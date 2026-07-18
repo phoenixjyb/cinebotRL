@@ -488,7 +488,9 @@ def test_explicit_preview_derivation_is_hash_bound_and_training_closed(
     assert 'source_manifest.get("episode_count") == args.expected_count' in source
     assert 'len(source_items) == args.expected_count' in source
     assert "--preserve-parent-smoothed-geometry" in source
-    assert "build_smoothed_riser_plan_from_geometry(" in source
+    assert "build_smoothed_riser_plan_from_geometry" in source
+    assert "build_smoothed_riser_batch_recovery_from_geometry" in source
+    assert "--batch-unicycle-recovery" in source
     assert '"parent_smoothed_geometry_preserved"' in source
     assert '_require(result.passed, "explicit preview candidate failed static admission")' not in source
     assert "result.passed" in source
@@ -553,3 +555,36 @@ def test_explicit_preview_builder_preserves_supplied_geometry(monkeypatch) -> No
     assert captured["heading_gain"] == 1.0
     assert captured["reset_yaw_mode"] == "forward_path"
     assert captured["planning_strategy_override"] == "smoothed_explicit_preview_v1"
+
+
+def test_batch_recovery_builder_reuses_geometry_seed(monkeypatch) -> None:
+    geometry = np.arange(12, dtype=np.float64).reshape(4, 3)
+    seed = object()
+    recovered = object()
+    captured = {}
+
+    def fake_seed(*args, **kwargs):
+        captured["geometry"] = args[2]
+        captured["seed_kwargs"] = kwargs
+        return seed
+
+    def fake_recovery(source, kinematics, actual_seed):
+        captured["recovery_args"] = (source, kinematics, actual_seed)
+        return recovered
+
+    monkeypatch.setattr(smoothed_plan, "build_smoothed_riser_plan_from_geometry", fake_seed)
+    monkeypatch.setattr(smoothed_plan, "_build_batch_unicycle_recovery", fake_recovery)
+    result = smoothed_plan.build_smoothed_riser_batch_recovery_from_geometry(
+        "source",
+        "kinematics",
+        geometry,
+        smoothing_sigma_samples=64.0,
+        smoothing_blend_factor=0.125,
+        lookahead_distance_m=0.9,
+        heading_gain=1.0,
+        reset_yaw_mode="forward_path",
+    )
+
+    assert result is recovered
+    np.testing.assert_array_equal(captured["geometry"], geometry)
+    assert captured["recovery_args"] == ("source", "kinematics", seed)

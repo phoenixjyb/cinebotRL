@@ -1174,6 +1174,32 @@ def build_smoothed_riser_plan_from_geometry(
     )
 
 
+def build_smoothed_riser_batch_recovery_from_geometry(
+    source: ExactSourceRiserReference,
+    kinematics: UrdfRiserCameraKinematics,
+    smoothed_position_source_frame_m: np.ndarray,
+    *,
+    smoothing_sigma_samples: float,
+    smoothing_blend_factor: float,
+    lookahead_distance_m: float,
+    heading_gain: float,
+    reset_yaw_mode: str,
+) -> SmoothedPlanResult:
+    """Reallocate bounded unicycle controls without changing target geometry."""
+
+    seed = build_smoothed_riser_plan_from_geometry(
+        source,
+        kinematics,
+        smoothed_position_source_frame_m,
+        smoothing_sigma_samples=smoothing_sigma_samples,
+        smoothing_blend_factor=smoothing_blend_factor,
+        lookahead_distance_m=lookahead_distance_m,
+        heading_gain=heading_gain,
+        reset_yaw_mode=reset_yaw_mode,
+    )
+    return _build_batch_unicycle_recovery(source, kinematics, seed)
+
+
 def save_smoothed_riser_plan(
     path: Path,
     result: SmoothedPlanResult,

@@ -24,6 +24,7 @@ from rl_platform.tasks.two_wheel_balance.riser_kinematics import (  # noqa: E402
 )
 from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (  # noqa: E402
     audit_smoothed_riser_plan,
+    build_smoothed_riser_batch_recovery_from_geometry,
     build_smoothed_riser_plan,
     build_smoothed_riser_plan_from_geometry,
     save_smoothed_riser_plan,
@@ -31,6 +32,7 @@ from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (  # noqa: E
 
 
 SCHEMA = "cinebotrl_two_wheel_riser_explicit_preview_derivation_v1"
+BATCH_SCHEMA = "cinebotrl_two_wheel_riser_batch_unicycle_recovery_derivation_v1"
 
 
 def _require(condition: bool, message: str) -> None:
@@ -107,6 +109,7 @@ def main() -> int:
         default="source",
     )
     parser.add_argument("--preserve-parent-smoothed-geometry", action="store_true")
+    parser.add_argument("--batch-unicycle-recovery", action="store_true")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
 
@@ -190,7 +193,12 @@ def main() -> int:
     source = references[args.case]
     kinematics = UrdfRiserCameraKinematics(args.urdf)
     if args.preserve_parent_smoothed_geometry:
-        result = build_smoothed_riser_plan_from_geometry(
+        builder = (
+            build_smoothed_riser_batch_recovery_from_geometry
+            if args.batch_unicycle_recovery
+            else build_smoothed_riser_plan_from_geometry
+        )
+        result = builder(
             source,
             kinematics,
             parent_smoothed_geometry,
@@ -216,7 +224,8 @@ def main() -> int:
     )
 
     args.output_dir.mkdir(parents=True)
-    output = args.output_dir / f"case_{args.case:04d}_explicit_preview_v1.npz"
+    suffix = "batch_unicycle_recovery_v1" if args.batch_unicycle_recovery else "explicit_preview_v1"
+    output = args.output_dir / f"case_{args.case:04d}_{suffix}.npz"
     save_smoothed_riser_plan(output, result, source)
     audit = audit_smoothed_riser_plan(output, source, kinematics)
     with np.load(output, allow_pickle=False) as data:
@@ -265,12 +274,22 @@ def main() -> int:
             "controller_changed": False,
             "thresholds_changed": False,
         },
+        "base_allocation_recovery": {
+            "applied": args.batch_unicycle_recovery,
+            "strategy": result.plan.planning_strategy,
+            "maximum_control_delta": result.kinematic_metrics.get(
+                "batch_maximum_control_delta"
+            ),
+            "source_geometry_changed": False,
+            "controller_changed": False,
+            "thresholds_changed": False,
+        },
         "source_arrays_immutable": source_arrays_immutable,
         "passed": passed,
         "valid_for_training": False,
     }
     manifest = {
-        "schema": SCHEMA,
+        "schema": BATCH_SCHEMA if args.batch_unicycle_recovery else SCHEMA,
         "code_commit": commit,
         "upstream_commit": upstream,
         "tracked_state_clean": True,

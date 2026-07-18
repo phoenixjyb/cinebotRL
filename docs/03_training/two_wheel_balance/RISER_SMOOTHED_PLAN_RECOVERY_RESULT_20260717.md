@@ -498,10 +498,46 @@ is unchanged, yaw action changes in the corrective direction by approximately
 `f6262e8a17760c6f1bec74fac806a3ae88678f7a`; the authoritative `.98` suite
 passes `292/292`.
 
-The fresh namespace
-`20260718_gate_c_smoothed_case74_relief_wzkp040_v3_exclusive` has not been
-created and Isaac has not started. Its live ownership preflight correctly
-rejected launch because the separate two-wheel-balance task had restarted an
-ep4 retarget process. Resume only after that process exits and GPU/CPU ownership
-is rechecked. Regardless of the v3 result, do not start accepted-corpus
-qualification, residual capture, BC, or PPO automatically.
+After the separate two-wheel-balance task released its bounded CPU job, the
+riser worktree was synchronized to clean pushed commit `cedc1ee`, and the full
+authoritative `.98` suite passed `293/293`. The v3 canary then ran exclusively,
+completed both clocks, and released the GPU cleanly. Increasing `wz_kp` to
+`0.40` improved the same metrics but did not cross the unchanged p95 gate.
+
+```text
+20260718_gate_c_smoothed_case74_relief_wzkp040_v3_exclusive
+
+51fdbbbba494390e7afcf73e149cc2cb8692a509a8ff9fafd1f7fec14b567785  admission.json
+e9a9c1052c537b997d2b9eb0d9c651bf9163ace14eb38b7d9b656836b2f802e7  gates/case_0074.json
+40ec2089a355e4cc5c7292825ccb33154567c046a89870d5a86d348db41c114b  logs/case_0074.log
+9a495b13943b55365ceb967a2d6268edf0d4fb9fc4110731d246578ca0889cc0  summary.json
+
+source / execution / wall:                 11.373883 / 22.294527 / 43.155 s
+completed steps:                           8631
+position p95 / max:                        0.158452 / 0.166571 m
+peak base XY / yaw error:                  0.153066 m / 8.137107 deg
+pitch p95 / max:                           6.420319 / 6.560083 deg
+attitude p95 / max:                        0.163086 / 0.225301 deg
+dynamic / thermal / label envelope:        fail / pass / pass
+termination / action saturation:           none / zero
+dataset / residual applied:                none / false
+```
+
+The only failed check remains `position_p95_bounded`: `0.158452 m` versus the
+unchanged `0.15 m` limit. The hard interval remains phase `17.6..19.0 s`, where
+the requested yaw rate is about `-0.36 rad/s` and the achieved rate remains
+about `-0.19..-0.20 rad/s`. Compared with v2, p95 improved by `0.002630 m`,
+maximum error by `0.002553 m`, and peak yaw error by `0.997141 deg`; this is a
+monotonic low-level yaw-authority response rather than a new geometry failure.
+
+One second and final scalar-only candidate changes `wz_kp` from `0.40` to
+`0.90`. At the sealed initial, hard-turn, and reverse-turn states, CPU tests
+prove the common/balance action is identical, the yaw delta always opposes the
+measured yaw-rate error, and absolute yaw action remains below `0.52`, versus
+the unchanged `0.8` action limit. The v3 authorization is retired. A future
+canary may use only the fresh namespace
+`20260718_gate_c_smoothed_case74_relief_wzkp090_v4_exclusive` after clean
+commit/upstream, full CPU-suite, GPU/process, namespace, and thermal preflight.
+
+Regardless of the v4 result, do not start accepted-corpus qualification,
+residual capture, BC, or PPO automatically.

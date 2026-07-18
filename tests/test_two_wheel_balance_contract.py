@@ -404,6 +404,49 @@ def test_case74_bounded_yaw_rate_gain_adds_only_corrective_yaw_action() -> None:
     np.testing.assert_allclose(candidate[0, 1] - baseline[0, 1], expected_delta)
 
 
+def test_case74_second_yaw_rate_gain_candidate_remains_bounded() -> None:
+    gain = np.array(
+        [
+            [-3.9542270864, -1.4129892407, 0.0, 0.0002045618, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0064842532, 0.0],
+        ]
+    )
+    scenarios = (
+        (0.0, 0.3324418843),
+        (-0.1914618313, -0.3684858926),
+        (0.127, 0.362),
+    )
+    for actual_wz, requested_wz in scenarios:
+        state = np.zeros((1, len(LQR_STATE_NAMES)))
+        state[0, 5] = actual_wz
+        controller_state = np.zeros((1, 6))
+        previous, _, _ = cascaded_lqr_action(
+            state,
+            np.zeros(1),
+            np.array([requested_wz]),
+            gain,
+            controller_state,
+            control_dt=0.02,
+            config=cascaded_lqr_config("structural_robust_v1", wz_kp=0.4),
+        )
+        candidate, _, _ = cascaded_lqr_action(
+            state,
+            np.zeros(1),
+            np.array([requested_wz]),
+            gain,
+            controller_state,
+            control_dt=0.02,
+            config=cascaded_lqr_config("structural_robust_v1", wz_kp=0.9),
+        )
+        np.testing.assert_allclose(candidate[:, 0], previous[:, 0])
+        expected_delta = (0.9 - 0.4) * (requested_wz - actual_wz)
+        np.testing.assert_allclose(candidate[0, 1] - previous[0, 1], expected_delta)
+        assert np.sign(candidate[0, 1] - previous[0, 1]) == np.sign(
+            requested_wz - actual_wz
+        )
+        assert abs(candidate[0, 1]) < 0.8
+
+
 def test_cascaded_lqr_accepts_measured_pitch_bias_override() -> None:
     _, controller_state, diagnostics = cascaded_lqr_action(
         np.zeros((1, len(LQR_STATE_NAMES))),

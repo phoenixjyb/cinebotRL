@@ -2244,3 +2244,41 @@ and must state whether its candidate was accepted or rejected.
   canary route with a duration-derived timeout.
 - Preserve exact-source geometry, the v14 portfolio, LQR/controller settings,
   `1.8 m` camera-height ceiling, all physical gates, and learning closure.
+
+## Round 64: case-31 paired lower-height plan passes Gate C
+
+- CPU inspection confirmed that v14 case 31 is statically admitted and
+  hash-bound to plan
+  `8ebc938eeb53b8f7dbf4382a085d3667ea38d5ea52e535dc3be409767737aefb`.
+  It shares case 30's source/execution clocks `18.144412/29.222488 s` and
+  full `1.0 m/s` planned riser-rate limit, while its target camera-height
+  range is lower at `1.168515-1.712510 m`. No static gate failed.
+- Published the fresh case-only route at `d031b4f` with the unchanged default
+  controller and a `1500 s` wall bound. The authoritative `.98` suite again
+  passed `341/341` tests before exclusive launch. Ran only case 31 in
+  `20260719_gate_c_smoothed_case31_v14_camera_lever_arm_v1_exclusive`.
+- Both clocks completed in `11536` steps. Dynamic position p95/max passed at
+  `0.136473/0.168665 m`; attitude p95/max passed at
+  `0.152725/0.229012 deg`; pitch max was `6.982104 deg`. Riser servo p95/max
+  were `0.011914/0.014094 m`; effort max was `32.296131 N`; thermal load max
+  was `0.001202`; and every completion, physical, thermal, controller,
+  runtime, IK, rate, saturation, and termination check passed.
+- The prospective residual envelope passed with normalized maxima
+  `[0.805935, 0.420867, 0.168425]`. Residual action stayed zero and unapplied;
+  no dataset, capture, BC, PPO, or training started. The evidence-derived
+  unique dynamic count is now `36/70`.
+- Evidence hashes: admission
+  `7d73e2bb2ea726b4048ac281869f4cf75c85152340c30cc443e9c5fce3bbfc17`,
+  gate `a990fce3ebaff929cfb38b29ce1ac453caccab570151064c6646eaf65e2c10ac`,
+  log `4b757ea3f68f7469e0bbd77b2035b829c5ddc51075fe7ce9e88340e70f8bac9d`,
+  and summary
+  `cdb4f0c12dfd5d10aeb7d45aae81b44e60c471649915e9849c32d8b2ca54f001`.
+  GPU and playback ownership were empty after closure.
+
+## Next round after Round 64
+
+- Continue source-order CPU inspection with v14 case 32. Use the unchanged
+  default profile first and authorize only one fresh case-specific canary after
+  static admission and duration-derived timeout review.
+- Keep residual capture, BC, PPO, and training closed. The current deterministic
+  qualification is `36/70`, not corpus completion or teacher admission.

@@ -585,3 +585,51 @@ the same clean-pushed, full-suite, ownership, namespace, and thermal preflight.
 If v5 does not pass, stop scalar gain stepping and perform a structural
 controller diagnosis. Accepted-corpus qualification, capture, BC, and PPO
 remain closed.
+
+## Final case-74 yaw-authority result
+
+After the competing case-77 retarget released, the v5 commit was synchronized
+to `.98` from a verified Git bundle and the full suite passed `295/295`. The
+exclusive canary completed normally and passed every unchanged deterministic,
+thermal, runtime-contract, and residual-label admission check.
+
+```text
+20260718_gate_c_smoothed_case74_relief_wzkp105_v5_exclusive
+
+139926870e61ff76b981121cd4dd24489bee343fd0d691f39fd5c35ab8be69b1  admission.json
+dd9511fc07120bc7d254e2d189d981b4a0286fe76496a687b70d06f30f672ac1  gates/case_0074.json
+43db41aa9eadfc3440d6452f678f5e09fb0829db155f7e2f72d9b56759917d8a  logs/case_0074.log
+341cc35fb32b104029263ef4826151b08922c9e53d2d3cbc9ed89ec70fb3837c  summary.json
+
+source / execution / wall:                 11.373883 / 22.294527 / 43.220 s
+completed steps:                           8644
+position p95 / max:                        0.149894 / 0.156471 m
+peak base XY / yaw error:                  0.161817 m / 6.297071 deg
+pitch p95 / max:                           6.436817 / 6.550212 deg
+attitude p95 / max:                        0.161514 / 0.227384 deg
+dynamic / thermal / label admission:       pass / pass / pass
+termination / action saturation:           none / zero
+dataset / residual applied:                none / false
+valid_for_final_gate_c / training:         true / false
+```
+
+The pass margin is narrow: `0.000106 m` below the `0.15 m` p95 limit. This is
+enough to advance from isolated case-74 diagnosis, but not enough to promote
+the gain globally without regression. The next bounded task is an ordered,
+fail-fast representative run over admitted cases 77 then 52 with the same
+`wz_kp=1.05` and no other changes:
+
+```text
+case 77: source 5.431279 s, execution 8.141487221 s, 273 states
+         a45892c98311cdd6e6f2096b6821ef760759504138edc2f9c7caa9b1ac90f559
+case 52: source 22.924931 s, execution 31.40718243547463 s, 1199 states
+         fa90c7345be5763e1e66a55b4b111780dfe5df97f5a779ab2c6bb390f7a3cbce
+```
+
+The representative contract must validate both plans independently, execute
+case 77 first, stop before case 52 on any physical/thermal/runtime failure, and
+reject any concurrent playback, GPU owner, or exact-source retarget process.
+Its output must keep dynamic, thermal, runtime, and residual-label outcomes
+separate. It may not create a dataset or authorize capture, BC, PPO, or
+training. Only two representative passes permit a subsequent accepted-corpus
+qualification proposal.

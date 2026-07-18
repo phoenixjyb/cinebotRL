@@ -157,6 +157,41 @@ def test_smoothed_case74_gate_c_rejects_missing_authorization_before_runtime() -
         assert "authorization is absent or unknown" in result.stderr
 
 
+def test_smoothed_representative_gate_is_ordered_hash_bound_and_fail_fast() -> None:
+    source = _read("run_riser_smoothed_gate_c_representative.sh")
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_REPRESENTATIVE_77_52_V1" in source
+    assert "20260718_gate_c_smoothed_representative_77_52_wzkp105_v1_exclusive" in source
+    assert 'CASES="77,52"' in source
+    assert "for CASE in 77 52" in source
+    assert 'CONTROLLER_WZ_KP="1.05"' in source
+    assert "TIMEOUT_SECONDS=480" in source
+    assert "a45892c98311cdd6e6f2096b6821ef760759504138edc2f9c7caa9b1ac90f559" in source
+    assert "fa90c7345be5763e1e66a55b4b111780dfe5df97f5a779ab2c6bb390f7a3cbce" in source
+    assert '--cases "$CASES"' in source
+    assert '--cases "$CASE"' in source
+    assert "representative Gate C stopped on case %s" in source
+    assert "[r]etarget_exact_source_v1_nonholonomic" in source
+    assert "wait_for_gpu_release" in source
+    assert "representative CPU/disk ownership is not exclusive" in source
+    assert 'summary.get("dynamically_passed_cases") == [77, 52]' in source
+    assert 'gate.get("controller_overrides") == {"wz_kp": 1.05}' in source
+    assert 'result.get("executed_residual_dataset") is None' in source
+    assert "--dataset-dir" not in source
+
+
+def test_smoothed_representative_gate_rejects_missing_authorization() -> None:
+    wrapper = SCRIPTS / "run_riser_smoothed_gate_c_representative.sh"
+    result = subprocess.run(
+        ["bash", str(wrapper)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={},
+    )
+    assert result.returncode == 7
+    assert "representative Gate C authorization is absent or unknown" in result.stderr
+
+
 def test_case74_localized_heading_relief_derivation_is_hash_bound_and_closed() -> None:
     source = _read("derive_riser_smoothed_case74_heading_relief.py")
     assert "cinebotrl_two_wheel_riser_case74_localized_heading_relief_v1" in source

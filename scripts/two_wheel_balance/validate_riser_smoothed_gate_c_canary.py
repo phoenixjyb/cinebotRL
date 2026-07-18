@@ -136,6 +136,78 @@ def validate(
     }
 
 
+def validate_cases(
+    manifest_path: Path,
+    *,
+    expected_manifest_sha256: str,
+    expected_source_manifest_sha256: str,
+    expected_planner_commit: str,
+    expected_count: int,
+    minimum_candidates: int,
+    requested_cases: list[int],
+) -> dict[str, object]:
+    if not requested_cases or len(set(requested_cases)) != len(requested_cases):
+        raise ValueError("representative cases must be non-empty and unique")
+    components = [
+        validate(
+            manifest_path,
+            expected_manifest_sha256=expected_manifest_sha256,
+            expected_source_manifest_sha256=expected_source_manifest_sha256,
+            expected_planner_commit=expected_planner_commit,
+            expected_count=expected_count,
+            minimum_candidates=minimum_candidates,
+            requested_case=case,
+        )
+        for case in requested_cases
+    ]
+    first = components[0]
+    common_checks = {
+        name: value
+        for name, value in first["top_checks"].items()
+        if name != "requested_case_admitted"
+    }
+    top_checks = {
+        **common_checks,
+        "requested_cases_admitted": all(
+            item["top_checks"]["requested_case_admitted"] is True
+            for item in components
+        ),
+        "component_admissions_pass": all(item["passed"] is True for item in components),
+    }
+    passed = all(top_checks.values())
+    return {
+        "schema": (
+            "cinebotrl_two_wheel_riser_smoothed_representative_admission_v1"
+        ),
+        "manifest": first["manifest"],
+        "manifest_sha256": first["manifest_sha256"],
+        "source_manifest_sha256": first["source_manifest_sha256"],
+        "planner_commit": first["planner_commit"],
+        "requested_cases": requested_cases,
+        "accepted_case_count": first["accepted_case_count"],
+        "accepted_cases": first["accepted_cases"],
+        "rejected_cases": first["rejected_cases"],
+        "selected_plans": [item["selected_plan"] for item in components],
+        "component_admissions": [
+            {
+                "case": case,
+                "passed": item["passed"],
+                "top_checks": item["top_checks"],
+                "selected_plan": item["selected_plan"],
+            }
+            for case, item in zip(requested_cases, components, strict=True)
+        ],
+        "top_checks": top_checks,
+        "rows": first["rows"],
+        "gate_c_execution_authorized": passed,
+        "residual_capture_authorized": False,
+        "bc_authorized": False,
+        "ppo_authorized": False,
+        "valid_for_training": False,
+        "passed": passed,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
@@ -144,18 +216,27 @@ def main() -> int:
     parser.add_argument("--expected-planner-commit", required=True)
     parser.add_argument("--expected-count", type=int, default=79)
     parser.add_argument("--minimum-candidates", type=int, default=70)
-    parser.add_argument("--case", type=int, required=True)
+    cases = parser.add_mutually_exclusive_group(required=True)
+    cases.add_argument("--case", type=int)
+    cases.add_argument("--cases")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    result = validate(
-        args.manifest,
-        expected_manifest_sha256=args.expected_manifest_sha256,
-        expected_source_manifest_sha256=args.expected_source_manifest_sha256,
-        expected_planner_commit=args.expected_planner_commit,
-        expected_count=args.expected_count,
-        minimum_candidates=args.minimum_candidates,
-        requested_case=args.case,
-    )
+    common = {
+        "expected_manifest_sha256": args.expected_manifest_sha256,
+        "expected_source_manifest_sha256": args.expected_source_manifest_sha256,
+        "expected_planner_commit": args.expected_planner_commit,
+        "expected_count": args.expected_count,
+        "minimum_candidates": args.minimum_candidates,
+    }
+    if args.case is not None:
+        result = validate(args.manifest, requested_case=args.case, **common)
+    else:
+        requested_cases = [int(value) for value in args.cases.split(",")]
+        result = validate_cases(
+            args.manifest,
+            requested_cases=requested_cases,
+            **common,
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))

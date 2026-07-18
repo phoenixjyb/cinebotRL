@@ -92,6 +92,34 @@ def _run(tmp_path: Path, manifest: Path, case: int):
     return result, json.loads(output.read_text())
 
 
+def _run_cases(tmp_path: Path, manifest: Path, cases: str):
+    output = tmp_path / "representative_admission.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--manifest",
+            str(manifest),
+            "--expected-manifest-sha256",
+            _sha(manifest),
+            "--expected-source-manifest-sha256",
+            "a" * 64,
+            "--expected-planner-commit",
+            "c" * 40,
+            "--expected-count",
+            "3",
+            "--minimum-candidates",
+            "2",
+            "--cases",
+            cases,
+            "--output",
+            str(output),
+        ],
+        check=False,
+    )
+    return result, json.loads(output.read_text())
+
+
 def test_smoothed_gate_c_admits_only_a_hash_bound_passing_plan(tmp_path: Path) -> None:
     manifest = _manifest(tmp_path)
     result, admission = _run(tmp_path, manifest, 2)
@@ -125,3 +153,50 @@ def test_smoothed_gate_c_rejects_learning_or_lineage_change(tmp_path: Path) -> N
     assert result.returncode == 6
     assert not admission["top_checks"]["runtime_and_learning_not_started"]
     assert not admission["top_checks"]["planner_commit_bound"]
+
+
+def test_smoothed_gate_c_admits_ordered_representative_cases(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path)
+    result, admission = _run_cases(tmp_path, manifest, "2,1")
+    assert result.returncode == 0
+    assert admission["requested_cases"] == [2, 1]
+    assert [row["case"] for row in admission["selected_plans"]] == [2, 1]
+    assert admission["gate_c_execution_authorized"]
+    assert not admission["valid_for_training"]
+
+
+def test_smoothed_gate_c_rejects_duplicate_or_failed_representative_case(
+    tmp_path: Path,
+) -> None:
+    manifest = _manifest(tmp_path)
+    result, admission = _run_cases(tmp_path, manifest, "1,3")
+    assert result.returncode == 6
+    assert not admission["top_checks"]["requested_cases_admitted"]
+
+    duplicate = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--manifest",
+            str(manifest),
+            "--expected-manifest-sha256",
+            _sha(manifest),
+            "--expected-source-manifest-sha256",
+            "a" * 64,
+            "--expected-planner-commit",
+            "c" * 40,
+            "--expected-count",
+            "3",
+            "--minimum-candidates",
+            "2",
+            "--cases",
+            "1,1",
+            "--output",
+            str(tmp_path / "duplicate.json"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert duplicate.returncode != 0
+    assert "non-empty and unique" in duplicate.stderr

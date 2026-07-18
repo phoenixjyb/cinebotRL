@@ -1161,3 +1161,46 @@ and must state whether its candidate was accepted or rejected.
   and must be classified from the sealed evidence. Do not tune during the run.
 - Keep residual capture, BC, PPO, and all training closed regardless of the
   canary outcome.
+
+## Round 34: case-7 retimed dynamic qualification
+
+- Published the one-case guarded runtime contract at commit
+  `7f9ce0aa949ce5da48616de59d8d337d22cea23b` and ran only case 7 in
+  `20260718_gate_c_smoothed_case7_dynamic_retime_v1_exclusive`. The wrapper
+  pinned the v8 portfolio/plan, source package, LQR gains, 28 kg USD, playback,
+  controller, loader, validator, summarizer, and wrapper identities.
+- The retimed case completed all `6607` physics steps and both clocks:
+  `12.940941 s` authoritative source time and `18.117317 s` execution time.
+  Camera-position p95/max passed at `0.130904/0.142948 m`, improving from the
+  parent run's `0.150671/0.168788 m` without changing the `0.15/0.25 m` gates.
+- Attitude p95/max passed at `0.151167/0.260295 deg`; action saturation was
+  zero; there was no termination. Riser effort max was `17.185259 N` and
+  thermal load max `0.001086`, with every thermal and controller-evidence
+  check true.
+- The bounded camera lever-arm correction remained unchanged at `0.05 m` and
+  saturated for `91.9479%` of policy-rate samples. The raw residual was only
+  audited prospectively: normalized maxima
+  `[0.766613, 0.403088, 0.126284]` passed the frozen envelope, but residual
+  action remained `[0,0,0]`, was not applied to commands, and no dataset was
+  written.
+- The canary summary independently records dynamic, thermal, controller,
+  runtime, and residual-envelope outcomes as true while capture, BC, PPO, and
+  training remain false. This raises the uniquely dynamically qualified set
+  to `18/70` CPU-admitted plans.
+- Evidence hashes:
+  - runtime admission: `2ec64cef491fab5a86ceef2769fc93e5046035f6976997e6cc893814cb2feabb`;
+  - case-7 gate JSON: `28b1117eb1dede740e70348f48eb06aa35d87ce86ae3572a740737a83c75605f`;
+  - case-7 log: `18e7b9290205667214c600349103dd22dac66da9560eb6080a033bc17d8325a1`;
+  - final summary: `6765e51ddb964e6e92ad7b32de0fdadc6f90dad5d9767788b1da3049a62b65d0`.
+- The wrapper exited `0`; GPU and playback ownership were empty after closure.
+  A transient SSH monitoring interruption did not affect the process or the
+  sealed result.
+
+## Next round after Round 34
+
+- Keep the v8 portfolio and the accepted case-7 retime immutable.
+- Continue the remaining CPU-admitted corpus in small, ordered, fail-fast
+  deterministic tranches under the same controller and gates. Do not infer
+  corpus qualification from `18/70` passes.
+- On the first rejection, stop and classify it before proposing any bounded
+  plan/controller change. Keep residual capture, BC, PPO, and training closed.

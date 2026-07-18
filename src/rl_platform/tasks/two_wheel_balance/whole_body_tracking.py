@@ -96,6 +96,9 @@ class WholeBodyTrackingConfig:
     progress_error_start_m: float = 0.05
     progress_error_full_m: float = 0.25
     minimum_progress_scale: float = 0.1
+    camera_recovery_error_start_m: float = 0.13
+    camera_recovery_error_full_m: float = 0.155
+    minimum_camera_recovery_scale: float = 0.2
 
 
 def riser_tracking_config(**overrides: float) -> WholeBodyTrackingConfig:
@@ -130,6 +133,39 @@ def bounded_progress_scale(
         1.0,
     )
     return float(1.0 - severity * (1.0 - config.minimum_progress_scale))
+
+
+def bounded_camera_recovery_progress_scale(
+    tool_position_error_m: float,
+    correction_saturated: bool,
+    config: WholeBodyTrackingConfig,
+) -> float:
+    """Slow phase only while a saturated camera correction is near its gate."""
+
+    if not math.isfinite(tool_position_error_m) or tool_position_error_m < 0.0:
+        raise ValueError("camera tracking error must be finite and non-negative")
+    if not (
+        0.0
+        < config.camera_recovery_error_start_m
+        < config.camera_recovery_error_full_m
+        and 0.0 < config.minimum_camera_recovery_scale <= 1.0
+    ):
+        raise ValueError("invalid camera recovery governor configuration")
+    if not correction_saturated:
+        return 1.0
+    severity = np.clip(
+        (tool_position_error_m - config.camera_recovery_error_start_m)
+        / (
+            config.camera_recovery_error_full_m
+            - config.camera_recovery_error_start_m
+        ),
+        0.0,
+        1.0,
+    )
+    return float(
+        1.0
+        - severity * (1.0 - config.minimum_camera_recovery_scale)
+    )
 
 
 def bounded_camera_lever_arm_base_target(

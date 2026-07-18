@@ -206,9 +206,17 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert '"--enable-camera-lever-arm-compensation"' in source
     assert '"--camera-lever-arm-compensation-gain"' in source
     assert '"--maximum-camera-lever-arm-correction-m"' in source
+    assert '"--enable-camera-error-recovery-governor"' in source
+    assert '"--camera-recovery-error-start-m"' in source
+    assert '"--camera-recovery-error-full-m"' in source
+    assert '"--minimum-camera-recovery-scale"' in source
     assert "math.isfinite(args.camera_lever_arm_compensation_gain)" in pre_app_source
     assert "math.isfinite(args.maximum_camera_lever_arm_correction_m)" in pre_app_source
     assert "bounded_camera_lever_arm_base_target(" in source
+    assert "bounded_camera_recovery_progress_scale(" in source
+    assert '"camera_recovery_governor_contract"' in source
+    assert '"camera_recovery_telemetry_observed"' in source
+    assert '"camera_recovery_activation_ratio"' in source
     assert '"camera_lever_arm_compensation_contract"' in source
     assert '"camera_lever_arm_compensation_enabled"' in source
     assert '"camera_lever_arm_telemetry_observed"' in source

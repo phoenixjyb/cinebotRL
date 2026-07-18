@@ -1915,3 +1915,60 @@ and must state whether its candidate was accepted or rejected.
   transition, and kinematic evidence.
 - Do not widen the camera correction cap or residual scales, relax thresholds,
   launch Isaac, or advance to case 21 before that CPU candidate passes.
+
+## Round 55: fixed-geometry base-allocation recovery rejected as a no-op
+
+- Added a fixed-geometry batch-unicycle derivation path that was required to
+  preserve target/source geometry and clocks while reporting parent-relative
+  base-state and command deltas. The first artifact reported an internal
+  optimizer command delta of `0.05`, but a direct NPZ audit proved every
+  emitted array was byte-identical to the parent, including `base_xy_yaw`,
+  `feedforward_v_wz`, riser/proxy states, target positions, and execution time.
+- Added a fail-closed no-op guard at `b012993`. The resealed CPU artifact
+  `20260719_case20_fixed_geometry_batch_unicycle_v2_noop_guard_cpu` exits `6`
+  with all actual parent-relative deltas zero and
+  `base_allocation_changed=false`. Manifest/summary hashes are
+  `0cce3a1b409c9d4ca8a20285a7196dd9cd3fb363c5e9c057da4301fb9843ef5c` /
+  `cd8e8e542971e695a9f2edd768963c0abc67ea61594aa2e2c7e058d8f4cb08bc`.
+- This closes the current static base-allocation route honestly. No candidate
+  was composed, no Isaac run was authorized, and learning remained closed.
+
+## Round 56: bounded camera-error phase-recovery candidate, CPU only
+
+- The sealed case-20 trace shows that the existing governor already consumes
+  `37.300 s` of a `43.407577 s` runtime bound. The position-p95 reject is only
+  `4.389 mm` over threshold and is localized near wall/phase times
+  `12.0/5.967 s` and `28.0-29.0/11.360-11.680 s`; therefore neither global
+  retiming nor a broader gain/correction change is justified.
+- Added an opt-in continuous phase cap that activates only when measured camera
+  correction is saturated and physical camera-position error exceeds
+  `0.13 m`. It reaches a frozen minimum scale of `0.20` at `0.155 m`:
+  `g(e)=1` below `0.13`; `g(e)=1-(e-0.13)/0.025*0.8` in the transition; and
+  `g(e)=0.20` at or above `0.155`. Runtime phase progress is the minimum of
+  the existing tracking-error governor, balance governor, and this new cap.
+- This changes only how quickly the immutable plan phase advances. It does not
+  alter source/plan arrays, LQR, controller or tracking gains, fixed-phase
+  commands, the `0.05 m` camera-correction cap, the `3.0x` horizon, physical
+  thresholds, or residual scales. The feature is disabled by default.
+- A 1 Hz counterfactual over the sealed trace would reduce progress at only two
+  recorded rows: `0.499167 -> 0.20` at wall `12 s`, and
+  `0.314514 -> 0.201219` at wall `28 s`. Its coarse additional-wall estimate
+  is `2.058879 s`, below the existing `6.107577 s` runtime margin. This is a
+  CPU diagnostic, not evidence that the dynamic gate will pass.
+- Added fail-closed identity and telemetry fields for profile
+  `riser_recovery_direction_v4_camera_lever_arm_error_governor_v1`. A future
+  summary must prove exact thresholds, policy-rate sample parity, bounded
+  progress scales, nonzero activation, unchanged learning closure, and the
+  existing camera/LQR/runtime contracts. No runtime authorization route or
+  namespace was created; Isaac, case 21, capture, BC, PPO, and training remain
+  closed.
+
+## Next round after Round 56
+
+- Run the authoritative CPU suite and diff-audit this candidate. Only after a
+  clean pushed commit, explicit review, and exclusive GPU release may a fresh
+  case-20-only canary route be authorized.
+- If the bounded canary fails completion or any physical/controller gate, stop
+  and preserve the first reject. If it passes physical dynamics, keep residual
+  admission independent and do not advance to case 21 until the evidence is
+  sealed.

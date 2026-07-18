@@ -168,6 +168,52 @@ def _enable_camera_lever_arm_contract(path: Path) -> None:
     path.write_text(json.dumps(payload))
 
 
+def _enable_camera_error_governor_contract(path: Path) -> None:
+    _enable_camera_lever_arm_contract(path)
+    payload = json.loads(path.read_text())
+    payload.update(
+        {
+            "tracking_profile": (
+                "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
+            ),
+            "camera_recovery_governor_enabled": True,
+            "camera_recovery_governor_contract": (
+                "saturated_camera_error_continuous_phase_cap_v1"
+            ),
+            "camera_recovery_error_range_m": [0.13, 0.155],
+            "minimum_camera_recovery_scale": 0.2,
+        }
+    )
+    result = payload["results"][0]
+    result.update(
+        {
+            "camera_recovery_governor_enabled": True,
+            "camera_recovery_governor_contract": (
+                "saturated_camera_error_continuous_phase_cap_v1"
+            ),
+            "camera_recovery_error_range_m": [0.13, 0.155],
+            "minimum_camera_recovery_scale": 0.2,
+            "camera_recovery_telemetry_observed": True,
+            "camera_recovery_telemetry_sample_count": result["completed_steps"],
+            "camera_recovery_progress_scale_min": 0.2,
+            "camera_recovery_progress_scale_mean": 0.8,
+            "camera_recovery_activation_ratio": 0.1,
+            "trace": [
+                {
+                    "camera_recovery_progress_scale": 0.2,
+                    "camera_recovery_active": True,
+                },
+                {
+                    "camera_recovery_progress_scale": 1.0,
+                    "camera_recovery_active": False,
+                },
+            ],
+        }
+    )
+    result["checks"]["camera_recovery_telemetry_observed"] = True
+    path.write_text(json.dumps(payload))
+
+
 def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path) -> None:
     (tmp_path / "gates").mkdir()
     (tmp_path / "logs").mkdir()
@@ -358,6 +404,82 @@ def test_camera_lever_arm_runtime_contract_rejects_missing_policy_rate_sample(
     assert summary["dynamic_quality_passed"]
     assert summary["thermal_admission_passed"]
     assert not summary["controller_evidence_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert not summary["passed"]
+
+
+def test_camera_error_governor_runtime_contract_passes_with_bounded_telemetry(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    _admission(tmp_path / "admission.json", commit, tmp_path.name)
+    gate = tmp_path / "gates/case_0020.json"
+    _gate(gate, 20, True)
+    _enable_camera_error_governor_contract(gate)
+    output = tmp_path / "summary.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--git-commit",
+            commit,
+            "--cases",
+            "20",
+            "--output",
+            str(output),
+            "--expected-tracking-profile",
+            "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1",
+            "--require-camera-lever-arm-compensation",
+            "--require-camera-error-recovery-governor",
+        ],
+        check=True,
+    )
+    summary = json.loads(output.read_text())
+    assert summary["passed"]
+    assert summary["runtime_contract_passed"]
+    assert summary["controller_evidence_passed"]
+    assert summary["gate_rows"][0]["camera_recovery_activation_ratio"] == 0.1
+
+
+def test_camera_error_governor_runtime_contract_rejects_noop_activation(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    _admission(tmp_path / "admission.json", commit, tmp_path.name)
+    gate = tmp_path / "gates/case_0020.json"
+    _gate(gate, 20, True)
+    _enable_camera_error_governor_contract(gate)
+    payload = json.loads(gate.read_text())
+    payload["results"][0]["camera_recovery_activation_ratio"] = 0.0
+    gate.write_text(json.dumps(payload))
+    output = tmp_path / "summary.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--git-commit",
+            commit,
+            "--cases",
+            "20",
+            "--output",
+            str(output),
+            "--expected-tracking-profile",
+            "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1",
+            "--require-camera-lever-arm-compensation",
+            "--require-camera-error-recovery-governor",
+        ],
+        check=True,
+    )
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
     assert not summary["runtime_contract_passed"]
     assert not summary["passed"]
 

@@ -58,6 +58,14 @@ parser.add_argument(
 )
 parser.add_argument("--camera-lever-arm-compensation-gain", type=float, default=1.0)
 parser.add_argument("--maximum-camera-lever-arm-correction-m", type=float, default=0.05)
+parser.add_argument(
+    "--enable-camera-error-recovery-governor",
+    action="store_true",
+    help="Reduce phase progress near the position gate while camera correction saturates.",
+)
+parser.add_argument("--camera-recovery-error-start-m", type=float, default=0.13)
+parser.add_argument("--camera-recovery-error-full-m", type=float, default=0.155)
+parser.add_argument("--minimum-camera-recovery-scale", type=float, default=0.20)
 parser.add_argument("--video-dir", type=Path)
 parser.add_argument(
     "--dataset-dir",
@@ -99,6 +107,25 @@ if not (
     and args.maximum_camera_lever_arm_correction_m > 0.0
 ):
     parser.error("--maximum-camera-lever-arm-correction-m must be positive")
+if not (
+    math.isfinite(args.camera_recovery_error_start_m)
+    and math.isfinite(args.camera_recovery_error_full_m)
+    and 0.0
+    < args.camera_recovery_error_start_m
+    < args.camera_recovery_error_full_m
+):
+    parser.error("camera recovery error bounds must be finite and increasing")
+if not (
+    math.isfinite(args.minimum_camera_recovery_scale)
+    and 0.0 < args.minimum_camera_recovery_scale <= 1.0
+):
+    parser.error("--minimum-camera-recovery-scale must be in (0, 1]")
+if args.enable_camera_error_recovery_governor and (
+    args.disable_phase_governor or not args.enable_camera_lever_arm_compensation
+):
+    parser.error(
+        "camera error recovery requires the phase governor and camera lever-arm compensation"
+    )
 app = AppLauncher(args).app
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -153,6 +180,7 @@ from rl_platform.tasks.two_wheel_balance.riser_recovery_evidence import (
 )
 from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     bounded_base_references,
+    bounded_camera_recovery_progress_scale,
     bounded_camera_lever_arm_base_target,
     bounded_progress_scale,
     continuous_joint_error,
@@ -285,8 +313,24 @@ def evaluate_case(
             "along_track_kp": args.tracking_along_kp,
             "cross_track_kp": args.tracking_cross_kp,
             "yaw_kp": args.tracking_yaw_kp,
+            "camera_recovery_error_start_m": (
+                args.camera_recovery_error_start_m
+            ),
+            "camera_recovery_error_full_m": args.camera_recovery_error_full_m,
+            "minimum_camera_recovery_scale": (
+                args.minimum_camera_recovery_scale
+            ),
         }.items()
         if value is not None
+        and (
+            name
+            not in {
+                "camera_recovery_error_start_m",
+                "camera_recovery_error_full_m",
+                "minimum_camera_recovery_scale",
+            }
+            or args.enable_camera_error_recovery_governor
+        )
     }
     tracking_cfg = riser_tracking_config(**tracking_overrides)
     execution_duration_s = float(plan.time_s[-1])
@@ -297,6 +341,7 @@ def evaluate_case(
     phase_time_s = 0.0
     progress_scale = 1.0
     progress_samples = []
+    camera_recovery_progress_samples = []
     camera_lever_arm_correction_norm_samples = []
     camera_lever_arm_raw_correction_norm_samples = []
     camera_lever_arm_saturated_samples = []
@@ -759,12 +804,23 @@ def evaluate_case(
             proxy_effort_count += len(proxy_ids)
 
         progress_scale = 1.0
+        camera_recovery_progress_scale = 1.0
         if not args.disable_phase_governor:
+            if args.enable_camera_error_recovery_governor:
+                camera_recovery_progress_scale = (
+                    bounded_camera_recovery_progress_scale(
+                        position_error,
+                        bool(camera_lever_arm_diagnostics["saturated"]),
+                        tracking_cfg,
+                    )
+                )
             progress_scale = min(
                 bounded_progress_scale(base_xy_error, position_error, tracking_cfg),
                 balance_progress_scale(abs(float(state["pitch"][0].item()))),
+                camera_recovery_progress_scale,
             )
         progress_samples.append(progress_scale)
+        camera_recovery_progress_samples.append(camera_recovery_progress_scale)
         if step % 200 == 0 or phase_time_s >= execution_duration_s:
             trace.append(
                 {
@@ -772,6 +828,12 @@ def evaluate_case(
                     "elapsed_s": elapsed_s,
                     "phase_time_s": phase_time_s,
                     "progress_scale": progress_scale,
+                    "camera_recovery_progress_scale": (
+                        camera_recovery_progress_scale
+                    ),
+                    "camera_recovery_active": (
+                        camera_recovery_progress_scale < 1.0 - 1e-12
+                    ),
                     "position_error_m": position_error,
                     "attitude_error_deg": attitude_error_deg,
                     "pitch_deg": pitch_deg,
@@ -897,6 +959,9 @@ def evaluate_case(
         and len(camera_lever_arm_raw_correction_norm_samples) == completed_steps
         and len(camera_lever_arm_saturated_samples) == completed_steps
     )
+    camera_recovery_telemetry_observed = (
+        len(camera_recovery_progress_samples) == completed_steps
+    )
     dynamic_checks = {
         "completed_reference": phase_time_s >= execution_duration_s,
         "no_termination": termination is None,
@@ -939,6 +1004,9 @@ def evaluate_case(
     controller_evidence_checks = {
         "camera_lever_arm_telemetry_observed": (
             camera_lever_arm_telemetry_observed
+        ),
+        "camera_recovery_telemetry_observed": (
+            camera_recovery_telemetry_observed
         ),
     }
     checks = dynamic_checks | thermal_checks | controller_evidence_checks
@@ -987,6 +1055,34 @@ def evaluate_case(
         "wall_duration_s": completed_steps / POLICY_HZ,
         "progress_scale_min": float(np.min(progress_samples)),
         "progress_scale_mean": float(np.mean(progress_samples)),
+        "camera_recovery_governor_enabled": (
+            args.enable_camera_error_recovery_governor
+        ),
+        "camera_recovery_governor_contract": (
+            "saturated_camera_error_continuous_phase_cap_v1"
+        ),
+        "camera_recovery_error_range_m": [
+            tracking_cfg.camera_recovery_error_start_m,
+            tracking_cfg.camera_recovery_error_full_m,
+        ],
+        "minimum_camera_recovery_scale": (
+            tracking_cfg.minimum_camera_recovery_scale
+        ),
+        "camera_recovery_telemetry_sample_count": len(
+            camera_recovery_progress_samples
+        ),
+        "camera_recovery_telemetry_observed": (
+            camera_recovery_telemetry_observed
+        ),
+        "camera_recovery_progress_scale_min": float(
+            np.min(camera_recovery_progress_samples)
+        ),
+        "camera_recovery_progress_scale_mean": float(
+            np.mean(camera_recovery_progress_samples)
+        ),
+        "camera_recovery_activation_ratio": float(
+            np.mean(np.asarray(camera_recovery_progress_samples) < 1.0 - 1e-12)
+        ),
         "position_error_p95_m": float(np.percentile(position, 95)),
         "position_error_max_m": float(np.max(position)),
         "attitude_error_p95_deg": float(np.percentile(attitude, 95)),
@@ -1216,9 +1312,13 @@ def main() -> int:
         "ppo_authorized": False,
         "controller_profile": "structural_robust_v1",
         "tracking_profile": (
-            "riser_recovery_direction_v4_camera_lever_arm_v1"
-            if args.enable_camera_lever_arm_compensation
-            else "riser_recovery_direction_v4"
+            "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
+            if args.enable_camera_error_recovery_governor
+            else (
+                "riser_recovery_direction_v4_camera_lever_arm_v1"
+                if args.enable_camera_lever_arm_compensation
+                else "riser_recovery_direction_v4"
+            )
         ),
         "camera_lever_arm_compensation_contract": (
             "measured_camera_to_base_xy_offset_v1"
@@ -1269,6 +1369,17 @@ def main() -> int:
             else "implicit_position_drive_diagnostic"
         ),
         "phase_governor_enabled": not args.disable_phase_governor,
+        "camera_recovery_governor_enabled": (
+            args.enable_camera_error_recovery_governor
+        ),
+        "camera_recovery_governor_contract": (
+            "saturated_camera_error_continuous_phase_cap_v1"
+        ),
+        "camera_recovery_error_range_m": [
+            args.camera_recovery_error_start_m,
+            args.camera_recovery_error_full_m,
+        ],
+        "minimum_camera_recovery_scale": args.minimum_camera_recovery_scale,
         "com_pitch_feedforward_enabled": not args.disable_com_pitch_feedforward,
         "maximum_duration_scale": args.maximum_duration_scale,
         "completion_horizon_contract": "bounded_execution_duration_scale_v1",
@@ -1339,6 +1450,15 @@ def write_runtime_failure(exc: Exception) -> None:
         "schema": "recomo_two_wheel_riser_reference_playback_failure_v1",
         "training_started": False,
         "ppo_authorized": False,
+        "tracking_profile": (
+            "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
+            if args.enable_camera_error_recovery_governor
+            else (
+                "riser_recovery_direction_v4_camera_lever_arm_v1"
+                if args.enable_camera_lever_arm_compensation
+                else "riser_recovery_direction_v4"
+            )
+        ),
         "trajectory_command_source": "deterministic_teacher",
         "residual_policy": None,
         "camera_lever_arm_compensation_contract": (
@@ -1353,6 +1473,17 @@ def write_runtime_failure(exc: Exception) -> None:
         "maximum_camera_lever_arm_correction_m": (
             args.maximum_camera_lever_arm_correction_m
         ),
+        "camera_recovery_governor_enabled": (
+            args.enable_camera_error_recovery_governor
+        ),
+        "camera_recovery_governor_contract": (
+            "saturated_camera_error_continuous_phase_cap_v1"
+        ),
+        "camera_recovery_error_range_m": [
+            args.camera_recovery_error_start_m,
+            args.camera_recovery_error_full_m,
+        ],
+        "minimum_camera_recovery_scale": args.minimum_camera_recovery_scale,
         "cases": cases,
         "passed_case_count": 0,
         "dynamic_quality_passed": False,

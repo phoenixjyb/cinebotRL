@@ -9,6 +9,7 @@ from rl_platform.tasks.two_wheel_balance.whole_body_kinematics import (
 from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     WholeBodyTrackingConfig,
     bounded_base_references,
+    bounded_camera_recovery_progress_scale,
     bounded_camera_lever_arm_base_target,
     bounded_dls_arm_target,
     bounded_progress_scale,
@@ -149,6 +150,41 @@ def test_progress_governor_slows_on_tracking_error() -> None:
     np.testing.assert_allclose(bounded_progress_scale(0.25, 0.0, config), 0.1)
     middle = bounded_progress_scale(0.15, 0.0, config)
     assert 0.1 < middle < 1.0
+
+
+def test_camera_recovery_governor_is_continuous_bounded_and_saturation_gated() -> None:
+    config = riser_tracking_config()
+    assert bounded_camera_recovery_progress_scale(0.20, False, config) == 1.0
+    assert bounded_camera_recovery_progress_scale(0.12, True, config) == 1.0
+    assert bounded_camera_recovery_progress_scale(0.155, True, config) == pytest.approx(
+        0.2
+    )
+    middle = bounded_camera_recovery_progress_scale(0.1425, True, config)
+    assert middle == pytest.approx(0.6)
+
+
+@pytest.mark.parametrize(
+    ("error", "config"),
+    [
+        (-0.01, riser_tracking_config()),
+        (
+            0.15,
+            riser_tracking_config(
+                camera_recovery_error_start_m=0.16,
+                camera_recovery_error_full_m=0.13,
+            ),
+        ),
+        (
+            0.15,
+            riser_tracking_config(minimum_camera_recovery_scale=0.0),
+        ),
+    ],
+)
+def test_camera_recovery_governor_rejects_invalid_contract(
+    error: float, config: WholeBodyTrackingConfig
+) -> None:
+    with pytest.raises(ValueError):
+        bounded_camera_recovery_progress_scale(error, True, config)
 
 
 def test_camera_lever_arm_compensation_is_zero_when_offsets_match() -> None:

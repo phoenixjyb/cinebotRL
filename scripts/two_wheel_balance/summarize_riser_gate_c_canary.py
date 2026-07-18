@@ -15,8 +15,14 @@ EXPECTED_TRACKING_PROFILE = "riser_recovery_direction_v4"
 CAMERA_LEVER_ARM_TRACKING_PROFILE = (
     "riser_recovery_direction_v4_camera_lever_arm_v1"
 )
+CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE = (
+    "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
+)
 CAMERA_LEVER_ARM_COMPENSATION_CONTRACT = (
     "measured_camera_to_base_xy_offset_v1"
+)
+CAMERA_ERROR_GOVERNOR_CONTRACT = (
+    "saturated_camera_error_continuous_phase_cap_v1"
 )
 EXPECTED_RECOVERY_ERROR_RANGE_M = [0.2, 0.4]
 EXPECTED_RISER_THERMAL_FORCE_CONTRACT = "leadshine_400w_first_order_monitor_v1"
@@ -130,6 +136,61 @@ def camera_lever_arm_telemetry_passed(
         and raw_max + 1e-12 >= correction_max
         and 0.0 <= saturation_ratio <= 1.0
     )
+
+
+def camera_error_governor_telemetry_passed(
+    payload: dict[str, object],
+    result: dict[str, object],
+    *,
+    expected_error_range_m: list[float],
+    expected_minimum_scale: float,
+) -> bool:
+    sample_count = result.get("camera_recovery_telemetry_sample_count")
+    activation_ratio = result.get("camera_recovery_activation_ratio")
+    scale_min = result.get("camera_recovery_progress_scale_min")
+    scale_mean = result.get("camera_recovery_progress_scale_mean")
+    trace = result.get("trace")
+    return (
+        payload.get("camera_recovery_governor_enabled") is True
+        and payload.get("camera_recovery_governor_contract")
+        == CAMERA_ERROR_GOVERNOR_CONTRACT
+        and payload.get("camera_recovery_error_range_m")
+        == expected_error_range_m
+        and payload.get("minimum_camera_recovery_scale")
+        == expected_minimum_scale
+        and result.get("camera_recovery_governor_enabled") is True
+        and result.get("camera_recovery_governor_contract")
+        == CAMERA_ERROR_GOVERNOR_CONTRACT
+        and result.get("camera_recovery_error_range_m")
+        == expected_error_range_m
+        and result.get("minimum_camera_recovery_scale")
+        == expected_minimum_scale
+        and result.get("camera_recovery_telemetry_observed") is True
+        and result.get("checks", {}).get("camera_recovery_telemetry_observed")
+        is True
+        and isinstance(sample_count, int)
+        and sample_count == result.get("completed_steps")
+        and all(
+            isinstance(value, (int, float)) and math.isfinite(value)
+            for value in (activation_ratio, scale_min, scale_mean)
+        )
+        and 0.0 < activation_ratio <= 1.0
+        and expected_minimum_scale - 1e-12 <= scale_min <= 1.0
+        and scale_min <= scale_mean <= 1.0
+        and isinstance(trace, list)
+        and len(trace) > 0
+        and all(
+            isinstance(row.get("camera_recovery_progress_scale"), (int, float))
+            and math.isfinite(row["camera_recovery_progress_scale"])
+            and expected_minimum_scale - 1e-12
+            <= row["camera_recovery_progress_scale"]
+            <= 1.0
+            and isinstance(row.get("camera_recovery_active"), bool)
+            for row in trace
+        )
+    )
+
+
 def contract_identity_rows_passed(admission: dict[str, object]) -> bool:
     identities = admission.get("identities")
     checks = admission.get("checks")
@@ -161,23 +222,48 @@ def main() -> int:
     parser.add_argument("--expected-case74-contract-sha256")
     parser.add_argument(
         "--expected-tracking-profile",
-        choices=(EXPECTED_TRACKING_PROFILE, CAMERA_LEVER_ARM_TRACKING_PROFILE),
+        choices=(
+            EXPECTED_TRACKING_PROFILE,
+            CAMERA_LEVER_ARM_TRACKING_PROFILE,
+            CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE,
+        ),
         default=EXPECTED_TRACKING_PROFILE,
     )
     parser.add_argument(
         "--require-camera-lever-arm-compensation", action="store_true"
     )
+    parser.add_argument("--require-camera-error-recovery-governor", action="store_true")
     parser.add_argument("--expected-camera-lever-arm-gain", type=float, default=1.0)
     parser.add_argument(
         "--expected-maximum-camera-lever-arm-correction-m",
         type=float,
         default=0.05,
     )
+    parser.add_argument(
+        "--expected-camera-recovery-error-start-m", type=float, default=0.13
+    )
+    parser.add_argument(
+        "--expected-camera-recovery-error-full-m", type=float, default=0.155
+    )
+    parser.add_argument(
+        "--expected-minimum-camera-recovery-scale", type=float, default=0.20
+    )
     args = parser.parse_args()
     if args.require_camera_lever_arm_compensation and (
-        args.expected_tracking_profile != CAMERA_LEVER_ARM_TRACKING_PROFILE
+        args.expected_tracking_profile
+        not in {
+            CAMERA_LEVER_ARM_TRACKING_PROFILE,
+            CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE,
+        }
     ):
         parser.error("camera lever-arm compensation requires its tracking profile")
+    if args.require_camera_error_recovery_governor and (
+        not args.require_camera_lever_arm_compensation
+        or args.expected_tracking_profile != CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE
+    ):
+        parser.error(
+            "camera error recovery requires lever-arm compensation and its tracking profile"
+        )
     requested = [int(value) for value in args.cases.split(",")]
     admission = args.root / "admission.json"
     admission_payload = json.loads(admission.read_text(encoding="utf-8"))
@@ -244,6 +330,20 @@ def main() -> int:
                 ),
             )
         )
+        camera_error_governor_evidence_passed = (
+            not args.require_camera_error_recovery_governor
+            or camera_error_governor_telemetry_passed(
+                payload,
+                result,
+                expected_error_range_m=[
+                    args.expected_camera_recovery_error_start_m,
+                    args.expected_camera_recovery_error_full_m,
+                ],
+                expected_minimum_scale=(
+                    args.expected_minimum_camera_recovery_scale
+                ),
+            )
+        )
         runtime_contract_passed = (
             payload.get("training_started") is False
             and payload.get("ppo_authorized") is False
@@ -262,6 +362,7 @@ def main() -> int:
             and result.get("executed_residual_dataset") is None
             and result.get("raw_residual_label_applied_to_commands") is False
             and camera_lever_arm_evidence_passed
+            and camera_error_governor_evidence_passed
         )
         row = {
             "case": case,
@@ -275,8 +376,20 @@ def main() -> int:
             "runtime_contract_passed": runtime_contract_passed,
             "controller_evidence_passed": (
                 camera_lever_arm_evidence_passed
+                and camera_error_governor_evidence_passed
                 if args.require_camera_lever_arm_compensation
                 else result.get("controller_evidence_passed")
+            ),
+            "camera_error_governor_evidence_passed": (
+                camera_error_governor_evidence_passed
+                if args.require_camera_error_recovery_governor
+                else None
+            ),
+            "camera_recovery_activation_ratio": result.get(
+                "camera_recovery_activation_ratio"
+            ),
+            "camera_recovery_progress_scale_min": result.get(
+                "camera_recovery_progress_scale_min"
             ),
             "camera_lever_arm_compensation_enabled": result.get(
                 "camera_lever_arm_compensation_enabled"
@@ -389,6 +502,27 @@ def main() -> int:
         "expected_maximum_camera_lever_arm_correction_m": (
             args.expected_maximum_camera_lever_arm_correction_m
             if args.require_camera_lever_arm_compensation
+            else None
+        ),
+        "camera_error_recovery_governor_required": (
+            args.require_camera_error_recovery_governor
+        ),
+        "expected_camera_error_recovery_governor_contract": (
+            CAMERA_ERROR_GOVERNOR_CONTRACT
+            if args.require_camera_error_recovery_governor
+            else None
+        ),
+        "expected_camera_recovery_error_range_m": (
+            [
+                args.expected_camera_recovery_error_start_m,
+                args.expected_camera_recovery_error_full_m,
+            ]
+            if args.require_camera_error_recovery_governor
+            else None
+        ),
+        "expected_minimum_camera_recovery_scale": (
+            args.expected_minimum_camera_recovery_scale
+            if args.require_camera_error_recovery_governor
             else None
         ),
         "controller_evidence_passed": bool(gate_rows)

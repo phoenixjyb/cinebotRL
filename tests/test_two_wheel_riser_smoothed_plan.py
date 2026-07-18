@@ -382,6 +382,8 @@ def test_smoothed_portfolio_composer_is_hash_bound_and_runtime_closed() -> None:
     assert "expected-replacement-sha256" in source
     assert '"parent_plan_sha256"' in source
     assert '"replacement_selected"' in source
+    assert "cinebotrl_two_wheel_riser_dynamic_margin_retime_v1" in source
+    assert "cinebotrl_two_wheel_riser_case74_localized_heading_relief_v1" in source
     assert '"--maximum-duration-median", type=float, default=1.5' in source
     assert '"--minimum-candidates", type=int, default=70' in source
     assert '"isaac_started": False' in source

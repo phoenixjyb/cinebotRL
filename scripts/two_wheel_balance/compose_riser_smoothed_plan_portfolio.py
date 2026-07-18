@@ -15,7 +15,10 @@ import subprocess
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PORTFOLIO_SCHEMA = "cinebotrl_two_wheel_riser_smoothed_plan_export_v1"
 PLAN_SCHEMA = "cinebotrl_two_wheel_riser_smoothed_plan_v1"
-REPLACEMENT_SCHEMA = "cinebotrl_two_wheel_riser_dynamic_margin_retime_v1"
+REPLACEMENT_SCHEMAS = {
+    "cinebotrl_two_wheel_riser_dynamic_margin_retime_v1",
+    "cinebotrl_two_wheel_riser_case74_localized_heading_relief_v1",
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -74,7 +77,7 @@ def main() -> int:
     _require(parent.get("schema") == PORTFOLIO_SCHEMA, "wrong parent schema")
     _require(parent.get("plan_schema") == PLAN_SCHEMA, "wrong parent plan schema")
     _require(
-        replacement.get("schema") == REPLACEMENT_SCHEMA
+        replacement.get("schema") in REPLACEMENT_SCHEMAS
         and replacement.get("passed") is True
         and replacement.get("valid_for_training") is False,
         "replacement is not an admitted CPU-only derivation",

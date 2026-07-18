@@ -459,6 +459,10 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert "CASE_TIMEOUT_SECONDS=1600" in source
     assert 'payload["case_timeout_seconds"] = int(sys.argv[4])' in source
     assert 'timeout --signal=TERM --kill-after=30s "$CASE_TIMEOUT_SECONDS"' in source
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE14_V10_CAMERA_LEVER_ARM_V1" in source
+    assert "20260719_gate_c_smoothed_case14_v10_camera_lever_arm_v1_exclusive" in source
+    assert "e863db5bc93c25bf91f31ac6dbcbd11fa091830290aaf64c58a4a3982d5cae58" in source
+    assert "CASE_TIMEOUT_SECONDS=2100" in source
     assert "20260718_smoothed_plan_all79_v8_case7_dynamic_retime_cpu" in source
     assert "0a6a9361095e3045b2835f2ea96520f2b6e1c378df4feaa394fb87627bc165b2" in source
     assert "a83934dab6e4293cd830397d3c2ffb41d4f4d78545dddec7fdfa630fa0d22f41" in source

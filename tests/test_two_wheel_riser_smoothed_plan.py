@@ -485,6 +485,8 @@ def test_explicit_preview_derivation_is_hash_bound_and_training_closed(
     ).read_text(encoding="utf-8")
     assert 'default=0.15' in source
     assert 'default=2.75' in source
+    assert 'source_manifest.get("episode_count") == args.expected_count' in source
+    assert 'len(source_items) == args.expected_count' in source
     assert 'smoothing_sigma_candidates=(0.0,)' in source
     assert 'failed == ["position_p95_bounded"]' in source
     assert '"source_geometry_changed": False' in source

@@ -121,7 +121,13 @@ def main() -> int:
         args.gate_summary, args.expected_gate_summary_sha256
     )
 
-    _require(source_manifest.get("case_count") == args.expected_count, "bad source count")
+    source_items = source_manifest.get("items")
+    _require(
+        source_manifest.get("episode_count") == args.expected_count
+        and isinstance(source_items, list)
+        and len(source_items) == args.expected_count,
+        "bad source count",
+    )
     items = parent.get("items")
     _require(isinstance(items, list) and len(items) == args.expected_count, "bad parent")
     parent_item = next((item for item in items if item.get("case") == args.case), None)

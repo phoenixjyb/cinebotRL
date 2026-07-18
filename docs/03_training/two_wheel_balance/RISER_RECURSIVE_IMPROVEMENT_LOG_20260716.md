@@ -1551,3 +1551,39 @@ and must state whether its candidate was accepted or rejected.
 - Keep source anchors, LQR, deterministic controller, camera correction,
   physical gates, thermal model, and residual scales unchanged. Keep residual
   capture, BC, PPO, and training closed.
+
+## Round 45: case-14 dynamic qualification
+
+- Published the case-14-only runtime contract at commit
+  `23dd27cc63a85b15a31fba92770e202661ad9b37` and ran it in
+  `20260719_gate_c_smoothed_case14_v10_camera_lever_arm_v1_exclusive`. The
+  hashed admission records the `2100 s` shell wall bound and only plan
+  `e863db5bc93c25bf91f31ac6dbcbd11fa091830290aaf64c58a4a3982d5cae58`.
+- The case completed `25777` physics steps and both clocks:
+  `33.754608 s` source and `52.432971 s` execution. Position p95/max passed at
+  `0.076035/0.135208 m` against the unchanged `0.15/0.25 m` gates.
+- Attitude p95/max passed at `0.123322/0.239985 deg`; pitch max was
+  `6.822419 deg`; internal attitude IK had zero failures, proxy rate max was
+  `49.104633 deg/s`, and no termination occurred.
+- Action saturation was `0.0000776`; proxy and riser saturation were zero.
+  Riser effort max was `19.640121 N`, thermal load max was `0.001763`, and all
+  thermal, runtime, and controller-evidence gates passed.
+- The prospective residual envelope passed with normalized maxima
+  `[0.909717, 0.323437, 0.127760]`. Residual action remained exactly zero and
+  unapplied, and no dataset was written.
+- This raises the uniquely dynamically qualified set to `27/70`. Residual
+  capture, BC, PPO, and training remain closed.
+- Evidence hashes:
+  - runtime admission: `15d4671cabe75006a8fbd9d4b53dabc968f21fc97a1ac4d33672442cd269d33f`;
+  - case-14 gate JSON: `b3d3774c60f04163ca235bf55707fdccf52b4f4bb982dc6afade5fd0482c23cf`;
+  - case-14 log: `2593d142e2fc6136cf6de0b3ff940d44401a88ef35cecdead2653584d72dcd37`;
+  - final summary: `6dd9a2978cd1e68e12a31b8e0b9fca4f94595d18a5e86217f232ef50f307db4d`.
+- The case exit code is `0`; GPU and playback ownership were empty after
+  closure.
+
+## Next round after Round 45
+
+- Inspect v10 case 15 CPU admission and execution duration. If admitted, add
+  a fresh case-only contract with a duration-derived bounded wall timeout.
+- Keep the exact-source/derived provenance boundary and all learning closures
+  unchanged.

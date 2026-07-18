@@ -1439,3 +1439,41 @@ and must state whether its candidate was accepted or rejected.
   safety gates. Count it only from sealed dynamic evidence.
 - Keep case 13 unstarted until case 9 passes. Keep residual capture, BC, PPO,
   and training closed.
+
+## Round 42: case-9 retimed dynamic qualification
+
+- Published the detached v10 case-9 runtime contract at commit
+  `ecff98034194fe9fc6d0e4362d872c591715ed7c` and ran only retimed case 9 in
+  `20260718_gate_c_smoothed_case9_dynamic_retime_v1_exclusive`.
+- The case completed `6608` physics steps and both clocks:
+  `12.940941 s` source and `18.117317 s` execution. Position p95/max improved
+  from `0.150626/0.168788 m` to `0.131352/0.143312 m`, passing the unchanged
+  `0.15/0.25 m` gates.
+- Attitude p95/max passed at `0.150890/0.219478 deg`; pitch max was
+  `6.171498 deg`; action, proxy, and riser saturation were all zero. No
+  termination occurred, internal attitude IK had zero failures, and all
+  controller-evidence, runtime-contract, and thermal-admission checks passed.
+- Riser effort max was `17.154804 N` and thermal load max `0.001085`. The
+  `0.05 m` camera correction remained unchanged and saturated for `91.8130%`
+  of policy-rate samples.
+- The frozen prospective residual envelope passed with normalized maxima
+  `[0.768161, 0.403818, 0.125279]`. Residual action remained exactly zero,
+  was not applied to the deterministic commands, and no dataset was written.
+- This raises the uniquely dynamically qualified set to `25/70`. Residual
+  capture, BC, PPO, and training remain closed.
+- Evidence hashes:
+  - runtime admission: `e495ea1d80ac4293eda113a26ac0b2f1f2d2c3e1c14fa54331aee3b75f551c20`;
+  - case-9 gate JSON: `3881e31b4b08ac1be6a8ac51aeb80b465ba44558080bf247851ce7da34d46461`;
+  - case-9 log: `e13264326f35066a1bd9e1bedb9a9f77f84685742566d4815218e59604d03284`;
+  - final summary: `aa4adcaf7fc27d48b5fae574655dc425eaddd2332705f6a0d9dc67071657d089`.
+- The wrapper closed fail-safe with the complete summary marked passed; GPU
+  and playback ownership were empty after closure.
+
+## Next round after Round 42
+
+- Continue in source order with one fresh, hash-bound v10 case-13-only dynamic
+  canary. Use a detached wrapper and the same exclusive ownership guard.
+- Do not alter the LQR, deterministic controller, source anchors, v10 plans,
+  physical gates, camera correction, thermal model, or residual scales.
+- Count case 13 only from sealed dynamic evidence. Keep residual capture, BC,
+  PPO, and training closed regardless of outcome.

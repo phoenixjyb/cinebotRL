@@ -1,6 +1,7 @@
 # Semantic Branch Lookback Status
 
 Date: 2026-07-17
+Updated: 2026-07-18
 
 ## Purpose
 
@@ -35,45 +36,59 @@ alternative survives.
 
 ## Verification
 
-- Focused retarget/checkpoint suite: `49 passed`, two pre-existing pytest
+- Foundation commit verification: focused `49 passed`; repository-wide `253
+  passed`.
+- Production integration commit
+  `3c7f83f929e01159926f8e1930271b3db3d4bee9`: focused retarget/checkpoint
+  `53 passed`; all `test_two_wheel*.py` files `181 passed`; repository-wide
+  `257 passed`. All runs report only the same two pre-existing pytest
   configuration warnings.
-- Repository-wide suite: `253 passed`, the same two warnings.
 - Python compilation and `git diff --check` pass.
-- Branch and GitHub remote both point to `e319bd5` after push.
+- Windows-Python checkpoint code-contract SHA-256 at `3c7f83f` is
+  `25d30b95ad0c0ce8a4848c1f3c4d8e627ab208295f5938de6c4ed3928eff6f5a`.
+- Local branch and GitHub ref `codex/ep4-time-reparameterization` both point to
+  `3c7f83f` after push.
+
+## Production integration
+
+Commit `3c7f83f` adds three default-disabled, checkpoint-identity-bound options:
+
+- `--enable-semantic-branch-lookback`
+- `--semantic-branch-lookback-source-intervals` (default `6`)
+- `--semantic-branch-beam-width` (default `4`, bounded to `2..4` when enabled)
+
+When explicitly enabled for a checkpoint resume, the production solver loads
+the checkpoint through the existing fail-closed identity/source validator,
+rewinds only complete source intervals, and runs deterministic complete-history
+ranking variants through the checkpoint's prior rejection interval. Speculative
+histories never write the checkpoint. Only distinct histories that pass every
+unchanged hard gate are retained. The selected crossing prefix is atomically
+saved before the normal greedy continuation resumes.
+
+The four ranking variants preserve the same feasibility predicate and differ
+only in deterministic ordering: existing score, gravity-first,
+position-first, and source-arm-continuity-first. Branch count, lineage,
+rejections, selection, and local/one-step future scores are emitted in the
+result diagnostics. The default-disabled path calls the original single-branch
+solver, and its resumed-vs-uninterrupted regression remains exact.
 
 ## Deliberate runtime boundary
 
-The current commit adds no CLI option and does not call either helper from the
-production semantic solver. Existing greedy behavior, checkpoint identity,
-source geometry/timestamps, rate limits, plant, physical gates, output schema,
-and candidate admission are unchanged. No ep4/ep7 solver run, Isaac playback,
-capture, BC, PPO, or residual learning was launched.
+No source position, attitude, timestamp, map, plant, rate limit, gravity/pitch,
+tracking, gimbal, or admission gate was changed. The old derived ep4 checkpoint
+cannot be consumed directly because the new commit, code-contract, and CLI
+identity are intentionally different; any future use requires a separately
+reviewed lineage-safe checkpoint migration.
 
-This foundation is not evidence that ep4 passes. It is not valid for dynamic
-evaluation or training.
+No ep4/ep7 solver run, Isaac playback, capture, BC, PPO, or residual learning
+was launched. The integration is not evidence that ep4 passes and remains
+invalid for dynamic evaluation or training.
 
-## Required integration before another canary
+## Next review gate
 
-The next code-only patch must:
-
-1. Add default-disabled, checkpoint-identity-bound settings for lookback source
-   intervals and beam width.
-2. On an explicitly requested resume, load and validate the original
-   checkpoint first, then rewind through the reviewed helper.
-3. Generate more than one complete hard-feasible interval alternative from
-   each retained branch; do not merely rename a one-step greedy rank.
-4. Retain deterministic branch history across the bounded window and score
-   future target reachability plus gravity slack without changing any hard
-   gate.
-5. Collapse to one branch only after crossing the previous rejection interval,
-   then continue the unchanged greedy path.
-6. Emit branch lineage/count/rejection diagnostics and bind every setting into
-   the checkpoint code/CLI identity.
-7. Prove disabled-default equivalence, exact prefix/map/clock preservation,
-   deterministic beam behavior, and fail-closed resume/config mismatch in
-   focused and full CPU tests.
-
-Only after that patch is independently reviewed should one fresh, CPU-only,
-training-disabled ep4 canary be considered. Gate relaxation, additional
-waypoint reduction, larger geometric relief, Isaac, and learning remain out of
-scope.
+Before any new ep4 canary, independently review the production diff and approve
+one lineage-safe migration of the existing verified prefix to commit `3c7f83f`
+with the opt-in lookback settings sealed in its identity. A future canary must
+remain CPU-only, bounded, single-owner, and training-disabled. Gate relaxation,
+additional waypoint reduction, larger geometric relief, Isaac, and learning
+remain out of scope.

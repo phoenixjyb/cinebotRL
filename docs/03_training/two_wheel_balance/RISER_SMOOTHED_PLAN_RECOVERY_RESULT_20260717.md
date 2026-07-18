@@ -7,10 +7,11 @@ Planner commit: `26e90ed96e2460ad1f33293166f5c06dedf1c9fc`
 ## Decision
 
 The bounded CPU recovery improved timing/transition/kinematic admission from
-`63/79` to `70/79`. The required `>=70` Gate-B count is now met. A bounded,
-deterministic Gate-C canary may be prepared under exclusive GPU ownership, but
-residual capture, BC, PPO, and differential-session work remain closed. All
-exported plans remain `valid_for_training=false`.
+`63/79` to `70/79`. The required `>=70` Gate-B count is met. The first
+smoothed-plan Gate-C canary, case 77, is a deterministic dynamic rejection
+because it did not complete under the frozen phase governor. Residual capture,
+BC, PPO, and differential-session work remain closed. All exported plans and
+runtime evidence remain `valid_for_training=false`.
 
 No source arrays, source hashes, physical limits, duration threshold, path
 threshold, position threshold, or gimbal-rate threshold were changed. Existing
@@ -137,11 +138,79 @@ The recovered plan has effectively zero lateral velocity
 rate at the unchanged `1.0 m/s` limit, and proxy rate at the unchanged
 `24 deg/s` limit.
 
+## Smoothed Gate-C case-77 result
+
+The first isolated namespace stopped before dynamics because the generic
+playback loader did not yet understand the nested smoothed-plan metadata:
+
+```text
+/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/
+20260718_gate_c_smoothed_case77_v1_exclusive
+
+runtime exception: KeyError('vertical_shift_m')
+dynamic / thermal result: null / null
+dataset / BC / PPO: none / false / false
+```
+
+This namespace is preserved as a consumed schema-failure audit. Commit
+`cd5ed94802165718d73266c2a52a527ad9c37045` added fail-closed support for the
+versioned `smoothed_target` metadata block. The authoritative CPU suite then
+passed `281/281` tests in two explicit chunks (`123 + 158`).
+
+The corrected one-case run used a new token and namespace:
+
+```text
+/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/
+20260718_gate_c_smoothed_case77_v2_exclusive
+
+ff064be8368f19b3508cd14e3c4d583f9ff970300a8d9ca1d6115d96955c341b  admission.json
+0d6133125f78831c93820e0a00ba1bbe6803ebfb217a3262e81174cbbd722fa4  gates/case_0077.json
+423a54577e74d82fbf750121428eac0bdd8eb1c3a5f71c2aaaf340076ccd9089  logs/case_0077.log
+59771700ce07e47726ce412777f496a76e77b277cb3e40dd7f01f629e2fc4a2e  summary.json
+```
+
+Case 77 passed every physical check except reference completion:
+
+```text
+source / execution duration:             5.431279 / 5.431279 s
+completed phase / 2x runtime horizon:     3.753394 / 10.862558 s
+position p95 / max:                       0.096049 / 0.101564 m
+pitch p95 / max:                          6.779128 / 7.253576 deg
+attitude p95 / max:                       0.124822 / 0.169612 deg
+thermal admission:                        pass
+action/riser/proxy saturation:            0 / 0 / 0
+termination:                              none
+dynamic quality:                          fail (completed_reference only)
+```
+
+The trace identifies a phase-governor lock rather than geometric divergence.
+Pitch settles near `6.27 deg`; the unchanged `3..8 deg` balance governor then
+holds progress near `0.345` even while camera error remains below `0.10 m`.
+The prospective raw residual envelope independently fails on `delta_vx`:
+
+```text
+raw residual abs max:                     [0.314832, 0.003819, 0.008910]
+normalized prospective label abs max:     [1.049442, 0.009548, 0.089099]
+residual applied to commands:              false
+residual dataset:                          none
+```
+
+No playback or compute owner remained after the run. This is the first final
+dynamic reject for the smoothed portfolio, so no additional Gate-C episode may
+start from this result.
+
 ## Exact continuation
 
-Re-read the current Gate-C handoff and runtime authorization contract. Then,
-only with exclusive GPU ownership, run one bounded deterministic canary from
-the accepted plans and stop on the first physical/safety/quality failure.
-Gate C must record source and execution clocks separately, raw residual-envelope
-status independently from dynamic quality, and no residual labels or dataset.
-Do not start case batches, residual capture, BC, or PPO from this CPU result.
+Perform one CPU-only derived-plan audit for case 77 with uniform `1.4x`
+execution retiming. Keep source arrays, source clocks, source ordering, EE path,
+base/RS4 decomposition, controller, governor, and all thresholds unchanged;
+scale only the execution clock and corresponding feed-forward derivatives.
+The candidate would reduce planned peak base speed from `0.390782` to
+`0.279130 m/s`, while the accepted-portfolio duration median remains
+`1.497221x`. It must receive a new plan/manifest hash and remain
+`valid_for_training=false`.
+
+Stop after CPU duration, path, transition, kinematic, provenance, and portfolio
+median checks. Do not authorize another Isaac canary until that derived
+candidate and its evidence contract are reviewed. Do not start case batches,
+residual capture, BC, or PPO.

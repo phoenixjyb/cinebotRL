@@ -826,3 +826,44 @@ clocks, reverse-path reset, 16-sample smoothing, and `0.642741 m` vertical shift
 were unchanged. No namespace or trajectory result was created. The corrected
 preflight pins each case's exact planning strategy rather than weakening the
 strategy check.
+
+## Tranche-2 result
+
+The strategy correction was committed and pushed at
+`bf3d263276a9e82fb0b7fee75bdea5ece8f5cfdf`. The complete `.98` suite passed
+`307/307`, the namespace remained fresh, and all five cases passed their full
+deterministic dynamic, thermal, and runtime gates:
+
+```text
+20260718_gate_c_smoothed_tranche2_24_19_28_70_26_horizon300_wzkp105_v1_exclusive
+
+d82e215833e95a3e2a85c07cbb8b7152ecb58b7ea7062c0ea6b0030c5a5caf3c  admission.json
+73e993f50c9ce181b6f2d9dfa0ab945e3adaba268b87ded85dd93921a0b3df14  gates/case_0024.json
+a8627ac85f07b46350942b87193e00bf14e5bf21c242d9407f946c1694321a64  gates/case_0019.json
+3b5e6c86baa85f36556e361270fd7f69873350f7841f880130188570c92728af  gates/case_0028.json
+e6a213460a46ccc7c3ea09163c05a37760b1fe4e3c2819e773f53eed378ec792  gates/case_0070.json
+a01ff8491f9355468362c2325f35f7ac790c956d4579e02b08543d60cad12703  gates/case_0026.json
+12067c812c82ae3771f06c383cf94a573bd8fa0967f04ea4119b030a520d2c0c  summary.json
+
+case 24 position p95/max:                    0.071287 / 0.071540 m
+case 19 position p95/max:                    0.135242 / 0.139935 m
+case 28 position p95/max:                    0.116714 / 0.117979 m
+case 70 position p95/max:                    0.115939 / 0.138332 m
+case 26 position p95/max:                    0.141104 / 0.150198 m
+dynamic / thermal / runtime:                 all pass
+label envelope pass cases:                   [24, 26]
+label envelope reject cases:                 [19, 28, 70]
+all process exit codes:                      0
+dataset / residual applied / training:       none / false / false
+```
+
+The deterministic pass set is now
+`{10, 11, 12, 19, 23, 24, 26, 28, 52, 53, 70, 74, 77}`, or 13/70. The three
+new label overflows are 6.69%, 6.54%, and 2.04% on the frozen first channel;
+they remain Gate-D evidence and did not affect commands. Fifty-seven admitted
+cases remain, totaling `1680.226997 s` of execution clock.
+
+The next five shortest cases are `(25, 66, 68, 67, 7)`, totaling
+`67.430270 s`. All five use the exact `smoothed_preview_0.05m_g2.75` strategy.
+Their next wrapper must retain the 3.0x horizon, exact hashes/clocks/order,
+fail-fast physical admission, independent label admission, and training closure.

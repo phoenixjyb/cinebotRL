@@ -369,6 +369,60 @@ def test_smoothed_tranche2_gate_rejects_missing_authorization() -> None:
     assert "tranche-2 Gate C authorization is absent or unknown" in result.stderr
 
 
+def test_smoothed_tranche3_gate_is_ordered_hash_bound_and_fail_fast() -> None:
+    source = _read("run_riser_smoothed_gate_c_tranche3.sh")
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_TRANCHE3_25_66_68_67_7_HORIZON300_V1" in source
+    assert "20260718_gate_c_smoothed_tranche3_25_66_68_67_7_horizon300_wzkp105_v1_exclusive" in source
+    assert 'CASES="25,66,68,67,7"' in source
+    assert "for CASE in 25 66 68 67 7" in source
+    assert 'MAXIMUM_DURATION_SCALE="3.00"' in source
+    assert 'CONTROLLER_WZ_KP="1.05"' in source
+    assert (
+        r'PORTFOLIO_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${PORTFOLIO_STAMP}"'
+        in source
+    )
+    assert r'OUTPUT_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${STAMP}"' in source
+    for plan_sha in (
+        "ac47ef0a8fef58fc8face3e8800b63283fe2d72da27321daeb44d59b8fe555c7",
+        "ebdaf9a2e60e66c6231931bec6087c0b36a0895e22d4ee659e2b056b9b21bc37",
+        "4f4fc302402c53533f4bdbed33682bf52971a6f0cb93af3b42bd6da5ffeed142",
+        "e7acb5b9ca748645d878d360f357feb82e89b968f92d86c2639f2b74e03950e0",
+        "421f9f74a9f56cb79b49611355d9520489bf0bbe7204212ba169b84591fa4cd0",
+    ):
+        assert plan_sha in source
+    for duration in (
+        "13.159482674279998",
+        "13.56287393451732",
+        "13.562891285858488",
+        "13.562899771959323",
+        "13.582122465552235",
+    ):
+        assert duration in source
+    assert source.count('"smoothed_preview_0.05m_g2.75"') == 5
+    assert 'summary.get("dynamically_passed_cases") == [25, 66, 68, 67, 7]' in source
+    assert 'gate.get("maximum_duration_scale") == 3.0' in source
+    assert "case_gate_passed" in source
+    assert 'case_$(printf \'%04d\' "$CASE").exit_code' in source
+    assert 'isinstance(result.get("residual_label_envelope_passed"), bool)' in source
+    assert "tranche-3 Gate C stopped on case %s" in source
+    assert "[r]etarget_exact_source_v1_nonholonomic" in source
+    assert 'result.get("executed_residual_dataset") is None' in source
+    assert "--dataset-dir" not in source
+
+
+def test_smoothed_tranche3_gate_rejects_missing_authorization() -> None:
+    wrapper = SCRIPTS / "run_riser_smoothed_gate_c_tranche3.sh"
+    result = subprocess.run(
+        ["bash", str(wrapper)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={},
+    )
+    assert result.returncode == 7
+    assert "tranche-3 Gate C authorization is absent or unknown" in result.stderr
+
+
 def test_case74_localized_heading_relief_derivation_is_hash_bound_and_closed() -> None:
     source = _read("derive_riser_smoothed_case74_heading_relief.py")
     assert "cinebotrl_two_wheel_riser_case74_localized_heading_relief_v1" in source

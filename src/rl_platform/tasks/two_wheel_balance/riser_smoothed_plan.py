@@ -961,7 +961,7 @@ def build_case74_localized_heading_relief(
 
     passed = [result for result in results if result.passed]
     _require(bool(passed), "no localized heading relief candidate passed CPU gates")
-    return min(
+    selected = min(
         passed,
         key=lambda result: (
             result.localized_heading_relief[
@@ -970,6 +970,16 @@ def build_case74_localized_heading_relief(
             result.plan.time_s[-1],
             result.kinematic_metrics["position_error_p95_m"],
         ),
+    )
+    return replace(
+        selected,
+        attempts=tuple(attempts),
+        localized_heading_relief={
+            **selected.localized_heading_relief,
+            "search_attempt_count": len(attempts),
+            "search_configuration_count": len(configurations),
+            "search_evidence_complete": len(attempts) == len(configurations),
+        },
     )
 
 

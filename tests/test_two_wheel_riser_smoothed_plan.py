@@ -2,9 +2,12 @@ from dataclasses import replace
 import importlib.util
 from pathlib import Path
 import string
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
+
+import rl_platform.tasks.two_wheel_balance.riser_smoothed_plan as smoothed_plan
 
 from rl_platform.tasks.two_wheel_balance.riser_playback import RiserPlaybackPlan
 from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (
@@ -14,6 +17,7 @@ from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (
     SMOOTHING_SIGMA_CANDIDATES,
     SmoothedPlanResult,
     batch_unicycle_recovery_seed_eligible,
+    build_case74_localized_heading_relief,
     derived_reset_yaw_rad,
     localized_heading_relief_positions,
     retime_smoothed_plan_from_demands,
@@ -130,6 +134,62 @@ def test_localized_heading_relief_rejects_unbounded_inputs() -> None:
             stronger_sigma_samples=2.0,
             relief_blend_factor=1.1,
         )
+
+
+def test_localized_heading_relief_records_the_complete_search(monkeypatch) -> None:
+    count = 590
+    source = SimpleNamespace(
+        case=74,
+        source_position_world_m=np.column_stack(
+            (
+                np.linspace(0.0, 4.0, count),
+                0.1 * np.sin(np.linspace(0.0, 6.0, count)),
+                np.ones(count),
+            )
+        ),
+        source_time_s=np.array([0.0, 10.0]),
+    )
+    parent = source.source_position_world_m.copy()
+
+    def fake_build_candidate(*args, **kwargs):
+        sigma = float(kwargs["sigma_samples"])
+        blend = float(kwargs["smoothing_blend_factor"])
+        variation = abs(sigma - 24.0) + abs(blend - 0.75)
+        yaw = np.linspace(0.0, variation, count)
+        plan = SimpleNamespace(
+            base_xy_yaw=np.column_stack((np.zeros(count), np.zeros(count), yaw)),
+            time_s=np.array([0.0, 15.0 + variation]),
+        )
+        return SmoothedPlanResult(
+            plan=plan,
+            smoothed_position_source_frame_m=kwargs[
+                "smoothed_position_override_m"
+            ],
+            smoothing_sigma_samples=sigma,
+            smoothing_blend_factor=blend,
+            lookahead_distance_m=0.25,
+            heading_gain=2.75,
+            reset_yaw_mode="source",
+            reset_yaw_rad=0.0,
+            path_metrics={},
+            transition_metrics={},
+            kinematic_metrics={
+                "position_error_p95_m": 0.1 + variation * 1e-4,
+                "position_error_max_m": 0.12 + variation * 1e-4,
+            },
+            kinematic_checks={"position_p95_bounded": True},
+            checks={"integrity": True},
+            attempts=(),
+        )
+
+    monkeypatch.setattr(smoothed_plan, "_build_candidate", fake_build_candidate)
+    result = build_case74_localized_heading_relief(source, object(), parent)
+    assert result.smoothing_sigma_samples == 24.0
+    assert result.smoothing_blend_factor == 0.75
+    assert len(result.attempts) == 7
+    assert result.localized_heading_relief["search_attempt_count"] == 7
+    assert result.localized_heading_relief["search_configuration_count"] == 7
+    assert result.localized_heading_relief["search_evidence_complete"] is True
 
 
 def test_reset_yaw_is_derived_from_immutable_source_direction() -> None:

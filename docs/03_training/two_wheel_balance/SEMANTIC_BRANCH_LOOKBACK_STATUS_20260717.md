@@ -129,6 +129,38 @@ under the bound: every process discarded completed rank outcomes and replayed
 the expensive interval-50 search. Commit `8a3632f` fixes that persistence defect
 without changing solver behavior.
 
+## Persisted four-rank outcome
+
+The accepted prefix was migrated to clean pushed tip `d3125d8` with code
+contract `b90809aa...`. The migration changed exactly `git_commit` and
+`code_contract_sha256`; all nine checkpoint arrays remained byte-identical.
+The migrated main checkpoint SHA-256 is
+`dcd4e6e320ed74f83e41be888b5124a10a4bb350b5b84a78bb1393f10e94f569`.
+
+Bounded, single-owner CPU tranches then completed all four deterministic rank
+variants. Ranks 0, 1, 2, and 3 all rejected at semantic interval 50. The final
+rank reported `0.057255 m` position error, `0.033310 deg` attitude error,
+`29.503980 Nm` gravity, `3.928948083 deg` equilibrium pitch, and
+`0.016186103` minimum gimbal margin against the unchanged `0.005` hard
+requirement. Across the beam, `hard_feasible_distinct_history_count=0`.
+
+The identity-bound journal now has selection status `exhausted`, SHA-256
+`36e2d522b8d977bd63942bb6b330101a274dafd370667a6fa6999396878d08e3`,
+and four durable rejected histories. The main checkpoint is unchanged, no
+successful rank checkpoint or candidate NPZ exists, and the final fail-closed
+result remains `valid_for_dynamic_evaluation=false` and
+`valid_for_training=false`.
+
+Final namespace:
+
+`gate1_ep4_relief20mm_reservecap8_branchjournal_d3125d8_canary_v7_20260718`
+
+Final result SHA-256:
+`40cc2c81b404df41df67436c355d401c29a773512c382c3b940b393e51cb78d9`.
+
+Final summary SHA-256:
+`6596b59e8342c7a4ecea501a3999c4b3c1f48678bad73ce846e9f73dfed517ca`.
+
 ## Deliberate runtime boundary
 
 No source position, attitude, timestamp, map, plant, rate limit, gravity/pitch,
@@ -138,24 +170,16 @@ code-contract identity are intentionally different; any future use requires a
 separately reviewed lineage-safe checkpoint migration. Its CLI config and all
 solver settings remain unchanged.
 
-No canary under commit `8a3632f`, ep7 run, Isaac playback, capture, BC, PPO, or
-residual learning was launched. The bounded v1-v3 runs are computational
+CPU-only canaries under the post-`8a3632f` code contract were launched solely
+to complete the persisted four-rank diagnostic. No ep7 run, Isaac playback,
+capture, BC, PPO, or residual learning was launched. These are computational
 diagnostics only; ep4 remains invalid for dynamic evaluation and training.
 
 ## Next review gate
 
-Before any new ep4 canary, independently review implementation commit `8a3632f`
-and approve one lineage-safe migration of the unchanged `23bca6b` checkpoint
-prefix to the clean pushed branch tip used for execution. That tip must contain
-`8a3632f` and report code contract `b90809aa...`. The identity change must be
-exactly `git_commit` plus `code_contract_sha256`; all 11 checkpoint identity
-fields, CLI config, source/package/seed/URDF hashes, nine arrays, next interval
-50, retimed count, source/map-expanded clock, and training-disabled flags must
-be audited. The old checkpoint must be preserved and no old journal/variant
-file may be reused.
-
-Only after that migration audit passes may one fresh CPU-only, 1800-second,
-single-owner canary resume the same four-rank search. On timeout it must preserve
-the new journal and any completed rank checkpoints, then stop for audit. Gate
-relaxation, additional waypoint reduction, larger geometric relief, ep7, Isaac,
-playback, capture, BC, PPO, and residual learning remain out of scope.
+Do not rerun this four-rank ep4 search: its deterministic beam is exhausted at
+interval 50 under the current source, derived timing, plant, and unchanged
+gates. Any next ep4 action requires a separately reviewed upstream/solver
+proposal with new evidence and provenance; it must not silently relax a gate or
+mutate this derived package. Ep7, Isaac, playback, capture, BC, PPO, and residual
+learning remain out of scope.

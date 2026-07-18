@@ -1381,3 +1381,61 @@ and must state whether its candidate was accepted or rejected.
   still requires independent dynamic evidence.
 - Preserve the v9 portfolio, fail-fast ordering, LQR/controller/gates, and all
   training-closure invariants.
+
+## Round 40: case-9 transport interruption and sealed p95-only retry
+
+- The first `[9,13]` namespace started case 9 but its SSH-bound wrapper exited
+  `255` after Isaac initialization, wrote no gate JSON, and correctly left
+  case 13 unstarted. It is preserved as infrastructure-interrupted evidence,
+  not a trajectory result.
+- Live cleanup found no remaining Isaac/Python/GPU owner and Windows memory had
+  recovered to approximately `21 GB` free. The retry used a fresh namespace
+  and a `nohup`-detached wrapper reparented to init so SSH transport could not
+  terminate the simulation.
+- The detached case 9 completed all `6100` steps and both
+  `13.582122/12.940941 s` execution/source clocks. It failed only
+  `position_p95_bounded`: `0.150626389 m` versus `0.15 m`, an excess of
+  `0.000626389 m`. Position max `0.168787626 m`, attitude, balance, thermal,
+  riser/proxy, saturation, completion, controller evidence, runtime, and
+  residual-envelope checks all passed. Case 13 remained unstarted.
+- Residual actions remained zero and unapplied; no dataset, capture, BC, PPO,
+  or training stage opened.
+- Retry evidence hashes:
+  - runtime admission: `74749e4357d33a60cdc9187272189c754715af968c2a0b0cf60bfd610c897dce`;
+  - case-9 gate/log: `b46a5e689f3cca12478b69bd2fbfb6c02b17c20bd5e87607ba2dd9641ba504e1` /
+    `d629ec2f4c1b9c9314b2a962763ec6ced2a4d9c3ccc68b549efea3bac50d76b6`;
+  - final summary: `bc5b58a82e99306c9cbcedba1b35bbe36edeb504fe23e6ec13e5f54de96bea1a`;
+  - detached outer log: `cd7578eaa48de4ab31e0fcd77336586d5cae4655b0d93cdc68200e1b4e696ebf`.
+- Corrected the CPU derivation admission to bind the failing case row,
+  first-reject runtime evidence, dynamically passed prefix, and unstarted
+  suffix independently from aggregate summary health. The complete suite
+  passes `324` tests at commit `c82e3658a7769a424a26eb22a203cd0b4ae39d52`.
+
+## Round 41: case-9 source-preserving retime candidate
+
+- Derived case 9 at execution/source ratio `1.4` from the sealed retry. Every
+  source pose, timestamp, target/base/riser/proxy state, endpoint, ordering,
+  and initialization array is unchanged; only execution time and derived
+  feed-forward rates change.
+- Execution duration is `18.117317 s`; maximum base/riser speeds are
+  `0.299870/0.685982 m/s`. All duration, path, transition, kinematic,
+  camera-height, array-identity, and training-closure checks pass.
+- Composed the v10 all-79 portfolio, preserving the prior case-7 and case-8
+  retimes and adding only case 9. It remains `70/79` CPU-admitted with median
+  ratio `1.499794`; static case-9 runtime admission passes and training remains
+  false.
+- CPU artifact hashes:
+  - case-9 retimed plan: `195249929b363e49fcc73a2600c2d7de9dc9d9fedf0bb9ed0718a44e76bf3fd3`;
+  - derivation manifest/summary: `06652c6b74ff22beb62b840bac26f215da0a2156e044f31158614ad71bd991c7` /
+    `d2a2ef8db7091cfc973720e005d13aa4616cdb8fe2c1bd51c75782a11951bf72`;
+  - v10 portfolio manifest/summary: `229a76e3003b2e31a0d1a7a7cd34cda208b292638e7039e79198c951e034cda1` /
+    `58a480469ef4dcfbd93b90c4f1aa27426dfdd1a75afc66ba4e4cee5f90966fbd`;
+  - case-9 static admission: `1ac875218dbcaaf4c694250cc19be8938543fbb6c7a95bc09dc822a5bace7222`.
+- No Isaac/GPU run or learning stage was started by this CPU retime step.
+
+## Next round after Round 41
+
+- Run one detached, hash-bound v10 case-9 canary under unchanged physical and
+  safety gates. Count it only from sealed dynamic evidence.
+- Keep case 13 unstarted until case 9 passes. Keep residual capture, BC, PPO,
+  and training closed.

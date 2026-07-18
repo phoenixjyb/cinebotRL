@@ -12,6 +12,12 @@ from pathlib import Path
 
 EXPECTED_CONTROLLER_PROFILE = "structural_robust_v1"
 EXPECTED_TRACKING_PROFILE = "riser_recovery_direction_v4"
+CAMERA_LEVER_ARM_TRACKING_PROFILE = (
+    "riser_recovery_direction_v4_camera_lever_arm_v1"
+)
+CAMERA_LEVER_ARM_COMPENSATION_CONTRACT = (
+    "measured_camera_to_base_xy_offset_v1"
+)
 EXPECTED_RECOVERY_ERROR_RANGE_M = [0.2, 0.4]
 EXPECTED_RISER_THERMAL_FORCE_CONTRACT = "leadshine_400w_first_order_monitor_v1"
 EXPECTED_RECOVERY_TELEMETRY_SCHEMA = "riser_recovery_direction_policy_rate_v1"
@@ -71,8 +77,13 @@ def recovery_telemetry_passed(result: dict[str, object]) -> bool:
         and telemetry["candidate_yaw_saturation_step_count"] <= active
         and telemetry["legacy_yaw_saturation_step_count"] <= active
         and telemetry["candidate_vs_legacy_delta_nonzero_step_count"] <= active
-        and isinstance(telemetry.get("candidate_vs_legacy_yaw_delta_abs_max_rad_s"), (int, float))
-        and math.isfinite(telemetry["candidate_vs_legacy_yaw_delta_abs_max_rad_s"])
+        and isinstance(
+            telemetry.get("candidate_vs_legacy_yaw_delta_abs_max_rad_s"),
+            (int, float),
+        )
+        and math.isfinite(
+            telemetry["candidate_vs_legacy_yaw_delta_abs_max_rad_s"]
+        )
         and telemetry["candidate_vs_legacy_yaw_delta_abs_max_rad_s"] >= 0.0
         and isinstance(telemetry.get("recovery_blend_max"), (int, float))
         and math.isfinite(telemetry["recovery_blend_max"])
@@ -80,6 +91,45 @@ def recovery_telemetry_passed(result: dict[str, object]) -> bool:
     )
 
 
+def camera_lever_arm_telemetry_passed(
+    payload: dict[str, object],
+    result: dict[str, object],
+    *,
+    expected_gain: float,
+    expected_maximum_correction_m: float,
+) -> bool:
+    numeric_fields = (
+        "camera_lever_arm_correction_max_m",
+        "camera_lever_arm_raw_correction_max_m",
+        "camera_lever_arm_correction_saturation_ratio",
+    )
+    values = [result.get(name) for name in numeric_fields]
+    if not all(
+        isinstance(value, (int, float)) and math.isfinite(value)
+        for value in values
+    ):
+        return False
+    correction_max, raw_max, saturation_ratio = values
+    return (
+        payload.get("camera_lever_arm_compensation_contract")
+        == CAMERA_LEVER_ARM_COMPENSATION_CONTRACT
+        and payload.get("camera_lever_arm_compensation_enabled") is True
+        and payload.get("camera_lever_arm_compensation_gain") == expected_gain
+        and payload.get("maximum_camera_lever_arm_correction_m")
+        == expected_maximum_correction_m
+        and result.get("camera_lever_arm_compensation_enabled") is True
+        and result.get("camera_lever_arm_compensation_gain") == expected_gain
+        and result.get("maximum_camera_lever_arm_correction_m")
+        == expected_maximum_correction_m
+        and payload.get("controller_evidence_passed") is True
+        and result.get("controller_evidence_passed") is True
+        and result.get("camera_lever_arm_telemetry_observed") is True
+        and result.get("camera_lever_arm_telemetry_sample_count")
+        == result.get("completed_steps")
+        and 0.0 <= correction_max <= expected_maximum_correction_m + 1e-9
+        and raw_max + 1e-12 >= correction_max
+        and 0.0 <= saturation_ratio <= 1.0
+    )
 def contract_identity_rows_passed(admission: dict[str, object]) -> bool:
     identities = admission.get("identities")
     checks = admission.get("checks")
@@ -109,7 +159,25 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--require-case74-contract", action="store_true")
     parser.add_argument("--expected-case74-contract-sha256")
+    parser.add_argument(
+        "--expected-tracking-profile",
+        choices=(EXPECTED_TRACKING_PROFILE, CAMERA_LEVER_ARM_TRACKING_PROFILE),
+        default=EXPECTED_TRACKING_PROFILE,
+    )
+    parser.add_argument(
+        "--require-camera-lever-arm-compensation", action="store_true"
+    )
+    parser.add_argument("--expected-camera-lever-arm-gain", type=float, default=1.0)
+    parser.add_argument(
+        "--expected-maximum-camera-lever-arm-correction-m",
+        type=float,
+        default=0.05,
+    )
     args = parser.parse_args()
+    if args.require_camera_lever_arm_compensation and (
+        args.expected_tracking_profile != CAMERA_LEVER_ARM_TRACKING_PROFILE
+    ):
+        parser.error("camera lever-arm compensation requires its tracking profile")
     requested = [int(value) for value in args.cases.split(",")]
     admission = args.root / "admission.json"
     admission_payload = json.loads(admission.read_text(encoding="utf-8"))
@@ -165,13 +233,24 @@ def main() -> int:
             and result.get("checks", {}).get("riser_thermal_load_bounded") is True
             and result.get("checks", {}).get("riser_peak_force_bounded") is True
         )
+        camera_lever_arm_evidence_passed = (
+            not args.require_camera_lever_arm_compensation
+            or camera_lever_arm_telemetry_passed(
+                payload,
+                result,
+                expected_gain=args.expected_camera_lever_arm_gain,
+                expected_maximum_correction_m=(
+                    args.expected_maximum_camera_lever_arm_correction_m
+                ),
+            )
+        )
         runtime_contract_passed = (
             payload.get("training_started") is False
             and payload.get("ppo_authorized") is False
             and payload.get("trajectory_command_source") == "deterministic_teacher"
             and payload.get("residual_policy") is None
             and payload.get("controller_profile") == EXPECTED_CONTROLLER_PROFILE
-            and payload.get("tracking_profile") == EXPECTED_TRACKING_PROFILE
+            and payload.get("tracking_profile") == args.expected_tracking_profile
             and payload.get("tracking_direction_recovery_error_range_m")
             == EXPECTED_RECOVERY_ERROR_RANGE_M
             and payload.get("riser_thermal_force_contract")
@@ -182,6 +261,7 @@ def main() -> int:
             and len(payload.get("results", [])) == 1
             and result.get("executed_residual_dataset") is None
             and result.get("raw_residual_label_applied_to_commands") is False
+            and camera_lever_arm_evidence_passed
         )
         row = {
             "case": case,
@@ -193,6 +273,23 @@ def main() -> int:
             "physical_dynamic_quality_passed": physical_dynamic_passed,
             "thermal_admission_passed": thermal_admission_passed,
             "runtime_contract_passed": runtime_contract_passed,
+            "controller_evidence_passed": (
+                camera_lever_arm_evidence_passed
+                if args.require_camera_lever_arm_compensation
+                else result.get("controller_evidence_passed")
+            ),
+            "camera_lever_arm_compensation_enabled": result.get(
+                "camera_lever_arm_compensation_enabled"
+            ),
+            "camera_lever_arm_correction_max_m": result.get(
+                "camera_lever_arm_correction_max_m"
+            ),
+            "camera_lever_arm_raw_correction_max_m": result.get(
+                "camera_lever_arm_raw_correction_max_m"
+            ),
+            "camera_lever_arm_correction_saturation_ratio": result.get(
+                "camera_lever_arm_correction_saturation_ratio"
+            ),
             "controller_profile": payload.get("controller_profile"),
             "tracking_profile": payload.get("tracking_profile"),
             "tracking_direction_recovery_error_range_m": payload.get(
@@ -275,7 +372,32 @@ def main() -> int:
         and len(gate_rows) == len(requested)
         and all(row["runtime_contract_passed"] for row in gate_rows),
         "expected_controller_profile": EXPECTED_CONTROLLER_PROFILE,
-        "expected_tracking_profile": EXPECTED_TRACKING_PROFILE,
+        "expected_tracking_profile": args.expected_tracking_profile,
+        "camera_lever_arm_compensation_required": (
+            args.require_camera_lever_arm_compensation
+        ),
+        "expected_camera_lever_arm_compensation_contract": (
+            CAMERA_LEVER_ARM_COMPENSATION_CONTRACT
+            if args.require_camera_lever_arm_compensation
+            else None
+        ),
+        "expected_camera_lever_arm_gain": (
+            args.expected_camera_lever_arm_gain
+            if args.require_camera_lever_arm_compensation
+            else None
+        ),
+        "expected_maximum_camera_lever_arm_correction_m": (
+            args.expected_maximum_camera_lever_arm_correction_m
+            if args.require_camera_lever_arm_compensation
+            else None
+        ),
+        "controller_evidence_passed": bool(gate_rows)
+        and len(gate_rows) == len(requested)
+        and all(
+            row["controller_evidence_passed"] is True for row in gate_rows
+        )
+        if args.require_camera_lever_arm_compensation
+        else None,
         "expected_tracking_direction_recovery_error_range_m": (
             EXPECTED_RECOVERY_ERROR_RANGE_M
         ),

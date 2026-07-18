@@ -135,6 +135,39 @@ def _gate(
     )
 
 
+def _enable_camera_lever_arm_contract(path: Path) -> None:
+    payload = json.loads(path.read_text())
+    payload.update(
+        {
+            "tracking_profile": (
+                "riser_recovery_direction_v4_camera_lever_arm_v1"
+            ),
+            "camera_lever_arm_compensation_contract": (
+                "measured_camera_to_base_xy_offset_v1"
+            ),
+            "camera_lever_arm_compensation_enabled": True,
+            "camera_lever_arm_compensation_gain": 1.0,
+            "maximum_camera_lever_arm_correction_m": 0.05,
+            "controller_evidence_passed": True,
+        }
+    )
+    result = payload["results"][0]
+    result.update(
+        {
+            "controller_evidence_passed": True,
+            "camera_lever_arm_compensation_enabled": True,
+            "camera_lever_arm_compensation_gain": 1.0,
+            "maximum_camera_lever_arm_correction_m": 0.05,
+            "camera_lever_arm_telemetry_observed": True,
+            "camera_lever_arm_telemetry_sample_count": result["completed_steps"],
+            "camera_lever_arm_correction_max_m": 0.05,
+            "camera_lever_arm_raw_correction_max_m": 0.18,
+            "camera_lever_arm_correction_saturation_ratio": 0.9,
+        }
+    )
+    path.write_text(json.dumps(payload))
+
+
 def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path) -> None:
     (tmp_path / "gates").mkdir()
     (tmp_path / "logs").mkdir()
@@ -248,6 +281,84 @@ def test_runtime_contract_rejects_wrong_tracking_profile(tmp_path: Path) -> None
     assert summary["first_dynamic_reject"]["classification"] == (
         "runtime_contract_rejection"
     )
+    assert not summary["passed"]
+
+
+def test_camera_lever_arm_runtime_contract_passes_with_bounded_telemetry(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    _admission(tmp_path / "admission.json", commit, tmp_path.name)
+    gate = tmp_path / "gates/case_0068.json"
+    _gate(gate, 68, True)
+    _enable_camera_lever_arm_contract(gate)
+    output = tmp_path / "summary.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--git-commit",
+            commit,
+            "--cases",
+            "68",
+            "--output",
+            str(output),
+            "--expected-tracking-profile",
+            "riser_recovery_direction_v4_camera_lever_arm_v1",
+            "--require-camera-lever-arm-compensation",
+        ],
+        check=True,
+    )
+    summary = json.loads(output.read_text())
+    assert summary["passed"]
+    assert summary["dynamic_quality_passed"]
+    assert summary["thermal_admission_passed"]
+    assert summary["controller_evidence_passed"]
+    assert summary["runtime_contract_passed"]
+    assert not summary["valid_for_training"]
+
+
+def test_camera_lever_arm_runtime_contract_rejects_missing_policy_rate_sample(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    _admission(tmp_path / "admission.json", commit, tmp_path.name)
+    gate = tmp_path / "gates/case_0068.json"
+    _gate(gate, 68, True)
+    _enable_camera_lever_arm_contract(gate)
+    payload = json.loads(gate.read_text())
+    payload["results"][0]["camera_lever_arm_telemetry_sample_count"] = 9
+    gate.write_text(json.dumps(payload))
+    output = tmp_path / "summary.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--git-commit",
+            commit,
+            "--cases",
+            "68",
+            "--output",
+            str(output),
+            "--expected-tracking-profile",
+            "riser_recovery_direction_v4_camera_lever_arm_v1",
+            "--require-camera-lever-arm-compensation",
+        ],
+        check=True,
+    )
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert summary["thermal_admission_passed"]
+    assert not summary["controller_evidence_passed"]
+    assert not summary["runtime_contract_passed"]
     assert not summary["passed"]
 
 

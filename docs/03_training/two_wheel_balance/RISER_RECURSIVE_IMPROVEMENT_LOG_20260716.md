@@ -1347,3 +1347,37 @@ and must state whether its candidate was accepted or rejected.
   correction, thermal monitor, physical gates, and ownership guard.
 - Count case 8 only from sealed dynamic evidence. Regardless of outcome, do
   not open residual capture, BC, PPO, or training.
+
+## Round 39: case-8 retimed dynamic qualification
+
+- Published the v9 one-case runtime contract at commit
+  `122c0981fde1a3f822e30843a91c7506397a2206` and ran only retimed case 8 in
+  `20260718_gate_c_smoothed_case8_dynamic_retime_v1_exclusive`.
+- The case completed `6605` physics steps and both clocks:
+  `12.940941 s` source and `18.117317 s` execution. Position p95/max improved
+  from `0.150576/0.168788 m` to `0.131254/0.143331 m`, passing the unchanged
+  `0.15/0.25 m` gates.
+- Attitude p95/max passed at `0.148800/0.223093 deg`; action saturation was
+  zero; no termination occurred. Riser effort max was `17.041342 N` and
+  thermal load max `0.001085`; every controller-evidence and runtime check
+  passed.
+- The `0.05 m` camera correction remained unchanged and saturated for
+  `92.0061%` of policy-rate samples. The frozen prospective residual envelope
+  passed with normalized maxima `[0.768307, 0.407379, 0.125314]`, but residual
+  action remained exactly zero, was not applied, and no dataset was written.
+- This raises the uniquely dynamically qualified set to `24/70`. Capture, BC,
+  PPO, and training remain closed.
+- Evidence hashes:
+  - runtime admission: `fbe2ac787022309ead89846a7c9905b929ba51fd60567950427cf310f09edde7`;
+  - case-8 gate JSON: `19506045f9b6ec04cee58efa1b5d2d5600824ce166b1534db05a4895596cf1e0`;
+  - case-8 log: `c2979794691ebbacbd92b9192335f5ec0841bde82ce55834405c792dad211617`;
+  - final summary: `b0591a9f928e8e3b052fe51a19c5f3d22936cf1f83bb7c1b27c796439b04759f`.
+- The wrapper exited `0`; GPU and playback ownership were empty after closure.
+
+## Next round after Round 39
+
+- Continue in source order with case 9, then case 13 only if case 9 passes.
+  Case 9 shares the aggressive original timing family with cases 7 and 8 but
+  still requires independent dynamic evidence.
+- Preserve the v9 portfolio, fail-fast ordering, LQR/controller/gates, and all
+  training-closure invariants.

@@ -313,6 +313,59 @@ def test_smoothed_tranche1_tail_gate_rejects_missing_authorization() -> None:
     assert "tranche-1 tail Gate C authorization is absent or unknown" in result.stderr
 
 
+def test_smoothed_tranche2_gate_is_ordered_hash_bound_and_fail_fast() -> None:
+    source = _read("run_riser_smoothed_gate_c_tranche2.sh")
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_TRANCHE2_24_19_28_70_26_HORIZON300_V1" in source
+    assert "20260718_gate_c_smoothed_tranche2_24_19_28_70_26_horizon300_wzkp105_v1_exclusive" in source
+    assert 'CASES="24,19,28,70,26"' in source
+    assert "for CASE in 24 19 28 70 26" in source
+    assert 'MAXIMUM_DURATION_SCALE="3.00"' in source
+    assert 'CONTROLLER_WZ_KP="1.05"' in source
+    assert (
+        r'PORTFOLIO_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${PORTFOLIO_STAMP}"'
+        in source
+    )
+    assert r'OUTPUT_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${STAMP}"' in source
+    for plan_sha in (
+        "598493ee1ab6dd79223ef9f4a4591e6a4d447a978e87eb70d803a8eed6b4aee6",
+        "8cf8bde298c73d1809c3dc7c0dae249446d7554ba77275a490d32fc1a6004b37",
+        "e46de958090bea0a1f2a70b27d7ce9f5dbe62190407e121d74d6866fc9ecaee4",
+        "bbdb8ec625daf650f36cd1703999989f5cbd219300066417991e3babe34d0390",
+        "66d6f491da71521928a7b9012fd929cd7721fc677d2cf432d69cf224f470b415",
+    ):
+        assert plan_sha in source
+    for duration in (
+        "9.929693999999998",
+        "12.028270780335086",
+        "12.408033674341521",
+        "12.763227468955776",
+        "13.159482653904575",
+    ):
+        assert duration in source
+    assert 'summary.get("dynamically_passed_cases") == [24, 19, 28, 70, 26]' in source
+    assert 'gate.get("maximum_duration_scale") == 3.0' in source
+    assert "case_gate_passed" in source
+    assert 'case_$(printf \'%04d\' "$CASE").exit_code' in source
+    assert 'isinstance(result.get("residual_label_envelope_passed"), bool)' in source
+    assert "tranche-2 Gate C stopped on case %s" in source
+    assert "[r]etarget_exact_source_v1_nonholonomic" in source
+    assert 'result.get("executed_residual_dataset") is None' in source
+    assert "--dataset-dir" not in source
+
+
+def test_smoothed_tranche2_gate_rejects_missing_authorization() -> None:
+    wrapper = SCRIPTS / "run_riser_smoothed_gate_c_tranche2.sh"
+    result = subprocess.run(
+        ["bash", str(wrapper)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={},
+    )
+    assert result.returncode == 7
+    assert "tranche-2 Gate C authorization is absent or unknown" in result.stderr
+
+
 def test_case74_localized_heading_relief_derivation_is_hash_bound_and_closed() -> None:
     source = _read("derive_riser_smoothed_case74_heading_relief.py")
     assert "cinebotrl_two_wheel_riser_case74_localized_heading_relief_v1" in source

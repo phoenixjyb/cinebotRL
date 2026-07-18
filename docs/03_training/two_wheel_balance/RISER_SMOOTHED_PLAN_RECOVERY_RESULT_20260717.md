@@ -779,3 +779,42 @@ or Isaac because its Windows portfolio path escaped `$PORTFOLIO_STAMP` instead
 of expanding it. No output namespace, gate, or trajectory result was created.
 The corrected wrapper uses brace-delimited variables with explicit path
 separators and has a static regression check for both Windows output paths.
+
+## Tranche-1 tail result
+
+The path correction was committed and pushed at
+`72fd11554e25a1ddcba05da5f39134939cea227c`. The complete `.98` suite again
+passed `305/305`, the namespace was still absent, and the corrected wrapper ran
+cases 12, 11, and 23 in order. All three completed and passed dynamic, thermal,
+runtime, and residual-label admission:
+
+```text
+20260718_gate_c_smoothed_tranche1_tail_12_11_23_horizon300_wzkp105_v1_exclusive
+
+bd2f4418997b1775249fc4fe8ed96934e2632524f26373978cb7418b580af984  admission.json
+d167aa91da3ec44278b8381e4e083ee2d6cdcb0586bfadb2e49d69dded6b1b8a  gates/case_0012.json
+276c55beeb3d506c121aac463caf4111b7eb8ff2703be15ea241e45fe775904b  gates/case_0011.json
+82825f871bf60493a6870b6e29ecb002e66639c4fe7e22ace185c8d95d27cc48  gates/case_0023.json
+5ae501b8c79bb65e07b388364c2887bd0292db36eda34c3f31b09e9394488d38  summary.json
+
+case 12 source/execution:                    4.235739 / 8.080625 s
+case 12 position p95/max:                    0.099906 / 0.129294 m
+case 12 raw/normalized label vx max:         0.292286 / 0.974288
+case 11 source/execution:                    6.270896 / 9.008324 s
+case 11 position p95/max:                    0.111744 / 0.112505 m
+case 11 raw/normalized label vx max:         0.210399 / 0.701329
+case 23 source/execution:                    9.929694 / 9.929694 s
+case 23 position p95/max:                    0.105450 / 0.105641 m
+case 23 raw/normalized label vx max:         0.202003 / 0.673344
+all dynamic / thermal / runtime / label:     pass / pass / pass / pass
+all process exit codes:                      0
+dataset / residual applied / training:       none / false / false
+```
+
+The deterministic pass set is now `{10, 11, 12, 23, 52, 53, 74, 77}`.
+Sixty-two of the 70 CPU-admitted cases remain, with a combined execution clock
+of `1740.515706 s`. The next ordered fail-fast tranche is the five shortest
+remaining cases `(24, 19, 28, 70, 26)`, with a combined execution clock of
+approximately `60.288709 s`. Use the same 3.0x outer completion horizon,
+`wz_kp=1.05`, source/plan/controller identities, independent label admission,
+and no dataset or training.

@@ -1804,3 +1804,35 @@ and must state whether its candidate was accepted or rejected.
   a duration-derived wall cap and preserve source-order fail-fast execution.
 - Do not start residual capture or learning until deterministic qualification
   and the subsequent raw residual-envelope recomputation are complete.
+
+## Round 52: case-19 dynamic qualification
+
+- V12 case 19 was unchanged and statically admitted with plan hash
+  `8cf8bde298c73d1809c3dc7c0dae249446d7554ba77275a490d32fc1a6004b37`,
+  source/execution clocks `8.338212/12.028271 s`, and static position p95/max
+  `0.039550/0.059349 m`.
+- Published the case-only route at
+  `ea27a43`; the authoritative remote suite passed all `325` tests before
+  launch. Ran only case 19 in
+  `20260719_gate_c_smoothed_case19_v12_camera_lever_arm_v1_exclusive`.
+- It completed `6022` steps. Dynamic position p95/max passed at
+  `0.085048/0.088555 m`; attitude p95/max passed at
+  `0.141937/0.214087 deg`; pitch max was `7.035737 deg`. IK failures and all
+  action/proxy/riser saturation were zero; no termination occurred.
+- Proxy rate max was `41.349092 deg/s`; riser effort/thermal maxima were
+  `21.486368 N` and `0.000961`. All dynamic, thermal, runtime,
+  controller-evidence, and residual-envelope gates passed. Normalized
+  prospective residual maxima were `[0.838843, 0.168118, 0.118204]`; no
+  residual action, dataset, capture, BC, PPO, or training was started. The
+  uniquely dynamically qualified set is now `32/70`.
+- Evidence hashes: admission
+  `4717c2ccded67e47970f01dbbc379be54e6a526d940604453b6cf58a8a5f9299`,
+  gate `d1b103a3f723d02e9b33b9e458479bac9437bd2bda46e34ce44fafda96c9e8a6`,
+  log `7fc2049ff64a04fdc498c2c66f8a2c9af3ce00b1815d947dceb7aec816adf627`,
+  summary `adfaa597d3f586e1e97a4b436c9f6005317cf2414d1b6b3767315983a3abb87b`.
+  GPU and playback ownership were empty after closure.
+
+## Next round after Round 52
+
+- Continue source-order CPU inspection with v12 case 20 and create a fresh
+  case-only route only if all static gates remain admitted.

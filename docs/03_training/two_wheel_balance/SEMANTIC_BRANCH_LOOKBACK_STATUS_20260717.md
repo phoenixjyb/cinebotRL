@@ -51,8 +51,9 @@ alternative survives.
 - Python compilation and `git diff --check` pass.
 - Windows-Python checkpoint code-contract SHA-256 at `3c7f83f` is
   `25d30b95ad0c0ce8a4848c1f3c4d8e627ab208295f5938de6c4ed3928eff6f5a`.
-- Local branch and GitHub ref `codex/ep4-time-reparameterization` both point to
-  `8a3632f` after push.
+- Implementation commit `8a3632f` is pushed on
+  `codex/ep4-time-reparameterization`; later documentation-only commits do not
+  alter its code-contract hash.
 - Windows-Python checkpoint code-contract SHA-256 at `8a3632f` is
   `b90809aa0d3d50e8e4caf6c17257fd55462ae927894086a833cd0fa70e86b365`.
 
@@ -132,7 +133,7 @@ without changing solver behavior.
 
 No source position, attitude, timestamp, map, plant, rate limit, gravity/pitch,
 tracking, gimbal, or admission gate was changed. The old derived ep4 checkpoint
-cannot be consumed directly by commit `8a3632f` because the commit and
+cannot be consumed directly by the post-`8a3632f` branch because the commit and
 code-contract identity are intentionally different; any future use requires a
 separately reviewed lineage-safe checkpoint migration. Its CLI config and all
 solver settings remain unchanged.
@@ -143,14 +144,15 @@ diagnostics only; ep4 remains invalid for dynamic evaluation and training.
 
 ## Next review gate
 
-Before any new ep4 canary, independently review commit `8a3632f` and approve one
-lineage-safe migration of the unchanged `23bca6b` checkpoint prefix to commit
-`8a3632f` and code contract `b90809aa...`. The identity change must be exactly
-`git_commit` plus `code_contract_sha256`; all 11 checkpoint identity fields,
-CLI config, source/package/seed/URDF hashes, nine arrays, next interval 50,
-retimed count, source/map-expanded clock, and training-disabled flags must be
-audited. The old checkpoint must be preserved and no old journal/variant file
-may be reused.
+Before any new ep4 canary, independently review implementation commit `8a3632f`
+and approve one lineage-safe migration of the unchanged `23bca6b` checkpoint
+prefix to the clean pushed branch tip used for execution. That tip must contain
+`8a3632f` and report code contract `b90809aa...`. The identity change must be
+exactly `git_commit` plus `code_contract_sha256`; all 11 checkpoint identity
+fields, CLI config, source/package/seed/URDF hashes, nine arrays, next interval
+50, retimed count, source/map-expanded clock, and training-disabled flags must
+be audited. The old checkpoint must be preserved and no old journal/variant
+file may be reused.
 
 Only after that migration audit passes may one fresh CPU-only, 1800-second,
 single-owner canary resume the same four-rank search. On timeout it must preserve

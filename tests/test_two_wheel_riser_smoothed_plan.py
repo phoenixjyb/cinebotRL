@@ -1,3 +1,4 @@
+from dataclasses import replace
 import importlib.util
 from pathlib import Path
 import string
@@ -11,6 +12,8 @@ from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (
     PREVIEW_CONFIGURATIONS,
     RECOVERY_CONFIGURATIONS,
     SMOOTHING_SIGMA_CANDIDATES,
+    SmoothedPlanResult,
+    batch_unicycle_recovery_seed_eligible,
     derived_reset_yaw_rad,
     retime_smoothed_plan_from_demands,
     smooth_source_positions,
@@ -143,10 +146,17 @@ def test_recovery_candidates_are_appended_without_reordering_baseline() -> None:
         (0.25, 2.75),
     )
     assert PREVIEW_CONFIGURATIONS[-2:] == ((0.40, 1.00), (0.50, 1.00))
-    assert RECOVERY_CONFIGURATIONS[-1] == (
+    assert RECOVERY_CONFIGURATIONS[-2] == (
         16.0,
         0.45,
         0.65,
+        1.00,
+        "forward_path",
+    )
+    assert RECOVERY_CONFIGURATIONS[-1] == (
+        64.0,
+        0.1276273593606172,
+        0.90,
         1.00,
         "forward_path",
     )
@@ -158,11 +168,60 @@ def test_recovery_candidates_are_appended_without_reordering_baseline() -> None:
         "smoothed_preview_0.40m_g1.00",
         "smoothed_preview_0.50m_g1.00",
         "smoothed_preview_0.65m_g1.00",
+        "smoothed_preview_0.90m_g1.00",
+        "smoothed_batch_unicycle_v1",
     ),
 )
 def test_recovery_strategy_names_validate(strategy: str) -> None:
     plan = _plan(np.array([0.0, 0.5, 1.0]))
     RiserPlaybackPlan(**{**plan.__dict__, "planning_strategy": strategy}).validate()
+
+
+def test_batch_recovery_seed_is_fail_closed_to_position_p95_only() -> None:
+    plan = _plan(np.array([0.0, 0.5, 1.0]))
+    result = SmoothedPlanResult(
+        plan=plan,
+        smoothed_position_source_frame_m=plan.target_position_world_m,
+        smoothing_sigma_samples=64.0,
+        smoothing_blend_factor=0.1276273593606172,
+        lookahead_distance_m=0.9,
+        heading_gain=1.0,
+        reset_yaw_mode="forward_path",
+        reset_yaw_rad=0.0,
+        path_metrics={},
+        transition_metrics={},
+        kinematic_metrics={"position_error_p95_m": 0.18},
+        kinematic_checks={
+            "position_p95_bounded": False,
+            "position_max_bounded": True,
+        },
+        checks={"source_integrity": True},
+        attempts=(),
+    )
+    assert batch_unicycle_recovery_seed_eligible(result, source_duration_s=0.5)
+    assert not batch_unicycle_recovery_seed_eligible(
+        replace(result, checks={"source_integrity": False}),
+        source_duration_s=0.5,
+    )
+    assert not batch_unicycle_recovery_seed_eligible(
+        replace(
+            result,
+            kinematic_checks={
+                "position_p95_bounded": False,
+                "position_max_bounded": False,
+            },
+        ),
+        source_duration_s=0.5,
+    )
+    assert not batch_unicycle_recovery_seed_eligible(
+        replace(result, kinematic_metrics={"position_error_p95_m": 0.21}),
+        source_duration_s=0.5,
+    )
+    assert not batch_unicycle_recovery_seed_eligible(
+        result, source_duration_s=0.49
+    )
+    with pytest.raises(ValueError, match="source duration"):
+        batch_unicycle_recovery_seed_eligible(result, source_duration_s=0.0)
 
 
 def test_exporter_defaults_to_bounded_case_order_and_training_closed() -> None:

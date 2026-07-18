@@ -62,7 +62,16 @@ RECOVERY_CONFIGURATIONS = (
     (0.0, 1.0, 0.25, 2.75, "reverse_path"),
     (0.0, 1.0, 0.50, 1.00, "reverse_path"),
     (16.0, 0.45, 0.65, 1.00, "forward_path"),
+    (64.0, 0.1276273593606172, 0.90, 1.00, "forward_path"),
 )
+BATCH_RECOVERY_ITERATIONS = 1000
+BATCH_RECOVERY_RESIDUAL_BOUND = 0.05
+BATCH_RECOVERY_REGULARIZATION = 0.002
+BATCH_RECOVERY_LEARNING_RATE = 0.02
+BATCH_RECOVERY_DURATION_WEIGHT = 250.0
+BATCH_RECOVERY_DURATION_RATIO_TARGET = 1.965
+BATCH_RECOVERY_SEED_POSITION_P95_LIMIT_M = 0.20
+BATCH_RECOVERY_SEED_DURATION_RATIO_LIMIT = 2.01
 
 
 def _require(condition: bool, message: str) -> None:
@@ -322,6 +331,265 @@ class SmoothedPlanResult:
         return all(self.checks.values()) and all(self.kinematic_checks.values())
 
 
+def batch_unicycle_recovery_seed_eligible(
+    result: SmoothedPlanResult, source_duration_s: float
+) -> bool:
+    """Admit only a near-gate seed with one position-p95 failure."""
+
+    _require(
+        math.isfinite(source_duration_s) and source_duration_s > 0.0,
+        "source duration must be finite and positive",
+    )
+    failed_plan = [key for key, value in result.checks.items() if not value]
+    failed_kinematic = [
+        key for key, value in result.kinematic_checks.items() if not value
+    ]
+    duration_ratio = float(result.plan.time_s[-1] / source_duration_s)
+    return (
+        not failed_plan
+        and set(failed_kinematic) == {"position_p95_bounded"}
+        and result.kinematic_metrics["position_error_p95_m"]
+        <= BATCH_RECOVERY_SEED_POSITION_P95_LIMIT_M
+        and duration_ratio <= BATCH_RECOVERY_SEED_DURATION_RATIO_LIMIT
+    )
+
+
+def _build_batch_unicycle_recovery(
+    source: ExactSourceRiserReference,
+    kinematics: UrdfRiserCameraKinematics,
+    seed: SmoothedPlanResult,
+) -> SmoothedPlanResult:
+    """Globally improve a near-gate seed using only legal unicycle controls."""
+
+    import torch
+
+    torch.set_num_threads(4)
+    smoothed = seed.smoothed_position_source_frame_m
+    provisional_time = _provisional_schedule(smoothed, source.source_time_s)
+    reference = CorrectedRiserReference(
+        case=source.case,
+        path=source.source_json_path,
+        positions_m=smoothed,
+        semantic_dfr_quat_wxyz=source.planning_reference(
+            source.source_time_s
+        ).semantic_dfr_quat_wxyz,
+        time_s=provisional_time,
+        initial_base_yaw_rad=seed.reset_yaw_rad,
+        metadata={
+            "source": SMOOTHED_TARGET_SCHEMA,
+            "source_manifest_sha256": source.package_manifest_sha256,
+            "source_json_sha256": source.source_json_sha256,
+        },
+    )
+    plan = seed.plan
+    dt_np = np.diff(provisional_time)
+    seed_yaw = np.unwrap(plan.base_xy_yaw[:, 2])
+    seed_delta = np.diff(plan.base_xy_yaw[:, :2], axis=0)
+    seed_mid_yaw = 0.5 * (seed_yaw[:-1] + seed_yaw[1:])
+    seed_control_np = np.column_stack(
+        (
+            (
+                np.cos(seed_mid_yaw) * seed_delta[:, 0]
+                + np.sin(seed_mid_yaw) * seed_delta[:, 1]
+            )
+            / dt_np,
+            np.diff(seed_yaw) / dt_np,
+        )
+    )
+    seed_control_np = np.clip(
+        seed_control_np,
+        [-PLAYBACK_BASE_LINEAR_LIMIT_MPS, -PLAYBACK_BASE_YAW_RATE_LIMIT_RAD_S],
+        [PLAYBACK_BASE_LINEAR_LIMIT_MPS, PLAYBACK_BASE_YAW_RATE_LIMIT_RAD_S],
+    )
+
+    offset_body_np = np.empty((len(seed_yaw), 2), dtype=np.float64)
+    for index in range(len(seed_yaw)):
+        camera_xy = kinematics.world_transform(
+            plan.base_xy_yaw[index],
+            float(plan.riser_q[index]),
+            plan.proxy_gimbal_q[index],
+        )[:2, 3]
+        world_offset = camera_xy - plan.base_xy_yaw[index, :2]
+        cosine = math.cos(float(seed_yaw[index]))
+        sine = math.sin(float(seed_yaw[index]))
+        offset_body_np[index] = (
+            cosine * world_offset[0] + sine * world_offset[1],
+            -sine * world_offset[0] + cosine * world_offset[1],
+        )
+
+    dt = torch.as_tensor(dt_np, dtype=torch.float64)
+    seed_control = torch.as_tensor(seed_control_np, dtype=torch.float64)
+    lower = torch.maximum(
+        seed_control - BATCH_RECOVERY_RESIDUAL_BOUND,
+        torch.as_tensor(
+            [-PLAYBACK_BASE_LINEAR_LIMIT_MPS, -PLAYBACK_BASE_YAW_RATE_LIMIT_RAD_S],
+            dtype=torch.float64,
+        ),
+    )
+    upper = torch.minimum(
+        seed_control + BATCH_RECOVERY_RESIDUAL_BOUND,
+        torch.as_tensor(
+            [PLAYBACK_BASE_LINEAR_LIMIT_MPS, PLAYBACK_BASE_YAW_RATE_LIMIT_RAD_S],
+            dtype=torch.float64,
+        ),
+    )
+    control = torch.nn.Parameter(seed_control.clone())
+    target_xy = torch.as_tensor(
+        plan.target_position_world_m[:, :2], dtype=torch.float64
+    )
+    offset_body = torch.as_tensor(offset_body_np, dtype=torch.float64)
+    initial = torch.as_tensor(plan.base_xy_yaw[0], dtype=torch.float64)
+    fixed_demand = torch.as_tensor(
+        np.maximum(
+            np.abs(np.diff(plan.riser_q)) / dt_np / PLAYBACK_RISER_RATE_LIMIT_MPS,
+            np.max(np.abs(np.diff(plan.proxy_gimbal_q, axis=0)), axis=1)
+            / dt_np
+            / PLAYBACK_PROXY_RATE_LIMIT_RAD_S,
+        ),
+        dtype=torch.float64,
+    )
+    optimizer = torch.optim.Adam(
+        [control], lr=BATCH_RECOVERY_LEARNING_RATE
+    )
+
+    def rollout(candidate_control: torch.Tensor) -> torch.Tensor:
+        x, y, yaw = initial
+        states = [torch.stack((x, y, yaw))]
+        for index in range(len(dt)):
+            velocity, yaw_rate = candidate_control[index]
+            half_delta = 0.5 * yaw_rate * dt[index]
+            scale = torch.sinc(half_delta / torch.pi)
+            x = x + velocity * dt[index] * scale * torch.cos(yaw + half_delta)
+            y = y + velocity * dt[index] * scale * torch.sin(yaw + half_delta)
+            yaw = yaw + 2.0 * half_delta
+            states.append(torch.stack((x, y, yaw)))
+        return torch.stack(states)
+
+    duration_ratio = torch.tensor(float("inf"), dtype=torch.float64)
+    for _ in range(BATCH_RECOVERY_ITERATIONS):
+        optimizer.zero_grad()
+        state = rollout(control)
+        cosine = torch.cos(state[:, 2])
+        sine = torch.sin(state[:, 2])
+        camera_xy = torch.column_stack(
+            (
+                state[:, 0]
+                + cosine * offset_body[:, 0]
+                - sine * offset_body[:, 1],
+                state[:, 1]
+                + sine * offset_body[:, 0]
+                + cosine * offset_body[:, 1],
+            )
+        )
+        error_norm = torch.linalg.vector_norm(camera_xy - target_xy, dim=1)
+        tracking = torch.mean(error_norm**4) / PLAYBACK_POSITION_P95_LIMIT_M**4
+        regularization = BATCH_RECOVERY_REGULARIZATION * torch.mean(
+            ((control - seed_control) / BATCH_RECOVERY_RESIDUAL_BOUND) ** 2
+        )
+        interval_demand = torch.maximum(
+            fixed_demand,
+            torch.maximum(
+                torch.abs(control[:, 0]) / PLAYBACK_BASE_LINEAR_LIMIT_MPS,
+                torch.abs(control[:, 1]) / PLAYBACK_BASE_YAW_RATE_LIMIT_RAD_S,
+            ),
+        )
+        duration_ratio = (
+            torch.sum(dt * interval_demand) / float(source.source_time_s[-1])
+        )
+        duration_penalty = BATCH_RECOVERY_DURATION_WEIGHT * torch.relu(
+            duration_ratio - BATCH_RECOVERY_DURATION_RATIO_TARGET
+        ) ** 2
+        (tracking + regularization + duration_penalty).backward()
+        optimizer.step()
+        with torch.no_grad():
+            control.clamp_(lower, upper)
+
+    optimized_base = rollout(control).detach().cpu().numpy()
+    attitude = plan_rs4_attitude_commands(
+        reference,
+        accepted62_body_basis_rotation(),
+        optimized_base[:, 2],
+    )
+    optimized_proxy = unwrap_proxy_joint_yaw(
+        rs4_command_to_proxy_joint_order(attitude.command_yaw_roll_pitch_rad)
+    )
+    optimized_riser = plan.riser_q.copy()
+    for index in range(len(optimized_riser)):
+        optimized_riser[index] = kinematics.solve_position(
+            plan.target_position_world_m[index],
+            float(optimized_base[index, 2]),
+            optimized_proxy[index],
+        ).base_xy_yaw_riser[3]
+
+    optimized_plan = replace(
+        plan,
+        base_xy_yaw=optimized_base,
+        riser_q=optimized_riser,
+        proxy_gimbal_q=optimized_proxy,
+        planning_strategy="smoothed_batch_unicycle_v1",
+    )
+    base_ff, riser_ff, proxy_ff = _feedforward(
+        optimized_plan, optimized_plan.time_s
+    )
+    optimized_plan = replace(
+        optimized_plan,
+        feedforward_v_wz=base_ff,
+        feedforward_riser_velocity=riser_ff,
+        feedforward_proxy_velocity=proxy_ff,
+    )
+    optimized_plan = retime_smoothed_plan_from_demands(
+        optimized_plan, float(source.source_time_s[-1])
+    )
+    transitions = transition_metrics(optimized_plan)
+    kinematic_metrics = riser_playback_kinematic_metrics(
+        optimized_plan, kinematics
+    )
+    kinematic_checks = riser_playback_kinematic_gate(
+        kinematic_metrics, kinematics
+    )
+    duration_ratio_value = float(
+        optimized_plan.time_s[-1] / source.source_time_s[-1]
+    )
+    checks = dict(seed.checks)
+    checks.update(
+        {
+            "execution_not_faster_than_source": duration_ratio_value
+            >= 1.0 - 1e-12,
+            "execution_duration_ratio_bounded": duration_ratio_value
+            <= MAXIMUM_EXECUTION_SOURCE_DURATION_RATIO + 1e-12,
+            "base_branch_step_bounded": transitions[
+                "maximum_pre_densification_base_branch_step_rad"
+            ]
+            <= MAXIMUM_PRE_DENSIFICATION_BRANCH_STEP_RAD + 1e-12,
+            "proxy_branch_step_bounded": transitions[
+                "maximum_pre_densification_proxy_branch_step_rad"
+            ]
+            <= MAXIMUM_PRE_DENSIFICATION_BRANCH_STEP_RAD + 1e-12,
+            "global_proxy_branch_feasible": bool(
+                np.all(attitude.command_feasible)
+            ),
+            "execution_schedule_strict": bool(
+                optimized_plan.time_s[0] == 0.0
+                and np.all(np.diff(optimized_plan.time_s) > 0.0)
+            ),
+        }
+    )
+    return replace(
+        seed,
+        plan=optimized_plan,
+        transition_metrics=transitions,
+        kinematic_metrics={
+            **kinematic_metrics,
+            "batch_surrogate_duration_ratio": float(duration_ratio.detach()),
+            "batch_maximum_control_delta": float(
+                torch.max(torch.abs(control.detach() - seed_control))
+            ),
+        },
+        kinematic_checks=kinematic_checks,
+        checks=checks,
+    )
+
+
 def _build_candidate(
     source: ExactSourceRiserReference,
     kinematics: UrdfRiserCameraKinematics,
@@ -570,6 +838,47 @@ def build_smoothed_riser_plan(
         if result.passed:
             return result
 
+    batch_seed = results[-1]
+    if batch_unicycle_recovery_seed_eligible(
+        batch_seed, float(source.source_time_s[-1])
+    ):
+        result = _build_batch_unicycle_recovery(source, kinematics, batch_seed)
+        summary = {
+            "smoothing_sigma_samples": result.smoothing_sigma_samples,
+            "smoothing_blend_factor": result.smoothing_blend_factor,
+            "lookahead_distance_m": result.lookahead_distance_m,
+            "heading_gain": result.heading_gain,
+            "reset_yaw_mode": result.reset_yaw_mode,
+            "reset_yaw_rad": result.reset_yaw_rad,
+            "planning_strategy": result.plan.planning_strategy,
+            "execution_source_duration_ratio": float(
+                result.plan.time_s[-1] / source.source_time_s[-1]
+            ),
+            "path_length_relative_drift": result.path_metrics[
+                "path_length_relative_drift"
+            ],
+            "position_error_p95_m": result.kinematic_metrics[
+                "position_error_p95_m"
+            ],
+            "position_error_max_m": result.kinematic_metrics[
+                "position_error_max_m"
+            ],
+            "failed_checks": [
+                key for key, value in result.checks.items() if not value
+            ]
+            + [
+                key
+                for key, value in result.kinematic_checks.items()
+                if not value
+            ],
+            "passed": result.passed,
+        }
+        attempts.append(summary)
+        result = replace(result, attempts=tuple(attempts))
+        results.append(result)
+        if result.passed:
+            return result
+
     def rank(result: SmoothedPlanResult) -> tuple[float, ...]:
         failed = sum(not value for value in result.checks.values()) + sum(
             not value for value in result.kinematic_checks.values()
@@ -651,6 +960,16 @@ def save_smoothed_riser_plan(
             "semantic_dfr_quaternion_order": "xyzw",
             "semantic_forward_axis": "+Y",
             "physical_gimbal_is_diagnostic_only": True,
+        },
+        "batch_unicycle_recovery": {
+            "applied": plan.planning_strategy == "smoothed_batch_unicycle_v1",
+            "iterations": BATCH_RECOVERY_ITERATIONS,
+            "residual_bound": BATCH_RECOVERY_RESIDUAL_BOUND,
+            "regularization": BATCH_RECOVERY_REGULARIZATION,
+            "learning_rate": BATCH_RECOVERY_LEARNING_RATE,
+            "duration_weight": BATCH_RECOVERY_DURATION_WEIGHT,
+            "duration_ratio_target": BATCH_RECOVERY_DURATION_RATIO_TARGET,
+            "lateral_control_available": False,
         },
         "path_metrics": result.path_metrics,
         "transition_metrics": result.transition_metrics,

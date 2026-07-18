@@ -241,13 +241,85 @@ recorded as unchanged. Dynamic and thermal qualification remain false because
 this is a derived CPU candidate, not runtime evidence. Residual capture, BC,
 and PPO remain disabled.
 
+## Case-77 1.499x portfolio and dynamic qualification
+
+The 1.4x candidate improved the phase-governed run but still stopped at
+`7.042292 / 7.603791 s`. All physical checks passed and its prospective
+residual label entered the frozen envelope. Because another uniform retime to
+1.5x would violate the portfolio median by `0.000294x`, the final CPU candidate
+uses `1.499x`:
+
+```text
+/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/
+20260718_case77_dynamic_margin_retime_1p499_v2_cpu
+
+a45892c98311cdd6e6f2096b6821ef760759504138edc2f9c7caa9b1ac90f559  case_0077_dynamic_margin_retime_v1.npz
+deb3466636b1ef40196c5bd3108e0ca7495b70412617b97999bf6de008a39111  manifest.json
+edeb6d58345b52589741ec93955b9692423e6af7906cafc4272b529bc2fa5aab  summary.json
+```
+
+All 12 immutable source/geometry/state arrays are bit-identical to the 1.4x
+parent. Only the execution clock, corresponding feed-forward rates, and
+metadata changed. The v6 portfolio replaces only case 77:
+
+```text
+/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/
+20260718_smoothed_plan_all79_v6_case77_1p499_cpu
+
+73121d240ccf54fa65783fc1cf47eed4d805af3e6bedbdfff847719c92f2130b  manifest.json
+df9977ed7eaefb1ddc5afdff1bb681380779db95a2264ef1bc3807f67b015179  summary.json
+
+hash-verified plans:                      79/79
+changed cases from v5:                    [77]
+accepted / rejected:                      70 / 9
+accepted duration median:                 1.499794x
+```
+
+The first v6 canary at the unchanged 2.0x runtime horizon was again a narrow
+completion-only reject: `7.977911 / 8.141487 s`, with position p95/max
+`0.084045 / 0.084785 m` and all other checks passing. Its stable tail required
+an estimated `0.334 s` more wall time. Commit
+`3b7edebcb87edd9cc5f7e2329f51a0c7fa0ce6fa` therefore adds a separately
+reported, fail-closed 2.05x completion horizon. This changes neither plan
+duration nor source, commands, controller, phase governor, or quality/safety
+thresholds. The complete CPU suite passes `285/285` tests with two pre-existing
+pytest configuration warnings.
+
+The fresh v5 canary passes:
+
+```text
+/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/
+20260718_gate_c_smoothed_case77_v5_completion_grace_exclusive
+
+850c01a6a976fbc2688c3cfada24f12510a9ee9a6b51cb8412e7b1d8205cb875  admission.json
+e3ddb05e5f1287b8945cabaefeac9aca54951d38b24802bd94f29f2c51551475  gates/case_0077.json
+b5abe0f6f77d2203af081872a2f35c20bea1b22923022224aba0774e7b11e684  logs/case_0077.log
+03b4327565d1a149cf2663c388fe64baec0459ed7fae0206da8059b1ad5b3aba  summary.json
+
+source / execution duration:             5.431279 / 8.141487 s
+completed phase / runtime:                8.141487 / 16.635000 s
+bounded maximum runtime:                  16.690049 s
+position p95 / max:                       0.084030 / 0.084785 m
+pitch p95 / max:                          5.816333 / 6.514108 deg
+attitude p95 / max:                       0.123348 / 0.165009 deg
+action/riser/proxy saturation:            0 / 0 / 0
+dynamic / thermal / label envelope:       pass / pass / pass
+```
+
+No residual was applied, no dataset was written, and residual capture, BC, and
+PPO remain false. The GPU was empty after the run. This is one qualified
+episode, not an all-70 dynamic qualification and not training admission.
+
 ## Exact continuation
 
-Review the sealed single-case candidate and derivation contract. If accepted,
-compose a fresh all-79 portfolio that replaces only case 77, re-hash all 79
-plans, and prove the accepted count remains `>=70` and the duration median
-remains `<=1.5x`. Only after that portfolio and a new one-case runtime contract
-are reviewed may one exclusive case-77 canary be authorized.
+Preserve all consumed namespaces and the v6 portfolio hashes. The next bounded
+task is to define and run a small representative deterministic Gate C expansion
+from the accepted v6 plans, beginning with the already important cases 52 and
+74. It must use fresh authorization and namespaces, stop on the first dynamic
+reject, retain the 2.05x completion-horizon evidence contract, and write no
+residual dataset. Only after representative canaries pass should the accepted
+70 be qualified sequentially.
 
-Do not reuse either consumed runtime namespace. Do not start another Isaac
-case, case batch, residual capture, BC, or PPO from the CPU candidate alone.
+Do not start residual capture, BC, or PPO. `valid_for_training` remains false
+until the required deterministic dynamic corpus and subsequent capture gates
+are complete.

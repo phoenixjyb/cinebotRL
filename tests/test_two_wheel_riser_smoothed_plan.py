@@ -450,6 +450,7 @@ def test_smoothed_portfolio_composer_is_hash_bound_and_runtime_closed() -> None:
     assert '"replacement_selected"' in source
     assert "cinebotrl_two_wheel_riser_dynamic_margin_retime_v1" in source
     assert "cinebotrl_two_wheel_riser_case74_localized_heading_relief_v1" in source
+    assert "cinebotrl_two_wheel_riser_explicit_preview_derivation_v1" in source
     assert '"--maximum-duration-median", type=float, default=1.5' in source
     assert '"--minimum-candidates", type=int, default=70' in source
     assert '"isaac_started": False' in source
@@ -473,3 +474,25 @@ def test_smoothed_portfolio_composer_is_hash_bound_and_runtime_closed() -> None:
     assert set(head) <= set(string.hexdigits)
     if (module.PROJECT_ROOT / ".git").is_file():
         assert "--git-dir" in module._git_command()
+
+
+def test_explicit_preview_derivation_is_hash_bound_and_training_closed() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/derive_riser_smoothed_explicit_preview.py"
+    ).read_text(encoding="utf-8")
+    assert 'default=0.15' in source
+    assert 'default=2.75' in source
+    assert 'smoothing_sigma_candidates=(0.0,)' in source
+    assert 'failed == ["position_p95_bounded"]' in source
+    assert '"source_geometry_changed": False' in source
+    assert '"controller_changed": False' in source
+    assert '"thresholds_changed": False' in source
+    assert '"source_arrays_immutable": source_arrays_immutable' in source
+    assert '"isaac_started": False' in source
+    assert '"residual_capture_started": False' in source
+    assert '"bc_started": False' in source
+    assert '"ppo_started": False' in source
+    assert '"valid_for_training": False' in source
+    assert "AppLauncher" not in source
+    assert "--headless" not in source

@@ -415,3 +415,93 @@ candidate, portfolio count/median, and hashes are reviewed.
 Do not start residual capture, BC, or PPO. `valid_for_training` remains false
 until representative and then accepted-corpus deterministic qualification is
 complete.
+
+## 2026-07-18 localized-relief result
+
+The CPU derivation and negative/invariant tests were implemented and pushed at
+`b0b0f300543bbc0e140f472ee4c9d3142284a906`. The authoritative `.98` suite
+passed `291/291` before generation. The selected candidate changes only XY
+geometry for interior anchors `395..571`; the maximum displacement from its
+parent is `0.033328 m`. Camera Z and all authoritative source positions,
+timestamps, semantic attitudes, and anchor indices are byte-identical.
+
+```text
+20260718_case74_localized_heading_relief_v1_cpu
+
+0acc088a695ff53f9eccfde73107b0748e5de12ffbb6b048efa467455071bf90  case_0074_localized_heading_relief_v1.npz
+e0242123a87e1550cf92f85065b8c9adc54543c7dd4a1813c9867330f7f03d9a  manifest.json
+df3ee7bc8f32171d5e2f14d28081e378ad3589965b938e4d52f903dc3c7a9ee9  summary.json
+
+execution/source ratio:                     1.960151
+kinematic position p95 / max:               0.118713 / 0.122610 m
+path-length relative drift:                -0.040477
+source-polyline p95 / max:                  0.034883 / 0.064719 m
+selected sigma / blend:                    24.0 / 0.75
+localized anchors:                         394..572
+```
+
+The candidate replaced only case 74 in a new all-79 portfolio. An independent
+audit recomputed every plan hash and case JSON, verified 79 contiguous cases,
+and confirmed that only case 74 changed. The portfolio admits exactly 70 cases
+and preserves the accepted duration median `1.4997940737652151`.
+
+```text
+20260718_smoothed_plan_all79_v7_case74_relief_cpu
+
+0fe4b517d2629a1bca413162378708c2985cf5a42a1da8746de0a662f2fab00c  manifest.json
+02facb78f65dc39ebc4170fcd0f4c9a5c1a745385d2670bf01100d22351d7868  summary.json
+
+accepted: 70
+rejected: [1, 27, 29, 35, 38, 39, 40, 45, 71]
+Isaac / capture / BC / PPO: false / false / false / false
+valid_for_training: false
+```
+
+## Localized-relief dynamic result
+
+One isolated deterministic canary ran from the fresh hash-bound wrapper at
+`f9c0435ec7dcfaf90f5d18b95046a280503bf097`. It completed the full execution
+clock without termination or saturation. Thermal and residual-label envelope
+gates passed, but dynamic quality still failed only `position_p95_bounded`.
+
+```text
+20260718_gate_c_smoothed_case74_relief_v2_exclusive
+
+47075cb6513957e78800a17c46be013764758f524d205c73a5d2f4ec7f9ef89b  admission.json
+265e851337617c278e7443b80fd34060b5e2eb9da918dfb13059e4c6701a5514  gates/case_0074.json
+1062256cc73d6b51fab2e0cd9c3788567a019c7ba3c715bebdb1542ed41ea513  logs/case_0074.log
+6b9558cee28449ba2175e643387f8a7fe2745dc6a12669051e63f12b2a07a653  summary.json
+
+source / execution / wall:                 11.373883 / 22.294527 / 43.08 s
+completed steps:                           8616
+position p95 / max:                        0.161081 / 0.169124 m
+pitch p95 / max:                           6.406132 / 6.601540 deg
+attitude p95 / max:                        0.163848 / 0.224864 deg
+dynamic / thermal / label envelope:        fail / pass / pass
+termination / action saturation:           none / zero
+dataset / residual applied:                none / false
+```
+
+Compared with the v1 canary, position p95 improved by only `0.002616 m` and
+peak base-yaw error fell from `9.882863 deg` to `9.134248 deg`. In the dominant
+phase `17.2..19.0 s`, mean yaw error fell by about `0.55 deg`, while mean base
+XY error increased slightly. More path smoothing is therefore not the next
+preferred intervention.
+
+The trace instead shows a low-level yaw-rate tracking deficit. Near the peak,
+the outer loop requests approximately `-0.3685 rad/s`, while measured yaw rate
+is approximately `-0.1915 rad/s`; no action saturation occurs. The next
+bounded candidate changes only cascaded-controller `wz_kp` from `0.25` to
+`0.40`. A pure CPU regression at that sealed state proves common/balance action
+is unchanged, yaw action changes in the corrective direction by approximately
+`0.0266`, and remains below the `0.8` limit. The wrapper and tests are pushed at
+`f6262e8a17760c6f1bec74fac806a3ae88678f7a`; the authoritative `.98` suite
+passes `292/292`.
+
+The fresh namespace
+`20260718_gate_c_smoothed_case74_relief_wzkp040_v3_exclusive` has not been
+created and Isaac has not started. Its live ownership preflight correctly
+rejected launch because the separate two-wheel-balance task had restarted an
+ep4 retarget process. Resume only after that process exits and GPU/CPU ownership
+is rechecked. Regardless of the v3 result, do not start accepted-corpus
+qualification, residual capture, BC, or PPO automatically.

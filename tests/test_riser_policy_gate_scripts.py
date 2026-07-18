@@ -192,6 +192,45 @@ def test_smoothed_representative_gate_rejects_missing_authorization() -> None:
     assert "representative Gate C authorization is absent or unknown" in result.stderr
 
 
+def test_smoothed_tranche1_gate_is_ordered_hash_bound_and_fail_fast() -> None:
+    source = _read("run_riser_smoothed_gate_c_tranche1.sh")
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_TRANCHE1_53_10_12_11_23_V1" in source
+    assert "20260718_gate_c_smoothed_tranche1_53_10_12_11_23_wzkp105_v1_exclusive" in source
+    assert 'CASES="53,10,12,11,23"' in source
+    assert "for CASE in 53 10 12 11 23" in source
+    assert 'CONTROLLER_WZ_KP="1.05"' in source
+    assert "TIMEOUT_SECONDS=480" in source
+    for plan_sha in (
+        "f4bcd19e6193fb5da18d1bb4d4e778bda90fceaf75a94b29b96abf0b8c6a1181",
+        "d5bda3feefe64230d0f9577523832b88b09662ae9ffa741ce4874b90db09eeb1",
+        "4f4f4ed45e618ce2ae350aba430e6e20e78d3d63b631dbed8a742a726023097b",
+        "538ddf56b161f93388040284626a9eae01fadbc88cfac8405a5e7848654292b2",
+        "ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6",
+    ):
+        assert plan_sha in source
+    assert '--cases "$CASES"' in source
+    assert '--cases "$CASE"' in source
+    assert "tranche-1 Gate C stopped on case %s" in source
+    assert "[r]etarget_exact_source_v1_nonholonomic" in source
+    assert 'summary.get("dynamically_passed_cases") == [53, 10, 12, 11, 23]' in source
+    assert 'gate.get("controller_overrides") == {"wz_kp": 1.05}' in source
+    assert 'result.get("executed_residual_dataset") is None' in source
+    assert "--dataset-dir" not in source
+
+
+def test_smoothed_tranche1_gate_rejects_missing_authorization() -> None:
+    wrapper = SCRIPTS / "run_riser_smoothed_gate_c_tranche1.sh"
+    result = subprocess.run(
+        ["bash", str(wrapper)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={},
+    )
+    assert result.returncode == 7
+    assert "tranche-1 Gate C authorization is absent or unknown" in result.stderr
+
+
 def test_case74_localized_heading_relief_derivation_is_hash_bound_and_closed() -> None:
     source = _read("derive_riser_smoothed_case74_heading_relief.py")
     assert "cinebotrl_two_wheel_riser_case74_localized_heading_relief_v1" in source

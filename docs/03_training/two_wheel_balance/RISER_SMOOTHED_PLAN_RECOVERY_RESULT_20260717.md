@@ -633,3 +633,50 @@ Its output must keep dynamic, thermal, runtime, and residual-label outcomes
 separate. It may not create a dataset or authorize capture, BC, PPO, or
 training. Only two representative passes permit a subsequent accepted-corpus
 qualification proposal.
+
+## Representative regression result
+
+The ordered representative contract was committed and pushed at
+`b3247988086c9ff3bbb5180d0e833982cb779048`. After the competing ep77 retarget
+reached its bounded stop, the commit was synchronized by a verified bundle and
+the complete `.98` suite passed `299/299`. The wrapper executed case 77 first
+and advanced to case 52 only after the first playback returned a full pass.
+Both cases completed without a concurrent retarget or GPU owner, and all
+processes released after the final summary.
+
+```text
+20260718_gate_c_smoothed_representative_77_52_wzkp105_v1_exclusive
+
+2ab068a224ab8cdcd82fff0806a7901fea76b37b757e92abbb2c0716d4432677  admission.json
+ac21e9daa011a40b05d963aad516089436f4f03bc52e29e175962d203db4d515  gates/case_0077.json
+2eaae8a5640fce030e8277c81c64e2026998939d456c6efa81c2f3266f1e8da5  logs/case_0077.log
+5ec8a7d8075a8b9a79810767b5d828ae72fc8f964757b384aaef98c0c1c25276  gates/case_0052.json
+1b83a29cd494736d75f35609ee1951276799786ac3a6409331a7cb45d163b0e7  logs/case_0052.log
+84dd4dd809e56bc941c167fbef2b35258503aeb8df8aebfcfaa5cc24ab982207  summary.json
+
+case 77 position p95 / max:                0.083963 / 0.084736 m
+case 77 pitch / attitude max:              6.514897 / 0.165353 deg
+case 77 action / proxy / riser saturation: 0 / 0 / 0
+case 52 position p95 / max:                0.137045 / 0.148154 m
+case 52 pitch / attitude max:              7.168662 / 0.280927 deg
+case 52 action saturation:                 0.000587257
+case 52 proxy / riser saturation:          0 / 0
+dynamic / thermal / runtime / label:       pass / pass / pass / pass
+dataset / capture / BC / PPO:              none / false / false / false
+valid_for_final_gate_c / training:         true / false
+```
+
+The deterministic pass set is now `{52, 74, 77}`. This is sufficient to
+propose accepted-corpus qualification, but not to promote the controller or
+start learning. The v7 portfolio has 70 CPU-admitted cases with a total
+execution clock of `1841.590621 s`. Excluding the three sealed dynamic passes
+leaves 67 cases and `1779.747424 s` of nominal execution. Qualify them in
+ordered fail-fast tranches with explicit case lists, plan hashes, execution
+budgets, and fresh namespaces. Start with the five shortest remaining admitted
+plans `(53, 10, 12, 11, 23)`, whose combined execution clock is approximately
+`39.231720 s`. Stop the tranche at the first dynamic, thermal, runtime,
+residual-envelope, or ownership rejection.
+
+Do not aggregate a partial tranche as a corpus pass. Do not start capture, BC,
+PPO, or any DNN training until all 70 admitted plans have sealed deterministic
+results and the raw residual envelope has been recomputed over dynamic passes.

@@ -2013,3 +2013,47 @@ and must state whether its candidate was accepted or rejected.
 - Keep fail-fast dynamic execution and all learning stages closed. The case-20
   result qualifies one deterministic trajectory; it does not authorize
   residual capture or establish a universal teacher transformation.
+
+## Round 58: case-21 reversal transient is the next fail-fast reject
+
+- CPU inspection admitted unchanged v12 case 21 with plan hash
+  `85029afbbcce435ec8df27770b521b0ab57eae8d98ab4a2dc7f7b7680efaa9ba`,
+  source/execution clocks `13.495780/18.753269 s`, ratio `1.389565`, and static
+  position p95/max `0.090662/0.119344 m`. Published the default-profile,
+  case-only route at `0cfb6bc`; `.98` passed `334/334` CPU tests before launch.
+- Ran only case 21 in
+  `20260719_gate_c_smoothed_case21_v12_camera_lever_arm_v1_exclusive`. It
+  completed both clocks in `5368` steps and failed only dynamic position p95:
+  `0.156808 m` against `0.15 m`. Position max passed at `0.195109 m`; attitude
+  p95/max passed at `0.192667/0.220782 deg`; pitch max was `6.317007 deg`;
+  termination, IK failures, and all physical/controller/thermal checks passed.
+- The prospective residual envelope independently failed at normalized maxima
+  `[1.018811, 0.537389, 0.113703]`; it remained unapplied and no dataset or
+  learning process started. The uniquely qualified count remains `33/70`.
+- Trace localization shows a forward-to-reverse transition around execution
+  phase `6.35-6.39 s`: planned feedforward changes from approximately
+  `+0.013` through zero to `-0.40 m/s`, with local finite-difference peaks up
+  to `16.88 m/s^2`. At wall `9-10 s`, base error grows from `0.157` to
+  `0.227 m`, while the command reaches `-0.40/-0.346 m/s`. This is a
+  longitudinal reversal transient, not a camera lever-arm saturation problem.
+- Applying the case-20 governor formula to the sealed trace would affect only
+  one 1 Hz row (`0.205 -> 0.20`) and add a coarse `0.023 s`; therefore it is
+  not an evidence-based recovery for case 21 and was not run.
+- Evidence hashes: admission
+  `7946840a02ab914901dc9fb2c5397d879c08098808ce435598f0bfe8ca2f0350`,
+  gate `22bf703472f4b0786120a420622f5af3e47067c61f3f44f018c6e3298e03bed0`,
+  log `5c297e10cb236be91f4bb748bad64b52ce4b084b5e80a432cb130ff208910a8e`,
+  and summary
+  `623c872ec80c5b13de855f741280363250246ce8adbd92ce0649bc1ac0cd53d8`.
+  GPU and playback ownership were empty after closure.
+
+## Next round after Round 58
+
+- Stay CPU-only and derive one localized case-21 time reparameterization around
+  the `6.35-6.39 s` reversal. Preserve source anchors/order and target
+  geometry, keep initialization separate, and remain within the frozen `2.0x`
+  duration ratio while adding explicit longitudinal acceleration/transition
+  evidence. Do not change LQR, correction cap, gates, or residual scales.
+- Do not launch a retry until that candidate passes duration, path, transition,
+  and kinematic checks and demonstrates a nonzero parent-relative timing and
+  command change. Case 22 and every learning stage remain closed.

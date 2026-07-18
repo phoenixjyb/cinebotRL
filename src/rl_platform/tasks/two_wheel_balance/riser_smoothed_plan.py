@@ -325,10 +325,47 @@ class SmoothedPlanResult:
     kinematic_checks: dict[str, bool]
     checks: dict[str, bool]
     attempts: tuple[dict[str, object], ...]
+    dynamic_margin_retime: dict[str, object] | None = None
 
     @property
     def passed(self) -> bool:
         return all(self.checks.values()) and all(self.kinematic_checks.values())
+
+
+def uniformly_retime_smoothed_plan(
+    plan: RiserPlaybackPlan,
+    source_duration_s: float,
+    target_execution_source_ratio: float,
+) -> RiserPlaybackPlan:
+    """Slow an admitted plan without changing its states or source clock."""
+
+    plan.validate()
+    _require(
+        math.isfinite(source_duration_s) and source_duration_s > 0.0,
+        "source duration must be finite and positive",
+    )
+    _require(
+        math.isfinite(target_execution_source_ratio)
+        and 1.0 <= target_execution_source_ratio
+        <= MAXIMUM_EXECUTION_SOURCE_DURATION_RATIO,
+        "target execution/source ratio must be in [1,2]",
+    )
+    current_ratio = float(plan.time_s[-1] / source_duration_s)
+    _require(
+        target_execution_source_ratio + 1e-12 >= current_ratio,
+        "uniform retime cannot make an admitted plan faster",
+    )
+    scale = target_execution_source_ratio / current_ratio
+    retimed = replace(plan, time_s=plan.time_s * scale)
+    base_ff, riser_ff, proxy_ff = _feedforward(retimed, retimed.time_s)
+    retimed = replace(
+        retimed,
+        feedforward_v_wz=base_ff,
+        feedforward_riser_velocity=riser_ff,
+        feedforward_proxy_velocity=proxy_ff,
+    )
+    retimed.validate()
+    return retimed
 
 
 def batch_unicycle_recovery_seed_eligible(
@@ -971,6 +1008,9 @@ def save_smoothed_riser_plan(
             "duration_ratio_target": BATCH_RECOVERY_DURATION_RATIO_TARGET,
             "lateral_control_available": False,
         },
+        "dynamic_margin_retime": result.dynamic_margin_retime
+        if result.dynamic_margin_retime is not None
+        else {"applied": False},
         "path_metrics": result.path_metrics,
         "transition_metrics": result.transition_metrics,
         "kinematic_metrics": result.kinematic_metrics,

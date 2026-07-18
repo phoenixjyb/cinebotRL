@@ -19,6 +19,7 @@ from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (
     smooth_source_positions,
     smoothed_path_metrics,
     transition_metrics,
+    uniformly_retime_smoothed_plan,
 )
 
 
@@ -119,6 +120,38 @@ def test_demand_retimer_discards_provisional_dwell_and_respects_source_duration(
     assert np.max(np.abs(retimed.feedforward_v_wz[:, 0])) <= 0.4 + 1e-12
     assert np.max(np.abs(retimed.feedforward_v_wz[:, 1])) <= 0.4 + 1e-12
     assert np.max(np.abs(retimed.feedforward_proxy_velocity)) <= np.deg2rad(24.0) + 1e-12
+
+
+def test_uniform_retime_changes_only_execution_clock_and_derivatives() -> None:
+    plan = _plan(np.array([0.0, 0.5, 1.0]))
+    retimed = uniformly_retime_smoothed_plan(plan, 1.0, 1.4)
+    np.testing.assert_allclose(retimed.time_s, plan.time_s * 1.4)
+    np.testing.assert_array_equal(retimed.source_time_s, plan.source_time_s)
+    np.testing.assert_allclose(retimed.feedforward_v_wz, plan.feedforward_v_wz / 1.4)
+    np.testing.assert_allclose(
+        retimed.feedforward_riser_velocity,
+        plan.feedforward_riser_velocity / 1.4,
+    )
+    np.testing.assert_allclose(
+        retimed.feedforward_proxy_velocity,
+        plan.feedforward_proxy_velocity / 1.4,
+    )
+    for name in (
+        "target_position_world_m",
+        "target_semantic_dfr_quat_wxyz",
+        "base_xy_yaw",
+        "riser_q",
+        "proxy_gimbal_q",
+    ):
+        np.testing.assert_array_equal(getattr(retimed, name), getattr(plan, name))
+
+
+def test_uniform_retime_rejects_speedup_or_out_of_contract_ratio() -> None:
+    plan = _plan(np.array([0.0, 0.75, 1.5]))
+    with pytest.raises(ValueError, match="cannot make.*faster"):
+        uniformly_retime_smoothed_plan(plan, 1.0, 1.4)
+    with pytest.raises(ValueError, match=r"ratio must be in \[1,2\]"):
+        uniformly_retime_smoothed_plan(plan, 1.0, 2.01)
 
 
 def test_transition_metrics_reject_pre_densification_branch_jump() -> None:
@@ -260,3 +293,24 @@ def test_exporter_resolves_linked_worktree_git_identity() -> None:
     assert set(head) <= set(string.hexdigits)
     if (module.PROJECT_ROOT / ".git").is_file():
         assert "--git-dir" in module._git_command()
+
+
+def test_dynamic_retime_derivation_is_cpu_only_evidence_bound_and_closed() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/derive_riser_smoothed_dynamic_retime.py"
+    ).read_text(encoding="utf-8")
+    assert 'failed == ["completed_reference"]' in source
+    assert '"--target-ratio", type=float, default=1.4' in source
+    assert '"--maximum-portfolio-median", type=float, default=1.5' in source
+    assert '"controller_changed": False' in source
+    assert '"phase_governor_changed": False' in source
+    assert '"thresholds_changed": False' in source
+    assert '"source_geometry_changed": False' in source
+    assert '"isaac_started": False' in source
+    assert '"residual_capture_started": False' in source
+    assert '"bc_started": False' in source
+    assert '"ppo_started": False' in source
+    assert '"valid_for_training": False' in source
+    assert "AppLauncher" not in source
+    assert "--headless" not in source

@@ -1071,3 +1071,48 @@ and must state whether its candidate was accepted or rejected.
   tranches. Do not globally infer success from cases 68 and 66.
 - Recompute the raw residual envelope only after deterministic qualification;
   keep capture, BC, PPO, and all training closed meanwhile.
+
+## Round 32: tranche-tail expansion and case-7 dynamic-margin diagnosis
+
+- Extended the same hash-bound camera-lever-arm wrapper to cases `[67, 7]` at
+  commit `8f36bcb7880033fe434be33675dd925be2e87fcf`. The fresh exclusive namespace
+  was `20260718_gate_c_smoothed_case67_7_camera_lever_arm_v1_exclusive`.
+- Case 67 passed every dynamic, thermal, controller-evidence, runtime, and
+  residual-label-envelope check. Camera-position p95/max were
+  `0.114029/0.115406 m`; pitch max was `6.658292 deg`; action saturation was
+  zero; no termination occurred. This raises the uniquely qualified set to
+  `17/70` admitted plans.
+- Case 7 completed all `6093` physics steps and the full
+  `13.582122/12.940941 s` execution/source clocks. It stopped the wrapper only
+  on `position_p95_bounded`: `0.150670894 m` against the unchanged `0.15 m`
+  gate, an excess of `0.000670894 m`. Position max `0.168787626 m`, pitch,
+  attitude, thermal force, servo, rate, saturation, and termination gates all
+  passed.
+- The 1 Hz trace localizes the case-7 error to the first three seconds. The
+  parent plan has execution/source ratio `1.049547` and rapidly reaches the
+  frozen `-0.4 m/s` base feed-forward limit. At approximately `2 s`, camera
+  error peaks near `0.169 m` while the base lags about `0.215 m`; the remainder
+  of the trace returns below approximately `0.131 m`. This is a startup dynamic
+  margin problem, not source geometry, camera-height geometry, balance, or a
+  failed lever-arm correction.
+- Evidence hashes:
+  - admission JSON: `bc692660e13955cbf5ed03413cc5eeb1e9122b5d9bed7404002c3d6364913b7b`;
+  - case 67 JSON: `df2ad0e85ecdd04395b2f1c520eedb3b1f6246d72cb3e645fe89ec1c5e190066`;
+  - case 7 JSON: `32a9bec2c4d375907888e6f01fd627f17d272eb3841b60bf318e3c7c43c0f31d`;
+  - final summary: `435d8ad4b4eb955a824219cd9771bc680fb0734d77f31e90c86199c825b54045`.
+- No residual dataset was written; residual commands remained zero; capture,
+  BC, PPO, and training remained false. GPU ownership was empty after closure.
+
+## Next round after Round 32
+
+- Derive one separately labeled, CPU-only uniform execution retime for case 7.
+  Preserve every source anchor, source timestamp, target state, endpoint,
+  ordering, and all physical gates; alter only the execution clock and derived
+  feed-forward rates.
+- Use target execution/source ratio `1.4`. This bounds peak feed-forward near
+  `0.30 m/s` (`1.049547 * 0.4 / 1.4`) while retaining margin below the frozen
+  `2.0x` duration ceiling and the `1.5` portfolio-median ceiling.
+- Run the duration, path, transition, kinematic, hash, and array-identity gates
+  before preparing any runtime wrapper. Do not launch Isaac from this step.
+- Keep capture, BC, PPO, and all training closed. A CPU pass authorizes only a
+  reviewable case-7 canary candidate, not dynamic admission.

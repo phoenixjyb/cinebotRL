@@ -110,6 +110,7 @@ def _gate_c_rejection(
     summary_path: Path,
     *,
     case: int,
+    reject_mode: str,
 ) -> dict[str, object]:
     gate = json.loads(gate_path.read_text(encoding="utf-8"))
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
@@ -120,7 +121,26 @@ def _gate_c_rejection(
     _require(isinstance(checks, dict), "Gate C checks are missing")
     failed = [name for name, passed in checks.items() if passed is not True]
     _require(gate.get("cases") == [case] and row.get("case") == case, "wrong case")
-    _require(failed == ["completed_reference"], "Gate C failure is not completion-only")
+    expected_failures = {
+        "completion_only": ["completed_reference"],
+        "completed_position_p95_only": ["position_p95_bounded"],
+    }
+    _require(reject_mode in expected_failures, "unknown Gate C reject mode")
+    _require(
+        failed == expected_failures[reject_mode],
+        f"Gate C failure does not match {reject_mode}",
+    )
+    if reject_mode == "completed_position_p95_only":
+        _require(checks.get("completed_reference") is True, "Gate C did not complete")
+        _require(
+            np.isclose(
+                float(row.get("completed_phase_time_s", float("nan"))),
+                float(row.get("execution_duration_s", float("nan"))),
+                rtol=0.0,
+                atol=1e-9,
+            ),
+            "completed Gate C clocks do not agree",
+        )
     _require(row.get("dynamic_quality_passed") is False, "dynamic reject is missing")
     _require(row.get("thermal_admission_passed") is True, "thermal gate did not pass")
     _require(row.get("termination") is None, "Gate C terminated physically")
@@ -147,6 +167,13 @@ def _gate_c_rejection(
         and summary.get("valid_for_training") is False,
         "learning stage was not closed",
     )
+    if reject_mode == "completed_position_p95_only":
+        _require(
+            summary.get("thermal_admission_passed") is True
+            and summary.get("runtime_contract_passed") is True
+            and summary.get("controller_evidence_passed") is True,
+            "completed p95-only reject lacks healthy runtime evidence",
+        )
     return row
 
 
@@ -225,6 +252,11 @@ def main() -> int:
     parser.add_argument("--expected-gate-summary-sha256", required=True)
     parser.add_argument("--urdf", type=Path, required=True)
     parser.add_argument("--case", type=int, default=77)
+    parser.add_argument(
+        "--gate-reject-mode",
+        choices=("completion_only", "completed_position_p95_only"),
+        default="completion_only",
+    )
     parser.add_argument("--target-ratio", type=float, default=1.4)
     parser.add_argument("--maximum-portfolio-median", type=float, default=1.5)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -258,7 +290,12 @@ def main() -> int:
     )
     _require(args.case in references, "case is absent from source package")
     source = references[args.case]
-    gate_row = _gate_c_rejection(args.gate_json, args.gate_summary, case=args.case)
+    gate_row = _gate_c_rejection(
+        args.gate_json,
+        args.gate_summary,
+        case=args.case,
+        reject_mode=args.gate_reject_mode,
+    )
     parent_result, parent_metadata = _parent_result(args.parent_plan)
     _require(parent_result.plan.case == args.case, "parent plan case mismatch")
 
@@ -313,7 +350,13 @@ def main() -> int:
     dynamic_retime = {
         "schema": "dynamic_margin_uniform_execution_retime_v1",
         "applied": True,
-        "reason": "gate_c_completed_reference_only_rejection",
+        "reason": {
+            "completion_only": "gate_c_completed_reference_only_rejection",
+            "completed_position_p95_only": (
+                "gate_c_completed_position_p95_only_rejection"
+            ),
+        }[args.gate_reject_mode],
+        "gate_reject_mode": args.gate_reject_mode,
         "parent_plan_sha256": args.expected_parent_plan_sha256,
         "gate_json_sha256": args.expected_gate_sha256,
         "gate_summary_sha256": args.expected_gate_summary_sha256,

@@ -417,7 +417,11 @@ def test_dynamic_retime_derivation_is_cpu_only_evidence_bound_and_closed() -> No
         Path(__file__).resolve().parents[1]
         / "scripts/two_wheel_balance/derive_riser_smoothed_dynamic_retime.py"
     ).read_text(encoding="utf-8")
-    assert 'failed == ["completed_reference"]' in source
+    assert '"completion_only": ["completed_reference"]' in source
+    assert '"completed_position_p95_only": ["position_p95_bounded"]' in source
+    assert '"--gate-reject-mode"' in source
+    assert 'checks.get("completed_reference") is True' in source
+    assert 'summary.get("runtime_contract_passed") is True' in source
     assert '"--target-ratio", type=float, default=1.4' in source
     assert '"--maximum-portfolio-median", type=float, default=1.5' in source
     assert '"controller_changed": False' in source

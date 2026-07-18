@@ -364,14 +364,53 @@ The miss is position-p95 only by `0.013698 m`. No residual was applied and no
 dataset was written in either case. The fail-fast representative sequence
 therefore stops at case 74; the accepted-70 batch remains closed.
 
+## Case-74 CPU structural diagnosis
+
+The sustained high-error window is execution phase `17.9..21.3 s`, inside
+anchors `394..572` (`15.517..22.022 s` execution and `7.62..11.08 s` source).
+The camera error is horizontal: Z remains about `0.022..0.027 m`, while XY
+reaches about `0.168 m`. Base XY error remains only `0.058..0.068 m`, but base
+yaw lags by `5..10 deg`; the arm/camera offset amplifies that yaw lag at the
+camera. The reference `wz` repeatedly reaches the unchanged `+/-0.4 rad/s`
+limit. Direction-recovery telemetry remains entirely inactive because base XY
+error never reaches its `0.2 m` activation threshold, so this is not another
+reverse-recovery failure.
+
+The current execution clock cannot be redistributed. Recomputing every
+transition's minimum duration from base linear/lateral/yaw, riser, and proxy
+limits shows all `589/589` transitions at their demand-derived floor. Total
+reclaimable slack is approximately `1.3e-13 s`. Slowing the late interval while
+preserving the current geometry would therefore either exceed the frozen 2.0x
+duration limit or violate a rate limit.
+
+The one bounded candidate is `case74_localized_heading_relief_v1`: modify only
+the derived horizontal smoothed geometry and resulting base-heading allocation
+over anchors `394..572`, with a tapered boundary, to reduce late yaw curvature
+and commanded yaw-rate saturation. Recompute the complete execution schedule
+and feed-forward arrays from demands. The candidate must preserve:
+
+- all authoritative source positions, timestamps, and semantic attitudes;
+- source start/final targets, ordered one-to-one anchor mapping, and 590 states;
+- unchanged camera Z and derived gimbal attitude contract;
+- path-length drift within 5%, source-polyline deviation within 0.15 m p95 and
+  0.25 m maximum, and no opposed source segment;
+- execution/source ratio at or below 2.0x and portfolio median at or below
+  1.5x;
+- base `0.4 m/s`, yaw `0.4 rad/s`, proxy 24 deg/s, riser 1.0 m/s, transition,
+  workspace, and all existing dynamic/thermal thresholds.
+
+CPU tests must prove anchors outside the tapered edit window are unchanged,
+source arrays are bit-identical, the clock is strict and unambiguous, all
+derivatives match the new clock, and every integrity/kinematic gate passes.
+The first candidate is diagnostic-only and `valid_for_training=false`.
+
 ## Exact continuation
 
-Perform CPU-only localization of case 74's tracking error against phase,
-source/execution clocks, base XY/yaw error, camera XYZ error, direction-recovery
-telemetry, and the 0.25 m preview/sigma-12 plan. Compare it with passing cases
-52 and 77 and propose one bounded plan/controller change. Do not relax the
-`0.15 m` p95 gate or launch another canary until that diagnosis is reviewed and
-covered by tests.
+Review the bounded `case74_localized_heading_relief_v1` contract above. If
+accepted, implement only the CPU derivation and its negative/invariant tests,
+then generate one fresh case-74 candidate and recompose the all-79 portfolio.
+Do not relax the `0.15 m` p95 gate or launch another canary until the CPU
+candidate, portfolio count/median, and hashes are reviewed.
 
 Do not start residual capture, BC, or PPO. `valid_for_training` remains false
 until representative and then accepted-corpus deterministic qualification is

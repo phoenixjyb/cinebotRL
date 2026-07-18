@@ -97,13 +97,15 @@ def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
 
 def test_smoothed_case77_gate_c_is_isolated_hash_bound_and_label_free() -> None:
     source = _read("run_riser_smoothed_gate_c_case77.sh")
-    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V2" in source
-    assert "9044dc360ad1a9a59fa84ec9adf0b00a30b1039751e959fd26ec2edc23a684dd" in source
-    assert "b43dd08dff924e5132361ed331803ecca2c6bb170dcec6471d864c32e8578875" in source
-    assert "20260718_gate_c_smoothed_case77_v2_exclusive" in source
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V3" in source
+    assert "9e3a09fdde5ad37795fcf10f9a2402eb593ef32316ab8e25c0911dcc62a68a76" in source
+    assert "7b0c9b5330733a5e6740023048c308491dd2bd85fd9f30e5fd0cc16901dbe5b7" in source
+    assert "20260718_gate_c_smoothed_case77_v3_dynamic_margin_exclusive" in source
     assert "--cases \"$CASE\"" in source
     assert "smoothed_riser_plan_v1.npz" in source
     assert "cinebotrl_two_wheel_riser_smoothed_plan_v1" in source
+    assert "dynamic_margin_uniform_execution_retime_v1" in source
+    assert "7.6037906" in source
     assert "time_alias_unambiguous" in source
     assert "assert_exclusive_gpu" in source
     assert "/usr/lib/wsl/lib/nvidia-smi" in source
@@ -120,9 +122,15 @@ def test_smoothed_case77_gate_c_is_isolated_hash_bound_and_label_free() -> None:
 
 def test_smoothed_case77_gate_c_rejects_missing_authorization_before_runtime() -> None:
     wrapper = SCRIPTS / "run_riser_smoothed_gate_c_case77.sh"
-    result = subprocess.run(["bash", str(wrapper)], capture_output=True, text=True)
-    assert result.returncode == 7
-    assert "authorization is absent or unknown" in result.stderr
+    for authorization in (None, "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V2"):
+        env = os.environ.copy()
+        if authorization is not None:
+            env["RISER_SMOOTHED_GATE_C_AUTHORIZATION"] = authorization
+        result = subprocess.run(
+            ["bash", str(wrapper)], capture_output=True, text=True, env=env
+        )
+        assert result.returncode == 7
+        assert "authorization is absent or unknown" in result.stderr
 
 
 def test_case74_recovery_wrapper_has_sealed_one_case_runtime_authorization() -> None:

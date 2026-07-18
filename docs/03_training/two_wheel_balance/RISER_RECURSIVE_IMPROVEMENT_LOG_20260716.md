@@ -1642,3 +1642,30 @@ and must state whether its candidate was accepted or rejected.
 
 - Add one fresh hash-bound v11 case-16-retime canary and run it under unchanged
   LQR/controller/physical gates. Do not advance to case 17 or learning first.
+
+## Round 48: case-16 duration-cap exhaustion and structural localization
+
+- Ran the v11 `2.0x` retimed case 16 at commit
+  `e76ba071d8b267b3bd1540681670ec9c033bcb10`. It completed `11603` steps and
+  both `17.548706/35.097412 s` clocks, but again failed only position p95:
+  `0.168950 m`. Position max `0.184844 m` and all attitude, balance, rate,
+  thermal, runtime, controller, and residual-envelope gates passed.
+- Uniform slowing improved p95 by only `0.001396 m` from the baseline
+  `0.170346 m`; the frozen `2.0` execution/source cap is now exhausted.
+- Evidence hashes: admission `e4b44535ace27b5673d654b07568c386d2eed52c9d6df736d27b773a3f766f12`,
+  gate `9a8186d4467b52639b8dbac455681174ce5624d5f14229035bac4c2d4c81fc5e`,
+  log `2c94ad446fa7a8cb528ac125f9b9482a5afe90cccf70156e6eae331fe9361939`,
+  summary `78345a0f1ab15b43f29d9ec0d0b18c3b2a3d87dfb21176939b39c59b17c50d89`.
+- The 1 Hz trace localizes the peak to forward-motion phase `7.2-12.0 s`,
+  dominated by camera cross-track error while the unchanged `0.05 m`
+  lever-arm correction is saturated. This is not an endpoint, reverse-motion,
+  attitude, riser, or thermal failure.
+- The parent static planner selected its first passing `0.10 m` lookahead
+  candidate and did not evaluate `0.15 m`. No correction cap, threshold,
+  controller gain, source anchor, or learning flag was changed.
+
+## Next round after Round 48
+
+- Add a CPU-only, case-16-specific explicit-lookahead derivation path and test
+  `0.15 m` while preserving the source camera path and all duration/transition
+  gates. Do not launch case 17, widen the `0.05 m` correction, or start learning.

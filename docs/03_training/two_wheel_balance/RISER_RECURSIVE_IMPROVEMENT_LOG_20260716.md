@@ -1026,3 +1026,48 @@ and must state whether its candidate was accepted or rejected.
   independently prove non-regression before this candidate can be considered
   for the remaining corpus.
 - Keep residual capture, BC, PPO, and all other training closed.
+
+## Round 31: camera lever-arm recovery and healthy-case regression
+
+- Published the opt-in controller and evidence contract at commit
+  `c03305a00a589171663072458cbdcb995d8b6252`. The final authoritative CPU
+  suite passed `320` tests with two existing pytest-configuration warnings.
+- Ran only cases `[68, 66]` in the fresh exclusive namespace
+  `20260718_gate_c_smoothed_case68_66_camera_lever_arm_v1_exclusive`.
+  Case 68 had to pass before the wrapper could start the previously healthy
+  case 66 regression. Both source plans, clocks, LQR gains, thresholds, and
+  the 28 kg robot USD remained unchanged.
+- Case 68 passed every physical, thermal, controller-evidence, and runtime
+  check. Camera-position p95/max improved from `0.172847/0.175031 m` to
+  `0.123103/0.125201 m`; pitch max was `6.705359 deg`; action saturation was
+  zero; and no termination occurred. Its residual-label envelope also passed
+  with normalized absolute maxima `[0.847078, 0.189232, 0.128190]`.
+- Case 66 independently passed the non-regression gate. Camera-position
+  p95/max improved from `0.139627/0.141763 m` to `0.091068/0.121144 m`;
+  pitch max was `6.614879 deg`; action saturation was zero; and no termination
+  occurred. Its residual-label envelope passed with normalized absolute
+  maxima `[0.834357, 0.187343, 0.129256]`.
+- The bounded correction reached `0.05 m` and was saturated for `98.2407%` of
+  case 68 and `97.7772%` of case 66. This is safe under the candidate contract
+  and improved both cases, but it is strong evidence that expansion must stay
+  bounded rather than treating two passes as universal portfolio proof.
+- Evidence hashes:
+  - admission JSON: `eda824d9a4f27898c4cc68bbb1c5e24c8fdbbf065629cbf25408405a9bc3f804`;
+  - case 68 JSON: `d49443e8cf3111f07661802738ca0abda1eaafc8f900a480226b8c723e6d4b56`;
+  - case 66 JSON: `3adafeaae66c0f5941ddfe79a3d443e5cb2c61c63ac1e7d9510979fa61f00a77`;
+  - final summary: `953b864ad282490aafcdd7ad4b76e10b8ccebd435b767585705531b331613026`.
+- The final summary records dynamic, thermal, controller-evidence, runtime,
+  and residual-envelope outcomes as independently true. It also records no
+  residual dataset, BC, PPO, or valid-for-training admission. GPU ownership
+  was empty after closure.
+
+## Next round after Round 31
+
+- Keep the bounded candidate controller profile and unchanged `0.05 m` bound
+  fixed.
+- Run only the previously unstarted tranche cases `[67, 7]` in a fresh,
+  hash-bound, ownership-guarded namespace and stop on the first rejection.
+- If both pass, continue the remaining admitted corpus in small fail-fast
+  tranches. Do not globally infer success from cases 68 and 66.
+- Recompute the raw residual envelope only after deterministic qualification;
+  keep capture, BC, PPO, and all training closed meanwhile.

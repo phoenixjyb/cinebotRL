@@ -427,8 +427,10 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     source = _read("run_riser_smoothed_gate_c_camera_lever_arm.sh")
     assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE68_66_CAMERA_LEVER_ARM_V1" in source
     assert "20260718_gate_c_smoothed_case68_66_camera_lever_arm_v1_exclusive" in source
-    assert 'CASES="68,66"' in source
-    assert "for CASE in 68 66" in source
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE67_7_CAMERA_LEVER_ARM_V1" in source
+    assert "20260718_gate_c_smoothed_case67_7_camera_lever_arm_v1_exclusive" in source
+    assert 'CASES="$CASE_A,$CASE_B"' in source
+    assert 'for CASE in "$CASE_A" "$CASE_B"' in source
     assert 'CAMERA_LEVER_ARM_GAIN="1.00"' in source
     assert 'MAXIMUM_CAMERA_LEVER_ARM_CORRECTION_M="0.05"' in source
     assert "--enable-camera-lever-arm-compensation" in source
@@ -446,7 +448,7 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert 'recovery_evidence "$RECOVERY_EVIDENCE"' in source
     assert 'playback_loader "$LOADER"' in source
     assert "camera lever-arm Gate C stopped on case %s" in source
-    assert 'summary.get("dynamically_passed_cases") == [68, 66]' in source
+    assert 'summary.get("dynamically_passed_cases") == expected_cases' in source
     assert "--dataset-dir" not in source
     assert "--residual-policy" not in source
     assert "--zero-policy-action" not in source
@@ -454,15 +456,22 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
 
 def test_camera_lever_arm_gate_rejects_missing_authorization() -> None:
     wrapper = SCRIPTS / "run_riser_smoothed_gate_c_camera_lever_arm.sh"
-    result = subprocess.run(
-        ["bash", str(wrapper)],
-        check=False,
-        capture_output=True,
-        text=True,
-        env={},
-    )
-    assert result.returncode == 7
-    assert "camera lever-arm Gate C authorization is absent or unknown" in result.stderr
+    for env in (
+        {},
+        {"RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION": "future-token"},
+    ):
+        result = subprocess.run(
+            ["bash", str(wrapper)],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert result.returncode == 7
+        assert (
+            "camera lever-arm Gate C authorization is absent or unknown"
+            in result.stderr
+        )
 
 
 def test_case74_localized_heading_relief_derivation_is_hash_bound_and_closed() -> None:

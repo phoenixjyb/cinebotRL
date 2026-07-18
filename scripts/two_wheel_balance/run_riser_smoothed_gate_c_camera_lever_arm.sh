@@ -5,15 +5,10 @@ ROOT="/mnt/g/wSpace/cinebotRL-two-wheel-riser"
 WIN_ROOT='G:\wSpace\cinebotRL-two-wheel-riser'
 PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
-AUTHORIZATION="AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE68_66_CAMERA_LEVER_ARM_V1"
-CASES="68,66"
-STAMP="20260718_gate_c_smoothed_case68_66_camera_lever_arm_v1_exclusive"
 PORTFOLIO_STAMP="20260718_smoothed_plan_all79_v7_case74_relief_cpu"
 MANIFEST_SHA256="0fe4b517d2629a1bca413162378708c2985cf5a42a1da8746de0a662f2fab00c"
 SOURCE_SHA256="f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d"
 PLANNER_COMMIT="b0b0f300543bbc0e140f472ee4c9d3142284a906"
-CASE68_PLAN_SHA256="4f4fc302402c53533f4bdbed33682bf52971a6f0cb93af3b42bd6da5ffeed142"
-CASE66_PLAN_SHA256="ebdaf9a2e60e66c6231931bec6087c0b36a0895e22d4ee659e2b056b9b21bc37"
 GAINS_SHA256="2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6"
 ROBOT_USD_SHA256="89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0"
 TIMEOUT_SECONDS=480
@@ -23,10 +18,27 @@ CAMERA_LEVER_ARM_GAIN="1.00"
 MAXIMUM_CAMERA_LEVER_ARM_CORRECTION_M="0.05"
 TRACKING_PROFILE="riser_recovery_direction_v4_camera_lever_arm_v1"
 
-if [[ "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" != "$AUTHORIZATION" ]]; then
-  printf 'camera lever-arm Gate C authorization is absent or unknown\n' >&2
-  exit 7
-fi
+case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
+  AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE68_66_CAMERA_LEVER_ARM_V1)
+    CASE_A=68
+    CASE_B=66
+    CASE_A_PLAN_SHA256="4f4fc302402c53533f4bdbed33682bf52971a6f0cb93af3b42bd6da5ffeed142"
+    CASE_B_PLAN_SHA256="ebdaf9a2e60e66c6231931bec6087c0b36a0895e22d4ee659e2b056b9b21bc37"
+    STAMP="20260718_gate_c_smoothed_case68_66_camera_lever_arm_v1_exclusive"
+    ;;
+  AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE67_7_CAMERA_LEVER_ARM_V1)
+    CASE_A=67
+    CASE_B=7
+    CASE_A_PLAN_SHA256="e7acb5b9ca748645d878d360f357feb82e89b968f92d86c2639f2b74e03950e0"
+    CASE_B_PLAN_SHA256="421f9f74a9f56cb79b49611355d9520489bf0bbe7204212ba169b84591fa4cd0"
+    STAMP="20260718_gate_c_smoothed_case67_7_camera_lever_arm_v1_exclusive"
+    ;;
+  *)
+    printf 'camera lever-arm Gate C authorization is absent or unknown\n' >&2
+    exit 7
+    ;;
+esac
+CASES="$CASE_A,$CASE_B"
 
 PORTFOLIO="$ROOT/artifacts/two_wheel_riser/$PORTFOLIO_STAMP"
 PORTFOLIO_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${PORTFOLIO_STAMP}"
@@ -136,8 +148,10 @@ PY
 [[ ! -e "$OUTPUT" ]] || { printf 'refusing existing namespace: %s\n' "$OUTPUT" >&2; exit 2; }
 [[ "$(sha256sum "$SOURCE_MANIFEST" | awk '{print $1}')" == "$SOURCE_SHA256" ]] || exit 2
 [[ "$(sha256sum "$PORTFOLIO/manifest.json" | awk '{print $1}')" == "$MANIFEST_SHA256" ]] || exit 2
-[[ "$(sha256sum "$PORTFOLIO/case_0068_smoothed_riser_plan_v1.npz" | awk '{print $1}')" == "$CASE68_PLAN_SHA256" ]] || exit 2
-[[ "$(sha256sum "$PORTFOLIO/case_0066_smoothed_riser_plan_v1.npz" | awk '{print $1}')" == "$CASE66_PLAN_SHA256" ]] || exit 2
+CASE_A_FILE="case_$(printf '%04d' "$CASE_A")_smoothed_riser_plan_v1.npz"
+CASE_B_FILE="case_$(printf '%04d' "$CASE_B")_smoothed_riser_plan_v1.npz"
+[[ "$(sha256sum "$PORTFOLIO/$CASE_A_FILE" | awk '{print $1}')" == "$CASE_A_PLAN_SHA256" ]] || exit 2
+[[ "$(sha256sum "$PORTFOLIO/$CASE_B_FILE" | awk '{print $1}')" == "$CASE_B_PLAN_SHA256" ]] || exit 2
 [[ "$(sha256sum "$GAINS" | awk '{print $1}')" == "$GAINS_SHA256" ]] || exit 2
 [[ "$(sha256sum "$ROBOT_USD" | awk '{print $1}')" == "$ROBOT_USD_SHA256" ]] || exit 2
 
@@ -162,8 +176,7 @@ python3 "$VALIDATOR" \
 
 python3 - "$TEMP_ADMISSION" "$COMMIT" "$STAMP" \
   source_manifest "$SOURCE_MANIFEST" portfolio_manifest "$PORTFOLIO/manifest.json" \
-  case68_plan "$PORTFOLIO/case_0068_smoothed_riser_plan_v1.npz" \
-  case66_plan "$PORTFOLIO/case_0066_smoothed_riser_plan_v1.npz" \
+  case_a_plan "$PORTFOLIO/$CASE_A_FILE" case_b_plan "$PORTFOLIO/$CASE_B_FILE" \
   lqr_gains "$GAINS" robot_usd "$ROBOT_USD" playback "$PLAYBACK" \
   tracking_controller "$TRACKING" riser_control "$RISER_CONTROL" \
   recovery_evidence "$RECOVERY_EVIDENCE" playback_loader "$LOADER" \
@@ -196,7 +209,7 @@ PY
 mkdir -p "$OUTPUT/gates" "$OUTPUT/logs"
 mv "$TEMP_ADMISSION" "$OUTPUT/admission.json"
 
-for CASE in 68 66; do
+for CASE in "$CASE_A" "$CASE_B"; do
   assert_exclusive_resources || exit 5
   STATUS=0
   timeout --signal=TERM --kill-after=30s "$TIMEOUT_SECONDS" \
@@ -225,15 +238,16 @@ done
 python3 "$SUMMARIZER" --root "$OUTPUT" --git-commit "$COMMIT" --cases "$CASES" \
   --expected-tracking-profile "$TRACKING_PROFILE" \
   --require-camera-lever-arm-compensation --output "$OUTPUT/summary.json" >/dev/null
-python3 - "$OUTPUT/summary.json" <<'PY'
+python3 - "$OUTPUT/summary.json" "$CASES" <<'PY'
 import json
 from pathlib import Path
 import sys
 
 summary = json.loads(Path(sys.argv[1]).read_text())
+expected_cases = [int(value) for value in sys.argv[2].split(",")]
 ok = (
-    summary.get("requested_cases") == [68, 66]
-    and summary.get("dynamically_passed_cases") == [68, 66]
+    summary.get("requested_cases") == expected_cases
+    and summary.get("dynamically_passed_cases") == expected_cases
     and summary.get("first_dynamic_reject") is None
     and summary.get("dynamic_quality_passed") is True
     and summary.get("thermal_admission_passed") is True

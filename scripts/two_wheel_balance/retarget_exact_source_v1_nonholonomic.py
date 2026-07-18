@@ -94,6 +94,9 @@ RETARGET_CLI_CONFIG_FIELDS = (
     "enable_gravity_aware_base_arm_recovery_seed",
     "gravity_aware_base_arm_finite_difference_step",
     "gravity_aware_base_arm_maximum_step_fraction",
+    "enable_semantic_branch_lookback",
+    "semantic_branch_lookback_source_intervals",
+    "semantic_branch_beam_width",
     "position_scale_m",
     "control_regularization",
     "maximum_position_p95_m",
@@ -168,6 +171,24 @@ def parse_args() -> argparse.Namespace:
         "--gravity-aware-base-arm-maximum-step-fraction",
         type=float,
         default=0.25,
+    )
+    parser.add_argument(
+        "--enable-semantic-branch-lookback",
+        action="store_true",
+        help=(
+            "Rewind a validated resume checkpoint and retain multiple "
+            "hard-feasible semantic histories across its prior rejection."
+        ),
+    )
+    parser.add_argument(
+        "--semantic-branch-lookback-source-intervals",
+        type=int,
+        default=6,
+    )
+    parser.add_argument(
+        "--semantic-branch-beam-width",
+        type=int,
+        default=4,
     )
     parser.add_argument("--position-scale-m", type=float, default=0.01)
     parser.add_argument("--control-regularization", type=float, default=0.01)
@@ -778,6 +799,16 @@ def main() -> int:
     args.integrity_seed_prior_only = True
     args.report_exact_source_prior_progress = args.rebuild_com_safe_seed_prior
     references, cases = load_retarget_inputs(args)
+    if args.enable_semantic_branch_lookback:
+        if not args.resume_checkpoint or args.checkpoint_path is None:
+            raise ValueError(
+                "--enable-semantic-branch-lookback requires "
+                "--resume-checkpoint and --checkpoint-path"
+            )
+        if args.semantic_branch_lookback_source_intervals < 1:
+            raise ValueError("semantic branch lookback must be positive")
+        if not 2 <= args.semantic_branch_beam_width <= 4:
+            raise ValueError("semantic branch beam width must be between 2 and 4")
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
         raise FileExistsError(f"refusing to overwrite nonempty {args.output_dir}")
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -813,6 +844,13 @@ def main() -> int:
             )
             if seed_diagnostics is not None:
                 result["semantic_seed_family_diagnostics"] = seed_diagnostics
+            branch_diagnostics = getattr(
+                error, "semantic_branch_lookback_diagnostics", None
+            )
+            if branch_diagnostics is not None:
+                result["semantic_branch_lookback_diagnostics"] = (
+                    branch_diagnostics
+                )
             (args.output_dir / f"case_{case:04d}.result.json").write_text(
                 json.dumps(result, indent=2) + "\n", encoding="utf-8", newline="\n"
             )

@@ -230,8 +230,13 @@ def test_gravity_recovery_settings_are_disabled_and_identity_bound_by_default(
     assert config["enable_gravity_aware_base_arm_recovery_seed"] is False
     assert config["gravity_aware_base_arm_finite_difference_step"] == 1e-5
     assert config["gravity_aware_base_arm_maximum_step_fraction"] == 0.25
+    assert config["enable_semantic_branch_lookback"] is False
+    assert config["semantic_branch_lookback_source_intervals"] == 6
+    assert config["semantic_branch_beam_width"] == 4
     changed = {**config, "enable_gravity_aware_base_arm_recovery_seed": True}
     assert canonical_json_sha256(changed) != canonical_json_sha256(config)
+    branch_changed = {**config, "enable_semantic_branch_lookback": True}
+    assert canonical_json_sha256(branch_changed) != canonical_json_sha256(config)
 
 
 @pytest.mark.parametrize(
@@ -426,6 +431,164 @@ def stationary_problem() -> tuple[object, np.ndarray, np.ndarray, object, object
         StubPositionKinematics(),
         StubCameraKinematics(target_rotation),
     )
+
+
+def _seed_diagnostics(start_interval: int) -> dict[str, object]:
+    return {
+        "contract": retarget.GRAVITY_AWARE_BASE_ARM_RECOVERY_CONTRACT,
+        "enabled": False,
+        "scope": "resumed_suffix_only",
+        "scope_start_source_interval": start_interval,
+        "generated_count": 0,
+        "deduplicated_count": 0,
+        "unavailable_count": 0,
+        "skipped_existing_feasible_count": 0,
+        "selected_count": 0,
+    }
+
+
+def test_semantic_branch_lookback_disabled_calls_single_branch_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sentinel = tuple(range(9))
+    calls: list[object] = []
+
+    def fake_single(*arguments: object) -> tuple[int, ...]:
+        calls.append(arguments[-1])
+        return sentinel
+
+    monkeypatch.setattr(
+        retarget, "_retarget_semantic_full_pose_single_branch", fake_single
+    )
+    args = solver_args(enable_semantic_branch_lookback=False)
+
+    assert retarget.retarget_semantic_full_pose(*stationary_problem(), args) == sentinel
+    assert calls == [args]
+    assert args.semantic_branch_lookback_diagnostics == {
+        "contract": retarget.SEMANTIC_BRANCH_LOOKBACK_CONTRACT,
+        "enabled": False,
+    }
+
+
+def test_semantic_branch_lookback_replays_without_speculative_checkpoint_writes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    problem = stationary_problem()
+    original = ExactSourceRetargetPrefix(
+        states=np.zeros((3, 9)),
+        controls=np.zeros((2, 5)),
+        target_positions=np.zeros((3, 3)),
+        target_attitudes=np.tile([1.0, 0.0, 0.0, 0.0], (3, 1)),
+        execution_time_s=np.array([0.0, 0.1, 0.2]),
+        position_errors_m=np.zeros(3),
+        attitude_errors_deg=np.zeros(3),
+        previous_control=np.zeros(8),
+        source_anchor_execution_index_prefix=np.array([0, 1, 2]),
+        retimed_interval_count=0,
+        next_source_interval=3,
+    )
+    rewound = replace(
+        original,
+        states=original.states[:2],
+        controls=original.controls[:1],
+        target_positions=original.target_positions[:2],
+        target_attitudes=original.target_attitudes[:2],
+        execution_time_s=original.execution_time_s[:2],
+        position_errors_m=original.position_errors_m[:2],
+        attitude_errors_deg=original.attitude_errors_deg[:2],
+        source_anchor_execution_index_prefix=np.array([0, 1]),
+        next_source_interval=2,
+    )
+    saved: list[ExactSourceRetargetPrefix] = []
+    continuation_prefixes: list[ExactSourceRetargetPrefix] = []
+    sentinel = tuple(range(9))
+
+    monkeypatch.setattr(retarget, "load_exact_source_checkpoint", lambda *a, **k: original)
+    monkeypatch.setattr(
+        retarget,
+        "truncate_exact_source_prefix_for_semantic_lookback",
+        lambda prefix, lookback: rewound,
+    )
+
+    def fake_single(*arguments: object) -> tuple[int, ...]:
+        branch_args = arguments[-1]
+        stop_after = getattr(
+            branch_args, "_semantic_branch_stop_after_source_interval", None
+        )
+        if stop_after is None:
+            continuation_prefixes.append(branch_args._semantic_branch_prefix_override)
+            branch_args.semantic_seed_family_diagnostics = _seed_diagnostics(4)
+            return sentinel
+        variant = branch_args._semantic_branch_rank_variant
+        assert branch_args.exact_source_checkpoint_path is None
+        if variant == 0:
+            raise ValueError("greedy history rejected")
+        marker = float(variant)
+        branch_args._semantic_branch_prefix_result = replace(
+            original,
+            states=np.vstack((original.states, np.full((1, 9), marker))),
+            controls=np.vstack((original.controls, np.zeros((1, 5)))),
+            target_positions=np.vstack((original.target_positions, np.zeros((1, 3)))),
+            target_attitudes=np.vstack(
+                (original.target_attitudes, [[1.0, 0.0, 0.0, 0.0]])
+            ),
+            execution_time_s=np.append(original.execution_time_s, 0.3),
+            position_errors_m=np.append(original.position_errors_m, 0.01),
+            attitude_errors_deg=np.append(original.attitude_errors_deg, 0.01),
+            source_anchor_execution_index_prefix=np.array([0, 1, 2, 3]),
+            next_source_interval=4,
+        )
+        branch_args.semantic_seed_family_diagnostics = _seed_diagnostics(2)
+        return sentinel
+
+    monkeypatch.setattr(
+        retarget, "_retarget_semantic_full_pose_single_branch", fake_single
+    )
+    monkeypatch.setattr(
+        retarget,
+        "_semantic_branch_prefix_scores",
+        lambda prefix, *unused: (float(prefix.states[-1, 0]), -float(prefix.states[-1, 0])),
+    )
+
+    def fake_save(*arguments: object, **keywords: object) -> None:
+        saved.append(arguments[2])
+
+    monkeypatch.setattr(retarget, "save_exact_source_checkpoint", fake_save)
+    args = solver_args(
+        enable_semantic_branch_lookback=True,
+        semantic_branch_lookback_source_intervals=1,
+        semantic_branch_beam_width=3,
+        exact_source_checkpoint_path=tmp_path / "checkpoint.npz",
+        exact_source_checkpoint_identity={"bound": True},
+        exact_source_resume_checkpoint=True,
+    )
+
+    result = retarget.retarget_semantic_full_pose(*problem, args)
+
+    assert result == sentinel
+    assert len(saved) == 1
+    assert saved[0].states[-1, 0] == 2.0
+    assert len(continuation_prefixes) == 1
+    assert continuation_prefixes[0] is saved[0]
+    diagnostics = args.semantic_branch_lookback_diagnostics
+    assert diagnostics["selected_rank_variant"] == 2
+    assert diagnostics["hard_feasible_distinct_history_count"] == 2
+    assert [row["status"] for row in diagnostics["history_diagnostics"]] == [
+        "rejected",
+        "crossed_prior_rejection",
+        "crossed_prior_rejection",
+    ]
+
+
+def test_semantic_branch_lookback_requires_bound_resume() -> None:
+    args = solver_args(
+        enable_semantic_branch_lookback=True,
+        semantic_branch_lookback_source_intervals=1,
+        semantic_branch_beam_width=2,
+    )
+    with pytest.raises(ValueError, match="requires checkpoint resume"):
+        retarget.retarget_semantic_full_pose(*stationary_problem(), args)
 
 
 def test_resumed_solver_is_identical_to_uninterrupted_solver(tmp_path: Path) -> None:

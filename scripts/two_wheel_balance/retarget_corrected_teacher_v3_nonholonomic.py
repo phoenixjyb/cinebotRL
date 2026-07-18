@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import csv
 from dataclasses import dataclass
@@ -73,6 +74,7 @@ GRAVITY_AWARE_BASE_ARM_RECOVERY_CONTRACT = (
 SEMANTIC_BRANCH_LOOKBACK_CONTRACT = (
     "bounded_hard_feasible_semantic_branch_lookback_v1"
 )
+SEMANTIC_BRANCH_RANK_VARIANT_COUNT = 4
 
 
 @dataclass(frozen=True)
@@ -214,6 +216,69 @@ def truncate_exact_source_prefix_for_semantic_lookback(
         retimed_interval_count=int(np.count_nonzero(np.diff(retained_mapping) > 1)),
         next_source_interval=restart_interval,
     )
+
+
+def _exact_source_prefix_from_execution(
+    *,
+    states: list[np.ndarray],
+    controls: list[np.ndarray],
+    target_positions: list[np.ndarray],
+    target_attitudes: list[np.ndarray],
+    execution_time_s: list[float],
+    position_errors_m: list[float],
+    attitude_errors_deg: list[float],
+    previous_control: np.ndarray,
+    source_anchor_indices: list[int],
+    retimed_interval_count: int,
+    next_source_interval: int,
+) -> ExactSourceRetargetPrefix:
+    return ExactSourceRetargetPrefix(
+        states=np.asarray(states, dtype=np.float64),
+        controls=np.asarray(controls, dtype=np.float64),
+        target_positions=np.asarray(target_positions, dtype=np.float64),
+        target_attitudes=np.asarray(target_attitudes, dtype=np.float64),
+        execution_time_s=np.asarray(execution_time_s, dtype=np.float64),
+        position_errors_m=np.asarray(position_errors_m, dtype=np.float64),
+        attitude_errors_deg=np.asarray(attitude_errors_deg, dtype=np.float64),
+        previous_control=np.asarray(previous_control, dtype=np.float64),
+        source_anchor_execution_index_prefix=np.asarray(
+            source_anchor_indices, dtype=np.int64
+        ),
+        retimed_interval_count=int(retimed_interval_count),
+        next_source_interval=int(next_source_interval),
+    )
+
+
+def semantic_branch_rank_key(
+    *,
+    variant: int,
+    feasible: bool,
+    baseline_score: float,
+    position_error_m: float,
+    attitude_error_deg: float,
+    gravity_effort_nm: float,
+    source_arm_error_rad: float,
+    stable_index: int,
+) -> tuple[object, ...]:
+    """Return one deterministic ranking without modifying hard feasibility."""
+
+    if not 0 <= variant < SEMANTIC_BRANCH_RANK_VARIANT_COUNT:
+        raise ValueError("semantic branch rank variant is unsupported")
+    common = (not feasible,)
+    if variant == 0:
+        ranking = (baseline_score,)
+    elif variant == 1:
+        ranking = (gravity_effort_nm, position_error_m, attitude_error_deg)
+    elif variant == 2:
+        ranking = (position_error_m, gravity_effort_nm, attitude_error_deg)
+    else:
+        ranking = (
+            source_arm_error_rad,
+            gravity_effort_nm,
+            position_error_m,
+            attitude_error_deg,
+        )
+    return (*common, *ranking, baseline_score, stable_index)
 
 
 @dataclass(frozen=True)
@@ -1831,7 +1896,7 @@ def build_com_safe_semantic_prior(
     return prior
 
 
-def retarget_semantic_full_pose(
+def _retarget_semantic_full_pose_single_branch(
     reference: SemanticReference,
     anchor: np.ndarray,
     source_base_arm_q: np.ndarray,
@@ -1866,11 +1931,16 @@ def retarget_semantic_full_pose(
     checkpoint_path = getattr(args, "exact_source_checkpoint_path", None)
     checkpoint_identity = getattr(args, "exact_source_checkpoint_identity", None)
     resume_checkpoint = getattr(args, "exact_source_resume_checkpoint", False)
+    prefix_override = getattr(args, "_semantic_branch_prefix_override", None)
     if checkpoint_path is not None and checkpoint_identity is None:
         raise ValueError("exact-source checkpoint identity is required")
     if resume_checkpoint and checkpoint_path is None:
         raise ValueError("resume requested without exact-source checkpoint path")
-    if resume_checkpoint:
+    if prefix_override is not None:
+        if not isinstance(prefix_override, ExactSourceRetargetPrefix):
+            raise ValueError("semantic branch prefix override has invalid type")
+        prefix = prefix_override
+    elif resume_checkpoint:
         prefix = load_exact_source_checkpoint(
             checkpoint_path,
             checkpoint_identity,
@@ -1879,6 +1949,7 @@ def retarget_semantic_full_pose(
             source_attitudes_wxyz=reference.attitudes_wxyz,
             expected_anchor=anchor,
         )
+    if prefix_override is not None or resume_checkpoint:
         states = [row.copy() for row in prefix.states]
         controls = [row.copy() for row in prefix.controls]
         target_positions = [row.copy() for row in prefix.target_positions]
@@ -1921,6 +1992,9 @@ def retarget_semantic_full_pose(
     gravity_seed_maximum_step_fraction = float(
         getattr(args, "gravity_aware_base_arm_maximum_step_fraction", 0.25)
     )
+    branch_rank_variant = int(getattr(args, "_semantic_branch_rank_variant", 0))
+    if not 0 <= branch_rank_variant < SEMANTIC_BRANCH_RANK_VARIANT_COUNT:
+        raise ValueError("semantic branch rank variant is unsupported")
     if gravity_seed_enabled and (
         not np.isfinite(gravity_seed_finite_difference_step)
         or gravity_seed_finite_difference_step <= 0.0
@@ -1935,7 +2009,9 @@ def retarget_semantic_full_pose(
         "contract": GRAVITY_AWARE_BASE_ARM_RECOVERY_CONTRACT,
         "enabled": gravity_seed_enabled,
         "scope": (
-            "resumed_suffix_only" if resume_checkpoint else "complete_execution"
+            "resumed_suffix_only"
+            if resume_checkpoint or prefix_override is not None
+            else "complete_execution"
         ),
         "scope_start_source_interval": start_index,
         "generated_count": 0,
@@ -2300,13 +2376,24 @@ def retarget_semantic_full_pose(
                             gravity_seed_diagnostics[f"{status}_count"]
                         ) + 1
 
-                solution_index = min(
-                    range(len(solutions)),
-                    key=lambda item: (
-                        not rank(solutions[item])[0],
-                        rank(solutions[item])[1],
-                    ),
-                )
+                def solution_rank_key(item: int) -> tuple[object, ...]:
+                    metrics = solution_metrics(solutions[item])
+                    feasible, baseline_score = rank(solutions[item])
+                    next_state = candidate(solutions[item].x)
+                    return semantic_branch_rank_key(
+                        variant=branch_rank_variant,
+                        feasible=feasible,
+                        baseline_score=baseline_score,
+                        position_error_m=metrics[0],
+                        attitude_error_deg=metrics[1],
+                        gravity_effort_nm=metrics[2],
+                        source_arm_error_rad=float(
+                            np.linalg.norm(next_state[3:6] - source_q[3:6])
+                        ),
+                        stable_index=item,
+                    )
+
+                solution_index = min(range(len(solutions)), key=solution_rank_key)
                 solution = solutions[solution_index]
                 if solution_seed_families[solution_index] == "gravity_aware_base_arm":
                     trial_gravity_seed_selected_count += 1
@@ -2419,6 +2506,8 @@ def retarget_semantic_full_pose(
                     trial_position_errors,
                     trial_attitude_errors,
                     trial_gravity_seed_selected_count,
+                    max(trial_gravity),
+                    max(trial_source_arm_errors),
                 )
             )
             if should_stop_semantic_retime_search(
@@ -2476,7 +2565,19 @@ def retarget_semantic_full_pose(
                 },
             )
             raise error
-        selected = min(feasible_attempts, key=lambda item: item[1])
+        def attempt_rank_key(item: tuple[object, ...]) -> tuple[object, ...]:
+            return semantic_branch_rank_key(
+                variant=branch_rank_variant,
+                feasible=bool(item[0]),
+                baseline_score=float(item[1]),
+                position_error_m=max(item[7]),
+                attitude_error_deg=max(item[8]),
+                gravity_effort_nm=float(item[10]),
+                source_arm_error_rad=float(item[11]),
+                stable_index=len(item[3]),
+            )
+
+        selected = min(feasible_attempts, key=attempt_rank_key)
         (
             _,
             _,
@@ -2488,6 +2589,8 @@ def retarget_semantic_full_pose(
             selected_position_errors,
             selected_attitude_errors,
             selected_gravity_seed_count,
+            _,
+            _,
         ) = selected
         gravity_seed_diagnostics["selected_count"] = int(
             gravity_seed_diagnostics["selected_count"]
@@ -2525,32 +2628,37 @@ def retarget_semantic_full_pose(
             raise ValueError("checkpoint cadence must be positive")
         completed_interval_count = index
         final_interval = index == len(reference.time_s) - 1
+        current_prefix = _exact_source_prefix_from_execution(
+            states=states,
+            controls=controls,
+            target_positions=target_positions,
+            target_attitudes=target_attitudes,
+            execution_time_s=time_s,
+            position_errors_m=position_errors,
+            attitude_errors_deg=attitude_errors,
+            previous_control=previous_control,
+            source_anchor_indices=source_anchor_indices,
+            retimed_interval_count=retimed_interval_count,
+            next_source_interval=index + 1,
+        )
         if checkpoint_path is not None and (
             completed_interval_count % checkpoint_cadence == 0 or final_interval
         ):
             save_exact_source_checkpoint(
                 checkpoint_path,
                 checkpoint_identity,
-                ExactSourceRetargetPrefix(
-                    states=np.asarray(states),
-                    controls=np.asarray(controls),
-                    target_positions=np.asarray(target_positions),
-                    target_attitudes=np.asarray(target_attitudes),
-                    execution_time_s=np.asarray(time_s),
-                    position_errors_m=np.asarray(position_errors),
-                    attitude_errors_deg=np.asarray(attitude_errors),
-                    previous_control=previous_control,
-                    source_anchor_execution_index_prefix=np.asarray(
-                        source_anchor_indices, dtype=np.int64
-                    ),
-                    retimed_interval_count=retimed_interval_count,
-                    next_source_interval=index + 1,
-                ),
+                current_prefix,
                 source_time_s=reference.time_s,
                 source_positions_m=reference.positions_m,
                 source_attitudes_wxyz=reference.attitudes_wxyz,
                 expected_anchor=anchor,
             )
+        stop_after = getattr(
+            args, "_semantic_branch_stop_after_source_interval", None
+        )
+        if stop_after is not None and index == int(stop_after):
+            setattr(args, "_semantic_branch_prefix_result", current_prefix)
+            break
 
     setattr(args, "semantic_seed_family_diagnostics", gravity_seed_diagnostics)
     state_array = np.asarray(states)
@@ -2565,6 +2673,273 @@ def retarget_semantic_full_pose(
         state_array[:, 6:9],
         retimed_interval_count,
     )
+
+
+def _semantic_branch_prefix_scores(
+    prefix: ExactSourceRetargetPrefix,
+    reference: SemanticReference,
+    position_kinematics: UrdfPositionKinematics,
+    camera_kinematics: UrdfPhysicalCameraKinematics,
+    args: argparse.Namespace,
+) -> tuple[float, float]:
+    state = prefix.states[-1]
+    gravity = float(
+        np.max(np.abs(position_kinematics.gravitational_effort_nm(state[:6])))
+    )
+    local_score = (
+        float(prefix.position_errors_m[-1]) / 0.05
+        + float(prefix.attitude_errors_deg[-1]) / args.maximum_ik_error_deg
+        + gravity
+        / (args.maximum_arm_gravity_effort_nm + args.gravity_effort_tolerance_nm)
+    )
+    target_index = min(prefix.next_source_interval, len(reference.time_s) - 1)
+    position_error = float(
+        np.linalg.norm(
+            position_kinematics.position(state[:6])
+            - reference.positions_m[target_index]
+        )
+    )
+    target_rotation = quaternion_matrix_wxyz(
+        semantic_dfr_to_physical_cam_quat_wxyz(
+            reference.attitudes_wxyz[target_index]
+        )
+    )
+    attitude_error = math.degrees(
+        float(
+            np.linalg.norm(
+                rotation_error_vector(
+                    retarget_solver_camera_rotation(
+                        state,
+                        position_kinematics,
+                        camera_kinematics,
+                        args,
+                    ),
+                    target_rotation,
+                )
+            )
+        )
+    )
+    future_score = (
+        position_error / 0.05
+        + attitude_error / args.maximum_ik_error_deg
+        + gravity
+        / (args.maximum_arm_gravity_effort_nm + args.gravity_effort_tolerance_nm)
+    )
+    return local_score, future_score
+
+
+def _combine_seed_family_diagnostics(
+    selected: dict[str, object], continuation: dict[str, object]
+) -> dict[str, object]:
+    combined = dict(continuation)
+    combined["scope"] = "lookback_replay_and_resumed_suffix"
+    combined["scope_start_source_interval"] = selected[
+        "scope_start_source_interval"
+    ]
+    for key in (
+        "generated_count",
+        "deduplicated_count",
+        "unavailable_count",
+        "skipped_existing_feasible_count",
+        "selected_count",
+    ):
+        combined[key] = int(selected[key]) + int(continuation[key])
+    return combined
+
+
+def retarget_semantic_full_pose(
+    reference: SemanticReference,
+    anchor: np.ndarray,
+    source_base_arm_q: np.ndarray,
+    position_kinematics: UrdfPositionKinematics,
+    camera_kinematics: UrdfPhysicalCameraKinematics,
+    args: argparse.Namespace,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    int,
+]:
+    enabled = bool(getattr(args, "enable_semantic_branch_lookback", False))
+    disabled_diagnostics: dict[str, object] = {
+        "contract": SEMANTIC_BRANCH_LOOKBACK_CONTRACT,
+        "enabled": False,
+    }
+    if not enabled:
+        setattr(args, "semantic_branch_lookback_diagnostics", disabled_diagnostics)
+        return _retarget_semantic_full_pose_single_branch(
+            reference,
+            anchor,
+            source_base_arm_q,
+            position_kinematics,
+            camera_kinematics,
+            args,
+        )
+
+    checkpoint_path = getattr(args, "exact_source_checkpoint_path", None)
+    checkpoint_identity = getattr(args, "exact_source_checkpoint_identity", None)
+    if not getattr(args, "exact_source_resume_checkpoint", False):
+        raise ValueError("semantic branch lookback requires checkpoint resume")
+    if checkpoint_path is None or checkpoint_identity is None:
+        raise ValueError("semantic branch lookback requires a bound checkpoint")
+    lookback = int(getattr(args, "semantic_branch_lookback_source_intervals", 0))
+    beam_width = int(getattr(args, "semantic_branch_beam_width", 0))
+    if lookback < 1:
+        raise ValueError("semantic branch lookback must be positive")
+    if not 2 <= beam_width <= SEMANTIC_BRANCH_RANK_VARIANT_COUNT:
+        raise ValueError(
+            "semantic branch beam width must be between 2 and "
+            f"{SEMANTIC_BRANCH_RANK_VARIANT_COUNT}"
+        )
+
+    original_prefix = load_exact_source_checkpoint(
+        checkpoint_path,
+        checkpoint_identity,
+        source_time_s=reference.time_s,
+        source_positions_m=reference.positions_m,
+        source_attitudes_wxyz=reference.attitudes_wxyz,
+        expected_anchor=anchor,
+    )
+    rejection_interval = original_prefix.next_source_interval
+    if rejection_interval >= len(reference.time_s):
+        raise ValueError("semantic branch lookback checkpoint is already complete")
+    rewound_prefix = truncate_exact_source_prefix_for_semantic_lookback(
+        original_prefix, lookback
+    )
+    alternatives: list[SemanticBranchAlternative] = []
+    prefixes: list[ExactSourceRetargetPrefix] = []
+    seed_diagnostics: list[dict[str, object]] = []
+    history_diagnostics: list[dict[str, object]] = []
+    for variant in range(beam_width):
+        branch_args = copy.copy(args)
+        branch_args.exact_source_checkpoint_path = None
+        branch_args.exact_source_checkpoint_identity = None
+        branch_args.exact_source_resume_checkpoint = False
+        branch_args._semantic_branch_prefix_override = rewound_prefix
+        branch_args._semantic_branch_stop_after_source_interval = rejection_interval
+        branch_args._semantic_branch_rank_variant = variant
+        try:
+            _retarget_semantic_full_pose_single_branch(
+                reference,
+                anchor,
+                source_base_arm_q,
+                position_kinematics,
+                camera_kinematics,
+                branch_args,
+            )
+            branch_prefix = branch_args._semantic_branch_prefix_result
+            local_score, future_score = _semantic_branch_prefix_scores(
+                branch_prefix,
+                reference,
+                position_kinematics,
+                camera_kinematics,
+                args,
+            )
+            payload_index = len(prefixes)
+            prefixes.append(branch_prefix)
+            seed_diagnostics.append(branch_args.semantic_seed_family_diagnostics)
+            alternatives.append(
+                SemanticBranchAlternative(
+                    state=branch_prefix.states[-1],
+                    previous_control=branch_prefix.previous_control,
+                    hard_feasible=True,
+                    local_score=local_score,
+                    future_score=future_score,
+                    lineage=(variant,),
+                    payload_index=payload_index,
+                )
+            )
+            history_diagnostics.append(
+                {
+                    "rank_variant": variant,
+                    "status": "crossed_prior_rejection",
+                    "next_source_interval": branch_prefix.next_source_interval,
+                    "local_score": local_score,
+                    "future_score": future_score,
+                }
+            )
+        except ValueError as error:
+            history_diagnostics.append(
+                {
+                    "rank_variant": variant,
+                    "status": "rejected",
+                    "error": str(error),
+                }
+            )
+
+    selected = select_semantic_branch_beam(alternatives, beam_width)
+    diagnostics: dict[str, object] = {
+        "contract": SEMANTIC_BRANCH_LOOKBACK_CONTRACT,
+        "enabled": True,
+        "lookback_source_intervals": lookback,
+        "beam_width": beam_width,
+        "checkpoint_next_source_interval_before_replay": rejection_interval,
+        "replay_start_source_interval": rewound_prefix.next_source_interval,
+        "history_diagnostics": history_diagnostics,
+        "hard_feasible_distinct_history_count": len(selected),
+    }
+    if not selected:
+        error = ValueError(
+            "semantic branch lookback found no hard-feasible history across "
+            f"source interval {rejection_interval}"
+        )
+        setattr(error, "semantic_branch_lookback_diagnostics", diagnostics)
+        raise error
+
+    selected_alternative = selected[0]
+    selected_prefix = prefixes[selected_alternative.payload_index]
+    diagnostics.update(
+        {
+            "selected_rank_variant": selected_alternative.lineage[0],
+            "selected_next_source_interval": selected_prefix.next_source_interval,
+            "selected_local_score": selected_alternative.local_score,
+            "selected_future_score": selected_alternative.future_score,
+        }
+    )
+    save_exact_source_checkpoint(
+        checkpoint_path,
+        checkpoint_identity,
+        selected_prefix,
+        source_time_s=reference.time_s,
+        source_positions_m=reference.positions_m,
+        source_attitudes_wxyz=reference.attitudes_wxyz,
+        expected_anchor=anchor,
+    )
+
+    continuation_args = copy.copy(args)
+    continuation_args.exact_source_resume_checkpoint = False
+    continuation_args._semantic_branch_prefix_override = selected_prefix
+    continuation_args._semantic_branch_rank_variant = 0
+    try:
+        result = _retarget_semantic_full_pose_single_branch(
+            reference,
+            anchor,
+            source_base_arm_q,
+            position_kinematics,
+            camera_kinematics,
+            continuation_args,
+        )
+    except ValueError as error:
+        setattr(error, "semantic_branch_lookback_diagnostics", diagnostics)
+        raise
+    selected_seed_diagnostics = seed_diagnostics[
+        selected_alternative.payload_index
+    ]
+    setattr(
+        args,
+        "semantic_seed_family_diagnostics",
+        _combine_seed_family_diagnostics(
+            selected_seed_diagnostics,
+            continuation_args.semantic_seed_family_diagnostics,
+        ),
+    )
+    setattr(args, "semantic_branch_lookback_diagnostics", diagnostics)
+    return result
 
 
 def retarget_case(
@@ -2667,11 +3042,22 @@ def retarget_case(
             },
         )
     )
+    branch_lookback_diagnostics = dict(
+        getattr(
+            args,
+            "semantic_branch_lookback_diagnostics",
+            {
+                "contract": SEMANTIC_BRANCH_LOOKBACK_CONTRACT,
+                "enabled": False,
+            },
+        )
+    )
     gimbal = {
         "full_pose_anchor_position_error_m": anchor_position_error,
         "full_pose_anchor_attitude_error_deg": anchor_attitude_error,
         "semantic_retimed_interval_count": semantic_retimed_interval_count,
         "semantic_seed_family_diagnostics": seed_family_diagnostics,
+        "semantic_branch_lookback_diagnostics": branch_lookback_diagnostics,
         **equilibrium_pitch_gimbal_diagnostics,
         **acquisition_diagnostics,
     }
@@ -2820,6 +3206,15 @@ def retarget_case(
         ),
         "gravity_aware_base_arm_recovery_selected_count": np.int32(
             seed_family_diagnostics["selected_count"]
+        ),
+        "semantic_branch_lookback_contract": np.asarray(
+            branch_lookback_diagnostics["contract"]
+        ),
+        "semantic_branch_lookback_enabled": np.bool_(
+            branch_lookback_diagnostics["enabled"]
+        ),
+        "semantic_branch_lookback_diagnostics_json": np.asarray(
+            json.dumps(branch_lookback_diagnostics, sort_keys=True)
         ),
         "time_s": time_s,
         "source_time_s": reference.time_s,

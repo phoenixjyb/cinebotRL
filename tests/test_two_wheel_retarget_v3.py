@@ -14,6 +14,7 @@ from retarget_corrected_teacher_v3_nonholonomic import (  # noqa: E402
     BALANCE_PITCH_OUTPUT_TOLERANCE_DEG,
     BALANCE_PITCH_SOLVER_TOLERANCE_DEG,
     HOME_ARM,
+    SEMANTIC_BRANCH_RANK_VARIANT_COUNT,
     SemanticBranchAlternative,
     append_gravity_aware_base_arm_recovery_seed,
     balance_pitch_optimization_margin_deg,
@@ -23,6 +24,7 @@ from retarget_corrected_teacher_v3_nonholonomic import (  # noqa: E402
     physical_gimbal_interpolation_error,
     physical_camera_rotation,
     select_semantic_branch_beam,
+    semantic_branch_rank_key,
     select_acquisition_base_route,
     semantic_gimbal_reserve_margin_ratio,
     semantic_gimbal_reserve_search_max_scale,
@@ -115,6 +117,78 @@ def test_semantic_branch_beam_rejects_bad_contract() -> None:
                 )
             ],
             beam_width=1,
+        )
+
+
+def test_semantic_branch_rank_variants_preserve_feasibility_and_ordering() -> None:
+    common = {
+        "feasible": True,
+        "attitude_error_deg": 0.01,
+        "source_arm_error_rad": 0.2,
+    }
+    low_score = semantic_branch_rank_key(
+        variant=0,
+        baseline_score=1.0,
+        position_error_m=0.04,
+        gravity_effort_nm=29.0,
+        stable_index=0,
+        **common,
+    )
+    low_gravity = semantic_branch_rank_key(
+        variant=1,
+        baseline_score=2.0,
+        position_error_m=0.045,
+        gravity_effort_nm=28.0,
+        stable_index=1,
+        **common,
+    )
+    assert low_score < semantic_branch_rank_key(
+        variant=0,
+        baseline_score=2.0,
+        position_error_m=0.01,
+        gravity_effort_nm=20.0,
+        stable_index=1,
+        **common,
+    )
+    assert low_gravity < semantic_branch_rank_key(
+        variant=1,
+        baseline_score=1.0,
+        position_error_m=0.01,
+        gravity_effort_nm=29.0,
+        stable_index=0,
+        **common,
+    )
+    infeasible = semantic_branch_rank_key(
+        variant=2,
+        feasible=False,
+        baseline_score=0.0,
+        position_error_m=0.0,
+        attitude_error_deg=0.0,
+        gravity_effort_nm=0.0,
+        source_arm_error_rad=0.0,
+        stable_index=0,
+    )
+    feasible = semantic_branch_rank_key(
+        variant=2,
+        feasible=True,
+        baseline_score=100.0,
+        position_error_m=100.0,
+        attitude_error_deg=100.0,
+        gravity_effort_nm=100.0,
+        source_arm_error_rad=100.0,
+        stable_index=1,
+    )
+    assert feasible < infeasible
+    with pytest.raises(ValueError, match="rank variant"):
+        semantic_branch_rank_key(
+            variant=SEMANTIC_BRANCH_RANK_VARIANT_COUNT,
+            feasible=True,
+            baseline_score=0.0,
+            position_error_m=0.0,
+            attitude_error_deg=0.0,
+            gravity_effort_nm=0.0,
+            source_arm_error_rad=0.0,
+            stable_index=0,
         )
 
 

@@ -278,6 +278,11 @@ def test_smoothed_tranche1_tail_gate_is_ordered_hash_bound_and_fail_fast() -> No
     assert "for CASE in 12 11 23" in source
     assert 'MAXIMUM_DURATION_SCALE="3.00"' in source
     assert 'CONTROLLER_WZ_KP="1.05"' in source
+    assert (
+        r'PORTFOLIO_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${PORTFOLIO_STAMP}"'
+        in source
+    )
+    assert r'OUTPUT_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${STAMP}"' in source
     for plan_sha in (
         "4f4f4ed45e618ce2ae350aba430e6e20e78d3d63b631dbed8a742a726023097b",
         "538ddf56b161f93388040284626a9eae01fadbc88cfac8405a5e7848654292b2",

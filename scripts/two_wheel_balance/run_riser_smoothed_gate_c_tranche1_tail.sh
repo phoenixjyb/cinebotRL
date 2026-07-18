@@ -27,10 +27,10 @@ if [[ "${RISER_SMOOTHED_GATE_C_TRANCHE1_TAIL_AUTHORIZATION:-}" != "$AUTHORIZATIO
 fi
 
 PORTFOLIO_WSL="$ROOT/artifacts/two_wheel_riser/$PORTFOLIO_STAMP"
-PORTFOLIO_WIN="$WIN_ROOT\artifacts\two_wheel_riser\$PORTFOLIO_STAMP"
+PORTFOLIO_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${PORTFOLIO_STAMP}"
 SOURCE_MANIFEST_WSL="/mnt/g/wSpace/cinebotRL/data/gikWBC9DOF_exact_source_reference_all79_20260717/manifest.json"
 OUTPUT_WSL="$ROOT/artifacts/two_wheel_riser/$STAMP"
-OUTPUT_WIN="$WIN_ROOT\artifacts\two_wheel_riser\$STAMP"
+OUTPUT_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${STAMP}"
 GAINS_WSL="$ROOT/docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json"
 GAINS_WIN="$WIN_ROOT\docs\03_training\two_wheel_balance\evidence_20260714_28kg\lqr_gains.json"
 ROBOT_USD="$ROOT/assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd"

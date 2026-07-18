@@ -773,3 +773,9 @@ fail-fast path. Use the same outer 3.0x runtime horizon established by case 10,
 without changing source/execution clocks, plans, controller, governor, gains,
 model, or thresholds. Execute in order `(12, 11, 23)` and stop on the first
 physical, thermal, runtime, or ownership reject. Training remains closed.
+
+The first invocation of the tail wrapper at `4e9f307` failed before admission
+or Isaac because its Windows portfolio path escaped `$PORTFOLIO_STAMP` instead
+of expanding it. No output namespace, gate, or trajectory result was created.
+The corrected wrapper uses brace-delimited variables with explicit path
+separators and has a static regression check for both Windows output paths.

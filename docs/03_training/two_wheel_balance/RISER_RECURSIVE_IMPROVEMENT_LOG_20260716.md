@@ -2202,3 +2202,45 @@ and must state whether its candidate was accepted or rejected.
 - Use the unchanged default profile first. Keep fail-fast execution and all
   residual capture/learning stages closed until deterministic qualification is
   complete and the raw residual envelope is recomputed over the final set.
+
+## Round 63: case-30 full-rate riser plan passes Gate C
+
+- Recomputed the dynamic-pass union from sealed result rows rather than the
+  historical running counter. Cases `23-26` and `28` were already qualified,
+  while cases `27` and `29` are not in the CPU-admitted v14 set; therefore
+  case 30 was the first eligible unqualified source-order case.
+- V14 case 30 is hash-bound to plan
+  `1722bfdc7c1aeabc5a9d3920cf6a47bc789afbc96e6ef5c8e540695dc3c97dcb`.
+  Its source/execution clocks are `18.144412/29.222488 s`; static position
+  p95/max are `0.135337/0.168890 m`; target camera height is
+  `1.256005-1.800000 m`; and its planned riser rate reaches the frozen
+  `1.0 m/s` limit without exceeding it.
+- Published the fresh case-only route at `ed5c57d` with a duration-derived
+  `1500 s` wall bound. The authoritative `.98` suite passed `341/341` tests
+  before launch. Ran only case 30 in
+  `20260719_gate_c_smoothed_case30_v14_camera_lever_arm_v1_exclusive`.
+- Both clocks completed in `11495` steps. Dynamic position p95/max passed at
+  `0.141848/0.169449 m`; attitude p95/max passed at
+  `0.153157/0.226069 deg`; pitch max was `7.034872 deg`. Riser servo p95/max
+  were `0.011870/0.014594 m`; effort max was `32.964031 N`; thermal load max
+  was `0.001203`; and every completion, termination, physical, thermal,
+  controller, runtime, IK, rate, and saturation check passed.
+- The prospective residual envelope passed with normalized maxima
+  `[0.804779, 0.412764, 0.172961]`. Residual action remained zero and
+  unapplied; no dataset, capture, BC, PPO, or training started. The corrected
+  uniquely dynamically qualified set is now `35/70`.
+- Evidence hashes: admission
+  `5e4b74e1d32144bc2cee11769d1e208262db7be79cde8df8d8fc49e28da67411`,
+  gate `76274cd5373c296910089d6c139ac3384e54ffa1e921673dcbf3f588f4e857e9`,
+  log `aa0332b27a7636931cbecde3fdd225ff8725c69c01f2e131eaa8637dc4944f0f`,
+  and summary
+  `a5cf2bed55a1e4d2ba993df622bbbe5228c0369961a8f7d59fcbb2cddfad3fa4`.
+  GPU and playback ownership were empty after closure.
+
+## Next round after Round 63
+
+- Inspect v14 case 31 on CPU and, if its frozen timing/path/transition and
+  kinematic gates remain admitted, create one fresh default-profile case-only
+  canary route with a duration-derived timeout.
+- Preserve exact-source geometry, the v14 portfolio, LQR/controller settings,
+  `1.8 m` camera-height ceiling, all physical gates, and learning closure.

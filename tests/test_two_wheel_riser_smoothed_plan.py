@@ -314,3 +314,23 @@ def test_dynamic_retime_derivation_is_cpu_only_evidence_bound_and_closed() -> No
     assert '"valid_for_training": False' in source
     assert "AppLauncher" not in source
     assert "--headless" not in source
+
+
+def test_smoothed_portfolio_composer_is_hash_bound_and_runtime_closed() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/compose_riser_smoothed_plan_portfolio.py"
+    ).read_text(encoding="utf-8")
+    assert "expected-parent-sha256" in source
+    assert "expected-replacement-sha256" in source
+    assert '"parent_plan_sha256"' in source
+    assert '"replacement_selected"' in source
+    assert '"--maximum-duration-median", type=float, default=1.5' in source
+    assert '"--minimum-candidates", type=int, default=70' in source
+    assert '"isaac_started": False' in source
+    assert '"residual_capture_started": False' in source
+    assert '"bc_started": False' in source
+    assert '"ppo_started": False' in source
+    assert '"valid_for_training": False' in source
+    assert "AppLauncher" not in source
+    assert "--headless" not in source

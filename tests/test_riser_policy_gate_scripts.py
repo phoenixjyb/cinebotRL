@@ -495,6 +495,14 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert "CASE_TIMEOUT_SECONDS=700" in source
     assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE20_V12_CAMERA_LEVER_ARM_V1" in source
     assert "20260719_gate_c_smoothed_case20_v12_camera_lever_arm_v1_exclusive" in source
+    assert (
+        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE20_V12_CAMERA_ERROR_GOVERNOR_V1"
+        in source
+    )
+    assert (
+        "20260719_gate_c_smoothed_case20_v12_camera_error_governor_v1_exclusive"
+        in source
+    )
     assert "ec0bb2845c948d17daec8abef6b00b205f6f56fe6cb9e4c42aa9395c6b66336d" in source
     assert "CASE_TIMEOUT_SECONDS=800" in source
     assert "20260718_smoothed_plan_all79_v8_case7_dynamic_retime_cpu" in source
@@ -507,6 +515,12 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert "--enable-camera-lever-arm-compensation" in source
     assert "--camera-lever-arm-compensation-gain" in source
     assert "--maximum-camera-lever-arm-correction-m" in source
+    assert "--enable-camera-error-recovery-governor" in source
+    assert 'CAMERA_RECOVERY_ERROR_START_M="0.13"' in source
+    assert 'CAMERA_RECOVERY_ERROR_FULL_M="0.155"' in source
+    assert 'MINIMUM_CAMERA_RECOVERY_SCALE="0.20"' in source
+    assert "--require-camera-error-recovery-governor" in source
+    assert "0.0 < recovery_numeric[0] <= 1.0" in source
     assert "riser_recovery_direction_v4_camera_lever_arm_v1" in source
     assert "measured_camera_to_base_xy_offset_v1" in source
     assert 'gate.get("controller_evidence_passed") is True' in source

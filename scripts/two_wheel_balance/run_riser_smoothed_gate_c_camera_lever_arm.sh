@@ -17,6 +17,10 @@ CONTROLLER_WZ_KP="1.05"
 CAMERA_LEVER_ARM_GAIN="1.00"
 MAXIMUM_CAMERA_LEVER_ARM_CORRECTION_M="0.05"
 TRACKING_PROFILE="riser_recovery_direction_v4_camera_lever_arm_v1"
+ENABLE_CAMERA_ERROR_RECOVERY=0
+CAMERA_RECOVERY_ERROR_START_M="0.13"
+CAMERA_RECOVERY_ERROR_FULL_M="0.155"
+MINIMUM_CAMERA_RECOVERY_SCALE="0.20"
 
 case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
   AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE68_66_CAMERA_LEVER_ARM_V1)
@@ -233,6 +237,19 @@ case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
     CASE_TIMEOUT_SECONDS=800
     STAMP="20260719_gate_c_smoothed_case20_v12_camera_lever_arm_v1_exclusive"
     ;;
+  AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE20_V12_CAMERA_ERROR_GOVERNOR_V1)
+    PORTFOLIO_STAMP="20260719_smoothed_plan_all79_v12_case16_explicit_preview015_cpu"
+    MANIFEST_SHA256="59e572712879e25a687bebd17be94b8464e7f0de08ef3d5ce2102bb9303a5581"
+    PLANNER_COMMIT="27574668625e55f858fac72df401d6165775b948"
+    CASE_A=20
+    CASE_B=""
+    CASE_A_PLAN_SHA256="ec0bb2845c948d17daec8abef6b00b205f6f56fe6cb9e4c42aa9395c6b66336d"
+    CASE_B_PLAN_SHA256=""
+    CASE_TIMEOUT_SECONDS=800
+    TRACKING_PROFILE="riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
+    ENABLE_CAMERA_ERROR_RECOVERY=1
+    STAMP="20260719_gate_c_smoothed_case20_v12_camera_error_governor_v1_exclusive"
+    ;;
   *)
     printf 'camera lever-arm Gate C authorization is absent or unknown\n' >&2
     exit 7
@@ -294,7 +311,7 @@ wait_for_gpu_release() {
 }
 
 case_gate_passed() {
-  python3 - "$1" "$2" <<'PY'
+  python3 - "$1" "$2" "$3" "$4" <<'PY'
 import json
 import math
 from pathlib import Path
@@ -302,11 +319,39 @@ import sys
 
 gate = json.loads(Path(sys.argv[1]).read_text())
 case = int(sys.argv[2])
+expected_tracking_profile = sys.argv[3]
+require_camera_recovery = bool(int(sys.argv[4]))
 result = gate.get("results", [{}])[0]
 correction_max = result.get("camera_lever_arm_correction_max_m")
 raw_max = result.get("camera_lever_arm_raw_correction_max_m")
 saturation_ratio = result.get("camera_lever_arm_correction_saturation_ratio")
 numeric = (correction_max, raw_max, saturation_ratio)
+recovery_numeric = (
+    result.get("camera_recovery_activation_ratio"),
+    result.get("camera_recovery_progress_scale_min"),
+    result.get("camera_recovery_progress_scale_mean"),
+)
+recovery_ok = not require_camera_recovery or (
+    gate.get("camera_recovery_governor_enabled") is True
+    and gate.get("camera_recovery_governor_contract")
+    == "saturated_camera_error_continuous_phase_cap_v1"
+    and gate.get("camera_recovery_error_range_m") == [0.13, 0.155]
+    and gate.get("minimum_camera_recovery_scale") == 0.2
+    and result.get("camera_recovery_governor_enabled") is True
+    and result.get("camera_recovery_governor_contract")
+    == "saturated_camera_error_continuous_phase_cap_v1"
+    and result.get("camera_recovery_error_range_m") == [0.13, 0.155]
+    and result.get("minimum_camera_recovery_scale") == 0.2
+    and result.get("camera_recovery_telemetry_observed") is True
+    and result.get("camera_recovery_telemetry_sample_count")
+    == result.get("completed_steps")
+    and all(
+        isinstance(value, (int, float)) and math.isfinite(value)
+        for value in recovery_numeric
+    )
+    and 0.0 < recovery_numeric[0] <= 1.0
+    and 0.2 - 1e-12 <= recovery_numeric[1] <= recovery_numeric[2] <= 1.0
+)
 ok = (
     gate.get("cases") == [case]
     and len(gate.get("results", [])) == 1
@@ -317,8 +362,7 @@ ok = (
     and gate.get("controller_evidence_passed") is True
     and result.get("controller_evidence_passed") is True
     and gate.get("controller_overrides") == {"wz_kp": 1.05}
-    and gate.get("tracking_profile")
-    == "riser_recovery_direction_v4_camera_lever_arm_v1"
+    and gate.get("tracking_profile") == expected_tracking_profile
     and gate.get("camera_lever_arm_compensation_contract")
     == "measured_camera_to_base_xy_offset_v1"
     and gate.get("camera_lever_arm_compensation_enabled") is True
@@ -341,6 +385,7 @@ ok = (
     and gate.get("training_started") is False
     and gate.get("ppo_authorized") is False
     and isinstance(result.get("residual_label_envelope_passed"), bool)
+    and recovery_ok
 )
 raise SystemExit(0 if ok else 6)
 PY
@@ -397,6 +442,9 @@ if [[ -n "$CASE_B" ]]; then
   IDENTITY_ARGS+=(case_b_plan "$PORTFOLIO/$CASE_B_FILE")
 fi
 python3 - "$TEMP_ADMISSION" "$COMMIT" "$STAMP" "$CASE_TIMEOUT_SECONDS" \
+  "$TRACKING_PROFILE" "$ENABLE_CAMERA_ERROR_RECOVERY" \
+  "$CAMERA_RECOVERY_ERROR_START_M" "$CAMERA_RECOVERY_ERROR_FULL_M" \
+  "$MINIMUM_CAMERA_RECOVERY_SCALE" \
   "${IDENTITY_ARGS[@]}" <<'PY'
 import hashlib
 import json
@@ -408,7 +456,14 @@ payload = json.loads(path.read_text())
 payload["runtime_commit"] = payload["upstream_commit"] = sys.argv[2]
 payload["namespace"] = sys.argv[3]
 payload["case_timeout_seconds"] = int(sys.argv[4])
-args = sys.argv[5:]
+payload["tracking_profile"] = sys.argv[5]
+payload["camera_recovery_governor_enabled"] = bool(int(sys.argv[6]))
+payload["camera_recovery_error_range_m"] = [float(sys.argv[7]), float(sys.argv[8])]
+payload["minimum_camera_recovery_scale"] = float(sys.argv[9])
+payload["camera_recovery_governor_contract"] = (
+    "saturated_camera_error_continuous_phase_cap_v1"
+)
+args = sys.argv[10:]
 payload["runtime_identities"] = {
     args[index]: {
         "path": str(Path(args[index + 1]).resolve()),
@@ -416,7 +471,6 @@ payload["runtime_identities"] = {
     }
     for index in range(0, len(args), 2)
 }
-payload["tracking_profile"] = "riser_recovery_direction_v4_camera_lever_arm_v1"
 payload["camera_lever_arm_compensation_contract"] = "measured_camera_to_base_xy_offset_v1"
 payload["camera_lever_arm_compensation_gain"] = 1.0
 payload["maximum_camera_lever_arm_correction_m"] = 0.05
@@ -426,6 +480,20 @@ PY
 
 mkdir -p "$OUTPUT/gates" "$OUTPUT/logs"
 mv "$TEMP_ADMISSION" "$OUTPUT/admission.json"
+
+CAMERA_RECOVERY_ARGS=()
+if [[ "$ENABLE_CAMERA_ERROR_RECOVERY" == 1 ]]; then
+  CAMERA_RECOVERY_ARGS+=(
+    --enable-camera-error-recovery-governor
+    --camera-recovery-error-start-m "$CAMERA_RECOVERY_ERROR_START_M"
+    --camera-recovery-error-full-m "$CAMERA_RECOVERY_ERROR_FULL_M"
+    --minimum-camera-recovery-scale "$MINIMUM_CAMERA_RECOVERY_SCALE"
+  )
+fi
+SUMMARY_RECOVERY_ARGS=()
+if [[ "$ENABLE_CAMERA_ERROR_RECOVERY" == 1 ]]; then
+  SUMMARY_RECOVERY_ARGS+=(--require-camera-error-recovery-governor)
+fi
 
 for CASE in "${CASE_LIST[@]}"; do
   assert_exclusive_resources || exit 5
@@ -439,15 +507,18 @@ for CASE in "${CASE_LIST[@]}"; do
     --enable-camera-lever-arm-compensation \
     --camera-lever-arm-compensation-gain "$CAMERA_LEVER_ARM_GAIN" \
     --maximum-camera-lever-arm-correction-m "$MAXIMUM_CAMERA_LEVER_ARM_CORRECTION_M" \
+    "${CAMERA_RECOVERY_ARGS[@]}" \
     --output "$OUTPUT_WIN\gates\case_$(printf '%04d' "$CASE").json" --headless \
     >"$OUTPUT/logs/case_$(printf '%04d' "$CASE").log" 2>&1 || STATUS=$?
   printf '%s\n' "$STATUS" >"$OUTPUT/logs/case_$(printf '%04d' "$CASE").exit_code"
   wait_for_gpu_release || exit 5
   if [[ ! -s "$OUTPUT/gates/case_$(printf '%04d' "$CASE").json" ]] \
-    || ! case_gate_passed "$OUTPUT/gates/case_$(printf '%04d' "$CASE").json" "$CASE"; then
+    || ! case_gate_passed "$OUTPUT/gates/case_$(printf '%04d' "$CASE").json" \
+      "$CASE" "$TRACKING_PROFILE" "$ENABLE_CAMERA_ERROR_RECOVERY"; then
     python3 "$SUMMARIZER" --root "$OUTPUT" --git-commit "$COMMIT" --cases "$CASES" \
       --expected-tracking-profile "$TRACKING_PROFILE" \
-      --require-camera-lever-arm-compensation --output "$OUTPUT/summary.json" >/dev/null
+      --require-camera-lever-arm-compensation "${SUMMARY_RECOVERY_ARGS[@]}" \
+      --output "$OUTPUT/summary.json" >/dev/null
     printf 'camera lever-arm Gate C stopped on case %s\n' "$CASE" >&2
     exit 4
   fi
@@ -455,7 +526,8 @@ done
 
 python3 "$SUMMARIZER" --root "$OUTPUT" --git-commit "$COMMIT" --cases "$CASES" \
   --expected-tracking-profile "$TRACKING_PROFILE" \
-  --require-camera-lever-arm-compensation --output "$OUTPUT/summary.json" >/dev/null
+  --require-camera-lever-arm-compensation "${SUMMARY_RECOVERY_ARGS[@]}" \
+  --output "$OUTPUT/summary.json" >/dev/null
 python3 - "$OUTPUT/summary.json" "$CASES" <<'PY'
 import json
 from pathlib import Path

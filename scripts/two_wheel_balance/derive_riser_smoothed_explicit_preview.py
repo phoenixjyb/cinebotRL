@@ -207,7 +207,6 @@ def main() -> int:
             smoothing_sigma_candidates=(args.smoothing_sigma_samples,),
             preview_configurations=((args.lookahead_distance, args.heading_gain),),
         )
-    _require(result.passed, "explicit preview candidate failed static admission")
     _require(
         result.smoothing_sigma_samples == args.smoothing_sigma_samples
         and result.smoothing_blend_factor == args.smoothing_blend_factor
@@ -242,7 +241,8 @@ def main() -> int:
             expected_smoothed_geometry,
         )
     passed = (
-        audit.get("passed") is True
+        result.passed
+        and audit.get("passed") is True
         and source_arrays_immutable
         and parent_smoothed_geometry_preserved
     )

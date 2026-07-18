@@ -490,6 +490,8 @@ def test_explicit_preview_derivation_is_hash_bound_and_training_closed(
     assert "--preserve-parent-smoothed-geometry" in source
     assert "build_smoothed_riser_plan_from_geometry(" in source
     assert '"parent_smoothed_geometry_preserved"' in source
+    assert '_require(result.passed, "explicit preview candidate failed static admission")' not in source
+    assert "result.passed" in source
     assert 'failed == ["position_p95_bounded"]' in source
     assert '"source_geometry_changed": False' in source
     assert '"controller_changed": False' in source

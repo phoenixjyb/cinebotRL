@@ -1286,3 +1286,64 @@ and must state whether its candidate was accepted or rejected.
   not as implied by case 7. Preserve fail-fast ordering and all existing
   thresholds.
 - Keep residual capture, BC, PPO, and all training closed.
+
+## Round 37: case-6 pass and case-8 p95-only rejection
+
+- Published and ran the ordered `[6,8]` tranche at commit
+  `b7917da1ba864647a252410ae06165815240aeb5`. Case 8 started only after case
+  6 passed.
+- Case 6 completed `7968` steps and the full `17.737275/15.942736 s`
+  execution/source clocks. Position p95/max passed at
+  `0.118125/0.127080 m`; attitude p95/max were
+  `0.157198/0.457533 deg`; action saturation ratio was `0.003263`; no
+  termination occurred. Every thermal, controller, runtime, and residual
+  envelope check passed.
+- Case 8 completed `6108` steps and the full `13.582122/12.940941 s` clocks.
+  It failed only `position_p95_bounded`: `0.150575598 m` against the unchanged
+  `0.15 m` gate, an excess of `0.000575598 m`. Position max
+  `0.168787626 m`, attitude, balance, thermal, riser/proxy, saturation,
+  completion, and residual-envelope checks all passed; no termination or
+  residual application occurred.
+- The wrapper stopped on case 8 with no later case. Case 6 raises the uniquely
+  qualified set to `23/70`; case 8 remains unqualified at this checkpoint.
+- Evidence hashes:
+  - runtime admission: `1f5b88dd1a7462f0a49ffd2a1b2ef060eae4548f948ef02d37208aed1f42b643`;
+  - case-6 gate/log: `140a080b1daab4985fe353bfee9e3f86186dfe3c319841d5a8e08f98e8d6b7c7` /
+    `237b2afc7141e852bcfb08d2bda75cd98cb9445e25b71705db190a9384e522af`;
+  - case-8 gate/log: `c5ea974ebebea42665112eb985b17af902b33d9fdf802a83c5d57ab33a777787` /
+    `5ef232728388527800861bf4a903d7576759fd9eb47ec8bfcf84ff4205842297`;
+  - final summary: `135c8f453daa311921c3c966a02f0ce20a0ee7c33608071bab57e4c2c571cdb2`.
+- GPU and playback ownership were empty after the fail-fast stop. Capture, BC,
+  PPO, and training remained closed.
+
+## Round 38: case-8 source-preserving retime candidate
+
+- Applied the same evidence-bound `completed_position_p95_only` CPU contract
+  proven by case 7. The case-8 candidate preserves every source pose,
+  timestamp, target/base/riser/proxy state, endpoint, ordering, and
+  initialization array; only execution time and derived feed-forward rates
+  change.
+- The candidate execution/source ratio is `1.4`, giving execution duration
+  `18.117317 s`, maximum base linear speed `0.299870 m/s`, and maximum riser
+  speed `0.685982 m/s`. Every static duration, path, transition, kinematic,
+  camera-height, array-identity, and learning-closure gate passes.
+- Composed the fresh v9 all-79 portfolio with both prior case-7 and new case-8
+  retimes preserved. It remains `70/79` CPU-admitted with accepted-duration
+  median `1.499794`; its case-8 static runtime admission passes while training
+  remains false.
+- CPU artifact hashes:
+  - case-8 retimed plan: `f07ff020128dee70ea9c8c2d806dc75c8e0ef3964dccb4e0aabfd1b0048f3655`;
+  - derivation manifest/summary: `3d70721d5525ab1a4ee2ebb537c99f8de64ab4220bcb3dcce46bdbf38ad6557b` /
+    `9a9161e94802abed48431ce7617f59839bb6d2d9b20e05e6dad3a172fddf35da`;
+  - v9 portfolio manifest/summary: `ac5da6ce721bd0af51b9b851ada86b08f587f190440c9de23172b115bad3c748` /
+    `b1c2fffd4a620c2e5c89303702d809c108bcd3554ceeaa4ccd59392c3d531285`;
+  - case-8 static admission: `5c89760bd220e1684394a73e5fa63b5c3d1b1e35bcb246f656074b817ea87db1`.
+- No Isaac/GPU process, dataset, capture, BC, PPO, or training was started by
+  the retime/composition step.
+
+## Next round after Round 38
+
+- Run one v9 case-8-only dynamic canary under the unchanged LQR, camera
+  correction, thermal monitor, physical gates, and ownership guard.
+- Count case 8 only from sealed dynamic evidence. Regardless of outcome, do
+  not open residual capture, BC, PPO, or training.

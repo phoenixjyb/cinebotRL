@@ -97,10 +97,11 @@ def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
 
 def test_smoothed_case52_gate_c_is_isolated_hash_bound_and_label_free() -> None:
     source = _read("run_riser_smoothed_gate_c_case52.sh")
-    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE52_V1" in source
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE52_V2" in source
     assert "73121d240ccf54fa65783fc1cf47eed4d805af3e6bedbdfff847719c92f2130b" in source
     assert "fa90c7345be5763e1e66a55b4b111780dfe5df97f5a779ab2c6bb390f7a3cbce" in source
-    assert "20260718_gate_c_smoothed_case52_v1_completion_grace_exclusive" in source
+    assert "20260718_gate_c_smoothed_case52_v2_timeout420_exclusive" in source
+    assert "TIMEOUT_SECONDS=420" in source
     assert "--cases \"$CASE\"" in source
     assert "smoothed_riser_plan_v1.npz" in source
     assert "cinebotrl_two_wheel_riser_smoothed_plan_v1" in source
@@ -130,6 +131,7 @@ def test_smoothed_case52_gate_c_rejects_missing_authorization_before_runtime() -
         None,
         "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V5",
         "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE52_V0",
+        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE52_V1",
     ):
         env = os.environ.copy()
         if authorization is not None:

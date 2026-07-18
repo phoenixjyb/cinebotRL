@@ -1613,3 +1613,32 @@ and must state whether its candidate was accepted or rejected.
 
 - Continue source-order CPU admission with case 16, then use one fresh bounded
   case-only canary if admitted. Keep all learning stages closed.
+
+## Round 47: case-16 p95 rejection and capped CPU retime
+
+- Case 16 completed `11446` steps and both `17.548706/33.648216 s`
+  source/execution clocks at commit `a84d13ea006ebc7c6053a2ba5a63a287aa7fbd53`.
+  It failed only position p95 at `0.170346 m`; position max `0.186027 m`,
+  attitude, balance, rates, thermal, runtime, controller evidence, and the
+  residual envelope all passed. No dataset or learning stage started.
+- Evidence hashes: admission `4cab04086c83724758772b863b6fe7a85563f102695659317e06873fc7f77349`,
+  gate `878c7612608539136abc745d22fd72e5bd652eec8e83c0252a7106918e7fb93c`,
+  log `3ea6605f7d3e14cbd4907d50a149a0d84ae8e0cae26d0ead65956db7bf9ff35f`,
+  summary `4abf933e548c689e788c18cc7a57dbe2a23ca7b0c637f7264df8af6915709ae6`.
+- Derived the only allowed uniform timing candidate at the unchanged `2.0`
+  execution/source cap. All 896 source anchors, timestamps, geometry,
+  attitudes, ordering, and initialization arrays remain unchanged; execution
+  duration becomes `35.097412 s` and feed-forward rates scale consistently.
+- The CPU candidate and v11 portfolio pass all integrity, transition,
+  kinematic, duration, and median gates. The portfolio remains `70/79`
+  admitted with median `1.499794`; all artifacts remain invalid for training.
+- CPU hashes: retimed plan `8bcf14454ce4b087973e0c0d2c6efb3858edf75209e195dec7fc09fe7111c821`,
+  derivation manifest/summary `23d822018be803d65d3de4cf21f4357678c0425e797f6a89e157231eafef7f40` /
+  `b1ca295565a4c03808a239f7d32112a8391d4277177bf81dd5fa204d3fd4441e`,
+  v11 manifest/summary `56670dd0ecbdf0157361bef65af50f8d688a9e86bc3e0ff50768472b17474032` /
+  `b711bfdbbc4fb15497732c3813161a2164a4dc9d888afadd977f9047ae4e4aa3`.
+
+## Next round after Round 47
+
+- Add one fresh hash-bound v11 case-16-retime canary and run it under unchanged
+  LQR/controller/physical gates. Do not advance to case 17 or learning first.

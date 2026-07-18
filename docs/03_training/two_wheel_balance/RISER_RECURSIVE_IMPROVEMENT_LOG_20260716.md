@@ -1765,3 +1765,42 @@ and must state whether its candidate was accepted or rejected.
   route and run no other case in parallel.
 - Preserve all controller, source, correction, gate, and learning-closure
   invariants.
+
+## Round 51: case-18 long-duration dynamic qualification
+
+- CPU inspection confirmed that v12 case 18 is unchanged and statically
+  admitted, with plan hash
+  `121b0f336dd1e236aaee2b9bf0b158466636624507c107e2d90935339edf2517`,
+  source/execution clocks `35.888335/56.216910 s`, and static position p95/max
+  `0.080594/0.203560 m`. No timing, path, transition, or kinematic check failed.
+- Published the fresh case-only runtime route at
+  `abfe84f258cad9b50ed46465191ed9fc602865d6`, with a duration-derived
+  `2200 s` wall bound. The authoritative remote suite passed all `325` tests
+  before launch.
+- Ran only case 18 in
+  `20260719_gate_c_smoothed_case18_v12_camera_lever_arm_v1_exclusive`. It
+  completed `26966` steps and both clocks. Dynamic position p95/max passed at
+  `0.124703/0.211728 m`; attitude p95/max passed at
+  `0.127902/0.223177 deg`; pitch max was `7.665609 deg`.
+- Internal attitude IK had zero failures, proxy rate max was
+  `43.581408 deg/s`, action saturation was `0.0000742`, and proxy/riser
+  saturation were zero. Riser effort/thermal maxima were `22.537685 N` and
+  `0.001525`; no termination occurred.
+- Dynamic, thermal, runtime, controller-evidence, and residual-envelope gates
+  all passed. Normalized prospective residual maxima were
+  `[0.982979, 0.357060, 0.143591]`; residual actions remained zero and
+  unapplied, and no dataset, capture, BC, PPO, or training was started. The
+  uniquely dynamically qualified set is now `31/70`.
+- Evidence hashes: admission
+  `53ca74b8480227cbf42a4331e0c637af61afb80ffe7893989d49a7b08e20e11e`,
+  gate `bdf6799e7aa663e7990ac54456317dbae381738e4f54550da1b8bef3dec227c6`,
+  log `6e8730ab433fb975f61426218cd1d18fd47fff03e439562177647128b9f61893`,
+  summary `cb42585916d4fbd3be696198f0c1a23a306260137a7765ff1f971e8993931e7c`.
+  GPU and playback ownership were empty after closure.
+
+## Next round after Round 51
+
+- Inspect v12 case 19 on CPU. If admitted, create a fresh case-only route with
+  a duration-derived wall cap and preserve source-order fail-fast execution.
+- Do not start residual capture or learning until deterministic qualification
+  and the subsequent raw residual-envelope recomputation are complete.

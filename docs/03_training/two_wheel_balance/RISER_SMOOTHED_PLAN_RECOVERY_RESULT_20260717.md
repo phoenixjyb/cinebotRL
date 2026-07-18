@@ -199,18 +199,55 @@ No playback or compute owner remained after the run. This is the first final
 dynamic reject for the smoothed portfolio, so no additional Gate-C episode may
 start from this result.
 
+## Case-77 dynamic-margin retime CPU result
+
+Commit `66f0e6aeca22d75d5a716039cb87197754274f78` adds a generic,
+evidence-bound uniform execution retimer and a CPU-only derivation command.
+The authoritative CPU suite passes `284/284` tests in two explicit chunks
+(`123 + 161`). No Isaac application was imported or launched.
+
+The fresh case-77 candidate is stored at:
+
+```text
+/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/
+20260718_case77_dynamic_margin_retime_1p4_v1_cpu
+
+7b0c9b5330733a5e6740023048c308491dd2bd85fd9f30e5fd0cc16901dbe5b7  case_0077_dynamic_margin_retime_v1.npz
+ef2e85f8c3ef2ae13b67efde6c2377e41285afea03844790ef7c9cef498a66c5  manifest.json
+4494f399f1e3a945375c67957eea2439562c57f9ed0f62536895f03ae90a285a  summary.json
+```
+
+The derivation is bound to the rejected v2 Gate-C JSON and summary hashes. An
+independent readback recomputed the output hash and every kinematic gate. All
+immutable source, target, base, riser, proxy, anchor-map, and initialization
+arrays are bit-identical to the parent. Only the execution clock and matching
+base/riser/proxy feed-forward derivatives changed.
+
+```text
+source / execution duration:             5.431279 / 7.603791 s
+execution/source ratio:                  1.400000
+prospective accepted count:              70
+prospective portfolio median:            1.497221x
+maximum base speed:                       0.279130 m/s
+maximum base yaw rate:                    0.034685 rad/s
+maximum riser rate:                       0.032118 m/s
+maximum proxy rate:                       0.034769 rad/s
+path drift / source deviation:            0 / 0
+failed CPU checks:                        none
+```
+
+Controller, phase governor, thresholds, and source geometry are explicitly
+recorded as unchanged. Dynamic and thermal qualification remain false because
+this is a derived CPU candidate, not runtime evidence. Residual capture, BC,
+and PPO remain disabled.
+
 ## Exact continuation
 
-Perform one CPU-only derived-plan audit for case 77 with uniform `1.4x`
-execution retiming. Keep source arrays, source clocks, source ordering, EE path,
-base/RS4 decomposition, controller, governor, and all thresholds unchanged;
-scale only the execution clock and corresponding feed-forward derivatives.
-The candidate would reduce planned peak base speed from `0.390782` to
-`0.279130 m/s`, while the accepted-portfolio duration median remains
-`1.497221x`. It must receive a new plan/manifest hash and remain
-`valid_for_training=false`.
+Review the sealed single-case candidate and derivation contract. If accepted,
+compose a fresh all-79 portfolio that replaces only case 77, re-hash all 79
+plans, and prove the accepted count remains `>=70` and the duration median
+remains `<=1.5x`. Only after that portfolio and a new one-case runtime contract
+are reviewed may one exclusive case-77 canary be authorized.
 
-Stop after CPU duration, path, transition, kinematic, provenance, and portfolio
-median checks. Do not authorize another Isaac canary until that derived
-candidate and its evidence contract are reviewed. Do not start case batches,
-residual capture, BC, or PPO.
+Do not reuse either consumed runtime namespace. Do not start another Isaac
+case, case batch, residual capture, BC, or PPO from the CPU candidate alone.

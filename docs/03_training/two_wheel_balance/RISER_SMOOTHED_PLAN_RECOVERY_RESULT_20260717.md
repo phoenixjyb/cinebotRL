@@ -675,8 +675,58 @@ ordered fail-fast tranches with explicit case lists, plan hashes, execution
 budgets, and fresh namespaces. Start with the five shortest remaining admitted
 plans `(53, 10, 12, 11, 23)`, whose combined execution clock is approximately
 `39.231720 s`. Stop the tranche at the first dynamic, thermal, runtime,
-residual-envelope, or ownership rejection.
+or ownership rejection. Record residual-envelope admission independently; an
+overflow keeps Gate D and training closed but does not itself stop deterministic
+physics.
 
 Do not aggregate a partial tranche as a corpus pass. Do not start capture, BC,
 PPO, or any DNN training until all 70 admitted plans have sealed deterministic
 results and the raw residual envelope has been recomputed over dynamic passes.
+
+## Tranche-1 fail-fast audit
+
+The first tranche wrapper ran from clean pushed commit
+`6c14ae98a0a8123d84d531a6bf3b1a82520616e9` after the complete `.98` suite
+passed `301/301`. The Windows Python process did not propagate its nonzero
+application exit code through WSL. The shell therefore continued after case 10
+failed and executed cases 12, 11, and 23 before the final aggregate validator
+closed with exit code 6. This is an orchestration defect, not a corpus pass.
+
+```text
+20260718_gate_c_smoothed_tranche1_53_10_12_11_23_wzkp105_v1_exclusive
+
+65c7a7558597b3bc4ee0650a182810f90521f835c7811b8f78f6a220d2b1a21c  admission.json
+c0faa126bef5af5f265b5b54838cf48986d2b47aa2c48468becc7936e82e56b5  gates/case_0053.json
+2051345b467c11d8e538cdbe27ee21380ccd916f5fc4fca84183a013690642ee  gates/case_0010.json
+a1c71cde3cabc7a04a3e14176431130e9c62effaed26eb20b280ac61f8be58c3  summary.json
+
+case 53: dynamic pass, position p95/max 0.092387/0.095815 m
+case 10: first physical reject, completed_reference=false
+case 12/11/23: diagnostic only, executed after the first reject
+capture / BC / PPO / training: false / false / false / false
+```
+
+Case 10 remained physically stable and accurate but exhausted the runtime
+horizon before completing the immutable execution clock:
+
+```text
+execution / completed phase:               7.874601 / 5.832402 s
+maximum runtime / wall:                    16.142933 / 16.150 s
+position p95 / max:                        0.116563 / 0.131853 m
+pitch / attitude max:                      7.146952 / 0.205674 deg
+progress scale mean / minimum:             0.361139 / 0.170610
+raw residual command abs max:              [0.313672, 0.062977, 0.010331]
+normalized residual abs max:               [1.045573, 0.157443, 0.103312]
+```
+
+The 4.56% first-channel residual-envelope overflow is independent and keeps
+Gate D closed. It must not prevent deterministic completion evaluation. The
+runner is repaired to parse each gate JSON explicitly before advancing, so a
+Windows/WSL exit-code mismatch cannot bypass fail-fast. The summarizer no
+longer derives runtime validity from the label-dependent `passed_case_count`.
+
+The next bounded canary is case 10 only. Increase only the outer runtime horizon
+from `2.05x` to `3.00x`; preserve the source and execution clocks, plan hash,
+phase governor, `wz_kp=1.05`, robot/gains identities, and every physical gate.
+If case 10 still does not complete, do not increase the horizon again without a
+new structural diagnosis. Capture, BC, PPO, and training remain closed.

@@ -172,6 +172,10 @@ def test_smoothed_representative_gate_is_ordered_hash_bound_and_fail_fast() -> N
     assert "representative Gate C stopped on case %s" in source
     assert "[r]etarget_exact_source_v1_nonholonomic" in source
     assert "wait_for_gpu_release" in source
+    assert "case_gate_passed" in source
+    assert 'case_$(printf \'%04d\' "$CASE").exit_code' in source
+    assert 'gate.get("dynamic_quality_passed") is True' in source
+    assert 'isinstance(result.get("residual_label_envelope_passed"), bool)' in source
     assert "representative CPU/disk ownership is not exclusive" in source
     assert 'summary.get("dynamically_passed_cases") == [77, 52]' in source
     assert 'gate.get("controller_overrides") == {"wz_kp": 1.05}' in source
@@ -211,6 +215,10 @@ def test_smoothed_tranche1_gate_is_ordered_hash_bound_and_fail_fast() -> None:
     assert '--cases "$CASES"' in source
     assert '--cases "$CASE"' in source
     assert "tranche-1 Gate C stopped on case %s" in source
+    assert "case_gate_passed" in source
+    assert 'case_$(printf \'%04d\' "$CASE").exit_code' in source
+    assert 'gate.get("dynamic_quality_passed") is True' in source
+    assert 'isinstance(result.get("residual_label_envelope_passed"), bool)' in source
     assert "[r]etarget_exact_source_v1_nonholonomic" in source
     assert 'summary.get("dynamically_passed_cases") == [53, 10, 12, 11, 23]' in source
     assert 'gate.get("controller_overrides") == {"wz_kp": 1.05}' in source
@@ -229,6 +237,37 @@ def test_smoothed_tranche1_gate_rejects_missing_authorization() -> None:
     )
     assert result.returncode == 7
     assert "tranche-1 Gate C authorization is absent or unknown" in result.stderr
+
+
+def test_smoothed_case10_horizon_gate_changes_only_runtime_bound() -> None:
+    source = _read("run_riser_smoothed_gate_c_case10_horizon.sh")
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE10_HORIZON300_V1" in source
+    assert "20260718_gate_c_smoothed_case10_horizon300_wzkp105_v1_exclusive" in source
+    assert 'CASES="10"' in source
+    assert "for CASE in 10" in source
+    assert 'MAXIMUM_DURATION_SCALE="3.00"' in source
+    assert 'CONTROLLER_WZ_KP="1.05"' in source
+    assert "d5bda3feefe64230d0f9577523832b88b09662ae9ffa741ce4874b90db09eeb1" in source
+    assert '"execution_duration_s": 7.874601349284786' in source
+    assert 'gate.get("maximum_duration_scale") == 3.0' in source
+    assert "case_gate_passed" in source
+    assert 'case_$(printf \'%04d\' "$CASE").exit_code' in source
+    assert 'isinstance(result.get("residual_label_envelope_passed"), bool)' in source
+    assert 'summary.get("dynamically_passed_cases") == [10]' in source
+    assert "--dataset-dir" not in source
+
+
+def test_smoothed_case10_horizon_gate_rejects_missing_authorization() -> None:
+    wrapper = SCRIPTS / "run_riser_smoothed_gate_c_case10_horizon.sh"
+    result = subprocess.run(
+        ["bash", str(wrapper)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={},
+    )
+    assert result.returncode == 7
+    assert "case10 horizon Gate C authorization is absent or unknown" in result.stderr
 
 
 def test_case74_localized_heading_relief_derivation_is_hash_bound_and_closed() -> None:

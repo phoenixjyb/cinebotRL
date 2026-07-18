@@ -120,6 +120,7 @@ def _gate(
                             "riser_peak_force_bounded": True,
                         },
                         "executed_residual_dataset": None,
+                        "raw_residual_label_applied_to_commands": False,
                         "recovery_telemetry_observed": True,
                         "classification": (
                             None
@@ -181,6 +182,12 @@ def test_dynamic_pass_is_independent_of_label_envelope(tmp_path: Path) -> None:
         True,
         label_envelope_passed=False,
     )
+    gate = tmp_path / "gates/case_0074.json"
+    payload = json.loads(gate.read_text())
+    payload["passed"] = False
+    payload["passed_case_count"] = 0
+    payload["results"][0]["passed"] = False
+    gate.write_text(json.dumps(payload))
     output = tmp_path / "summary.json"
     subprocess.run(
         [

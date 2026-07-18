@@ -80,6 +80,36 @@ wait_for_gpu_release() {
   assert_gpu_free
 }
 
+case_gate_passed() {
+  python3 - "$1" "$2" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+gate = json.loads(Path(sys.argv[1]).read_text())
+case = int(sys.argv[2])
+result = gate.get("results", [{}])[0]
+ok = (
+    gate.get("cases") == [case]
+    and len(gate.get("results", [])) == 1
+    and gate.get("dynamic_quality_passed") is True
+    and result.get("dynamic_quality_passed") is True
+    and gate.get("thermal_admission_passed") is True
+    and result.get("thermal_admission_passed") is True
+    and gate.get("controller_overrides") == {"wz_kp": 1.05}
+    and gate.get("trajectory_command_source") == "deterministic_teacher"
+    and gate.get("residual_policy") is None
+    and result.get("executed_residual_dataset") is None
+    and result.get("raw_residual_label_applied_to_commands") is False
+    and gate.get("training_started") is False
+    and gate.get("ppo_authorized") is False
+    and isinstance(result.get("residual_label_envelope_passed"), bool)
+    and isinstance(result.get("residual_label_admission_passed"), bool)
+)
+raise SystemExit(0 if ok else 6)
+PY
+}
+
 [[ -x "$PY" ]] || { printf 'missing Isaac Python\n' >&2; exit 2; }
 [[ -x "$NVIDIA_SMI" ]] || { printf 'missing WSL NVIDIA ownership probe\n' >&2; exit 2; }
 [[ -s "$PORTFOLIO_WSL/manifest.json" ]] || { printf 'missing smoothed manifest\n' >&2; exit 2; }
@@ -203,7 +233,8 @@ for CASE in 77 52; do
       --cases "$CASES" --output "$OUTPUT_WSL/summary.json" >/dev/null
     exit 5
   fi
-  if ! timeout --signal=TERM --kill-after=30s "$TIMEOUT_SECONDS" \
+  PLAYBACK_STATUS=0
+  timeout --signal=TERM --kill-after=30s "$TIMEOUT_SECONDS" \
     "$PY" -u -X utf8 "$PLAYBACK_WIN" \
     --gains "$GAINS_WIN" \
     --plan-dir "$PORTFOLIO_WIN" \
@@ -212,14 +243,19 @@ for CASE in 77 52; do
     --controller-wz-kp "$CONTROLLER_WZ_KP" \
     --maximum-duration-scale "$MAXIMUM_DURATION_SCALE" \
     --output "$OUTPUT_WIN\\gates\\case_$(printf '%04d' "$CASE").json" \
-    --headless >"$OUTPUT_WSL/logs/case_$(printf '%04d' "$CASE").log" 2>&1; then
+    --headless >"$OUTPUT_WSL/logs/case_$(printf '%04d' "$CASE").log" 2>&1 \
+    || PLAYBACK_STATUS=$?
+  printf '%s\n' "$PLAYBACK_STATUS" \
+    >"$OUTPUT_WSL/logs/case_$(printf '%04d' "$CASE").exit_code"
+  wait_for_gpu_release || exit 5
+  if [[ ! -s "$OUTPUT_WSL/gates/case_$(printf '%04d' "$CASE").json" ]] \
+    || ! case_gate_passed \
+    "$OUTPUT_WSL/gates/case_$(printf '%04d' "$CASE").json" "$CASE"; then
     python3 "$SUMMARIZER" --root "$OUTPUT_WSL" --git-commit "$COMMIT" \
       --cases "$CASES" --output "$OUTPUT_WSL/summary.json" >/dev/null
-    wait_for_gpu_release || exit 5
     printf 'representative Gate C stopped on case %s\n' "$CASE" >&2
     exit 4
   fi
-  wait_for_gpu_release || exit 5
   if ! assert_no_competing_cpu; then
     python3 "$SUMMARIZER" --root "$OUTPUT_WSL" --git-commit "$COMMIT" \
       --cases "$CASES" --output "$OUTPUT_WSL/summary.json" >/dev/null
@@ -243,8 +279,6 @@ ok = (
     and summary.get("dynamic_quality_passed") is True
     and summary.get("thermal_admission_passed") is True
     and summary.get("runtime_contract_passed") is True
-    and summary.get("residual_label_envelope_passed") is True
-    and summary.get("residual_label_admission_passed") is True
     and summary.get("residual_capture_started") is False
     and summary.get("bc_started") is False
     and summary.get("ppo_started") is False

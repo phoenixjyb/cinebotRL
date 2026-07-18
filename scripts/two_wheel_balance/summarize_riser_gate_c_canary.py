@@ -179,9 +179,9 @@ def main() -> int:
             and result.get("recovery_telemetry_observed") is True
             and recovery_telemetry_passed(result)
             and payload.get("cases") == [case]
-            and payload.get("passed_case_count") == 1
             and len(payload.get("results", [])) == 1
             and result.get("executed_residual_dataset") is None
+            and result.get("raw_residual_label_applied_to_commands") is False
         )
         row = {
             "case": case,

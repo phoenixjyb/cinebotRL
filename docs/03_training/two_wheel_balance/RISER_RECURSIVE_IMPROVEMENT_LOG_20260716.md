@@ -2057,3 +2057,64 @@ and must state whether its candidate was accepted or rejected.
 - Do not launch a retry until that candidate passes duration, path, transition,
   and kinematic checks and demonstrates a nonzero parent-relative timing and
   command change. Case 22 and every learning stage remain closed.
+
+## Round 59: localized case-21 reversal retime passes CPU admission
+
+- Added a reusable local execution-time scaling primitive at `9871991`. It
+  applies a smooth endpoint-neutral interval taper, never speeds an interval,
+  preserves all states/source arrays, recomputes every feedforward derivative,
+  rejects duration overflow, and reports command-transition evidence. The
+  authoritative `.98` suite passed `340/340` tests.
+- Derived case 21 over intervals `230:340` with peak time scale `4.0`. All 693
+  source anchors, target geometry, base/riser/proxy states, source timestamps,
+  initialization separation, LQR/controller settings, and physical thresholds
+  remained unchanged. Execution duration changed from `18.753269` to
+  `20.284171 s`, ratio `1.503001 < 2.0`.
+- In the reversal window, maximum linear acceleration fell from
+  `16.881930` to `4.891088 m/s^2` (`0.289723x`), command-transition norm from
+  `0.162606` to `0.108473` (`0.667093x`), and maximum linear velocity from
+  `0.400000` to `0.237283 m/s`. Every duration/path/transition/kinematic and
+  nonzero parent-delta check passed.
+- CPU candidate plan hash is
+  `81c0da4be22d5b800978d1d46ca9705912f72007f7c615b31715c672dd86a1d4`;
+  derivation manifest hash is
+  `4dcf6151e8ec6d247adcbddc2de41add08d647217de5b067597f52dab8484ac0`.
+- Added the replacement schema to the fail-closed portfolio composer at
+  `823db97`; `.98` passed `341/341` tests. V13 portfolio manifest hash is
+  `40611139cb50c4431c238994f311e578c6b43f754ad07b700ec54576a8574e3e`.
+  It retains `70/79` CPU-admitted plans and accepted duration median
+  `1.499794 <= 1.5`. No Isaac or learning stage ran during derivation.
+
+## Round 60: case-21 localized reversal plan passes Gate C
+
+- Published the fresh v13 case-only route at `91fb909`; the authoritative
+  `.98` suite again passed `341/341` tests before launch. Ran only case 21 in
+  `20260719_gate_c_smoothed_case21_v13_localized_reversal_v1_exclusive` under
+  the unchanged default tracking/LQR profile.
+- Both clocks completed in `5486` steps. Dynamic position p95/max passed at
+  `0.102706/0.108222 m`, improving from the parent's
+  `0.156808/0.195109 m`. Attitude p95/max passed at
+  `0.192802/0.215200 deg`; pitch max was `6.300506 deg`; no termination or
+  controller/thermal failure occurred.
+- The independently evaluated prospective residual envelope also passed:
+  normalized maxima changed from the rejected parent's
+  `[1.018811, 0.537389, 0.113703]` to
+  `[0.573797, 0.537389, 0.113652]`. Residual action remained zero and
+  unapplied; no dataset, capture, BC, PPO, or training started. The uniquely
+  dynamically qualified set is now `34/70`.
+- Evidence hashes: admission
+  `c216d80eadd4c354549a60c8166a53e88db78cdf6ce57b91451e14d0ecca4658`,
+  gate `5f71526f4b4d4e2055a4c1153b9e104d1d1eb88617d33fe6a67c730171ed1fb8`,
+  log `bed79df285467ef0e24c1f24464fd5a843404c3cf1ca9614a75fc26f4371bc76`,
+  and summary
+  `f5555c95a17eb57802254bcf0121afe9f1fd4a4f6e0314cfcca12175ad704f83`.
+  GPU and playback ownership were empty after closure.
+
+## Next round after Round 60
+
+- Resume source-order CPU inspection with v13 case 22. Use its unchanged
+  default plan/profile unless its own evidence demonstrates a reversal or
+  camera-error recovery need; do not generalize the case-21 retime blindly.
+- Keep fail-fast Gate C execution and all residual capture/learning stages
+  closed until deterministic qualification is complete and the raw residual
+  envelope is recomputed over the final accepted portfolio.

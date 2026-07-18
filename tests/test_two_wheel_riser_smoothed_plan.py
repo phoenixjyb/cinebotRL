@@ -487,7 +487,9 @@ def test_explicit_preview_derivation_is_hash_bound_and_training_closed(
     assert 'default=2.75' in source
     assert 'source_manifest.get("episode_count") == args.expected_count' in source
     assert 'len(source_items) == args.expected_count' in source
-    assert 'smoothing_sigma_candidates=(0.0,)' in source
+    assert "--preserve-parent-smoothed-geometry" in source
+    assert "build_smoothed_riser_plan_from_geometry(" in source
+    assert '"parent_smoothed_geometry_preserved"' in source
     assert 'failed == ["position_p95_bounded"]' in source
     assert '"source_geometry_changed": False' in source
     assert '"controller_changed": False' in source
@@ -518,3 +520,34 @@ def test_explicit_preview_derivation_is_hash_bound_and_training_closed(
     module._require_hash_bound_file(binary_plan, module.sha256_file(binary_plan))
     with pytest.raises(ValueError, match="hash mismatch"):
         module._require_hash_bound_file(binary_plan, "0" * 64)
+
+
+def test_explicit_preview_builder_preserves_supplied_geometry(monkeypatch) -> None:
+    geometry = np.arange(12, dtype=np.float64).reshape(4, 3)
+    sentinel = object()
+    captured = {}
+
+    def fake_build(source, kinematics, **kwargs):
+        captured.update(kwargs)
+        return sentinel
+
+    monkeypatch.setattr(smoothed_plan, "_build_candidate", fake_build)
+    result = smoothed_plan.build_smoothed_riser_plan_from_geometry(
+        object(),
+        object(),
+        geometry,
+        smoothing_sigma_samples=64.0,
+        smoothing_blend_factor=0.125,
+        lookahead_distance_m=1.0,
+        heading_gain=1.0,
+        reset_yaw_mode="forward_path",
+    )
+
+    assert result is sentinel
+    np.testing.assert_array_equal(captured["smoothed_position_override_m"], geometry)
+    assert captured["sigma_samples"] == 64.0
+    assert captured["smoothing_blend_factor"] == 0.125
+    assert captured["lookahead_distance_m"] == 1.0
+    assert captured["heading_gain"] == 1.0
+    assert captured["reset_yaw_mode"] == "forward_path"
+    assert captured["planning_strategy_override"] == "smoothed_explicit_preview_v1"

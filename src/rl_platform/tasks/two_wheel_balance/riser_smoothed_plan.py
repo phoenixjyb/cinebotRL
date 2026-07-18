@@ -1148,6 +1148,32 @@ def build_smoothed_riser_plan(
     return replace(best, attempts=tuple(attempts))
 
 
+def build_smoothed_riser_plan_from_geometry(
+    source: ExactSourceRiserReference,
+    kinematics: UrdfRiserCameraKinematics,
+    smoothed_position_source_frame_m: np.ndarray,
+    *,
+    smoothing_sigma_samples: float,
+    smoothing_blend_factor: float,
+    lookahead_distance_m: float,
+    heading_gain: float,
+    reset_yaw_mode: str,
+) -> SmoothedPlanResult:
+    """Build one preview candidate while preserving an admitted smoothed path."""
+
+    return _build_candidate(
+        source,
+        kinematics,
+        sigma_samples=smoothing_sigma_samples,
+        smoothing_blend_factor=smoothing_blend_factor,
+        lookahead_distance_m=lookahead_distance_m,
+        heading_gain=heading_gain,
+        reset_yaw_mode=reset_yaw_mode,
+        smoothed_position_override_m=smoothed_position_source_frame_m,
+        planning_strategy_override="smoothed_explicit_preview_v1",
+    )
+
+
 def save_smoothed_riser_plan(
     path: Path,
     result: SmoothedPlanResult,

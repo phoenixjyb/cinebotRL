@@ -25,6 +25,7 @@ from rl_platform.tasks.two_wheel_balance.riser_kinematics import (  # noqa: E402
 from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (  # noqa: E402
     audit_smoothed_riser_plan,
     build_smoothed_riser_plan,
+    build_smoothed_riser_plan_from_geometry,
     save_smoothed_riser_plan,
 )
 
@@ -98,6 +99,14 @@ def main() -> int:
     parser.add_argument("--case", type=int, default=16)
     parser.add_argument("--lookahead-distance", type=float, default=0.15)
     parser.add_argument("--heading-gain", type=float, default=2.75)
+    parser.add_argument("--smoothing-sigma-samples", type=float, default=0.0)
+    parser.add_argument("--smoothing-blend-factor", type=float, default=1.0)
+    parser.add_argument(
+        "--reset-yaw-mode",
+        choices=("source", "forward_path", "reverse_path"),
+        default="source",
+    )
+    parser.add_argument("--preserve-parent-smoothed-geometry", action="store_true")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
 
@@ -137,6 +146,20 @@ def main() -> int:
         and parent_item.get("passed") is True,
         "parent case is not admitted and hash-bound",
     )
+    with np.load(args.parent_plan, allow_pickle=False) as parent_data:
+        parent_smoothed_geometry = np.asarray(
+            parent_data["smoothed_target_position_source_frame_m"],
+            dtype=np.float64,
+        ).copy()
+    if args.preserve_parent_smoothed_geometry:
+        _require(
+            parent_item.get("selected_smoothing_sigma_samples")
+            == args.smoothing_sigma_samples
+            and parent_item.get("selected_smoothing_blend_factor")
+            == args.smoothing_blend_factor
+            and parent_item.get("selected_reset_yaw_mode") == args.reset_yaw_mode,
+            "parent smoothing or reset-yaw contract mismatch",
+        )
     results = gate.get("results")
     _require(gate.get("cases") == [args.case] and isinstance(results, list) and len(results) == 1, "bad gate case")
     gate_row = results[0]
@@ -166,15 +189,28 @@ def main() -> int:
     )
     source = references[args.case]
     kinematics = UrdfRiserCameraKinematics(args.urdf)
-    result = build_smoothed_riser_plan(
-        source,
-        kinematics,
-        smoothing_sigma_candidates=(0.0,),
-        preview_configurations=((args.lookahead_distance, args.heading_gain),),
-    )
+    if args.preserve_parent_smoothed_geometry:
+        result = build_smoothed_riser_plan_from_geometry(
+            source,
+            kinematics,
+            parent_smoothed_geometry,
+            smoothing_sigma_samples=args.smoothing_sigma_samples,
+            smoothing_blend_factor=args.smoothing_blend_factor,
+            lookahead_distance_m=args.lookahead_distance,
+            heading_gain=args.heading_gain,
+            reset_yaw_mode=args.reset_yaw_mode,
+        )
+    else:
+        result = build_smoothed_riser_plan(
+            source,
+            kinematics,
+            smoothing_sigma_candidates=(args.smoothing_sigma_samples,),
+            preview_configurations=((args.lookahead_distance, args.heading_gain),),
+        )
     _require(result.passed, "explicit preview candidate failed static admission")
     _require(
-        result.smoothing_sigma_samples == 0.0
+        result.smoothing_sigma_samples == args.smoothing_sigma_samples
+        and result.smoothing_blend_factor == args.smoothing_blend_factor
         and result.lookahead_distance_m == args.lookahead_distance
         and result.heading_gain == args.heading_gain,
         "planner selected an unexpected configuration",
@@ -195,12 +231,21 @@ def main() -> int:
                 data["source_target_semantic_dfr_quat_xyzw"],
                 source.source_semantic_dfr_quat_xyzw,
             )
-            and np.array_equal(
-                data["smoothed_target_position_source_frame_m"],
-                source.source_position_world_m,
-            )
         )
-    passed = audit.get("passed") is True and source_arrays_immutable
+        expected_smoothed_geometry = (
+            parent_smoothed_geometry
+            if args.preserve_parent_smoothed_geometry
+            else source.source_position_world_m
+        )
+        parent_smoothed_geometry_preserved = np.array_equal(
+            data["smoothed_target_position_source_frame_m"],
+            expected_smoothed_geometry,
+        )
+    passed = (
+        audit.get("passed") is True
+        and source_arrays_immutable
+        and parent_smoothed_geometry_preserved
+    )
     row = {
         **audit,
         "parent_plan": str(args.parent_plan.resolve()),
@@ -210,7 +255,12 @@ def main() -> int:
         "explicit_preview": {
             "lookahead_distance_m": args.lookahead_distance,
             "heading_gain": args.heading_gain,
-            "smoothing_sigma_samples": 0.0,
+            "smoothing_sigma_samples": args.smoothing_sigma_samples,
+            "smoothing_blend_factor": args.smoothing_blend_factor,
+            "reset_yaw_mode": args.reset_yaw_mode,
+            "parent_smoothed_geometry_preserved": (
+                parent_smoothed_geometry_preserved
+            ),
             "source_geometry_changed": False,
             "controller_changed": False,
             "thresholds_changed": False,

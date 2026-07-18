@@ -1587,3 +1587,29 @@ and must state whether its candidate was accepted or rejected.
   a fresh case-only contract with a duration-derived bounded wall timeout.
 - Keep the exact-source/derived provenance boundary and all learning closures
   unchanged.
+
+## Round 46: case-15 dynamic qualification
+
+- Ran only case 15 at commit `4722a915aa391d4a7ceee691576716cfdee64025`
+  in `20260719_gate_c_smoothed_case15_v10_camera_lever_arm_v1_exclusive`,
+  bound to plan `8626af7d6d2feeb22d0eb4b2136f0617f91f1fbd3dc87c639d0f459f3c38c25f`
+  and an `1100 s` wall timeout.
+- It completed `12978` steps and `17.277396/25.052774 s` source/execution
+  clocks. Position p95/max passed at `0.065091/0.067957 m`; attitude p95/max
+  passed at `0.122486/0.230283 deg`; pitch max was `6.871187 deg`.
+- IK failures were zero, proxy rate max was `43.741906 deg/s`, action
+  saturation was `0.000308`, and proxy/riser saturation were zero. Riser
+  effort/thermal maxima were `22.957657 N` and `0.001314`.
+- Dynamic, thermal, runtime, controller, and residual-envelope gates all
+  passed. Residual actions stayed zero and unapplied; no dataset, capture, BC,
+  PPO, or training was started. The uniquely qualified count is now `28/70`.
+- Evidence hashes: admission `e81bc0dc671fb82e539c818c353ef37f6a832d35bf9537980443e27e37c29907`,
+  gate `481188488d236ac0abbbf40488e02149e20197bacb97862b6639d79215aaf384`,
+  log `dbe38ed29fd6155f99c132dc7b17957757e32adb73a31a5acd93ecbf911077b8`,
+  summary `2818516a93c2c5d6b061bb1748eb1ae93378ed3838ce8827e3dc225b589940be`.
+- GPU and playback ownership were empty after closure.
+
+## Next round after Round 46
+
+- Continue source-order CPU admission with case 16, then use one fresh bounded
+  case-only canary if admitted. Keep all learning stages closed.

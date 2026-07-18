@@ -513,6 +513,10 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE22_V13_CAMERA_LEVER_ARM_V1" in source
     assert "20260719_gate_c_smoothed_case22_v13_camera_lever_arm_v1_exclusive" in source
     assert "b36626c23d41ecd647f91f9c98e1e06abeb1320fbc96a3a59aea052926a39b75" in source
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE22_V14_LOCALIZED_REVERSAL_V1" in source
+    assert "20260719_gate_c_smoothed_case22_v14_localized_reversal_v1_exclusive" in source
+    assert "369e3294a45ef468979a81a8bf34b9012f9ec4f77a1d4489c4514930f2d79dab" in source
+    assert "8f1638cd771cfac32ca251906e2c095bd7091edb2561974f12ae09b0a65d4a79" in source
     assert "ec0bb2845c948d17daec8abef6b00b205f6f56fe6cb9e4c42aa9395c6b66336d" in source
     assert "CASE_TIMEOUT_SECONDS=800" in source
     assert "20260718_smoothed_plan_all79_v8_case7_dynamic_retime_cpu" in source

@@ -476,7 +476,9 @@ def test_smoothed_portfolio_composer_is_hash_bound_and_runtime_closed() -> None:
         assert "--git-dir" in module._git_command()
 
 
-def test_explicit_preview_derivation_is_hash_bound_and_training_closed() -> None:
+def test_explicit_preview_derivation_is_hash_bound_and_training_closed(
+    tmp_path: Path,
+) -> None:
     source = (
         Path(__file__).resolve().parents[1]
         / "scripts/two_wheel_balance/derive_riser_smoothed_explicit_preview.py"
@@ -509,3 +511,8 @@ def test_explicit_preview_derivation_is_hash_bound_and_training_closed() -> None
         module._windows_path_from_gitdir("/mnt/g/wSpace/repo/.git/worktrees/x")
         == "G:/wSpace/repo/.git/worktrees/x"
     )
+    binary_plan = tmp_path / "parent_plan.npz"
+    binary_plan.write_bytes(b"\x93NUMPY\x00\xff\x80")
+    module._require_hash_bound_file(binary_plan, module.sha256_file(binary_plan))
+    with pytest.raises(ValueError, match="hash mismatch"):
+        module._require_hash_bound_file(binary_plan, "0" * 64)

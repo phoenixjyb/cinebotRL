@@ -66,8 +66,12 @@ def _git_output(*args: str) -> str:
     return subprocess.check_output([*_git_command(), *args], text=True).strip()
 
 
-def _load_hash_bound(path: Path, expected: str) -> dict[str, object]:
+def _require_hash_bound_file(path: Path, expected: str) -> None:
     _require(path.is_file() and sha256_file(path) == expected, f"hash mismatch: {path}")
+
+
+def _load_hash_bound_json(path: Path, expected: str) -> dict[str, object]:
+    _require_hash_bound_file(path, expected)
     payload = json.loads(path.read_text(encoding="utf-8"))
     _require(isinstance(payload, dict), f"invalid JSON: {path}")
     return payload
@@ -105,15 +109,15 @@ def main() -> int:
         not _git_output("status", "--porcelain", "--untracked-files=no"),
         "derivation requires clean tracked state",
     )
-    source_manifest = _load_hash_bound(
+    source_manifest = _load_hash_bound_json(
         args.source_manifest, args.expected_source_manifest_sha256
     )
-    parent = _load_hash_bound(
+    parent = _load_hash_bound_json(
         args.parent_portfolio_manifest, args.expected_parent_portfolio_sha256
     )
-    _load_hash_bound(args.parent_plan, args.expected_parent_plan_sha256)
-    gate = _load_hash_bound(args.gate_json, args.expected_gate_sha256)
-    summary = _load_hash_bound(
+    _require_hash_bound_file(args.parent_plan, args.expected_parent_plan_sha256)
+    gate = _load_hash_bound_json(args.gate_json, args.expected_gate_sha256)
+    summary = _load_hash_bound_json(
         args.gate_summary, args.expected_gate_summary_sha256
     )
 

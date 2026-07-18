@@ -72,6 +72,19 @@ BATCH_RECOVERY_DURATION_WEIGHT = 250.0
 BATCH_RECOVERY_DURATION_RATIO_TARGET = 1.965
 BATCH_RECOVERY_SEED_POSITION_P95_LIMIT_M = 0.20
 BATCH_RECOVERY_SEED_DURATION_RATIO_LIMIT = 2.01
+CASE74_RELIEF_START_ANCHOR = 394
+CASE74_RELIEF_END_ANCHOR = 572
+CASE74_RELIEF_RAMP_FRACTION = 0.2
+CASE74_RELIEF_CONFIGURATIONS = (
+    (16.0, 0.25),
+    (16.0, 0.50),
+    (24.0, 0.50),
+    (24.0, 0.75),
+    (32.0, 0.75),
+    (32.0, 1.00),
+    (48.0, 1.00),
+)
+CASE74_RELIEF_STRATEGY = "case74_localized_heading_relief_v1"
 
 
 def _require(condition: bool, message: str) -> None:
@@ -119,6 +132,73 @@ def smooth_source_positions(
     result = source + blend_factor * (result - source)
     result[0] = source[0]
     result[-1] = source[-1]
+    return result
+
+
+def localized_heading_relief_positions(
+    source_position_m: np.ndarray,
+    parent_smoothed_position_m: np.ndarray,
+    *,
+    start_anchor: int,
+    end_anchor: int,
+    stronger_sigma_samples: float,
+    relief_blend_factor: float,
+    ramp_fraction: float = CASE74_RELIEF_RAMP_FRACTION,
+) -> np.ndarray:
+    """Blend stronger horizontal smoothing into one tapered anchor window."""
+
+    source = np.asarray(source_position_m, dtype=np.float64)
+    parent = np.asarray(parent_smoothed_position_m, dtype=np.float64)
+    _require(
+        source.ndim == 2
+        and source.shape[1] == 3
+        and source.shape == parent.shape
+        and np.isfinite(source).all()
+        and np.isfinite(parent).all(),
+        "source and parent positions must be finite matching shape (N,3)",
+    )
+    _require(
+        0 <= start_anchor < end_anchor < len(source),
+        "localized relief anchor range is invalid",
+    )
+    _require(
+        end_anchor - start_anchor >= 4,
+        "localized relief requires at least five anchors",
+    )
+    _require(
+        math.isfinite(stronger_sigma_samples) and stronger_sigma_samples > 0.0,
+        "localized relief sigma must be finite and positive",
+    )
+    _require(
+        math.isfinite(relief_blend_factor)
+        and 0.0 < relief_blend_factor <= 1.0,
+        "localized relief blend must be in (0,1]",
+    )
+    _require(
+        math.isfinite(ramp_fraction) and 0.0 < ramp_fraction <= 0.5,
+        "localized relief ramp fraction must be in (0,0.5]",
+    )
+
+    stronger = smooth_source_positions(source, stronger_sigma_samples)
+    count = end_anchor - start_anchor + 1
+    ramp_count = max(2, int(round((count - 1) * ramp_fraction)))
+    weight = np.ones(count, dtype=np.float64)
+    ramp = 0.5 - 0.5 * np.cos(
+        np.pi * np.arange(ramp_count + 1, dtype=np.float64) / ramp_count
+    )
+    weight[: ramp_count + 1] = ramp
+    weight[-(ramp_count + 1) :] = ramp[::-1]
+
+    result = parent.copy()
+    window = slice(start_anchor, end_anchor + 1)
+    result[window, :2] += (
+        relief_blend_factor
+        * weight[:, None]
+        * (stronger[window, :2] - parent[window, :2])
+    )
+    result[:, 2] = parent[:, 2]
+    result[start_anchor] = parent[start_anchor]
+    result[end_anchor] = parent[end_anchor]
     return result
 
 
@@ -326,6 +406,7 @@ class SmoothedPlanResult:
     checks: dict[str, bool]
     attempts: tuple[dict[str, object], ...]
     dynamic_margin_retime: dict[str, object] | None = None
+    localized_heading_relief: dict[str, object] | None = None
 
     @property
     def passed(self) -> bool:
@@ -636,10 +717,22 @@ def _build_candidate(
     lookahead_distance_m: float,
     heading_gain: float,
     reset_yaw_mode: str = "source",
+    smoothed_position_override_m: np.ndarray | None = None,
+    planning_strategy_override: str | None = None,
 ) -> SmoothedPlanResult:
-    smoothed = smooth_source_positions(
-        source.source_position_world_m, sigma_samples, smoothing_blend_factor
-    )
+    if smoothed_position_override_m is None:
+        smoothed = smooth_source_positions(
+            source.source_position_world_m, sigma_samples, smoothing_blend_factor
+        )
+    else:
+        smoothed = np.asarray(
+            smoothed_position_override_m, dtype=np.float64
+        ).copy()
+        _require(
+            smoothed.shape == source.source_position_world_m.shape
+            and np.isfinite(smoothed).all(),
+            "smoothed position override must match the exact source",
+        )
     path = smoothed_path_metrics(source.source_position_world_m, smoothed)
     provisional_time = _provisional_schedule(smoothed, source.source_time_s)
     source_attitude_wxyz = source.planning_reference(
@@ -678,11 +771,16 @@ def _build_candidate(
         lookahead_distance_m=lookahead_distance_m,
         heading_gain=heading_gain,
     )
+    planning_strategy = (
+        _strategy(lookahead_distance_m, heading_gain)
+        if planning_strategy_override is None
+        else planning_strategy_override
+    )
     preliminary = playback_plan_from_kinematic_plan(
         reference,
         replace(
             kinematic_plan,
-            planning_strategy=_strategy(lookahead_distance_m, heading_gain),
+            planning_strategy=planning_strategy,
         ),
     )
 
@@ -768,6 +866,110 @@ def _build_candidate(
         kinematic_checks=kinematic_checks,
         checks=checks,
         attempts=(),
+    )
+
+
+def build_case74_localized_heading_relief(
+    source: ExactSourceRiserReference,
+    kinematics: UrdfRiserCameraKinematics,
+    parent_smoothed_position_m: np.ndarray,
+    *,
+    configurations: tuple[tuple[float, float], ...] = (
+        CASE74_RELIEF_CONFIGURATIONS
+    ),
+    start_anchor: int = CASE74_RELIEF_START_ANCHOR,
+    end_anchor: int = CASE74_RELIEF_END_ANCHOR,
+) -> SmoothedPlanResult:
+    """Search bounded local geometry relief for the sealed case-74 reject."""
+
+    _require(source.case == 74, "localized heading relief is sealed to case 74")
+    _require(bool(configurations), "localized relief configurations are empty")
+    parent = np.asarray(parent_smoothed_position_m, dtype=np.float64)
+    _require(
+        parent.shape == source.source_position_world_m.shape,
+        "parent smoothed geometry does not match case 74",
+    )
+    attempts: list[dict[str, object]] = []
+    results: list[SmoothedPlanResult] = []
+    for sigma_samples, blend_factor in configurations:
+        smoothed = localized_heading_relief_positions(
+            source.source_position_world_m,
+            parent,
+            start_anchor=start_anchor,
+            end_anchor=end_anchor,
+            stronger_sigma_samples=sigma_samples,
+            relief_blend_factor=blend_factor,
+        )
+        result = _build_candidate(
+            source,
+            kinematics,
+            sigma_samples=sigma_samples,
+            smoothing_blend_factor=blend_factor,
+            lookahead_distance_m=0.25,
+            heading_gain=2.75,
+            reset_yaw_mode="source",
+            smoothed_position_override_m=smoothed,
+            planning_strategy_override=CASE74_RELIEF_STRATEGY,
+        )
+        local_yaw = np.unwrap(
+            result.plan.base_xy_yaw[start_anchor : end_anchor + 1, 2]
+        )
+        local_yaw_total_variation = float(np.sum(np.abs(np.diff(local_yaw))))
+        attempt = {
+            "schema": CASE74_RELIEF_STRATEGY,
+            "start_anchor": start_anchor,
+            "end_anchor": end_anchor,
+            "stronger_sigma_samples": float(sigma_samples),
+            "relief_blend_factor": float(blend_factor),
+            "local_yaw_total_variation_rad": local_yaw_total_variation,
+            "execution_source_duration_ratio": float(
+                result.plan.time_s[-1] / source.source_time_s[-1]
+            ),
+            "position_error_p95_m": result.kinematic_metrics[
+                "position_error_p95_m"
+            ],
+            "position_error_max_m": result.kinematic_metrics[
+                "position_error_max_m"
+            ],
+            "failed_checks": [
+                key for key, value in result.checks.items() if not value
+            ]
+            + [
+                key
+                for key, value in result.kinematic_checks.items()
+                if not value
+            ],
+            "passed": result.passed,
+        }
+        attempts.append(attempt)
+        relief = {
+            **attempt,
+            "applied": True,
+            "source_geometry_changed": False,
+            "outside_window_parent_geometry_unchanged": True,
+            "controller_changed": False,
+            "phase_governor_changed": False,
+            "thresholds_changed": False,
+        }
+        results.append(
+            replace(
+                result,
+                attempts=tuple(attempts),
+                localized_heading_relief=relief,
+            )
+        )
+
+    passed = [result for result in results if result.passed]
+    _require(bool(passed), "no localized heading relief candidate passed CPU gates")
+    return min(
+        passed,
+        key=lambda result: (
+            result.localized_heading_relief[
+                "local_yaw_total_variation_rad"
+            ],
+            result.plan.time_s[-1],
+            result.kinematic_metrics["position_error_p95_m"],
+        ),
     )
 
 
@@ -1010,6 +1212,9 @@ def save_smoothed_riser_plan(
         },
         "dynamic_margin_retime": result.dynamic_margin_retime
         if result.dynamic_margin_retime is not None
+        else {"applied": False},
+        "localized_heading_relief": result.localized_heading_relief
+        if result.localized_heading_relief is not None
         else {"applied": False},
         "path_metrics": result.path_metrics,
         "transition_metrics": result.transition_metrics,

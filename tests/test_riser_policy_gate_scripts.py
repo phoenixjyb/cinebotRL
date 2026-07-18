@@ -144,6 +144,22 @@ def test_smoothed_case74_gate_c_rejects_missing_authorization_before_runtime() -
         assert "authorization is absent or unknown" in result.stderr
 
 
+def test_case74_localized_heading_relief_derivation_is_hash_bound_and_closed() -> None:
+    source = _read("derive_riser_smoothed_case74_heading_relief.py")
+    assert "cinebotrl_two_wheel_riser_case74_localized_heading_relief_v1" in source
+    assert "build_case74_localized_heading_relief" in source
+    assert 'failed == ["position_p95_bounded"]' in source
+    assert '"parent_plan_sha256"' in source
+    assert '"gate_json_sha256"' in source
+    assert '"array_derivation_checks"' in source
+    assert '"prospective_accepted_duration_median"' in source
+    assert '"isaac_started": False' in source
+    assert '"residual_capture_started": False' in source
+    assert '"bc_started": False' in source
+    assert '"ppo_started": False' in source
+    assert '"valid_for_training": False' in source
+
+
 def test_case74_recovery_wrapper_has_sealed_one_case_runtime_authorization() -> None:
     source = _read("run_riser_case74_recovery_canary.sh")
     assert 'RISER_CASE74_GPU_AUTHORIZATION' in source

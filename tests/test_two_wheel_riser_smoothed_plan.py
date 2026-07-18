@@ -15,6 +15,7 @@ from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (
     SmoothedPlanResult,
     batch_unicycle_recovery_seed_eligible,
     derived_reset_yaw_rad,
+    localized_heading_relief_positions,
     retime_smoothed_plan_from_demands,
     smooth_source_positions,
     smoothed_path_metrics,
@@ -74,6 +75,61 @@ def test_smoothing_preserves_endpoints_and_separate_source_array() -> None:
 
     blended = smooth_source_positions(source, 1.5, 0.45)
     np.testing.assert_allclose(blended, source + 0.45 * (smoothed - source))
+
+
+def test_localized_heading_relief_is_tapered_and_preserves_outside_window() -> None:
+    source = np.column_stack(
+        (
+            np.linspace(0.0, 1.1, 12),
+            0.15 * np.sin(np.linspace(0.0, 2.5 * np.pi, 12)),
+            np.linspace(0.8, 1.2, 12),
+        )
+    )
+    parent = smooth_source_positions(source, 0.8)
+    source_before = source.copy()
+    parent_before = parent.copy()
+    relieved = localized_heading_relief_positions(
+        source,
+        parent,
+        start_anchor=2,
+        end_anchor=9,
+        stronger_sigma_samples=2.5,
+        relief_blend_factor=0.75,
+        ramp_fraction=0.25,
+    )
+
+    np.testing.assert_array_equal(source, source_before)
+    np.testing.assert_array_equal(parent, parent_before)
+    np.testing.assert_array_equal(relieved[:2], parent[:2])
+    np.testing.assert_array_equal(relieved[10:], parent[10:])
+    np.testing.assert_array_equal(relieved[2], parent[2])
+    np.testing.assert_array_equal(relieved[9], parent[9])
+    np.testing.assert_array_equal(relieved[:, 2], parent[:, 2])
+    assert not np.array_equal(relieved[3:9, :2], parent[3:9, :2])
+
+
+def test_localized_heading_relief_rejects_unbounded_inputs() -> None:
+    source = np.column_stack(
+        (np.linspace(0.0, 1.0, 8), np.zeros(8), np.ones(8))
+    )
+    with pytest.raises(ValueError, match="anchor range"):
+        localized_heading_relief_positions(
+            source,
+            source,
+            start_anchor=6,
+            end_anchor=2,
+            stronger_sigma_samples=2.0,
+            relief_blend_factor=0.5,
+        )
+    with pytest.raises(ValueError, match="blend"):
+        localized_heading_relief_positions(
+            source,
+            source,
+            start_anchor=1,
+            end_anchor=6,
+            stronger_sigma_samples=2.0,
+            relief_blend_factor=1.1,
+        )
 
 
 def test_reset_yaw_is_derived_from_immutable_source_direction() -> None:
@@ -203,6 +259,7 @@ def test_recovery_candidates_are_appended_without_reordering_baseline() -> None:
         "smoothed_preview_0.65m_g1.00",
         "smoothed_preview_0.90m_g1.00",
         "smoothed_batch_unicycle_v1",
+        "case74_localized_heading_relief_v1",
     ),
 )
 def test_recovery_strategy_names_validate(strategy: str) -> None:

@@ -1244,3 +1244,45 @@ and must state whether its candidate was accepted or rejected.
 - Preserve the same ordered fail-fast rule. If case 4 rejects, case 5 must not
   start; classify the first failed check before any change.
 - Keep residual capture, BC, PPO, and all training closed.
+
+## Round 36: paired cases 4 and 5 dynamic qualification
+
+- Published the `[4,5]` fail-fast tranche at commit
+  `9813ec22ea8aebf44a08f8198c152bd54aa234db` and ran only those two v8
+  plans. Case 5 started only after case 4 passed.
+- Case 4 completed `6172` steps and its full `21.514453/14.042191 s`
+  execution/source clocks. Position p95/max passed at
+  `0.128736/0.151724 m`; attitude p95/max were
+  `0.183879/0.217912 deg`; action saturation was zero; no termination
+  occurred. Riser effort/thermal maxima were `18.323277 N` and `0.001204`.
+- Case 5 completed `6169` steps and its full `21.514453/14.042191 s`
+  execution/source clocks. Position p95/max passed at
+  `0.128780/0.152655 m`; attitude p95/max were
+  `0.183783/0.212018 deg`; action saturation was zero; no termination
+  occurred. Riser effort/thermal maxima were `18.269590 N` and `0.001204`.
+- Both cases passed every dynamic, thermal, controller-evidence, runtime, and
+  frozen residual-envelope check. The camera correction remained bounded to
+  `0.05 m`; residual action remained exactly zero and no dataset or learning
+  stage opened.
+- The close but independently measured results confirm the paired trajectory
+  structure without treating one camera-height variant as evidence for the
+  other. The uniquely dynamically qualified set is now `22/70`.
+- Evidence hashes:
+  - runtime admission: `1316bb80d7f14a5069d84b3cbc63c636fac8ea1e7b73dd95deb0116d11f88a66`;
+  - case-4 gate/log: `b1dc4b6e970b7fba1c22769f7087fcdc8e71305511b11479ddaadb5e0b64b992` /
+    `51a5d1329e5893793895345de7b6260bcc226c74a1caec0a2be2b1414f0f9cbd`;
+  - case-5 gate/log: `e3b46ceb405bad9e3a6ee00d482dbc9da90e9f3f2097dfdbd0a8729e471e4ce0` /
+    `d97aeb5b9f81b27fff1c397c72f299d62ed6a17348d6206963361123a7199705`;
+  - final summary: `90980a0b0df103b48a8529398590479e31795dd51306caf226382df41412f582`.
+- Both wrappers exited `0`; GPU and playback ownership were empty after the
+  tranche closed.
+
+## Next round after Round 36
+
+- Continue in source order with `[6,8]`; case 7 is already separately
+  qualified from its v8 retime.
+- Case 8 retains the aggressive `1.049547x` execution ratio and
+  `0.915 m/s` static riser rate, so treat it as an independent dynamic test,
+  not as implied by case 7. Preserve fail-fast ordering and all existing
+  thresholds.
+- Keep residual capture, BC, PPO, and all training closed.

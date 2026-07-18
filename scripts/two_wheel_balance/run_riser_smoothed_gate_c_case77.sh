@@ -5,14 +5,14 @@ ROOT="/mnt/g/wSpace/cinebotRL-two-wheel-riser"
 WIN_ROOT='G:\wSpace\cinebotRL-two-wheel-riser'
 PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
-AUTHORIZATION="AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V3"
+AUTHORIZATION="AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V4"
 CASE=77
-STAMP="20260718_gate_c_smoothed_case77_v3_dynamic_margin_exclusive"
-PORTFOLIO_STAMP="20260718_smoothed_plan_all79_v5_case77_dynamic_margin_cpu"
-MANIFEST_SHA256="9e3a09fdde5ad37795fcf10f9a2402eb593ef32316ab8e25c0911dcc62a68a76"
+STAMP="20260718_gate_c_smoothed_case77_v4_dynamic_margin_exclusive"
+PORTFOLIO_STAMP="20260718_smoothed_plan_all79_v6_case77_1p499_cpu"
+MANIFEST_SHA256="73121d240ccf54fa65783fc1cf47eed4d805af3e6bedbdfff847719c92f2130b"
 SOURCE_SHA256="f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d"
-PLANNER_COMMIT="9a2af48eebe2f5c6527f247011095ecfb3d4929f"
-PLAN_SHA256="7b0c9b5330733a5e6740023048c308491dd2bd85fd9f30e5fd0cc16901dbe5b7"
+PLANNER_COMMIT="b95371b169a100416c3cfdb5933e9bd2c3838a0d"
+PLAN_SHA256="a45892c98311cdd6e6f2096b6821ef760759504138edc2f9c7caa9b1ac90f559"
 GAINS_SHA256="2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6"
 ROBOT_USD_SHA256="89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0"
 TIMEOUT_SECONDS=300
@@ -101,7 +101,7 @@ checks = {
     and bool(np.all(np.diff(source_time) > 0.0)),
     "execution_clock": len(execution_time) == 273
     and execution_time[0] == 0.0
-    and abs(float(execution_time[-1]) - 7.6037906) <= 1e-9
+    and abs(float(execution_time[-1]) - 8.141487221) <= 1e-9
     and bool(np.all(np.diff(execution_time) > 0.0)),
     "time_alias_unambiguous": np.array_equal(time_alias, execution_time),
     "dynamic_margin_retime": metadata.get("dynamic_margin_retime", {}).get(
@@ -112,7 +112,7 @@ checks = {
     and metadata.get("dynamic_margin_retime", {}).get(
         "target_execution_source_ratio"
     )
-    == 1.4
+    == 1.499
     and metadata.get("dynamic_margin_retime", {}).get("controller_changed")
     is False
     and metadata.get("dynamic_margin_retime", {}).get("phase_governor_changed")

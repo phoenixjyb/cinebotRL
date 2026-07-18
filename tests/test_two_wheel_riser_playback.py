@@ -87,10 +87,14 @@ def test_playback_roundtrip_preserves_unequal_source_and_execution_clocks(
     assert loaded.source_time_s[-1] != loaded.time_s[-1]
 
 
-def _rewrite_npz_metadata(path: Path, **updates: object) -> None:
+def _rewrite_npz_metadata(
+    path: Path, *, remove: tuple[str, ...] = (), **updates: object
+) -> None:
     with np.load(path, allow_pickle=False) as data:
         arrays = {name: np.array(data[name]) for name in data.files}
     metadata = json.loads(str(arrays["metadata_json"].item()))
+    for name in remove:
+        metadata.pop(name, None)
     metadata.update(updates)
     arrays["metadata_json"] = np.asarray(json.dumps(metadata))
     np.savez_compressed(path, **arrays)
@@ -100,11 +104,32 @@ def test_playback_loader_accepts_explicit_smoothed_plan_schema(tmp_path: Path) -
     path = tmp_path / "case.npz"
     save_riser_playback_plan(path, _plan())
     _rewrite_npz_metadata(
-        path, schema="cinebotrl_two_wheel_riser_smoothed_plan_v1"
+        path,
+        remove=("vertical_shift_m", "planning_strategy"),
+        schema="cinebotrl_two_wheel_riser_smoothed_plan_v1",
+        smoothed_target={
+            "schema": "derived_smoothed_target_v1",
+            "vertical_shift_m": 0.0,
+            "planning_strategy": "smoothed_preview_0.05m_g2.75",
+        },
     )
     loaded = load_riser_playback_plan(path)
     assert loaded.case == 1
+    assert loaded.vertical_shift_m == 0.0
+    assert loaded.planning_strategy == "smoothed_preview_0.05m_g2.75"
     np.testing.assert_array_equal(loaded.time_s, [0.0, 0.1, 0.2])
+
+
+def test_playback_loader_rejects_malformed_smoothed_metadata(tmp_path: Path) -> None:
+    path = tmp_path / "case.npz"
+    save_riser_playback_plan(path, _plan())
+    _rewrite_npz_metadata(
+        path,
+        schema="cinebotrl_two_wheel_riser_smoothed_plan_v1",
+        smoothed_target={"schema": "unreviewed_target_v1"},
+    )
+    with pytest.raises(ValueError, match="invalid smoothed target metadata"):
+        load_riser_playback_plan(path)
 
 
 def test_playback_loader_rejects_unknown_schema_or_ambiguous_clock(

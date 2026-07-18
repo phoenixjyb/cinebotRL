@@ -5,9 +5,9 @@ ROOT="/mnt/g/wSpace/cinebotRL-two-wheel-riser"
 WIN_ROOT='G:\wSpace\cinebotRL-two-wheel-riser'
 PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
-AUTHORIZATION="AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V1"
+AUTHORIZATION="AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V2"
 CASE=77
-STAMP="20260718_gate_c_smoothed_case77_v1_exclusive"
+STAMP="20260718_gate_c_smoothed_case77_v2_exclusive"
 PORTFOLIO_STAMP="20260718_smoothed_plan_all79_v4_batch_recovery_committed_cpu"
 MANIFEST_SHA256="9044dc360ad1a9a59fa84ec9adf0b00a30b1039751e959fd26ec2edc23a684dd"
 SOURCE_SHA256="f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d"
@@ -87,6 +87,14 @@ with np.load(sys.argv[1], allow_pickle=False) as data:
 checks = {
     "schema": metadata.get("schema") == "cinebotrl_two_wheel_riser_smoothed_plan_v1",
     "case": metadata.get("case") == 77,
+    "smoothed_target_schema": metadata.get("smoothed_target", {}).get("schema")
+    == "derived_smoothed_target_v1",
+    "vertical_shift": metadata.get("smoothed_target", {}).get("vertical_shift_m")
+    == 0.0,
+    "planning_strategy": metadata.get("smoothed_target", {}).get(
+        "planning_strategy"
+    )
+    == "smoothed_preview_0.05m_g2.75",
     "source_clock": len(source_time) == 273
     and source_time[0] == 0.0
     and abs(float(source_time[-1]) - 5.431279) <= 1e-9

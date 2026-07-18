@@ -97,10 +97,10 @@ def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
 
 def test_smoothed_case77_gate_c_is_isolated_hash_bound_and_label_free() -> None:
     source = _read("run_riser_smoothed_gate_c_case77.sh")
-    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V1" in source
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V2" in source
     assert "9044dc360ad1a9a59fa84ec9adf0b00a30b1039751e959fd26ec2edc23a684dd" in source
     assert "b43dd08dff924e5132361ed331803ecca2c6bb170dcec6471d864c32e8578875" in source
-    assert "20260718_gate_c_smoothed_case77_v1_exclusive" in source
+    assert "20260718_gate_c_smoothed_case77_v2_exclusive" in source
     assert "--cases \"$CASE\"" in source
     assert "smoothed_riser_plan_v1.npz" in source
     assert "cinebotrl_two_wheel_riser_smoothed_plan_v1" in source

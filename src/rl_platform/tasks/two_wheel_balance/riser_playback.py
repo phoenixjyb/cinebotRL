@@ -20,9 +20,10 @@ from .riser_rs4_reference import plan_rs4_riser_reference
 
 
 PLAYBACK_SCHEMA = "cinebotrl_two_wheel_riser_playback_v1"
+SMOOTHED_PLAYBACK_SCHEMA = "cinebotrl_two_wheel_riser_smoothed_plan_v1"
 LOADABLE_PLAYBACK_SCHEMAS = {
     PLAYBACK_SCHEMA,
-    "cinebotrl_two_wheel_riser_smoothed_plan_v1",
+    SMOOTHED_PLAYBACK_SCHEMA,
 }
 PLAYBACK_POSITION_P95_LIMIT_M = 0.15
 PLAYBACK_POSITION_MAX_LIMIT_M = 0.25
@@ -370,8 +371,18 @@ def save_riser_playback_plan(path: Path, plan: RiserPlaybackPlan) -> None:
 def load_riser_playback_plan(path: Path) -> RiserPlaybackPlan:
     with np.load(path, allow_pickle=False) as data:
         metadata = json.loads(str(data["metadata_json"].item()))
-        if metadata.get("schema") not in LOADABLE_PLAYBACK_SCHEMAS:
+        schema = metadata.get("schema")
+        if schema not in LOADABLE_PLAYBACK_SCHEMAS:
             raise ValueError(f"unexpected playback schema in {path}")
+        if schema == SMOOTHED_PLAYBACK_SCHEMA:
+            smoothed_target = metadata.get("smoothed_target")
+            if not isinstance(smoothed_target, dict) or smoothed_target.get(
+                "schema"
+            ) != "derived_smoothed_target_v1":
+                raise ValueError(f"invalid smoothed target metadata in {path}")
+            plan_metadata = smoothed_target
+        else:
+            plan_metadata = metadata
         execution_time_s = np.asarray(
             (
                 data["execution_time_s"]
@@ -411,8 +422,8 @@ def load_riser_playback_plan(path: Path) -> RiserPlaybackPlan:
             feedforward_proxy_velocity=np.asarray(
                 data["feedforward_proxy_velocity"], dtype=np.float64
             ),
-            vertical_shift_m=float(metadata["vertical_shift_m"]),
-            planning_strategy=str(metadata["planning_strategy"]),
+            vertical_shift_m=float(plan_metadata["vertical_shift_m"]),
+            planning_strategy=str(plan_metadata["planning_strategy"]),
             source_time_s=source_time_s,
         )
     plan.validate()

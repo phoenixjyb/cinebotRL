@@ -1669,3 +1669,58 @@ and must state whether its candidate was accepted or rejected.
 - Add a CPU-only, case-16-specific explicit-lookahead derivation path and test
   `0.15 m` while preserving the source camera path and all duration/transition
   gates. Do not launch case 17, widen the `0.05 m` correction, or start learning.
+
+## Round 49: case-16 explicit-preview recovery and dynamic qualification
+
+- Added a CPU-only, hash-bound explicit-preview derivation. Its first two
+  fail-closed invocations exposed and fixed evidence-path defects before any
+  artifact or runtime existed: binary NPZ parents are now hashed without JSON
+  decoding (`5ffe01fda72d67250d54b7a3715c9cc186bbf5a7`), and the authoritative
+  source count is validated using `episode_count` plus the item count
+  (`27574668625e55f858fac72df401d6165775b948`). The authoritative remote suite
+  remained `325 passed` after both repairs.
+- The explicit `0.15 m` lookahead and unchanged `2.75` heading gain produced a
+  statically admitted case-16 plan at source/execution clocks
+  `17.548706/26.028630 s`, ratio `1.483222`. All 896 source positions,
+  attitudes, timestamps, anchor order, path length, and initialization fields
+  remain immutable. Static position p95/max are `0.042568/0.058537 m`.
+- CPU artifact hashes: plan
+  `742d1f705d3559916c3e1d7d35caffd5ea9e7200b6e321d1f9f70c8e5a7dad16`,
+  derivation manifest/summary
+  `cc4c00dcd77deeaed1c02bec3fe3f2b86d75d25dd58d1fef164ce2d84bbb2ff9` /
+  `5eb852ad1a1bdd59c0fe5b6c28e09c7d29af654184d73ff5441cf125a2949828`.
+- Composed the v12 all-79 portfolio without altering any other case. It remains
+  `70/79` statically admitted; its accepted duration-ratio median is
+  `1.496427 < 1.5`. Manifest/summary hashes are
+  `59e572712879e25a687bebd17be94b8464e7f0de08ef3d5ce2102bb9303a5581` /
+  `e97da6859c9d3da5fb8a1ed3d7b842b5880005c25c56e7e26f6f73833a7e4ff3`.
+- Published the one-case runtime route at
+  `0d0939bdbc80a8a927e8c6017206b03fcf25a732` and ran only case 16 in
+  `20260719_gate_c_smoothed_case16_explicit_preview015_v12_exclusive`.
+  It completed `10445` steps and both clocks. Dynamic position p95/max passed
+  at `0.080600/0.081492 m`, improving from the capped-retime reject's
+  `0.168950/0.184844 m` without changing source geometry, LQR, controller
+  gains, the `0.05 m` camera correction bound, or physical thresholds.
+- Attitude p95/max passed at `0.119408/0.214863 deg`; pitch max was
+  `6.030922 deg`; internal attitude IK had zero failures; proxy rate max was
+  `43.660585 deg/s`; action, proxy, and riser saturation were all zero.
+  Riser effort/thermal maxima were `22.748663 N` and `0.001462`.
+- Dynamic, thermal, runtime, controller-evidence, and residual-envelope gates
+  all passed. Normalized prospective residual maxima were
+  `[0.212769, 0.352328, 0.127748]`; residual action remained exactly zero and
+  unapplied, and no dataset, capture, BC, PPO, or training was started. The
+  uniquely dynamically qualified set is now `29/70`.
+- Dynamic evidence hashes: admission
+  `7065aff16249cc0a6f4022c5ac63c34788cf9455a23ff57cfd95adf87b79827a`,
+  gate `b51e7e8b65a0da12e792d93d31c897fa6e2d5dd2a9a2d030d98dbbfb76634bec`,
+  log `a29e6a4063b3f017b023cc9dd761d5659c5b5a5f63d14e51239e092bc04becc9`,
+  summary `408edb317561c002d9524f95c34fb1775475bae3054509a8c4f1201deed33362`.
+  GPU and playback ownership were empty after closure.
+
+## Next round after Round 49
+
+- Continue in source order with CPU inspection of v12 case 17. If it remains
+  admitted and unchanged, add one fresh hash-bound case-only route with a
+  duration-derived wall timeout and run only that canary.
+- Keep exact-source provenance, LQR/controller settings, all physical gates,
+  and the learning closure unchanged.

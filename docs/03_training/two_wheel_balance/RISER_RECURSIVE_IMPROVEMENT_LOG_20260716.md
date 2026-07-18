@@ -2118,3 +2118,87 @@ and must state whether its candidate was accepted or rejected.
 - Keep fail-fast Gate C execution and all residual capture/learning stages
   closed until deterministic qualification is complete and the raw residual
   envelope is recomputed over the final accepted portfolio.
+
+## Round 61: case-22 default plan reproduces the paired reversal reject
+
+- Published the fresh v13 case-only default route at `2e3f769`; the
+  authoritative `.98` CPU suite passed `341/341` tests before launch. A first
+  launch attempt correctly stopped before Python with exit `73` because a
+  separate Isaac renderer owned the machine. The admitted run started only
+  after Windows and WSL ownership were clear.
+- Ran only case 22 in
+  `20260719_gate_c_smoothed_case22_v13_camera_lever_arm_v1_exclusive`. Both
+  clocks completed in `5640` steps at source/execution durations
+  `13.495780/18.753269 s`. Dynamic position p95 alone failed at
+  `0.156460 m`; position max passed at `0.201943 m`. Attitude p95/max passed
+  at `0.191535/0.213396 deg`, pitch max was `6.529206 deg`, and every
+  completion, termination, thermal, controller-evidence, runtime, IK, and
+  saturation check passed.
+- The 1 Hz trace reproduces the case-21 forward-to-reverse transient: phase
+  advances from `5.531609 s` with `+0.035649 m/s` reference to `6.436596 s`
+  with `-0.383448 m/s`, after which position error reaches `0.199612 m`.
+  This confirms the paired XY path's reversal mechanism despite case 22's
+  `+0.45 m` camera-height offset.
+- The prospective residual envelope independently failed at normalized maxima
+  `[1.178149, 0.529025, 0.125254]`; residual action remained zero and
+  unapplied, with no dataset, capture, BC, PPO, or training.
+- Evidence hashes: admission
+  `d858b58cc079cfda0802aaf59c2b53a905ad31e5d75b9d0777e53a877180ed9d`,
+  gate `d2b7678d81a7710818abf3ab2c8af536d484871630a2f8f458b060ac20050460`,
+  log `0bbe00fc1a993f9473fbc58df1b1de904555f2fcff05a9a28c7da1d2313004b0`,
+  and summary
+  `94112f7f5b71a1a70c53332f2d65956a1c0680adf7e75babc59df75f4d1b118b`.
+
+## Round 62: bounded case-22 localized reversal recovery passes
+
+- Reused the already-tested localized retime primitive, but bound the
+  derivation to case 22's own sealed v13 plan and Round-61 reject. A peak scale
+  of `4.0` was rejected CPU-side because it would raise the accepted-set
+  duration median above the frozen `1.5` ceiling. The strongest evaluated
+  compliant scale, `3.9`, preserves that global invariant without relaxing it.
+- The candidate changes only execution intervals `230:340`. All `693` source
+  anchors/timestamps, target geometry, base/riser/proxy states, initialization,
+  LQR, controller gains, correction cap, and physical thresholds are
+  unchanged. Execution duration is `20.233141 s`, ratio `1.499220`.
+  Reversal-window acceleration falls from `16.881937` to
+  `4.993260 m/s^2` (`0.295775x`) and command-transition norm from
+  `0.162607` to `0.109724` (`0.674780x`). Camera height remains
+  `1.23934-1.80000 m`.
+- The candidate plan hash is
+  `8f1638cd771cfac32ca251906e2c095bd7091edb2561974f12ae09b0a65d4a79`;
+  derivation manifest hash is
+  `2b5237a041a7a671678aab772a94ee07a05f6a117b4a84804b5f72fc1d0807da`.
+  V14 portfolio manifest hash is
+  `369e3294a45ef468979a81a8bf34b9012f9ec4f77a1d4489c4514930f2d79dab`;
+  it retains `70/79` CPU admissions with median `1.499904 <= 1.5`.
+- Published the v14 case-only route at `a50e2d6`; `.98` again passed
+  `341/341` CPU tests. The exclusive retry namespace was
+  `20260719_gate_c_smoothed_case22_v14_localized_reversal_v1_exclusive`.
+  Both clocks completed in `5721` steps. Dynamic position p95/max passed at
+  `0.099300/0.113607 m`; attitude p95/max passed at
+  `0.190204/0.216710 deg`; pitch max was `6.529206 deg`; all physical,
+  thermal, controller, runtime, IK, and saturation checks passed.
+- The prospective residual envelope also passed at normalized maxima
+  `[0.595563, 0.529025, 0.117504]`, but remained unapplied. No dataset,
+  capture, BC, PPO, or training started.
+- A fresh union over all sealed Gate C result rows proves `34/70` unique
+  dynamic passes after this run. This corrects the running count from Round 52
+  onward: case 19 was already present in Round 30's initial 15-case qualified
+  set, so Round 52 must not have incremented the unique count. No trajectory
+  admission changed; this is bookkeeping correction from immutable evidence.
+- Retry evidence hashes: admission
+  `c46b1eabebfb66427454177bbd0324fa0c40187dc2dd78f7337acda918a28323`,
+  gate `911855b08f4688431f5f4b346cebd42d4a9d388b98c1b131470f3b3e546f72a4`,
+  log `39f2f704e3382ebee65b0fae6ffe405ec027db86deeb64112e4234f3c8447ddf`,
+  and summary
+  `60e23bcd2cd10834f6764b1396a4b470b783a9688cd71b0909907ce8adc11e07`.
+  GPU and playback ownership were empty after closure.
+
+## Next round after Round 62
+
+- Recompute the union of sealed dynamic passes and continue with the first
+  source-order v14 CPU-admitted case that is not already qualified; do not
+  rerun previously sealed passes merely because their case number follows 22.
+- Use the unchanged default profile first. Keep fail-fast execution and all
+  residual capture/learning stages closed until deterministic qualification is
+  complete and the raw residual envelope is recomputed over the final set.

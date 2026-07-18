@@ -95,18 +95,17 @@ def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
     assert '"riser_peak_force_bounded"' in summarizer
 
 
-def test_smoothed_case77_gate_c_is_isolated_hash_bound_and_label_free() -> None:
-    source = _read("run_riser_smoothed_gate_c_case77.sh")
-    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V5" in source
+def test_smoothed_case52_gate_c_is_isolated_hash_bound_and_label_free() -> None:
+    source = _read("run_riser_smoothed_gate_c_case52.sh")
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE52_V1" in source
     assert "73121d240ccf54fa65783fc1cf47eed4d805af3e6bedbdfff847719c92f2130b" in source
-    assert "a45892c98311cdd6e6f2096b6821ef760759504138edc2f9c7caa9b1ac90f559" in source
-    assert "20260718_gate_c_smoothed_case77_v5_completion_grace_exclusive" in source
+    assert "fa90c7345be5763e1e66a55b4b111780dfe5df97f5a779ab2c6bb390f7a3cbce" in source
+    assert "20260718_gate_c_smoothed_case52_v1_completion_grace_exclusive" in source
     assert "--cases \"$CASE\"" in source
     assert "smoothed_riser_plan_v1.npz" in source
     assert "cinebotrl_two_wheel_riser_smoothed_plan_v1" in source
-    assert "dynamic_margin_uniform_execution_retime_v1" in source
-    assert "8.141487221" in source
-    assert '== 1.499' in source
+    assert '"dynamic_margin_retime_absent"' in source
+    assert "31.40718243547463" in source
     assert 'MAXIMUM_DURATION_SCALE="2.05"' in source
     assert '--maximum-duration-scale "$MAXIMUM_DURATION_SCALE"' in source
     assert 'gate.get("maximum_duration_scale") == 2.05' in source
@@ -125,13 +124,12 @@ def test_smoothed_case77_gate_c_is_isolated_hash_bound_and_label_free() -> None:
     assert "--zero-policy-action" not in source
 
 
-def test_smoothed_case77_gate_c_rejects_missing_authorization_before_runtime() -> None:
-    wrapper = SCRIPTS / "run_riser_smoothed_gate_c_case77.sh"
+def test_smoothed_case52_gate_c_rejects_missing_authorization_before_runtime() -> None:
+    wrapper = SCRIPTS / "run_riser_smoothed_gate_c_case52.sh"
     for authorization in (
         None,
-        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V2",
-        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V3",
-        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V4",
+        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V5",
+        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE52_V0",
     ):
         env = os.environ.copy()
         if authorization is not None:

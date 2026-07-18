@@ -438,10 +438,11 @@ def test_dynamic_retime_derivation_is_cpu_only_evidence_bound_and_closed() -> No
 
 
 def test_smoothed_portfolio_composer_is_hash_bound_and_runtime_closed() -> None:
-    source = (
+    script = (
         Path(__file__).resolve().parents[1]
         / "scripts/two_wheel_balance/compose_riser_smoothed_plan_portfolio.py"
-    ).read_text(encoding="utf-8")
+    )
+    source = script.read_text(encoding="utf-8")
     assert "expected-parent-sha256" in source
     assert "expected-replacement-sha256" in source
     assert '"parent_plan_sha256"' in source
@@ -457,3 +458,17 @@ def test_smoothed_portfolio_composer_is_hash_bound_and_runtime_closed() -> None:
     assert '"valid_for_training": False' in source
     assert "AppLauncher" not in source
     assert "--headless" not in source
+
+    spec = importlib.util.spec_from_file_location("compose_smoothed_portfolio", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert (
+        module._windows_path_from_gitdir("/mnt/g/wSpace/repo/.git/worktrees/x")
+        == "G:/wSpace/repo/.git/worktrees/x"
+    )
+    head = module._git_output("rev-parse", "HEAD")
+    assert len(head) == 40
+    assert set(head) <= set(string.hexdigits)
+    if (module.PROJECT_ROOT / ".git").is_file():
+        assert "--git-dir" in module._git_command()

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -84,6 +85,44 @@ def test_playback_roundtrip_preserves_unequal_source_and_execution_clocks(
     np.testing.assert_array_equal(loaded.source_time_s, [0.0, 0.04, 0.08])
     np.testing.assert_array_equal(loaded.time_s, [0.0, 0.1, 0.2])
     assert loaded.source_time_s[-1] != loaded.time_s[-1]
+
+
+def _rewrite_npz_metadata(path: Path, **updates: object) -> None:
+    with np.load(path, allow_pickle=False) as data:
+        arrays = {name: np.array(data[name]) for name in data.files}
+    metadata = json.loads(str(arrays["metadata_json"].item()))
+    metadata.update(updates)
+    arrays["metadata_json"] = np.asarray(json.dumps(metadata))
+    np.savez_compressed(path, **arrays)
+
+
+def test_playback_loader_accepts_explicit_smoothed_plan_schema(tmp_path: Path) -> None:
+    path = tmp_path / "case.npz"
+    save_riser_playback_plan(path, _plan())
+    _rewrite_npz_metadata(
+        path, schema="cinebotrl_two_wheel_riser_smoothed_plan_v1"
+    )
+    loaded = load_riser_playback_plan(path)
+    assert loaded.case == 1
+    np.testing.assert_array_equal(loaded.time_s, [0.0, 0.1, 0.2])
+
+
+def test_playback_loader_rejects_unknown_schema_or_ambiguous_clock(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "case.npz"
+    save_riser_playback_plan(path, _plan())
+    _rewrite_npz_metadata(path, schema="unreviewed_plan_v1")
+    with pytest.raises(ValueError, match="unexpected playback schema"):
+        load_riser_playback_plan(path)
+
+    save_riser_playback_plan(path, _plan())
+    with np.load(path, allow_pickle=False) as data:
+        arrays = {name: np.array(data[name]) for name in data.files}
+    arrays["execution_time_s"] = np.array([0.0, 0.11, 0.22])
+    np.savez_compressed(path, **arrays)
+    with pytest.raises(ValueError, match="ambiguous execution time aliases"):
+        load_riser_playback_plan(path)
 
 
 def test_phase_governor_scales_every_playback_derivative() -> None:

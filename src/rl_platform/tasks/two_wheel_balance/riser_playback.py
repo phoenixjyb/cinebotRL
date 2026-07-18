@@ -20,6 +20,10 @@ from .riser_rs4_reference import plan_rs4_riser_reference
 
 
 PLAYBACK_SCHEMA = "cinebotrl_two_wheel_riser_playback_v1"
+LOADABLE_PLAYBACK_SCHEMAS = {
+    PLAYBACK_SCHEMA,
+    "cinebotrl_two_wheel_riser_smoothed_plan_v1",
+}
 PLAYBACK_POSITION_P95_LIMIT_M = 0.15
 PLAYBACK_POSITION_MAX_LIMIT_M = 0.25
 PLAYBACK_ATTITUDE_P95_LIMIT_DEG = 5.0
@@ -366,7 +370,7 @@ def save_riser_playback_plan(path: Path, plan: RiserPlaybackPlan) -> None:
 def load_riser_playback_plan(path: Path) -> RiserPlaybackPlan:
     with np.load(path, allow_pickle=False) as data:
         metadata = json.loads(str(data["metadata_json"].item()))
-        if metadata.get("schema") != PLAYBACK_SCHEMA:
+        if metadata.get("schema") not in LOADABLE_PLAYBACK_SCHEMAS:
             raise ValueError(f"unexpected playback schema in {path}")
         execution_time_s = np.asarray(
             (

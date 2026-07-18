@@ -95,6 +95,36 @@ def test_gate_c_canary_is_hash_bound_clean_pushed_and_label_free() -> None:
     assert '"riser_peak_force_bounded"' in summarizer
 
 
+def test_smoothed_case77_gate_c_is_isolated_hash_bound_and_label_free() -> None:
+    source = _read("run_riser_smoothed_gate_c_case77.sh")
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE77_V1" in source
+    assert "9044dc360ad1a9a59fa84ec9adf0b00a30b1039751e959fd26ec2edc23a684dd" in source
+    assert "b43dd08dff924e5132361ed331803ecca2c6bb170dcec6471d864c32e8578875" in source
+    assert "20260718_gate_c_smoothed_case77_v1_exclusive" in source
+    assert "--cases \"$CASE\"" in source
+    assert "smoothed_riser_plan_v1.npz" in source
+    assert "cinebotrl_two_wheel_riser_smoothed_plan_v1" in source
+    assert "time_alias_unambiguous" in source
+    assert "assert_exclusive_gpu" in source
+    assert "/usr/lib/wsl/lib/nvidia-smi" in source
+    assert "--query-compute-apps=pid,process_name" in source
+    assert "wait_for_gpu_release" in source
+    assert "source_manifest \"$SOURCE_MANIFEST_WSL\"" in source
+    assert "robot_usd \"$ROBOT_USD\"" in source
+    assert "playback_loader \"$LOADER\"" in source
+    assert "rev-parse '@{u}'" in source
+    assert "--dataset-dir" not in source
+    assert "--residual-policy" not in source
+    assert "--zero-policy-action" not in source
+
+
+def test_smoothed_case77_gate_c_rejects_missing_authorization_before_runtime() -> None:
+    wrapper = SCRIPTS / "run_riser_smoothed_gate_c_case77.sh"
+    result = subprocess.run(["bash", str(wrapper)], capture_output=True, text=True)
+    assert result.returncode == 7
+    assert "authorization is absent or unknown" in result.stderr
+
+
 def test_case74_recovery_wrapper_has_sealed_one_case_runtime_authorization() -> None:
     source = _read("run_riser_case74_recovery_canary.sh")
     assert 'RISER_CASE74_GPU_AUTHORIZATION' in source

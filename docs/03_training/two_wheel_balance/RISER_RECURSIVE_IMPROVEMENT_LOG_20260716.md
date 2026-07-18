@@ -1836,3 +1836,44 @@ and must state whether its candidate was accepted or rejected.
 
 - Continue source-order CPU inspection with v12 case 20 and create a fresh
   case-only route only if all static gates remain admitted.
+
+## Round 53: case-20 narrow dynamic and residual-envelope rejection
+
+- V12 case 20 was statically admitted with plan hash
+  `ec0bb2845c948d17daec8abef6b00b205f6f56fe6cb9e4c42aa9395c6b66336d`,
+  source/execution clocks `7.261100/14.469192 s`, ratio `1.992700`, and static
+  position p95/max `0.139940/0.165549 m`.
+- Published the fresh case-only route at
+  `d2280c002f13c4c5e72ff1c32a255fb3d9f36f03`; all `325` authoritative tests
+  passed before the exclusive launch. Case 20 completed all `7460` steps in
+  `20260719_gate_c_smoothed_case20_v12_camera_lever_arm_v1_exclusive`.
+- The physical run failed only position p95: `0.154389 m` against the unchanged
+  `0.15 m` limit. Position max passed at `0.163111 m`; attitude p95/max passed
+  at `0.135357/0.239113 deg`; pitch max was `7.873634 deg`; IK failures,
+  action/proxy/riser saturation, and termination were zero.
+- Thermal and controller evidence passed. Proxy rate max was
+  `39.716284 deg/s`; riser effort/thermal maxima were `29.560146 N` and
+  `0.001248`.
+- The residual-label envelope independently failed: raw vx residual reached
+  `0.302311 m/s`, normalized `1.007705` against the frozen scale. It was not
+  clipped or applied; residual action stayed zero and no dataset, capture, BC,
+  PPO, or training started.
+- The 1 Hz trace localizes the largest XY errors around execution/phase
+  `12.0/5.97 s` and `28.0-29.0/11.36-11.68 s`. Camera lever-arm correction was
+  saturated for `98.78%` of samples. The plan already consumes the frozen
+  near-`2.0` duration cap, so further uniform retiming is not admissible.
+- Evidence hashes: admission
+  `87ebaab1dcb5d8bc2283a0e216befeb40cd0392c3600dc6dda47a1b7c42b10ce`,
+  gate `9dd45696d26b8aa1ccf4f6025a9646e8cb5f1c9c25ee50eb0c159eae91d5d14e`,
+  log `8d9c31844be2667c218f574fcd6c77a4a7f19cfc471f89862fb454c094ff4968`,
+  summary `d0d09404f99f6d69cf84f3e0e0dc56c276cb916f327f4429c20165d71026a79a`.
+  GPU and playback ownership were empty after closure. The uniquely qualified
+  count remains `32/70`.
+
+## Next round after Round 53
+
+- Perform CPU-only case-20 preview recovery analysis while preserving the
+  already-selected smoothed target geometry, source arrays, duration cap,
+  controller, `0.05 m` correction cap, and all physical thresholds.
+- Do not run case 20 again or advance to case 21 until a fresh candidate passes
+  duration, path, transition, and kinematic gates. Keep learning closed.

@@ -449,6 +449,91 @@ def uniformly_retime_smoothed_plan(
     return retimed
 
 
+def locally_retime_smoothed_plan(
+    plan: RiserPlaybackPlan,
+    source_duration_s: float,
+    start_interval: int,
+    end_interval: int,
+    peak_time_scale: float,
+) -> tuple[RiserPlaybackPlan, np.ndarray]:
+    """Slow a bounded interval window with a smooth, endpoint-neutral taper."""
+
+    plan.validate()
+    interval_count = len(plan.time_s) - 1
+    _require(
+        math.isfinite(source_duration_s) and source_duration_s > 0.0,
+        "source duration must be finite and positive",
+    )
+    _require(
+        0 <= start_interval < end_interval <= interval_count,
+        "local retime interval range is invalid",
+    )
+    _require(
+        math.isfinite(peak_time_scale) and peak_time_scale > 1.0,
+        "local retime peak scale must be greater than one",
+    )
+    interval_scale = np.ones(interval_count, dtype=np.float64)
+    phase = (
+        np.arange(end_interval - start_interval, dtype=np.float64) + 0.5
+    ) / (end_interval - start_interval)
+    interval_scale[start_interval:end_interval] += (
+        peak_time_scale - 1.0
+    ) * np.square(np.sin(np.pi * phase))
+    execution_dt = np.diff(plan.time_s) * interval_scale
+    execution_time = np.r_[0.0, np.cumsum(execution_dt)]
+    _require(
+        execution_time[-1]
+        <= MAXIMUM_EXECUTION_SOURCE_DURATION_RATIO * source_duration_s + 1e-12,
+        "local retime exceeds the execution/source duration ratio",
+    )
+    retimed = replace(plan, time_s=execution_time)
+    base_ff, riser_ff, proxy_ff = _feedforward(retimed, execution_time)
+    retimed = replace(
+        retimed,
+        feedforward_v_wz=base_ff,
+        feedforward_riser_velocity=riser_ff,
+        feedforward_proxy_velocity=proxy_ff,
+    )
+    retimed.validate()
+    return retimed, interval_scale
+
+
+def feedforward_transition_metrics(
+    plan: RiserPlaybackPlan,
+    start_interval: int = 0,
+    end_interval: int | None = None,
+) -> dict[str, float]:
+    """Measure command slew over transition midpoints in an interval window."""
+
+    plan.validate()
+    interval_count = len(plan.feedforward_v_wz)
+    end = interval_count if end_interval is None else end_interval
+    _require(
+        0 <= start_interval < end <= interval_count and end - start_interval >= 2,
+        "transition metric window must contain at least two intervals",
+    )
+    midpoint_time = 0.5 * (plan.time_s[:-1] + plan.time_s[1:])
+    dt = np.diff(midpoint_time[start_interval:end])
+    command = plan.feedforward_v_wz[start_interval:end]
+    command_rate = np.diff(command, axis=0) / dt[:, None]
+    command_delta = np.diff(command, axis=0)
+    return {
+        "maximum_abs_linear_acceleration_mps2": float(
+            np.max(np.abs(command_rate[:, 0]))
+        ),
+        "maximum_abs_yaw_acceleration_radps2": float(
+            np.max(np.abs(command_rate[:, 1]))
+        ),
+        "maximum_command_transition_norm": float(
+            np.max(np.linalg.norm(command_delta, axis=1))
+        ),
+        "maximum_abs_linear_velocity_mps": float(
+            np.max(np.abs(command[:, 0]))
+        ),
+        "maximum_abs_yaw_rate_radps": float(np.max(np.abs(command[:, 1]))),
+    }
+
+
 def batch_unicycle_recovery_seed_eligible(
     result: SmoothedPlanResult, source_duration_s: float
 ) -> bool:

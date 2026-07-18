@@ -32,7 +32,9 @@ from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (  # noqa: E
     MAXIMUM_EXECUTION_SOURCE_DURATION_RATIO,
     SmoothedPlanResult,
     audit_smoothed_riser_plan,
+    feedforward_transition_metrics,
     load_smoothed_riser_plan,
+    locally_retime_smoothed_plan,
     save_smoothed_riser_plan,
     transition_metrics,
     uniformly_retime_smoothed_plan,
@@ -195,7 +197,8 @@ def _gate_c_rejection(
 def _array_derivation_checks(
     parent_path: Path,
     output_path: Path,
-    scale: float,
+    expected_plan,
+    interval_scale: np.ndarray,
 ) -> dict[str, bool]:
     immutable = (
         "target_position_world_m",
@@ -220,30 +223,54 @@ def _array_derivation_checks(
         }
         checks.update(
             {
-                "execution_clock_uniformly_scaled": np.allclose(
+                "execution_clock_matches_candidate": np.allclose(
                     output["execution_time_s"],
-                    parent["execution_time_s"] * scale,
+                    expected_plan.time_s,
+                    rtol=0.0,
+                    atol=1e-12,
+                ),
+                "execution_clock_changed": not np.array_equal(
+                    output["execution_time_s"], parent["execution_time_s"]
+                ),
+                "interval_scale_nontrivial": bool(
+                    np.max(np.abs(interval_scale - 1.0)) > 1e-12
+                ),
+                "interval_scale_never_speeds_up": bool(
+                    np.all(interval_scale >= 1.0 - 1e-12)
+                ),
+                "execution_interval_scale_matches": np.allclose(
+                    np.diff(output["execution_time_s"]),
+                    np.diff(parent["execution_time_s"]) * interval_scale,
                     rtol=0.0,
                     atol=1e-12,
                 ),
                 "time_alias_unambiguous": np.array_equal(
                     output["time_s"], output["execution_time_s"]
                 ),
-                "base_feedforward_scaled": np.allclose(
+                "base_feedforward_matches_candidate": np.allclose(
                     output["feedforward_v_wz"],
-                    parent["feedforward_v_wz"] / scale,
+                    expected_plan.feedforward_v_wz,
                     rtol=1e-11,
                     atol=1e-12,
                 ),
-                "riser_feedforward_scaled": np.allclose(
+                "base_feedforward_changed": not np.array_equal(
+                    output["feedforward_v_wz"], parent["feedforward_v_wz"]
+                ),
+                "unchanged_intervals_preserve_base_feedforward": np.allclose(
+                    output["feedforward_v_wz"][interval_scale == 1.0],
+                    parent["feedforward_v_wz"][interval_scale == 1.0],
+                    rtol=1e-11,
+                    atol=1e-12,
+                ),
+                "riser_feedforward_matches_candidate": np.allclose(
                     output["feedforward_riser_velocity"],
-                    parent["feedforward_riser_velocity"] / scale,
+                    expected_plan.feedforward_riser_velocity,
                     rtol=1e-11,
                     atol=1e-12,
                 ),
-                "proxy_feedforward_scaled": np.allclose(
+                "proxy_feedforward_matches_candidate": np.allclose(
                     output["feedforward_proxy_velocity"],
-                    parent["feedforward_proxy_velocity"] / scale,
+                    expected_plan.feedforward_proxy_velocity,
                     rtol=1e-11,
                     atol=1e-12,
                 ),
@@ -273,6 +300,14 @@ def main() -> int:
         default="completion_only",
     )
     parser.add_argument("--target-ratio", type=float, default=1.4)
+    parser.add_argument(
+        "--retime-mode",
+        choices=("uniform", "localized_reversal"),
+        default="uniform",
+    )
+    parser.add_argument("--local-start-interval", type=int)
+    parser.add_argument("--local-end-interval", type=int)
+    parser.add_argument("--local-peak-time-scale", type=float)
     parser.add_argument("--maximum-portfolio-median", type=float, default=1.5)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
@@ -332,11 +367,36 @@ def main() -> int:
 
     source_duration_s = float(source.source_time_s[-1])
     old_ratio = float(parent_result.plan.time_s[-1] / source_duration_s)
-    retimed_plan = uniformly_retime_smoothed_plan(
-        parent_result.plan,
-        source_duration_s,
-        args.target_ratio,
+    local_values = (
+        args.local_start_interval,
+        args.local_end_interval,
+        args.local_peak_time_scale,
     )
+    if args.retime_mode == "localized_reversal":
+        _require(all(value is not None for value in local_values), "local retime args missing")
+        retimed_plan, interval_scale = locally_retime_smoothed_plan(
+            parent_result.plan,
+            source_duration_s,
+            args.local_start_interval,
+            args.local_end_interval,
+            args.local_peak_time_scale,
+        )
+    else:
+        _require(
+            all(value is None for value in local_values),
+            "local retime args require localized_reversal mode",
+        )
+        retimed_plan = uniformly_retime_smoothed_plan(
+            parent_result.plan,
+            source_duration_s,
+            args.target_ratio,
+        )
+        interval_scale = np.full(
+            len(parent_result.plan.time_s) - 1,
+            retimed_plan.time_s[-1] / parent_result.plan.time_s[-1],
+            dtype=np.float64,
+        )
+    candidate_ratio = float(retimed_plan.time_s[-1] / source_duration_s)
     scale = float(retimed_plan.time_s[-1] / parent_result.plan.time_s[-1])
     kinematics = UrdfRiserCameraKinematics(args.urdf)
     kinematic_metrics = riser_playback_kinematic_metrics(retimed_plan, kinematics)
@@ -345,8 +405,8 @@ def main() -> int:
     checks = dict(parent_result.checks)
     checks.update(
         {
-            "execution_not_faster_than_source": args.target_ratio >= 1.0,
-            "execution_duration_ratio_bounded": args.target_ratio
+            "execution_not_faster_than_source": candidate_ratio >= 1.0,
+            "execution_duration_ratio_bounded": candidate_ratio
             <= MAXIMUM_EXECUTION_SOURCE_DURATION_RATIO,
             "execution_schedule_strict": bool(
                 retimed_plan.time_s[0] == 0.0
@@ -356,14 +416,47 @@ def main() -> int:
     )
     ratios = [float(item["execution_source_duration_ratio"]) for item in passed_items]
     old_index = [item.get("case") for item in passed_items].index(args.case)
-    ratios[old_index] = args.target_ratio
+    ratios[old_index] = candidate_ratio
     prospective_median = float(statistics.median(ratios))
     _require(
         prospective_median <= args.maximum_portfolio_median + 1e-12,
         "derived candidate violates portfolio median target",
     )
+    local_transition_metrics = None
+    if args.retime_mode == "localized_reversal":
+        parent_transition = feedforward_transition_metrics(
+            parent_result.plan,
+            args.local_start_interval,
+            args.local_end_interval,
+        )
+        candidate_transition = feedforward_transition_metrics(
+            retimed_plan,
+            args.local_start_interval,
+            args.local_end_interval,
+        )
+        local_transition_metrics = {
+            "parent": parent_transition,
+            "candidate": candidate_transition,
+            "linear_acceleration_ratio": (
+                candidate_transition["maximum_abs_linear_acceleration_mps2"]
+                / parent_transition["maximum_abs_linear_acceleration_mps2"]
+            ),
+            "command_transition_norm_ratio": (
+                candidate_transition["maximum_command_transition_norm"]
+                / parent_transition["maximum_command_transition_norm"]
+            ),
+        }
+        _require(
+            local_transition_metrics["linear_acceleration_ratio"] < 1.0
+            and local_transition_metrics["command_transition_norm_ratio"] < 1.0,
+            "localized retime did not reduce reversal transition severity",
+        )
     dynamic_retime = {
-        "schema": "dynamic_margin_uniform_execution_retime_v1",
+        "schema": (
+            "dynamic_margin_localized_reversal_retime_v1"
+            if args.retime_mode == "localized_reversal"
+            else "dynamic_margin_uniform_execution_retime_v1"
+        ),
         "applied": True,
         "reason": {
             "completion_only": "gate_c_completed_reference_only_rejection",
@@ -376,8 +469,18 @@ def main() -> int:
         "gate_json_sha256": args.expected_gate_sha256,
         "gate_summary_sha256": args.expected_gate_summary_sha256,
         "old_execution_source_ratio": old_ratio,
-        "target_execution_source_ratio": args.target_ratio,
-        "uniform_execution_scale": scale,
+        "target_execution_source_ratio": candidate_ratio,
+        "uniform_execution_scale": (
+            scale if args.retime_mode == "uniform" else None
+        ),
+        "overall_execution_scale": scale,
+        "local_start_interval": args.local_start_interval,
+        "local_end_interval": args.local_end_interval,
+        "local_peak_time_scale": args.local_peak_time_scale,
+        "interval_scale_min": float(np.min(interval_scale)),
+        "interval_scale_max": float(np.max(interval_scale)),
+        "changed_interval_count": int(np.count_nonzero(interval_scale > 1.0 + 1e-12)),
+        "local_transition_metrics": local_transition_metrics,
         "controller_changed": False,
         "phase_governor_changed": False,
         "thresholds_changed": False,
@@ -387,7 +490,7 @@ def main() -> int:
     }
     attempt = {
         "derivation": dynamic_retime["schema"],
-        "execution_source_duration_ratio": args.target_ratio,
+        "execution_source_duration_ratio": candidate_ratio,
         "failed_checks": [],
         "passed": True,
     }
@@ -404,10 +507,20 @@ def main() -> int:
     _require(result.passed, "retimed candidate failed kinematic admission")
 
     args.output_dir.mkdir(parents=True)
-    output = args.output_dir / f"case_{args.case:04d}_dynamic_margin_retime_v1.npz"
+    suffix = (
+        "localized_reversal_retime_v1"
+        if args.retime_mode == "localized_reversal"
+        else "dynamic_margin_retime_v1"
+    )
+    output = args.output_dir / f"case_{args.case:04d}_{suffix}.npz"
     save_smoothed_riser_plan(output, result, source)
     audit = audit_smoothed_riser_plan(output, source, kinematics)
-    derivation_checks = _array_derivation_checks(args.parent_plan, output, scale)
+    derivation_checks = _array_derivation_checks(
+        args.parent_plan,
+        output,
+        retimed_plan,
+        interval_scale,
+    )
     with np.load(output, allow_pickle=False) as data:
         output_metadata = json.loads(str(data["metadata_json"].item()))
     metadata_checks = {
@@ -443,14 +556,18 @@ def main() -> int:
         "valid_for_training": False,
     }
     manifest = {
-        "schema": "cinebotrl_two_wheel_riser_dynamic_margin_retime_v1",
+        "schema": (
+            "cinebotrl_two_wheel_riser_localized_reversal_retime_v1"
+            if args.retime_mode == "localized_reversal"
+            else "cinebotrl_two_wheel_riser_dynamic_margin_retime_v1"
+        ),
         "code_commit": commit,
         "upstream_commit": upstream,
         "tracked_state_clean": True,
         "source_manifest_sha256": args.expected_source_manifest_sha256,
         "parent_portfolio_manifest_sha256": args.expected_parent_portfolio_sha256,
         "case": args.case,
-        "target_execution_source_ratio": args.target_ratio,
+        "target_execution_source_ratio": candidate_ratio,
         "item": row,
         "isaac_started": False,
         "residual_capture_started": False,

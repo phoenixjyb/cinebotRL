@@ -19,7 +19,9 @@ from rl_platform.tasks.two_wheel_balance.riser_smoothed_plan import (
     batch_unicycle_recovery_seed_eligible,
     build_case74_localized_heading_relief,
     derived_reset_yaw_rad,
+    feedforward_transition_metrics,
     localized_heading_relief_positions,
+    locally_retime_smoothed_plan,
     retime_smoothed_plan_from_demands,
     smooth_source_positions,
     smoothed_path_metrics,
@@ -56,7 +58,7 @@ def _plan(time_s: np.ndarray) -> RiserPlaybackPlan:
         feedforward_proxy_velocity=np.diff(proxy, axis=0) / dt[:, None],
         vertical_shift_m=0.0,
         planning_strategy="smoothed_preview_0.05m_g2.75",
-        source_time_s=np.array([0.0, 0.5, 1.0]),
+        source_time_s=np.linspace(0.0, 1.0, count),
     )
 
 
@@ -270,6 +272,70 @@ def test_uniform_retime_rejects_speedup_or_out_of_contract_ratio() -> None:
         uniformly_retime_smoothed_plan(plan, 1.0, 2.01)
 
 
+def test_local_retime_changes_only_window_clock_and_derivatives() -> None:
+    plan = _plan(np.linspace(0.0, 1.0, 7))
+    retimed, interval_scale = locally_retime_smoothed_plan(
+        plan,
+        source_duration_s=1.0,
+        start_interval=1,
+        end_interval=5,
+        peak_time_scale=3.0,
+    )
+    assert retimed.time_s[-1] > plan.time_s[-1]
+    np.testing.assert_allclose(interval_scale[[0, 5]], 1.0)
+    assert np.all(interval_scale[1:5] > 1.0)
+    assert interval_scale[1] == pytest.approx(interval_scale[4])
+    assert interval_scale[2] == pytest.approx(interval_scale[3])
+    np.testing.assert_array_equal(retimed.source_time_s, plan.source_time_s)
+    for name in (
+        "target_position_world_m",
+        "target_semantic_dfr_quat_wxyz",
+        "base_xy_yaw",
+        "riser_q",
+        "proxy_gimbal_q",
+    ):
+        np.testing.assert_array_equal(getattr(retimed, name), getattr(plan, name))
+    expected_v = plan.feedforward_v_wz[:, 0] / interval_scale
+    np.testing.assert_allclose(retimed.feedforward_v_wz[:, 0], expected_v)
+
+
+def test_local_retime_reduces_window_transition_rate() -> None:
+    plan = _plan(np.linspace(0.0, 1.0, 7))
+    base = plan.base_xy_yaw.copy()
+    base[:, 0] = [0.0, 0.05, 0.10, 0.15, 0.10, 0.05, 0.0]
+    plan = replace(plan, base_xy_yaw=base)
+    plan = replace(
+        plan,
+        feedforward_v_wz=smoothed_plan._feedforward(plan, plan.time_s)[0],
+    )
+    parent = feedforward_transition_metrics(plan, 1, 5)
+    retimed, _ = locally_retime_smoothed_plan(plan, 1.0, 1, 5, 4.0)
+    candidate = feedforward_transition_metrics(retimed, 1, 5)
+    assert candidate["maximum_abs_linear_acceleration_mps2"] < parent[
+        "maximum_abs_linear_acceleration_mps2"
+    ]
+    assert candidate["maximum_command_transition_norm"] < parent[
+        "maximum_command_transition_norm"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "peak", "message"),
+    [
+        (-1, 2, 2.0, "interval range"),
+        (2, 2, 2.0, "interval range"),
+        (0, 2, 1.0, "greater than one"),
+        (0, 2, 10.0, "duration ratio"),
+    ],
+)
+def test_local_retime_rejects_invalid_or_overlong_contract(
+    start: int, end: int, peak: float, message: str
+) -> None:
+    plan = _plan(np.array([0.0, 0.5, 1.0]))
+    with pytest.raises(ValueError, match=message):
+        locally_retime_smoothed_plan(plan, 1.0, start, end, peak)
+
+
 def test_transition_metrics_reject_pre_densification_branch_jump() -> None:
     plan = _plan(np.array([0.0, 0.5, 1.0]))
     metrics = transition_metrics(plan)
@@ -424,6 +490,16 @@ def test_dynamic_retime_derivation_is_cpu_only_evidence_bound_and_closed() -> No
     assert 'first_reject.get("runtime_contract_passed") is True' in source
     assert 'not_started_cases == requested_cases[reject_index + 1 :]' in source
     assert '"--target-ratio", type=float, default=1.4' in source
+    assert 'choices=("uniform", "localized_reversal")' in source
+    assert '"--local-start-interval"' in source
+    assert '"--local-end-interval"' in source
+    assert '"--local-peak-time-scale"' in source
+    assert "locally_retime_smoothed_plan(" in source
+    assert "feedforward_transition_metrics(" in source
+    assert '"linear_acceleration_ratio"' in source
+    assert '"command_transition_norm_ratio"' in source
+    assert '"execution_interval_scale_matches"' in source
+    assert '"unchanged_intervals_preserve_base_feedforward"' in source
     assert '"--maximum-portfolio-median", type=float, default=1.5' in source
     assert '"controller_changed": False' in source
     assert '"phase_governor_changed": False' in source

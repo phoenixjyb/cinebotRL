@@ -1512,3 +1512,42 @@ and must state whether its candidate was accepted or rejected.
 - This retry is an orchestration/evidence correction only. Do not change the
   source plan, LQR, controller, camera correction, thermal model, residual
   scales, or deterministic commands.
+
+## Round 44: case-13 bounded retry dynamic qualification
+
+- Published the fresh retry contract at commit
+  `df0ee39d99e82013f57a8c870a3e070e0911c25c` and ran only case 13 in
+  `20260718_gate_c_smoothed_case13_v10_camera_lever_arm_retry_v2_exclusive`.
+  The hashed admission records the `1600 s` shell wall bound; the simulation's
+  own `3.0` duration-scale horizon and every controller/gate remained
+  unchanged.
+- The case completed `19617` physics steps and both clocks:
+  `33.821283 s` source and `40.269133 s` execution. Position p95/max passed at
+  `0.149032/0.160031 m` against the unchanged `0.15/0.25 m` gates.
+- Attitude p95/max passed at `0.135536/0.416216 deg`; pitch max was
+  `6.929054 deg`; internal attitude IK had zero failures, proxy rate max was
+  `44.246564 deg/s`, and no termination occurred.
+- Action/proxy saturation ratios were `0.000535/0.000187`; riser saturation
+  was zero. Riser effort max was `19.971910 N`, thermal load max was
+  `0.001568`, and all thermal, runtime, and controller-evidence gates passed.
+- The frozen prospective residual envelope passed with normalized maxima
+  `[0.784293, 0.267138, 0.108635]`. Residual action remained exactly zero and
+  unapplied, and no dataset was written.
+- This raises the uniquely dynamically qualified set to `26/70`. Residual
+  capture, BC, PPO, and training remain closed.
+- Evidence hashes:
+  - runtime admission: `073428109be413f5286e193b453f5419e979c9852e9a69d161495242fa9b03d6`;
+  - case-13 gate JSON: `28c861bd8a550363c06973087872bf75f965d060133a98f4714748c69d66241c`;
+  - case-13 log: `8cdace55e4e451378ad382f82312a4fb3009a82234d69badf8b73549c36973c9`;
+  - final summary: `fd6624ed5c75974fbf713b5ce7be9909fa62a03316514c904f3afd1677ef26c8`.
+- The case exit code is `0`; GPU and playback ownership were empty after
+  closure.
+
+## Next round after Round 44
+
+- Continue in source order with a fresh, hash-bound v10 case-14-only canary.
+  Determine and record a sufficient bounded wall timeout from its execution
+  duration before launch rather than reverting to a universal `480 s` cap.
+- Keep source anchors, LQR, deterministic controller, camera correction,
+  physical gates, thermal model, and residual scales unchanged. Keep residual
+  capture, BC, PPO, and training closed.

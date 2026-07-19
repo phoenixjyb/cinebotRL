@@ -536,6 +536,7 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert "WINDOWS_POWERSHELL=" in source
     assert "Get-CimInstance Win32_Process" in source
     assert "evaluate_cascade_robustness" in source
+    assert "$_.ProcessId -ne $queryProcessId" in source
     assert '|| -n "$windows_owners" ]]' in source
     assert "CASE_TIMEOUT_SECONDS=1600" in source
     assert "CASE_TIMEOUT_SECONDS=1500" in source

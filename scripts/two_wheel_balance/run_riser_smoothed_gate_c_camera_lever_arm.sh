@@ -397,10 +397,13 @@ assert_gpu_free() {
   windows_owners="$(
     "$WINDOWS_POWERSHELL" -NoProfile -NonInteractive -Command '
       $ErrorActionPreference = "Stop"
+      $queryProcessId = $PID
       Get-CimInstance Win32_Process |
         Where-Object {
-          $_.Name -eq "kit.exe" -or
-          $_.CommandLine -match "smoke_.*playback|evaluate_cascade_robustness"
+          $_.ProcessId -ne $queryProcessId -and (
+            $_.Name -eq "kit.exe" -or
+            $_.CommandLine -match "smoke_.*playback|evaluate_cascade_robustness"
+          )
         } |
         ForEach-Object { "{0}`t{1}" -f $_.ProcessId, $_.CommandLine }
     ' | tr -d '\r'

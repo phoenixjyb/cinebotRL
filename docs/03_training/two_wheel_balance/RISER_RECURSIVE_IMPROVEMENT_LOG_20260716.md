@@ -2538,3 +2538,56 @@ and must state whether its candidate was accepted or rejected.
   timeouts, and physical thresholds remain unchanged.
 - V4 is a runtime authorization only. It does not admit v1-v3 evidence, create
   labels, open residual capture, BC, PPO, or training, or advance case 33.
+
+## Round 72: exclusive case-32 v4 dynamically qualifies the preview recovery
+
+- Published the fresh v4 route at `f124970`; the authoritative `.98` suite
+  passed `341/341` tests. Both WSL and Windows owner probes were empty before
+  launch, and a dedicated five-second monitor observed the full playback close
+  without any competing robustness process.
+- Case 32 ran only in
+  `20260720_gate_c_smoothed_case32_v15_explicit_preview0175_v4_exclusive`.
+  Both source/execution clocks completed at `21.648708/29.592866 s` in `13037`
+  steps. Dynamic position p95/max passed at `0.102419/0.133996 m`; attitude
+  p95/max passed at `0.140728/0.219045 deg`; pitch p95/max were
+  `6.341652/7.418519 deg`. Riser servo p95/max were
+  `0.012923/0.013585 m`, effort max was `21.440975 N`, and thermal-load max
+  was `0.001576`. Every physical, completion, runtime, thermal, controller,
+  IK, rate, saturation, and termination check passed.
+- The prospective residual envelope independently passed with raw maxima
+  `[0.264953, 0.158985, 0.013684]` and normalized maxima
+  `[0.883177, 0.397463, 0.136840]`. Residual action stayed exactly zero and
+  unapplied; no dataset, capture, BC, PPO, or training started.
+- A fresh union over all sealed dynamic gate rows proves `37/70` unique passes:
+  `[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,28,30,31,32,52,53,66,67,68,70,74,77]`.
+- Evidence hashes: admission
+  `eb41fee8882cb1cffea276ca4fbca0cfd9be008dbf9f134e28eb2a2132bde9ea`,
+  gate `da9003bbf089b28da8b19238d99efb4ad1beecc267e529b70a51221382fb5cf2`,
+  log `d9974f4a4f19770995418493683d3e2b210334ea99f36630eeaee1898916abf2`,
+  and summary
+  `96dcb03e9ab46ba2e99a0adca2452689b5ae19468d067e9fa7b4dbf5e6bafa1a`.
+  GPU and playback ownership were empty after closure.
+
+## Next round after Round 72
+
+- Inspect v15 case 33 on CPU. If its unchanged source, duration, path,
+  transition, rate, workspace, and kinematic gates pass, add exactly one fresh
+  default-profile case-only route with a duration-derived timeout.
+- Keep residual capture, BC, PPO, and training closed until deterministic
+  qualification and the final raw residual-envelope audit are complete.
+
+## Round 73: case-33 CPU admission and bounded route
+
+- V15 case 33 is statically admitted and hash-bound to plan
+  `052b828587efef44e8f17bc6c8a4d73dcbfc2d35466ae02f5dd1a60f64af8d00`.
+  It preserves all `1253` source anchors and has source/execution clocks
+  `24.515451/36.622524 s`, ratio `1.493855`. Static position p95/max are
+  `0.111536/0.137112 m`; camera height is `0.600000-1.637535 m`; planned riser
+  rate max is `0.404418 m/s`.
+- Every source-integrity, path, duration, transition, initialization, base/riser
+  rate, proxy-rate, workspace, and kinematic check passes. Prepare exactly one
+  default-profile route in
+  `20260720_gate_c_smoothed_case33_v15_camera_lever_arm_v1_exclusive` with a
+  `1600 s` wall bound. No controller or threshold changes are authorized.
+- Case 33 remains invalid for training until its exclusive dynamic result is
+  sealed. Residual capture, BC, PPO, and training remain closed.

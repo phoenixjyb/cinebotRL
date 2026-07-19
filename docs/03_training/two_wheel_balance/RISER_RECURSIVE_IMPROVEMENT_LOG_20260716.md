@@ -2416,3 +2416,38 @@ and must state whether its candidate was accepted or rejected.
   guard proves no other Isaac/GPU owner.
 - Seal the first dynamic outcome. Advance to case 33 only if case 32 passes;
   otherwise stop for evidence-driven diagnosis. Keep all learning closed.
+
+## Round 68: case-32 v15 canary quarantined after cross-session GPU overlap
+
+- Published the v15 route at `36186c7`; `.98` passed `341/341` CPU tests.
+  Case 32 started at `19:37` in
+  `20260719_gate_c_smoothed_case32_v15_explicit_preview0175_v1_exclusive`.
+  Startup completed, but the log immediately warned that another Kit process
+  held the key-value database. At `19:40`, a separate
+  `evaluate_cascade_robustness.py` process became visible while this canary was
+  still live, invalidating exclusive GPU ownership.
+- Stopped only the riser process tree and left the later robustness process
+  untouched. No runtime gate JSON or labels were written. The fail-closed
+  summary classifies case 32 as `missing_runtime_json`; it is not a physical
+  or tracking reject and cannot update the `36/70` dynamic-pass count.
+- Preserved interruption hashes: admission
+  `9a51d6b2102357bec05f2ea29222b5d67180f45703b8ad85468c90cf553b6475`,
+  partial log
+  `3675bbbfa116c9b46ddcae5e8f44052438085373f0604121b550f403578f641c`,
+  exit-code file
+  `9d9b18720961e9b4689fd763b85e7b6f36160ccd3a8a1c9ddc5103bb0f66c396`,
+  and summary
+  `9b9235957bb16cd3cfa3d26986f9c0cbbb54efe03a880ac5f343a845179ff167`.
+  Residual capture, BC, PPO, and training remain false.
+- The old ownership check could miss Windows-side Isaac/Kit processes when
+  they were absent from WSL `ps` and the WSL `nvidia-smi` compute list. The
+  riser runner must additionally query Windows process command lines and
+  reject Kit, playback, or robustness owners before any future launch.
+
+## Next round after Round 68
+
+- Add the Windows-process ownership check and a fresh v2 namespace, then run
+  CPU tests. Do not launch while the robustness process remains active.
+- After an explicit clean ownership read, run exactly one v2 case-32 canary.
+  Treat the v1 namespace only as quarantined overlap evidence. Keep case 33 and
+  all learning stages closed.

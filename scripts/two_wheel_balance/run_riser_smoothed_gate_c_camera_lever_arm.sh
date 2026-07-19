@@ -5,6 +5,7 @@ ROOT="/mnt/g/wSpace/cinebotRL-two-wheel-riser"
 WIN_ROOT='G:\wSpace\cinebotRL-two-wheel-riser'
 PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
+WINDOWS_POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 PORTFOLIO_STAMP="20260718_smoothed_plan_all79_v7_case74_relief_cpu"
 MANIFEST_SHA256="0fe4b517d2629a1bca413162378708c2985cf5a42a1da8746de0a662f2fab00c"
 SOURCE_SHA256="f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d"
@@ -351,6 +352,17 @@ case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
     CASE_TIMEOUT_SECONDS=1500
     STAMP="20260719_gate_c_smoothed_case32_v15_explicit_preview0175_v1_exclusive"
     ;;
+  AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE32_V15_EXPLICIT_PREVIEW0175_V2)
+    PORTFOLIO_STAMP="20260719_smoothed_plan_all79_v15_case32_explicit_preview0175_cpu"
+    MANIFEST_SHA256="ef084a77e9f9fe633d8f6918d4e29808d7b339fe2e7db939c4aa826d597f1977"
+    PLANNER_COMMIT="6bc1ad879ca27add191d3ebcc4ce961388524ba6"
+    CASE_A=32
+    CASE_B=""
+    CASE_A_PLAN_SHA256="71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f"
+    CASE_B_PLAN_SHA256=""
+    CASE_TIMEOUT_SECONDS=1500
+    STAMP="20260719_gate_c_smoothed_case32_v15_explicit_preview0175_v2_exclusive"
+    ;;
   *)
     printf 'camera lever-arm Gate C authorization is absent or unknown\n' >&2
     exit 7
@@ -379,13 +391,25 @@ RISER_CONTROL="$ROOT/src/rl_platform/tasks/two_wheel_balance/riser_control.py"
 RECOVERY_EVIDENCE="$ROOT/src/rl_platform/tasks/two_wheel_balance/riser_recovery_evidence.py"
 
 assert_gpu_free() {
-  local playback_owners compute_owners
+  local playback_owners compute_owners windows_owners
   playback_owners="$(ps -ef | grep -E '[p]ython(\.exe)? .*smoke_.*playback\.py' || true)"
   compute_owners="$($NVIDIA_SMI --query-compute-apps=pid,process_name --format=csv,noheader)"
-  if [[ -n "$playback_owners" || -n "$compute_owners" ]]; then
+  windows_owners="$(
+    "$WINDOWS_POWERSHELL" -NoProfile -NonInteractive -Command '
+      $ErrorActionPreference = "Stop"
+      Get-CimInstance Win32_Process |
+        Where-Object {
+          $_.Name -eq "kit.exe" -or
+          $_.CommandLine -match "smoke_.*playback|evaluate_cascade_robustness"
+        } |
+        ForEach-Object { "{0}`t{1}" -f $_.ProcessId, $_.CommandLine }
+    ' | tr -d '\r'
+  )"
+  if [[ -n "$playback_owners" || -n "$compute_owners" || -n "$windows_owners" ]]; then
     printf 'camera lever-arm Gate C GPU is not free\n' >&2
     [[ -z "$playback_owners" ]] || printf '%s\n' "$playback_owners" >&2
     [[ -z "$compute_owners" ]] || printf '%s\n' "$compute_owners" >&2
+    [[ -z "$windows_owners" ]] || printf '%s\n' "$windows_owners" >&2
     return 1
   fi
 }
@@ -492,7 +516,7 @@ raise SystemExit(0 if ok else 6)
 PY
 }
 
-[[ -x "$PY" && -x "$NVIDIA_SMI" ]] || exit 2
+[[ -x "$PY" && -x "$NVIDIA_SMI" && -x "$WINDOWS_POWERSHELL" ]] || exit 2
 [[ ! -e "$OUTPUT" ]] || { printf 'refusing existing namespace: %s\n' "$OUTPUT" >&2; exit 2; }
 [[ "$(sha256sum "$SOURCE_MANIFEST" | awk '{print $1}')" == "$SOURCE_SHA256" ]] || exit 2
 [[ "$(sha256sum "$PORTFOLIO/manifest.json" | awk '{print $1}')" == "$MANIFEST_SHA256" ]] || exit 2

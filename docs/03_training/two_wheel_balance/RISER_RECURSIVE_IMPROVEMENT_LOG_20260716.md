@@ -2451,3 +2451,35 @@ and must state whether its candidate was accepted or rejected.
 - After an explicit clean ownership read, run exactly one v2 case-32 canary.
   Treat the v1 namespace only as quarantined overlap evidence. Keep case 33 and
   all learning stages closed.
+
+## Round 69: Windows guard validated; v2 later invalidated by shard 2
+
+- Added a Windows `Win32_Process` ownership query and excluded the query's own
+  PowerShell PID. Commit `e737c0c` passed `341/341` authoritative CPU tests.
+  While robustness shard 1 was active, the v2 authorization correctly exited
+  `5` before creating a namespace and reported both Windows wrapper/worker
+  command lines. This validates pre-launch rejection for Windows-side owners.
+- After a sustained clean window, v2 started at `21:10` in
+  `20260719_gate_c_smoothed_case32_v15_explicit_preview0175_v2_exclusive`.
+  It remained the only observed owner initially, but robustness shard 2 entered
+  at `21:13` while the canary was still running. Stopped only the riser process
+  tree; the robustness shard was not changed.
+- No runtime gate JSON or labels were written. The fail-closed summary is a
+  `missing_runtime_json` interruption, not a physical reject or dynamic pass.
+  Evidence hashes: admission
+  `dc91e4147364d118c0e561c3aea9b4e70dcbb70269bffb2234544c9489213685`,
+  partial log
+  `23a3a21fd0debd3a65f71803a293c75efaa4b487a4615f1d39877cf72d242112`,
+  exit-code file
+  `9d9b18720961e9b4689fd763b85e7b6f36160ccd3a8a1c9ddc5103bb0f66c396`,
+  and summary
+  `122d849957799623b6b25a1deed2a50c4cf9379545f86007357aa1ac8a5e2448`.
+  The dynamic count remains `36/70`; learning remains closed.
+
+## Next round after Round 69
+
+- Do not race the remaining robustness queue. Prepare a fresh v3 namespace,
+  but launch it only after shard 3 of 4 has been observed and then completed,
+  followed by an empty Windows-owner query.
+- Keep the v1/v2 namespaces quarantined as overlap evidence. Do not advance to
+  case 33, residual capture, BC, PPO, or training first.

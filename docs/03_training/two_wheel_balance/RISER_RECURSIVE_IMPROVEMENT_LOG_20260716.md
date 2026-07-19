@@ -2521,3 +2521,20 @@ and must state whether its candidate was accepted or rejected.
 - Once that external condition is satisfied, create one fresh namespace bound
   to the unchanged v15 case-32 plan and rerun exactly once. Keep case 33 and all
   learning stages closed until a valid exclusive case-32 result exists.
+
+## Round 71: resumed ownership audit permits one fresh v4 route
+
+- On 2026-07-20, both the WSL process audit and the Windows `Win32_Process`
+  query were empty for playback, robustness, training, and Kit owners. Local
+  and remote riser branches remained clean; the remote retained only the
+  previously documented preserved untracked evidence directories.
+- Prepare exactly one fresh namespace,
+  `20260720_gate_c_smoothed_case32_v15_explicit_preview0175_v4_exclusive`,
+  bound to unchanged v15 manifest
+  `ef084a77e9f9fe633d8f6918d4e29808d7b339fe2e7db939c4aa826d597f1977`
+  and case-32 plan
+  `71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f`.
+  The default camera-lever-arm profile, LQR, gains, `0.05 m` correction cap,
+  timeouts, and physical thresholds remain unchanged.
+- V4 is a runtime authorization only. It does not admit v1-v3 evidence, create
+  labels, open residual capture, BC, PPO, or training, or advance case 33.

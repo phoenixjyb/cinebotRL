@@ -84,6 +84,39 @@ def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
+def _validate_closed_position_p95_reject(
+    gate: dict[str, object],
+    summary: dict[str, object],
+    case: int,
+) -> dict[str, object]:
+    _require(gate.get("cases") == [case], "bad gate case")
+    results = gate.get("results")
+    _require(isinstance(results, list) and len(results) == 1, "bad gate results")
+    gate_row = results[0]
+    _require(isinstance(gate_row, dict), "bad gate result row")
+    checks = gate_row.get("checks")
+    _require(isinstance(checks, dict), "bad gate checks")
+    failed = [key for key, value in checks.items() if value is not True]
+    _require(
+        failed == ["position_p95_bounded"]
+        and checks.get("completed_reference") is True
+        and gate_row.get("thermal_admission_passed") is True
+        and gate_row.get("controller_evidence_passed") is True,
+        "gate is not a completed position-p95-only reject",
+    )
+    first_reject = summary.get("first_dynamic_reject")
+    _require(
+        isinstance(first_reject, dict)
+        and first_reject.get("case") == case
+        and first_reject.get("runtime_contract_passed") is True
+        and summary.get("residual_capture_started") is False
+        and summary.get("bc_started") is False
+        and summary.get("ppo_started") is False,
+        "summary does not seal the expected closed reject",
+    )
+    return gate_row
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-manifest", type=Path, required=True)
@@ -97,6 +130,10 @@ def main() -> int:
     parser.add_argument("--expected-gate-sha256", required=True)
     parser.add_argument("--gate-summary", type=Path, required=True)
     parser.add_argument("--expected-gate-summary-sha256", required=True)
+    parser.add_argument("--corroborating-gate-json", type=Path)
+    parser.add_argument("--expected-corroborating-gate-sha256")
+    parser.add_argument("--corroborating-gate-summary", type=Path)
+    parser.add_argument("--expected-corroborating-gate-summary-sha256")
     parser.add_argument("--urdf", type=Path, required=True)
     parser.add_argument("--case", type=int, default=16)
     parser.add_argument("--lookahead-distance", type=float, default=0.15)
@@ -132,6 +169,17 @@ def main() -> int:
     summary = _load_hash_bound_json(
         args.gate_summary, args.expected_gate_summary_sha256
     )
+    corroborating_arguments = (
+        args.corroborating_gate_json,
+        args.expected_corroborating_gate_sha256,
+        args.corroborating_gate_summary,
+        args.expected_corroborating_gate_summary_sha256,
+    )
+    _require(
+        all(value is not None for value in corroborating_arguments)
+        or all(value is None for value in corroborating_arguments),
+        "corroborating reject arguments must be supplied together",
+    )
 
     source_items = source_manifest.get("items")
     _require(
@@ -163,27 +211,30 @@ def main() -> int:
             and parent_item.get("selected_reset_yaw_mode") == args.reset_yaw_mode,
             "parent smoothing or reset-yaw contract mismatch",
         )
-    results = gate.get("results")
-    _require(gate.get("cases") == [args.case] and isinstance(results, list) and len(results) == 1, "bad gate case")
-    gate_row = results[0]
-    failed = [key for key, value in gate_row.get("checks", {}).items() if value is not True]
-    _require(
-        failed == ["position_p95_bounded"]
-        and gate_row.get("checks", {}).get("completed_reference") is True
-        and gate_row.get("thermal_admission_passed") is True
-        and gate_row.get("controller_evidence_passed") is True,
-        "gate is not a completed position-p95-only reject",
-    )
-    first_reject = summary.get("first_dynamic_reject")
-    _require(
-        isinstance(first_reject, dict)
-        and first_reject.get("case") == args.case
-        and first_reject.get("runtime_contract_passed") is True
-        and summary.get("residual_capture_started") is False
-        and summary.get("bc_started") is False
-        and summary.get("ppo_started") is False,
-        "summary does not seal the expected closed reject",
-    )
+    _validate_closed_position_p95_reject(gate, summary, args.case)
+    corroborating_reject = None
+    if args.corroborating_gate_json is not None:
+        corroborating_gate = _load_hash_bound_json(
+            args.corroborating_gate_json,
+            args.expected_corroborating_gate_sha256,
+        )
+        corroborating_summary = _load_hash_bound_json(
+            args.corroborating_gate_summary,
+            args.expected_corroborating_gate_summary_sha256,
+        )
+        _validate_closed_position_p95_reject(
+            corroborating_gate,
+            corroborating_summary,
+            args.case,
+        )
+        corroborating_reject = {
+            "gate_json": str(args.corroborating_gate_json.resolve()),
+            "gate_json_sha256": args.expected_corroborating_gate_sha256,
+            "gate_summary": str(args.corroborating_gate_summary.resolve()),
+            "gate_summary_sha256": (
+                args.expected_corroborating_gate_summary_sha256
+            ),
+        }
 
     references = load_exact_source_package(
         args.source_manifest,
@@ -289,6 +340,7 @@ def main() -> int:
         "parent_plan_sha256": args.expected_parent_plan_sha256,
         "gate_json_sha256": args.expected_gate_sha256,
         "gate_summary_sha256": args.expected_gate_summary_sha256,
+        "corroborating_dynamic_reject": corroborating_reject,
         "explicit_preview": {
             "lookahead_distance_m": args.lookahead_distance,
             "heading_gain": args.heading_gain,

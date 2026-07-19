@@ -2325,3 +2325,46 @@ and must state whether its candidate was accepted or rejected.
   governor, unchanged v14 plan, LQR, gains, `0.05 m` correction cap, horizon,
   and physical thresholds. Stop and seal either outcome.
 - Do not advance to case 33 or any learning stage until the retry closes.
+
+## Round 66: case-32 governor retry rejects slowdown as the recovery mechanism
+
+- Published the bounded governor route at `797734e`; the authoritative `.98`
+  CPU suite passed `341/341` tests before launch. Ran only case 32 in
+  `20260719_gate_c_smoothed_case32_v14_camera_error_governor_v1_exclusive`
+  with the unchanged v14 plan, LQR, gains, `0.05 m` correction cap, physical
+  thresholds, and frozen `0.13/0.155/0.20` governor profile.
+- The retry completed both clocks in `14222` steps and again failed only
+  position p95. P95 worsened from `0.171752 m` to `0.177584 m`, while position
+  max improved slightly from `0.192684 m` to `0.184828 m` and remained below
+  its gate. Every completion, attitude, balance, rate, thermal, controller,
+  runtime, IK, saturation, and termination check passed.
+- The governor was active for `12.6213%` of policy steps, reached its frozen
+  minimum phase scale `0.20`, and had mean scale `0.906603`. At its peak-error
+  trace row, chassis XY error was only `0.028700 m`, but camera error remained
+  `0.184264 m`; the camera-to-base lever-arm mismatch was about `0.188600 m`
+  and the `0.05 m` correction was saturated. Slowing phase therefore prolonged
+  the camera-error plateau instead of repairing the base/yaw allocation.
+- The prospective residual envelope independently passed at normalized maxima
+  `[0.862471, 0.399056, 0.137504]`. Residual action remained zero and
+  unapplied; no dataset, capture, BC, PPO, or training started. The unique
+  dynamically qualified count remains `36/70`.
+- Evidence hashes: admission
+  `1c0ec491cb5ceacf196bcb026067669e943dc8a2bb2c2af5c62765410570a492`,
+  gate `06cd9d93239ca4c8858f54c5479ffd897d764f9353a7a4dd4f80a45aed01edfa`,
+  log `b7ef7e9bcf102d0f0c28deb7c4697bc852c5ee90e79e7e6d97946466d9a8dfdf`,
+  and summary
+  `412ee7d0e42f09293abf7f561c57d1677dd3c6ae8a5dba6a2fb1080db9500e77`.
+  GPU and playback ownership were empty after this case-32 run closed.
+
+## Next round after Round 66
+
+- Do not retry case 32 with another phase governor or a wider correction cap.
+  Audit base/yaw allocation on CPU using a hash-bound explicit-preview
+  candidate that preserves all source arrays and the parent smoothed camera
+  geometry. Bind the derivation to both sealed case-32 rejects.
+- The existing parent search contains no usable alternate: `0.10 m` lookahead
+  is the only admitted attempt, while its `0.05 m` attempt has static position
+  p95/max `0.679576/0.715013 m`. Evaluate a bounded preview/heading grid, admit
+  at most one candidate through the unchanged duration, path, transition, and
+  kinematic gates, and do not create a runtime route yet.
+- Keep case 33, residual capture, BC, PPO, and all training closed.

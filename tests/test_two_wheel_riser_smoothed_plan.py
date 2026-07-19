@@ -582,6 +582,10 @@ def test_explicit_preview_derivation_is_hash_bound_and_training_closed(
     assert '_require(result.passed, "explicit preview candidate failed static admission")' not in source
     assert "result.passed" in source
     assert 'failed == ["position_p95_bounded"]' in source
+    assert "--corroborating-gate-json" in source
+    assert "--expected-corroborating-gate-sha256" in source
+    assert "corroborating reject arguments must be supplied together" in source
+    assert '"corroborating_dynamic_reject": corroborating_reject' in source
     assert '"source_geometry_changed": False' in source
     assert '"controller_changed": False' in source
     assert '"thresholds_changed": False' in source
@@ -611,6 +615,37 @@ def test_explicit_preview_derivation_is_hash_bound_and_training_closed(
     module._require_hash_bound_file(binary_plan, module.sha256_file(binary_plan))
     with pytest.raises(ValueError, match="hash mismatch"):
         module._require_hash_bound_file(binary_plan, "0" * 64)
+
+    checks = {
+        "completed_reference": True,
+        "position_p95_bounded": False,
+        "position_max_bounded": True,
+    }
+    gate = {
+        "cases": [32],
+        "results": [
+            {
+                "checks": checks,
+                "thermal_admission_passed": True,
+                "controller_evidence_passed": True,
+            }
+        ],
+    }
+    summary = {
+        "first_dynamic_reject": {
+            "case": 32,
+            "runtime_contract_passed": True,
+        },
+        "residual_capture_started": False,
+        "bc_started": False,
+        "ppo_started": False,
+    }
+    assert module._validate_closed_position_p95_reject(gate, summary, 32) == gate[
+        "results"
+    ][0]
+    gate["results"][0]["checks"]["position_max_bounded"] = False
+    with pytest.raises(ValueError, match="position-p95-only"):
+        module._validate_closed_position_p95_reject(gate, summary, 32)
 
 
 def test_explicit_preview_builder_preserves_supplied_geometry(monkeypatch) -> None:

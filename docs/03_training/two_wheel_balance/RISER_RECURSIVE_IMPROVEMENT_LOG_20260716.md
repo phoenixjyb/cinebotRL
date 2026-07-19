@@ -2483,3 +2483,41 @@ and must state whether its candidate was accepted or rejected.
   followed by an empty Windows-owner query.
 - Keep the v1/v2 namespaces quarantined as overlap evidence. Do not advance to
   case 33, residual capture, BC, PPO, or training first.
+
+## Round 70: v3 confirms that idle snapshots are not an exclusive lease
+
+- Synced exact pushed commit `c06a46f` to `.98` and passed the authoritative
+  `341/341` CPU suite. Both WSL and Windows ownership queries were empty before
+  v3 started in
+  `20260719_gate_c_smoothed_case32_v15_explicit_preview0175_v3_exclusive`.
+- A dedicated monitor then detected the separate minimal-controller process
+  `candidate_speedki0p3_yaw10_5_provisional_full_v20` entering after v3 had
+  started. This reproduces the same cross-session violation as v1/v2: a clean
+  preflight snapshot cannot prevent a different task from claiming the GPU
+  during the several-minute playback.
+- Stopped only the riser process tree. No runtime gate JSON or labels were
+  written. The normal runner exited during its bounded GPU-release wait because
+  the later process remained active, so the preserved namespace was sealed
+  CPU-side with the standard summarizer. Its classification is
+  `missing_runtime_json`, not a physical reject or pass.
+- Evidence hashes: admission
+  `3525ddfd43698cf539f61530d6663dea9ef2bb3e7e216f9131b202e1945a433a`,
+  partial log
+  `c20da588672d81e754746f394d9ff3b9f5a7807767afbc7c4259d18379b72534`,
+  exit-code file
+  `9d9b18720961e9b4689fd763b85e7b6f36160ccd3a8a1c9ddc5103bb0f66c396`,
+  and summary
+  `7ff6aeec0443115ae2ecb92c201303ff4cfda17da12c9e26219c1044ee61e8c3`.
+  Dynamic qualification remains `36/70`; residual capture, BC, PPO, and
+  training remain closed.
+
+## Resume condition after Round 70
+
+- Do not issue a v4 runtime token based only on another momentary empty-owner
+  read. The minimal-controller task in
+  `/mnt/g/wSpace/cinebotRL-two-wheel-minimal` must explicitly release `.98` for
+  the full riser playback window, or both tasks must adopt one shared atomic
+  GPU lease before any new Isaac launch.
+- Once that external condition is satisfied, create one fresh namespace bound
+  to the unchanged v15 case-32 plan and rerun exactly once. Keep case 33 and all
+  learning stages closed until a valid exclusive case-32 result exists.

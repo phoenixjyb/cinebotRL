@@ -2282,3 +2282,46 @@ and must state whether its candidate was accepted or rejected.
   static admission and duration-derived timeout review.
 - Keep residual capture, BC, PPO, and training closed. The current deterministic
   qualification is `36/70`, not corpus completion or teacher admission.
+
+## Round 65: case-32 localized camera-lag reject and bounded recovery choice
+
+- V14 case 32 was statically admitted with plan hash
+  `45040c19379c0f56f68f44e6391033d2342769f3c034cc281d12f4e5f0cb35a1`,
+  `1099` source anchors, source/execution clocks `21.648708/32.092669 s`,
+  static position p95/max `0.129187/0.185137 m`, camera height
+  `1.350000-1.486568 m`, and riser rate max `0.059092 m/s`.
+- Published the default case-only route at `e541668`; the authoritative `.98`
+  suite passed `341/341` tests before launch. Case 32 ran exclusively in
+  `20260719_gate_c_smoothed_case32_v14_camera_lever_arm_v1_exclusive` and
+  completed both clocks in `13447` steps.
+- The only failed physical check was position p95: `0.171752 m` against the
+  unchanged `0.15 m` gate. Position max passed at `0.192684 m`; attitude
+  p95/max passed at `0.148761/0.221794 deg`; pitch max was `7.392641 deg`;
+  no termination, IK, rate, saturation, thermal, controller, or runtime check
+  failed. The residual envelope independently passed at normalized maxima
+  `[0.862471, 0.400925, 0.137795]` but remained unapplied.
+- The 1 Hz trace localizes all samples above `0.15 m` to wall seconds `20-24`
+  and phase `9.882854-11.491540 s`. Camera correction is saturated, motion
+  direction does not change, and position error rises to `0.192294 m` before
+  recovering. This is a localized camera-lag hump, not reversal, terminal,
+  balance, or riser behavior.
+- The already-reviewed camera-error governor would affect exactly those five
+  trace rows, capping phase progress from `0.359677-0.482954` to `0.20`. Its
+  coarse additional-wall estimate is `5.513073 s`, below the existing
+  `29.043008 s` runtime margin. This justifies one unchanged-plan retry; it is
+  not proof of a pass and does not authorize broader tuning.
+- Evidence hashes: admission
+  `18a7161567b88a9b3ada2d91bb6e15ee45348625913f370904931e57953317bc`,
+  gate `319a663352bebeb88a5b234a527854dba47f0274845c011462b5c5271294e2f7`,
+  log `bb126c8809e250a753458cbe3f55772a14d7e63bc1b812035869f699b6d5b474`,
+  and summary
+  `2904537707061a2515b7fffacae0482d590c85be79301b9ae9a2603d10114047`.
+  No dataset, capture, BC, PPO, or training started; the unique count remains
+  `36/70`.
+
+## Next round after Round 65
+
+- Run one case-32-only retry with the frozen `0.13/0.155/0.20` camera-error
+  governor, unchanged v14 plan, LQR, gains, `0.05 m` correction cap, horizon,
+  and physical thresholds. Stop and seal either outcome.
+- Do not advance to case 33 or any learning stage until the retry closes.

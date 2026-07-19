@@ -2368,3 +2368,51 @@ and must state whether its candidate was accepted or rejected.
   at most one candidate through the unchanged duration, path, transition, and
   kinematic gates, and do not create a runtime route yet.
 - Keep case 33, residual capture, BC, PPO, and all training closed.
+
+## Round 67: dual-reject-bound case-32 preview candidate passes CPU gates
+
+- Extended the explicit-preview derivation contract so one candidate can be
+  hash-bound to a second corroborating dynamic reject. The new contract
+  validates that both evidence pairs are completed position-p95-only rejects
+  with runtime, thermal, and controller evidence intact, and that neither run
+  opened residual capture, BC, or PPO. The authoritative `.98` suite passed
+  `341/341` tests at pushed commit `6bc1ad8`.
+- A bounded CPU sweep preserved the parent camera geometry and evaluated
+  lookahead distances `0.11-0.25 m` at heading gain `2.75`, followed by gains
+  `2.25-3.25` around the best `0.15/0.175 m` previews. The selected `0.175 m`,
+  `2.75` candidate has the lowest static position p95 at `0.066916 m`; max is
+  `0.109337 m`. The parent values were `0.129187/0.185137 m`.
+- Derived the single candidate in
+  `20260719_smoothed_case32_explicit_preview0175_dual_reject_cpu`. It is bound
+  to default-reject gate/summary hashes
+  `319a663352bebeb88a5b234a527854dba47f0274845c011462b5c5271294e2f7` /
+  `2904537707061a2515b7fffacae0482d590c85be79301b9ae9a2603d10114047`
+  and governor-reject gate/summary hashes
+  `06cd9d93239ca4c8858f54c5479ffd897d764f9353a7a4dd4f80a45aed01edfa` /
+  `412ee7d0e42f09293abf7f561c57d1677dd3c6ae8a5dba6a2fb1080db9500e77`.
+- All `1099` source anchors, source timestamps, positions, attitudes, order,
+  path length, initialization separation, and the parent smoothed camera
+  geometry remain unchanged. Execution duration is `29.592866 s`, ratio
+  `1.366958`; all path, duration, transition, rate, workspace, and kinematic
+  gates pass. Candidate plan hash is
+  `71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f`;
+  derivation manifest/summary hashes are
+  `1af96b793cdae719a5d2a3b79cb77412fe5ee5b726d0d06e9db542d11e5eaa1b` /
+  `2c58a71b6c880b162082ab7260b037eddfecb5c083de53dc4c67292cb07ef313`.
+- Composed v15 at
+  `20260719_smoothed_plan_all79_v15_case32_explicit_preview0175_cpu`. It keeps
+  `70/79` static admissions and accepted duration-ratio median
+  `1.499904 <= 1.5`. Manifest/summary hashes are
+  `ef084a77e9f9fe633d8f6918d4e29808d7b339fe2e7db939c4aa826d597f1977` /
+  `438adf783461c8954522cefe86fb0a3ea445f93481aced9a42d06b70a6c221a4`.
+  Isaac, differential work, residual capture, BC, PPO, and training remain
+  false; neither artifact is valid for training.
+
+## Next round after Round 67
+
+- Add one fresh, hash-bound case-32-only v15 route using the unchanged default
+  camera-lever-arm controller, LQR, correction cap, and physical gates. Do not
+  use the failed phase governor. Run it only after the shared `.98` ownership
+  guard proves no other Isaac/GPU owner.
+- Seal the first dynamic outcome. Advance to case 33 only if case 32 passes;
+  otherwise stop for evidence-driven diagnosis. Keep all learning closed.

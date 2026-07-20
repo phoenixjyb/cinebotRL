@@ -2663,3 +2663,21 @@ and must state whether its candidate was accepted or rejected.
 - Keep deterministic commands and all thresholds unchanged. Residual capture,
   BC, PPO, and training remain closed until the deterministic portfolio is
   qualified and the final raw residual-envelope audit is complete.
+
+## Round 77: skip case-35 reject and admit case 36 on CPU
+
+- Preserve v15 case 35 as a static reject: position p95/max are
+  `0.288929/0.364426 m`, so it fails both immutable position gates despite
+  passing source integrity, timing, path, transition, rate, attitude, and
+  workspace checks. It is not routed to Isaac.
+- V15 case 36 is statically admitted with plan hash
+  `16b8d492571794b057a6747235ce37ce26173058c776773c2eaf717e38f1fe95`.
+  It preserves all `797` source anchors and has source/execution clocks
+  `15.694569/27.210186 s`, ratio `1.733733`. Path-length drift is `-2.754%`,
+  static position p95/max are `0.121207/0.225160 m`, camera height is
+  `1.425330-1.704093 m`, and planned riser rate max is `0.151173 m/s`.
+- Every immutable source, path, duration, transition, initialization, rate,
+  workspace, and kinematic check passes. Prepare exactly one default-profile
+  route in `20260720_gate_c_smoothed_case36_v15_camera_lever_arm_v1_exclusive`
+  with a `1500 s` wall bound. No controller, plan, threshold, or learning-stage
+  change is authorized.

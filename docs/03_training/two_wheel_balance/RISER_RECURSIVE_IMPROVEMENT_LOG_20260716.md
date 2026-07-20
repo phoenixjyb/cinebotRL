@@ -2943,3 +2943,39 @@ and must state whether its candidate was accepted or rejected.
   Prepare exactly one retry in
   `20260720_gate_c_smoothed_case42_v18_localized_reversal_retime_v1_exclusive`
   with a `2300 s` wall bound. Learning remains closed.
+
+## Round 89: v18 rejects and the lineage audit selects the v16 baseline
+
+- Published the v18 route at `134aef5`; the authoritative `.98` suite passed
+  `343/343`. The exclusive case-42 run exhausted its bounded simulated horizon
+  at phase `37.191666/57.348774 s` after `34411` steps. Position p95/max failed
+  at `5.074297/5.308876 m`; no termination occurred.
+- All non-position physical gates remained healthy: attitude p95/max were
+  `0.124800/0.218509 deg`, pitch p95/max were `7.330061/8.026940 deg`, riser
+  servo p95/max were `0.010540/0.012393 m`, thermal-load max was `0.001429`,
+  IK failures were zero, and action/riser/proxy saturation remained zero.
+  The label envelope independently failed at normalized raw maxima
+  `[1.417943,0.376901,0.126241]`; labels were not applied and no dataset,
+  capture, BC, PPO, or training started.
+- Sealed v18 hashes are admission
+  `ecf8d6209389b45f8e8487a5ef2552de6e51de7f3906b89dcca900c4271cb978`,
+  gate `e1621e47f56492129642a66bec306b51b3add9755737d9a299c116662a0e1309`,
+  log `8ad1a97117bc07f6e5073bf14edad7dbf19b2cb40425cd487810db448043962f`,
+  and summary
+  `a466bf0da5777d4c35e7f1b3391d9c48b935246d85c1fde2cf6e91896b30908d`.
+- Added the hash-bound lineage audit at `99c35c2`; the authoritative suite now
+  passes `346/346`. Its real artifact SHA is
+  `1ad420538b0d64b961b004c7c3e0bd952c3f2b9c5196ea4924c811daf5de2c8d`.
+  It proves all authoritative source arrays are identical across v16/v17/v18,
+  v18 only retimed the rejected v17 allocation, and v17 changed base/riser/proxy
+  allocation by up to `0.673676 m`, `0.031866 m`, and `0.729410 rad` from v16.
+- Select the pre-existing v16 case-42 plan, SHA
+  `f737f0b2e1fe4877685ae2bc4a976c2179dce5ce8c30491146d14b3994eb4343`,
+  as the sole next candidate. It already passes every duration, path,
+  transition, and kinematic gate with static position p95/max
+  `0.148363/0.197051 m`, but remains dynamically unvalidated and training
+  ineligible.
+- Prepare exactly one fail-closed rollback canary in
+  `20260720_gate_c_smoothed_case42_v16_baseline_rollback_v1_exclusive` with a
+  `2200 s` wall bound. No controller, threshold, source geometry, or learning
+  stage changes are authorized; case 43 remains closed until case 42 passes.

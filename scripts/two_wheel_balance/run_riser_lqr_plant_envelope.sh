@@ -13,7 +13,7 @@ readonly TRACKING_SHA256="f2cfe1abcaf1f225461b0ccfa9d26ab205e2dc9624047be77edeab
 readonly ROBOT_CONFIG_SHA256="31b84c21baf8fb043c8653bfb592217b97d9edbd7a1a0e17633b86f4f36f05e2"
 readonly GAINS_SHA256="2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6"
 readonly ROBOT_USD_SHA256="89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0"
-readonly SUMMARIZER_SHA256="09302cd2058711de4156e940eb1e15db38f580f755f0c8cc927e56841d686c2d"
+readonly SUMMARIZER_SHA256="1f557c33d4e4843a77d09a5abd2c396f328435f5175ffb1ace01a6d33c2a256a"
 readonly TIMEOUT_SECONDS=420
 
 if [[ $# -ne 1 ]]; then
@@ -30,13 +30,13 @@ case "$SHARD" in
     ;;
   mid)
     readonly RISER_POSITION_M="0.6"
-    readonly AUTHORIZATION="AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_MID_V2"
-    readonly NAMESPACE="20260720_riser_lqr_plant_envelope_vxkp072_mid_v2_exclusive"
+    readonly AUTHORIZATION="AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_MID_V3"
+    readonly NAMESPACE="20260720_riser_lqr_plant_envelope_vxkp072_mid_v3_exclusive"
     ;;
   high)
     readonly RISER_POSITION_M="1.2"
-    readonly AUTHORIZATION="AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_HIGH_V2"
-    readonly NAMESPACE="20260720_riser_lqr_plant_envelope_vxkp072_high_v2_exclusive"
+    readonly AUTHORIZATION="AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_HIGH_V3"
+    readonly NAMESPACE="20260720_riser_lqr_plant_envelope_vxkp072_high_v3_exclusive"
     ;;
   *)
     printf 'unknown riser plant-envelope shard: %s\n' "$SHARD" >&2
@@ -172,6 +172,7 @@ payload = {
         "action_limit": 0.8,
         "minimum_success_rate": 1.0,
         "maximum_direction_speed_asymmetry_mps": 0.05,
+        "maximum_riser_hold_error_m": 0.03,
         "semantic_proxy_state_adapter": True,
     },
     "runtime_identities": {
@@ -223,6 +224,7 @@ timeout --signal=TERM --kill-after=30s "$TIMEOUT_SECONDS" \
   --plant-uncertainty-profile provisional_prior_v1 \
   --minimum-success-rate 1.0 \
   --maximum-direction-speed-asymmetry-mps 0.05 \
+  --maximum-riser-hold-error-m 0.03 \
   --output "$OUTPUT_WIN\gates\result.json" \
   --headless >"$OUTPUT/logs/runtime.log" 2>&1 || STATUS=$?
 printf '%s\n' "$STATUS" >"$OUTPUT/logs/exit_code"

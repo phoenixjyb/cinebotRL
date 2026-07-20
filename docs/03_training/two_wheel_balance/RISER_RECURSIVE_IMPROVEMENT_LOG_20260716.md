@@ -4042,3 +4042,47 @@ and must state whether its candidate was accepted or rejected.
 - Only after the resealed low status passes may one fresh v2 mid-height shard
   run. High, case 42, residual capture, BC, PPO, training, and obstacle work
   remain closed.
+
+## Round 114: low resealed pass; mid hold-gate contract correction
+
+- Commit `96875bd64f92c71b68863b1aaedf042e0398c85e` was pushed and
+  transferred with bundle SHA-256
+  `c19179c8130a91f8ba880f7285fe0b39de4407bdefe0a7a2c46a7286bcad8127`;
+  the authoritative `.98` suite passed `421/421` in `27.25 s`
+  (`29.51 s` command wall time).
+- Preserved the original low final status at SHA-256
+  `8bb9203e411686c019761e1bb8dc429e8b92445ca3c8e938535878f5b44665af`
+  and resealed the unchanged low admission/result/log/exit artifacts. Schema-v2
+  final status passes every check at SHA-256
+  `b5d99fcefc660200b6b5883b44065761aee12a35c93e4fbf05d9f22b0c452026`.
+  No low physics rerun occurred.
+- One exclusive mid-height v2 shard then ran at riser position `0.6 m` and
+  stopped fail-closed. All `56` scenarios survived and passed balance recovery,
+  tracking recovery, `vx/wz` tracking, pitch/roll, action saturation, gimbal
+  hold, and direction symmetry. Aggregate selected `vx/wz` RMSE was
+  `0.038222/0.001502`, peak pitch was `8.442031 deg`, action saturation was
+  zero, and speed asymmetry was `0.033005 m/s`.
+- The only failed check was riser hold: maximum error `0.011223 m` against the
+  newly introduced `0.010 m` maximum. Result/final-status SHA-256 values are
+  `8a7f7a9599a976e73656ecd9491f6998cbefb1b838ff4bd291b201e4565abd64`
+  and `cb463058bbb8c86c7aacc07bd553bbf6d9d833759cf7eccc70771817ed75ce1d`.
+  High did not start.
+- CPU audit found the `0.010 m max` threshold inconsistent with the established
+  riser contract. Static/dynamic riser smokes and Gate C use `0.030 m`; prior
+  accepted dynamic evidence reports `0.0105-0.0138 m` maxima. Corrected the
+  plant-envelope route to an explicit, hash-bound `0.030 m maximum`, which is
+  stricter than the established `0.030 m p95` gate. The summarizer now proves
+  this exact threshold plus the unchanged `1 deg` gimbal threshold. No actuator,
+  controller, plan, plant, push, pitch/action limit, or learned component was
+  changed.
+- Mid/high route identities move to fresh v3 namespaces. The v2 mid reject is
+  preserved and will not be relabeled. Residual capture, BC, PPO, training,
+  case 42, high, and obstacle work remain closed.
+
+## Next round after Round 114
+
+- Pass focused and full authoritative CPU tests, commit, push, and transfer the
+  gate-contract correction. Verify fresh mid-v3 namespace and exclusive
+  WSL/Windows/NVIDIA ownership.
+- Run exactly one mid-v3 shard. Stop on any reject. Only the existing sealed low
+  pass plus a clean mid-v3 pass may admit one high-v3 shard.

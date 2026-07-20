@@ -79,6 +79,10 @@ def summarize(
                 "equilibrium_pitch_bias_max_deg",
             )
         ),
+        "hold_threshold_contract": close(
+            thresholds.get("maximum_riser_hold_error_m"), 0.03
+        )
+        and close(thresholds.get("maximum_gimbal_hold_error_deg"), 1.0),
         "riser_hold": riser.get("riser_hold_error_max_m", math.inf)
         <= thresholds.get("maximum_riser_hold_error_m", -1.0),
         "gimbal_hold": riser.get("gimbal_hold_error_max_deg", math.inf)

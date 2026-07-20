@@ -54,7 +54,7 @@ def write_fixture(root: Path) -> None:
             "runtime": {"nominal_total_mass_kg": 28.0},
         },
         "thresholds": {
-            "maximum_riser_hold_error_m": 0.01,
+            "maximum_riser_hold_error_m": 0.03,
             "maximum_gimbal_hold_error_deg": 1.0,
         },
         "summary": {

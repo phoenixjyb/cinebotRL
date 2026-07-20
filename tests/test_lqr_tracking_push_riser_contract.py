@@ -119,6 +119,8 @@ def test_plant_envelope_runner_is_single_height_hash_bound_and_no_learning() -> 
     assert "--semantic-proxy-state-adapter" in text
     assert "--plant-uncertainty-profile provisional_prior_v1" in text
     assert "--minimum-success-rate 1.0" in text
+    assert "--maximum-riser-hold-error-m 0.03" in text
+    assert "AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_MID_V3" in text
     assert '"capture_started": False' in text
     assert '"bc_started": False' in text
     assert '"ppo_started": False' in text

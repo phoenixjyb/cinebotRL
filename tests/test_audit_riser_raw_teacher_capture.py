@@ -11,6 +11,9 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     OBSERVATION_NAMES,
     save_raw_teacher_case,
 )
+from scripts.two_wheel_balance.audit_riser_raw_teacher_capture import (
+    canonical_cross_platform_path,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -152,3 +155,9 @@ def test_rejects_capture_if_residual_was_applied(tmp_path: Path) -> None:
     audit = json.loads((tmp_path / "audit.json").read_text(encoding="utf-8"))
     assert not audit["checks"]["zero_applied_residual"]
     assert not audit["capture_admission_passed"]
+
+
+def test_canonicalizes_windows_paths_for_wsl_audit() -> None:
+    assert canonical_cross_platform_path(r"G:\wSpace\capture.npz") == (
+        "/mnt/g/wSpace/capture.npz"
+    )

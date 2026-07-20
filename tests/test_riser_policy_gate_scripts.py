@@ -865,6 +865,32 @@ def test_runtime_evidence_separates_source_and_execution_clocks() -> None:
     assert '"residual_label_envelope_passed": residual_label_envelope_ok' in riser
 
 
+def test_raw_teacher_canary_is_one_case_scale_independent_and_guarded() -> None:
+    source = _read("run_riser_raw_teacher_canary_case2.sh")
+    assert "AUTHORIZED_RISER_RAW_TEACHER_CASE2_CANARY_V1" in source
+    assert "--cases 2" in source
+    assert "--raw-teacher-dir" in source
+    assert "--dataset-dir" not in source
+    assert "--residual-policy" not in source
+    assert '"raw_teacher_capture_authorized": True' in source
+    assert '"normalized_dataset_capture_authorized": False' in source
+    assert '"residual_action_application_authorized": False' in source
+    assert '"scale_freeze_authorized": False' in source
+    assert '"bc_authorized": False' in source
+    assert '"ppo_authorized": False' in source
+    assert "Get-CimInstance Win32_Process" in source
+    assert "rev-parse '@{upstream}'" in source
+
+
+def test_raw_teacher_canary_rejects_missing_authorization() -> None:
+    runner = SCRIPTS / "run_riser_raw_teacher_canary_case2.sh"
+    result = subprocess.run(
+        ["bash", str(runner)], capture_output=True, text=True, env={}
+    )
+    assert result.returncode == 7
+    assert "authorization is absent or unknown" in result.stderr
+
+
 def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:
     source = _read("run_riser_residual_holdout_gate.sh")
     assert "exact_source_v1" in source

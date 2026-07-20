@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import sys
 from typing import Any
 
@@ -46,6 +47,14 @@ def parse_scales(value: str) -> np.ndarray:
     if values.shape != (3,) or not np.isfinite(values).all():
         raise argparse.ArgumentTypeError("expected three finite comma-separated values")
     return values
+
+
+def canonical_cross_platform_path(value: str | Path) -> str:
+    text = str(value).replace("\\", "/")
+    match = re.fullmatch(r"([A-Za-z]):/(.*)", text)
+    if match:
+        return f"/mnt/{match.group(1).lower()}/{match.group(2)}"
+    return str(Path(text).resolve())
 
 
 def selected_row(selection: dict[str, Any], case: int) -> dict[str, Any]:
@@ -142,8 +151,10 @@ def main() -> int:
         "both_clocks_present": result.get("source_duration_s") is not None
         and result.get("execution_duration_s") is not None,
         "row_count_matches_steps": len(observations) == result.get("completed_steps"),
-        "raw_capture_path_matches": result.get("executed_raw_teacher_capture")
-        == str(args.raw_case.resolve()),
+        "raw_capture_path_matches": canonical_cross_platform_path(
+            result.get("executed_raw_teacher_capture", "")
+        )
+        == canonical_cross_platform_path(args.raw_case),
         "no_normalized_dataset": result.get("executed_residual_dataset") is None,
         "raw_labels_not_applied": result.get("raw_residual_label_applied_to_commands")
         is False,

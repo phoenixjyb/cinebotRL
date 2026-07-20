@@ -897,8 +897,10 @@ def test_raw_teacher_canary_rejects_missing_authorization() -> None:
 
 def test_raw_teacher42_scheduler_is_resumable_homogeneous_and_unissued() -> None:
     source = _read("run_riser_raw_teacher42_capture.sh")
-    assert 'AUTHORIZATION_SHA256=""' in source
-    assert "raw-teacher batch has no issued runtime authorization" in source
+    assert (
+        'AUTHORIZATION_SHA256="7f3a058422c961a362b50b4ea8d9980664e5fab3b44739acac9668fa461fa370"'
+        in source
+    )
     assert "RISER_RAW_TEACHER_BATCH_PREFLIGHT" in source
     assert "output_namespace_created\": False" in source
     assert "--enable-camera-lever-arm-compensation" in source
@@ -911,6 +913,7 @@ def test_raw_teacher42_scheduler_is_resumable_homogeneous_and_unissued() -> None
     assert "progress_status.json.tmp" in source
     assert "runtime_or_physical_reject" in source
     assert "case_audit_reject" in source
+    assert 'sys.argv[4] == "corpus_and_dataset_admitted"' in source
     assert "completed case audit mismatch" in source
     assert "stop_on_first_reject\": True" in source
     assert "--expected-count 42" in source
@@ -921,13 +924,13 @@ def test_raw_teacher42_scheduler_is_resumable_homogeneous_and_unissued() -> None
     assert "rev-parse '@{upstream}'" in source
 
 
-def test_raw_teacher42_scheduler_cannot_launch_without_issued_secret() -> None:
+def test_raw_teacher42_scheduler_rejects_missing_secret() -> None:
     runner = SCRIPTS / "run_riser_raw_teacher42_capture.sh"
     result = subprocess.run(
-        ["bash", str(runner)], capture_output=True, text=True, env={}
+        ["bash", str(runner)], capture_output=True, text=True, env=os.environ.copy()
     )
     assert result.returncode == 7
-    assert "no issued runtime authorization" in result.stderr
+    assert "authorization is absent or unknown" in result.stderr
 
 
 def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:

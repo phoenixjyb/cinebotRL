@@ -6,7 +6,7 @@ WIN_ROOT='G:\wSpace\cinebotRL-two-wheel-riser'
 PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
 POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
-AUTHORIZATION_SHA256=""
+AUTHORIZATION_SHA256="7f3a058422c961a362b50b4ea8d9980664e5fab3b44739acac9668fa461fa370"
 STAMP="20260721_initial_teacher42_raw_capture_v1_exclusive"
 PORTFOLIO_STAMP="20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu"
 MANIFEST_SHA256="8351514a361d3be4e5fbf57f2dbb019a7d8d2f5b86e89cea2553a1cfda3c64a1"
@@ -145,7 +145,7 @@ output = {
     "reason": sys.argv[4],
     "stopped_case": int(sys.argv[5]) if sys.argv[5] else None,
     "exit_code": int(sys.argv[6]),
-    "capture_admission_passed": False,
+    "capture_admission_passed": sys.argv[4] == "corpus_and_dataset_admitted",
     "bc_authorized": False,
     "ppo_authorized": False,
     "training_started": False,

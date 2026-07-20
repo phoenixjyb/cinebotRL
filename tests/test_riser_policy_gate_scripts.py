@@ -856,6 +856,11 @@ def test_runtime_evidence_separates_source_and_execution_clocks() -> None:
     assert "failure_plan.time_s[-1]" in riser
     assert "if dataset_dir is not None:" in riser
     assert '"raw_residual_label_applied_to_commands": False' in riser
+    assert "if dataset_dir is not None or raw_teacher_dir is not None:" in riser
+    assert "if raw_teacher_dir is not None and case_admission_passed:" in riser
+    assert "teacher_residual_action\n                if dataset_dir is not None" in riser
+    assert '"raw_teacher_capture_started": args.raw_teacher_dir is not None' in riser
+    assert "raw teacher capture, normalized dataset collection, and policy rollout" in riser
     assert '"dynamic_quality_passed": dynamic_quality_passed' in riser
     assert '"residual_label_envelope_passed": residual_label_envelope_ok' in riser
 

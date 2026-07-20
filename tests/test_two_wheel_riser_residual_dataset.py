@@ -12,7 +12,9 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     build_raw_residual_command,
     build_residual_action,
     load_case_dataset,
+    load_raw_teacher_case,
     save_case_dataset,
+    save_raw_teacher_case,
     normalize_residual_command,
     residual_action_envelope_passed,
 )
@@ -164,3 +166,55 @@ def test_case_dataset_round_trip_and_rejects_mixed_cases(tmp_path) -> None:
         assert "mixes trajectories" in str(error)
     else:
         raise AssertionError("mixed-case dataset was accepted")
+
+
+def test_raw_teacher_capture_is_scale_independent_and_not_trainable(tmp_path) -> None:
+    count = 4
+    payload = {
+        "observations": np.zeros(
+            (count, len(OBSERVATION_NAMES)), dtype=np.float32
+        ),
+        "raw_residual_commands": np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [0.31, -0.2, 0.01],
+                [0.32, 0.1, -0.02],
+                [0.1, 0.0, 0.0],
+            ],
+            dtype=np.float32,
+        ),
+        "case_ids": np.full(count, 10, dtype=np.int16),
+        "elapsed_time_s": np.arange(count, dtype=np.float64) * 0.005,
+        "phase_time_s": np.arange(count, dtype=np.float64) * 0.004,
+        "baseline_wheel_actions": np.zeros((count, 2), dtype=np.float32),
+        "teacher_commands": np.zeros((count, 3), dtype=np.float32),
+    }
+    path = tmp_path / "case_0010_executed_raw_teacher_v1.npz"
+    save_raw_teacher_case(path, 10, payload)
+    metadata, restored = load_raw_teacher_case(path)
+    assert metadata["action_scale_frozen"] is False
+    assert metadata["raw_residual_applied_to_commands"] is False
+    assert metadata["valid_for_training"] is False
+    assert "action_scales" not in metadata
+    np.testing.assert_array_equal(
+        restored["raw_residual_commands"], payload["raw_residual_commands"]
+    )
+
+
+def test_raw_teacher_capture_rejects_nonzero_previous_action_placeholder(
+    tmp_path,
+) -> None:
+    count = 2
+    observations = np.zeros((count, len(OBSERVATION_NAMES)), dtype=np.float32)
+    observations[1, 23] = 0.1
+    payload = {
+        "observations": observations,
+        "raw_residual_commands": np.zeros((count, 3), dtype=np.float32),
+        "case_ids": np.full(count, 2, dtype=np.int16),
+        "elapsed_time_s": np.arange(count, dtype=np.float64) * 0.005,
+        "phase_time_s": np.arange(count, dtype=np.float64) * 0.004,
+        "baseline_wheel_actions": np.zeros((count, 2), dtype=np.float32),
+        "teacher_commands": np.zeros((count, 3), dtype=np.float32),
+    }
+    with pytest.raises(ValueError, match="previous-action placeholders"):
+        save_raw_teacher_case(tmp_path / "bad.npz", 2, payload)

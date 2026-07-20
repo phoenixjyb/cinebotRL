@@ -12,6 +12,7 @@ from .camera_attitude import quaternion_matrix_wxyz, rotation_error_vector
 
 
 DATASET_SCHEMA = "cinebotrl_two_wheel_riser_executed_residual_v2"
+RAW_TEACHER_SCHEMA = "cinebotrl_two_wheel_riser_executed_raw_teacher_v1"
 LOOKAHEAD_HORIZONS_S = (0.25, 0.50, 1.00)
 BASE_OBSERVATION_NAMES = (
     "pitch_rad",
@@ -77,6 +78,14 @@ ACTION_NAMES = (
 )
 ACTION_SCALES = np.array([0.30, 0.40, 0.10], dtype=np.float64)
 SPLIT_NAMES = ("train", "validation", "holdout")
+PREVIOUS_ACTION_NAMES = (
+    "previous_residual_vx_normalized",
+    "previous_residual_wz_normalized",
+    "previous_residual_riser_target_normalized",
+)
+PREVIOUS_ACTION_INDICES = tuple(
+    OBSERVATION_INDEX[name] for name in PREVIOUS_ACTION_NAMES
+)
 
 
 def _wrap_angle(value: float) -> float:
@@ -331,6 +340,113 @@ def validate_case_dataset(payload: dict[str, np.ndarray], *, expected_case: int 
         raise ValueError("executed timestamps must start at zero and increase")
     if not np.all(np.diff(payload["phase_time_s"]) >= 0):
         raise ValueError("phase time must be monotonic")
+
+
+def validate_raw_teacher_case(
+    payload: dict[str, np.ndarray], *, expected_case: int | None = None
+) -> None:
+    required = {
+        "observations": 2,
+        "raw_residual_commands": 2,
+        "case_ids": 1,
+        "elapsed_time_s": 1,
+        "phase_time_s": 1,
+        "baseline_wheel_actions": 2,
+        "teacher_commands": 2,
+    }
+    for name, ndim in required.items():
+        if name not in payload or np.asarray(payload[name]).ndim != ndim:
+            raise ValueError(f"missing or invalid {name}")
+    count = len(payload["observations"])
+    if count < 2 or any(len(payload[name]) != count for name in required):
+        raise ValueError("raw teacher row counts do not match")
+    if payload["observations"].shape[1] != len(OBSERVATION_NAMES):
+        raise ValueError("raw teacher observation dimension mismatch")
+    if payload["raw_residual_commands"].shape[1] != len(ACTION_NAMES):
+        raise ValueError("raw residual command dimension mismatch")
+    if (
+        payload["baseline_wheel_actions"].shape[1] != 2
+        or payload["teacher_commands"].shape[1] != 3
+    ):
+        raise ValueError("raw teacher auxiliary command dimension mismatch")
+    if not all(np.isfinite(np.asarray(payload[name])).all() for name in required):
+        raise ValueError("raw teacher capture contains non-finite values")
+    cases = np.unique(payload["case_ids"])
+    if len(cases) != 1 or (
+        expected_case is not None and int(cases[0]) != expected_case
+    ):
+        raise ValueError("raw teacher capture mixes trajectories")
+    if abs(float(payload["elapsed_time_s"][0])) > 1e-9 or not np.all(
+        np.diff(payload["elapsed_time_s"]) > 0
+    ):
+        raise ValueError("raw teacher timestamps must start at zero and increase")
+    if not np.all(np.diff(payload["phase_time_s"]) >= 0):
+        raise ValueError("raw teacher phase time must be monotonic")
+    previous = payload["observations"][:, PREVIOUS_ACTION_INDICES]
+    if not np.allclose(previous, 0.0, atol=1e-12):
+        raise ValueError("raw teacher previous-action placeholders must be zero")
+
+
+def save_raw_teacher_case(
+    path: Path, case: int, payload: dict[str, np.ndarray]
+) -> None:
+    validate_raw_teacher_case(payload, expected_case=case)
+    metadata = {
+        "schema": RAW_TEACHER_SCHEMA,
+        "case": case,
+        "source": "executed_isaac_state_and_deterministic_controller",
+        "observation_names": list(OBSERVATION_NAMES),
+        "raw_action_names": [
+            "residual_vx_m_s",
+            "residual_wz_rad_s",
+            "residual_riser_target_m",
+        ],
+        "observation_contract": "executed_state_with_execution_time_lookahead_v2",
+        "lookahead_horizons_s": list(LOOKAHEAD_HORIZONS_S),
+        "lookahead_reference_clock": "execution_time_s",
+        "camera_observation_frame": "physical_cam_link_fk",
+        "target_attitude_contract": "semantic_dfr_to_physical_cam_v1",
+        "previous_action_contract": "zero_placeholder_relabel_after_scale_freeze_v1",
+        "action_scale_frozen": False,
+        "source_action_labels_used": False,
+        "physical_gimbal_labels_used_as_actions": False,
+        "raw_residual_applied_to_commands": False,
+        "training_started": False,
+        "bc_authorized": False,
+        "ppo_authorized": False,
+        "valid_for_training": False,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(
+        path,
+        metadata_json=np.array(json.dumps(metadata, sort_keys=True)),
+        **payload,
+    )
+
+
+def load_raw_teacher_case(
+    path: Path,
+) -> tuple[dict[str, object], dict[str, np.ndarray]]:
+    with np.load(path, allow_pickle=False) as data:
+        metadata = json.loads(str(data["metadata_json"].item()))
+        payload = {
+            name: np.asarray(data[name])
+            for name in data.files
+            if name != "metadata_json"
+        }
+    if metadata.get("schema") != RAW_TEACHER_SCHEMA:
+        raise ValueError(f"wrong raw teacher schema in {path}")
+    if metadata.get("observation_names") != list(OBSERVATION_NAMES):
+        raise ValueError(f"raw teacher observation contract mismatch in {path}")
+    if metadata.get("previous_action_contract") != (
+        "zero_placeholder_relabel_after_scale_freeze_v1"
+    ):
+        raise ValueError(f"raw teacher previous-action contract mismatch in {path}")
+    if metadata.get("valid_for_training") is not False:
+        raise ValueError(f"raw teacher artifact is incorrectly training-enabled: {path}")
+    case = int(metadata["case"])
+    validate_raw_teacher_case(payload, expected_case=case)
+    return metadata, payload
 
 
 def save_case_dataset(path: Path, case: int, payload: dict[str, np.ndarray]) -> None:

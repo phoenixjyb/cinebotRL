@@ -125,6 +125,14 @@ parser.add_argument(
     help="Write dense pre-action executed-state residual datasets per case.",
 )
 parser.add_argument(
+    "--raw-teacher-dir",
+    type=Path,
+    help=(
+        "Write scale-independent raw teacher captures without applying residuals; "
+        "these artifacts are not directly trainable."
+    ),
+)
+parser.add_argument(
     "--residual-policy",
     type=Path,
     help="Optional gated TorchScript high-level residual policy.",
@@ -267,6 +275,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     normalize_residual_command,
     residual_action_envelope_passed,
     save_case_dataset,
+    save_raw_teacher_case,
 )
 from rl_platform.tasks.two_wheel_balance.riser_recovery_evidence import (
     LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA,
@@ -428,6 +437,7 @@ def evaluate_case(
     target_marker: VisualizationMarkers | None,
     path_marker: VisualizationMarkers | None,
     dataset_dir: Path | None,
+    raw_teacher_dir: Path | None,
     residual_policy,
     residual_policy_device: torch.device,
     zero_policy_action: bool,
@@ -958,9 +968,10 @@ def evaluate_case(
                 riser_bounds_m=(kinematics.riser_lower, kinematics.riser_upper),
             )
         applied_residual_actions.append(applied_residual_action.copy())
-        if dataset_dir is not None:
+        if dataset_dir is not None or raw_teacher_dir is not None:
             dataset_observations.append(executed_observation)
-            dataset_actions.append(teacher_residual_action)
+            if dataset_dir is not None:
+                dataset_actions.append(teacher_residual_action)
             dataset_elapsed_time.append(elapsed_s)
             dataset_phase_time.append(phase_time_s)
             dataset_teacher_commands.append([vx_ref, wz_ref, sample.riser_q])
@@ -1589,6 +1600,32 @@ def evaluate_case(
                 ),
             },
         )
+    raw_teacher_path = None
+    if raw_teacher_dir is not None and case_admission_passed:
+        raw_teacher_path = (
+            raw_teacher_dir
+            / f"case_{plan.case:04d}_executed_raw_teacher_v1.npz"
+        )
+        count = len(dataset_observations)
+        save_raw_teacher_case(
+            raw_teacher_path,
+            plan.case,
+            {
+                "observations": np.asarray(dataset_observations, dtype=np.float32),
+                "raw_residual_commands": np.asarray(
+                    raw_residual_commands, dtype=np.float32
+                ),
+                "case_ids": np.full(count, plan.case, dtype=np.int16),
+                "elapsed_time_s": np.asarray(dataset_elapsed_time, dtype=np.float64),
+                "phase_time_s": np.asarray(dataset_phase_time, dtype=np.float64),
+                "baseline_wheel_actions": np.asarray(
+                    dataset_baseline_actions, dtype=np.float32
+                ),
+                "teacher_commands": np.asarray(
+                    dataset_teacher_commands, dtype=np.float32
+                ),
+            },
+        )
     progress_hold_summary = summarize_progress_hold(
         np.asarray(progress_samples, dtype=np.float64)
     )
@@ -1796,6 +1833,11 @@ def evaluate_case(
         "executed_residual_dataset": (
             None if dataset_path is None else str(dataset_path.resolve())
         ),
+        "executed_raw_teacher_capture": (
+            None
+            if raw_teacher_path is None
+            else str(raw_teacher_path.resolve())
+        ),
         "passed": case_admission_passed,
     }
 
@@ -1810,6 +1852,15 @@ def main() -> int:
         args.residual_policy is not None or args.zero_policy_action
     ):
         raise ValueError("teacher dataset collection and residual rollout are exclusive")
+    if args.raw_teacher_dir is not None and (
+        args.dataset_dir is not None
+        or args.residual_policy is not None
+        or args.zero_policy_action
+    ):
+        raise ValueError(
+            "raw teacher capture, normalized dataset collection, and policy rollout "
+            "are mutually exclusive"
+        )
     if args.residual_policy is not None and args.zero_policy_action:
         raise ValueError("learned and zero-action policy modes are exclusive")
     if args.video_fps <= 0:
@@ -1925,6 +1976,7 @@ def main() -> int:
             target_marker,
             path_marker,
             args.dataset_dir,
+            args.raw_teacher_dir,
             residual_policy,
             residual_policy_device,
             args.zero_policy_action,
@@ -2062,6 +2114,8 @@ def main() -> int:
         "residual_policy": (
             None if args.residual_policy is None else str(args.residual_policy.resolve())
         ),
+        "raw_teacher_capture_started": args.raw_teacher_dir is not None,
+        "normalized_dataset_capture_started": args.dataset_dir is not None,
         "cases": cases,
         "passed_case_count": sum(item["passed"] for item in results),
         "dynamic_quality_passed": all(
@@ -2117,6 +2171,8 @@ def write_runtime_failure(exc: Exception) -> None:
         "schema": "recomo_two_wheel_riser_reference_playback_failure_v1",
         "training_started": False,
         "ppo_authorized": False,
+        "raw_teacher_capture_started": args.raw_teacher_dir is not None,
+        "normalized_dataset_capture_started": args.dataset_dir is not None,
         "tracking_profile": tracking_profile_name(),
         "controller_vx_kp": (
             args.controller_vx_kp
@@ -2208,6 +2264,7 @@ def write_runtime_failure(exc: Exception) -> None:
                     * args.maximum_duration_scale
                 ),
                 "executed_residual_dataset": None,
+                "executed_raw_teacher_capture": None,
             }
         ],
         "passed": False,

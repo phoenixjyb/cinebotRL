@@ -290,6 +290,11 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert '"--camera-recovery-error-full-m"' in source
     assert '"--minimum-camera-recovery-scale"' in source
     assert '"--tracking-minimum-progress-scale"' in source
+    assert '"--tracking-maximum-linear-velocity-mps"' in source
+    assert '"maximum_linear_velocity_mps"' in source
+    assert "0.0 < args.tracking_maximum_linear_velocity_mps <= 0.4" in pre_app_source
+    assert '"tracking_recovery_velocity_cap_enabled"' in source
+    assert "zero_progress_hold_velocity_cap_v1" in source
     assert "math.isfinite(args.camera_lever_arm_compensation_gain)" in pre_app_source
     assert "math.isfinite(args.maximum_camera_lever_arm_correction_m)" in pre_app_source
     assert "bounded_camera_lever_arm_base_target(" in source

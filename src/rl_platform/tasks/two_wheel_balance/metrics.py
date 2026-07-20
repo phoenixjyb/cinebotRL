@@ -472,6 +472,9 @@ def cascaded_lqr_action(
     tracking_states[:, 4] -= (
         config.wheel_track_m / config.wheel_radius_m
     ) * effective_wz_ref
+    state_action_contributions = -(
+        tracking_states[:, None, :] * gain[None, :, :]
+    )
     actions = lqr_action(
         tracking_states,
         gain,
@@ -522,6 +525,11 @@ def cascaded_lqr_action(
         "wheel_difference_error": wheel_difference_error,
         "inner_common_action": inner_common_action,
         "inner_yaw_action": inner_yaw_action,
+        "state_action_contributions": state_action_contributions,
+        "common_action_state_contributions": state_action_contributions[:, 0, :],
+        "common_action_unclipped": np.sum(
+            state_action_contributions[:, 0, :], axis=1
+        ),
         "yaw_correction": yaw_correction,
         "yaw_action_unclipped": final_yaw_unclipped,
         "pitch_reference": pitch_reference,

@@ -274,6 +274,13 @@ def bounded_base_references(
     ):
         raise ValueError("direction blend speed must be finite and positive")
     if not (
+        math.isfinite(config.maximum_linear_velocity_mps)
+        and config.maximum_linear_velocity_mps > 0.0
+        and math.isfinite(config.maximum_yaw_rate_radps)
+        and config.maximum_yaw_rate_radps > 0.0
+    ):
+        raise ValueError("base velocity limits must be finite and positive")
+    if not (
         math.isfinite(config.direction_recovery_error_start_m)
         and math.isfinite(config.direction_recovery_error_full_m)
         and 0.0

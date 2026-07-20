@@ -57,6 +57,14 @@ parser.add_argument("--tracking-along-kp", type=float)
 parser.add_argument("--tracking-cross-kp", type=float)
 parser.add_argument("--tracking-yaw-kp", type=float)
 parser.add_argument(
+    "--tracking-maximum-linear-velocity-mps",
+    type=float,
+    help=(
+        "Optional symmetric base-command cap. It may reduce, but never expand, "
+        "the default 0.4 m/s tracking envelope."
+    ),
+)
+parser.add_argument(
     "--tracking-minimum-progress-scale",
     type=float,
     help=(
@@ -115,6 +123,13 @@ if args.tracking_minimum_progress_scale is not None and not (
     and 0.0 <= args.tracking_minimum_progress_scale <= 1.0
 ):
     parser.error("--tracking-minimum-progress-scale must be in [0, 1]")
+if args.tracking_maximum_linear_velocity_mps is not None and not (
+    math.isfinite(args.tracking_maximum_linear_velocity_mps)
+    and 0.0 < args.tracking_maximum_linear_velocity_mps <= 0.4
+):
+    parser.error(
+        "--tracking-maximum-linear-velocity-mps must be in (0, 0.4]"
+    )
 if (
     args.tracking_minimum_progress_scale is not None
     and args.disable_phase_governor
@@ -361,6 +376,9 @@ def evaluate_case(
             "along_track_kp": args.tracking_along_kp,
             "cross_track_kp": args.tracking_cross_kp,
             "yaw_kp": args.tracking_yaw_kp,
+            "maximum_linear_velocity_mps": (
+                args.tracking_maximum_linear_velocity_mps
+            ),
             "minimum_progress_scale": args.tracking_minimum_progress_scale,
             "camera_recovery_error_start_m": (
                 args.camera_recovery_error_start_m
@@ -1403,6 +1421,7 @@ def evaluate_case(
         "progress_scale_min": float(np.min(progress_samples)),
         "progress_scale_mean": float(np.mean(progress_samples)),
         "minimum_progress_scale": tracking_cfg.minimum_progress_scale,
+        "maximum_linear_velocity_mps": tracking_cfg.maximum_linear_velocity_mps,
         **progress_hold_summary,
         "camera_recovery_governor_enabled": (
             args.enable_camera_error_recovery_governor
@@ -1673,17 +1692,32 @@ def main() -> int:
         "ppo_authorized": False,
         "controller_profile": "structural_robust_v1",
         "tracking_profile": (
-            "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
-            if args.tracking_minimum_progress_scale == 0.0
+            "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_velocity_cap_v1"
+            if (
+                args.tracking_minimum_progress_scale == 0.0
+                and args.tracking_maximum_linear_velocity_mps is not None
+            )
             else (
-                "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
-                if args.enable_camera_error_recovery_governor
+                "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
+                if args.tracking_minimum_progress_scale == 0.0
                 else (
-                    "riser_recovery_direction_v4_camera_lever_arm_v1"
-                    if args.enable_camera_lever_arm_compensation
-                    else "riser_recovery_direction_v4"
+                    "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
+                    if args.enable_camera_error_recovery_governor
+                    else (
+                        "riser_recovery_direction_v4_camera_lever_arm_v1"
+                        if args.enable_camera_lever_arm_compensation
+                        else "riser_recovery_direction_v4"
+                    )
                 )
             )
+        ),
+        "tracking_recovery_velocity_cap_enabled": (
+            args.tracking_maximum_linear_velocity_mps is not None
+        ),
+        "maximum_linear_velocity_mps": (
+            args.tracking_maximum_linear_velocity_mps
+            if args.tracking_maximum_linear_velocity_mps is not None
+            else riser_tracking_config().maximum_linear_velocity_mps
         ),
         "camera_lever_arm_compensation_contract": (
             "measured_camera_to_base_xy_offset_v1"
@@ -1722,6 +1756,9 @@ def main() -> int:
                 "along_track_kp": args.tracking_along_kp,
                 "cross_track_kp": args.tracking_cross_kp,
                 "yaw_kp": args.tracking_yaw_kp,
+                "maximum_linear_velocity_mps": (
+                    args.tracking_maximum_linear_velocity_mps
+                ),
                 "minimum_progress_scale": args.tracking_minimum_progress_scale,
             }.items()
             if value is not None
@@ -1823,17 +1860,32 @@ def write_runtime_failure(exc: Exception) -> None:
         "training_started": False,
         "ppo_authorized": False,
         "tracking_profile": (
-            "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
-            if args.tracking_minimum_progress_scale == 0.0
+            "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_velocity_cap_v1"
+            if (
+                args.tracking_minimum_progress_scale == 0.0
+                and args.tracking_maximum_linear_velocity_mps is not None
+            )
             else (
-                "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
-                if args.enable_camera_error_recovery_governor
+                "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
+                if args.tracking_minimum_progress_scale == 0.0
                 else (
-                    "riser_recovery_direction_v4_camera_lever_arm_v1"
-                    if args.enable_camera_lever_arm_compensation
-                    else "riser_recovery_direction_v4"
+                    "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
+                    if args.enable_camera_error_recovery_governor
+                    else (
+                        "riser_recovery_direction_v4_camera_lever_arm_v1"
+                        if args.enable_camera_lever_arm_compensation
+                        else "riser_recovery_direction_v4"
+                    )
                 )
             )
+        ),
+        "tracking_recovery_velocity_cap_enabled": (
+            args.tracking_maximum_linear_velocity_mps is not None
+        ),
+        "maximum_linear_velocity_mps": (
+            args.tracking_maximum_linear_velocity_mps
+            if args.tracking_maximum_linear_velocity_mps is not None
+            else riser_tracking_config().maximum_linear_velocity_mps
         ),
         "trajectory_command_source": "deterministic_teacher",
         "residual_policy": None,

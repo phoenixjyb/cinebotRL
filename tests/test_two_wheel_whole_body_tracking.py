@@ -110,6 +110,34 @@ def test_riser_tracking_profile_preserves_limits_and_raises_path_authority() -> 
     assert riser.progress_error_full_m == default.progress_error_full_m
 
 
+def test_riser_recovery_velocity_cap_is_symmetric_and_default_off() -> None:
+    default = riser_tracking_config()
+    capped = riser_tracking_config(maximum_linear_velocity_mps=0.2)
+
+    assert default.maximum_linear_velocity_mps == pytest.approx(0.4)
+    for desired_x, expected in ((1.0, 0.2), (-1.0, -0.2)):
+        velocity, _, _ = bounded_base_references(
+            desired_base_q=np.array([desired_x, 0.0, 0.0]),
+            actual_base_q=np.zeros(3),
+            feedforward_v_mps=0.0,
+            feedforward_wz_radps=0.0,
+            config=capped,
+        )
+        assert velocity == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("limit", [0.0, -0.1, float("nan")])
+def test_base_reference_rejects_invalid_velocity_cap(limit: float) -> None:
+    with pytest.raises(ValueError, match="base velocity limits"):
+        bounded_base_references(
+            desired_base_q=np.zeros(3),
+            actual_base_q=np.zeros(3),
+            feedforward_v_mps=0.0,
+            feedforward_wz_radps=0.0,
+            config=riser_tracking_config(maximum_linear_velocity_mps=limit),
+        )
+
+
 def test_dls_target_reduces_small_position_error() -> None:
     kinematics = UrdfPositionKinematics(URDF)
     state = np.array([0.0, 0.0, 0.0, 0.0, 1.2, 2.0])

@@ -142,6 +142,31 @@ def test_cascaded_lqr_signed_commands_produce_signed_actions() -> None:
     assert diagnostics["pitch_reference"][1] < 0.0
 
 
+def test_cascaded_lqr_exposes_exact_longitudinal_action_contributions() -> None:
+    gain = np.array(
+        [[-4.0, -1.5, 0.0, 0.0002, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0065, 0.0]]
+    )
+    states = np.array([[0.13, -0.34, 0.0, 4.3, 0.0, 0.0]])
+    action, _, diagnostics = cascaded_lqr_action(
+        states,
+        np.zeros(1),
+        np.zeros(1),
+        gain,
+        np.zeros((1, 2)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(vx_kp=0.0, vx_ki=0.0, wz_kp=0.0, wz_ki=0.0),
+    )
+
+    contributions = diagnostics["common_action_state_contributions"][0]
+    assert contributions[0] > 0.0
+    assert contributions[1] < 0.0
+    assert contributions[3] < 0.0
+    assert diagnostics["common_action_unclipped"][0] == pytest.approx(
+        np.sum(contributions)
+    )
+    assert action[0, 0] == pytest.approx(np.sum(contributions))
+
+
 def test_cascaded_lqr_root_feedback_changes_only_outer_velocity_error() -> None:
     gain = np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES)))
     states = np.zeros((1, len(LQR_STATE_NAMES)))

@@ -3590,3 +3590,59 @@ and must state whether its candidate was accepted or rejected.
 - Keep case 43, residual capture, BC, PPO, all training, and obstacle work
   closed. A dynamic pass would qualify only this deterministic candidate; it
   would not itself authorize learned-policy training.
+
+## Round 104: commanded-base progress canary is dynamically rejected
+
+- Commit `92c15aa` sealed the case-42-only route after focused tests passed
+  `42/42`. It was pushed and transferred to `.98` with bundle SHA-256
+  `b561c4825fc80f36725ea84926283a8cfcec427d9c6855295f0a0725d6eb8c49`.
+  The authoritative suite passed `394/394` in `27.87 s). Local, GitHub,
+  remote HEAD, and remote upstream all matched, the namespace was fresh, and
+  WSL, Windows, and NVIDIA ownership checks were empty before launch.
+- The one exclusive case-42 run closed fail-closed with no retry. It consumed
+  `28,980` scored steps and the full `144.9 s` wall/`146.9 s` simulated
+  horizon, reaching phase `44.911829/48.297533 s`. This is approximately
+  `0.995 s` farther than Round 101, but still leaves `3.386 s` unconsumed.
+- Physical position p95 failed at `0.192780 m` against the unchanged
+  `0.15 m` gate; max remained bounded at `0.202003 m`. The only failed
+  dynamic checks were `completed_reference` and `position_p95_bounded`.
+  Attitude p95/max were `0.131819/1.745864 deg`, pitch p95/max were
+  `5.710350/6.793391 deg`, proxy error max was `1.558272 deg`, riser error
+  p95/max were `0.010933/0.013184 m`, action saturation was zero, thermal
+  admission passed, and no termination occurred.
+- The new controller evidence passed independently for all `28,980` policy
+  steps. The selected source was the compensated commanded-base target; mean
+  selected-versus-nominal error delta was `-0.044223 m`, absolute maximum was
+  `0.05 m`, and all source, sample-count, and bound checks passed.
+- The prospective residual-label envelope passed, but admission remained
+  false. Raw labels were not applied, residual action stayed exactly
+  `[0,0,0]`, no dataset was written, and residual capture, BC, PPO, and all
+  training remained closed. The demonstrated dynamic union remains `42/70`.
+- Trace comparison rejects another phase-only adjustment. During the critical
+  reverse segment around elapsed `84-96 s`, effective deterministic velocity
+  reference was approximately `-0.162` to `-0.166 m/s`, while measured
+  wheel/root velocity settled near `-0.098` to `-0.114 m/s` with zero action
+  saturation. Advancing the target faster increased the long position-error
+  plateau rather than supplying missing physical tracking authority.
+- Sealed hashes are admission
+  `27c9cbe39d0af86e33e67c54ed0a2758d91160e437084b37f861f183533b4b95`,
+  gate `5aae2fd78b0b960294c6097ed4c80094d4a69a2d2b95424b2fc984563200f9fa`,
+  log `617923aa1bae1fa4e0ae54f6cda19928f43e6e59a1e391a6a6c9e8a287d587f7`,
+  exit-code evidence
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+  and summary
+  `4654037493ed85d265416cc0d316c2d8807df6dc055741053bb65f8f64173052`.
+
+## Next round after Round 104
+
+- Stay CPU-only and audit deterministic longitudinal authority inside the
+  balance cascade. Use policy-rate pitch, pitch-rate, wheel-velocity, common
+  action, total-pitch-limit, and effective-reference evidence to explain the
+  steady `0.05-0.06 m/s` reverse tracking deficit despite zero saturation.
+- Derive at most one bounded, default-off inner-loop/controller candidate with
+  synthetic sign, stability, saturation, and legacy-compatibility tests. Do
+  not compensate by moving source anchors, relaxing the `0.15 m` position
+  gate, widening residual limits, or handing primary balance to RL.
+- Do not add a runtime token or namespace until CPU review and the full
+  authoritative suite pass. Keep case 43, residual capture, BC, PPO, training,
+  and obstacle work closed.

@@ -4165,3 +4165,38 @@ and must state whether its candidate was accepted or rejected.
 - Do not launch Isaac again until the derived plan and a fresh authorization
   have been independently audited. Keep case 43, residual capture, BC, PPO,
   training, and obstacle work closed.
+
+## Round 117: ratio-2 retime fails closed on initialization preservation
+
+- The corrected evidence summarizer resealed the unchanged case-42 runtime to
+  a separate file at SHA-256
+  `61afbac7ac8c3f2cac8ff51dd8452c07da2add4bab16692c0304c19629c12ffc`.
+  Physical dynamic quality remains false, while runtime, controller, thermal,
+  zero-capable governor, and exact `vx_kp=0.72` evidence now pass. The original
+  summary remains preserved.
+- A CPU-only uniform-retime derivation used the maximum admitted
+  execution/source ratio `2.0`. It produced `64.907202 s` execution duration,
+  kept all exact-source geometry and timestamps, never sped an interval up,
+  recomputed feedforward, and passed all timing, path, transition, and kinematic
+  gates. Prospective portfolio median remained bounded at `1.499904`.
+- The candidate correctly remained invalid because the generic retime save path
+  replaced the separate v20 initialization arrays with empty arrays. The failed
+  namespace is preserved as
+  `20260720_smoothed_plan_case42_v21_plant_capacity_uniform_ratio2_cpu`;
+  plan/manifest/summary SHA-256 values are
+  `bb218af7ae584535de8533846ba0d9c1474186b65ca60673aa3904d037a11f0d`,
+  `4f9e2955bda0a8bf815df09c13752f3d435882d50c4ead88665eb9fa10b02c9a`,
+  and `67b80c196cbd60ba3e3a50f8e467378f3be056dfa01afec9b8abfeb43557b849`.
+- Added an explicit derivation step that copies the unscored initialization
+  clock/state verbatim after execution retiming, plus a regression proving the
+  execution clock remains changed while initialization remains exact. This is
+  an artifact-preservation repair, not a controller, source, plan-geometry,
+  governor, threshold, or learning change.
+
+## Next round after Round 117
+
+- Pass focused and authoritative CPU tests, commit, push, and transfer the
+  initialization-preservation repair.
+- Derive a fresh v22 ratio-2 candidate and require every source, initialization,
+  execution-clock, feedforward, timing, path, transition, and kinematic check to
+  pass. Stop before any runtime authorization or Isaac launch.

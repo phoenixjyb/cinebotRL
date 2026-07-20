@@ -2,6 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 
@@ -129,3 +130,29 @@ def test_completed_position_p95_mode_accepts_trailing_unstarted_cases(
         reject_mode="completed_position_p95_only",
     )
     assert row["case"] == 7
+
+
+def test_retime_preserves_separate_initialization_arrays(tmp_path: Path) -> None:
+    parent = tmp_path / "parent.npz"
+    output = tmp_path / "output.npz"
+    initialization_time = np.array([0.0, 0.5, 1.0])
+    initialization_state = np.arange(21, dtype=np.float64).reshape(3, 7)
+    np.savez_compressed(
+        parent,
+        initialization_time_s=initialization_time,
+        initialization_state=initialization_state,
+        execution_time_s=np.array([0.0, 1.0]),
+    )
+    np.savez_compressed(
+        output,
+        initialization_time_s=np.empty(0),
+        initialization_state=np.empty((0, 7)),
+        execution_time_s=np.array([0.0, 2.0]),
+    )
+
+    MODULE._restore_initialization_arrays(parent, output)
+
+    with np.load(output, allow_pickle=False) as candidate:
+        assert np.array_equal(candidate["initialization_time_s"], initialization_time)
+        assert np.array_equal(candidate["initialization_state"], initialization_state)
+        assert np.array_equal(candidate["execution_time_s"], np.array([0.0, 2.0]))

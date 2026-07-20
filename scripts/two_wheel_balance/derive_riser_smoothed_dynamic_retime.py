@@ -289,6 +289,19 @@ def _array_derivation_checks(
     return checks
 
 
+def _restore_initialization_arrays(parent_path: Path, output_path: Path) -> None:
+    """Keep the unscored initialization clock/state outside execution retiming."""
+
+    with np.load(parent_path, allow_pickle=False) as parent:
+        initialization_time = np.array(parent["initialization_time_s"])
+        initialization_state = np.array(parent["initialization_state"])
+    with np.load(output_path, allow_pickle=False) as output:
+        arrays = {name: np.array(output[name]) for name in output.files}
+    arrays["initialization_time_s"] = initialization_time
+    arrays["initialization_state"] = initialization_state
+    np.savez_compressed(output_path, **arrays)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-manifest", type=Path, required=True)
@@ -531,6 +544,7 @@ def main() -> int:
     )
     output = args.output_dir / f"case_{args.case:04d}_{suffix}.npz"
     save_smoothed_riser_plan(output, result, source)
+    _restore_initialization_arrays(args.parent_plan, output)
     audit = audit_smoothed_riser_plan(output, source, kinematics)
     derivation_checks = _array_derivation_checks(
         args.parent_plan,

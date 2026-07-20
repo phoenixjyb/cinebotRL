@@ -3388,3 +3388,40 @@ and must state whether its candidate was accepted or rejected.
   controller, plan, gain, USD, source, total-target limit, cap, hold, thresholds,
   ownership, and no-learning identities. Do not combine authorization with the
   reviewed CPU candidate commit.
+
+## Round 100: symmetric physical-pitch canary contract is authorized
+
+- Independent CPU review added a nonzero-bias compatibility regression at
+  `5c05865`. It proves the default-off path retains the legacy physical target
+  range of approximately `-4.35/+7.65 deg` under a `+1.65 deg` equilibrium
+  bias, while only the candidate produces a symmetric `-6/+6 deg` physical
+  target. The authoritative `.98` suite then passed `383/383`.
+- Separate commit `68500c6` adds one unique case-42 authorization token and
+  namespace. It pins the unchanged v20 portfolio manifest
+  `3d7f9650a4f701f80a11948364a53ecd34641160bffb6bc3ed697d038d559b72`,
+  plan `ea2e54273c42efa3980eaa3ea9b161109702047467df131d4ad1d2604f063984`,
+  planner `5a66e3deef01fceacc80fee37b199045705d7f02`, the existing `0.2 m/s`
+  cap, exact phase hold, initialization, gains, USD, source, runtime hashes,
+  ownership, thresholds, and no-learning invariants.
+- Runtime evidence must independently prove the total physical pitch target
+  reaches but never exceeds `6 deg`, while the velocity-generated correction
+  exceeds `6 deg` to compensate the nonzero equilibrium bias. Missing, forged,
+  inactive, or mismatched evidence fails admission without changing commands or
+  relaxing any physical/quality gate.
+- Focused route/evidence tests pass `98/98`; the authoritative `.98` suite
+  passes `384/384` in `27.29 s`. Transfer bundle SHA is
+  `84a55abf0bcceaee3d575d44577e054e60f95a77b8e81f4626cbe68e5ba1fac6`.
+  No Isaac process, namespace, residual capture, BC, PPO, or training was
+  started by these CPU commits.
+
+## Next round after Round 100
+
+- Seal the documentation commit, verify local and `.98` HEAD equal their pushed
+  upstream, confirm the new namespace is absent, and prove WSL playback,
+  Windows Kit/playback ownership, and NVIDIA compute ownership are all empty.
+- If and only if preflight is clean, launch the single authorized case-42
+  canary. Do not launch case 43 or any parallel GPU work.
+- On closure, hash and audit admission, gate, log, exit code, and summary. Treat
+  dynamic quality, thermal admission, runtime contract, total-pitch evidence,
+  and residual-label envelope as independent outcomes; stop after the first
+  result with no automatic retry.

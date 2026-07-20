@@ -659,6 +659,30 @@ def test_total_pitch_limit_is_default_off_and_zero_bias_compatible() -> None:
     assert not np.any(legacy["total_pitch_reference_limit_enabled"])
 
 
+def test_total_pitch_limit_does_not_change_legacy_nonzero_bias_behavior() -> None:
+    gain = np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES)))
+    states = np.zeros((2, len(LQR_STATE_NAMES)))
+    bias = np.full(2, np.radians(1.65))
+    legacy = cascaded_lqr_action(
+        states,
+        np.array([-1.0, 1.0]),
+        np.zeros(2),
+        gain,
+        np.zeros((2, 6)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(),
+        pitch_bias_override_rad=bias,
+    )[2]
+
+    np.testing.assert_allclose(
+        legacy["pitch_reference"], np.radians([-6.0, 6.0])
+    )
+    np.testing.assert_allclose(
+        legacy["total_pitch_reference"], np.radians([-4.35, 7.65])
+    )
+    assert not np.any(legacy["total_pitch_reference_limit_enabled"])
+
+
 def test_cascaded_lqr_defaults_match_selected_tracking_gate() -> None:
     config = CascadedLQRConfig()
     assert config.wheel_radius_m == 0.1016

@@ -3178,3 +3178,67 @@ and must state whether its candidate was accepted or rejected.
   frozen inner LQR. Do not authorize another GPU canary until the evidence
   contract, backward-compatible default behavior, and synthetic sign/reversal
   tests pass. Case 43 and all learning stages remain closed.
+
+## Round 95: root-velocity feedback is measured and rejected as the case-42 fix
+
+- Added policy-rate root-versus-wheel velocity evidence at `05c63dc`. The
+  evidence compares root-link longitudinal velocity, wheel-derived velocity,
+  their mismatch, both reference errors, direction disagreement, pitch
+  reference/bias, and common wheel action without changing commands. Added the
+  optional outer-loop-only root-velocity selector at `95a6303`; the wheel state
+  remains in the frozen inner LQR and the default selector preserves legacy
+  behavior. The authoritative CPU suite passed `365/365`.
+- Added the case-42-only root-velocity route at `b6f6c64`, with the same v20
+  plan SHA `ea2e54273c42efa3980eaa3ea9b161109702047467df131d4ad1d2604f063984`,
+  v20 manifest SHA
+  `3d7f9650a4f701f80a11948364a53ecd34641160bffb6bc3ed697d038d559b72`,
+  source, gains, USD, controller, position gates, and `2.0 s` initialization.
+  WSL, Windows, and GPU ownership checks were empty before the exclusive run.
+- The scored reference completed all `48.297533 s` in `25787` steps with no
+  termination. Dynamic position p95/max still fail at
+  `0.407546/0.519863 m`; all other physical checks, initialization, thermal,
+  controller, runtime, and telemetry contracts pass. This is only
+  `0.000309/0.000583 m` better than wheel-feedback v20 and remains worse than
+  v17 at `0.385169/0.496077 m`.
+- Root/wheel mismatch is only `0.020294 m/s` RMS and `0.110495 m/s` maximum.
+  Root and wheel reference-error RMS are `0.159325/0.171710 m/s`, opposite
+  direction occurs for `1.6675%` of policy samples, and false wheel tracking is
+  exactly zero. The selected feedback source is `root_link_vx`, schema
+  `riser_root_vs_wheel_velocity_policy_rate_v1`, and its `25787` samples equal
+  completed steps. Root-vs-wheel estimation is therefore not the structural
+  case-42 bottleneck.
+- The separate initialization again passes: `400` steps over `2.0 s`, zero
+  source/residual samples and saturation, thermal-load max `0.000102`, and
+  terminal base/yaw/riser/proxy errors `0.158063 m`, `1.815077 deg`,
+  `0.010919 m`, and `0.072426 deg`.
+- Residual-label admission independently fails at raw maxima
+  `[0.440000,0.150003,0.013778]`, normalized to
+  `[1.466667,0.375007,0.137775]`. Labels were not applied, residual action
+  stayed zero, and no dataset, capture, BC, PPO, or training started. The
+  dynamic union remains `42/70`.
+- Sealed hashes are admission
+  `21728d274ce0bf8752bd10b3fd7d2fad9a819c5d65f1bb37f59791ea60f6b837`,
+  gate `d2df0ea14b1608fa8acdc118c2d974a4fe4094b1beda1763e23d4788e111f936`,
+  log `cdee0b62ab7e91369b117cc7de8d09b1d36a028ad0c4a6a8a1bb7c5c29776fe5`,
+  exit-code evidence
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+  and summary
+  `1f0228634cf31ee8379539d93c0210124f9b29273e81a1b4e111fa34a9970f0d`.
+
+## Next round after Round 95
+
+- Stay CPU-only. The sealed trace localizes the dominant reversal at phase
+  `3.5-4.9 s`: progress is already pinned at `0.10`, position error reaches
+  `0.519485 m` at phase `4.199624 s`, and the controller continues commanding
+  approximately `-0.34 m/s` while the body needs several seconds to reverse.
+  The moving target, not velocity-observer disagreement, dominates the error.
+- Add an optional, fail-closed zero-progress recovery mode which permits the
+  existing position governor to hold the current immutable target only at its
+  full-error boundary. Keep the default `0.10` minimum unchanged, preserve all
+  source/plan arrays and controller gains, and retain the existing completion,
+  timeout, safety, thermal, and quality gates so a non-converging hold remains
+  a rejection.
+- Add telemetry and negative/default-compatibility tests before considering any
+  runtime route. Do not create a namespace or authorization token, launch
+  Isaac, case 43, residual capture, BC, PPO, or training in the CPU contract
+  change.

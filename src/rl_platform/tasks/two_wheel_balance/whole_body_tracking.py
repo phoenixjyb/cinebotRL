@@ -122,7 +122,7 @@ def bounded_progress_scale(
         raise ValueError("tracking errors must be non-negative")
     if not (
         0.0 < config.progress_error_start_m < config.progress_error_full_m
-        and 0.0 < config.minimum_progress_scale <= 1.0
+        and 0.0 <= config.minimum_progress_scale <= 1.0
     ):
         raise ValueError("invalid progress governor configuration")
     worst_error = max(base_position_error_m, tool_position_error_m)
@@ -133,6 +133,30 @@ def bounded_progress_scale(
         1.0,
     )
     return float(1.0 - severity * (1.0 - config.minimum_progress_scale))
+
+
+def summarize_progress_hold(
+    progress_scales: np.ndarray,
+    *,
+    hold_threshold: float = 1e-12,
+) -> dict[str, float | int]:
+    """Summarize exact phase holds without expanding policy-rate traces."""
+
+    values = np.asarray(progress_scales, dtype=np.float64)
+    if values.ndim != 1 or values.size == 0:
+        raise ValueError("progress scales must be a non-empty vector")
+    if not np.isfinite(values).all() or np.any((values < 0.0) | (values > 1.0)):
+        raise ValueError("progress scales must be finite and in [0, 1]")
+    if not math.isfinite(hold_threshold) or not 0.0 <= hold_threshold < 1.0:
+        raise ValueError("hold threshold must be finite and in [0, 1)")
+
+    held = values <= hold_threshold
+    starts = held & ~np.concatenate((np.asarray([False]), held[:-1]))
+    return {
+        "progress_hold_step_count": int(np.count_nonzero(held)),
+        "progress_hold_ratio": float(np.mean(held)),
+        "progress_hold_segment_count": int(np.count_nonzero(starts)),
+    }
 
 
 def bounded_camera_recovery_progress_scale(

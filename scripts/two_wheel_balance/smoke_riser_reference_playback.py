@@ -57,6 +57,14 @@ parser.add_argument("--tracking-along-kp", type=float)
 parser.add_argument("--tracking-cross-kp", type=float)
 parser.add_argument("--tracking-yaw-kp", type=float)
 parser.add_argument(
+    "--tracking-minimum-progress-scale",
+    type=float,
+    help=(
+        "Optional position-governor floor; 0 holds immutable trajectory phase "
+        "at the full-error boundary."
+    ),
+)
+parser.add_argument(
     "--enable-camera-lever-arm-compensation",
     action="store_true",
     help="Apply bounded camera-to-base lever displacement feedback to base XY.",
@@ -102,6 +110,25 @@ for name in ("tracking_along_kp", "tracking_cross_kp", "tracking_yaw_kp"):
     value = getattr(args, name)
     if value is not None and value < 0.0:
         parser.error(f"--{name.replace('_', '-')} must be non-negative")
+if args.tracking_minimum_progress_scale is not None and not (
+    math.isfinite(args.tracking_minimum_progress_scale)
+    and 0.0 <= args.tracking_minimum_progress_scale <= 1.0
+):
+    parser.error("--tracking-minimum-progress-scale must be in [0, 1]")
+if (
+    args.tracking_minimum_progress_scale is not None
+    and args.disable_phase_governor
+):
+    parser.error(
+        "--tracking-minimum-progress-scale requires the phase governor"
+    )
+if (
+    args.tracking_minimum_progress_scale == 0.0
+    and args.enable_camera_error_recovery_governor
+):
+    parser.error(
+        "zero-progress hold cannot be combined with the camera error governor"
+    )
 if not (
     math.isfinite(args.camera_lever_arm_compensation_gain)
     and 0.0 <= args.camera_lever_arm_compensation_gain <= 1.0
@@ -195,6 +222,7 @@ from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     equilibrium_pitch_from_world_com,
     nearest_equivalent_angle,
     riser_tracking_config,
+    summarize_progress_hold,
     yaw_from_quaternion_wxyz,
 )
 from task_spec import register_isaac_lab_tasks
@@ -333,6 +361,7 @@ def evaluate_case(
             "along_track_kp": args.tracking_along_kp,
             "cross_track_kp": args.tracking_cross_kp,
             "yaw_kp": args.tracking_yaw_kp,
+            "minimum_progress_scale": args.tracking_minimum_progress_scale,
             "camera_recovery_error_start_m": (
                 args.camera_recovery_error_start_m
             ),
@@ -1318,6 +1347,9 @@ def evaluate_case(
                 ),
             },
         )
+    progress_hold_summary = summarize_progress_hold(
+        np.asarray(progress_samples, dtype=np.float64)
+    )
     return {
         "case": plan.case,
         "planning_strategy": plan.planning_strategy,
@@ -1370,6 +1402,8 @@ def evaluate_case(
         "wall_duration_s": completed_steps / POLICY_HZ,
         "progress_scale_min": float(np.min(progress_samples)),
         "progress_scale_mean": float(np.mean(progress_samples)),
+        "minimum_progress_scale": tracking_cfg.minimum_progress_scale,
+        **progress_hold_summary,
         "camera_recovery_governor_enabled": (
             args.enable_camera_error_recovery_governor
         ),
@@ -1639,12 +1673,16 @@ def main() -> int:
         "ppo_authorized": False,
         "controller_profile": "structural_robust_v1",
         "tracking_profile": (
-            "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
-            if args.enable_camera_error_recovery_governor
+            "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
+            if args.tracking_minimum_progress_scale == 0.0
             else (
-                "riser_recovery_direction_v4_camera_lever_arm_v1"
-                if args.enable_camera_lever_arm_compensation
-                else "riser_recovery_direction_v4"
+                "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
+                if args.enable_camera_error_recovery_governor
+                else (
+                    "riser_recovery_direction_v4_camera_lever_arm_v1"
+                    if args.enable_camera_lever_arm_compensation
+                    else "riser_recovery_direction_v4"
+                )
             )
         ),
         "camera_lever_arm_compensation_contract": (
@@ -1684,6 +1722,7 @@ def main() -> int:
                 "along_track_kp": args.tracking_along_kp,
                 "cross_track_kp": args.tracking_cross_kp,
                 "yaw_kp": args.tracking_yaw_kp,
+                "minimum_progress_scale": args.tracking_minimum_progress_scale,
             }.items()
             if value is not None
         },
@@ -1696,6 +1735,12 @@ def main() -> int:
             else "implicit_position_drive_diagnostic"
         ),
         "phase_governor_enabled": not args.disable_phase_governor,
+        "phase_governor_contract": "position_error_continuous_phase_scale_v1",
+        "minimum_progress_scale": (
+            args.tracking_minimum_progress_scale
+            if args.tracking_minimum_progress_scale is not None
+            else riser_tracking_config().minimum_progress_scale
+        ),
         "camera_recovery_governor_enabled": (
             args.enable_camera_error_recovery_governor
         ),
@@ -1778,12 +1823,16 @@ def write_runtime_failure(exc: Exception) -> None:
         "training_started": False,
         "ppo_authorized": False,
         "tracking_profile": (
-            "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
-            if args.enable_camera_error_recovery_governor
+            "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
+            if args.tracking_minimum_progress_scale == 0.0
             else (
-                "riser_recovery_direction_v4_camera_lever_arm_v1"
-                if args.enable_camera_lever_arm_compensation
-                else "riser_recovery_direction_v4"
+                "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
+                if args.enable_camera_error_recovery_governor
+                else (
+                    "riser_recovery_direction_v4_camera_lever_arm_v1"
+                    if args.enable_camera_lever_arm_compensation
+                    else "riser_recovery_direction_v4"
+                )
             )
         ),
         "trajectory_command_source": "deterministic_teacher",

@@ -18,6 +18,7 @@ from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     nearest_equivalent_angle,
     riser_tracking_config,
     slew_limited_arm_target,
+    summarize_progress_hold,
     yaw_from_quaternion_wxyz,
 )
 
@@ -150,6 +151,44 @@ def test_progress_governor_slows_on_tracking_error() -> None:
     np.testing.assert_allclose(bounded_progress_scale(0.25, 0.0, config), 0.1)
     middle = bounded_progress_scale(0.15, 0.0, config)
     assert 0.1 < middle < 1.0
+
+
+def test_progress_governor_can_hold_only_when_explicitly_configured() -> None:
+    default = riser_tracking_config()
+    hold = riser_tracking_config(minimum_progress_scale=0.0)
+
+    assert bounded_progress_scale(0.25, 0.0, default) == pytest.approx(0.1)
+    assert bounded_progress_scale(0.25, 0.0, hold) == 0.0
+    assert bounded_progress_scale(0.15, 0.0, hold) == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize("minimum", [-0.01, 1.01])
+def test_progress_governor_rejects_invalid_minimum(minimum: float) -> None:
+    with pytest.raises(ValueError, match="invalid progress governor"):
+        bounded_progress_scale(
+            0.25,
+            0.0,
+            riser_tracking_config(minimum_progress_scale=minimum),
+        )
+
+
+def test_progress_hold_summary_counts_bounded_segments() -> None:
+    summary = summarize_progress_hold(
+        np.array([1.0, 0.5, 0.0, 0.0, 0.2, 0.0, 1.0])
+    )
+
+    assert summary["progress_hold_step_count"] == 3
+    assert summary["progress_hold_ratio"] == pytest.approx(3.0 / 7.0)
+    assert summary["progress_hold_segment_count"] == 2
+
+
+@pytest.mark.parametrize(
+    "values",
+    [np.array([]), np.array([0.0, np.nan]), np.array([-0.1]), np.array([1.1])],
+)
+def test_progress_hold_summary_rejects_invalid_evidence(values: np.ndarray) -> None:
+    with pytest.raises(ValueError, match="progress scales"):
+        summarize_progress_hold(values)
 
 
 def test_camera_recovery_governor_is_continuous_bounded_and_saturation_gated() -> None:

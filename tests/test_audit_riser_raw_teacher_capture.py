@@ -84,7 +84,6 @@ def _fixture(tmp_path: Path, *, applied_residual: bool = False) -> list[str]:
         "dynamic_quality_passed": True,
         "thermal_admission_passed": True,
         "controller_evidence_passed": True,
-        "completed_reference": True,
         "completed_steps": count,
         "source_duration_s": 1.0,
         "execution_duration_s": 1.5,
@@ -94,6 +93,7 @@ def _fixture(tmp_path: Path, *, applied_residual: bool = False) -> list[str]:
         "residual_action_abs_max": [0.1, 0.0, 0.0] if applied_residual else [0, 0, 0],
         "executed_residual_dataset": None,
         "executed_raw_teacher_capture": str(raw_case.resolve()),
+        "checks": {"completed_reference": True},
     }
     gate.write_text(
         json.dumps(

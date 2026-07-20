@@ -147,7 +147,8 @@ def main() -> int:
         "controller_evidence_passed": gate.get("controller_evidence_passed") is True
         and result.get("controller_evidence_passed") is True,
         "no_termination": result.get("termination") is None,
-        "reference_completed": result.get("completed_reference") is True,
+        "reference_completed": result.get("checks", {}).get("completed_reference")
+        is True,
         "both_clocks_present": result.get("source_duration_s") is not None
         and result.get("execution_duration_s") is not None,
         "row_count_matches_steps": len(observations) == result.get("completed_steps"),

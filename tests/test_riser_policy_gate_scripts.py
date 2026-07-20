@@ -873,6 +873,7 @@ def test_raw_teacher_canary_is_one_case_scale_independent_and_guarded() -> None:
     assert "--cases 2" in source
     assert "--minimum-candidates 70" in source
     assert "--raw-teacher-dir" in source
+    assert '"$PY" -X utf8 "$AUDITOR_WIN"' in source
     assert "--dataset-dir" not in source
     assert "--residual-policy" not in source
     assert '"raw_teacher_capture_authorized": True' in source

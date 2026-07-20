@@ -36,6 +36,7 @@ PORTFOLIO="$ROOT/artifacts/two_wheel_riser/$PORTFOLIO_STAMP"
 PORTFOLIO_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${PORTFOLIO_STAMP}"
 SOURCE_MANIFEST="/mnt/g/wSpace/cinebotRL/data/gikWBC9DOF_exact_source_reference_all79_20260717/manifest.json"
 SELECTION="$ROOT/artifacts/two_wheel_riser/20260720_initial_teacher42_selection_v1/selection.json"
+SELECTION_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\20260720_initial_teacher42_selection_v1\\selection.json"
 OUTPUT="$ROOT/artifacts/two_wheel_riser/$STAMP"
 OUTPUT_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${STAMP}"
 PLAN="$PORTFOLIO/case_0002_smoothed_riser_plan_v1.npz"
@@ -46,6 +47,7 @@ VALIDATOR="$ROOT/scripts/two_wheel_balance/validate_riser_smoothed_gate_c_canary
 PLAYBACK="$ROOT/scripts/two_wheel_balance/smoke_riser_reference_playback.py"
 PLAYBACK_WIN="${WIN_ROOT}\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 AUDITOR="$ROOT/scripts/two_wheel_balance/audit_riser_raw_teacher_capture.py"
+AUDITOR_WIN="${WIN_ROOT}\\scripts\\two_wheel_balance\\audit_riser_raw_teacher_capture.py"
 RUNNER="$ROOT/scripts/two_wheel_balance/run_riser_raw_teacher_canary_case2.sh"
 DATASET_MODULE="$ROOT/src/rl_platform/tasks/two_wheel_balance/riser_residual_dataset.py"
 TRACKING="$ROOT/src/rl_platform/tasks/two_wheel_balance/whole_body_tracking.py"
@@ -196,9 +198,12 @@ AUDIT_STATUS=6
 RAW_CASE="$OUTPUT/raw_cases/case_0002_executed_raw_teacher_v1.npz"
 if [[ "$STATUS" == 0 && -s "$OUTPUT/gates/case_0002.json" && -s "$RAW_CASE" ]]; then
   AUDIT_STATUS=0
-  python3 "$AUDITOR" --gate "$OUTPUT/gates/case_0002.json" \
-    --admission "$OUTPUT/admission.json" --raw-case "$RAW_CASE" \
-    --selection "$SELECTION" --case 2 --output "$OUTPUT/raw_capture_audit.json" \
+  "$PY" -X utf8 "$AUDITOR_WIN" \
+    --gate "${OUTPUT_WIN}\\gates\\case_0002.json" \
+    --admission "${OUTPUT_WIN}\\admission.json" \
+    --raw-case "${OUTPUT_WIN}\\raw_cases\\case_0002_executed_raw_teacher_v1.npz" \
+    --selection "$SELECTION_WIN" --case 2 \
+    --output "${OUTPUT_WIN}\\raw_capture_audit.json" \
     >"$OUTPUT/logs/raw_capture_audit.log" 2>&1 || AUDIT_STATUS=$?
 fi
 

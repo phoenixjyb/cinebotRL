@@ -430,6 +430,80 @@ def _enable_commanded_base_progress_error_admission(
     path.write_text(json.dumps(payload))
 
 
+def _enable_opposing_vx_integral_reset_contract(path: Path) -> None:
+    _enable_commanded_base_progress_error_contract(path)
+    payload = json.loads(path.read_text())
+    payload.update(
+        {
+            "opposing_vx_integral_deficit_reset_enabled": True,
+            "vx_integral_reset_reference_deadband_mps": 0.05,
+            "controller_overrides": {
+                "wz_kp": 1.05,
+                "limit_total_pitch_reference": True,
+                "reset_opposing_vx_integral_on_directional_deficit": True,
+                "vx_integral_reset_reference_deadband_mps": 0.05,
+            },
+        }
+    )
+    result = payload["results"][0]
+    result.update(
+        {
+            "opposing_vx_integral_deficit_reset_enabled": True,
+            "vx_integral_reset_reference_deadband_mps": 0.05,
+            "longitudinal_authority_telemetry_observed": True,
+            "longitudinal_authority_telemetry": {
+                "schema": "riser_longitudinal_authority_policy_rate_v1",
+                "policy_rate_sample_count": 10,
+                "controller_update_count": 3,
+                "held_controller_command_step_count": 7,
+                "reference_sign_change_count": 2,
+                "opposing_integral_sign_change_count": 1,
+                "integral_reset_count": 2,
+                "velocity_deficit_step_count": 4,
+                "total_pitch_limit_step_count": 1,
+                "velocity_deficit_ratio": 0.4,
+                "velocity_deficit_mean_mps": 0.05,
+                "velocity_deficit_abs_max_mps": 0.08,
+                "deficit_pitch_contribution_mean": 0.1,
+                "deficit_pitch_rate_contribution_mean": -0.2,
+                "deficit_wheel_velocity_contribution_mean": -0.001,
+                "vx_integral_before_abs_max": 0.3,
+                "vx_integral_after_abs_max": 0.2,
+                "pitch_abs_max_rad": 0.08,
+                "pitch_rate_abs_max_rad_s": 0.3,
+                "total_pitch_reference_abs_max_rad": math.radians(6.0),
+                "common_action_abs_max": 0.5,
+                "reference_deadband_mps": 0.05,
+                "deficit_tolerance_mps": 0.03,
+            },
+        }
+    )
+    result["checks"]["longitudinal_authority_telemetry_observed"] = True
+    path.write_text(json.dumps(payload))
+
+
+def _enable_opposing_vx_integral_reset_admission(
+    path: Path,
+    commit: str,
+) -> None:
+    _enable_commanded_base_progress_error_admission(path, commit)
+    payload = json.loads(path.read_text())
+    payload.update(
+        {
+            "opposing_vx_integral_deficit_reset_required": True,
+            "vx_integral_reset_reference_deadband_mps": 0.05,
+            "longitudinal_authority_telemetry_schema": (
+                "riser_longitudinal_authority_policy_rate_v1"
+            ),
+            "reviewed_controller_parent_commit": (
+                "35f775c39ed2d0c22b52be5dd8f9641354ee0b8f"
+            ),
+            "reviewed_controller_parent_is_ancestor": True,
+        }
+    )
+    path.write_text(json.dumps(payload))
+
+
 def _enable_initialization_preroll_evidence(path: Path) -> None:
     payload = json.loads(path.read_text())
     result = payload["results"][0]
@@ -847,6 +921,95 @@ def test_summary_requires_commanded_base_progress_error_evidence(
     summary = json.loads(output.read_text())
     assert not summary["runtime_contract_passed"]
     assert summary["commanded_base_progress_error_evidence_passed"] is False
+
+
+def test_summary_requires_opposing_vx_integral_reset_evidence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    admission = tmp_path / "admission.json"
+    _admission(admission, commit, tmp_path.name)
+    _enable_opposing_vx_integral_reset_admission(admission, commit)
+    gate = tmp_path / "gates/case_0042.json"
+    _gate(gate, 42, True)
+    _enable_opposing_vx_integral_reset_contract(gate)
+    output = tmp_path / "summary.json"
+    profile = (
+        "riser_recovery_direction_v4_camera_lever_arm_"
+        "zero_progress_hold_velocity_cap_total_pitch_limit_v1"
+    )
+    command = [
+        sys.executable,
+        str(SCRIPT),
+        "--root",
+        str(tmp_path),
+        "--git-commit",
+        commit,
+        "--cases",
+        "42",
+        "--expected-tracking-profile",
+        profile,
+        "--require-camera-lever-arm-compensation",
+        "--require-zero-progress-hold",
+        "--require-recovery-velocity-cap",
+        "--expected-maximum-linear-velocity-mps",
+        "0.2",
+        "--require-total-pitch-reference-limit",
+        "--require-commanded-base-progress-error",
+        "--require-opposing-vx-integral-deficit-reset",
+        "--expected-vx-integral-reset-reference-deadband-mps",
+        "0.05",
+        "--output",
+        str(output),
+    ]
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    row = summary["gate_rows"][0]
+    assert summary["passed"]
+    assert summary["opposing_vx_integral_deficit_reset_required"] is True
+    assert summary["longitudinal_authority_evidence_passed"] is True
+    assert row["longitudinal_authority_evidence_passed"] is True
+    assert row["longitudinal_authority_telemetry"]["integral_reset_count"] == 2
+
+    payload = json.loads(gate.read_text())
+    payload["results"][0]["longitudinal_authority_telemetry"][
+        "integral_reset_count"
+    ] = 0
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert summary["longitudinal_authority_evidence_passed"] is False
+
+    _enable_opposing_vx_integral_reset_contract(gate)
+    payload = json.loads(gate.read_text())
+    payload["results"][0]["longitudinal_authority_telemetry"][
+        "held_controller_command_step_count"
+    ] = 6
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert summary["longitudinal_authority_evidence_passed"] is False
+
+    _enable_opposing_vx_integral_reset_contract(gate)
+    payload = json.loads(gate.read_text())
+    del payload["results"][0]["longitudinal_authority_telemetry"]
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert summary["longitudinal_authority_evidence_passed"] is False
+
+    _enable_opposing_vx_integral_reset_contract(gate)
+    admission_payload = json.loads(admission.read_text())
+    admission_payload["reviewed_controller_parent_commit"] = "f" * 40
+    admission.write_text(json.dumps(admission_payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert not summary["zero_progress_hold_admission_passed"]
+    assert not summary["runtime_contract_passed"]
 
 
 def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path) -> None:

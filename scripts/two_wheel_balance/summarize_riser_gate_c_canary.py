@@ -45,6 +45,12 @@ CAMERA_ERROR_GOVERNOR_CONTRACT = (
 EXPECTED_RECOVERY_ERROR_RANGE_M = [0.2, 0.4]
 EXPECTED_RISER_THERMAL_FORCE_CONTRACT = "leadshine_400w_first_order_monitor_v1"
 EXPECTED_RECOVERY_TELEMETRY_SCHEMA = "riser_recovery_direction_policy_rate_v1"
+EXPECTED_LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA = (
+    "riser_longitudinal_authority_policy_rate_v1"
+)
+REVIEWED_OPPOSING_VX_INTEGRAL_RESET_PARENT_COMMIT = (
+    "35f775c39ed2d0c22b52be5dd8f9641354ee0b8f"
+)
 REQUIRED_CONTRACT_IDENTITIES = {
     "source_manifest",
     "portfolio_manifest",
@@ -217,6 +223,91 @@ def commanded_base_progress_error_passed(
     )
 
 
+def longitudinal_authority_telemetry_passed(
+    payload: dict[str, object],
+    result: dict[str, object],
+    *,
+    expected_deadband_mps: float,
+) -> bool:
+    telemetry = result.get("longitudinal_authority_telemetry")
+    if not isinstance(telemetry, dict):
+        return False
+    integer_fields = (
+        "policy_rate_sample_count",
+        "controller_update_count",
+        "held_controller_command_step_count",
+        "reference_sign_change_count",
+        "opposing_integral_sign_change_count",
+        "integral_reset_count",
+        "velocity_deficit_step_count",
+        "total_pitch_limit_step_count",
+    )
+    numeric_fields = (
+        "velocity_deficit_ratio",
+        "velocity_deficit_mean_mps",
+        "velocity_deficit_abs_max_mps",
+        "deficit_pitch_contribution_mean",
+        "deficit_pitch_rate_contribution_mean",
+        "deficit_wheel_velocity_contribution_mean",
+        "vx_integral_before_abs_max",
+        "vx_integral_after_abs_max",
+        "pitch_abs_max_rad",
+        "pitch_rate_abs_max_rad_s",
+        "total_pitch_reference_abs_max_rad",
+        "common_action_abs_max",
+        "reference_deadband_mps",
+        "deficit_tolerance_mps",
+    )
+    if not all(
+        isinstance(telemetry.get(name), int) and telemetry[name] >= 0
+        for name in integer_fields
+    ):
+        return False
+    if not all(
+        isinstance(telemetry.get(name), (int, float))
+        and math.isfinite(telemetry[name])
+        for name in numeric_fields
+    ):
+        return False
+    samples = telemetry["policy_rate_sample_count"]
+    updates = telemetry["controller_update_count"]
+    return bool(
+        payload.get("opposing_vx_integral_deficit_reset_enabled") is True
+        and payload.get("vx_integral_reset_reference_deadband_mps")
+        == expected_deadband_mps
+        and result.get("opposing_vx_integral_deficit_reset_enabled") is True
+        and result.get("vx_integral_reset_reference_deadband_mps")
+        == expected_deadband_mps
+        and result.get("longitudinal_authority_telemetry_observed") is True
+        and result.get("checks", {}).get(
+            "longitudinal_authority_telemetry_observed"
+        )
+        is True
+        and telemetry.get("schema")
+        == EXPECTED_LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA
+        and samples == result.get("completed_steps")
+        and 0 < updates <= samples
+        and telemetry["held_controller_command_step_count"] == samples - updates
+        and telemetry["reference_sign_change_count"] <= updates
+        and telemetry["opposing_integral_sign_change_count"]
+        <= telemetry["reference_sign_change_count"]
+        and 0 < telemetry["integral_reset_count"] <= updates
+        and telemetry["velocity_deficit_step_count"] <= samples
+        and telemetry["total_pitch_limit_step_count"] <= samples
+        and telemetry["reference_deadband_mps"] == expected_deadband_mps
+        and telemetry["deficit_tolerance_mps"] > 0.0
+        and 0.0 <= telemetry["velocity_deficit_ratio"] <= 1.0
+        and telemetry["velocity_deficit_mean_mps"] >= 0.0
+        and telemetry["velocity_deficit_abs_max_mps"] >= 0.0
+        and telemetry["vx_integral_before_abs_max"] >= 0.0
+        and telemetry["vx_integral_after_abs_max"] >= 0.0
+        and telemetry["pitch_abs_max_rad"] >= 0.0
+        and telemetry["pitch_rate_abs_max_rad_s"] >= 0.0
+        and telemetry["total_pitch_reference_abs_max_rad"] >= 0.0
+        and telemetry["common_action_abs_max"] >= 0.0
+    )
+
+
 def camera_error_governor_telemetry_passed(
     payload: dict[str, object],
     result: dict[str, object],
@@ -355,6 +446,8 @@ def total_pitch_reference_limit_passed(
     result: dict[str, object],
     *,
     required: bool,
+    require_opposing_vx_integral_deficit_reset: bool = False,
+    expected_vx_integral_reset_deadband_mps: float = 0.05,
 ) -> bool:
     if not required:
         return True
@@ -363,6 +456,19 @@ def total_pitch_reference_limit_passed(
         return False
     total_max = telemetry.get("total_pitch_reference_abs_max_rad")
     velocity_offset_max = telemetry.get("pitch_reference_abs_max_rad")
+    expected_controller_overrides: dict[str, object] = {
+        "wz_kp": 1.05,
+        "limit_total_pitch_reference": True,
+    }
+    if require_opposing_vx_integral_deficit_reset:
+        expected_controller_overrides.update(
+            {
+                "reset_opposing_vx_integral_on_directional_deficit": True,
+                "vx_integral_reset_reference_deadband_mps": (
+                    expected_vx_integral_reset_deadband_mps
+                ),
+            }
+        )
     return bool(
         payload.get("total_pitch_reference_limit_enabled") is True
         and payload.get("total_pitch_reference_limit_rad")
@@ -370,8 +476,7 @@ def total_pitch_reference_limit_passed(
         and result.get("total_pitch_reference_limit_enabled") is True
         and result.get("total_pitch_reference_limit_rad")
         == EXPECTED_TOTAL_PITCH_REFERENCE_LIMIT_RAD
-        and payload.get("controller_overrides")
-        == {"wz_kp": 1.05, "limit_total_pitch_reference": True}
+        and payload.get("controller_overrides") == expected_controller_overrides
         and isinstance(total_max, (int, float))
         and math.isfinite(total_max)
         and EXPECTED_TOTAL_PITCH_REFERENCE_LIMIT_RAD - 1e-9
@@ -412,6 +517,14 @@ def main() -> int:
     parser.add_argument("--require-total-pitch-reference-limit", action="store_true")
     parser.add_argument(
         "--require-commanded-base-progress-error", action="store_true"
+    )
+    parser.add_argument(
+        "--require-opposing-vx-integral-deficit-reset", action="store_true"
+    )
+    parser.add_argument(
+        "--expected-vx-integral-reset-reference-deadband-mps",
+        type=float,
+        default=0.05,
     )
     parser.add_argument(
         "--expected-maximum-linear-velocity-mps", type=float, default=0.2
@@ -490,6 +603,18 @@ def main() -> int:
         parser.error(
             "commanded-base progress error requires lever compensation and zero-progress hold"
         )
+    if args.require_opposing_vx_integral_deficit_reset and (
+        not args.require_commanded_base_progress_error
+        or not args.require_total_pitch_reference_limit
+        or not math.isfinite(
+            args.expected_vx_integral_reset_reference_deadband_mps
+        )
+        or args.expected_vx_integral_reset_reference_deadband_mps <= 0.0
+    ):
+        parser.error(
+            "opposing PI-memory reset requires commanded-base progress, the "
+            "total-pitch limit, and a positive finite reference deadband"
+        )
     expected_phase_governor_contract = (
         COMMANDED_BASE_PHASE_GOVERNOR_CONTRACT
         if args.require_commanded_base_progress_error
@@ -547,6 +672,29 @@ def main() -> int:
                     "maximum_commanded_base_progress_error_delta_m"
                 )
                 == args.expected_maximum_camera_lever_arm_correction_m
+            )
+        )
+        and (
+            not args.require_opposing_vx_integral_deficit_reset
+            or (
+                admission_payload.get(
+                    "opposing_vx_integral_deficit_reset_required"
+                )
+                is True
+                and admission_payload.get(
+                    "vx_integral_reset_reference_deadband_mps"
+                )
+                == args.expected_vx_integral_reset_reference_deadband_mps
+                and admission_payload.get(
+                    "longitudinal_authority_telemetry_schema"
+                )
+                == EXPECTED_LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA
+                and admission_payload.get("reviewed_controller_parent_commit")
+                == REVIEWED_OPPOSING_VX_INTEGRAL_RESET_PARENT_COMMIT
+                and admission_payload.get(
+                    "reviewed_controller_parent_is_ancestor"
+                )
+                is True
             )
         )
         and admission_payload.get("minimum_progress_scale") == 0.0
@@ -640,6 +788,16 @@ def main() -> int:
                 ),
             )
         )
+        longitudinal_authority_evidence_passed = (
+            not args.require_opposing_vx_integral_deficit_reset
+            or longitudinal_authority_telemetry_passed(
+                payload,
+                result,
+                expected_deadband_mps=(
+                    args.expected_vx_integral_reset_reference_deadband_mps
+                ),
+            )
+        )
         initialization_duration_s = float(
             result.get("initialization_duration_s", 0.0)
         )
@@ -711,6 +869,12 @@ def main() -> int:
                 payload,
                 result,
                 required=args.require_total_pitch_reference_limit,
+                require_opposing_vx_integral_deficit_reset=(
+                    args.require_opposing_vx_integral_deficit_reset
+                ),
+                expected_vx_integral_reset_deadband_mps=(
+                    args.expected_vx_integral_reset_reference_deadband_mps
+                ),
             )
         )
         runtime_contract_passed = (
@@ -733,6 +897,7 @@ def main() -> int:
             and camera_lever_arm_evidence_passed
             and camera_error_governor_evidence_passed
             and commanded_base_progress_error_evidence_passed
+            and longitudinal_authority_evidence_passed
             and initialization_evidence_passed
             and velocity_feedback_evidence_passed
             and zero_progress_hold_evidence_passed
@@ -756,6 +921,7 @@ def main() -> int:
                 and velocity_feedback_evidence_passed
                 and zero_progress_hold_evidence_passed
                 and commanded_base_progress_error_evidence_passed
+                and longitudinal_authority_evidence_passed
                 if args.require_camera_lever_arm_compensation
                 else result.get("controller_evidence_passed")
             ),
@@ -767,6 +933,11 @@ def main() -> int:
             "commanded_base_progress_error_evidence_passed": (
                 commanded_base_progress_error_evidence_passed
                 if args.require_commanded_base_progress_error
+                else None
+            ),
+            "longitudinal_authority_evidence_passed": (
+                longitudinal_authority_evidence_passed
+                if args.require_opposing_vx_integral_deficit_reset
                 else None
             ),
             "initialization_evidence_passed": initialization_evidence_passed,
@@ -855,6 +1026,18 @@ def main() -> int:
             ),
             "velocity_feedback_telemetry_observed": result.get(
                 "velocity_feedback_telemetry_observed"
+            ),
+            "longitudinal_authority_telemetry": result.get(
+                "longitudinal_authority_telemetry"
+            ),
+            "longitudinal_authority_telemetry_observed": result.get(
+                "longitudinal_authority_telemetry_observed"
+            ),
+            "opposing_vx_integral_deficit_reset_enabled": result.get(
+                "opposing_vx_integral_deficit_reset_enabled"
+            ),
+            "vx_integral_reset_reference_deadband_mps": result.get(
+                "vx_integral_reset_reference_deadband_mps"
             ),
             "outer_velocity_feedback_source": result.get(
                 "outer_velocity_feedback_source"
@@ -997,6 +1180,19 @@ def main() -> int:
         "commanded_base_progress_error_required": (
             args.require_commanded_base_progress_error
         ),
+        "opposing_vx_integral_deficit_reset_required": (
+            args.require_opposing_vx_integral_deficit_reset
+        ),
+        "expected_vx_integral_reset_reference_deadband_mps": (
+            args.expected_vx_integral_reset_reference_deadband_mps
+            if args.require_opposing_vx_integral_deficit_reset
+            else None
+        ),
+        "expected_longitudinal_authority_telemetry_schema": (
+            EXPECTED_LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA
+            if args.require_opposing_vx_integral_deficit_reset
+            else None
+        ),
         "zero_progress_hold_admission_passed": (
             zero_progress_hold_admission_passed
         ),
@@ -1018,6 +1214,16 @@ def main() -> int:
                 for row in gate_rows
             )
             if args.require_commanded_base_progress_error
+            else None
+        ),
+        "longitudinal_authority_evidence_passed": (
+            bool(gate_rows)
+            and len(gate_rows) == len(requested)
+            and all(
+                row["longitudinal_authority_evidence_passed"] is True
+                for row in gate_rows
+            )
+            if args.require_opposing_vx_integral_deficit_reset
             else None
         ),
         "expected_minimum_progress_scale": (

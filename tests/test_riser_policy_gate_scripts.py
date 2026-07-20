@@ -665,6 +665,29 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
         in source
     )
     assert '"commanded_base_progress_error_evidence_passed"' in source
+    assert (
+        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V20_ZERO_PROGRESS_HOLD_"
+        "CAP020_TOTAL_PITCH_COMMANDED_BASE_PROGRESS_OPPOSING_PI_RESET_V1"
+        in source
+    )
+    assert (
+        "20260720_gate_c_smoothed_case42_v20_zero_progress_hold_cap020_"
+        "total_pitch_commanded_base_progress_opposing_pi_reset_v1_exclusive"
+        in source
+    )
+    assert (
+        'REVIEWED_CONTROLLER_PARENT_COMMIT="'
+        '35f775c39ed2d0c22b52be5dd8f9641354ee0b8f"' in source
+    )
+    assert 'REQUIRE_OPPOSING_VX_INTEGRAL_DEFICIT_RESET=1' in source
+    assert 'VX_INTEGRAL_RESET_REFERENCE_DEADBAND_MPS="0.05"' in source
+    assert "--reset-opposing-vx-integral-on-directional-deficit" in source
+    assert "--require-opposing-vx-integral-deficit-reset" in source
+    assert 'result.get("longitudinal_authority_telemetry_observed") is True' in source
+    assert 'longitudinal_authority["integral_reset_count"]' in source
+    assert 'summary.get("longitudinal_authority_evidence_passed") is True' in source
+    assert "merge-base --is-ancestor" in source
+    assert 'payload["reviewed_controller_parent_is_ancestor"] = True' in source
     assert "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f" in source
     assert "WINDOWS_POWERSHELL=" in source
     assert "Get-CimInstance Win32_Process" in source

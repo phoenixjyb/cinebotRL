@@ -3725,3 +3725,44 @@ and must state whether its candidate was accepted or rejected.
   not authorize residual capture or learning; the raw residual envelope must be
   recomputed only after deterministic dynamic qualification, and BC/PPO remain
   separately gated.
+
+## Round 107: hash-bound opposing-PI-reset case-42 route
+
+- A fresh one-case authorization route now binds case 42 to the unchanged v20
+  source manifest, smoothed plan, initialization separation, `0.2 m/s`
+  deterministic velocity cap, exact-hold floor, symmetric `6 deg` total-pitch
+  limit, commanded-base phase governor, frozen gains, riser USD, and all
+  existing physical/quality gates. Its namespace is
+  `20260720_gate_c_smoothed_case42_v20_zero_progress_hold_cap020_total_pitch_commanded_base_progress_opposing_pi_reset_v1_exclusive`.
+- The route pins reviewed controller parent
+  `35f775c39ed2d0c22b52be5dd8f9641354ee0b8f`, requires it to exist and be an
+  ancestor of the eventual clean pushed runtime commit, and seals runtime file
+  identities in admission evidence. Conflicting or missing authorization,
+  dirty tracked state, HEAD/upstream mismatch, reused namespace, identity
+  mismatch, or occupied WSL/Windows/NVIDIA ownership fails before Isaac.
+- Runtime evidence now independently requires the default-off candidate to be
+  enabled at the exact `0.05 m/s` deadband and records the longitudinal
+  authority schema, policy-rate and controller-update counts, held-command
+  count, sign changes, reset count, velocity-deficit metrics, PI magnitude,
+  LQR contribution aggregates, total-pitch-limit occupancy, and common-action
+  magnitude. At least one reset must be observed for candidate exercise; no
+  reset, absent/non-finite telemetry, forged parent, or inconsistent counts
+  reject the runtime contract without changing physical dynamic classification.
+- Healthy, missing/zero-reset, non-finite, inconsistent-count, and forged-parent
+  paths are fail-closed. Focused wrapper, summarizer, controller, telemetry, and
+  playback tests pass `108/108`; shell syntax, Python compilation, and
+  `git diff --check` pass. The diff contains no source, plan, gain, robot-asset,
+  gate-threshold, controller-command, residual-policy, capture, BC, or PPO
+  change.
+
+## Next round after Round 107
+
+- Commit, push, transfer, and run the complete authoritative `.98` CPU suite.
+  Only if HEAD equals upstream, the namespace is absent, and WSL, Windows, and
+  NVIDIA ownership are empty may the new authorization token be used once.
+- Run case 42 only and stop after the first result with no retry. Audit dynamic
+  completion separately from longitudinal-authority telemetry and the
+  residual-label envelope. Keep residual action unapplied and write no dataset.
+- If physical dynamics fail, preserve and seal the first reject and return to
+  CPU diagnosis. If they pass, stop before capture and recompute the raw
+  residual envelope as a separate next stage; BC/PPO remain closed.

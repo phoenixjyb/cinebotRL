@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 from pathlib import Path
 import sys
 
@@ -67,3 +68,80 @@ def test_portfolio_composer_admits_preroll_replacement_schema() -> None:
     assert '"parent_plan_sha256": args.expected_parent_plan_sha256' in derivation
     assert '"item": replacement_item' in derivation
     assert '"source_manifest_sha256"' in derivation
+
+
+def _load_composer():
+    script = (
+        ROOT
+        / "scripts/two_wheel_balance/compose_riser_smoothed_plan_portfolio.py"
+    )
+    spec = importlib.util.spec_from_file_location("preroll_composer", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def healthy_replacement_contract() -> tuple[dict[str, object], dict[str, object]]:
+    checks = {
+        "parent_initialization_was_empty": True,
+        "initialization_separate_clock": True,
+        "initialization_unscored": True,
+        "initialization_kinematic_gate_passed": True,
+    }
+    item = {
+        "checks": checks,
+        "initialization_preroll": {
+            "source_clock_advanced": False,
+            "execution_clock_advanced": False,
+            "scored_as_source_tracking": False,
+        },
+    }
+    replacement = {
+        "schema": "cinebotrl_two_wheel_riser_initialization_preroll_derivation_v1",
+        "source_and_scored_arrays_immutable": {"source_time_s": True},
+        "source_clock_advanced": False,
+        "execution_clock_advanced": False,
+        "initialization_metrics": {
+            "duration_s": 2.0,
+            "sample_count": 401,
+            "checks": {"state_finite": True},
+        },
+    }
+    return replacement, item
+
+
+def test_composer_accepts_isolated_preroll_contract() -> None:
+    replacement, item = healthy_replacement_contract()
+    _load_composer()._validate_initialization_replacement(replacement, item)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda payload, item: payload.update(source_clock_advanced=True), "scored clock"),
+        (
+            lambda payload, item: payload["source_and_scored_arrays_immutable"].update(
+                source_time_s=False
+            ),
+            "mutated source",
+        ),
+        (
+            lambda payload, item: item["checks"].update(
+                initialization_separate_empty=True
+            ),
+            "stale or incomplete",
+        ),
+        (
+            lambda payload, item: item["initialization_preroll"].update(
+                scored_as_source_tracking=True
+            ),
+            "not isolated",
+        ),
+    ],
+)
+def test_composer_rejects_invalid_preroll_contract(mutation, message: str) -> None:
+    replacement, item = healthy_replacement_contract()
+    mutation(replacement, item)
+    with pytest.raises(ValueError, match=message):
+        _load_composer()._validate_initialization_replacement(replacement, item)

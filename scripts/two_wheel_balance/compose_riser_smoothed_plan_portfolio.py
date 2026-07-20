@@ -73,6 +73,56 @@ def _load_hash_bound(path: Path, expected_sha256: str) -> dict[str, object]:
     return payload
 
 
+def _validate_initialization_replacement(
+    replacement: dict[str, object], replacement_item: dict[str, object]
+) -> None:
+    if replacement.get("schema") != (
+        "cinebotrl_two_wheel_riser_initialization_preroll_derivation_v1"
+    ):
+        return
+    immutable = replacement.get("source_and_scored_arrays_immutable")
+    _require(
+        isinstance(immutable, dict)
+        and bool(immutable)
+        and all(value is True for value in immutable.values()),
+        "initialization replacement mutated source or scored arrays",
+    )
+    _require(
+        replacement.get("source_clock_advanced") is False
+        and replacement.get("execution_clock_advanced") is False,
+        "initialization replacement advanced a scored clock",
+    )
+    metrics = replacement.get("initialization_metrics")
+    metric_checks = metrics.get("checks") if isinstance(metrics, dict) else None
+    _require(
+        isinstance(metrics, dict)
+        and float(metrics.get("duration_s", 0.0)) > 0.0
+        and int(metrics.get("sample_count", 0)) >= 2
+        and isinstance(metric_checks, dict)
+        and bool(metric_checks)
+        and all(value is True for value in metric_checks.values()),
+        "initialization replacement failed its kinematic contract",
+    )
+    preroll = replacement_item.get("initialization_preroll")
+    _require(
+        isinstance(preroll, dict)
+        and preroll.get("source_clock_advanced") is False
+        and preroll.get("execution_clock_advanced") is False
+        and preroll.get("scored_as_source_tracking") is False,
+        "initialization replacement is not isolated from scored execution",
+    )
+    checks = replacement_item.get("checks")
+    _require(
+        isinstance(checks, dict)
+        and "initialization_separate_empty" not in checks
+        and checks.get("parent_initialization_was_empty") is True
+        and checks.get("initialization_separate_clock") is True
+        and checks.get("initialization_unscored") is True
+        and checks.get("initialization_kinematic_gate_passed") is True,
+        "initialization replacement has stale or incomplete admission checks",
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--parent-manifest", type=Path, required=True)
@@ -125,6 +175,7 @@ def main() -> int:
     )
     replacement_item = replacement.get("item")
     _require(isinstance(replacement_item, dict), "replacement item is missing")
+    _validate_initialization_replacement(replacement, replacement_item)
     replacement_case = replacement_item.get("case")
     _require(
         isinstance(replacement_case, int) and replacement_case in expected_cases,

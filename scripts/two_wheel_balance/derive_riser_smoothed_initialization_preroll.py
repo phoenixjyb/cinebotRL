@@ -238,6 +238,20 @@ def derive(args: argparse.Namespace) -> dict[str, object]:
         }
     require(all(immutable.values()), "candidate mutated scored/source arrays")
     output_hash = sha256_file(output_plan)
+    replacement_checks = dict(parent_item.get("checks", {}))
+    parent_initialization_was_empty = bool(
+        replacement_checks.pop("initialization_separate_empty", False)
+    )
+    replacement_checks.update(
+        {
+            "parent_initialization_was_empty": parent_initialization_was_empty,
+            "initialization_separate_clock": True,
+            "initialization_unscored": True,
+            "initialization_kinematic_gate_passed": all(
+                metrics["checks"].values()
+            ),
+        }
+    )
     replacement_item = {
         **parent_item,
         "case": args.expected_case,
@@ -246,6 +260,7 @@ def derive(args: argparse.Namespace) -> dict[str, object]:
         "parent_plan_sha256": args.expected_parent_plan_sha256,
         "initialization_preroll": metadata["initialization_preroll"],
         "initialization_metrics": metrics,
+        "checks": replacement_checks,
         "passed": True,
         "timing_transition_kinematic_gate_passed": True,
         "valid_for_training": False,

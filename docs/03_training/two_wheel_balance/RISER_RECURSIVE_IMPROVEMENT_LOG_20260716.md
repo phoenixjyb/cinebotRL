@@ -3694,3 +3694,34 @@ and must state whether its candidate was accepted or rejected.
   limits. A future learned policy remains a bounded supervisory residual over
   model-based commands; case 43, residual capture, BC, PPO, training, and
   obstacle work remain closed.
+
+## Round 106: authoritative CPU qualification
+
+- Candidate commit `35f775c39ed2d0c22b52be5dd8f9641354ee0b8f` was
+  pushed to `codex/two-wheel-riser-rl` and transferred exactly to `.98` with
+  incremental bundle SHA-256
+  `b8a8874ea962d72b2174b28e8e883ba070230065738738441da72fd657520f0c`.
+  Local, GitHub, `.98` HEAD, and the `.98` upstream tracking ref agree.
+- The complete authoritative `.98` CPU suite passes `402/402` in `39.92 s`
+  (`42.84 s` measured command wall time), with only the two established
+  pytest configuration warnings. The focused Mac suite remains `65/65`.
+- The six pre-existing untracked evidence directories and the pre-sync archive
+  on `.98` remain untouched. WSL playback-process and NVIDIA compute-owner
+  checks are empty after validation. No runtime route, authorization token,
+  namespace, Isaac process, dataset, residual capture, BC, PPO, or training was
+  created.
+
+## Next round after Round 106
+
+- Stop for review of the default-off longitudinal PI-memory trigger and its
+  telemetry contract. The next runtime action, if separately authorized, is
+  exactly one fresh, hash-bound deterministic case-42 canary with the same
+  source, plan, clocks, gains, physical limits, and quality gates as Round 104.
+- Compare completion, position p95/max, reverse/forward transition lag,
+  integral-reset count, velocity-deficit duration, total-pitch-limit occupancy,
+  action saturation, thermal evidence, and all existing safety metrics. Stop
+  after the first result with no automatic retry.
+- A deterministic pass would qualify only this controller candidate. It would
+  not authorize residual capture or learning; the raw residual envelope must be
+  recomputed only after deterministic dynamic qualification, and BC/PPO remain
+  separately gated.

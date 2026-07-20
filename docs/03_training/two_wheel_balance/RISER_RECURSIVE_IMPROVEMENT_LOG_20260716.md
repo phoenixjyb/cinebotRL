@@ -2681,3 +2681,53 @@ and must state whether its candidate was accepted or rejected.
   route in `20260720_gate_c_smoothed_case36_v15_camera_lever_arm_v1_exclusive`
   with a `1500 s` wall bound. No controller, plan, threshold, or learning-stage
   change is authorized.
+
+## Round 78: default case-36 playback is a position-p95-only reject
+
+- Published the case-36 route at `0391190`; the authoritative `.98` suite
+  passed `341/341`. Both clocks completed at `15.694569/27.210186 s` in
+  `15362` steps with no termination. Position max passed at `0.210480 m`, but
+  p95 failed at `0.193973 m`; this was the only failed dynamic check.
+- Attitude p95/max passed at `0.134712/0.238552 deg`; pitch p95/max were
+  `6.563231/6.664334 deg`. Riser servo p95/max were
+  `0.011681/0.011932 m`, effort max was `22.072868 N`, and thermal-load max
+  was `0.001282`. Completion, attitude, balance, riser, thermal, controller,
+  IK, proxy-rate, saturation, and runtime gates all passed.
+- The residual-label envelope independently passed with raw maxima
+  `[0.131102,0.111716,0.012025]` and normalized maxima
+  `[0.437007,0.279289,0.120250]`; action remained zero and unapplied. No
+  dataset, capture, BC, PPO, or training started.
+- Evidence hashes: admission
+  `a1d2a95ab48ac26ca21c2f34e2b1255cb0199ab3e9b18a658f82fefbe24dbbc8`,
+  gate `a271fa32e494faa7f000025ca4d73410d497681e43ebb499da892168e989befe`,
+  log `148ad9d5174d25fcbcef61808a0c16bb0494690acf1da632cb0fcb69cfeb89fa`,
+  and summary
+  `51113c58b906e0ccd5b4fd893178f4bbdfb275ed5e84394c202b789805518344`.
+  The dynamic union remains `39/70`; case 37 is not started.
+
+## Round 79: bounded case-36 preview replacement restores static margin
+
+- The failed p95 window is localized to execution phase `15.90-17.88 s`.
+  Base XY error remains only `0.038-0.069 m`, while the physical camera
+  lever-arm mismatch reaches about `0.24 m` during reorientation and the
+  unchanged `0.05 m` correction cap saturates. This is a plan-allocation
+  margin problem, not a balance, attitude, riser, thermal, or rate failure.
+- A CPU-only grid over the unchanged parent smoothed geometry selected
+  lookahead `0.55 m` and heading gain `1.25`. The hash-bound derived plan
+  `d1e4da8ea73a26a8ac9f7b3d7063d2272569a7375f5ec8feed6e9a238a3c08ed`
+  preserves all `797` source anchors, exact source arrays, camera geometry,
+  endpoints, and source order. Source/execution clocks are
+  `15.694569/26.525347 s`; static position p95/max improve to
+  `0.111912/0.129099 m`. Every static gate passes without changing the
+  controller, gains, correction cap, or thresholds.
+- Compose v16 in
+  `20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu`.
+  Its manifest hash is
+  `8351514a361d3be4e5fbf57f2dbb019a7d8d2f5b86e89cea2553a1cfda3c64a1`;
+  it retains `70/79` CPU admissions and accepted-duration median `1.499904`.
+  The derivation manifest hash is
+  `46b2b1ca8e0ae24956390235ad764bd2152ffb864ee2f9568555b455e7e566d1`.
+  All artifacts remain invalid for training.
+- Prepare exactly one v16 case-36 retry in
+  `20260720_gate_c_smoothed_case36_v16_explicit_preview055_g125_v1_exclusive`
+  with the unchanged default runtime profile and `1500 s` wall bound.

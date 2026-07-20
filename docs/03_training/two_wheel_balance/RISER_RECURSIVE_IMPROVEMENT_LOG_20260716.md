@@ -3060,3 +3060,67 @@ and must state whether its candidate was accepted or rejected.
 - Do not add a GPU authorization token or runtime namespace until the runner
   contract and authoritative CPU suite pass. Case 43, residual capture, BC,
   PPO, and training remain closed.
+
+## Round 92: initialization playback and evidence contracts are implemented
+
+- Added initialization execution and evidence support at `be0e874`. The runner
+  executes the separate `2.0 s` pre-roll before source phase zero, retains the
+  LQR/controller state into scored execution, and excludes initialization from
+  source tracking metrics, residual-label observations, and datasets.
+- Initialization now has independent completion, terminal error, saturation,
+  effort, thermal, and sample-count evidence. Summary admission fails closed
+  if required initialization evidence is absent or if any source/residual
+  sample leaks into the pre-roll. Plans without initialization retain their
+  historical evidence contract.
+- Added composable replacement support at `83212c2`. The first composed v19
+  portfolio reached `70/79`, but audit found that its case-42 row inherited the
+  obsolete parent assertion `initialization_separate_empty=true`. V19 is
+  superseded and must not be used as runtime evidence even though its NPZ data
+  are valid and training remained closed.
+- Replaced that stale assertion at `5a66e3d` with explicit evidence that the
+  parent initialization was empty, the new initialization uses a separate
+  clock, remains unscored, and passes its kinematic gate. The composer now
+  rejects mutated source/scored arrays, advanced source/execution clocks,
+  malformed pre-roll metadata, failed initialization checks, and stale empty
+  assertions. Focused tests pass `9/9`; the authoritative `.98` suite passes
+  `360/360`.
+
+## Round 93: corrected case-42 pre-roll portfolio passes full CPU audit
+
+- Regenerated the corrected case-42 derivation in
+  `20260720_smoothed_plan_case42_v17_initialization_preroll2s_v3_cpu`.
+  The plan SHA remains
+  `ea2e54273c42efa3980eaa3ea9b161109702047467df131d4ad1d2604f063984`;
+  manifest and summary SHAs are
+  `44854a904f494014b44dfdc911d7bbfbf6406a542ba9600aa4c07a0e8f06b821`
+  and `03cdeeb8fb1cb3e536b6a04add31485ecf862319db86a8a2240e7a709a50e5ca`.
+- Composed the corrected all-79 CPU portfolio in
+  `20260720_smoothed_plan_all79_v20_case42_initialization_preroll2s_cpu`.
+  It admits `70/79`; honest rejects remain
+  `[1,27,29,35,38,39,40,45,71]`, and accepted-duration median is
+  `1.499110`, within the unchanged `1.5` gate. Manifest and summary SHAs are
+  `3d7f9650a4f701f80a11948364a53ecd34641160bffb6bc3ed697d038d559b72`
+  and `4546f29d35b4b6a7a69c38e10122f80b8ff00a1c32eb50fa79b8878b7215155c`.
+- Read-only audit verified all `79` NPZ hashes, all `79` per-case JSON rows,
+  and `78` byte-identical parent plans. Case 42 is byte-identical to the v3
+  replacement and differs from its v17 parent only in `metadata_json`,
+  `initialization_time_s`, and `initialization_state`; every scored/source
+  array and both clocks remain identical. Case 42 is the sole plan with a
+  non-empty initialization (`401 x 7`).
+- No Isaac process, runtime namespace, authorization token, residual capture,
+  dataset, BC, PPO, or training was opened. V20 remains dynamically
+  unvalidated and invalid for training.
+
+## Next round after Round 93
+
+- Add one hash-bound, fail-closed case-42-only Gate C authorization for the v20
+  portfolio and the existing default controller profile. Pin commit `5a66e3d`,
+  v20 manifest SHA, case-42 plan SHA, source/gains/USD identities, exclusive
+  ownership, and a fresh namespace.
+- Run the focused route tests and the full authoritative CPU suite before any
+  launch. Then verify WSL, Windows, and GPU ownership immediately before one
+  bounded case-42 canary. Initialization must complete independently before
+  scored phase zero; any initialization or dynamic rejection stops the route.
+- Do not launch case 43, residual capture, BC, PPO, training, or differential
+  work. A case-42 dynamic pass would move the demonstrated union from `42/70`
+  to `43/70`; a reject must be sealed and diagnosed CPU-first.

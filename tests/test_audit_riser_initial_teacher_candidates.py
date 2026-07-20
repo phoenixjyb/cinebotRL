@@ -176,3 +176,45 @@ def test_rejects_evidence_for_a_different_plan_hash(tmp_path: Path) -> None:
     assert payload["missing_cases"] == [2]
     assert not payload["selection_count_met"]
     assert not payload["passed"]
+
+
+def test_rejects_explicit_controller_evidence_failure(tmp_path: Path) -> None:
+    manifest, evidence = _write_fixture(tmp_path)
+    gate = evidence / "run_2/gates/case_0002.json"
+    payload = json.loads(gate.read_text(encoding="utf-8"))
+    payload["controller_evidence_passed"] = False
+    gate.write_text(json.dumps(payload), encoding="utf-8")
+    summary_path = evidence / "run_2/summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["gate_rows"][0]["gate_sha256"] = _sha256(gate)
+    summary_path.write_text(json.dumps(summary), encoding="utf-8")
+    output = tmp_path / "selection.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--portfolio-manifest",
+            str(manifest),
+            "--evidence-root",
+            str(evidence),
+            "--cases",
+            "1,2",
+            "--minimum-teacher-cases",
+            "2",
+            "--minimum-train-cases",
+            "0",
+            "--minimum-validation-cases",
+            "1",
+            "--minimum-holdout-cases",
+            "1",
+            "--output",
+            str(output),
+        ],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    selected = json.loads(output.read_text(encoding="utf-8"))
+    assert selected["selected_cases"] == [1]

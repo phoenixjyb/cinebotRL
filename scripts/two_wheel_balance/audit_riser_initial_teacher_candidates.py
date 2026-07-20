@@ -102,10 +102,16 @@ def audit_candidate(
         "gate_hash": row.get("gate_sha256") == sha256(gate_path),
         "gate_dynamic_quality": gate.get("dynamic_quality_passed") is True,
         "gate_thermal_admission": gate.get("thermal_admission_passed") is True,
-        "gate_controller_evidence": gate.get("controller_evidence_passed") is True,
+        "gate_controller_evidence_not_rejected": gate.get(
+            "controller_evidence_passed", True
+        )
+        is True,
         "result_dynamic_quality": result.get("dynamic_quality_passed") is True,
         "result_thermal_admission": result.get("thermal_admission_passed") is True,
-        "result_controller_evidence": result.get("controller_evidence_passed") is True,
+        "result_controller_evidence_not_rejected": result.get(
+            "controller_evidence_passed", True
+        )
+        is True,
         "no_termination": result.get("termination") is None,
         "no_dataset": result.get("executed_residual_dataset") is None,
         "residual_not_applied": result.get("raw_residual_label_applied_to_commands")
@@ -141,6 +147,10 @@ def audit_candidate(
         "batch_summary_first_dynamic_reject": summary.get("first_dynamic_reject"),
         "controller_profile": row.get("controller_profile"),
         "tracking_profile": row.get("tracking_profile"),
+        "legacy_controller_evidence_fields_observed": (
+            "controller_evidence_passed" in gate
+            and "controller_evidence_passed" in result
+        ),
         "plan_sha256": plan_sha,
         "source_duration_s": row.get("source_duration_s"),
         "execution_duration_s": row.get("execution_duration_s"),

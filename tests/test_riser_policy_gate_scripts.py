@@ -581,6 +581,7 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert 'result.get("initialization_source_metric_samples") == 0' in source
     assert 'result.get("initialization_residual_label_samples") == 0' in source
     assert 'gate_rows[0].get("initialization_evidence_passed") is True' in source
+    assert 'python3 - "$1" "$2" "$3" "$4" "$5"' in source
     assert "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f" in source
     assert "WINDOWS_POWERSHELL=" in source
     assert "Get-CimInstance Win32_Process" in source

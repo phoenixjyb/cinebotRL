@@ -573,7 +573,7 @@ wait_for_gpu_release() {
 }
 
 case_gate_passed() {
-  python3 - "$1" "$2" "$3" "$4" <<'PY'
+  python3 - "$1" "$2" "$3" "$4" "$5" <<'PY'
 import json
 import math
 from pathlib import Path

@@ -364,6 +364,72 @@ def _enable_total_pitch_reference_limit_admission(path: Path, commit: str) -> No
     path.write_text(json.dumps(payload))
 
 
+def _enable_commanded_base_progress_error_contract(path: Path) -> None:
+    _enable_total_pitch_reference_limit_contract(path)
+    payload = json.loads(path.read_text())
+    contract = "commanded_base_and_camera_error_continuous_phase_scale_v1"
+    source = "lever_compensated_commanded_base_target"
+    payload.update(
+        {
+            "phase_governor_contract": contract,
+            "commanded_base_progress_error_enabled": True,
+            "progress_base_error_source": source,
+        }
+    )
+    result = payload["results"][0]
+    result.update(
+        {
+            "phase_governor_contract": contract,
+            "commanded_base_progress_error_enabled": True,
+            "progress_base_error_source": source,
+            "progress_base_error_telemetry_sample_count": result[
+                "completed_steps"
+            ],
+            "progress_base_error_telemetry_observed": True,
+            "progress_base_error_selected_source_matches": True,
+            "progress_base_error_command_delta_bounded": True,
+            "nominal_base_progress_error_p95_m": 0.20,
+            "nominal_base_progress_error_max_m": 0.22,
+            "commanded_base_progress_error_p95_m": 0.15,
+            "commanded_base_progress_error_max_m": 0.17,
+            "selected_base_progress_error_p95_m": 0.15,
+            "selected_base_progress_error_max_m": 0.17,
+            "selected_vs_nominal_base_progress_error_mean_delta_m": -0.04,
+            "selected_vs_nominal_base_progress_error_abs_max_delta_m": 0.05,
+            "maximum_commanded_base_progress_error_delta_m": 0.05,
+        }
+    )
+    result["checks"].update(
+        {
+            "progress_base_error_telemetry_observed": True,
+            "progress_base_error_selected_source_matches": True,
+            "progress_base_error_command_delta_bounded": True,
+        }
+    )
+    path.write_text(json.dumps(payload))
+
+
+def _enable_commanded_base_progress_error_admission(
+    path: Path,
+    commit: str,
+) -> None:
+    _enable_total_pitch_reference_limit_admission(path, commit)
+    payload = json.loads(path.read_text())
+    payload.update(
+        {
+            "phase_governor_contract": (
+                "commanded_base_and_camera_error_continuous_phase_scale_v1"
+            ),
+            "commanded_base_progress_error_required": True,
+            "progress_base_error_source": (
+                "lever_compensated_commanded_base_target"
+            ),
+            "maximum_commanded_base_progress_error_delta_m": 0.05,
+        }
+    )
+    path.write_text(json.dumps(payload))
+
+
 def _enable_initialization_preroll_evidence(path: Path) -> None:
     payload = json.loads(path.read_text())
     result = payload["results"][0]
@@ -703,6 +769,85 @@ def test_summary_requires_total_pitch_reference_limit_evidence(tmp_path: Path) -
         summary["gate_rows"][0]["total_pitch_reference_limit_evidence_passed"]
         is False
     )
+
+
+def test_summary_requires_commanded_base_progress_error_evidence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    _admission(tmp_path / "admission.json", commit, tmp_path.name)
+    _enable_commanded_base_progress_error_admission(
+        tmp_path / "admission.json", commit
+    )
+    gate = tmp_path / "gates/case_0042.json"
+    _gate(gate, 42, True)
+    _enable_commanded_base_progress_error_contract(gate)
+    output = tmp_path / "summary.json"
+    profile = (
+        "riser_recovery_direction_v4_camera_lever_arm_"
+        "zero_progress_hold_velocity_cap_total_pitch_limit_v1"
+    )
+    command = [
+        sys.executable,
+        str(SCRIPT),
+        "--root",
+        str(tmp_path),
+        "--git-commit",
+        commit,
+        "--cases",
+        "42",
+        "--expected-tracking-profile",
+        profile,
+        "--require-camera-lever-arm-compensation",
+        "--require-zero-progress-hold",
+        "--require-recovery-velocity-cap",
+        "--expected-maximum-linear-velocity-mps",
+        "0.2",
+        "--require-total-pitch-reference-limit",
+        "--require-commanded-base-progress-error",
+        "--output",
+        str(output),
+    ]
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    row = summary["gate_rows"][0]
+    assert summary["passed"]
+    assert summary["commanded_base_progress_error_required"] is True
+    assert summary["commanded_base_progress_error_evidence_passed"] is True
+    assert row["commanded_base_progress_error_evidence_passed"] is True
+    assert row["progress_base_error_selected_source_matches"] is True
+
+    payload = json.loads(gate.read_text())
+    payload["results"][0][
+        "progress_base_error_selected_source_matches"
+    ] = False
+    payload["results"][0]["checks"][
+        "progress_base_error_selected_source_matches"
+    ] = False
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert summary["commanded_base_progress_error_evidence_passed"] is False
+
+    payload["results"][0][
+        "progress_base_error_selected_source_matches"
+    ] = True
+    payload["results"][0]["checks"][
+        "progress_base_error_selected_source_matches"
+    ] = True
+    payload["results"][0][
+        "selected_vs_nominal_base_progress_error_abs_max_delta_m"
+    ] = 0.0501
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert not summary["runtime_contract_passed"]
+    assert summary["commanded_base_progress_error_evidence_passed"] is False
+
 
 def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path) -> None:
     (tmp_path / "gates").mkdir()

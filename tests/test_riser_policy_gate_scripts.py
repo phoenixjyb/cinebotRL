@@ -631,6 +631,40 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
         'gate_rows[0].get("total_pitch_reference_limit_evidence_passed") is True'
         in source
     )
+    assert (
+        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V20_ZERO_PROGRESS_HOLD_"
+        "CAP020_TOTAL_PITCH_COMMANDED_BASE_PROGRESS_V1" in source
+    )
+    assert (
+        "20260720_gate_c_smoothed_case42_v20_zero_progress_hold_cap020_"
+        "total_pitch_commanded_base_progress_v1_exclusive" in source
+    )
+    assert (
+        'REVIEWED_CONTROLLER_PARENT_COMMIT="'
+        '20ed7cb5e40c5eb8930e8df74e1842a162b1011b"' in source
+    )
+    assert 'REQUIRE_COMMANDED_BASE_PROGRESS_ERROR=1' in source
+    assert "--use-commanded-base-progress-error" in source
+    assert "--require-commanded-base-progress-error" in source
+    assert (
+        '"commanded_base_and_camera_error_continuous_phase_scale_v1"'
+        in source
+    )
+    assert '"lever_compensated_commanded_base_target"' in source
+    assert 'result.get("progress_base_error_telemetry_observed") is True' in source
+    assert (
+        'result.get("progress_base_error_selected_source_matches") is True'
+        in source
+    )
+    assert (
+        'result.get("progress_base_error_command_delta_bounded") is True'
+        in source
+    )
+    assert (
+        'summary.get("commanded_base_progress_error_evidence_passed") is True'
+        in source
+    )
+    assert '"commanded_base_progress_error_evidence_passed"' in source
     assert "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f" in source
     assert "WINDOWS_POWERSHELL=" in source
     assert "Get-CimInstance Win32_Process" in source

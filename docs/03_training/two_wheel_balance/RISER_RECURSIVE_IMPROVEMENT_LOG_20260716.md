@@ -3547,3 +3547,46 @@ and must state whether its candidate was accepted or rejected.
   error never exceeds the `0.05 m` correction, and residual action remains
   zero. Stop after one result with no automatic retry.
 - Do not launch case 43, residual capture, BC, PPO, training, or obstacle work.
+
+## Round 103: hierarchical policy boundary and commanded-base admission route
+
+- The project goal remains unchanged, but the control ownership is now stated
+  explicitly. Deterministic inner loops own primary two-wheel balance, actuator
+  limits, hard collision enforcement, emergency behavior, riser hard limits,
+  and gimbal cable/angular limits. A future learned policy may operate only
+  above those loops as a bounded supervisory residual or allocation policy.
+- The initial learned-action contract therefore remains the already defined
+  bounded residual over deterministic commands, currently
+  `[delta_v, delta_wz, delta_h_target]`. Camera-attitude residuals may be
+  introduced later using semantic camera attitude, never physical DJI motor
+  joint labels. Every final command must still pass the deterministic safety
+  supervisor. No learned action is active in Gate C.
+- Review hardening commit `20ed7cb` made commanded-base phase-governor
+  telemetry fail closed: policy-rate sample count, selected-source identity,
+  and the selected-versus-nominal error bound must all agree, and the latter
+  may not exceed the frozen `0.05 m` camera-lever correction.
+- The new CPU-only admission route is restricted to case 42 and the existing
+  v20 source, manifest, plan, initialization, `0.2 m/s` cap, exact-hold
+  floor, symmetric total-pitch target, `3x` horizon, gains, USD, and quality
+  gates. It records `20ed7cb` as the reviewed controller parent and uses a
+  fresh namespace. The playback switch remains default-off.
+- Runtime summarization now treats physical dynamics, thermal/safety
+  admission, commanded-base controller evidence, residual-label envelope, and
+  training admission as independent outcomes. Missing, forged, non-finite, or
+  over-`0.05 m` progress telemetry rejects the runtime contract without
+  changing commands, clipping labels, or creating a dataset.
+- The focused route and summarizer suites pass `42/42`. The Mac full suite is
+  not authoritative because six unrelated modules require `gymnasium`, which
+  is absent from the local Python environment; full validation remains assigned
+  to the established `.98` Isaac Python environment.
+
+## Next round after Round 103
+
+- Commit, push, and transfer the exact CPU contract to `.98`, then run the
+  complete authoritative CPU suite and verify clean HEAD equals upstream.
+- Only after a fresh WSL, Windows-process, and NVIDIA ownership preflight may
+  one exclusive case-42 canary be considered. Stop after that one result with
+  no automatic retry.
+- Keep case 43, residual capture, BC, PPO, all training, and obstacle work
+  closed. A dynamic pass would qualify only this deterministic candidate; it
+  would not itself authorize learned-policy training.

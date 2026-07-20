@@ -30,6 +30,12 @@ ZERO_PROGRESS_HOLD_VELOCITY_CAP_TOTAL_PITCH_TRACKING_PROFILE = (
 )
 EXPECTED_TOTAL_PITCH_REFERENCE_LIMIT_RAD = math.radians(6.0)
 PHASE_GOVERNOR_CONTRACT = "position_error_continuous_phase_scale_v1"
+COMMANDED_BASE_PHASE_GOVERNOR_CONTRACT = (
+    "commanded_base_and_camera_error_continuous_phase_scale_v1"
+)
+COMMANDED_BASE_PROGRESS_ERROR_SOURCE = (
+    "lever_compensated_commanded_base_target"
+)
 CAMERA_LEVER_ARM_COMPENSATION_CONTRACT = (
     "measured_camera_to_base_xy_offset_v1"
 )
@@ -150,6 +156,67 @@ def camera_lever_arm_telemetry_passed(
     )
 
 
+def commanded_base_progress_error_passed(
+    payload: dict[str, object],
+    result: dict[str, object],
+    *,
+    expected_maximum_correction_m: float,
+) -> bool:
+    numeric_fields = (
+        "nominal_base_progress_error_p95_m",
+        "nominal_base_progress_error_max_m",
+        "commanded_base_progress_error_p95_m",
+        "commanded_base_progress_error_max_m",
+        "selected_base_progress_error_p95_m",
+        "selected_base_progress_error_max_m",
+        "selected_vs_nominal_base_progress_error_mean_delta_m",
+        "selected_vs_nominal_base_progress_error_abs_max_delta_m",
+        "maximum_commanded_base_progress_error_delta_m",
+    )
+    values = [result.get(name) for name in numeric_fields]
+    if not all(
+        isinstance(value, (int, float)) and math.isfinite(value)
+        for value in values
+    ):
+        return False
+    nonnegative = values[:6]
+    abs_delta = values[7]
+    configured_delta = values[8]
+    return bool(
+        payload.get("phase_governor_enabled") is True
+        and payload.get("phase_governor_contract")
+        == COMMANDED_BASE_PHASE_GOVERNOR_CONTRACT
+        and payload.get("commanded_base_progress_error_enabled") is True
+        and payload.get("progress_base_error_source")
+        == COMMANDED_BASE_PROGRESS_ERROR_SOURCE
+        and result.get("phase_governor_contract")
+        == COMMANDED_BASE_PHASE_GOVERNOR_CONTRACT
+        and result.get("commanded_base_progress_error_enabled") is True
+        and result.get("progress_base_error_source")
+        == COMMANDED_BASE_PROGRESS_ERROR_SOURCE
+        and result.get("progress_base_error_telemetry_observed") is True
+        and result.get("progress_base_error_telemetry_sample_count")
+        == result.get("completed_steps")
+        and result.get("progress_base_error_selected_source_matches") is True
+        and result.get("progress_base_error_command_delta_bounded") is True
+        and result.get("checks", {}).get(
+            "progress_base_error_telemetry_observed"
+        )
+        is True
+        and result.get("checks", {}).get(
+            "progress_base_error_selected_source_matches"
+        )
+        is True
+        and result.get("checks", {}).get(
+            "progress_base_error_command_delta_bounded"
+        )
+        is True
+        and all(value >= 0.0 for value in nonnegative)
+        and configured_delta == expected_maximum_correction_m
+        and 0.0 <= abs_delta <= expected_maximum_correction_m + 1e-9
+    )
+
+
 def camera_error_governor_telemetry_passed(
     payload: dict[str, object],
     result: dict[str, object],
@@ -208,6 +275,7 @@ def zero_progress_hold_telemetry_passed(
     result: dict[str, object],
     *,
     expected_maximum_linear_velocity_mps: float | None = None,
+    expected_phase_governor_contract: str = PHASE_GOVERNOR_CONTRACT,
 ) -> bool:
     completed_steps = result.get("completed_steps")
     hold_steps = result.get("progress_hold_step_count")
@@ -237,7 +305,8 @@ def zero_progress_hold_telemetry_passed(
     )
     return (
         payload.get("phase_governor_enabled") is True
-        and payload.get("phase_governor_contract") == PHASE_GOVERNOR_CONTRACT
+        and payload.get("phase_governor_contract")
+        == expected_phase_governor_contract
         and payload.get("minimum_progress_scale") == 0.0
         and payload.get("tracking_overrides") == expected_tracking_overrides
         and result.get("minimum_progress_scale") == 0.0
@@ -342,6 +411,9 @@ def main() -> int:
     parser.add_argument("--require-recovery-velocity-cap", action="store_true")
     parser.add_argument("--require-total-pitch-reference-limit", action="store_true")
     parser.add_argument(
+        "--require-commanded-base-progress-error", action="store_true"
+    )
+    parser.add_argument(
         "--expected-maximum-linear-velocity-mps", type=float, default=0.2
     )
     parser.add_argument("--expected-camera-lever-arm-gain", type=float, default=1.0)
@@ -411,6 +483,18 @@ def main() -> int:
         parser.error(
             "total pitch-reference limiting requires the capped hold total-pitch profile"
         )
+    if args.require_commanded_base_progress_error and (
+        not args.require_camera_lever_arm_compensation
+        or not args.require_zero_progress_hold
+    ):
+        parser.error(
+            "commanded-base progress error requires lever compensation and zero-progress hold"
+        )
+    expected_phase_governor_contract = (
+        COMMANDED_BASE_PHASE_GOVERNOR_CONTRACT
+        if args.require_commanded_base_progress_error
+        else PHASE_GOVERNOR_CONTRACT
+    )
     requested = [int(value) for value in args.cases.split(",")]
     admission = args.root / "admission.json"
     admission_payload = json.loads(admission.read_text(encoding="utf-8"))
@@ -449,7 +533,22 @@ def main() -> int:
         == args.expected_tracking_profile
         and admission_payload.get("zero_progress_hold_required") is True
         and admission_payload.get("phase_governor_contract")
-        == PHASE_GOVERNOR_CONTRACT
+        == expected_phase_governor_contract
+        and (
+            not args.require_commanded_base_progress_error
+            or (
+                admission_payload.get(
+                    "commanded_base_progress_error_required"
+                )
+                is True
+                and admission_payload.get("progress_base_error_source")
+                == COMMANDED_BASE_PROGRESS_ERROR_SOURCE
+                and admission_payload.get(
+                    "maximum_commanded_base_progress_error_delta_m"
+                )
+                == args.expected_maximum_camera_lever_arm_correction_m
+            )
+        )
         and admission_payload.get("minimum_progress_scale") == 0.0
         and (
             not args.require_recovery_velocity_cap
@@ -531,6 +630,16 @@ def main() -> int:
                 ),
             )
         )
+        commanded_base_progress_error_evidence_passed = (
+            not args.require_commanded_base_progress_error
+            or commanded_base_progress_error_passed(
+                payload,
+                result,
+                expected_maximum_correction_m=(
+                    args.expected_maximum_camera_lever_arm_correction_m
+                ),
+            )
+        )
         initialization_duration_s = float(
             result.get("initialization_duration_s", 0.0)
         )
@@ -592,6 +701,9 @@ def main() -> int:
                     if args.require_recovery_velocity_cap
                     else None
                 ),
+                expected_phase_governor_contract=(
+                    expected_phase_governor_contract
+                ),
             )
         )
         total_pitch_reference_limit_evidence_passed = (
@@ -620,6 +732,7 @@ def main() -> int:
             and result.get("raw_residual_label_applied_to_commands") is False
             and camera_lever_arm_evidence_passed
             and camera_error_governor_evidence_passed
+            and commanded_base_progress_error_evidence_passed
             and initialization_evidence_passed
             and velocity_feedback_evidence_passed
             and zero_progress_hold_evidence_passed
@@ -642,12 +755,18 @@ def main() -> int:
                 and initialization_evidence_passed
                 and velocity_feedback_evidence_passed
                 and zero_progress_hold_evidence_passed
+                and commanded_base_progress_error_evidence_passed
                 if args.require_camera_lever_arm_compensation
                 else result.get("controller_evidence_passed")
             ),
             "camera_error_governor_evidence_passed": (
                 camera_error_governor_evidence_passed
                 if args.require_camera_error_recovery_governor
+                else None
+            ),
+            "commanded_base_progress_error_evidence_passed": (
+                commanded_base_progress_error_evidence_passed
+                if args.require_commanded_base_progress_error
                 else None
             ),
             "initialization_evidence_passed": initialization_evidence_passed,
@@ -756,6 +875,27 @@ def main() -> int:
             "progress_hold_segment_count": result.get(
                 "progress_hold_segment_count"
             ),
+            "commanded_base_progress_error_enabled": result.get(
+                "commanded_base_progress_error_enabled"
+            ),
+            "progress_base_error_source": result.get(
+                "progress_base_error_source"
+            ),
+            "progress_base_error_telemetry_sample_count": result.get(
+                "progress_base_error_telemetry_sample_count"
+            ),
+            "progress_base_error_selected_source_matches": result.get(
+                "progress_base_error_selected_source_matches"
+            ),
+            "progress_base_error_command_delta_bounded": result.get(
+                "progress_base_error_command_delta_bounded"
+            ),
+            "selected_vs_nominal_base_progress_error_mean_delta_m": result.get(
+                "selected_vs_nominal_base_progress_error_mean_delta_m"
+            ),
+            "selected_vs_nominal_base_progress_error_abs_max_delta_m": result.get(
+                "selected_vs_nominal_base_progress_error_abs_max_delta_m"
+            ),
             "source_duration_s": result.get("source_duration_s"),
             "execution_duration_s": result.get("execution_duration_s"),
             "completed_steps": result.get("completed_steps"),
@@ -854,11 +994,31 @@ def main() -> int:
         "total_pitch_reference_limit_required": (
             args.require_total_pitch_reference_limit
         ),
+        "commanded_base_progress_error_required": (
+            args.require_commanded_base_progress_error
+        ),
         "zero_progress_hold_admission_passed": (
             zero_progress_hold_admission_passed
         ),
         "expected_phase_governor_contract": (
-            PHASE_GOVERNOR_CONTRACT if args.require_zero_progress_hold else None
+            expected_phase_governor_contract
+            if args.require_zero_progress_hold
+            else None
+        ),
+        "expected_progress_base_error_source": (
+            COMMANDED_BASE_PROGRESS_ERROR_SOURCE
+            if args.require_commanded_base_progress_error
+            else None
+        ),
+        "commanded_base_progress_error_evidence_passed": (
+            bool(gate_rows)
+            and len(gate_rows) == len(requested)
+            and all(
+                row["commanded_base_progress_error_evidence_passed"] is True
+                for row in gate_rows
+            )
+            if args.require_commanded_base_progress_error
+            else None
         ),
         "expected_minimum_progress_scale": (
             0.0 if args.require_zero_progress_hold else None

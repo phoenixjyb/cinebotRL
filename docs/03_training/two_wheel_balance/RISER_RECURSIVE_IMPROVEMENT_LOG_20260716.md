@@ -2850,3 +2850,21 @@ and must state whether its candidate was accepted or rejected.
 - Do not launch case 42 merely because it narrowly passes static admission.
   Keep case 43 and all learning stages closed until this margin review is
   complete and one bounded case-42 route is explicitly selected.
+
+## Round 85: case-42 CPU preview margin review
+
+- Run a read-only CPU grid over the exact same unsmoothed case-42 camera path.
+  The default `0.10 m / 2.75` preview has static position p95/max
+  `0.148363/0.197051 m` and execution/source ratio `1.619662`; it is admitted
+  but has only `0.001637 m` p95 margin.
+- Every tested geometry-preserving preview from `0.125 m / 2.75` through
+  `0.55 m / 1.25` passes all immutable static gates. The strongest bounded
+  candidate is `0.55 m / 1.25`: static p95/max improve to
+  `0.051280/0.081235 m`, duration ratio improves to `1.488203`, and maximum
+  pre-densification base branch step is `0.020546 rad`.
+- This read-only grid is diagnosis, not a deployment artifact. Do not route
+  case 42 from an ad hoc result. The next bounded CPU task is to bind the
+  selected candidate to the exact source, v16 parent manifest/plan, unchanged
+  smoothed geometry, planner commit, and fresh output namespace under a
+  proactive static-margin derivation contract. That contract must keep Isaac,
+  residual capture, BC, PPO, and training closed before any route is added.

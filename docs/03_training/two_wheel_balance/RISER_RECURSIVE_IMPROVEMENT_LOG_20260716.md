@@ -3820,3 +3820,46 @@ and must state whether its candidate was accepted or rejected.
   choose a single bounded `vx_kp` value. Do not tune from position score alone
   and do not add a runtime token in the controller commit.
 - Keep case 43, residual capture, BC, PPO, training, and obstacle work closed.
+
+## Round 109: evidence-bounded longitudinal proportional authority
+
+- The sealed Round-108 telemetry provides a direct action-headroom bound for a
+  proportional-gain increase:
+  `delta_Kp <= (action_limit - reserve - observed_action_max) /
+  (abs(pitch_action_gain) * maximum_velocity_deficit)`. Using unchanged action
+  limit `0.8`, explicit reserve `0.03`, observed common-action max `0.596117`,
+  frozen pitch gain magnitude `3.954227`, and maximum deficit `0.363252 m/s`
+  gives maximum `vx_kp = 0.721056` from the `0.6` baseline.
+- Select `vx_kp = 0.72` as the single bounded candidate. Its conservative
+  worst-case counterfactual common-action bound is below `0.77`, preserving at
+  least the explicit `0.03` reserve before the existing `0.8` clip. The sealed
+  one-hertz trace predicts approximately `0.365 deg` more mean reverse physical
+  pitch target while retaining the same symmetric `+/-6 deg` total target.
+  This is a controller-authority hypothesis, not dynamic pass evidence.
+- Added a fail-closed reusable derivation helper and an optional
+  `--controller-vx-kp` playback override restricted to `(0, 1]`. The option is
+  absent by default, and default controller output/evidence remains unchanged.
+  Runtime evidence records the resolved Kp and includes it in controller
+  overrides only when explicitly selected.
+- Synthetic tests prove signed authority increases in both directions, the
+  total physical pitch target remains inside `+/-6 deg`, action remains inside
+  `+/-0.8`, the candidate stays close to the baseline for representative
+  deficits, and malformed/non-finite/no-headroom derivations fail closed.
+  Focused controller/evidence/playback tests pass `71/71`; the broader route,
+  summarizer, controller, evidence, and playback set passes `114/114`.
+- No source, plan, clock, gain matrix, robot asset, physical/quality threshold,
+  authorization token, runtime namespace, Isaac process, dataset, residual
+  capture, BC, PPO, or training was added or changed.
+
+## Next round after Round 109
+
+- Commit, push, transfer, and run the complete authoritative `.98` CPU suite.
+  Review the derivation, default compatibility, and action-margin evidence
+  before creating any separate runtime route.
+- If reviewed, run the existing deterministic push/plant-envelope campaign at
+  `vx_kp=0.72` before another case-42 rollout. Require nominal and provisional
+  variations, both `+/-0.2 m/s` directions, fixed pitch/action limits, and no
+  learned action. Reject the candidate if balance, recovery, saturation, or
+  direction symmetry regresses.
+- Keep case 42 runtime retry, case 43, residual capture, BC, PPO, training, and
+  obstacle work closed until that robustness gate passes.

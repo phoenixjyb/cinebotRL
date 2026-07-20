@@ -7,6 +7,7 @@ from rl_platform.tasks.two_wheel_balance.riser_recovery_evidence import (
     LongitudinalAuthorityTelemetryAccumulator,
     RecoveryTelemetryAccumulator,
     VelocityFeedbackTelemetryAccumulator,
+    bounded_vx_kp_from_authority_evidence,
 )
 
 
@@ -208,3 +209,40 @@ def test_longitudinal_authority_rejects_invalid_or_repeated_reset() -> None:
             controller_updated=True,
             **{**kwargs, "pitch_rate_rad_s": float("nan")},
         )
+
+
+def test_bounded_vx_kp_uses_sealed_action_headroom() -> None:
+    maximum = bounded_vx_kp_from_authority_evidence(
+        baseline_vx_kp=0.6,
+        observed_common_action_abs_max=0.5961173176765442,
+        velocity_deficit_abs_max_mps=0.36325200515733025,
+        pitch_action_gain_abs=3.954227086414207,
+        action_limit=0.8,
+        action_reserve=0.03,
+    )
+    assert maximum == pytest.approx(0.7210561072, rel=1e-6)
+    assert 0.72 < maximum < 0.7211
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    (
+        {"observed_common_action_abs_max": 0.8},
+        {"velocity_deficit_abs_max_mps": 0.0},
+        {"pitch_action_gain_abs": float("nan")},
+        {"action_reserve": 0.21},
+    ),
+)
+def test_bounded_vx_kp_rejects_missing_headroom(
+    overrides: dict[str, float],
+) -> None:
+    kwargs = {
+        "baseline_vx_kp": 0.6,
+        "observed_common_action_abs_max": 0.5961173176765442,
+        "velocity_deficit_abs_max_mps": 0.36325200515733025,
+        "pitch_action_gain_abs": 3.954227086414207,
+        "action_limit": 0.8,
+        "action_reserve": 0.03,
+    }
+    with pytest.raises(ValueError):
+        bounded_vx_kp_from_authority_evidence(**(kwargs | overrides))

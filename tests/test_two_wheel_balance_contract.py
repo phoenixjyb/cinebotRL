@@ -528,6 +528,62 @@ def test_opposing_vx_integral_reset_preserves_overspeed_braking_memory() -> None
     assert next_state[0, 0] < -0.30
 
 
+def test_bounded_vx_kp_candidate_adds_authority_inside_existing_limits() -> None:
+    gain = np.array(
+        [
+            [-3.954227086414207, -1.4129892407382363, 0.0, 0.00020456176435757918, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.006484253171153763, 0.0],
+        ]
+    )
+    states = np.zeros((2, len(LQR_STATE_NAMES)))
+    states[:, 3] = np.array([-0.08, 0.08]) / 0.1016
+    refs = np.array([-0.16, 0.16])
+    integrals = np.zeros((2, 6))
+    bias = np.full(2, np.radians(2.0))
+    baseline = cascaded_lqr_action(
+        states,
+        refs,
+        np.zeros(2),
+        gain,
+        integrals,
+        control_dt=0.02,
+        config=cascaded_lqr_config(
+            "structural_robust_v1",
+            vx_kp=0.6,
+            limit_total_pitch_reference=True,
+            reset_opposing_vx_integral_on_directional_deficit=True,
+        ),
+        pitch_bias_override_rad=bias,
+    )
+    candidate = cascaded_lqr_action(
+        states,
+        refs,
+        np.zeros(2),
+        gain,
+        integrals,
+        control_dt=0.02,
+        config=cascaded_lqr_config(
+            "structural_robust_v1",
+            vx_kp=0.72,
+            limit_total_pitch_reference=True,
+            reset_opposing_vx_integral_on_directional_deficit=True,
+        ),
+        pitch_bias_override_rad=bias,
+    )
+
+    baseline_action, _, baseline_diagnostics = baseline
+    candidate_action, _, candidate_diagnostics = candidate
+    assert candidate_diagnostics["total_pitch_reference"][0] < baseline_diagnostics[
+        "total_pitch_reference"
+    ][0]
+    assert candidate_diagnostics["total_pitch_reference"][1] > baseline_diagnostics[
+        "total_pitch_reference"
+    ][1]
+    assert np.max(np.abs(candidate_diagnostics["total_pitch_reference"])) <= np.radians(6.0)
+    assert np.max(np.abs(candidate_action)) <= 0.8
+    assert np.max(np.abs(candidate_action - baseline_action)) < 0.04
+
+
 def test_cascaded_lqr_governor_retimes_only_bias_reinforcing_motion() -> None:
     gain = np.zeros((2, len(LQR_STATE_NAMES)))
     controller_state = np.zeros((3, 6))

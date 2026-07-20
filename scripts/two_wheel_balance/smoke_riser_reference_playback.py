@@ -44,6 +44,7 @@ parser.add_argument("--maximum-saturation-ratio", type=float, default=0.20)
 parser.add_argument("--disable-phase-governor", action="store_true")
 parser.add_argument("--disable-com-pitch-feedforward", action="store_true")
 parser.add_argument("--disable-semantic-proxy-state-adapter", action="store_true")
+parser.add_argument("--controller-vx-kp", type=float)
 parser.add_argument("--controller-wz-kp", type=float)
 parser.add_argument("--controller-wz-ki", type=float)
 parser.add_argument("--controller-wz-feedforward", type=float)
@@ -214,6 +215,10 @@ if not (
     and args.vx_integral_reset_reference_deadband_mps > 0.0
 ):
     parser.error("--vx-integral-reset-reference-deadband-mps must be positive")
+if args.controller_vx_kp is not None and not (
+    math.isfinite(args.controller_vx_kp) and 0.0 < args.controller_vx_kp <= 1.0
+):
+    parser.error("--controller-vx-kp must be in (0, 1]")
 app = AppLauncher(args).app
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -444,6 +449,7 @@ def evaluate_case(
     controller_overrides = {
         name: value
         for name, value in {
+            "vx_kp": args.controller_vx_kp,
             "wz_kp": args.controller_wz_kp,
             "wz_ki": args.controller_wz_ki,
             "wz_feedforward": args.controller_wz_feedforward,
@@ -1728,6 +1734,7 @@ def evaluate_case(
         "longitudinal_authority_telemetry_observed": (
             longitudinal_authority_telemetry_observed
         ),
+        "controller_vx_kp": controller_cfg.vx_kp,
         "opposing_vx_integral_deficit_reset_enabled": (
             controller_cfg.reset_opposing_vx_integral_on_directional_deficit
         ),
@@ -1931,6 +1938,11 @@ def main() -> int:
         "ppo_authorized": False,
         "controller_profile": "structural_robust_v1",
         "tracking_profile": tracking_profile_name(),
+        "controller_vx_kp": (
+            args.controller_vx_kp
+            if args.controller_vx_kp is not None
+            else cascaded_lqr_config("structural_robust_v1").vx_kp
+        ),
         "total_pitch_reference_limit_enabled": args.limit_total_pitch_reference,
         "total_pitch_reference_limit_rad": TOTAL_PITCH_REFERENCE_LIMIT_RAD,
         "opposing_vx_integral_deficit_reset_enabled": (
@@ -1971,6 +1983,7 @@ def main() -> int:
         "controller_overrides": {
             name: value
             for name, value in {
+                "vx_kp": args.controller_vx_kp,
                 "wz_kp": args.controller_wz_kp,
                 "wz_ki": args.controller_wz_ki,
                 "wz_feedforward": args.controller_wz_feedforward,
@@ -2105,6 +2118,11 @@ def write_runtime_failure(exc: Exception) -> None:
         "training_started": False,
         "ppo_authorized": False,
         "tracking_profile": tracking_profile_name(),
+        "controller_vx_kp": (
+            args.controller_vx_kp
+            if args.controller_vx_kp is not None
+            else cascaded_lqr_config("structural_robust_v1").vx_kp
+        ),
         "total_pitch_reference_limit_enabled": args.limit_total_pitch_reference,
         "total_pitch_reference_limit_rad": TOTAL_PITCH_REFERENCE_LIMIT_RAD,
         "opposing_vx_integral_deficit_reset_enabled": (

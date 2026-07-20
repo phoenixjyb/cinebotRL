@@ -293,6 +293,10 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert '"--tracking-minimum-progress-scale"' in source
     assert '"--tracking-maximum-linear-velocity-mps"' in source
     assert '"--limit-total-pitch-reference"' in source
+    assert '"--controller-vx-kp"' in source
+    assert '"controller_vx_kp"' in source
+    assert '"vx_kp": args.controller_vx_kp' in source
+    assert 'parser.error("--controller-vx-kp must be in (0, 1]")' in pre_app_source
     assert '"--reset-opposing-vx-integral-on-directional-deficit"' in source
     assert '"--vx-integral-reset-reference-deadband-mps"' in source
     assert '"limit_total_pitch_reference"' in source

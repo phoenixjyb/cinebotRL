@@ -15,6 +15,45 @@ LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA = (
 )
 
 
+def bounded_vx_kp_from_authority_evidence(
+    *,
+    baseline_vx_kp: float,
+    observed_common_action_abs_max: float,
+    velocity_deficit_abs_max_mps: float,
+    pitch_action_gain_abs: float,
+    action_limit: float,
+    action_reserve: float,
+) -> float:
+    """Bound a proportional-gain increase using sealed action headroom."""
+
+    values = (
+        baseline_vx_kp,
+        observed_common_action_abs_max,
+        velocity_deficit_abs_max_mps,
+        pitch_action_gain_abs,
+        action_limit,
+        action_reserve,
+    )
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError("longitudinal gain-bound inputs must be finite")
+    if baseline_vx_kp <= 0.0:
+        raise ValueError("baseline vx Kp must be positive")
+    if velocity_deficit_abs_max_mps <= 0.0 or pitch_action_gain_abs <= 0.0:
+        raise ValueError("deficit and pitch-action gain must be positive")
+    if not 0.0 <= observed_common_action_abs_max < action_limit:
+        raise ValueError("observed common action must be inside the action limit")
+    if not 0.0 <= action_reserve < action_limit:
+        raise ValueError("action reserve must be inside the action limit")
+    usable_headroom = (
+        action_limit - action_reserve - observed_common_action_abs_max
+    )
+    if usable_headroom <= 0.0:
+        raise ValueError("action reserve leaves no proportional-gain headroom")
+    return baseline_vx_kp + usable_headroom / (
+        pitch_action_gain_abs * velocity_deficit_abs_max_mps
+    )
+
+
 def _sign(value: float, deadband: float) -> int:
     if value > deadband:
         return 1

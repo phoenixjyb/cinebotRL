@@ -4228,3 +4228,35 @@ and must state whether its candidate was accepted or rejected.
   parent-semantics audit repair.
 - Derive a fresh v23 ratio-2 candidate. Require all checks true and stop at the
   CPU artifact boundary; do not issue authorization or launch Isaac.
+
+## Round 119: initialization goal changed from 70 to 40 teachers
+
+- The user changed the immediate learning objective: a bounded initial policy
+  may use already dynamically accepted trajectories and no longer needs to wait
+  for 70 qualified cases. The 70-case milestone is now later coverage evidence;
+  79/79 remains the final evaluation goal.
+- The demonstrated physical dynamic union is 42 cases:
+  `[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,28,30,31,32,33,34,36,37,41,52,53,66,67,68,70,74,77]`.
+  Historical Gate-C runs selected these plans but intentionally wrote no
+  residual datasets, so they cannot be merged directly into BC input.
+- CPU evidence inspection found 42 physical passes but only 39 passes under the
+  provisional `[0.30,0.40,0.10]` residual-label scale. Cases 10, 28, and 70
+  overflow only the old label normalization. They remain valid physical teacher
+  candidates; clipping or misreporting 39 as 40 is forbidden.
+- Added a fail-closed candidate auditor that binds each selection to the exact
+  source manifest, v16 plan hash, admission, gate, summary, dynamic/thermal/
+  runtime result, zero applied residual, and no-dataset/no-training evidence.
+  Its output remains `valid_for_training=false` and requires a fresh homogeneous
+  capture of at least 40 cases.
+- Added the initialization split minimum `30 train / 5 validation / 5 holdout`.
+  BC remains closed until fresh capture, raw-envelope recomputation, zero
+  clipping, command reconstruction, and case-disjoint split gates pass. PPO
+  remains closed after BC initialization.
+
+## Next round after Round 119
+
+- Run the CPU candidate auditor on `.98` and seal the 42-case selection manifest.
+- Implement scale-independent raw-command capture and prove it on a small
+  accepted canary before scheduling the 40-plus-case homogeneous recapture.
+- Do not alter the deterministic LQR/safety supervisor, launch PPO, or train
+  from historical Gate-C traces.

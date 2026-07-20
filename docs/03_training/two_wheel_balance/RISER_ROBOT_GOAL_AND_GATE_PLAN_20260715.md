@@ -7,6 +7,13 @@ Worktree: `/mnt/g/wSpace/cinebotRL-two-wheel-riser`
 Current operational status and continuation sequence:
 `RISER_PROJECT_STATUS_20260717.md`.
 
+Initialization-count amendment (2026-07-20):
+`RISER_INITIAL_TEACHER40_CONTRACT_20260720.md`. At least 40 freshly captured,
+dynamically qualified cases may admit a bounded BC initialization experiment.
+The former 70-case threshold is retained as a later coverage milestone, not an
+initialization prerequisite. No physical, integrity, semantic-label, clipping,
+or holdout gate is relaxed.
+
 ## 1. Goal
 
 Build and validate a new self-balancing two-wheel camera robot that removes the

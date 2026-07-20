@@ -2731,3 +2731,51 @@ and must state whether its candidate was accepted or rejected.
 - Prepare exactly one v16 case-36 retry in
   `20260720_gate_c_smoothed_case36_v16_explicit_preview055_g125_v1_exclusive`
   with the unchanged default runtime profile and `1500 s` wall bound.
+
+## Round 80: v16 case-36 preview recovery passes Gate C
+
+- Published the v16 recovery route at `ca7cea5`; the authoritative `.98`
+  suite passed `341/341`. Both clocks completed at
+  `15.694569/26.525347 s` in `14898` steps with no termination.
+- Dynamic position p95/max passed at `0.130809/0.147473 m`; attitude p95/max
+  passed at `0.135354/0.220562 deg`; pitch p95/max were
+  `6.562593/6.608260 deg`. Riser servo p95/max were
+  `0.011676/0.011750 m`, effort max was `22.072868 N`, and thermal-load max
+  was `0.001277`. Every completion, physical, runtime, thermal, controller,
+  IK, proxy-rate, saturation, and termination check passed.
+- The prospective residual-label envelope independently passed with raw maxima
+  `[0.131102,0.102489,0.011813]` and normalized maxima
+  `[0.437007,0.256223,0.118127]`. Residual action remained zero and unapplied;
+  no dataset, capture, BC, PPO, or training started.
+- The unique dynamically qualified union is now `40/70`:
+  `[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,28,30,31,32,33,34,36,52,53,66,67,68,70,74,77]`.
+- Evidence hashes: admission
+  `5cedb5d1d4251020c4b2059a0355af9f68ab69d41ad29f37806d1054a14d9293`,
+  gate `46027d28ce2e1d443f6292be2ea5bf63a7e9223e7902aed3a01dc2029e22ada8`,
+  log `ebae68627724ac3dd7cdce97c5ed71e6101974352fa44948382884e009c2e572`,
+  and summary
+  `11453bda0bc55eef0b750ce9bb68ee7aa2ac30a3b4420442e5b4c57d2e0c6302`.
+
+## Next round after Round 80
+
+- Inspect v16 case 37 on CPU. Route at most one fresh case-only canary if its
+  source, timing, path, transition, workspace, and kinematic gates remain
+  admitted. Do not revisit case 35 or launch statically rejected case 38.
+- Keep residual capture, BC, PPO, and training closed pending completion of
+  deterministic qualification and the final raw residual-envelope audit.
+
+## Round 81: case-37 CPU admission and bounded route
+
+- V16 case 37 is statically admitted with plan hash
+  `3bc3119fa210f1fd190d7fba11b9571caa74dc1bc4de02fb98296ecc9e8d2c1e`.
+  It preserves all `1458` exact-source anchors with unchanged geometry and has
+  source/execution clocks `28.823874/46.347559 s`, ratio `1.607957`.
+- Static position p95/max are `0.036262/0.059870 m`; camera height is
+  `1.342686-1.666355 m`; planned riser rate max is `0.042155 m/s`. Every
+  source, path, duration, transition, initialization, rate, workspace, and
+  kinematic gate passes with substantial position margin.
+- Prepare exactly one unchanged default-profile route in
+  `20260720_gate_c_smoothed_case37_v16_camera_lever_arm_v1_exclusive` with a
+  `2000 s` wall bound. Preserve case 38 as a static reject because its
+  execution/source ratio is `2.190027`, above the immutable `2.0` limit.
+  Learning remains closed.

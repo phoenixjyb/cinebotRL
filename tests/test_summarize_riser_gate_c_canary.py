@@ -214,6 +214,53 @@ def _enable_camera_error_governor_contract(path: Path) -> None:
     path.write_text(json.dumps(payload))
 
 
+def _enable_zero_progress_hold_contract(path: Path) -> None:
+    _enable_camera_lever_arm_contract(path)
+    payload = json.loads(path.read_text())
+    payload.update(
+        {
+            "tracking_profile": (
+                "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
+            ),
+            "phase_governor_enabled": True,
+            "phase_governor_contract": "position_error_continuous_phase_scale_v1",
+            "minimum_progress_scale": 0.0,
+            "tracking_overrides": {"minimum_progress_scale": 0.0},
+        }
+    )
+    result = payload["results"][0]
+    result.update(
+        {
+            "minimum_progress_scale": 0.0,
+            "progress_scale_min": 0.0,
+            "progress_hold_step_count": 2,
+            "progress_hold_ratio": 0.2,
+            "progress_hold_segment_count": 1,
+            "outer_velocity_feedback_source": "wheel_derived_vx",
+        }
+    )
+    path.write_text(json.dumps(payload))
+
+
+def _enable_zero_progress_hold_admission(path: Path, commit: str) -> None:
+    payload = json.loads(path.read_text())
+    payload.update(
+        {
+            "requested_cases": [42],
+            "tracking_profile": (
+                "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
+            ),
+            "zero_progress_hold_required": True,
+            "phase_governor_contract": "position_error_continuous_phase_scale_v1",
+            "minimum_progress_scale": 0.0,
+            "root_velocity_outer_feedback_enabled": False,
+            "runtime_commit": commit,
+            "upstream_commit": commit,
+        }
+    )
+    path.write_text(json.dumps(payload))
+
+
 def _enable_initialization_preroll_evidence(path: Path) -> None:
     payload = json.loads(path.read_text())
     result = payload["results"][0]
@@ -360,6 +407,62 @@ def test_velocity_feedback_evidence_is_backward_compatible_and_fail_closed(
     assert summary["dynamic_quality_passed"]
     assert not summary["runtime_contract_passed"]
     assert summary["gate_rows"][0]["velocity_feedback_evidence_passed"] is False
+
+
+def test_zero_progress_hold_evidence_is_explicit_and_fail_closed(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    _admission(tmp_path / "admission.json", commit, tmp_path.name)
+    _enable_zero_progress_hold_admission(tmp_path / "admission.json", commit)
+    gate = tmp_path / "gates/case_0042.json"
+    _gate(gate, 42, True)
+    _enable_zero_progress_hold_contract(gate)
+    output = tmp_path / "summary.json"
+    command = [
+        sys.executable,
+        str(SCRIPT),
+        "--root",
+        str(tmp_path),
+        "--git-commit",
+        commit,
+        "--cases",
+        "42",
+        "--expected-tracking-profile",
+        "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1",
+        "--require-camera-lever-arm-compensation",
+        "--require-zero-progress-hold",
+        "--output",
+        str(output),
+    ]
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    row = summary["gate_rows"][0]
+    assert summary["passed"]
+    assert summary["zero_progress_hold_required"] is True
+    assert summary["zero_progress_hold_admission_passed"] is True
+    assert row["zero_progress_hold_evidence_passed"] is True
+    assert row["progress_hold_step_count"] == 2
+
+    payload = json.loads(gate.read_text())
+    payload["results"][0]["progress_hold_ratio"] = 0.3
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert summary["gate_rows"][0]["zero_progress_hold_evidence_passed"] is False
+
+    payload["results"][0]["progress_hold_ratio"] = 0.2
+    payload["results"][0]["outer_velocity_feedback_source"] = "root_link_vx"
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert summary["gate_rows"][0]["zero_progress_hold_evidence_passed"] is False
 
 
 def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path) -> None:

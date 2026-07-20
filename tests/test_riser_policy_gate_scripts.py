@@ -581,7 +581,7 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert 'result.get("initialization_source_metric_samples") == 0' in source
     assert 'result.get("initialization_residual_label_samples") == 0' in source
     assert 'gate_rows[0].get("initialization_evidence_passed") is True' in source
-    assert 'python3 - "$1" "$2" "$3" "$4" "$5" "$6"' in source
+    assert 'python3 - "$1" "$2" "$3" "$4" "$5" "$6" "$7"' in source
     assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V20_ROOT_VX_OUTER_V1" in source
     assert "20260720_gate_c_smoothed_case42_v20_root_vx_outer_v1_exclusive" in source
     assert 'USE_ROOT_VELOCITY_OUTER_FEEDBACK=1' in source
@@ -589,6 +589,16 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert 'balance_controller "$METRICS"' in source
     assert 'result.get("outer_velocity_feedback_source") == "root_link_vx"' in source
     assert 'velocity_feedback.get("policy_rate_sample_count")' in source
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V20_ZERO_PROGRESS_HOLD_V1" in source
+    assert "20260720_gate_c_smoothed_case42_v20_zero_progress_hold_v1_exclusive" in source
+    assert 'REQUIRE_ZERO_PROGRESS_HOLD=1' in source
+    assert 'TRACKING_MINIMUM_PROGRESS_SCALE="0.0"' in source
+    assert "--tracking-minimum-progress-scale" in source
+    assert "--require-zero-progress-hold" in source
+    assert 'gate.get("minimum_progress_scale") == 0.0' in source
+    assert 'result.get("progress_scale_min") == 0.0' in source
+    assert 'result.get("outer_velocity_feedback_source") == "wheel_derived_vx"' in source
+    assert 'gate_rows[0].get("zero_progress_hold_evidence_passed") is True' in source
     assert "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f" in source
     assert "WINDOWS_POWERSHELL=" in source
     assert "Get-CimInstance Win32_Process" in source

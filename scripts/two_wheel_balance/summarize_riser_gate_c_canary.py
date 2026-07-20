@@ -18,6 +18,10 @@ CAMERA_LEVER_ARM_TRACKING_PROFILE = (
 CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE = (
     "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
 )
+ZERO_PROGRESS_HOLD_TRACKING_PROFILE = (
+    "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
+)
+PHASE_GOVERNOR_CONTRACT = "position_error_continuous_phase_scale_v1"
 CAMERA_LEVER_ARM_COMPENSATION_CONTRACT = (
     "measured_camera_to_base_xy_offset_v1"
 )
@@ -191,6 +195,38 @@ def camera_error_governor_telemetry_passed(
     )
 
 
+def zero_progress_hold_telemetry_passed(
+    payload: dict[str, object], result: dict[str, object]
+) -> bool:
+    completed_steps = result.get("completed_steps")
+    hold_steps = result.get("progress_hold_step_count")
+    hold_ratio = result.get("progress_hold_ratio")
+    hold_segments = result.get("progress_hold_segment_count")
+    progress_min = result.get("progress_scale_min")
+    return (
+        payload.get("phase_governor_enabled") is True
+        and payload.get("phase_governor_contract") == PHASE_GOVERNOR_CONTRACT
+        and payload.get("minimum_progress_scale") == 0.0
+        and payload.get("tracking_overrides") == {"minimum_progress_scale": 0.0}
+        and result.get("minimum_progress_scale") == 0.0
+        and result.get("outer_velocity_feedback_source") == "wheel_derived_vx"
+        and isinstance(completed_steps, int)
+        and completed_steps > 0
+        and isinstance(hold_steps, int)
+        and 0 < hold_steps <= completed_steps
+        and isinstance(hold_segments, int)
+        and 0 < hold_segments <= hold_steps
+        and isinstance(hold_ratio, (int, float))
+        and math.isfinite(hold_ratio)
+        and math.isclose(
+            hold_ratio, hold_steps / completed_steps, rel_tol=0.0, abs_tol=1e-12
+        )
+        and isinstance(progress_min, (int, float))
+        and math.isfinite(progress_min)
+        and progress_min == 0.0
+    )
+
+
 def contract_identity_rows_passed(admission: dict[str, object]) -> bool:
     identities = admission.get("identities")
     checks = admission.get("checks")
@@ -226,6 +262,7 @@ def main() -> int:
             EXPECTED_TRACKING_PROFILE,
             CAMERA_LEVER_ARM_TRACKING_PROFILE,
             CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE,
+            ZERO_PROGRESS_HOLD_TRACKING_PROFILE,
         ),
         default=EXPECTED_TRACKING_PROFILE,
     )
@@ -233,6 +270,7 @@ def main() -> int:
         "--require-camera-lever-arm-compensation", action="store_true"
     )
     parser.add_argument("--require-camera-error-recovery-governor", action="store_true")
+    parser.add_argument("--require-zero-progress-hold", action="store_true")
     parser.add_argument("--expected-camera-lever-arm-gain", type=float, default=1.0)
     parser.add_argument(
         "--expected-maximum-camera-lever-arm-correction-m",
@@ -254,6 +292,7 @@ def main() -> int:
         not in {
             CAMERA_LEVER_ARM_TRACKING_PROFILE,
             CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE,
+            ZERO_PROGRESS_HOLD_TRACKING_PROFILE,
         }
     ):
         parser.error("camera lever-arm compensation requires its tracking profile")
@@ -263,6 +302,14 @@ def main() -> int:
     ):
         parser.error(
             "camera error recovery requires lever-arm compensation and its tracking profile"
+        )
+    if args.require_zero_progress_hold and (
+        not args.require_camera_lever_arm_compensation
+        or args.require_camera_error_recovery_governor
+        or args.expected_tracking_profile != ZERO_PROGRESS_HOLD_TRACKING_PROFILE
+    ):
+        parser.error(
+            "zero-progress hold requires lever-arm compensation and its tracking profile"
         )
     requested = [int(value) for value in args.cases.split(",")]
     admission = args.root / "admission.json"
@@ -287,6 +334,25 @@ def main() -> int:
         and contract_identity_rows_passed(admission_payload)
         and admission_payload.get("runtime_authorized") is True
         and admission_payload.get("gate_c_execution_authorized") is True
+        and admission_payload.get("residual_capture_authorized") is False
+        and admission_payload.get("bc_authorized") is False
+        and admission_payload.get("ppo_authorized") is False
+        and admission_payload.get("valid_for_training") is False
+    )
+    zero_progress_hold_admission_passed = not args.require_zero_progress_hold or (
+        requested == [42]
+        and admission_payload.get("requested_cases") == [42]
+        and admission_payload.get("namespace") == args.root.name
+        and admission_payload.get("runtime_commit") == args.git_commit
+        and admission_payload.get("upstream_commit") == args.git_commit
+        and admission_payload.get("tracking_profile")
+        == ZERO_PROGRESS_HOLD_TRACKING_PROFILE
+        and admission_payload.get("zero_progress_hold_required") is True
+        and admission_payload.get("phase_governor_contract")
+        == PHASE_GOVERNOR_CONTRACT
+        and admission_payload.get("minimum_progress_scale") == 0.0
+        and admission_payload.get("root_velocity_outer_feedback_enabled") is False
+        and admission_payload.get("runtime_authorized") is True
         and admission_payload.get("residual_capture_authorized") is False
         and admission_payload.get("bc_authorized") is False
         and admission_payload.get("ppo_authorized") is False
@@ -395,6 +461,10 @@ def main() -> int:
             )
             is True
         )
+        zero_progress_hold_evidence_passed = (
+            not args.require_zero_progress_hold
+            or zero_progress_hold_telemetry_passed(payload, result)
+        )
         runtime_contract_passed = (
             payload.get("training_started") is False
             and payload.get("ppo_authorized") is False
@@ -416,6 +486,8 @@ def main() -> int:
             and camera_error_governor_evidence_passed
             and initialization_evidence_passed
             and velocity_feedback_evidence_passed
+            and zero_progress_hold_evidence_passed
+            and zero_progress_hold_admission_passed
         )
         row = {
             "case": case,
@@ -432,6 +504,7 @@ def main() -> int:
                 and camera_error_governor_evidence_passed
                 and initialization_evidence_passed
                 and velocity_feedback_evidence_passed
+                and zero_progress_hold_evidence_passed
                 if args.require_camera_lever_arm_compensation
                 else result.get("controller_evidence_passed")
             ),
@@ -443,6 +516,9 @@ def main() -> int:
             "initialization_evidence_passed": initialization_evidence_passed,
             "velocity_feedback_evidence_passed": (
                 velocity_feedback_evidence_passed
+            ),
+            "zero_progress_hold_evidence_passed": (
+                zero_progress_hold_evidence_passed
             ),
             "initialization_duration_s": initialization_duration_s,
             "initialization_steps": result.get("initialization_steps", 0),
@@ -516,6 +592,13 @@ def main() -> int:
             ),
             "outer_velocity_feedback_source": result.get(
                 "outer_velocity_feedback_source"
+            ),
+            "minimum_progress_scale": result.get("minimum_progress_scale"),
+            "progress_scale_min": result.get("progress_scale_min"),
+            "progress_hold_step_count": result.get("progress_hold_step_count"),
+            "progress_hold_ratio": result.get("progress_hold_ratio"),
+            "progress_hold_segment_count": result.get(
+                "progress_hold_segment_count"
             ),
             "source_duration_s": result.get("source_duration_s"),
             "execution_duration_s": result.get("execution_duration_s"),
@@ -609,6 +692,16 @@ def main() -> int:
         ),
         "camera_error_recovery_governor_required": (
             args.require_camera_error_recovery_governor
+        ),
+        "zero_progress_hold_required": args.require_zero_progress_hold,
+        "zero_progress_hold_admission_passed": (
+            zero_progress_hold_admission_passed
+        ),
+        "expected_phase_governor_contract": (
+            PHASE_GOVERNOR_CONTRACT if args.require_zero_progress_hold else None
+        ),
+        "expected_minimum_progress_scale": (
+            0.0 if args.require_zero_progress_hold else None
         ),
         "expected_camera_error_recovery_governor_contract": (
             CAMERA_ERROR_GOVERNOR_CONTRACT

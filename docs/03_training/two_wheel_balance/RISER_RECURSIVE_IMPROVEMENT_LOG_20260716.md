@@ -4086,3 +4086,37 @@ and must state whether its candidate was accepted or rejected.
   WSL/Windows/NVIDIA ownership.
 - Run exactly one mid-v3 shard. Stop on any reject. Only the existing sealed low
   pass plus a clean mid-v3 pass may admit one high-v3 shard.
+
+## Round 115: three-height plant envelope passed; case-42 route prepared
+
+- The corrected mid-v3 shard passed all `56/56` scenarios. Aggregate selected
+  `vx/wz` RMSE was `0.038222/0.001502`, peak pitch was `8.442031 deg`, action
+  saturation was zero, direction asymmetry was `0.033005 m/s`, and riser/gimbal
+  hold maxima were `0.011223 m/0.084689 deg`. Result/final-status SHA-256 values
+  are `d5f2abb66663e1afaf68b403acde59d70daea2ea8531dfd3ab7de9a3301566cc`
+  and `c6c06b74d3752ca8b24d1ad01251d8b5a77a47fd9980eacb3bc822396cbc46ee`.
+- The exclusive high-v3 shard, representing the approximately `1.8 m` physical
+  camera-height condition, also passed `56/56`. Aggregate selected `vx/wz` RMSE
+  was `0.030486/0.002347`, peak pitch was `9.383905 deg`, action saturation was
+  zero, direction asymmetry was `0.046568 m/s`, and riser/gimbal hold maxima
+  were `0.011437 m/0.084396 deg`. Result/final-status SHA-256 values are
+  `e7874d6e9f223040435dc0cbe573168e668b67090641aa769ce101cf0f8377b0`
+  and `c377bae12c23069633e337b6a6db22308bc6bf153ba9eb2a18d719eb870594ef`.
+- Together with the sealed low-v2 pass, the representative full-riser plant
+  envelope is now complete at low, mid, and high height. This admits one fresh
+  case-42 deterministic trajectory canary at the already selected
+  `vx_kp=0.72`; it does not admit residual capture, BC, PPO, or training.
+- Added a fresh fail-closed case-42 authorization and namespace. It preserves
+  the exact v20 source/portfolio/plan identities, initialization preroll,
+  zero-progress hold, `0.2 m/s` recovery cap, `6 deg` total-pitch limit,
+  commanded-base progress error, and opposing PI-memory reset. Admission,
+  runtime gate, and summary must all report exactly `controller_vx_kp=0.72` and
+  reviewed parent `1e7ebbde4dcb241fde63275e5434dfa2fc4d1cb8`.
+
+## Next round after Round 115
+
+- Pass focused and full authoritative CPU tests, commit, push, and transfer the
+  route. Verify a clean pushed HEAD, fresh namespace, exact plan/controller
+  identities, and exclusive WSL/Windows/NVIDIA ownership.
+- Run exactly case 42. Stop and seal either outcome. Do not start case 43,
+  residual capture, BC, PPO, training, or obstacle work.

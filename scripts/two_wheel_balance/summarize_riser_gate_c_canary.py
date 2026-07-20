@@ -51,6 +51,7 @@ EXPECTED_LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA = (
 REVIEWED_OPPOSING_VX_INTEGRAL_RESET_PARENT_COMMIT = (
     "35f775c39ed2d0c22b52be5dd8f9641354ee0b8f"
 )
+REVIEWED_VX_KP_PARENT_COMMIT = "1e7ebbde4dcb241fde63275e5434dfa2fc4d1cb8"
 REQUIRED_CONTRACT_IDENTITIES = {
     "source_manifest",
     "portfolio_manifest",
@@ -448,6 +449,8 @@ def total_pitch_reference_limit_passed(
     required: bool,
     require_opposing_vx_integral_deficit_reset: bool = False,
     expected_vx_integral_reset_deadband_mps: float = 0.05,
+    require_controller_vx_kp: bool = False,
+    expected_controller_vx_kp: float = 0.6,
 ) -> bool:
     if not required:
         return True
@@ -460,6 +463,8 @@ def total_pitch_reference_limit_passed(
         "wz_kp": 1.05,
         "limit_total_pitch_reference": True,
     }
+    if require_controller_vx_kp:
+        expected_controller_overrides["vx_kp"] = expected_controller_vx_kp
     if require_opposing_vx_integral_deficit_reset:
         expected_controller_overrides.update(
             {
@@ -526,6 +531,8 @@ def main() -> int:
         type=float,
         default=0.05,
     )
+    parser.add_argument("--require-controller-vx-kp", action="store_true")
+    parser.add_argument("--expected-controller-vx-kp", type=float, default=0.6)
     parser.add_argument(
         "--expected-maximum-linear-velocity-mps", type=float, default=0.2
     )
@@ -615,6 +622,14 @@ def main() -> int:
             "opposing PI-memory reset requires commanded-base progress, the "
             "total-pitch limit, and a positive finite reference deadband"
         )
+    if args.require_controller_vx_kp and (
+        not args.require_opposing_vx_integral_deficit_reset
+        or not math.isfinite(args.expected_controller_vx_kp)
+        or not 0.0 < args.expected_controller_vx_kp <= 1.0
+    ):
+        parser.error(
+            "controller vx Kp evidence requires opposing PI reset and a gain in (0, 1]"
+        )
     expected_phase_governor_contract = (
         COMMANDED_BASE_PHASE_GOVERNOR_CONTRACT
         if args.require_commanded_base_progress_error
@@ -690,7 +705,11 @@ def main() -> int:
                 )
                 == EXPECTED_LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA
                 and admission_payload.get("reviewed_controller_parent_commit")
-                == REVIEWED_OPPOSING_VX_INTEGRAL_RESET_PARENT_COMMIT
+                == (
+                    REVIEWED_VX_KP_PARENT_COMMIT
+                    if args.require_controller_vx_kp
+                    else REVIEWED_OPPOSING_VX_INTEGRAL_RESET_PARENT_COMMIT
+                )
                 and admission_payload.get(
                     "reviewed_controller_parent_is_ancestor"
                 )
@@ -875,6 +894,20 @@ def main() -> int:
                 expected_vx_integral_reset_deadband_mps=(
                     args.expected_vx_integral_reset_reference_deadband_mps
                 ),
+                require_controller_vx_kp=args.require_controller_vx_kp,
+                expected_controller_vx_kp=args.expected_controller_vx_kp,
+            )
+        )
+        controller_vx_kp_evidence_passed = (
+            not args.require_controller_vx_kp
+            or (
+                admission_payload.get("controller_vx_kp_required") is True
+                and admission_payload.get("expected_controller_vx_kp")
+                == args.expected_controller_vx_kp
+                and payload.get("controller_overrides", {}).get("vx_kp")
+                == args.expected_controller_vx_kp
+                and result.get("controller_vx_kp")
+                == args.expected_controller_vx_kp
             )
         )
         runtime_contract_passed = (
@@ -902,6 +935,7 @@ def main() -> int:
             and velocity_feedback_evidence_passed
             and zero_progress_hold_evidence_passed
             and total_pitch_reference_limit_evidence_passed
+            and controller_vx_kp_evidence_passed
             and zero_progress_hold_admission_passed
         )
         row = {
@@ -922,6 +956,7 @@ def main() -> int:
                 and zero_progress_hold_evidence_passed
                 and commanded_base_progress_error_evidence_passed
                 and longitudinal_authority_evidence_passed
+                and controller_vx_kp_evidence_passed
                 if args.require_camera_lever_arm_compensation
                 else result.get("controller_evidence_passed")
             ),
@@ -940,6 +975,12 @@ def main() -> int:
                 if args.require_opposing_vx_integral_deficit_reset
                 else None
             ),
+            "controller_vx_kp_evidence_passed": (
+                controller_vx_kp_evidence_passed
+                if args.require_controller_vx_kp
+                else None
+            ),
+            "controller_vx_kp": result.get("controller_vx_kp"),
             "initialization_evidence_passed": initialization_evidence_passed,
             "velocity_feedback_evidence_passed": (
                 velocity_feedback_evidence_passed
@@ -1182,6 +1223,22 @@ def main() -> int:
         ),
         "opposing_vx_integral_deficit_reset_required": (
             args.require_opposing_vx_integral_deficit_reset
+        ),
+        "controller_vx_kp_required": args.require_controller_vx_kp,
+        "expected_controller_vx_kp": (
+            args.expected_controller_vx_kp
+            if args.require_controller_vx_kp
+            else None
+        ),
+        "controller_vx_kp_evidence_passed": (
+            bool(gate_rows)
+            and len(gate_rows) == len(requested)
+            and all(
+                row["controller_vx_kp_evidence_passed"] is True
+                for row in gate_rows
+            )
+            if args.require_controller_vx_kp
+            else None
         ),
         "expected_vx_integral_reset_reference_deadband_mps": (
             args.expected_vx_integral_reset_reference_deadband_mps

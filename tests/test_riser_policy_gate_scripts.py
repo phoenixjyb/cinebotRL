@@ -688,6 +688,23 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert 'summary.get("longitudinal_authority_evidence_passed") is True' in source
     assert "merge-base --is-ancestor" in source
     assert 'payload["reviewed_controller_parent_is_ancestor"] = True' in source
+    assert (
+        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V20_ZERO_PROGRESS_HOLD_"
+        "CAP020_TOTAL_PITCH_COMMANDED_BASE_PROGRESS_OPPOSING_PI_RESET_"
+        "VXKP072_V2" in source
+    )
+    assert (
+        "20260720_gate_c_smoothed_case42_v20_zero_progress_hold_cap020_"
+        "total_pitch_commanded_base_progress_opposing_pi_reset_"
+        "vxkp072_v2_exclusive" in source
+    )
+    assert 'CONTROLLER_VX_KP="0.72"' in source
+    assert "--controller-vx-kp" in source
+    assert "--require-controller-vx-kp" in source
+    assert "--expected-controller-vx-kp" in source
+    assert "1e7ebbde4dcb241fde63275e5434dfa2fc4d1cb8" in source
+    assert 'payload["controller_vx_kp_required"]' in source
+    assert 'result.get("controller_vx_kp") == expected_controller_vx_kp' in source
     assert "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f" in source
     assert "WINDOWS_POWERSHELL=" in source
     assert "Get-CimInstance Win32_Process" in source

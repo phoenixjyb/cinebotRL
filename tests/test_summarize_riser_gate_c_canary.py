@@ -504,6 +504,29 @@ def _enable_opposing_vx_integral_reset_admission(
     path.write_text(json.dumps(payload))
 
 
+def _enable_controller_vx_kp_contract(path: Path) -> None:
+    _enable_opposing_vx_integral_reset_contract(path)
+    payload = json.loads(path.read_text())
+    payload["controller_overrides"]["vx_kp"] = 0.72
+    payload["results"][0]["controller_vx_kp"] = 0.72
+    path.write_text(json.dumps(payload))
+
+
+def _enable_controller_vx_kp_admission(path: Path, commit: str) -> None:
+    _enable_opposing_vx_integral_reset_admission(path, commit)
+    payload = json.loads(path.read_text())
+    payload.update(
+        {
+            "controller_vx_kp_required": True,
+            "expected_controller_vx_kp": 0.72,
+            "reviewed_controller_parent_commit": (
+                "1e7ebbde4dcb241fde63275e5434dfa2fc4d1cb8"
+            ),
+        }
+    )
+    path.write_text(json.dumps(payload))
+
+
 def _enable_initialization_preroll_evidence(path: Path) -> None:
     payload = json.loads(path.read_text())
     result = payload["results"][0]
@@ -1010,6 +1033,77 @@ def test_summary_requires_opposing_vx_integral_reset_evidence(
     summary = json.loads(output.read_text())
     assert not summary["zero_progress_hold_admission_passed"]
     assert not summary["runtime_contract_passed"]
+
+
+def test_summary_requires_exact_controller_vx_kp_evidence(tmp_path: Path) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    admission = tmp_path / "admission.json"
+    _admission(admission, commit, tmp_path.name)
+    _enable_controller_vx_kp_admission(admission, commit)
+    gate = tmp_path / "gates/case_0042.json"
+    _gate(gate, 42, True)
+    _enable_controller_vx_kp_contract(gate)
+    output = tmp_path / "summary.json"
+    profile = (
+        "riser_recovery_direction_v4_camera_lever_arm_"
+        "zero_progress_hold_velocity_cap_total_pitch_limit_v1"
+    )
+    command = [
+        sys.executable,
+        str(SCRIPT),
+        "--root",
+        str(tmp_path),
+        "--git-commit",
+        commit,
+        "--cases",
+        "42",
+        "--expected-tracking-profile",
+        profile,
+        "--require-camera-lever-arm-compensation",
+        "--require-zero-progress-hold",
+        "--require-recovery-velocity-cap",
+        "--expected-maximum-linear-velocity-mps",
+        "0.2",
+        "--require-total-pitch-reference-limit",
+        "--require-commanded-base-progress-error",
+        "--require-opposing-vx-integral-deficit-reset",
+        "--expected-vx-integral-reset-reference-deadband-mps",
+        "0.05",
+        "--require-controller-vx-kp",
+        "--expected-controller-vx-kp",
+        "0.72",
+        "--output",
+        str(output),
+    ]
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert summary["passed"]
+    assert summary["controller_vx_kp_required"] is True
+    assert summary["expected_controller_vx_kp"] == 0.72
+    assert summary["controller_vx_kp_evidence_passed"] is True
+    assert summary["gate_rows"][0]["controller_vx_kp"] == 0.72
+
+    payload = json.loads(gate.read_text())
+    payload["results"][0]["controller_vx_kp"] = 0.71
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert summary["controller_vx_kp_evidence_passed"] is False
+    assert not summary["runtime_contract_passed"]
+    assert not summary["passed"]
+
+    _enable_controller_vx_kp_contract(gate)
+    admission_payload = json.loads(admission.read_text())
+    admission_payload["reviewed_controller_parent_commit"] = "f" * 40
+    admission.write_text(json.dumps(admission_payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert not summary["zero_progress_hold_admission_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert not summary["passed"]
 
 
 def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path) -> None:

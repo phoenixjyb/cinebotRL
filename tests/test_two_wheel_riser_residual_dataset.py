@@ -6,13 +6,16 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     BASE_OBSERVATION_NAMES,
     LOOKAHEAD_CHANNEL_NAMES,
     LOOKAHEAD_HORIZONS_S,
+    OBSERVATION_INDEX,
     OBSERVATION_NAMES,
+    PREVIOUS_ACTION_INDICES,
     apply_residual_action,
     build_executed_observation,
     build_raw_residual_command,
     build_residual_action,
     load_case_dataset,
     load_raw_teacher_case,
+    normalize_raw_teacher_payload,
     save_case_dataset,
     save_raw_teacher_case,
     normalize_residual_command,
@@ -218,3 +221,48 @@ def test_raw_teacher_capture_rejects_nonzero_previous_action_placeholder(
     }
     with pytest.raises(ValueError, match="previous-action placeholders"):
         save_raw_teacher_case(tmp_path / "bad.npz", 2, payload)
+
+
+def test_normalize_raw_teacher_rebuilds_previous_actions() -> None:
+    count = 3
+    observations = np.zeros((count, len(OBSERVATION_NAMES)), dtype=np.float32)
+    observations[:, OBSERVATION_INDEX["feedforward_vx_m_s"]] = 0.1
+    observations[:, OBSERVATION_INDEX["feedforward_wz_rad_s"]] = -0.2
+    observations[:, OBSERVATION_INDEX["riser_position_m"]] = 1.0
+    raw = np.array(
+        [[0.1, 0.2, 0.01], [-0.2, 0.1, 0.02], [0.05, -0.1, -0.01]],
+        dtype=np.float32,
+    )
+    scales = np.array([0.4, 0.4, 0.1], dtype=np.float64)
+    payload = {
+        "observations": observations,
+        "raw_residual_commands": raw,
+        "case_ids": np.full(count, 2, dtype=np.int16),
+        "elapsed_time_s": np.arange(count, dtype=np.float64) * 0.005,
+        "phase_time_s": np.arange(count, dtype=np.float64) * 0.004,
+        "baseline_wheel_actions": np.zeros((count, 2), dtype=np.float32),
+        "teacher_commands": np.column_stack(
+            (0.1 + raw[:, 0], -0.2 + raw[:, 1], 1.0 + raw[:, 2])
+        ),
+    }
+    normalized = normalize_raw_teacher_payload(payload, scales)
+    expected_actions = raw / scales
+    np.testing.assert_allclose(normalized["actions"], expected_actions, atol=1e-7)
+    previous = normalized["observations"][:, PREVIOUS_ACTION_INDICES]
+    np.testing.assert_array_equal(previous[0], np.zeros(3))
+    np.testing.assert_allclose(previous[1:], expected_actions[:-1], atol=1e-7)
+
+
+def test_normalize_raw_teacher_rejects_scale_without_margin() -> None:
+    count = 2
+    payload = {
+        "observations": np.zeros((count, len(OBSERVATION_NAMES)), dtype=np.float32),
+        "raw_residual_commands": np.array([[0.4, 0.0, 0.0]] * count),
+        "case_ids": np.full(count, 2, dtype=np.int16),
+        "elapsed_time_s": np.arange(count, dtype=np.float64) * 0.005,
+        "phase_time_s": np.arange(count, dtype=np.float64) * 0.004,
+        "baseline_wheel_actions": np.zeros((count, 2), dtype=np.float32),
+        "teacher_commands": np.array([[0.4, 0.0, 0.0]] * count),
+    }
+    with pytest.raises(ValueError, match="unclipped margin"):
+        normalize_raw_teacher_payload(payload, np.array([0.4, 0.4, 0.1]))

@@ -449,6 +449,48 @@ def load_raw_teacher_case(
     return metadata, payload
 
 
+def normalize_raw_teacher_payload(
+    payload: dict[str, np.ndarray], action_scales: np.ndarray
+) -> dict[str, np.ndarray]:
+    validate_raw_teacher_case(payload)
+    scales = np.asarray(action_scales, dtype=np.float64)
+    if scales.shape != (3,) or not np.isfinite(scales).all() or np.any(scales <= 0.0):
+        raise ValueError("action scales must contain three positive finite values")
+    actions = np.asarray(payload["raw_residual_commands"], dtype=np.float64) / scales
+    if np.max(np.abs(actions)) >= 1.0 - 1e-6:
+        raise ValueError("frozen action scales do not leave an unclipped margin")
+    observations = np.asarray(payload["observations"], dtype=np.float32).copy()
+    previous_actions = np.zeros_like(actions, dtype=np.float32)
+    previous_actions[1:] = actions[:-1].astype(np.float32)
+    observations[:, PREVIOUS_ACTION_INDICES] = previous_actions
+    normalized = {
+        "observations": observations,
+        "actions": actions.astype(np.float32),
+        "case_ids": np.asarray(payload["case_ids"]).copy(),
+        "elapsed_time_s": np.asarray(payload["elapsed_time_s"]).copy(),
+        "phase_time_s": np.asarray(payload["phase_time_s"]).copy(),
+        "baseline_wheel_actions": np.asarray(
+            payload["baseline_wheel_actions"]
+        ).copy(),
+        "teacher_commands": np.asarray(payload["teacher_commands"]).copy(),
+    }
+    validate_case_dataset(normalized)
+    reconstructed = np.column_stack(
+        (
+            observations[:, OBSERVATION_INDEX["feedforward_vx_m_s"]]
+            + scales[0] * normalized["actions"][:, 0],
+            observations[:, OBSERVATION_INDEX["feedforward_wz_rad_s"]]
+            + scales[1] * normalized["actions"][:, 1],
+            observations[:, OBSERVATION_INDEX["riser_position_m"]]
+            + scales[2] * normalized["actions"][:, 2],
+        )
+    )
+    error = float(np.max(np.abs(reconstructed - normalized["teacher_commands"])))
+    if error > 2e-6:
+        raise ValueError(f"normalized teacher command reconstruction failed: {error}")
+    return normalized
+
+
 def save_case_dataset(path: Path, case: int, payload: dict[str, np.ndarray]) -> None:
     validate_case_dataset(payload, expected_case=case)
     metadata = {

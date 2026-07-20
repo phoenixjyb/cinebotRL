@@ -280,6 +280,7 @@ def cascaded_lqr_action(
     control_dt: float,
     config: CascadedLQRConfig,
     pitch_bias_override_rad: np.ndarray | None = None,
+    outer_vx_feedback_m_s: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]:
     """Track chassis commands with bounded outer loops and a frozen inner LQR."""
     states = np.asarray(states, dtype=np.float64)
@@ -303,6 +304,17 @@ def cascaded_lqr_action(
             or not np.isfinite(pitch_bias_override_rad).all()
         ):
             raise ValueError("pitch bias override must be finite and match the batch")
+    if outer_vx_feedback_m_s is not None:
+        outer_vx_feedback_m_s = np.asarray(
+            outer_vx_feedback_m_s, dtype=np.float64
+        ).reshape(-1)
+        if (
+            outer_vx_feedback_m_s.shape != (batch,)
+            or not np.isfinite(outer_vx_feedback_m_s).all()
+        ):
+            raise ValueError(
+                "outer velocity feedback must be finite and match the batch"
+            )
     valid_controller_state_shapes = ((batch, 2), (batch, 3), (batch, 4), (batch, 6))
     if integrals.shape not in valid_controller_state_shapes:
         raise ValueError(
@@ -369,8 +381,13 @@ def cascaded_lqr_action(
             effective_wz_ref = integrals[:, 5] + np.clip(
                 governed_wz_ref - integrals[:, 5], -maximum_delta, maximum_delta
             )
-    vx_estimate = config.wheel_radius_m * states[:, 3]
-    vx_error = effective_vx_ref - vx_estimate
+    wheel_vx_estimate = config.wheel_radius_m * states[:, 3]
+    outer_vx_feedback = (
+        wheel_vx_estimate
+        if outer_vx_feedback_m_s is None
+        else outer_vx_feedback_m_s
+    )
+    vx_error = effective_vx_ref - outer_vx_feedback
     wz_error = effective_wz_ref - states[:, 5]
     candidate_integrals = integrals.copy()
     candidate_integrals[:, 0] = np.clip(
@@ -492,7 +509,12 @@ def cascaded_lqr_action(
         "governed_vx_ref": governed_vx_ref,
         "governed_wz_ref": governed_wz_ref,
         "path_progress_scale": path_progress_scale,
-        "vx_estimate": vx_estimate,
+        "vx_estimate": wheel_vx_estimate,
+        "wheel_vx_estimate": wheel_vx_estimate,
+        "outer_vx_feedback": outer_vx_feedback,
+        "outer_vx_feedback_is_root": np.full(
+            batch, outer_vx_feedback_m_s is not None, dtype=bool
+        ),
         "effective_vx_ref": effective_vx_ref,
         "effective_wz_ref": effective_wz_ref,
         "vx_error": vx_error,

@@ -1,6 +1,7 @@
 """Pure tests for the two-wheel action and observation contract."""
 
 import numpy as np
+import pytest
 
 from rl_platform.tasks.two_wheel_balance.metrics import (
     ACTION_NAMES,
@@ -139,6 +140,81 @@ def test_cascaded_lqr_signed_commands_produce_signed_actions() -> None:
     assert actions[1, 1] < 0.0
     assert diagnostics["pitch_reference"][0] > 0.0
     assert diagnostics["pitch_reference"][1] < 0.0
+
+
+def test_cascaded_lqr_root_feedback_changes_only_outer_velocity_error() -> None:
+    gain = np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES)))
+    states = np.zeros((1, len(LQR_STATE_NAMES)))
+    states[0, 3] = -0.38 / 0.1016
+    reference = np.array([-0.4])
+    _, _, legacy = cascaded_lqr_action(
+        states,
+        reference,
+        np.zeros(1),
+        gain,
+        np.zeros((1, 2)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(),
+    )
+    _, _, candidate = cascaded_lqr_action(
+        states,
+        reference,
+        np.zeros(1),
+        gain,
+        np.zeros((1, 2)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(),
+        outer_vx_feedback_m_s=np.array([0.05]),
+    )
+    np.testing.assert_allclose(legacy["wheel_vx_estimate"], [-0.38])
+    np.testing.assert_allclose(candidate["wheel_vx_estimate"], [-0.38])
+    np.testing.assert_allclose(candidate["outer_vx_feedback"], [0.05])
+    np.testing.assert_allclose(legacy["vx_error"], [-0.02])
+    np.testing.assert_allclose(candidate["vx_error"], [-0.45])
+    assert abs(candidate["pitch_reference"][0]) > abs(
+        legacy["pitch_reference"][0]
+    )
+    assert not legacy["outer_vx_feedback_is_root"][0]
+    assert candidate["outer_vx_feedback_is_root"][0]
+
+    explicit_wheel_action, explicit_wheel_state, explicit_wheel = (
+        cascaded_lqr_action(
+            states,
+            reference,
+            np.zeros(1),
+            gain,
+            np.zeros((1, 2)),
+            control_dt=0.02,
+            config=CascadedLQRConfig(),
+            outer_vx_feedback_m_s=np.array([-0.38]),
+        )
+    )
+    legacy_action, legacy_state, _ = cascaded_lqr_action(
+        states,
+        reference,
+        np.zeros(1),
+        gain,
+        np.zeros((1, 2)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(),
+    )
+    np.testing.assert_allclose(explicit_wheel_action, legacy_action)
+    np.testing.assert_allclose(explicit_wheel_state, legacy_state)
+    np.testing.assert_allclose(explicit_wheel["vx_error"], legacy["vx_error"])
+
+
+def test_cascaded_lqr_rejects_invalid_root_velocity_feedback() -> None:
+    with pytest.raises(ValueError, match="outer velocity feedback"):
+        cascaded_lqr_action(
+            np.zeros((1, len(LQR_STATE_NAMES))),
+            np.zeros(1),
+            np.zeros(1),
+            np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES))),
+            np.zeros((1, 2)),
+            control_dt=0.02,
+            config=CascadedLQRConfig(),
+            outer_vx_feedback_m_s=np.array([float("nan")]),
+        )
 
 
 def test_cascaded_lqr_blocks_integrators_that_drive_further_into_limits() -> None:

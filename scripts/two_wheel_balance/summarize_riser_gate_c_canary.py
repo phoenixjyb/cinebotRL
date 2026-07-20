@@ -514,6 +514,9 @@ def main() -> int:
             "velocity_feedback_telemetry_observed": result.get(
                 "velocity_feedback_telemetry_observed"
             ),
+            "outer_velocity_feedback_source": result.get(
+                "outer_velocity_feedback_source"
+            ),
             "source_duration_s": result.get("source_duration_s"),
             "execution_duration_s": result.get("execution_duration_s"),
             "completed_steps": result.get("completed_steps"),

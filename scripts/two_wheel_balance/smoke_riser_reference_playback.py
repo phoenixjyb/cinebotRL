@@ -48,6 +48,11 @@ parser.add_argument("--controller-wz-kp", type=float)
 parser.add_argument("--controller-wz-ki", type=float)
 parser.add_argument("--controller-wz-feedforward", type=float)
 parser.add_argument("--controller-wheel-difference-kp", type=float)
+parser.add_argument(
+    "--use-root-velocity-outer-feedback",
+    action="store_true",
+    help="Use measured root vx for the outer PI only; keep wheel state in the frozen LQR.",
+)
 parser.add_argument("--tracking-along-kp", type=float)
 parser.add_argument("--tracking-cross-kp", type=float)
 parser.add_argument("--tracking-yaw-kp", type=float)
@@ -502,6 +507,13 @@ def evaluate_case(
             unwrapped.vx_ref.fill_(vx_ref)
             unwrapped.wz_ref.fill_(wz_ref)
             if initialization_step % control_interval == 0:
+                initialization_outer_vx = (
+                    np.array(
+                        [float(unwrapped._state_terms()["vx"][0].item())]
+                    )
+                    if args.use_root_velocity_outer_feedback
+                    else None
+                )
                 action, controller_state, _ = cascaded_lqr_action(
                     current_states,
                     np.array([vx_ref]),
@@ -511,6 +523,7 @@ def evaluate_case(
                     control_dt=control_interval / POLICY_HZ,
                     config=controller_cfg,
                     pitch_bias_override_rad=np.array([com_pitch_bias]),
+                    outer_vx_feedback_m_s=initialization_outer_vx,
                 )
                 action = action.astype(np.float32)
             obs, _, terminated, truncated, _ = env.step(
@@ -883,6 +896,11 @@ def evaluate_case(
         unwrapped.vx_ref.fill_(vx_ref)
         unwrapped.wz_ref.fill_(wz_ref)
         if step % control_interval == 0:
+            outer_vx_feedback = (
+                np.array([float(unwrapped._state_terms()["vx"][0].item())])
+                if args.use_root_velocity_outer_feedback
+                else None
+            )
             action, controller_state, controller_diagnostics = cascaded_lqr_action(
                 current_states,
                 np.array([vx_ref]),
@@ -896,6 +914,7 @@ def evaluate_case(
                     if args.disable_com_pitch_feedforward
                     else np.array([com_pitch_bias])
                 ),
+                outer_vx_feedback_m_s=outer_vx_feedback,
             )
             action = action.astype(np.float32)
         dataset_baseline_actions.append(action[0].copy())
@@ -1305,6 +1324,11 @@ def evaluate_case(
         "source_duration_s": source_duration_s,
         "execution_duration_s": execution_duration_s,
         "maximum_duration_scale": args.maximum_duration_scale,
+        "outer_velocity_feedback_source": (
+            "root_link_vx"
+            if args.use_root_velocity_outer_feedback
+            else "wheel_derived_vx"
+        ),
         "maximum_runtime_s": execution_duration_s * args.maximum_duration_scale,
         "completed_phase_time_s": phase_time_s,
         "completed_steps": completed_steps,

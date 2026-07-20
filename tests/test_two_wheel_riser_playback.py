@@ -283,6 +283,7 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert 'parser.add_argument("--video-fps", type=int, default=200)' in source
     assert '"riser_recovery_direction_v4"' in source
     assert '"--enable-camera-lever-arm-compensation"' in source
+    assert '"--use-commanded-base-progress-error"' in source
     assert '"--camera-lever-arm-compensation-gain"' in source
     assert '"--maximum-camera-lever-arm-correction-m"' in source
     assert '"--enable-camera-error-recovery-governor"' in source
@@ -304,11 +305,22 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert "math.isfinite(args.camera_lever_arm_compensation_gain)" in pre_app_source
     assert "math.isfinite(args.maximum_camera_lever_arm_correction_m)" in pre_app_source
     assert "bounded_camera_lever_arm_base_target(" in source
+    assert "select_progress_governor_base_error(" in source
     assert "bounded_camera_recovery_progress_scale(" in source
     assert '"camera_recovery_governor_contract"' in source
     assert '"camera_recovery_telemetry_observed"' in source
     assert '"camera_recovery_activation_ratio"' in source
     assert '"phase_governor_contract"' in source
+    assert '"commanded_base_progress_error_enabled"' in source
+    assert '"progress_base_error_source"' in source
+    assert '"progress_base_error_telemetry_observed"' in source
+    assert '"commanded_base_xy_error_m"' in source
+    assert '"progress_base_error_m"' in source
+    assert "commanded_base_and_camera_error_continuous_phase_scale_v1" in source
+    assert (
+        "commanded-base progress error requires the phase governor and "
+        "camera lever-arm compensation"
+    ) in pre_app_source
     assert '"minimum_progress_scale"' in source
     assert "summarize_progress_hold(" in source
     assert '"camera_lever_arm_compensation_contract"' in source

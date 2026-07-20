@@ -17,6 +17,7 @@ from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     equilibrium_pitch_from_world_com,
     nearest_equivalent_angle,
     riser_tracking_config,
+    select_progress_governor_base_error,
     slew_limited_arm_target,
     summarize_progress_hold,
     yaw_from_quaternion_wxyz,
@@ -188,6 +189,38 @@ def test_progress_governor_can_hold_only_when_explicitly_configured() -> None:
     assert bounded_progress_scale(0.25, 0.0, default) == pytest.approx(0.1)
     assert bounded_progress_scale(0.25, 0.0, hold) == 0.0
     assert bounded_progress_scale(0.15, 0.0, hold) == pytest.approx(0.5)
+
+
+def test_progress_governor_base_error_defaults_to_nominal_plan_target() -> None:
+    assert select_progress_governor_base_error(
+        0.22,
+        0.11,
+        use_commanded_base_target=False,
+    ) == pytest.approx(0.22)
+
+
+def test_progress_governor_base_error_can_use_compensated_command_target() -> None:
+    assert select_progress_governor_base_error(
+        0.22,
+        0.11,
+        use_commanded_base_target=True,
+    ) == pytest.approx(0.11)
+
+
+@pytest.mark.parametrize(
+    ("nominal", "commanded"),
+    [(-0.01, 0.1), (0.1, -0.01), (np.nan, 0.1), (0.1, np.inf)],
+)
+def test_progress_governor_base_error_rejects_invalid_evidence(
+    nominal: float,
+    commanded: float,
+) -> None:
+    with pytest.raises(ValueError, match="progress-governor base errors"):
+        select_progress_governor_base_error(
+            nominal,
+            commanded,
+            use_commanded_base_target=True,
+        )
 
 
 @pytest.mark.parametrize("minimum", [-0.01, 1.01])

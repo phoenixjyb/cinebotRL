@@ -85,6 +85,14 @@ parser.add_argument(
     action="store_true",
     help="Apply bounded camera-to-base lever displacement feedback to base XY.",
 )
+parser.add_argument(
+    "--use-commanded-base-progress-error",
+    action="store_true",
+    help=(
+        "Govern trajectory phase using error to the lever-compensated base "
+        "command instead of the nominal plan allocation."
+    ),
+)
 parser.add_argument("--camera-lever-arm-compensation-gain", type=float, default=1.0)
 parser.add_argument("--maximum-camera-lever-arm-correction-m", type=float, default=0.05)
 parser.add_argument(
@@ -181,6 +189,12 @@ if args.enable_camera_error_recovery_governor and (
     parser.error(
         "camera error recovery requires the phase governor and camera lever-arm compensation"
     )
+if args.use_commanded_base_progress_error and (
+    args.disable_phase_governor or not args.enable_camera_lever_arm_compensation
+):
+    parser.error(
+        "commanded-base progress error requires the phase governor and camera lever-arm compensation"
+    )
 app = AppLauncher(args).app
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -245,6 +259,7 @@ from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     equilibrium_pitch_from_world_com,
     nearest_equivalent_angle,
     riser_tracking_config,
+    select_progress_governor_base_error,
     summarize_progress_hold,
     yaw_from_quaternion_wxyz,
 )
@@ -281,6 +296,22 @@ def tracking_profile_name() -> str:
     if args.enable_camera_lever_arm_compensation:
         return "riser_recovery_direction_v4_camera_lever_arm_v1"
     return "riser_recovery_direction_v4"
+
+
+def progress_governor_base_error_source() -> str:
+    return (
+        "lever_compensated_commanded_base_target"
+        if args.use_commanded_base_progress_error
+        else "nominal_plan_base_target"
+    )
+
+
+def phase_governor_contract() -> str:
+    return (
+        "commanded_base_and_camera_error_continuous_phase_scale_v1"
+        if args.use_commanded_base_progress_error
+        else "position_error_continuous_phase_scale_v1"
+    )
 
 
 def parse_cases(value: str) -> list[int]:
@@ -442,6 +473,9 @@ def evaluate_case(
     phase_time_s = 0.0
     progress_scale = 1.0
     progress_samples = []
+    nominal_base_progress_error_samples = []
+    commanded_base_progress_error_samples = []
+    selected_base_progress_error_samples = []
     camera_recovery_progress_samples = []
     camera_lever_arm_correction_norm_samples = []
     camera_lever_arm_raw_correction_norm_samples = []
@@ -1088,6 +1122,14 @@ def evaluate_case(
         base_xy_error = float(
             np.linalg.norm(actual_base_post[:2] - sample.base_xy_yaw[:2])
         )
+        commanded_base_xy_error = float(
+            np.linalg.norm(actual_base_post[:2] - commanded_base_xy_yaw[:2])
+        )
+        progress_base_error = select_progress_governor_base_error(
+            base_xy_error,
+            commanded_base_xy_error,
+            use_commanded_base_target=args.use_commanded_base_progress_error,
+        )
         base_yaw_error = abs(
             math.atan2(
                 math.sin(actual_base_post[2] - sample.base_xy_yaw[2]),
@@ -1135,11 +1177,18 @@ def evaluate_case(
                     )
                 )
             progress_scale = min(
-                bounded_progress_scale(base_xy_error, position_error, tracking_cfg),
+                bounded_progress_scale(
+                    progress_base_error,
+                    position_error,
+                    tracking_cfg,
+                ),
                 balance_progress_scale(abs(float(state["pitch"][0].item()))),
                 camera_recovery_progress_scale,
             )
         progress_samples.append(progress_scale)
+        nominal_base_progress_error_samples.append(base_xy_error)
+        commanded_base_progress_error_samples.append(commanded_base_xy_error)
+        selected_base_progress_error_samples.append(progress_base_error)
         camera_recovery_progress_samples.append(camera_recovery_progress_scale)
         if step % 200 == 0 or phase_time_s >= execution_duration_s:
             trace.append(
@@ -1170,6 +1219,11 @@ def evaluate_case(
                     "proxy_target_velocity_deg_s": target_proxy_velocity_deg_s.tolist(),
                     "proxy_applied_effort_nm": latest_proxy_effort_nm.tolist(),
                     "base_xy_error_m": base_xy_error,
+                    "commanded_base_xy_error_m": commanded_base_xy_error,
+                    "progress_base_error_m": progress_base_error,
+                    "progress_base_error_source": (
+                        progress_governor_base_error_source()
+                    ),
                     "base_yaw_error_deg": math.degrees(base_yaw_error),
                     "actual_base_xy_yaw": actual_base_post.tolist(),
                     "target_base_xy_yaw": sample.base_xy_yaw.tolist(),
@@ -1301,6 +1355,19 @@ def evaluate_case(
     camera_recovery_telemetry_observed = (
         len(camera_recovery_progress_samples) == completed_steps
     )
+    progress_base_error_telemetry_observed = (
+        len(nominal_base_progress_error_samples) == completed_steps
+        and len(commanded_base_progress_error_samples) == completed_steps
+        and len(selected_base_progress_error_samples) == completed_steps
+        and np.array_equal(
+            np.asarray(selected_base_progress_error_samples),
+            np.asarray(
+                commanded_base_progress_error_samples
+                if args.use_commanded_base_progress_error
+                else nominal_base_progress_error_samples
+            ),
+        )
+    )
     dynamic_checks = {
         "initialization_completed": initialization_completed,
         "initialization_action_saturation_bounded": (
@@ -1368,6 +1435,9 @@ def evaluate_case(
         ),
         "camera_recovery_telemetry_observed": (
             camera_recovery_telemetry_observed
+        ),
+        "progress_base_error_telemetry_observed": (
+            progress_base_error_telemetry_observed
         ),
     }
     checks = dynamic_checks | thermal_checks | controller_evidence_checks
@@ -1460,6 +1530,49 @@ def evaluate_case(
         "progress_scale_min": float(np.min(progress_samples)),
         "progress_scale_mean": float(np.mean(progress_samples)),
         "minimum_progress_scale": tracking_cfg.minimum_progress_scale,
+        "commanded_base_progress_error_enabled": (
+            args.use_commanded_base_progress_error
+        ),
+        "phase_governor_contract": phase_governor_contract(),
+        "progress_base_error_source": progress_governor_base_error_source(),
+        "progress_base_error_telemetry_sample_count": len(
+            selected_base_progress_error_samples
+        ),
+        "progress_base_error_telemetry_observed": (
+            progress_base_error_telemetry_observed
+        ),
+        "nominal_base_progress_error_p95_m": float(
+            np.percentile(nominal_base_progress_error_samples, 95)
+        ),
+        "nominal_base_progress_error_max_m": float(
+            np.max(nominal_base_progress_error_samples)
+        ),
+        "commanded_base_progress_error_p95_m": float(
+            np.percentile(commanded_base_progress_error_samples, 95)
+        ),
+        "commanded_base_progress_error_max_m": float(
+            np.max(commanded_base_progress_error_samples)
+        ),
+        "selected_base_progress_error_p95_m": float(
+            np.percentile(selected_base_progress_error_samples, 95)
+        ),
+        "selected_base_progress_error_max_m": float(
+            np.max(selected_base_progress_error_samples)
+        ),
+        "selected_vs_nominal_base_progress_error_mean_delta_m": float(
+            np.mean(
+                np.asarray(selected_base_progress_error_samples)
+                - np.asarray(nominal_base_progress_error_samples)
+            )
+        ),
+        "selected_vs_nominal_base_progress_error_abs_max_delta_m": float(
+            np.max(
+                np.abs(
+                    np.asarray(selected_base_progress_error_samples)
+                    - np.asarray(nominal_base_progress_error_samples)
+                )
+            )
+        ),
         "maximum_linear_velocity_mps": tracking_cfg.maximum_linear_velocity_mps,
         "total_pitch_reference_limit_enabled": (
             controller_cfg.limit_total_pitch_reference
@@ -1801,7 +1914,11 @@ def main() -> int:
             else "implicit_position_drive_diagnostic"
         ),
         "phase_governor_enabled": not args.disable_phase_governor,
-        "phase_governor_contract": "position_error_continuous_phase_scale_v1",
+        "phase_governor_contract": phase_governor_contract(),
+        "commanded_base_progress_error_enabled": (
+            args.use_commanded_base_progress_error
+        ),
+        "progress_base_error_source": progress_governor_base_error_source(),
         "minimum_progress_scale": (
             args.tracking_minimum_progress_scale
             if args.tracking_minimum_progress_scale is not None
@@ -1924,6 +2041,12 @@ def write_runtime_failure(exc: Exception) -> None:
             args.camera_recovery_error_full_m,
         ],
         "minimum_camera_recovery_scale": args.minimum_camera_recovery_scale,
+        "phase_governor_enabled": not args.disable_phase_governor,
+        "phase_governor_contract": phase_governor_contract(),
+        "commanded_base_progress_error_enabled": (
+            args.use_commanded_base_progress_error
+        ),
+        "progress_base_error_source": progress_governor_base_error_source(),
         "cases": cases,
         "passed_case_count": 0,
         "dynamic_quality_passed": False,

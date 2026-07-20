@@ -135,6 +135,24 @@ def bounded_progress_scale(
     return float(1.0 - severity * (1.0 - config.minimum_progress_scale))
 
 
+def select_progress_governor_base_error(
+    nominal_base_error_m: float,
+    commanded_base_error_m: float,
+    *,
+    use_commanded_base_target: bool,
+) -> float:
+    """Select the base target that owns phase-governor error feedback."""
+
+    values = (nominal_base_error_m, commanded_base_error_m)
+    if not all(math.isfinite(value) and value >= 0.0 for value in values):
+        raise ValueError("progress-governor base errors must be finite and non-negative")
+    return float(
+        commanded_base_error_m
+        if use_commanded_base_target
+        else nominal_base_error_m
+    )
+
+
 def summarize_progress_hold(
     progress_scales: np.ndarray,
     *,

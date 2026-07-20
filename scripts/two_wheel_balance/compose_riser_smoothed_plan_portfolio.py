@@ -20,6 +20,7 @@ REPLACEMENT_SCHEMAS = {
     "cinebotrl_two_wheel_riser_localized_reversal_retime_v1",
     "cinebotrl_two_wheel_riser_case74_localized_heading_relief_v1",
     "cinebotrl_two_wheel_riser_explicit_preview_derivation_v1",
+    "cinebotrl_two_wheel_riser_static_margin_preview_derivation_v1",
 }
 
 

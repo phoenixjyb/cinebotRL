@@ -679,6 +679,65 @@ def test_explicit_preview_builder_preserves_supplied_geometry(monkeypatch) -> No
     assert captured["planning_strategy_override"] == "smoothed_explicit_preview_v1"
 
 
+def test_static_margin_preview_derivation_is_fail_closed_and_training_closed() -> None:
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/derive_riser_smoothed_static_margin_preview.py"
+    )
+    source = script.read_text(encoding="utf-8")
+    assert "cinebotrl_two_wheel_riser_static_margin_preview_derivation_v1" in source
+    assert "PARENT_POSITION_P95_FLOOR_M = 0.14" in source
+    assert "MINIMUM_POSITION_P95_IMPROVEMENT_M = 0.03" in source
+    assert "MINIMUM_POSITION_MAX_IMPROVEMENT_M = 0.03" in source
+    assert '"parent_smoothed_geometry_preserved": True' in source
+    assert '"source_geometry_changed": False' in source
+    assert '"controller_changed": False' in source
+    assert '"thresholds_changed": False' in source
+    assert '"source_arrays_immutable": source_arrays_immutable' in source
+    assert '"isaac_started": False' in source
+    assert '"residual_capture_started": False' in source
+    assert '"bc_started": False' in source
+    assert '"ppo_started": False' in source
+    assert '"valid_for_training": False' in source
+    assert "AppLauncher" not in source
+    assert "--headless" not in source
+
+    spec = importlib.util.spec_from_file_location("static_margin_preview", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    parent = {
+        "passed": True,
+        "timing_transition_kinematic_gate_passed": True,
+        "valid_for_training": False,
+        "kinematic_metrics": {
+            "position_error_p95_m": 0.148,
+            "position_error_max_m": 0.197,
+        },
+    }
+    parent_metrics = module._validate_parent_static_margin(parent)
+    candidate = {
+        "passed": True,
+        "kinematic_metrics": {
+            "position_error_p95_m": 0.051,
+            "position_error_max_m": 0.081,
+        },
+    }
+    assert module._validate_candidate_improvement(parent_metrics, candidate) == {
+        "position_error_p95_m": 0.051,
+        "position_error_max_m": 0.081,
+    }
+    parent["kinematic_metrics"]["position_error_p95_m"] = 0.13
+    with pytest.raises(ValueError, match="proactive p95 margin band"):
+        module._validate_parent_static_margin(parent)
+    candidate["kinematic_metrics"]["position_error_p95_m"] = 0.13
+    with pytest.raises(ValueError, match="p95 improvement is insufficient"):
+        module._validate_candidate_improvement(
+            {"position_error_p95_m": 0.148, "position_error_max_m": 0.197},
+            candidate,
+        )
+
+
 def test_batch_recovery_builder_reuses_geometry_seed(monkeypatch) -> None:
     geometry = np.arange(12, dtype=np.float64).reshape(4, 3)
     seed = object()

@@ -3766,3 +3766,57 @@ and must state whether its candidate was accepted or rejected.
 - If physical dynamics fail, preserve and seal the first reject and return to
   CPU diagnosis. If they pass, stop before capture and recompute the raw
   residual envelope as a separate next stage; BC/PPO remain closed.
+
+## Round 108: PI-memory reset completes case 42 but misses position p95
+
+- Route commit `b0e2e8448a06b9a4f97707fa8cddce0e052bc90f` was pushed
+  and transferred exactly to `.98` with bundle SHA-256
+  `68678851016886e986fcf3fe4b4ef49b951c44fa83c632fb2e2a77b36b512e40`.
+  The complete authoritative CPU suite passed `403/403` in `27.95 s`
+  (`30.21 s` command wall time), and the fresh namespace plus WSL, Windows,
+  and NVIDIA ownership preflight passed before one exclusive launch.
+- The canary completed the full `48.297533 s` execution phase in `28,437`
+  scored steps and `142.185 s` wall time. This recovers the prior
+  `3.385704 s` phase deficit and uses `543` fewer scored steps than Round 104.
+  There was no termination and no action saturation.
+- Dynamic admission still fails solely on position p95:
+  `0.186930 m` against the unchanged `0.15 m` gate. Position max passes at
+  `0.200354 m`; attitude p95/max pass at `0.135134/1.743115 deg`, pitch
+  p95/max are `6.513145/7.025337 deg`, proxy servo max is `1.557279 deg`,
+  thermal admission passes, and all controller/runtime evidence passes.
+- Longitudinal telemetry is complete for all `28,437` policy steps and
+  `7,110` controller updates. It records `25` opposing-memory resets,
+  `18,874` directional-deficit steps (`66.3713%`), mean/max deficit
+  `0.079778/0.363252 m/s`, PI magnitude reaching the unchanged `0.7` bound,
+  total-pitch-limit occupancy for `2,624` steps (`9.2274%`), and common-action
+  maximum `0.596117` below the unchanged `0.8` limit.
+- One-hertz direction segmentation shows the candidate solved the formerly
+  delayed positive segments, whose mean position error falls to approximately
+  `0.067-0.076 m`. Reverse segments remain systematic at approximately
+  `0.150-0.162 m`. The exact phase now completes, so another retime or phase
+  governor adjustment is not justified; the remaining gap is deterministic
+  longitudinal feedback authority during directional deficit.
+- Residual-label envelope passes independently, but training admission remains
+  false. Raw labels were not applied, residual action stayed zero, no dataset
+  was written, and residual capture, BC, PPO, and training remained closed.
+  The demonstrated dynamic union remains `42/70`.
+- Sealed hashes are admission
+  `d8253da9b2668256bfb41c5516555a3532d5496e28926ccafad3802e80dd68b2`,
+  gate `ce27128bf0018b55e109273ce0ceb5a0f0caaf771ff35dc53d218524ec2f404b`,
+  log `01e45faf179602babc799ddbefa7c2e7a6d09fdcd84a27bb999362ebf2bf536a`,
+  exit-code evidence
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+  and summary
+  `92cca965711af3e72411d761e46d1e8097602cad6f7bcf7e0b9b2fc13db72e87`.
+
+## Next round after Round 108
+
+- Stay CPU-only. Derive one default-off longitudinal proportional-authority
+  candidate from the sealed trace while preserving the symmetric `6 deg`
+  total-pitch limit, `0.8` action limit, gains, PI-memory reset, source/plan,
+  both clocks, and every physical/quality gate.
+- Use counterfactual target/action bounds plus synthetic sign, saturation,
+  anti-windup, default-compatibility, and provisional plant-envelope tests to
+  choose a single bounded `vx_kp` value. Do not tune from position score alone
+  and do not add a runtime token in the controller commit.
+- Keep case 43, residual capture, BC, PPO, training, and obstacle work closed.

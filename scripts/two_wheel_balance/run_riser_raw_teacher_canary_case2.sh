@@ -6,8 +6,8 @@ WIN_ROOT='G:\wSpace\cinebotRL-two-wheel-riser'
 PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
 POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
-AUTHORIZATION="AUTHORIZED_RISER_RAW_TEACHER_CASE2_CANARY_V1"
-STAMP="20260720_initial_teacher_raw_canary_case2_v1_exclusive"
+AUTHORIZATION="AUTHORIZED_RISER_RAW_TEACHER_CASE2_CANARY_V2"
+STAMP="20260720_initial_teacher_raw_canary_case2_v2_exclusive"
 PORTFOLIO_STAMP="20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu"
 MANIFEST_SHA256="8351514a361d3be4e5fbf57f2dbb019a7d8d2f5b86e89cea2553a1cfda3c64a1"
 SOURCE_SHA256="f265aa1bdd1cd6c762fd6e5367c00c7abcb7b19dea76bb30c6311885d2f3237d"
@@ -33,18 +33,18 @@ for name in RISER_ROOT RISER_WIN_ROOT ISAAC_PYTHON RISER_GATE_C_CASES \
 done
 
 PORTFOLIO="$ROOT/artifacts/two_wheel_riser/$PORTFOLIO_STAMP"
-PORTFOLIO_WIN="$WIN_ROOT\artifacts\two_wheel_riser\$PORTFOLIO_STAMP"
+PORTFOLIO_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${PORTFOLIO_STAMP}"
 SOURCE_MANIFEST="/mnt/g/wSpace/cinebotRL/data/gikWBC9DOF_exact_source_reference_all79_20260717/manifest.json"
 SELECTION="$ROOT/artifacts/two_wheel_riser/20260720_initial_teacher42_selection_v1/selection.json"
 OUTPUT="$ROOT/artifacts/two_wheel_riser/$STAMP"
-OUTPUT_WIN="$WIN_ROOT\artifacts\two_wheel_riser\$STAMP"
+OUTPUT_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${STAMP}"
 PLAN="$PORTFOLIO/case_0002_smoothed_riser_plan_v1.npz"
 GAINS="$ROOT/docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json"
-GAINS_WIN="$WIN_ROOT\docs\03_training\two_wheel_balance\evidence_20260714_28kg\lqr_gains.json"
+GAINS_WIN="${WIN_ROOT}\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json"
 ROBOT_USD="$ROOT/assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd"
 VALIDATOR="$ROOT/scripts/two_wheel_balance/validate_riser_smoothed_gate_c_canary.py"
 PLAYBACK="$ROOT/scripts/two_wheel_balance/smoke_riser_reference_playback.py"
-PLAYBACK_WIN="$WIN_ROOT\scripts\two_wheel_balance\smoke_riser_reference_playback.py"
+PLAYBACK_WIN="${WIN_ROOT}\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 AUDITOR="$ROOT/scripts/two_wheel_balance/audit_riser_raw_teacher_capture.py"
 RUNNER="$ROOT/scripts/two_wheel_balance/run_riser_raw_teacher_canary_case2.sh"
 DATASET_MODULE="$ROOT/src/rl_platform/tasks/two_wheel_balance/riser_residual_dataset.py"
@@ -186,8 +186,8 @@ timeout --signal=TERM --kill-after=30s "$TIMEOUT_SECONDS" \
   --enable-camera-lever-arm-compensation \
   --camera-lever-arm-compensation-gain 1.0 \
   --maximum-camera-lever-arm-correction-m 0.05 \
-  --raw-teacher-dir "$OUTPUT_WIN\raw_cases" \
-  --output "$OUTPUT_WIN\gates\case_0002.json" --headless \
+  --raw-teacher-dir "${OUTPUT_WIN}\\raw_cases" \
+  --output "${OUTPUT_WIN}\\gates\\case_0002.json" --headless \
   >"$OUTPUT/logs/case_0002.log" 2>&1 || STATUS=$?
 printf '%s\n' "$STATUS" >"$OUTPUT/logs/case_0002.exit_code"
 wait_for_gpu_release || STATUS=5

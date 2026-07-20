@@ -869,6 +869,7 @@ def test_raw_teacher_canary_is_one_case_scale_independent_and_guarded() -> None:
     source = _read("run_riser_raw_teacher_canary_case2.sh")
     assert "AUTHORIZED_RISER_RAW_TEACHER_CASE2_CANARY_V1" in source
     assert "--cases 2" in source
+    assert "--minimum-candidates 70" in source
     assert "--raw-teacher-dir" in source
     assert "--dataset-dir" not in source
     assert "--residual-policy" not in source

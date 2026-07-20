@@ -126,7 +126,7 @@ python3 "$VALIDATOR" \
   --expected-manifest-sha256 "$MANIFEST_SHA256" \
   --expected-source-manifest-sha256 "$SOURCE_SHA256" \
   --expected-planner-commit "$PLANNER_COMMIT" \
-  --expected-count 79 --minimum-candidates 40 --cases 2 \
+  --expected-count 79 --minimum-candidates 70 --cases 2 \
   --output "$TEMP_ADMISSION" >/dev/null
 
 python3 - "$TEMP_ADMISSION" "$COMMIT" "$STAMP" "$SELECTION_SHA256" \
@@ -254,4 +254,3 @@ output = {
 print(json.dumps(output, indent=2))
 raise SystemExit(0 if passed else 4)
 PY
-

@@ -3863,3 +3863,45 @@ and must state whether its candidate was accepted or rejected.
   direction symmetry regresses.
 - Keep case 42 runtime retry, case 43, residual capture, BC, PPO, training, and
   obstacle work closed until that robustness gate passes.
+
+## Round 110: representative riser plant-envelope contract
+
+- A source audit rejected the existing `evaluate_lqr_tracking_push.py` default
+  as qualification evidence for the riser controller. Its default
+  `TWO_WHEEL_BALANCE_CFG` loads the lightweight
+  `recomoProto2_two_wheel_balance.usd`, whose equilibrium pitch is close to
+  zero; trajectory playback instead loads the complete
+  `TWO_WHEEL_RISER_CFG`. The earlier chassis campaign remains valid only for
+  the lightweight balance plant and must not be relabeled as riser evidence.
+- Added an explicit, default-off `--robot-form riser` evaluation path. It loads
+  the complete riser/gimbal/camera USD, holds a selected riser height and the
+  zero semantic-gimbal pose, and computes the physical COM equilibrium pitch
+  from all current rigid-body masses and `body_com_pos_w` for every environment.
+  The original `balance` form remains the default and retains its existing
+  schema.
+- The riser path exposes and records the exact deterministic controller options
+  needed by the case-42 candidate: root-velocity outer feedback, total physical
+  pitch limiting, opposing PI-memory reset and its deadband, and the selected
+  `vx_kp`. It does not alter the frozen LQR gain matrix, the `6 deg` pitch
+  limit, the `0.8` action limit, or any trajectory gate.
+- Riser evidence fails closed on maximum riser and gimbal hold error and records
+  per-scenario COM-bias bounds, robot form, USD path, controller settings, and
+  independent no-learned-action/no-dataset/no-capture/no-BC/no-PPO/no-training
+  markers. The candidate has not run in Isaac and has no dynamic admission.
+- The new source-contract tests and related controller/playback regressions pass
+  `102/102` locally. Syntax compilation and `git diff --check` also pass.
+
+## Next round after Round 110
+
+- Run the complete authoritative `.98` CPU suite after commit transfer. Do not
+  issue a runtime token or start Isaac from an unpushed or dirty commit.
+- Build a separate guarded plant-envelope route for exactly one height per
+  shard at riser positions `0.0`, `0.6`, and `1.2 m` (physical camera heights
+  approximately `0.6`, `1.2`, and `1.8 m`). Each shard must cover both
+  `-0.2/+0.2 m/s`, nominal plus the provisional plant variations, the pinned
+  case-42 deterministic controller options, and the unchanged pitch/action and
+  recovery gates.
+- Stop on the first balance, tracking-recovery, saturation, direction-symmetry,
+  riser-hold, or gimbal-hold reject. Only a clean three-height pass may open one
+  fresh case-42 retry route. Residual capture, BC, PPO, training, case 43, and
+  obstacle work remain closed.

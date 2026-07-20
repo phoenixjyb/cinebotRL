@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import itertools
 import json
 import os
@@ -23,8 +24,33 @@ os.environ.setdefault("GYMNASIUM_DISABLE_PLUGIN_ENTRYPOINTS", "1")
 from isaaclab.app import AppLauncher
 
 
+POLICY_HZ = 200.0
+WHEEL_RADIUS_M = 0.1016
+RISER_LOWER_M = 0.0
+RISER_UPPER_M = 1.2
+RISER_PROXY_JOINTS = (
+    "joint1_gimbal_pitch",
+    "joint2_gimbal_roll",
+    "joint3_gimbal_yaw",
+)
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--gains", type=Path, required=True)
+parser.add_argument(
+    "--robot-form",
+    choices=("balance", "riser"),
+    default="balance",
+    help="Select the lightweight balance chassis or the complete riser plant.",
+)
+parser.add_argument(
+    "--riser-position-m",
+    type=float,
+    default=0.3,
+    help="Static riser joint position used by the full-riser plant gate.",
+)
+parser.add_argument("--maximum-riser-hold-error-m", type=float, default=0.01)
+parser.add_argument("--maximum-gimbal-hold-error-deg", type=float, default=1.0)
 parser.add_argument("--num-envs", type=int, default=24)
 parser.add_argument("--horizon-steps", type=int, default=2000)
 parser.add_argument("--vx-commands", default="-0.2,0.2")
@@ -64,6 +90,17 @@ parser.add_argument(
     "--governor-include-opposing-bias", action="store_true", default=None
 )
 parser.add_argument("--pitch-reference-limit-deg", type=float)
+parser.add_argument("--limit-total-pitch-reference", action="store_true")
+parser.add_argument(
+    "--reset-opposing-vx-integral-on-directional-deficit",
+    action="store_true",
+)
+parser.add_argument(
+    "--vx-integral-reset-reference-deadband-mps",
+    type=float,
+    default=0.05,
+)
+parser.add_argument("--use-root-velocity-outer-feedback", action="store_true")
 parser.add_argument("--vx-reference-slew-rate", type=float)
 parser.add_argument("--wz-reference-slew-rate", type=float)
 parser.add_argument("--path-progress-governor", action="store_true", default=None)
@@ -85,11 +122,34 @@ parser.add_argument("--seed", type=int, default=20260713)
 parser.add_argument("--output", type=Path, required=True)
 AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
+if not (
+    np.isfinite(args.riser_position_m)
+    and RISER_LOWER_M <= args.riser_position_m <= RISER_UPPER_M
+):
+    parser.error(
+        f"--riser-position-m must be in [{RISER_LOWER_M}, {RISER_UPPER_M}]"
+    )
+if not (
+    np.isfinite(args.maximum_riser_hold_error_m)
+    and args.maximum_riser_hold_error_m > 0.0
+):
+    parser.error("--maximum-riser-hold-error-m must be positive")
+if not (
+    np.isfinite(args.maximum_gimbal_hold_error_deg)
+    and args.maximum_gimbal_hold_error_deg > 0.0
+):
+    parser.error("--maximum-gimbal-hold-error-deg must be positive")
+if not (
+    np.isfinite(args.vx_integral_reset_reference_deadband_mps)
+    and args.vx_integral_reset_reference_deadband_mps > 0.0
+):
+    parser.error("--vx-integral-reset-reference-deadband-mps must be positive")
 app = AppLauncher(args).app
 
 import gymnasium as gym
 import torch
 
+from rl_platform.robots.two_wheel_balance import TWO_WHEEL_RISER_CFG
 from rl_platform.tasks.two_wheel_balance import RecomoTwoWheelBalanceEnvCfg
 from rl_platform.tasks.two_wheel_balance.metrics import (
     ACTION_NAMES,
@@ -101,10 +161,10 @@ from rl_platform.tasks.two_wheel_balance.metrics import (
     diagnostic_plant_variations,
     provisional_plant_variations,
 )
+from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
+    equilibrium_pitch_from_world_com,
+)
 from task_spec import register_isaac_lab_tasks
-
-
-POLICY_HZ = 200.0
 
 
 def parse_csv(value: str) -> np.ndarray:
@@ -112,6 +172,41 @@ def parse_csv(value: str) -> np.ndarray:
     if result.size == 0 or not np.isfinite(result).all():
         raise ValueError(f"expected finite comma-separated values, got {value!r}")
     return result
+
+
+def single_joint_id(robot, joint_name: str) -> int:
+    joint_ids = robot.find_joints(joint_name)[0]
+    if len(joint_ids) != 1:
+        raise RuntimeError(f"expected exactly one {joint_name}, got {joint_ids}")
+    return int(joint_ids[0])
+
+
+def equilibrium_pitch_biases(env, body_masses: torch.Tensor) -> np.ndarray:
+    """Resolve the physical pitch equilibrium for each complete riser plant."""
+
+    robot = env.robot
+    if not hasattr(robot.data, "body_com_pos_w"):
+        raise RuntimeError("Isaac articulation data does not expose body_com_pos_w")
+    body_com_positions = robot.data.body_com_pos_w
+    center_of_mass_world = (
+        torch.sum(body_masses[:, :, None] * body_com_positions, dim=1)
+        / torch.sum(body_masses, dim=1)[:, None]
+    )
+    root_positions = robot.data.root_pos_w.detach().cpu().numpy()
+    root_quaternions = robot.data.root_quat_w.detach().cpu().numpy()
+    center_of_mass_world_np = center_of_mass_world.detach().cpu().numpy()
+    return np.asarray(
+        [
+            equilibrium_pitch_from_world_com(
+                root_positions[index],
+                root_quaternions[index],
+                center_of_mass_world_np[index],
+                WHEEL_RADIUS_M,
+            )[0]
+            for index in range(env.num_envs)
+        ],
+        dtype=np.float64,
+    )
 
 
 def build_scenarios(
@@ -303,6 +398,9 @@ def main() -> int:
     cfg = RecomoTwoWheelBalanceEnvCfg()
     cfg.seed = args.seed
     cfg.scene.num_envs = args.num_envs
+    if args.robot_form == "riser":
+        cfg.robot_cfg = copy.deepcopy(TWO_WHEEL_RISER_CFG)
+        cfg.robot_cfg.init_state.joint_pos["riser_joint"] = args.riser_position_m
     cfg.reset_pitch_rad = 0.0
     cfg.control_mode = "direct"
     env = gym.make(
@@ -313,6 +411,35 @@ def main() -> int:
     )
     obs, _ = env.reset(seed=args.seed)
     unwrapped = env.unwrapped
+    riser_joint_id = None
+    proxy_joint_ids: list[int] = []
+    riser_position_target = None
+    proxy_position_target = None
+    if args.robot_form == "riser":
+        riser_joint_id = single_joint_id(unwrapped.robot, "riser_joint")
+        proxy_joint_ids = [
+            single_joint_id(unwrapped.robot, name) for name in RISER_PROXY_JOINTS
+        ]
+        riser_position_target = torch.full(
+            (args.num_envs, 1),
+            args.riser_position_m,
+            dtype=torch.float32,
+            device=unwrapped.device,
+        )
+        proxy_position_target = torch.zeros(
+            (args.num_envs, len(proxy_joint_ids)),
+            dtype=torch.float32,
+            device=unwrapped.device,
+        )
+        unwrapped.robot.set_joint_position_target(
+            riser_position_target, joint_ids=[riser_joint_id]
+        )
+        unwrapped.robot.set_joint_velocity_target(
+            torch.zeros_like(riser_position_target), joint_ids=[riser_joint_id]
+        )
+        unwrapped.robot.set_joint_position_target(
+            proxy_position_target, joint_ids=proxy_joint_ids
+        )
     plant_runtime = {
         "body_names": list(unwrapped.robot.body_names),
         "nominal_total_mass_kg": float(
@@ -322,6 +449,9 @@ def main() -> int:
     }
     if args.plant_uncertainty_profile != "nominal":
         plant_runtime = apply_plant_variations(unwrapped, scenario_plants)
+    body_masses = unwrapped.robot.root_physx_view.get_masses().to(
+        device=unwrapped.device
+    )
     set_push_wrench(unwrapped, np.zeros(args.num_envs))
     current_states = obs["policy"][:, : len(LQR_STATE_NAMES)].detach().cpu().numpy()
     active = np.ones(args.num_envs, dtype=bool)
@@ -348,6 +478,13 @@ def main() -> int:
             "vx_integral_limit": args.vx_integral_limit,
             "wz_integral_limit": args.wz_integral_limit,
             "governor_include_opposing_bias": args.governor_include_opposing_bias,
+            "limit_total_pitch_reference": args.limit_total_pitch_reference,
+            "reset_opposing_vx_integral_on_directional_deficit": (
+                args.reset_opposing_vx_integral_on_directional_deficit
+            ),
+            "vx_integral_reset_reference_deadband_mps": (
+                args.vx_integral_reset_reference_deadband_mps
+            ),
             "vx_reference_slew_rate_m_s2": args.vx_reference_slew_rate,
             "wz_reference_slew_rate_rad_s2": args.wz_reference_slew_rate,
             "path_progress_governor_enabled": args.path_progress_governor,
@@ -410,6 +547,14 @@ def main() -> int:
     pre_command_pitch_deg = np.zeros(args.num_envs, dtype=np.float64)
     pre_command_pitch_rate = np.zeros(args.num_envs, dtype=np.float64)
     pre_command_wheel_speed = np.zeros(args.num_envs, dtype=np.float64)
+    equilibrium_pitch_bias_min_deg = np.full(
+        args.num_envs, np.inf, dtype=np.float64
+    )
+    equilibrium_pitch_bias_max_deg = np.full(
+        args.num_envs, -np.inf, dtype=np.float64
+    )
+    riser_hold_error_max_m = np.zeros(args.num_envs, dtype=np.float64)
+    gimbal_hold_error_max_deg = np.zeros(args.num_envs, dtype=np.float64)
 
     for step in range(args.horizon_steps):
         command_active = step >= args.command_start_step
@@ -426,7 +571,35 @@ def main() -> int:
         elif step == push_end_step:
             set_push_wrench(unwrapped, np.zeros(args.num_envs))
 
+        if args.robot_form == "riser":
+            unwrapped.robot.set_joint_position_target(
+                riser_position_target, joint_ids=[riser_joint_id]
+            )
+            unwrapped.robot.set_joint_velocity_target(
+                torch.zeros_like(riser_position_target), joint_ids=[riser_joint_id]
+            )
+            unwrapped.robot.set_joint_position_target(
+                proxy_position_target, joint_ids=proxy_joint_ids
+            )
+
         if step % control_interval == 0:
+            pitch_bias_override_rad = None
+            if args.robot_form == "riser":
+                pitch_bias_override_rad = equilibrium_pitch_biases(
+                    unwrapped, body_masses
+                )
+                pitch_bias_deg = np.degrees(pitch_bias_override_rad)
+                equilibrium_pitch_bias_min_deg = np.minimum(
+                    equilibrium_pitch_bias_min_deg, pitch_bias_deg
+                )
+                equilibrium_pitch_bias_max_deg = np.maximum(
+                    equilibrium_pitch_bias_max_deg, pitch_bias_deg
+                )
+            outer_vx_feedback_m_s = None
+            if args.use_root_velocity_outer_feedback:
+                outer_vx_feedback_m_s = (
+                    unwrapped._state_terms()["vx"].detach().cpu().numpy()
+                )
             requested_action_np, integrals, diagnostics = cascaded_lqr_action(
                 current_states,
                 step_vx_ref,
@@ -435,6 +608,8 @@ def main() -> int:
                 integrals,
                 control_dt=control_interval / POLICY_HZ,
                 config=config,
+                pitch_bias_override_rad=pitch_bias_override_rad,
+                outer_vx_feedback_m_s=outer_vx_feedback_m_s,
             )
             admitted_vx_ref = diagnostics["governed_vx_ref"]
             admitted_wz_ref = diagnostics["governed_wz_ref"]
@@ -502,6 +677,27 @@ def main() -> int:
         vx_odometry = config.wheel_radius_m * current_states[:, 3]
         wz_truth = state["yaw_rate"].detach().cpu().numpy()
         wheel_speed = state["max_abs_wheel_velocity"].detach().cpu().numpy()
+        if args.robot_form == "riser":
+            actual_riser = (
+                unwrapped.robot.data.joint_pos[:, riser_joint_id]
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            actual_proxy = (
+                unwrapped.robot.data.joint_pos[:, proxy_joint_ids]
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            riser_hold_error_max_m = np.maximum(
+                riser_hold_error_max_m,
+                np.abs(actual_riser - args.riser_position_m),
+            )
+            gimbal_hold_error_max_deg = np.maximum(
+                gimbal_hold_error_max_deg,
+                np.degrees(np.max(np.abs(actual_proxy), axis=1)),
+            )
         requested_vx_error = np.abs(vx_truth - step_vx_ref)
         requested_wz_error = np.abs(wz_truth - step_wz_ref)
         admitted_vx_error = np.abs(vx_truth - admitted_vx_ref)
@@ -683,6 +879,15 @@ def main() -> int:
             and selected_post_wz_rmse <= args.maximum_post_wz_rmse
             and saturation_ratio <= args.maximum_saturation_ratio
             and path_progress_scale_min[index] >= args.minimum_path_progress_scale
+            and (
+                args.robot_form != "riser"
+                or (
+                    riser_hold_error_max_m[index]
+                    <= args.maximum_riser_hold_error_m
+                    and gimbal_hold_error_max_deg[index]
+                    <= args.maximum_gimbal_hold_error_deg
+                )
+            )
         )
         scenario_results.append(
             {
@@ -751,6 +956,25 @@ def main() -> int:
                 "path_progress_scale_min": float(path_progress_scale_min[index]),
                 "path_progress_scale_mean": float(progress_scale_mean),
                 "action_saturation_ratio": float(saturation_ratio),
+                "riser_plant": (
+                    {
+                        "riser_position_target_m": args.riser_position_m,
+                        "riser_hold_error_max_m": float(
+                            riser_hold_error_max_m[index]
+                        ),
+                        "gimbal_hold_error_max_deg": float(
+                            gimbal_hold_error_max_deg[index]
+                        ),
+                        "equilibrium_pitch_bias_min_deg": float(
+                            equilibrium_pitch_bias_min_deg[index]
+                        ),
+                        "equilibrium_pitch_bias_max_deg": float(
+                            equilibrium_pitch_bias_max_deg[index]
+                        ),
+                    }
+                    if args.robot_form == "riser"
+                    else None
+                ),
                 "control_allocation": {
                     "wheel_saturation_ratio": float(
                         wheel_mix_saturated[index] / max(wheel_mix_samples[index], 1)
@@ -815,6 +1039,21 @@ def main() -> int:
         if args.tracking_reference == "admitted"
         else aggregate_requested_wz_rmse
     )
+    riser_plant_summary = None
+    if args.robot_form == "riser":
+        riser_plant_summary = {
+            "riser_position_target_m": args.riser_position_m,
+            "riser_hold_error_max_m": float(np.max(riser_hold_error_max_m)),
+            "gimbal_hold_error_max_deg": float(
+                np.max(gimbal_hold_error_max_deg)
+            ),
+            "equilibrium_pitch_bias_min_deg": float(
+                np.min(equilibrium_pitch_bias_min_deg)
+            ),
+            "equilibrium_pitch_bias_max_deg": float(
+                np.max(equilibrium_pitch_bias_max_deg)
+            ),
+        }
     summary = {
         "scenarios": len(scenario_results),
         "success_rate": success_rate,
@@ -865,10 +1104,17 @@ def main() -> int:
             np.sum(post_vx_odometry_sum) / max(total_post_samples, 1)
         ),
         "post_wz_mean": float(np.sum(post_wz_sum) / max(total_post_samples, 1)),
+        "riser_plant": riser_plant_summary,
     }
     result = {
-        "schema": "recomo_two_wheel_cascaded_lqr_tracking_push_gate_v4",
+        "schema": (
+            "recomo_two_wheel_riser_cascaded_lqr_tracking_push_gate_v1"
+            if args.robot_form == "riser"
+            else "recomo_two_wheel_cascaded_lqr_tracking_push_gate_v4"
+        ),
         "seed": args.seed,
+        "robot_form": args.robot_form,
+        "robot_asset_usd": str(cfg.robot_cfg.spawn.usd_path),
         "tracking_reference": args.tracking_reference,
         "controller_profile": args.controller_profile,
         "gains": str(args.gains.resolve()),
@@ -882,6 +1128,16 @@ def main() -> int:
             "vx_integral_limit": config.vx_integral_limit,
             "wz_integral_limit": config.wz_integral_limit,
             "governor_include_opposing_bias": config.governor_include_opposing_bias,
+            "limit_total_pitch_reference": config.limit_total_pitch_reference,
+            "reset_opposing_vx_integral_on_directional_deficit": (
+                config.reset_opposing_vx_integral_on_directional_deficit
+            ),
+            "vx_integral_reset_reference_deadband_mps": (
+                config.vx_integral_reset_reference_deadband_mps
+            ),
+            "use_root_velocity_outer_feedback": (
+                args.use_root_velocity_outer_feedback
+            ),
             "pitch_bias_adaptation_rate": config.pitch_bias_adaptation_rate,
             "pitch_bias_limit_deg": float(np.degrees(config.pitch_bias_limit_rad)),
             "vx_reference_slew_rate_m_s2": config.vx_reference_slew_rate_m_s2,
@@ -937,6 +1193,10 @@ def main() -> int:
             "maximum_post_vx_rmse": args.maximum_post_vx_rmse,
             "maximum_post_wz_rmse": args.maximum_post_wz_rmse,
             "maximum_saturation_ratio": args.maximum_saturation_ratio,
+            "maximum_riser_hold_error_m": args.maximum_riser_hold_error_m,
+            "maximum_gimbal_hold_error_deg": (
+                args.maximum_gimbal_hold_error_deg
+            ),
         },
         "summary": summary,
         "scenarios": scenario_results,
@@ -951,6 +1211,11 @@ def main() -> int:
             "wz_ref",
         ],
         "evaluation_only_truth": ["base_link_vx", "base_roll"],
+        "learned_action_applied": False,
+        "residual_dataset": None,
+        "capture_started": False,
+        "bc_started": False,
+        "ppo_started": False,
         "training_started": False,
     }
     result["passed"] = bool(
@@ -959,6 +1224,15 @@ def main() -> int:
         and summary["selected_post_wz_rmse"] <= args.maximum_post_wz_rmse
         and summary["action_saturation_ratio"] <= args.maximum_saturation_ratio
         and summary["path_progress_scale_min"] >= args.minimum_path_progress_scale
+        and (
+            args.robot_form != "riser"
+            or (
+                summary["riser_plant"]["riser_hold_error_max_m"]
+                <= args.maximum_riser_hold_error_m
+                and summary["riser_plant"]["gimbal_hold_error_max_deg"]
+                <= args.maximum_gimbal_hold_error_deg
+            )
+        )
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2), encoding="utf-8")

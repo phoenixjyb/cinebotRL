@@ -3910,3 +3910,45 @@ and must state whether its candidate was accepted or rejected.
   riser-hold, or gimbal-hold reject. Only a clean three-height pass may open one
   fresh case-42 retry route. Residual capture, BC, PPO, training, case 43, and
   obstacle work remain closed.
+
+## Round 111: guarded three-height plant-envelope route
+
+- Added a riser-only bidirectional authority gate. It requires both forward and
+  reverse scenarios and rejects achieved-speed magnitude asymmetry above
+  `0.05 m/s`. This is additional admission evidence; it does not change the
+  controller, command, plant, or trajectory thresholds. The lightweight
+  balance form retains its existing behavior.
+- Added `run_riser_lqr_plant_envelope.sh` as a single-shard launcher. The only
+  accepted shards are `low`, `mid`, and `high`, corresponding to riser joint
+  positions `0.0`, `0.6`, and `1.2 m`. Each uses an independent authorization
+  and fresh namespace; the launcher never advances to another height.
+- Every shard pins the reviewed evaluator lineage and exact evaluator,
+  controller, tracking, robot-config, gains, and full-riser USD hashes. It
+  requires clean HEAD equal to upstream, rejects conflicting environment
+  overrides, and checks WSL processes, Windows command lines, and NVIDIA
+  compute ownership before launch and after exit.
+- The campaign contract is `56` scenarios per height: both `-0.2/+0.2 m/s`,
+  zero yaw command, `-20/+20 N` deterministic pushes, and all `14` provisional
+  plant variations. It pins `structural_robust_v1`, `vx_kp=0.72`, the existing
+  `6 deg` total-pitch limit, `0.8` action limit, root-velocity outer feedback,
+  and opposing PI-memory reset. Success requires `56/56`, complete direction
+  evidence, hold gates, and no learned action.
+- Admission and final-status evidence record runtime identities, result/log
+  hashes, the exact height, controller and scenario checks, and explicit
+  no-dataset/no-capture/no-BC/no-PPO/no-training fields. Missing output or any
+  failed check closes the shard with no retry or next-height launch.
+- Focused route/controller/playback tests pass `105/105`; dedicated negative,
+  hash-binding, syntax, and source-contract checks pass `9/9`. No runtime
+  namespace, authorization use, Isaac process, dataset, or training was started
+  by this CPU-only change.
+
+## Next round after Round 111
+
+- Commit, push, transfer, and pass the full authoritative `.98` CPU suite.
+- Verify exclusive WSL, Windows, and NVIDIA ownership, then run only the `low`
+  shard under its exact authorization. Seal and audit its admission, result,
+  log, exit code, and final status.
+- Stop on any low-height reject. Only a complete low-height pass may admit the
+  `mid` shard; only low plus mid may admit `high`. Do not start another
+  case-42 rollout, residual capture, BC, PPO, training, case 43, or obstacle
+  work during this campaign.

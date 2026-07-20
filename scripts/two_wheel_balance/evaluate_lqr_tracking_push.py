@@ -51,6 +51,9 @@ parser.add_argument(
 )
 parser.add_argument("--maximum-riser-hold-error-m", type=float, default=0.01)
 parser.add_argument("--maximum-gimbal-hold-error-deg", type=float, default=1.0)
+parser.add_argument(
+    "--maximum-direction-speed-asymmetry-mps", type=float, default=0.05
+)
 parser.add_argument("--num-envs", type=int, default=24)
 parser.add_argument("--horizon-steps", type=int, default=2000)
 parser.add_argument("--vx-commands", default="-0.2,0.2")
@@ -139,6 +142,11 @@ if not (
     and args.maximum_gimbal_hold_error_deg > 0.0
 ):
     parser.error("--maximum-gimbal-hold-error-deg must be positive")
+if not (
+    np.isfinite(args.maximum_direction_speed_asymmetry_mps)
+    and args.maximum_direction_speed_asymmetry_mps >= 0.0
+):
+    parser.error("--maximum-direction-speed-asymmetry-mps must be non-negative")
 if not (
     np.isfinite(args.vx_integral_reset_reference_deadband_mps)
     and args.vx_integral_reset_reference_deadband_mps > 0.0
@@ -1054,6 +1062,42 @@ def main() -> int:
                 np.max(equilibrium_pitch_bias_max_deg)
             ),
         }
+    direction_tracking = {}
+    for name, predicate in (
+        ("reverse", lambda value: value < 0.0),
+        ("forward", lambda value: value > 0.0),
+    ):
+        rows = [
+            row for row in scenario_results if predicate(row["vx_ref_m_s"])
+        ]
+        direction_tracking[name] = {
+            "scenario_count": len(rows),
+            "command_mean_mps": (
+                float(np.mean([row["vx_ref_m_s"] for row in rows]))
+                if rows
+                else None
+            ),
+            "achieved_mean_mps": (
+                float(np.mean([row["post_vx_mean"] for row in rows]))
+                if rows
+                else None
+            ),
+            "selected_tracking_rmse_mean_mps": (
+                float(np.mean([row["selected_post_vx_rmse"] for row in rows]))
+                if rows
+                else None
+            ),
+        }
+    direction_contract_complete = all(
+        direction_tracking[name]["scenario_count"] > 0
+        for name in ("reverse", "forward")
+    )
+    direction_speed_asymmetry_mps = None
+    if direction_contract_complete:
+        direction_speed_asymmetry_mps = abs(
+            abs(direction_tracking["forward"]["achieved_mean_mps"])
+            - abs(direction_tracking["reverse"]["achieved_mean_mps"])
+        )
     summary = {
         "scenarios": len(scenario_results),
         "success_rate": success_rate,
@@ -1105,6 +1149,9 @@ def main() -> int:
         ),
         "post_wz_mean": float(np.sum(post_wz_sum) / max(total_post_samples, 1)),
         "riser_plant": riser_plant_summary,
+        "direction_tracking": direction_tracking,
+        "direction_contract_complete": direction_contract_complete,
+        "direction_speed_asymmetry_mps": direction_speed_asymmetry_mps,
     }
     result = {
         "schema": (
@@ -1197,6 +1244,9 @@ def main() -> int:
             "maximum_gimbal_hold_error_deg": (
                 args.maximum_gimbal_hold_error_deg
             ),
+            "maximum_direction_speed_asymmetry_mps": (
+                args.maximum_direction_speed_asymmetry_mps
+            ),
         },
         "summary": summary,
         "scenarios": scenario_results,
@@ -1231,6 +1281,9 @@ def main() -> int:
                 <= args.maximum_riser_hold_error_m
                 and summary["riser_plant"]["gimbal_hold_error_max_deg"]
                 <= args.maximum_gimbal_hold_error_deg
+                and summary["direction_contract_complete"] is True
+                and summary["direction_speed_asymmetry_mps"]
+                <= args.maximum_direction_speed_asymmetry_mps
             )
         )
     )

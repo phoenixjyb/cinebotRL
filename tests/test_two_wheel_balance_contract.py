@@ -607,6 +607,58 @@ def test_cascaded_lqr_accepts_measured_pitch_bias_override() -> None:
     np.testing.assert_allclose(controller_state[:, 3], [1.0])
 
 
+def test_total_pitch_limit_restores_symmetric_physical_headroom() -> None:
+    gain = np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES)))
+    states = np.zeros((2, len(LQR_STATE_NAMES)))
+    bias = np.full(2, np.radians(1.65))
+    _, _, diagnostics = cascaded_lqr_action(
+        states,
+        np.array([-1.0, 1.0]),
+        np.zeros(2),
+        gain,
+        np.zeros((2, 6)),
+        control_dt=0.02,
+        config=CascadedLQRConfig(limit_total_pitch_reference=True),
+        pitch_bias_override_rad=bias,
+    )
+
+    np.testing.assert_allclose(
+        diagnostics["total_pitch_reference"],
+        np.radians([-6.0, 6.0]),
+    )
+    np.testing.assert_allclose(
+        diagnostics["pitch_reference"],
+        np.radians([-7.65, 4.35]),
+    )
+    assert np.all(diagnostics["total_pitch_reference_limit_enabled"])
+
+
+def test_total_pitch_limit_is_default_off_and_zero_bias_compatible() -> None:
+    gain = np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES)))
+    states = np.zeros((2, len(LQR_STATE_NAMES)))
+    kwargs = dict(
+        states=states,
+        vx_ref=np.array([-1.0, 1.0]),
+        wz_ref=np.zeros(2),
+        gain=gain,
+        integrals=np.zeros((2, 6)),
+        control_dt=0.02,
+        pitch_bias_override_rad=np.zeros(2),
+    )
+    legacy = cascaded_lqr_action(config=CascadedLQRConfig(), **kwargs)[2]
+    candidate = cascaded_lqr_action(
+        config=CascadedLQRConfig(limit_total_pitch_reference=True), **kwargs
+    )[2]
+
+    np.testing.assert_allclose(
+        candidate["pitch_reference"], legacy["pitch_reference"]
+    )
+    np.testing.assert_allclose(
+        candidate["total_pitch_reference"], legacy["total_pitch_reference"]
+    )
+    assert not np.any(legacy["total_pitch_reference_limit_enabled"])
+
+
 def test_cascaded_lqr_defaults_match_selected_tracking_gate() -> None:
     config = CascadedLQRConfig()
     assert config.wheel_radius_m == 0.1016

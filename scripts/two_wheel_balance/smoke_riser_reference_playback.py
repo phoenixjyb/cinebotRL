@@ -49,6 +49,14 @@ parser.add_argument("--controller-wz-ki", type=float)
 parser.add_argument("--controller-wz-feedforward", type=float)
 parser.add_argument("--controller-wheel-difference-kp", type=float)
 parser.add_argument(
+    "--limit-total-pitch-reference",
+    action="store_true",
+    help=(
+        "Apply the pitch limit to equilibrium bias plus velocity correction, "
+        "rather than limiting the velocity correction before adding the bias."
+    ),
+)
+parser.add_argument(
     "--use-root-velocity-outer-feedback",
     action="store_true",
     help="Use measured root vx for the outer PI only; keep wheel state in the frozen LQR.",
@@ -364,6 +372,9 @@ def evaluate_case(
             "wz_ki": args.controller_wz_ki,
             "wz_feedforward": args.controller_wz_feedforward,
             "wheel_difference_kp": args.controller_wheel_difference_kp,
+            "limit_total_pitch_reference": (
+                True if args.limit_total_pitch_reference else None
+            ),
         }.items()
         if value is not None
     }
@@ -986,6 +997,9 @@ def evaluate_case(
         pitch_reference_rad = float(
             controller_diagnostics["pitch_reference"][0]
         )
+        total_pitch_reference_rad = float(
+            controller_diagnostics["total_pitch_reference"][0]
+        )
         applied_pitch_bias_rad = float(
             controller_diagnostics["applied_pitch_bias"][0]
         )
@@ -995,6 +1009,7 @@ def evaluate_case(
             wheel_velocity_mps=wheel_velocity_mps,
             effective_reference_mps=effective_velocity_reference_mps,
             pitch_reference_rad=pitch_reference_rad,
+            total_pitch_reference_rad=total_pitch_reference_rad,
             applied_pitch_bias_rad=applied_pitch_bias_rad,
             common_action=common_action,
         )
@@ -1168,6 +1183,7 @@ def evaluate_case(
                         effective_velocity_reference_mps
                     ),
                     "pitch_reference_rad": pitch_reference_rad,
+                    "total_pitch_reference_rad": total_pitch_reference_rad,
                     "applied_pitch_bias_rad": applied_pitch_bias_rad,
                     "common_wheel_action": common_action,
                     "phase_feedforward_v_mps": phase_feedforward_v_mps,
@@ -1747,6 +1763,9 @@ def main() -> int:
                 "wz_ki": args.controller_wz_ki,
                 "wz_feedforward": args.controller_wz_feedforward,
                 "wheel_difference_kp": args.controller_wheel_difference_kp,
+                "limit_total_pitch_reference": (
+                    True if args.limit_total_pitch_reference else None
+                ),
             }.items()
             if value is not None
         },

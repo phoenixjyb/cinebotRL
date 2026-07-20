@@ -291,6 +291,9 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert '"--minimum-camera-recovery-scale"' in source
     assert '"--tracking-minimum-progress-scale"' in source
     assert '"--tracking-maximum-linear-velocity-mps"' in source
+    assert '"--limit-total-pitch-reference"' in source
+    assert '"limit_total_pitch_reference"' in source
+    assert '"total_pitch_reference_rad"' in source
     assert '"maximum_linear_velocity_mps"' in source
     assert "0.0 < args.tracking_maximum_linear_velocity_mps <= 0.4" in pre_app_source
     assert '"tracking_recovery_velocity_cap_enabled"' in source

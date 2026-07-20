@@ -89,6 +89,7 @@ def test_velocity_feedback_telemetry_localizes_false_wheel_tracking() -> None:
         wheel_velocity_mps=-0.4,
         effective_reference_mps=-0.4,
         pitch_reference_rad=-0.02,
+        total_pitch_reference_rad=-0.01,
         applied_pitch_bias_rad=0.01,
         common_action=0.2,
     )
@@ -97,6 +98,7 @@ def test_velocity_feedback_telemetry_localizes_false_wheel_tracking() -> None:
         wheel_velocity_mps=-0.38,
         effective_reference_mps=-0.4,
         pitch_reference_rad=-0.1,
+        total_pitch_reference_rad=-0.08,
         applied_pitch_bias_rad=0.02,
         common_action=0.5,
     )
@@ -109,6 +111,7 @@ def test_velocity_feedback_telemetry_localizes_false_wheel_tracking() -> None:
         "wheel_reference_error_rms_mps"
     ]
     assert summary["root_wheel_mismatch_abs_max_mps"] == pytest.approx(0.43)
+    assert summary["total_pitch_reference_abs_max_rad"] == pytest.approx(0.08)
 
 
 def test_velocity_feedback_telemetry_rejects_nonfinite_samples() -> None:
@@ -119,6 +122,7 @@ def test_velocity_feedback_telemetry_rejects_nonfinite_samples() -> None:
             wheel_velocity_mps=0.0,
             effective_reference_mps=0.0,
             pitch_reference_rad=0.0,
+            total_pitch_reference_rad=0.0,
             applied_pitch_bias_rad=0.0,
             common_action=0.0,
         )

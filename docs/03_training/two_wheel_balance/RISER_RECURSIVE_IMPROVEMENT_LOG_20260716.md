@@ -3319,3 +3319,71 @@ and must state whether its candidate was accepted or rejected.
 - Run focused route tests and the full authoritative CPU suite. Only then may
   one exclusive bounded case-42 canary be considered. Case 43, residual capture,
   BC, PPO, training, and obstacle work remain closed.
+
+## Round 98: the bounded `0.2 m/s` recovery cap is dynamically rejected
+
+- Commit `b7f01e3` bound the unchanged v20 case-42 plan to one fresh exclusive
+  route with exact phase hold and a `0.2 m/s` symmetric tracking-command cap.
+  The authoritative preflight suite passed `380/380`; source anchors, both
+  clocks, gains, USD, thresholds, and no-learning invariants remained pinned.
+- The runner closed fail-closed after the full bounded horizon. Initialization
+  completed for `2.0 s` and `400` steps. Scored execution reached only
+  `3.208039/48.297533 s` in `28,980` steps; one exact hold occupied
+  `25,180` steps (`86.8875%`). Position p95/max failed at
+  `11.776149/12.494410 m`, while completion also failed.
+- The cap contract itself passed: the requested base velocity was bounded to
+  `0.2 m/s` and the effective controller reference reached only
+  `0.171485 m/s`. Nevertheless, the robot converged to approximately
+  `+0.099 m/s` body-forward motion while the route correctly required reverse
+  motion. At yaw near `174 deg`, this drove the robot monotonically away from
+  the frozen target to more than `12 m` error. The velocity cap hypothesis is
+  therefore falsified and must not be retried unchanged.
+- Independent subsystem outcomes stayed separate. Pitch max was
+  `4.560527 deg`, attitude max `1.662295 deg`, action saturation zero, riser
+  thermal admission passed, internal attitude IK had zero failures, and no
+  termination occurred. The prospective residual-label envelope passed, but
+  admission remained false; residual action stayed exactly zero and no dataset,
+  capture, BC, PPO, or training started.
+- Sealed hashes are admission
+  `99e7ee3faf60b710fb87df6185d6c58b7af04ae2b8d61efec2484a8f80214de6`,
+  gate `76c4a506d3e48b21132e1514cf7a7796803f3406682a764b0c4ea5b38ada22bd`,
+  log `10ef2b37b6a7f5e8300c216501b3315b4857f8e435789df7170e08f2b80182bd`,
+  and summary
+  `952d89ed6e8c7aec874fdda2f2c78e606276d4e86cb937793e07398d84cb3c86`.
+
+## Round 99: CPU diagnosis isolates asymmetric physical pitch authority
+
+- Case 42's path sign is correct. At the held target and yaw near `174 deg`,
+  negative body velocity is required to move toward increasing world X. The
+  path layer continues to request `-0.2 m/s`; neither source retiming nor the
+  motion-direction rule explains the opposite steady motion.
+- The riser plant carries an observed equilibrium-pitch bias of approximately
+  `+1.65 deg`. The current cascade clips the velocity-generated pitch offset to
+  `+/-6 deg` before adding that bias. Its physical pitch target therefore has
+  asymmetric bounds of approximately `-4.35/+7.65 deg`. This differs from the
+  earlier `+/-0.2 m/s` proof, whose simplified chassis had approximately zero
+  equilibrium offset, and explains why reducing the velocity command did not
+  restore the previously demonstrated authority.
+- A default-off CPU candidate applies the existing `+/-6 deg` limit to the
+  total physical pitch target, then derives the velocity correction around the
+  measured equilibrium bias. With `+1.65 deg` bias, saturated reverse/forward
+  targets become exactly `-6/+6 deg`; the corresponding velocity corrections
+  are `-7.65/+4.35 deg`. This does not relax the physical pitch limit, LQR gain,
+  action limit, plan, or any dynamic/quality threshold.
+- Evidence now distinguishes the velocity pitch correction from the total
+  physical pitch target and aggregates the latter at policy rate. The option is
+  disabled by default and zero-bias behavior is bitwise-compatible in focused
+  tests. The local focused controller/evidence/playback suite passes `56/56`.
+  The Mac cannot collect the full suite because `gymnasium` is absent; the
+  authoritative `.98` environment remains required before any review.
+
+## Next round after Round 99
+
+- Diff-audit the candidate for default compatibility, add source-level runner
+  coverage for the default-off option and explicit total-target telemetry, then
+  run the authoritative `.98` CPU suite.
+- Commit and push only the CPU controller/evidence change and this diagnosis.
+  Do not add a route, namespace, authorization token, or launch Isaac.
+- Request review of the physical-target limiting contract before considering
+  one bounded case-42 canary. Case 43, residual capture, BC, PPO, training, and
+  obstacle work remain closed.

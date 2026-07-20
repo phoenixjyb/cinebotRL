@@ -124,6 +124,7 @@ class CascadedLQRConfig:
     wz_feedforward: float = 0.6
     wheel_difference_kp: float = 0.0
     pitch_reference_limit_rad: float = math.radians(6.0)
+    limit_total_pitch_reference: bool = False
     vx_integral_limit: float = 0.5
     wz_integral_limit: float = 2.0
     governor_include_opposing_bias: bool = False
@@ -410,9 +411,11 @@ def cascaded_lqr_action(
         config.vx_kp * vx_error + config.vx_ki * candidate_integrals[:, 0]
     )
     vx_integrator_blocked = (
-        (pitch_reference_unclipped > config.pitch_reference_limit_rad) & (vx_error > 0.0)
+        (pitch_reference_unclipped > config.pitch_reference_limit_rad)
+        & (vx_error > 0.0)
     ) | (
-        (pitch_reference_unclipped < -config.pitch_reference_limit_rad) & (vx_error < 0.0)
+        (pitch_reference_unclipped < -config.pitch_reference_limit_rad)
+        & (vx_error < 0.0)
     )
     next_integrals = candidate_integrals.copy()
     next_integrals[vx_integrator_blocked, 0] = integrals[vx_integrator_blocked, 0]
@@ -461,11 +464,23 @@ def cascaded_lqr_action(
         if integrals.shape[1] >= 4:
             next_integrals[:, 3] = 1.0
     applied_pitch_bias = np.where(pitch_bias_adapting, 0.0, pitch_bias)
-    pitch_reference = np.clip(
-        config.vx_kp * vx_error + config.vx_ki * next_integrals[:, 0],
-        -config.pitch_reference_limit_rad,
-        config.pitch_reference_limit_rad,
+    velocity_pitch_reference = (
+        config.vx_kp * vx_error + config.vx_ki * next_integrals[:, 0]
     )
+    if config.limit_total_pitch_reference:
+        total_pitch_reference = np.clip(
+            applied_pitch_bias + velocity_pitch_reference,
+            -config.pitch_reference_limit_rad,
+            config.pitch_reference_limit_rad,
+        )
+        pitch_reference = total_pitch_reference - applied_pitch_bias
+    else:
+        pitch_reference = np.clip(
+            velocity_pitch_reference,
+            -config.pitch_reference_limit_rad,
+            config.pitch_reference_limit_rad,
+        )
+        total_pitch_reference = applied_pitch_bias + pitch_reference
     tracking_states = states.copy()
     tracking_states[:, 0] -= applied_pitch_bias + pitch_reference
     tracking_states[:, 3] -= effective_vx_ref / config.wheel_radius_m
@@ -533,6 +548,11 @@ def cascaded_lqr_action(
         "yaw_correction": yaw_correction,
         "yaw_action_unclipped": final_yaw_unclipped,
         "pitch_reference": pitch_reference,
+        "velocity_pitch_reference_unclipped": velocity_pitch_reference,
+        "total_pitch_reference": total_pitch_reference,
+        "total_pitch_reference_limit_enabled": np.full(
+            batch, config.limit_total_pitch_reference, dtype=bool
+        ),
         "pitch_bias": pitch_bias,
         "applied_pitch_bias": applied_pitch_bias,
         "pitch_bias_adapting": pitch_bias_adapting,

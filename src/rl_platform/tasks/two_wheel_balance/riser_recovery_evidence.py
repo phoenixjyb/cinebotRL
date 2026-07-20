@@ -166,6 +166,7 @@ class VelocityFeedbackTelemetryAccumulator:
     wheel_reference_error_abs_max_mps: float = 0.0
     effective_reference_abs_max_mps: float = 0.0
     pitch_reference_abs_max_rad: float = 0.0
+    total_pitch_reference_abs_max_rad: float = 0.0
     applied_pitch_bias_abs_max_rad: float = 0.0
     common_action_abs_max: float = 0.0
     _mismatch_squared_sum: float = field(default=0.0, init=False, repr=False)
@@ -188,6 +189,7 @@ class VelocityFeedbackTelemetryAccumulator:
         wheel_velocity_mps: float,
         effective_reference_mps: float,
         pitch_reference_rad: float,
+        total_pitch_reference_rad: float,
         applied_pitch_bias_rad: float,
         common_action: float,
     ) -> None:
@@ -196,6 +198,7 @@ class VelocityFeedbackTelemetryAccumulator:
             wheel_velocity_mps,
             effective_reference_mps,
             pitch_reference_rad,
+            total_pitch_reference_rad,
             applied_pitch_bias_rad,
             common_action,
         )
@@ -228,6 +231,10 @@ class VelocityFeedbackTelemetryAccumulator:
         )
         self.pitch_reference_abs_max_rad = max(
             self.pitch_reference_abs_max_rad, abs(pitch_reference_rad)
+        )
+        self.total_pitch_reference_abs_max_rad = max(
+            self.total_pitch_reference_abs_max_rad,
+            abs(total_pitch_reference_rad),
         )
         self.applied_pitch_bias_abs_max_rad = max(
             self.applied_pitch_bias_abs_max_rad, abs(applied_pitch_bias_rad)
@@ -274,6 +281,9 @@ class VelocityFeedbackTelemetryAccumulator:
                 self.effective_reference_abs_max_mps
             ),
             "pitch_reference_abs_max_rad": self.pitch_reference_abs_max_rad,
+            "total_pitch_reference_abs_max_rad": (
+                self.total_pitch_reference_abs_max_rad
+            ),
             "applied_pitch_bias_abs_max_rad": (
                 self.applied_pitch_bias_abs_max_rad
             ),

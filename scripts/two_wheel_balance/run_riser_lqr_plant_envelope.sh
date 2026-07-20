@@ -7,7 +7,7 @@ readonly PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 readonly NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
 readonly POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 readonly REVIEWED_EVALUATOR_PARENT="0dc1aad417aecdc0ed1b29110d08e7abf5db0622"
-readonly EVALUATOR_SHA256="f5aa042326c85f0b46bb5de872664cd7cd42b4d7aa2ecaedc6961e55aa84a570"
+readonly EVALUATOR_SHA256="e3828dc067dc4b77c9005e206c726f0ac006f9a673614086234e9f9d99273402"
 readonly METRICS_SHA256="5041b711eb9d8026f2086898443d8ff4c4fba64662b9b051d27ced5181a51c2e"
 readonly TRACKING_SHA256="f2cfe1abcaf1f225461b0ccfa9d26ab205e2dc9624047be77edeab9f67f754e7"
 readonly ROBOT_CONFIG_SHA256="31b84c21baf8fb043c8653bfb592217b97d9edbd7a1a0e17633b86f4f36f05e2"
@@ -24,18 +24,18 @@ readonly SHARD="$1"
 case "$SHARD" in
   low)
     readonly RISER_POSITION_M="0.0"
-    readonly AUTHORIZATION="AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_LOW_V1"
-    readonly NAMESPACE="20260720_riser_lqr_plant_envelope_vxkp072_low_v1_exclusive"
+    readonly AUTHORIZATION="AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_LOW_V2"
+    readonly NAMESPACE="20260720_riser_lqr_plant_envelope_vxkp072_low_v2_exclusive"
     ;;
   mid)
     readonly RISER_POSITION_M="0.6"
-    readonly AUTHORIZATION="AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_MID_V1"
-    readonly NAMESPACE="20260720_riser_lqr_plant_envelope_vxkp072_mid_v1_exclusive"
+    readonly AUTHORIZATION="AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_MID_V2"
+    readonly NAMESPACE="20260720_riser_lqr_plant_envelope_vxkp072_mid_v2_exclusive"
     ;;
   high)
     readonly RISER_POSITION_M="1.2"
-    readonly AUTHORIZATION="AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_HIGH_V1"
-    readonly NAMESPACE="20260720_riser_lqr_plant_envelope_vxkp072_high_v1_exclusive"
+    readonly AUTHORIZATION="AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_HIGH_V2"
+    readonly NAMESPACE="20260720_riser_lqr_plant_envelope_vxkp072_high_v2_exclusive"
     ;;
   *)
     printf 'unknown riser plant-envelope shard: %s\n' "$SHARD" >&2
@@ -75,7 +75,7 @@ readonly GAINS_WIN="$WIN_ROOT\docs\03_training\two_wheel_balance\evidence_202607
 readonly ROBOT_USD="$ROOT/assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd"
 readonly RUNNER="$ROOT/scripts/two_wheel_balance/run_riser_lqr_plant_envelope.sh"
 readonly OUTPUT="$ROOT/artifacts/two_wheel_riser/$NAMESPACE"
-readonly OUTPUT_WIN="$WIN_ROOT\artifacts\two_wheel_riser\$NAMESPACE"
+readonly OUTPUT_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$NAMESPACE"
 
 assert_resources_free() {
   local wsl_owners windows_owners compute_owners
@@ -169,6 +169,7 @@ payload = {
         "action_limit": 0.8,
         "minimum_success_rate": 1.0,
         "maximum_direction_speed_asymmetry_mps": 0.05,
+        "semantic_proxy_state_adapter": True,
     },
     "runtime_identities": {
         identity_args[index]: {
@@ -215,6 +216,7 @@ timeout --signal=TERM --kill-after=30s "$TIMEOUT_SECONDS" \
   --reset-opposing-vx-integral-on-directional-deficit \
   --vx-integral-reset-reference-deadband-mps 0.05 \
   --use-root-velocity-outer-feedback \
+  --semantic-proxy-state-adapter \
   --plant-uncertainty-profile provisional_prior_v1 \
   --minimum-success-rate 1.0 \
   --maximum-direction-speed-asymmetry-mps 0.05 \
@@ -283,6 +285,7 @@ if result is not None:
             is True
             and controller.get("vx_integral_reset_reference_deadband_mps") == 0.05
             and controller.get("use_root_velocity_outer_feedback") is True
+            and controller.get("semantic_proxy_state_adapter") is True
             and controller.get("pitch_reference_limit_deg") == 6.0
             and controller.get("action_limit") == 0.8,
             "command_contract": command.get("vx_m_s") == [-0.2, 0.2]

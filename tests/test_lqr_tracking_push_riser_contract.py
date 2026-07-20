@@ -57,6 +57,7 @@ def test_riser_mode_carries_the_case42_controller_contract() -> None:
         "--reset-opposing-vx-integral-on-directional-deficit",
         "--vx-integral-reset-reference-deadband-mps",
         "--use-root-velocity-outer-feedback",
+        "--semantic-proxy-state-adapter",
     ):
         assert option in text
     assert "outer_vx_feedback_m_s=outer_vx_feedback_m_s" in text
@@ -111,12 +112,17 @@ def test_plant_envelope_runner_is_single_height_hash_bound_and_no_learning() -> 
     assert "--limit-total-pitch-reference" in text
     assert "--reset-opposing-vx-integral-on-directional-deficit" in text
     assert "--use-root-velocity-outer-feedback" in text
+    assert "--semantic-proxy-state-adapter" in text
     assert "--plant-uncertainty-profile provisional_prior_v1" in text
     assert "--minimum-success-rate 1.0" in text
     assert '"capture_started": False' in text
     assert '"bc_started": False' in text
     assert '"ppo_started": False' in text
     assert '"training_started": False' in text
+    assert (
+        'readonly OUTPUT_WIN="$WIN_ROOT\\\\artifacts\\\\two_wheel_riser'
+        '\\\\$NAMESPACE"'
+    ) in text
 
 
 def test_plant_envelope_runner_pins_current_evaluator_blob() -> None:
@@ -136,7 +142,7 @@ def test_plant_envelope_runner_rejects_unknown_auth_and_overrides_pre_runtime() 
             base_env
             | {
                 "RISER_PLANT_ENVELOPE_AUTHORIZATION": (
-                    "AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_LOW_V1"
+                    "AUTHORIZED_RISER_LQR_PLANT_ENVELOPE_VXKP072_LOW_V2"
                 ),
                 "RISER_PLANT_ENVELOPE_NUM_ENVS": "1",
             },

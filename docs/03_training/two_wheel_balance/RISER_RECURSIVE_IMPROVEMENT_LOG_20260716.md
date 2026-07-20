@@ -3952,3 +3952,48 @@ and must state whether its candidate was accepted or rejected.
   `mid` shard; only low plus mid may admit `high`. Do not start another
   case-42 rollout, residual capture, BC, PPO, training, case 43, or obstacle
   work during this campaign.
+
+## Round 112: low-shard output quarantine and semantic-proxy correction
+
+- Commit `37dfad82382c0a5ed766e7c8de1b6d105f7ff2ef` was pushed and
+  transferred to `.98` with bundle SHA-256
+  `0fe4580937ddb593ff0cfb1aed57df4b60e291ef1fbf5fda32ca4eb52fc49e9b`.
+  The authoritative `.98` CPU suite passed `418/418` in `28.03 s`
+  (`30.08 s` command wall time). Clean HEAD/upstream, a fresh low namespace,
+  and empty WSL/NVIDIA ownership were verified before exactly one launch.
+- The v1 low route failed its evidence contract and did not admit dynamics.
+  `OUTPUT_WIN` escaped `$NAMESPACE`, so Windows wrote `result.json` beneath the
+  literal path `artifacts/two_wheel_riser$NAMESPACE` while the intended
+  namespace correctly reported `result_written=false`. The misrouted output is
+  preserved as
+  `20260720_riser_lqr_plant_envelope_vxkp072_low_v1_MISROUTED_OUTPUT_QUARANTINED`;
+  its result SHA-256 is
+  `788bfd3d8983a961bef60108277efae1b1f95f438b764f6f6333657e293b9c80`.
+- The quarantined result is diagnostic only, not admitted evidence. All `56`
+  scenarios survived and recovered balance/tracking, aggregate selected `vx`
+  RMSE was `0.049120 m/s`, peak pitch was `8.653920 deg`, action saturation was
+  zero, and forward/reverse achieved-speed asymmetry was `0.001401 m/s`.
+  Every scenario failed solely on the `1 deg` gimbal hold gate, with maximum
+  proxy error `9.258271 deg`.
+- That gimbal result exposed a contract mismatch rather than a wheel-controller
+  failure. The DJI joints in this asset are semantic attitude-setpoint proxies,
+  not physical motor shafts. Accepted trajectory playback writes their semantic
+  state through the deterministic DJI adapter each policy step; the new plant
+  gate had only applied a passive position drive. Added an explicit,
+  riser-only `--semantic-proxy-state-adapter` option that uses the same ideal
+  proxy-state contract. It remains default-off and does not alter wheel
+  commands, LQR gains, pushes, plant variations, pitch/action limits, or gates.
+- Fixed the Windows output path expansion, added an exact path regression, and
+  moved all three shard tokens/namespaces to fresh v2 identities. The v2 runner
+  requires and records the semantic proxy adapter. No mid/high shard, case 42,
+  residual capture, BC, PPO, or training started.
+
+## Next round after Round 112
+
+- Run focused and full authoritative CPU tests, commit, push, and transfer the
+  v2 route. Verify the evaluator hash, output-path expansion, clean
+  HEAD/upstream, fresh v2 low namespace, and exclusive WSL/Windows/NVIDIA
+  ownership.
+- Run exactly one v2 low shard. Treat all physical, direction, hold, identity,
+  and no-learning checks as hard. Stop on any reject; only a complete low pass
+  may admit the v2 mid shard.

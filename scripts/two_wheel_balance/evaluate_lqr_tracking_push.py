@@ -104,6 +104,14 @@ parser.add_argument(
     default=0.05,
 )
 parser.add_argument("--use-root-velocity-outer-feedback", action="store_true")
+parser.add_argument(
+    "--semantic-proxy-state-adapter",
+    action="store_true",
+    help=(
+        "Apply the same ideal DJI attitude-setpoint adapter used by riser "
+        "playback; these proxy joints are not physical motor shafts."
+    ),
+)
 parser.add_argument("--vx-reference-slew-rate", type=float)
 parser.add_argument("--wz-reference-slew-rate", type=float)
 parser.add_argument("--path-progress-governor", action="store_true", default=None)
@@ -152,6 +160,8 @@ if not (
     and args.vx_integral_reset_reference_deadband_mps > 0.0
 ):
     parser.error("--vx-integral-reset-reference-deadband-mps must be positive")
+if args.semantic_proxy_state_adapter and args.robot_form != "riser":
+    parser.error("--semantic-proxy-state-adapter requires --robot-form riser")
 app = AppLauncher(args).app
 
 import gymnasium as gym
@@ -448,6 +458,9 @@ def main() -> int:
         unwrapped.robot.set_joint_position_target(
             proxy_position_target, joint_ids=proxy_joint_ids
         )
+        proxy_env_ids = torch.arange(
+            args.num_envs, dtype=torch.long, device=unwrapped.device
+        )
     plant_runtime = {
         "body_names": list(unwrapped.robot.body_names),
         "nominal_total_mass_kg": float(
@@ -589,6 +602,13 @@ def main() -> int:
             unwrapped.robot.set_joint_position_target(
                 proxy_position_target, joint_ids=proxy_joint_ids
             )
+            if args.semantic_proxy_state_adapter:
+                unwrapped.robot.write_joint_state_to_sim(
+                    proxy_position_target,
+                    torch.zeros_like(proxy_position_target),
+                    joint_ids=proxy_joint_ids,
+                    env_ids=proxy_env_ids,
+                )
 
         if step % control_interval == 0:
             pitch_bias_override_rad = None
@@ -1185,6 +1205,7 @@ def main() -> int:
             "use_root_velocity_outer_feedback": (
                 args.use_root_velocity_outer_feedback
             ),
+            "semantic_proxy_state_adapter": args.semantic_proxy_state_adapter,
             "pitch_bias_adaptation_rate": config.pitch_bias_adaptation_rate,
             "pitch_bias_limit_deg": float(np.degrees(config.pitch_bias_limit_rad)),
             "vx_reference_slew_rate_m_s2": config.vx_reference_slew_rate_m_s2,

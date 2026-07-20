@@ -984,18 +984,32 @@ zero_progress_hold_ok = not require_zero_progress_hold or (
     and gate.get("minimum_progress_scale") == 0.0
     and gate.get("tracking_overrides") == expected_tracking_overrides
     and result.get("minimum_progress_scale") == 0.0
-    and result.get("progress_scale_min") == 0.0
     and result.get("outer_velocity_feedback_source") == "wheel_derived_vx"
     and isinstance(completed_steps, int)
     and completed_steps > 0
     and isinstance(hold_steps, int)
-    and 0 < hold_steps <= completed_steps
+    and 0 <= hold_steps <= completed_steps
     and isinstance(hold_segments, int)
-    and 0 < hold_segments <= hold_steps
+    and 0 <= hold_segments <= hold_steps
     and isinstance(hold_ratio, (int, float))
     and math.isfinite(hold_ratio)
     and math.isclose(
         hold_ratio, hold_steps / completed_steps, rel_tol=0.0, abs_tol=1e-12
+    )
+    and isinstance(result.get("progress_scale_min"), (int, float))
+    and math.isfinite(result["progress_scale_min"])
+    and 0.0 <= result["progress_scale_min"] <= 1.0
+    and (
+        (
+            result["progress_scale_min"] == 0.0
+            and hold_steps > 0
+            and hold_segments > 0
+        )
+        or (
+            result["progress_scale_min"] > 0.0
+            and hold_steps == 0
+            and hold_segments == 0
+        )
     )
 )
 expected_controller_overrides = {"wz_kp": 1.05}
@@ -1389,9 +1403,22 @@ zero_progress_hold_ok = not require_zero_progress_hold or (
     len(gate_rows) == 1
     and gate_rows[0].get("zero_progress_hold_evidence_passed") is True
     and gate_rows[0].get("minimum_progress_scale") == 0.0
-    and gate_rows[0].get("progress_scale_min") == 0.0
-    and gate_rows[0].get("progress_hold_step_count", 0) > 0
-    and gate_rows[0].get("progress_hold_segment_count", 0) > 0
+    and isinstance(gate_rows[0].get("progress_scale_min"), (int, float))
+    and 0.0 <= gate_rows[0]["progress_scale_min"] <= 1.0
+    and isinstance(gate_rows[0].get("progress_hold_step_count"), int)
+    and isinstance(gate_rows[0].get("progress_hold_segment_count"), int)
+    and (
+        (
+            gate_rows[0]["progress_scale_min"] == 0.0
+            and gate_rows[0]["progress_hold_step_count"] > 0
+            and gate_rows[0]["progress_hold_segment_count"] > 0
+        )
+        or (
+            gate_rows[0]["progress_scale_min"] > 0.0
+            and gate_rows[0]["progress_hold_step_count"] == 0
+            and gate_rows[0]["progress_hold_segment_count"] == 0
+        )
+    )
     and gate_rows[0].get("outer_velocity_feedback_source") == "wheel_derived_vx"
 )
 recovery_velocity_cap_ok = not require_recovery_velocity_cap or (

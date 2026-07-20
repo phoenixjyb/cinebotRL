@@ -395,6 +395,26 @@ def zero_progress_hold_telemetry_passed(
         and velocity_feedback["effective_reference_abs_max_mps"]
         <= expected_maximum_linear_velocity_mps + 1e-9
     )
+    hold_accounting_ok = (
+        isinstance(completed_steps, int)
+        and completed_steps > 0
+        and isinstance(hold_steps, int)
+        and 0 <= hold_steps <= completed_steps
+        and isinstance(hold_segments, int)
+        and 0 <= hold_segments <= hold_steps
+        and isinstance(hold_ratio, (int, float))
+        and math.isfinite(hold_ratio)
+        and math.isclose(
+            hold_ratio, hold_steps / completed_steps, rel_tol=0.0, abs_tol=1e-12
+        )
+        and isinstance(progress_min, (int, float))
+        and math.isfinite(progress_min)
+        and 0.0 <= progress_min <= 1.0
+        and (
+            (progress_min == 0.0 and hold_steps > 0 and hold_segments > 0)
+            or (progress_min > 0.0 and hold_steps == 0 and hold_segments == 0)
+        )
+    )
     return (
         payload.get("phase_governor_enabled") is True
         and payload.get("phase_governor_contract")
@@ -403,20 +423,7 @@ def zero_progress_hold_telemetry_passed(
         and payload.get("tracking_overrides") == expected_tracking_overrides
         and result.get("minimum_progress_scale") == 0.0
         and result.get("outer_velocity_feedback_source") == "wheel_derived_vx"
-        and isinstance(completed_steps, int)
-        and completed_steps > 0
-        and isinstance(hold_steps, int)
-        and 0 < hold_steps <= completed_steps
-        and isinstance(hold_segments, int)
-        and 0 < hold_segments <= hold_steps
-        and isinstance(hold_ratio, (int, float))
-        and math.isfinite(hold_ratio)
-        and math.isclose(
-            hold_ratio, hold_steps / completed_steps, rel_tol=0.0, abs_tol=1e-12
-        )
-        and isinstance(progress_min, (int, float))
-        and math.isfinite(progress_min)
-        and progress_min == 0.0
+        and hold_accounting_ok
         and velocity_cap_ok
     )
 

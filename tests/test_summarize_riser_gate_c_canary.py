@@ -713,6 +713,22 @@ def test_zero_progress_hold_evidence_is_explicit_and_fail_closed(
     assert row["progress_hold_step_count"] == 2
 
     payload = json.loads(gate.read_text())
+    payload["results"][0].update(
+        {
+            "progress_scale_min": 0.01,
+            "progress_hold_step_count": 0,
+            "progress_hold_ratio": 0.0,
+            "progress_hold_segment_count": 0,
+        }
+    )
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert summary["passed"]
+    assert summary["gate_rows"][0]["zero_progress_hold_evidence_passed"] is True
+
+    _enable_zero_progress_hold_contract(gate)
+    payload = json.loads(gate.read_text())
     payload["results"][0]["progress_hold_ratio"] = 0.3
     gate.write_text(json.dumps(payload))
     subprocess.run(command, check=True)

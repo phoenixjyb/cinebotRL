@@ -596,7 +596,10 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert "--tracking-minimum-progress-scale" in source
     assert "--require-zero-progress-hold" in source
     assert 'gate.get("minimum_progress_scale") == 0.0' in source
-    assert 'result.get("progress_scale_min") == 0.0' in source
+    assert '0.0 <= result["progress_scale_min"] <= 1.0' in source
+    assert 'result["progress_scale_min"] > 0.0' in source
+    assert "hold_steps == 0" in source
+    assert "hold_segments == 0" in source
     assert 'result.get("outer_velocity_feedback_source") == "wheel_derived_vx"' in source
     assert 'gate_rows[0].get("zero_progress_hold_evidence_passed") is True' in source
     assert (

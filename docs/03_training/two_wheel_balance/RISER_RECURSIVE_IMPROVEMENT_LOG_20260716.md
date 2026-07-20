@@ -4120,3 +4120,48 @@ and must state whether its candidate was accepted or rejected.
   identities, and exclusive WSL/Windows/NVIDIA ownership.
 - Run exactly case 42. Stop and seal either outcome. Do not start case 43,
   residual capture, BC, PPO, training, or obstacle work.
+
+## Round 116: explicit-vx-Kp case-42 reject and retiming diagnosis
+
+- Commit `84f1af82bb4dc26f016e99bf20143f44c6e94540` was pushed and
+  transferred with bundle SHA-256
+  `f027219f4e82e4c65b71802f02d2895354c00d1db03d63265d3596eec33c10d4`.
+  The authoritative `.98` CPU suite passed `422/422` in `27.14 s`
+  (`29.06 s` command wall time). Clean HEAD/upstream, fresh namespace, and
+  exclusive WSL/Windows/NVIDIA ownership were verified before one launch.
+- The exact `vx_kp=0.72` case-42 canary completed all `48.297533 s` of plan
+  phase in `28653` policy steps and stopped fail-closed. Thermal admission,
+  attitude, pitch, action saturation, exact gain evidence, and the residual
+  label envelope passed. No residual action was applied and no dataset,
+  capture, BC, PPO, or training was created.
+- The only physical failed check was position p95: `0.182557 m` against the
+  unchanged `0.15 m` gate; maximum position error was `0.189559 m`. Compared
+  with the `vx_kp=0.60` run (`0.186930/0.200354 m`), the gain increase improved
+  p95 by only `4.4 mm` and max by `10.8 mm`. Action saturation remained zero.
+- Admission/gate/log/summary SHA-256 values are
+  `76c3ac61d3ad8e61aa50e6fbd7c0186e24376448536b108d4ff89e28b2e98aa0`,
+  `3d6377db0eb62c6984f439cb2852a85c352810c3c8ea828db70a4edef4aab53e`,
+  `731808822b9fe6d38222fda3fb397f2c6b977c5f258e08910547b7e6587506d5`,
+  and `9a81da746201be06c4f82abfcf2b0c0fe72a39ce024ab7785218aaa44f6d6172`.
+- Trace diagnosis shows persistent longitudinal XY lag, not Z, attitude, or
+  cross-track failure. In the high-error intervals the velocity reference is
+  already capped at `-0.2 m/s`, while achieved root speed is typically
+  `-0.12..-0.14 m/s`. More balance-loop Kp is therefore not the next lever.
+  The next plan must use closed-loop plant authority and acceleration/reversal
+  constraints in its execution retiming while preserving exact-source anchors.
+- The run also exposed an independent evidence bug: a configured zero-capable
+  phase governor was treated as invalid unless that particular execution
+  actually produced a zero-scale sample. Corrected validation to accept either
+  consistent hold activation or consistent non-activation. This changes no
+  command, gate threshold, source, plan, or physical result; the sealed case-42
+  dynamic reject remains a reject.
+
+## Next round after Round 116
+
+- Pass focused and authoritative CPU tests and commit the evidence-only repair.
+- CPU-only, derive and validate one case-42 plan variant using plant-qualified
+  closed-loop velocity plus acceleration/reversal retiming. Preserve source
+  anchors and both clocks, and pass duration/path/transition/kinematic gates.
+- Do not launch Isaac again until the derived plan and a fresh authorization
+  have been independently audited. Keep case 43, residual capture, BC, PPO,
+  training, and obstacle work closed.

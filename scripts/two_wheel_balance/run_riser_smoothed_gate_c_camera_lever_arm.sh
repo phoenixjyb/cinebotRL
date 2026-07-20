@@ -23,6 +23,7 @@ CAMERA_RECOVERY_ERROR_START_M="0.13"
 CAMERA_RECOVERY_ERROR_FULL_M="0.155"
 MINIMUM_CAMERA_RECOVERY_SCALE="0.20"
 REQUIRE_INITIALIZATION_PREROLL=0
+USE_ROOT_VELOCITY_OUTER_FEEDBACK=0
 
 case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
   AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE68_66_CAMERA_LEVER_ARM_V1)
@@ -497,6 +498,19 @@ case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
     REQUIRE_INITIALIZATION_PREROLL=1
     STAMP="20260720_gate_c_smoothed_case42_v20_initialization_preroll2s_v1_exclusive"
     ;;
+  AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V20_ROOT_VX_OUTER_V1)
+    PORTFOLIO_STAMP="20260720_smoothed_plan_all79_v20_case42_initialization_preroll2s_cpu"
+    MANIFEST_SHA256="3d7f9650a4f701f80a11948364a53ecd34641160bffb6bc3ed697d038d559b72"
+    PLANNER_COMMIT="5a66e3deef01fceacc80fee37b199045705d7f02"
+    CASE_A=42
+    CASE_B=""
+    CASE_A_PLAN_SHA256="ea2e54273c42efa3980eaa3ea9b161109702047467df131d4ad1d2604f063984"
+    CASE_B_PLAN_SHA256=""
+    CASE_TIMEOUT_SECONDS=2200
+    REQUIRE_INITIALIZATION_PREROLL=1
+    USE_ROOT_VELOCITY_OUTER_FEEDBACK=1
+    STAMP="20260720_gate_c_smoothed_case42_v20_root_vx_outer_v1_exclusive"
+    ;;
   *)
     printf 'camera lever-arm Gate C authorization is absent or unknown\n' >&2
     exit 7
@@ -523,6 +537,7 @@ LOADER="$ROOT/src/rl_platform/tasks/two_wheel_balance/riser_playback.py"
 TRACKING="$ROOT/src/rl_platform/tasks/two_wheel_balance/whole_body_tracking.py"
 RISER_CONTROL="$ROOT/src/rl_platform/tasks/two_wheel_balance/riser_control.py"
 RECOVERY_EVIDENCE="$ROOT/src/rl_platform/tasks/two_wheel_balance/riser_recovery_evidence.py"
+METRICS="$ROOT/src/rl_platform/tasks/two_wheel_balance/metrics.py"
 
 assert_gpu_free() {
   local playback_owners compute_owners windows_owners
@@ -573,7 +588,7 @@ wait_for_gpu_release() {
 }
 
 case_gate_passed() {
-  python3 - "$1" "$2" "$3" "$4" "$5" <<'PY'
+  python3 - "$1" "$2" "$3" "$4" "$5" "$6" <<'PY'
 import json
 import math
 from pathlib import Path
@@ -584,6 +599,7 @@ case = int(sys.argv[2])
 expected_tracking_profile = sys.argv[3]
 require_camera_recovery = bool(int(sys.argv[4]))
 require_initialization = bool(int(sys.argv[5]))
+require_root_velocity_feedback = bool(int(sys.argv[6]))
 result = gate.get("results", [{}])[0]
 correction_max = result.get("camera_lever_arm_correction_max_m")
 raw_max = result.get("camera_lever_arm_raw_correction_max_m")
@@ -652,6 +668,19 @@ initialization_ok = not require_initialization or (
         "initialization_source_metrics_clean"
     ) is True
 )
+velocity_feedback = result.get("velocity_feedback_telemetry")
+root_velocity_feedback_ok = not require_root_velocity_feedback or (
+    result.get("outer_velocity_feedback_source") == "root_link_vx"
+    and result.get("velocity_feedback_telemetry_observed") is True
+    and isinstance(velocity_feedback, dict)
+    and velocity_feedback.get("schema")
+    == "riser_root_vs_wheel_velocity_policy_rate_v1"
+    and velocity_feedback.get("policy_rate_sample_count")
+    == result.get("completed_steps")
+    and result.get("checks", {}).get(
+        "velocity_feedback_telemetry_observed"
+    ) is True
+)
 ok = (
     gate.get("cases") == [case]
     and len(gate.get("results", [])) == 1
@@ -687,6 +716,7 @@ ok = (
     and isinstance(result.get("residual_label_envelope_passed"), bool)
     and recovery_ok
     and initialization_ok
+    and root_velocity_feedback_ok
 )
 raise SystemExit(0 if ok else 6)
 PY
@@ -734,6 +764,7 @@ IDENTITY_ARGS=(
   tracking_controller "$TRACKING"
   riser_control "$RISER_CONTROL"
   recovery_evidence "$RECOVERY_EVIDENCE"
+  balance_controller "$METRICS"
   playback_loader "$LOADER"
   wrapper "$RUNNER"
   summarizer "$SUMMARIZER"
@@ -745,7 +776,7 @@ fi
 python3 - "$TEMP_ADMISSION" "$COMMIT" "$STAMP" "$CASE_TIMEOUT_SECONDS" \
   "$TRACKING_PROFILE" "$ENABLE_CAMERA_ERROR_RECOVERY" \
   "$CAMERA_RECOVERY_ERROR_START_M" "$CAMERA_RECOVERY_ERROR_FULL_M" \
-  "$MINIMUM_CAMERA_RECOVERY_SCALE" \
+  "$MINIMUM_CAMERA_RECOVERY_SCALE" "$USE_ROOT_VELOCITY_OUTER_FEEDBACK" \
   "${IDENTITY_ARGS[@]}" <<'PY'
 import hashlib
 import json
@@ -761,10 +792,11 @@ payload["tracking_profile"] = sys.argv[5]
 payload["camera_recovery_governor_enabled"] = bool(int(sys.argv[6]))
 payload["camera_recovery_error_range_m"] = [float(sys.argv[7]), float(sys.argv[8])]
 payload["minimum_camera_recovery_scale"] = float(sys.argv[9])
+payload["root_velocity_outer_feedback_enabled"] = bool(int(sys.argv[10]))
 payload["camera_recovery_governor_contract"] = (
     "saturated_camera_error_continuous_phase_cap_v1"
 )
-args = sys.argv[10:]
+args = sys.argv[11:]
 payload["runtime_identities"] = {
     args[index]: {
         "path": str(Path(args[index + 1]).resolve()),
@@ -795,6 +827,10 @@ SUMMARY_RECOVERY_ARGS=()
 if [[ "$ENABLE_CAMERA_ERROR_RECOVERY" == 1 ]]; then
   SUMMARY_RECOVERY_ARGS+=(--require-camera-error-recovery-governor)
 fi
+ROOT_VELOCITY_ARGS=()
+if [[ "$USE_ROOT_VELOCITY_OUTER_FEEDBACK" == 1 ]]; then
+  ROOT_VELOCITY_ARGS+=(--use-root-velocity-outer-feedback)
+fi
 
 for CASE in "${CASE_LIST[@]}"; do
   assert_exclusive_resources || exit 5
@@ -808,6 +844,7 @@ for CASE in "${CASE_LIST[@]}"; do
     --enable-camera-lever-arm-compensation \
     --camera-lever-arm-compensation-gain "$CAMERA_LEVER_ARM_GAIN" \
     --maximum-camera-lever-arm-correction-m "$MAXIMUM_CAMERA_LEVER_ARM_CORRECTION_M" \
+    "${ROOT_VELOCITY_ARGS[@]}" \
     "${CAMERA_RECOVERY_ARGS[@]}" \
     --output "$OUTPUT_WIN\gates\case_$(printf '%04d' "$CASE").json" --headless \
     >"$OUTPUT/logs/case_$(printf '%04d' "$CASE").log" 2>&1 || STATUS=$?
@@ -816,7 +853,8 @@ for CASE in "${CASE_LIST[@]}"; do
   if [[ ! -s "$OUTPUT/gates/case_$(printf '%04d' "$CASE").json" ]] \
     || ! case_gate_passed "$OUTPUT/gates/case_$(printf '%04d' "$CASE").json" \
       "$CASE" "$TRACKING_PROFILE" "$ENABLE_CAMERA_ERROR_RECOVERY" \
-      "$REQUIRE_INITIALIZATION_PREROLL"; then
+      "$REQUIRE_INITIALIZATION_PREROLL" \
+      "$USE_ROOT_VELOCITY_OUTER_FEEDBACK"; then
     python3 "$SUMMARIZER" --root "$OUTPUT" --git-commit "$COMMIT" --cases "$CASES" \
       --expected-tracking-profile "$TRACKING_PROFILE" \
       --require-camera-lever-arm-compensation "${SUMMARY_RECOVERY_ARGS[@]}" \
@@ -831,7 +869,8 @@ python3 "$SUMMARIZER" --root "$OUTPUT" --git-commit "$COMMIT" --cases "$CASES" \
   --require-camera-lever-arm-compensation "${SUMMARY_RECOVERY_ARGS[@]}" \
   --output "$OUTPUT/summary.json" >/dev/null
 python3 - "$OUTPUT/summary.json" "$CASES" \
-  "$REQUIRE_INITIALIZATION_PREROLL" <<'PY'
+  "$REQUIRE_INITIALIZATION_PREROLL" \
+  "$USE_ROOT_VELOCITY_OUTER_FEEDBACK" <<'PY'
 import json
 from pathlib import Path
 import sys
@@ -839,6 +878,7 @@ import sys
 summary = json.loads(Path(sys.argv[1]).read_text())
 expected_cases = [int(value) for value in sys.argv[2].split(",")]
 require_initialization = bool(int(sys.argv[3]))
+require_root_velocity_feedback = bool(int(sys.argv[4]))
 gate_rows = summary.get("gate_rows", [])
 initialization_ok = not require_initialization or (
     len(gate_rows) == 1
@@ -847,6 +887,11 @@ initialization_ok = not require_initialization or (
     and gate_rows[0].get("initialization_steps") == 400
     and gate_rows[0].get("initialization_source_metric_samples") == 0
     and gate_rows[0].get("initialization_residual_label_samples") == 0
+)
+root_velocity_feedback_ok = not require_root_velocity_feedback or (
+    len(gate_rows) == 1
+    and gate_rows[0].get("outer_velocity_feedback_source") == "root_link_vx"
+    and gate_rows[0].get("velocity_feedback_evidence_passed") is True
 )
 ok = (
     summary.get("requested_cases") == expected_cases
@@ -862,6 +907,7 @@ ok = (
     and summary.get("valid_for_final_gate_c") is True
     and summary.get("valid_for_training") is False
     and initialization_ok
+    and root_velocity_feedback_ok
 )
 raise SystemExit(0 if ok else 6)
 PY

@@ -126,13 +126,20 @@ def _gate_c_rejection(
     expected_failures = {
         "completion_only": ["completed_reference"],
         "completed_position_p95_only": ["position_p95_bounded"],
+        "completed_position_p95_max": [
+            "position_p95_bounded",
+            "position_max_bounded",
+        ],
     }
     _require(reject_mode in expected_failures, "unknown Gate C reject mode")
     _require(
         failed == expected_failures[reject_mode],
         f"Gate C failure does not match {reject_mode}",
     )
-    if reject_mode == "completed_position_p95_only":
+    if reject_mode in {
+        "completed_position_p95_only",
+        "completed_position_p95_max",
+    }:
         _require(checks.get("completed_reference") is True, "Gate C did not complete")
         _require(
             np.isclose(
@@ -169,7 +176,10 @@ def _gate_c_rejection(
         and summary.get("valid_for_training") is False,
         "learning stage was not closed",
     )
-    if reject_mode == "completed_position_p95_only":
+    if reject_mode in {
+        "completed_position_p95_only",
+        "completed_position_p95_max",
+    }:
         requested_cases = summary.get("requested_cases")
         passed_cases = summary.get("dynamically_passed_cases")
         not_started_cases = summary.get("not_started_cases")
@@ -296,7 +306,11 @@ def main() -> int:
     parser.add_argument("--case", type=int, default=77)
     parser.add_argument(
         "--gate-reject-mode",
-        choices=("completion_only", "completed_position_p95_only"),
+        choices=(
+            "completion_only",
+            "completed_position_p95_only",
+            "completed_position_p95_max",
+        ),
         default="completion_only",
     )
     parser.add_argument("--target-ratio", type=float, default=1.4)
@@ -462,6 +476,9 @@ def main() -> int:
             "completion_only": "gate_c_completed_reference_only_rejection",
             "completed_position_p95_only": (
                 "gate_c_completed_position_p95_only_rejection"
+            ),
+            "completed_position_p95_max": (
+                "gate_c_completed_position_p95_max_rejection"
             ),
         }[args.gate_reject_mode],
         "gate_reject_mode": args.gate_reject_mode,

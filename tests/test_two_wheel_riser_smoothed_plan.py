@@ -1,5 +1,6 @@
 from dataclasses import replace
 import importlib.util
+import json
 from pathlib import Path
 import string
 from types import SimpleNamespace
@@ -485,6 +486,8 @@ def test_dynamic_retime_derivation_is_cpu_only_evidence_bound_and_closed() -> No
     ).read_text(encoding="utf-8")
     assert '"completion_only": ["completed_reference"]' in source
     assert '"completed_position_p95_only": ["position_p95_bounded"]' in source
+    assert '"completed_position_p95_max": [' in source
+    assert '"position_max_bounded"' in source
     assert '"--gate-reject-mode"' in source
     assert 'checks.get("completed_reference") is True' in source
     assert 'first_reject.get("runtime_contract_passed") is True' in source
@@ -512,6 +515,79 @@ def test_dynamic_retime_derivation_is_cpu_only_evidence_bound_and_closed() -> No
     assert '"valid_for_training": False' in source
     assert "AppLauncher" not in source
     assert "--headless" not in source
+
+
+def test_dynamic_retime_accepts_only_a_completed_p95_max_reject(
+    tmp_path: Path,
+) -> None:
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/derive_riser_smoothed_dynamic_retime.py"
+    )
+    spec = importlib.util.spec_from_file_location("dynamic_retime", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    gate_path = tmp_path / "gate.json"
+    summary_path = tmp_path / "summary.json"
+    checks = {
+        "completed_reference": True,
+        "position_p95_bounded": False,
+        "position_max_bounded": False,
+    }
+    row = {
+        "case": 42,
+        "checks": checks,
+        "completed_phase_time_s": 48.0,
+        "execution_duration_s": 48.0,
+        "dynamic_quality_passed": False,
+        "thermal_admission_passed": True,
+        "controller_evidence_passed": True,
+        "termination": None,
+        "executed_residual_dataset": None,
+        "raw_residual_label_applied_to_commands": False,
+        "residual_action_abs_max": [0.0, 0.0, 0.0],
+    }
+    gate_path.write_text(
+        json.dumps({"cases": [42], "results": [row]}),
+        encoding="utf-8",
+    )
+    summary = {
+        "requested_cases": [42],
+        "dynamically_passed_cases": [],
+        "not_started_cases": [],
+        "first_dynamic_reject": {
+            "case": 42,
+            "classification": "dynamic_gate_rejection",
+            "stage": "dynamic_gate",
+            "physical_dynamic_quality_passed": False,
+            "thermal_admission_passed": True,
+            "runtime_contract_passed": True,
+        },
+        "residual_capture_started": False,
+        "bc_started": False,
+        "ppo_started": False,
+        "valid_for_training": False,
+    }
+    summary_path.write_text(json.dumps(summary), encoding="utf-8")
+    assert module._gate_c_rejection(
+        gate_path,
+        summary_path,
+        case=42,
+        reject_mode="completed_position_p95_max",
+    ) == row
+    checks["position_max_bounded"] = True
+    gate_path.write_text(
+        json.dumps({"cases": [42], "results": [row]}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="completed_position_p95_max"):
+        module._gate_c_rejection(
+            gate_path,
+            summary_path,
+            case=42,
+            reject_mode="completed_position_p95_max",
+        )
 
 
 def test_portfolio_composer_accepts_localized_reversal_retime_schema() -> None:

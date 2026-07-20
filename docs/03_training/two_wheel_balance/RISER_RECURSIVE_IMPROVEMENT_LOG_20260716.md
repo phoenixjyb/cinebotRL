@@ -4252,6 +4252,17 @@ and must state whether its candidate was accepted or rejected.
   BC remains closed until fresh capture, raw-envelope recomputation, zero
   clipping, command reconstruction, and case-disjoint split gates pass. PPO
   remains closed after BC initialization.
+- The authoritative `.98` CPU audit selected all `42/42` requested physical
+  teacher candidates from the v16 portfolio with no missing case. The selection
+  manifest is
+  `20260720_initial_teacher42_selection_v1/selection.json`, SHA-256
+  `e0f1d2b44061aabfe64ad2ffa3d23f57bf9b3e51015b2e3fa0703ba24316bb06`.
+  It reports raw residual maxima `[0.319627,0.216497,0.017296]`, 39 passes under
+  the legacy scale, and legacy-scale rejects `[10,28,70]`. Selection passes,
+  while capture, BC, PPO, and training admission remain false.
+- The authoritative `.98` regression suite passed all `427/427` collected
+  tests after the per-case legacy-schema compatibility and modern-evidence
+  preference fixes. No GPU/Isaac application was launched.
 
 ## Next round after Round 119
 

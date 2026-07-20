@@ -87,9 +87,6 @@ def audit_candidate(
     result = results[0]
     plan_sha = selected_plan_sha256(admission, case)
     checks = {
-        "summary_dynamic_quality": summary.get("dynamic_quality_passed") is True,
-        "summary_thermal_admission": summary.get("thermal_admission_passed") is True,
-        "summary_runtime_contract": summary.get("runtime_contract_passed") is True,
         "summary_timing_separated": summary.get("source_execution_timing_separated")
         is True,
         "row_passed": row.get("passed") is True,
@@ -138,6 +135,10 @@ def audit_candidate(
         "gate": str(gate_path.resolve()),
         "gate_sha256": sha256(gate_path),
         "runtime_commit": admission.get("runtime_commit"),
+        "batch_summary_dynamic_quality_passed": summary.get(
+            "dynamic_quality_passed"
+        ),
+        "batch_summary_first_dynamic_reject": summary.get("first_dynamic_reject"),
         "controller_profile": row.get("controller_profile"),
         "tracking_profile": row.get("tracking_profile"),
         "plan_sha256": plan_sha,

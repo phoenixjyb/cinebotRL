@@ -77,7 +77,8 @@ def _write_fixture(root: Path, *, bad_plan_hash: bool = False) -> tuple[Path, Pa
             encoding="utf-8",
         )
         summary = {
-            "dynamic_quality_passed": True,
+            # A sibling reject may make the batch false without invalidating this row.
+            "dynamic_quality_passed": case == 1,
             "thermal_admission_passed": True,
             "runtime_contract_passed": True,
             "source_execution_timing_separated": True,

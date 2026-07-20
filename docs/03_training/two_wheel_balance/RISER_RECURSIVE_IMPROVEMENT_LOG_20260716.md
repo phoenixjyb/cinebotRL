@@ -2979,3 +2979,37 @@ and must state whether its candidate was accepted or rejected.
   `20260720_gate_c_smoothed_case42_v16_baseline_rollback_v1_exclusive` with a
   `2200 s` wall bound. No controller, threshold, source geometry, or learning
   stage changes are authorized; case 43 remains closed until case 42 passes.
+
+## Round 90: v16 rollback completes but disproves the baseline allocation
+
+- Published the hash-bound v16 rollback route at `b9f7d81`; the authoritative
+  `.98` suite passed `346/346`, and WSL, Windows, and GPU ownership checks were
+  empty before launch. The exclusive canary completed all
+  `52.563872/52.563872 s` in `28578` steps with no termination.
+- Dynamic position p95/max failed at `1.276124/1.468091 m`. The remaining
+  physical gates passed: attitude p95/max were `0.136711/0.224623 deg`, pitch
+  p95/max were `6.465981/7.005437 deg`, riser servo p95/max were
+  `0.012703/0.014659 m`, thermal-load max was `0.001717`, IK failures were
+  zero, and action/riser/proxy saturation remained zero.
+- The residual label envelope independently failed at normalized maxima
+  `[1.466667,0.297448,0.147136]`. Prospective labels were never applied,
+  residual action remained zero, and no dataset, capture, BC, PPO, or training
+  started. The dynamic union remains `42/70`.
+- Sealed hashes are admission
+  `7ecc155c0038753f9b5fc388f3e266f7c6e4c5180c0cba8f5b6a4088a1d4265d`,
+  gate `b1b7ff22cfb7640b4a0eab83379388cb9412b901fa895ffa65bd16d9ca8772d8`,
+  log `3f325f3acb5c55a06dd70c5056aced246eba967be15125cf7239ffadc50f4138`,
+  and summary
+  `dfc9ef8503229de3dccdd4fe98f56bb0b4e3c552efa835695949ebad9afcc59d`.
+- Cross-run localization shows v16, v17, and v18 first exceed `0.15 m` at
+  elapsed `1 s`; their dominant failure is the first reversal around phase
+  `4.2-4.9 s`. V17 remains the best allocation at dynamic p95/max
+  `0.385169/0.496077 m`; reverting its allocation or stretching its reversal
+  is rejected.
+- Stop GPU work. The next CPU-only candidate must use explicit initialization
+  separation: add a bounded, unscored pre-roll that reaches the immutable
+  first source anchor with compatible chassis velocity before source time
+  starts. It must preserve all `1643` source anchors/timestamps, keep source
+  and execution clocks separate, prove continuity and all existing kinematic
+  limits, and remain dynamically unvalidated/training-ineligible. No runtime
+  route may be added until that contract and focused negative tests pass.

@@ -2816,3 +2816,37 @@ and must state whether its candidate was accepted or rejected.
 - Prepare exactly one unchanged default-profile route in
   `20260720_gate_c_smoothed_case41_v16_camera_lever_arm_v1_exclusive` with a
   duration-derived `2800 s` wall bound. Learning remains closed.
+
+## Round 84: exclusive case-41 playback passes Gate C
+
+- Published the case-only route at `c587817`; the authoritative `.98` suite
+  passed `341/341`. Both clocks completed at `39.991917/70.739720 s` in
+  `25298` steps with no termination.
+- Dynamic position p95/max passed at `0.085697/0.131343 m`; attitude p95/max
+  passed at `0.157019/0.251114 deg`; pitch p95/max were
+  `6.377008/6.415854 deg`. Riser servo p95/max were
+  `0.013107/0.014853 m`, effort max was `25.502213 N`, and thermal-load max
+  was `0.001688`. Every completion, physical, runtime, thermal, controller,
+  IK, proxy-rate, saturation, and termination check passed.
+- The prospective residual-label envelope independently passed with raw maxima
+  `[0.109987,0.145519,0.014965]` and normalized maxima
+  `[0.366623,0.363797,0.149654]`. Residual action remained zero and unapplied;
+  no dataset, capture, BC, PPO, or training started. The unique dynamic union
+  is now `42/70`.
+- Evidence hashes: admission
+  `24aaa9dfb0b9f1c686f61590f2e53f7b2a45a87229a757f791150a8da3b4e181`,
+  gate `e4a8ad303aedba34c3c03b60e94f360b29d3f7b25c99ceb9ca824bf73d4ad593`,
+  log `b54a37d78b7965eac2d3ecb3293cf7078f37848dc1021823f9124a92daf288ad`,
+  and summary
+  `61461418c83cb071ffce9300838140dd99ddff6fe333d834a3785b6ec895b016`.
+
+## Next round after Round 84
+
+- Review v16 case 42 on CPU before routing it. It is statically admitted, but
+  its position p95 is `0.148363 m`, only `0.001637 m` below the immutable
+  `0.15 m` gate; static max is `0.197051 m`. Preserve its exact source and
+  determine whether a geometry-preserving preview allocation can provide
+  meaningful static margin under the existing duration and transition gates.
+- Do not launch case 42 merely because it narrowly passes static admission.
+  Keep case 43 and all learning stages closed until this margin review is
+  complete and one bounded case-42 route is explicitly selected.

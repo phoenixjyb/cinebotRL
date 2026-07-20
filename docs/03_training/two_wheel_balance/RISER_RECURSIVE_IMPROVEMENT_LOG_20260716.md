@@ -3646,3 +3646,51 @@ and must state whether its candidate was accepted or rejected.
 - Do not add a runtime token or namespace until CPU review and the full
   authoritative suite pass. Keep case 43, residual capture, BC, PPO, training,
   and obstacle work closed.
+
+## Round 105: opposing longitudinal PI-memory candidate
+
+- Reconstructing the sealed case-42 trace with the frozen gain matrix localizes
+  the missing reverse authority to stale outer-loop PI memory rather than LQR
+  saturation. When the effective reference became approximately
+  `-0.16 m/s`, the stored longitudinal integral was still about `+0.294` and
+  opposed the requested direction. It crossed zero only several seconds later;
+  the same lag then appeared with opposite sign at the reverse-to-forward
+  transition. The inner action was not saturated during this interval.
+- A bounded, default-off controller candidate resets only the longitudinal PI
+  seed when all three conditions hold: the effective reference exceeds a
+  `0.05 m/s` deadband, measured velocity is deficient in that commanded
+  direction, and the existing integral opposes that direction. It then
+  integrates the current error normally. It does not reset during overspeed
+  braking, alter yaw memory, change the frozen LQR gains, change source or plan
+  data, relax the symmetric total-pitch limit, alter action limits, or bypass
+  anti-windup.
+- New policy-rate evidence records controller-update and held-command counts,
+  reference sign changes, opposing-memory events, actual reset count,
+  directional velocity deficit, pitch/pitch-rate/wheel-velocity LQR
+  contributions, PI magnitude, total-pitch-limit occupancy, and common-action
+  magnitude. Evidence changes do not alter deterministic commands.
+- Synthetic coverage proves default-off bitwise compatibility, one reset across
+  a gradual zero crossing, deadband behavior, compact controller-state support,
+  anti-windup from the reset seed, preservation of legitimate overspeed braking
+  memory, finite telemetry, and fail-closed validation. The focused controller,
+  evidence, and playback suite passes `65/65`; compilation, stale-identifier
+  scan, and `git diff --check` also pass.
+- The broader Mac mirror reaches `233` passes. Its `27` failures are all missing
+  generated URDF/mesh assets in the lightweight local clone, so authoritative
+  full validation remains assigned to the complete `.98` worktree. No runtime
+  route, token, namespace, Isaac process, dataset, residual capture, BC, PPO,
+  or training was created.
+
+## Next round after Round 105
+
+- Commit and push this CPU-only candidate, transfer the exact commit to `.98`,
+  and run the complete authoritative CPU suite with the generated assets
+  present. Diff-audit that only the default-off PI-memory candidate, telemetry,
+  tests, and this log changed.
+- Stop for controller/evidence review after the authoritative suite. Do not add
+  a runtime authorization route or run another case-42 canary in the same
+  round.
+- Preserve deterministic ownership of primary balance and all hard safety
+  limits. A future learned policy remains a bounded supervisory residual over
+  model-based commands; case 43, residual capture, BC, PPO, training, and
+  obstacle work remain closed.

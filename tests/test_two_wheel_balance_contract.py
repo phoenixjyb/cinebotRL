@@ -299,6 +299,235 @@ def test_cascaded_lqr_slews_references_and_persists_effective_commands() -> None
     np.testing.assert_allclose(controller_state[:, 4:], [[0.02, -0.04]])
 
 
+def test_opposing_vx_integral_reset_removes_only_directional_deficit_memory() -> None:
+    gain = np.array(
+        [
+            [-4.0, -2.0, 0.0, 0.00025, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0065, 0.0],
+        ]
+    )
+    states = np.zeros((2, len(LQR_STATE_NAMES)))
+    states[:, 3] = -0.10 / 0.1016
+    controller_state = np.zeros((2, 6))
+    controller_state[:, 0] = [0.30, -0.30]
+    controller_state[:, 4] = 0.16
+    reference = np.full(2, -0.16)
+    legacy_action, legacy_state, legacy = cascaded_lqr_action(
+        states,
+        reference,
+        np.zeros(2),
+        gain,
+        controller_state,
+        control_dt=0.02,
+        config=cascaded_lqr_config(
+            "structural_robust_v1",
+            limit_total_pitch_reference=True,
+        ),
+    )
+    candidate_action, candidate_state, candidate = cascaded_lqr_action(
+        states,
+        reference,
+        np.zeros(2),
+        gain,
+        controller_state,
+        control_dt=0.02,
+        config=cascaded_lqr_config(
+            "structural_robust_v1",
+            limit_total_pitch_reference=True,
+            reset_opposing_vx_integral_on_directional_deficit=True,
+        ),
+    )
+
+    assert not np.any(legacy["opposing_vx_integral_deficit_reset"])
+    np.testing.assert_array_equal(
+        candidate["opposing_vx_integral_deficit_reset"], [True, False]
+    )
+    assert candidate_state[0, 0] == pytest.approx(-0.0012)
+    assert candidate_state[1, 0] == pytest.approx(legacy_state[1, 0])
+    assert candidate["pitch_reference"][0] < legacy["pitch_reference"][0]
+    assert candidate_action[0, 0] > legacy_action[0, 0]
+    np.testing.assert_allclose(candidate_action[1], legacy_action[1])
+
+
+def test_opposing_vx_integral_reset_is_deadbanded_and_default_compatible() -> None:
+    gain = np.array(
+        [
+            [-4.0, -2.0, 0.0, 0.00025, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0065, 0.0],
+        ]
+    )
+    states = np.zeros((1, len(LQR_STATE_NAMES)))
+    controller_state = np.zeros((1, 6))
+    controller_state[0, 0] = 0.30
+    controller_state[0, 4] = 0.04
+    kwargs = dict(
+        states=states,
+        vx_ref=np.array([-0.04]),
+        wz_ref=np.zeros(1),
+        gain=gain,
+        integrals=controller_state,
+        control_dt=0.02,
+    )
+    default = cascaded_lqr_action(
+        config=cascaded_lqr_config(
+            "structural_robust_v1",
+            limit_total_pitch_reference=True,
+        ),
+        **kwargs,
+    )
+    explicit_off = cascaded_lqr_action(
+        config=cascaded_lqr_config(
+            "structural_robust_v1",
+            limit_total_pitch_reference=True,
+            reset_opposing_vx_integral_on_directional_deficit=False,
+        ),
+        **kwargs,
+    )
+    deadbanded = cascaded_lqr_action(
+        config=cascaded_lqr_config(
+            "structural_robust_v1",
+            limit_total_pitch_reference=True,
+            reset_opposing_vx_integral_on_directional_deficit=True,
+        ),
+        **kwargs,
+    )
+
+    np.testing.assert_array_equal(default[0], explicit_off[0])
+    np.testing.assert_array_equal(default[1], explicit_off[1])
+    assert not deadbanded[2]["opposing_vx_integral_deficit_reset"][0]
+    np.testing.assert_allclose(deadbanded[0], default[0])
+    np.testing.assert_allclose(deadbanded[1], default[1])
+
+
+def test_opposing_vx_integral_reset_supports_compact_memory_and_validates_deadband() -> None:
+    kwargs = dict(
+        states=np.zeros((1, len(LQR_STATE_NAMES))),
+        vx_ref=np.array([-0.16]),
+        wz_ref=np.zeros(1),
+        gain=np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES))),
+        control_dt=0.02,
+    )
+    compact_state = np.array([[0.3, 0.0]])
+    _, next_state, diagnostics = cascaded_lqr_action(
+        integrals=compact_state,
+        config=CascadedLQRConfig(
+            reset_opposing_vx_integral_on_directional_deficit=True
+        ),
+        **kwargs,
+    )
+    assert diagnostics["opposing_vx_integral_deficit_reset"][0]
+    assert next_state[0, 0] < 0.0
+    with pytest.raises(ValueError, match="integral-reset reference deadband"):
+        cascaded_lqr_action(
+            integrals=np.zeros((1, 6)),
+            **{
+                **kwargs,
+                "config": CascadedLQRConfig(
+                    reset_opposing_vx_integral_on_directional_deficit=True,
+                    vx_integral_reset_reference_deadband_mps=0.0,
+                ),
+            },
+        )
+    with pytest.raises(ValueError, match="integral-reset reference deadband"):
+        cascaded_lqr_action(
+            integrals=np.zeros((1, 6)),
+            **{
+                **kwargs,
+                "config": CascadedLQRConfig(
+                    reset_opposing_vx_integral_on_directional_deficit=True,
+                    vx_integral_reset_reference_deadband_mps=float("nan"),
+                ),
+            },
+        )
+
+
+def test_opposing_vx_integral_reset_preserves_antiwindup_from_reset_seed() -> None:
+    controller_state = np.zeros((1, 6))
+    controller_state[0, 0] = 0.30
+    controller_state[0, 4] = 0.16
+    _, next_state, diagnostics = cascaded_lqr_action(
+        np.zeros((1, len(LQR_STATE_NAMES))),
+        np.array([-1.0]),
+        np.zeros(1),
+        np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES))),
+        controller_state,
+        control_dt=0.02,
+        config=CascadedLQRConfig(
+            vx_kp=10.0,
+            vx_ki=10.0,
+            pitch_reference_limit_rad=0.1,
+            reset_opposing_vx_integral_on_directional_deficit=True,
+        ),
+    )
+
+    assert diagnostics["opposing_vx_integral_deficit_reset"][0]
+    assert diagnostics["vx_integrator_blocked"][0]
+    assert next_state[0, 0] == 0.0
+
+
+def test_opposing_vx_integral_reset_handles_gradual_zero_crossing_once() -> None:
+    gain = np.array(
+        [
+            [-4.0, -2.0, 0.0, 0.00025, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0065, 0.0],
+        ]
+    )
+    state = np.zeros((1, len(LQR_STATE_NAMES)))
+    controller_state = np.zeros((1, 6))
+    controller_state[0, 0] = 0.30
+    controller_state[0, 4] = 0.16
+    reset_count = 0
+    for reference in (0.16, 0.08, 0.04, 0.0, -0.04, -0.08, -0.16):
+        action, controller_state, diagnostics = cascaded_lqr_action(
+            state,
+            np.array([reference]),
+            np.zeros(1),
+            gain,
+            controller_state,
+            control_dt=0.02,
+            config=cascaded_lqr_config(
+                "structural_robust_v1",
+                limit_total_pitch_reference=True,
+                reset_opposing_vx_integral_on_directional_deficit=True,
+            ),
+        )
+        reset_count += int(
+            diagnostics["opposing_vx_integral_deficit_reset"][0]
+        )
+        assert np.isfinite(action).all()
+        assert np.max(np.abs(action)) <= 0.8
+        assert (
+            abs(diagnostics["total_pitch_reference"][0])
+            <= np.radians(6.0) + 1e-12
+        )
+        assert abs(controller_state[0, 0]) <= 0.7
+
+    assert reset_count == 1
+    assert controller_state[0, 0] < 0.0
+
+
+def test_opposing_vx_integral_reset_preserves_overspeed_braking_memory() -> None:
+    state = np.zeros((1, len(LQR_STATE_NAMES)))
+    state[0, 3] = 0.20 / 0.1016
+    controller_state = np.zeros((1, 6))
+    controller_state[0, 0] = -0.30
+    controller_state[0, 4] = 0.16
+    _, next_state, diagnostics = cascaded_lqr_action(
+        state,
+        np.array([0.16]),
+        np.zeros(1),
+        np.zeros((len(ACTION_NAMES), len(LQR_STATE_NAMES))),
+        controller_state,
+        control_dt=0.02,
+        config=CascadedLQRConfig(
+            reset_opposing_vx_integral_on_directional_deficit=True
+        ),
+    )
+
+    assert not diagnostics["opposing_vx_integral_deficit_reset"][0]
+    assert next_state[0, 0] < -0.30
+
+
 def test_cascaded_lqr_governor_retimes_only_bias_reinforcing_motion() -> None:
     gain = np.zeros((2, len(LQR_STATE_NAMES)))
     controller_state = np.zeros((3, 6))

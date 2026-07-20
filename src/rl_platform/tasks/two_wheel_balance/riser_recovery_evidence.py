@@ -10,6 +10,9 @@ RECOVERY_TELEMETRY_SCHEMA = "riser_recovery_direction_policy_rate_v1"
 VELOCITY_FEEDBACK_TELEMETRY_SCHEMA = (
     "riser_root_vs_wheel_velocity_policy_rate_v1"
 )
+LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA = (
+    "riser_longitudinal_authority_policy_rate_v1"
+)
 
 
 def _sign(value: float, deadband: float) -> int:
@@ -301,4 +304,200 @@ class VelocityFeedbackTelemetryAccumulator:
             "sign_deadband_mps": self.sign_deadband_mps,
             "wheel_tracking_tolerance_mps": self.wheel_tracking_tolerance_mps,
             "root_lag_threshold_mps": self.root_lag_threshold_mps,
+        }
+
+
+@dataclass
+class LongitudinalAuthorityTelemetryAccumulator:
+    """Expose PI-memory and held inner-LQR authority at policy rate."""
+
+    reference_deadband_mps: float = 0.05
+    deficit_tolerance_mps: float = 0.03
+    sample_count: int = 0
+    controller_update_count: int = 0
+    reference_sign_change_count: int = 0
+    opposing_integral_sign_change_count: int = 0
+    integral_reset_count: int = 0
+    velocity_deficit_step_count: int = 0
+    total_pitch_limit_step_count: int = 0
+    velocity_deficit_abs_max_mps: float = 0.0
+    vx_integral_before_abs_max: float = 0.0
+    vx_integral_after_abs_max: float = 0.0
+    pitch_abs_max_rad: float = 0.0
+    pitch_rate_abs_max_rad_s: float = 0.0
+    total_pitch_reference_abs_max_rad: float = 0.0
+    common_action_abs_max: float = 0.0
+    _velocity_deficit_sum_mps: float = field(
+        default=0.0, init=False, repr=False
+    )
+    _deficit_pitch_contribution_sum: float = field(
+        default=0.0, init=False, repr=False
+    )
+    _deficit_pitch_rate_contribution_sum: float = field(
+        default=0.0, init=False, repr=False
+    )
+    _deficit_wheel_velocity_contribution_sum: float = field(
+        default=0.0, init=False, repr=False
+    )
+
+    def __post_init__(self) -> None:
+        values = (self.reference_deadband_mps, self.deficit_tolerance_mps)
+        if not all(math.isfinite(value) and value > 0.0 for value in values):
+            raise ValueError(
+                "longitudinal authority thresholds must be finite and positive"
+            )
+
+    def step(
+        self,
+        *,
+        controller_updated: bool,
+        effective_reference_mps: float,
+        previous_effective_reference_mps: float,
+        wheel_velocity_mps: float,
+        pitch_rad: float,
+        pitch_rate_rad_s: float,
+        total_pitch_reference_rad: float,
+        total_pitch_limit_rad: float,
+        common_action: float,
+        vx_integral_before: float,
+        vx_integral_after: float,
+        integral_reset: bool,
+        pitch_contribution: float,
+        pitch_rate_contribution: float,
+        wheel_velocity_contribution: float,
+    ) -> None:
+        values = (
+            effective_reference_mps,
+            previous_effective_reference_mps,
+            wheel_velocity_mps,
+            pitch_rad,
+            pitch_rate_rad_s,
+            total_pitch_reference_rad,
+            total_pitch_limit_rad,
+            common_action,
+            vx_integral_before,
+            vx_integral_after,
+            pitch_contribution,
+            pitch_rate_contribution,
+            wheel_velocity_contribution,
+        )
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("longitudinal authority samples must be finite")
+        if total_pitch_limit_rad <= 0.0:
+            raise ValueError("total pitch limit must be positive")
+        if integral_reset and not controller_updated:
+            raise ValueError("integral reset must coincide with a controller update")
+
+        self.sample_count += 1
+        self.controller_update_count += int(controller_updated)
+        self.vx_integral_before_abs_max = max(
+            self.vx_integral_before_abs_max, abs(vx_integral_before)
+        )
+        self.vx_integral_after_abs_max = max(
+            self.vx_integral_after_abs_max, abs(vx_integral_after)
+        )
+        self.pitch_abs_max_rad = max(self.pitch_abs_max_rad, abs(pitch_rad))
+        self.pitch_rate_abs_max_rad_s = max(
+            self.pitch_rate_abs_max_rad_s, abs(pitch_rate_rad_s)
+        )
+        self.total_pitch_reference_abs_max_rad = max(
+            self.total_pitch_reference_abs_max_rad,
+            abs(total_pitch_reference_rad),
+        )
+        self.common_action_abs_max = max(
+            self.common_action_abs_max, abs(common_action)
+        )
+        self.total_pitch_limit_step_count += int(
+            abs(total_pitch_reference_rad) >= total_pitch_limit_rad - 1e-9
+        )
+
+        reference_sign = _sign(
+            effective_reference_mps, self.reference_deadband_mps
+        )
+        previous_sign = _sign(
+            previous_effective_reference_mps, self.reference_deadband_mps
+        )
+        sign_changed = bool(
+            controller_updated
+            and reference_sign != 0
+            and previous_sign != 0
+            and reference_sign != previous_sign
+        )
+        opposing_integral = bool(
+            sign_changed and vx_integral_before * effective_reference_mps < 0.0
+        )
+        self.reference_sign_change_count += int(sign_changed)
+        self.opposing_integral_sign_change_count += int(opposing_integral)
+        self.integral_reset_count += int(integral_reset)
+
+        projected_deficit = (
+            reference_sign
+            * (effective_reference_mps - wheel_velocity_mps)
+            if reference_sign != 0
+            else 0.0
+        )
+        velocity_deficit = max(projected_deficit, 0.0)
+        if velocity_deficit > self.deficit_tolerance_mps:
+            self.velocity_deficit_step_count += 1
+            self._velocity_deficit_sum_mps += velocity_deficit
+            self._deficit_pitch_contribution_sum += pitch_contribution
+            self._deficit_pitch_rate_contribution_sum += (
+                pitch_rate_contribution
+            )
+            self._deficit_wheel_velocity_contribution_sum += (
+                wheel_velocity_contribution
+            )
+            self.velocity_deficit_abs_max_mps = max(
+                self.velocity_deficit_abs_max_mps, velocity_deficit
+            )
+
+    def summary(self) -> dict[str, object]:
+        sample_denominator = max(self.sample_count, 1)
+        deficit_denominator = max(self.velocity_deficit_step_count, 1)
+        return {
+            "schema": LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA,
+            "policy_rate_sample_count": self.sample_count,
+            "controller_update_count": self.controller_update_count,
+            "held_controller_command_step_count": (
+                self.sample_count - self.controller_update_count
+            ),
+            "reference_sign_change_count": self.reference_sign_change_count,
+            "opposing_integral_sign_change_count": (
+                self.opposing_integral_sign_change_count
+            ),
+            "integral_reset_count": self.integral_reset_count,
+            "velocity_deficit_step_count": self.velocity_deficit_step_count,
+            "velocity_deficit_ratio": (
+                self.velocity_deficit_step_count / sample_denominator
+            ),
+            "velocity_deficit_mean_mps": (
+                self._velocity_deficit_sum_mps / deficit_denominator
+            ),
+            "velocity_deficit_abs_max_mps": (
+                self.velocity_deficit_abs_max_mps
+            ),
+            "deficit_pitch_contribution_mean": (
+                self._deficit_pitch_contribution_sum / deficit_denominator
+            ),
+            "deficit_pitch_rate_contribution_mean": (
+                self._deficit_pitch_rate_contribution_sum
+                / deficit_denominator
+            ),
+            "deficit_wheel_velocity_contribution_mean": (
+                self._deficit_wheel_velocity_contribution_sum
+                / deficit_denominator
+            ),
+            "vx_integral_before_abs_max": self.vx_integral_before_abs_max,
+            "vx_integral_after_abs_max": self.vx_integral_after_abs_max,
+            "pitch_abs_max_rad": self.pitch_abs_max_rad,
+            "pitch_rate_abs_max_rad_s": self.pitch_rate_abs_max_rad_s,
+            "total_pitch_reference_abs_max_rad": (
+                self.total_pitch_reference_abs_max_rad
+            ),
+            "total_pitch_limit_step_count": (
+                self.total_pitch_limit_step_count
+            ),
+            "common_action_abs_max": self.common_action_abs_max,
+            "reference_deadband_mps": self.reference_deadband_mps,
+            "deficit_tolerance_mps": self.deficit_tolerance_mps,
         }

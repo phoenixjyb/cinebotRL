@@ -1,8 +1,10 @@
 import pytest
 
 from rl_platform.tasks.two_wheel_balance.riser_recovery_evidence import (
+    LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA,
     RECOVERY_TELEMETRY_SCHEMA,
     VELOCITY_FEEDBACK_TELEMETRY_SCHEMA,
+    LongitudinalAuthorityTelemetryAccumulator,
     RecoveryTelemetryAccumulator,
     VelocityFeedbackTelemetryAccumulator,
 )
@@ -125,4 +127,84 @@ def test_velocity_feedback_telemetry_rejects_nonfinite_samples() -> None:
             total_pitch_reference_rad=0.0,
             applied_pitch_bias_rad=0.0,
             common_action=0.0,
+        )
+
+
+def test_longitudinal_authority_localizes_opposing_reversal_memory() -> None:
+    telemetry = LongitudinalAuthorityTelemetryAccumulator()
+    telemetry.step(
+        controller_updated=True,
+        effective_reference_mps=-0.16,
+        previous_effective_reference_mps=0.16,
+        wheel_velocity_mps=-0.10,
+        pitch_rad=0.02,
+        pitch_rate_rad_s=-0.10,
+        total_pitch_reference_rad=-0.04,
+        total_pitch_limit_rad=0.104719755,
+        common_action=-0.06,
+        vx_integral_before=0.30,
+        vx_integral_after=-0.0012,
+        integral_reset=True,
+        pitch_contribution=0.20,
+        pitch_rate_contribution=-0.26,
+        wheel_velocity_contribution=-0.0001,
+    )
+    telemetry.step(
+        controller_updated=False,
+        effective_reference_mps=-0.16,
+        previous_effective_reference_mps=0.16,
+        wheel_velocity_mps=-0.15,
+        pitch_rad=0.01,
+        pitch_rate_rad_s=-0.02,
+        total_pitch_reference_rad=-0.03,
+        total_pitch_limit_rad=0.104719755,
+        common_action=-0.02,
+        vx_integral_before=-0.0012,
+        vx_integral_after=-0.0012,
+        integral_reset=False,
+        pitch_contribution=0.05,
+        pitch_rate_contribution=-0.03,
+        wheel_velocity_contribution=-0.0001,
+    )
+
+    summary = telemetry.summary()
+    assert summary["schema"] == LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA
+    assert summary["policy_rate_sample_count"] == 2
+    assert summary["controller_update_count"] == 1
+    assert summary["held_controller_command_step_count"] == 1
+    assert summary["reference_sign_change_count"] == 1
+    assert summary["opposing_integral_sign_change_count"] == 1
+    assert summary["integral_reset_count"] == 1
+    assert summary["velocity_deficit_step_count"] == 1
+    assert summary["velocity_deficit_mean_mps"] == pytest.approx(0.06)
+    assert summary["deficit_pitch_contribution_mean"] == pytest.approx(0.20)
+    assert summary["deficit_pitch_rate_contribution_mean"] == pytest.approx(-0.26)
+
+
+def test_longitudinal_authority_rejects_invalid_or_repeated_reset() -> None:
+    with pytest.raises(ValueError, match="thresholds"):
+        LongitudinalAuthorityTelemetryAccumulator(reference_deadband_mps=0.0)
+    telemetry = LongitudinalAuthorityTelemetryAccumulator()
+    kwargs = dict(
+        effective_reference_mps=-0.16,
+        previous_effective_reference_mps=0.16,
+        wheel_velocity_mps=-0.10,
+        pitch_rad=0.0,
+        pitch_rate_rad_s=0.0,
+        total_pitch_reference_rad=0.0,
+        total_pitch_limit_rad=0.104719755,
+        common_action=0.0,
+        vx_integral_before=0.3,
+        vx_integral_after=0.0,
+        integral_reset=True,
+        pitch_contribution=0.0,
+        pitch_rate_contribution=0.0,
+        wheel_velocity_contribution=0.0,
+    )
+    with pytest.raises(ValueError, match="controller update"):
+        telemetry.step(controller_updated=False, **kwargs)
+    with pytest.raises(ValueError, match="finite"):
+        telemetry.step(
+            controller_updated=True,
+            **{**kwargs, "pitch_rate_rad_s": float("nan")},
         )

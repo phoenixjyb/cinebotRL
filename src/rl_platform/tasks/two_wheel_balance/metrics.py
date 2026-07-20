@@ -134,6 +134,8 @@ class CascadedLQRConfig:
     pitch_bias_pitch_rate_threshold: float = 0.05
     vx_reference_slew_rate_m_s2: float = 0.0
     wz_reference_slew_rate_rad_s2: float = 0.0
+    reset_opposing_vx_integral_on_directional_deficit: bool = False
+    vx_integral_reset_reference_deadband_mps: float = 0.05
     path_progress_governor_enabled: bool = False
     governor_bias_start_rad: float = math.radians(0.5)
     governor_bias_full_rad: float = math.radians(2.5)
@@ -338,8 +340,13 @@ def cascaded_lqr_action(
         config.pitch_bias_adaptation_rate < 0.0
         or config.vx_reference_slew_rate_m_s2 < 0.0
         or config.wz_reference_slew_rate_rad_s2 < 0.0
+        or not math.isfinite(config.vx_integral_reset_reference_deadband_mps)
+        or config.vx_integral_reset_reference_deadband_mps <= 0.0
     ):
-        raise ValueError("adaptation and reference slew rates must be non-negative")
+        raise ValueError(
+            "adaptation and slew rates must be non-negative and integral-reset "
+            "reference deadband must be positive"
+        )
     if not (
         0.0 <= config.governor_bias_start_rad < config.governor_bias_full_rad
         and 0.0 < config.governor_minimum_progress_scale <= 1.0
@@ -390,9 +397,28 @@ def cascaded_lqr_action(
     )
     vx_error = effective_vx_ref - outer_vx_feedback
     wz_error = effective_wz_ref - states[:, 5]
+    previous_effective_vx_ref = (
+        integrals[:, 4].copy()
+        if integrals.shape[1] == 6
+        else np.zeros(batch, dtype=np.float64)
+    )
+    vx_integral_before = integrals[:, 0].copy()
+    vx_integral_seed = vx_integral_before.copy()
+    opposing_vx_integral_deficit_reset = np.zeros(batch, dtype=bool)
+    if config.reset_opposing_vx_integral_on_directional_deficit:
+        deadband = config.vx_integral_reset_reference_deadband_mps
+        directional_velocity_deficit = (
+            (np.abs(effective_vx_ref) >= deadband)
+            & (vx_error * effective_vx_ref > 0.0)
+        )
+        integral_opposes_reference = vx_integral_before * effective_vx_ref < 0.0
+        opposing_vx_integral_deficit_reset = (
+            directional_velocity_deficit & integral_opposes_reference
+        )
+        vx_integral_seed[opposing_vx_integral_deficit_reset] = 0.0
     candidate_integrals = integrals.copy()
     candidate_integrals[:, 0] = np.clip(
-        candidate_integrals[:, 0] + control_dt * vx_error,
+        vx_integral_seed + control_dt * vx_error,
         -config.vx_integral_limit,
         config.vx_integral_limit,
     )
@@ -418,7 +444,9 @@ def cascaded_lqr_action(
         & (vx_error < 0.0)
     )
     next_integrals = candidate_integrals.copy()
-    next_integrals[vx_integrator_blocked, 0] = integrals[vx_integrator_blocked, 0]
+    next_integrals[vx_integrator_blocked, 0] = vx_integral_seed[
+        vx_integrator_blocked
+    ]
     pitch_bias = np.zeros(batch, dtype=np.float64)
     pitch_bias_adapting = np.zeros(batch, dtype=bool)
     pitch_bias_calibrated = np.zeros(batch, dtype=bool)
@@ -536,6 +564,22 @@ def cascaded_lqr_action(
         "effective_vx_ref": effective_vx_ref,
         "effective_wz_ref": effective_wz_ref,
         "vx_error": vx_error,
+        "previous_effective_vx_ref": previous_effective_vx_ref,
+        "vx_integral_before": vx_integral_before,
+        "vx_integral_after": next_integrals[:, 0].copy(),
+        "opposing_vx_integral_deficit_reset_enabled": np.full(
+            batch,
+            config.reset_opposing_vx_integral_on_directional_deficit,
+            dtype=bool,
+        ),
+        "opposing_vx_integral_deficit_reset": (
+            opposing_vx_integral_deficit_reset
+        ),
+        "vx_integral_reset_reference_deadband_mps": np.full(
+            batch,
+            config.vx_integral_reset_reference_deadband_mps,
+            dtype=np.float64,
+        ),
         "wz_error": wz_error,
         "wheel_difference_error": wheel_difference_error,
         "inner_common_action": inner_common_action,

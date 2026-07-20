@@ -57,6 +57,20 @@ parser.add_argument(
     ),
 )
 parser.add_argument(
+    "--reset-opposing-vx-integral-on-directional-deficit",
+    action="store_true",
+    help=(
+        "Reset only opposing longitudinal PI memory when an active, deadbanded "
+        "velocity reference is under-tracked; the frozen inner LQR remains "
+        "unchanged."
+    ),
+)
+parser.add_argument(
+    "--vx-integral-reset-reference-deadband-mps",
+    type=float,
+    default=0.05,
+)
+parser.add_argument(
     "--use-root-velocity-outer-feedback",
     action="store_true",
     help="Use measured root vx for the outer PI only; keep wheel state in the frozen LQR.",
@@ -195,6 +209,11 @@ if args.use_commanded_base_progress_error and (
     parser.error(
         "commanded-base progress error requires the phase governor and camera lever-arm compensation"
     )
+if not (
+    math.isfinite(args.vx_integral_reset_reference_deadband_mps)
+    and args.vx_integral_reset_reference_deadband_mps > 0.0
+):
+    parser.error("--vx-integral-reset-reference-deadband-mps must be positive")
 app = AppLauncher(args).app
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -245,8 +264,10 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     save_case_dataset,
 )
 from rl_platform.tasks.two_wheel_balance.riser_recovery_evidence import (
+    LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA,
     RECOVERY_TELEMETRY_SCHEMA,
     VELOCITY_FEEDBACK_TELEMETRY_SCHEMA,
+    LongitudinalAuthorityTelemetryAccumulator,
     RecoveryTelemetryAccumulator,
     VelocityFeedbackTelemetryAccumulator,
 )
@@ -430,6 +451,16 @@ def evaluate_case(
             "limit_total_pitch_reference": (
                 True if args.limit_total_pitch_reference else None
             ),
+            "reset_opposing_vx_integral_on_directional_deficit": (
+                True
+                if args.reset_opposing_vx_integral_on_directional_deficit
+                else None
+            ),
+            "vx_integral_reset_reference_deadband_mps": (
+                args.vx_integral_reset_reference_deadband_mps
+                if args.reset_opposing_vx_integral_on_directional_deficit
+                else None
+            ),
         }.items()
         if value is not None
     }
@@ -493,6 +524,13 @@ def evaluate_case(
     riser_thermal_monitor = RiserMotorThermalMonitor()
     recovery_telemetry = RecoveryTelemetryAccumulator()
     velocity_feedback_telemetry = VelocityFeedbackTelemetryAccumulator()
+    longitudinal_authority_telemetry = (
+        LongitudinalAuthorityTelemetryAccumulator(
+            reference_deadband_mps=(
+                args.vx_integral_reset_reference_deadband_mps
+            )
+        )
+    )
     saturated_proxy = 0
     proxy_effort_count = 0
     proxy_axis_saturated = np.zeros(len(PROXY_JOINTS), dtype=np.int64)
@@ -1011,7 +1049,8 @@ def evaluate_case(
         )
         unwrapped.vx_ref.fill_(vx_ref)
         unwrapped.wz_ref.fill_(wz_ref)
-        if step % control_interval == 0:
+        controller_updated = step % control_interval == 0
+        if controller_updated:
             outer_vx_feedback = (
                 np.array([float(unwrapped._state_terms()["vx"][0].item())])
                 if args.use_root_velocity_outer_feedback
@@ -1070,6 +1109,37 @@ def evaluate_case(
             total_pitch_reference_rad=total_pitch_reference_rad,
             applied_pitch_bias_rad=applied_pitch_bias_rad,
             common_action=common_action,
+        )
+        common_contributions = controller_diagnostics[
+            "common_action_state_contributions"
+        ][0]
+        longitudinal_authority_telemetry.step(
+            controller_updated=controller_updated,
+            effective_reference_mps=effective_velocity_reference_mps,
+            previous_effective_reference_mps=float(
+                controller_diagnostics["previous_effective_vx_ref"][0]
+            ),
+            wheel_velocity_mps=wheel_velocity_mps,
+            pitch_rad=float(current_states[0, 0]),
+            pitch_rate_rad_s=float(current_states[0, 1]),
+            total_pitch_reference_rad=total_pitch_reference_rad,
+            total_pitch_limit_rad=controller_cfg.pitch_reference_limit_rad,
+            common_action=common_action,
+            vx_integral_before=float(
+                controller_diagnostics["vx_integral_before"][0]
+            ),
+            vx_integral_after=float(
+                controller_diagnostics["vx_integral_after"][0]
+            ),
+            integral_reset=bool(
+                controller_updated
+                and controller_diagnostics[
+                    "opposing_vx_integral_deficit_reset"
+                ][0]
+            ),
+            pitch_contribution=float(common_contributions[0]),
+            pitch_rate_contribution=float(common_contributions[1]),
+            wheel_velocity_contribution=float(common_contributions[3]),
         )
         root_position_post = robot.data.root_pos_w[0].detach().cpu().numpy()
         root_quaternion_post = robot.data.root_quat_w[0].detach().cpu().numpy()
@@ -1337,6 +1407,9 @@ def evaluate_case(
     proxy_saturation_ratio = saturated_proxy / max(proxy_effort_count, 1)
     recovery_telemetry_summary = recovery_telemetry.summary()
     velocity_feedback_telemetry_summary = velocity_feedback_telemetry.summary()
+    longitudinal_authority_telemetry_summary = (
+        longitudinal_authority_telemetry.summary()
+    )
     recovery_telemetry_observed = (
         recovery_telemetry_summary["schema"] == RECOVERY_TELEMETRY_SCHEMA
         and recovery_telemetry_summary["policy_rate_sample_count"]
@@ -1347,6 +1420,28 @@ def evaluate_case(
         == VELOCITY_FEEDBACK_TELEMETRY_SCHEMA
         and velocity_feedback_telemetry_summary["policy_rate_sample_count"]
         == completed_steps
+    )
+    expected_controller_updates = (
+        completed_steps + control_interval - 1
+    ) // control_interval
+    longitudinal_authority_telemetry_observed = (
+        longitudinal_authority_telemetry_summary["schema"]
+        == LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA
+        and longitudinal_authority_telemetry_summary[
+            "policy_rate_sample_count"
+        ]
+        == completed_steps
+        and longitudinal_authority_telemetry_summary[
+            "controller_update_count"
+        ]
+        == expected_controller_updates
+        and (
+            args.reset_opposing_vx_integral_on_directional_deficit
+            or longitudinal_authority_telemetry_summary[
+                "integral_reset_count"
+            ]
+            == 0
+        )
     )
     camera_lever_arm_telemetry_observed = (
         len(camera_lever_arm_correction_norm_samples) == completed_steps
@@ -1430,6 +1525,9 @@ def evaluate_case(
         ),
         "velocity_feedback_telemetry_observed": (
             velocity_feedback_telemetry_observed
+        ),
+        "longitudinal_authority_telemetry_observed": (
+            longitudinal_authority_telemetry_observed
         ),
         "camera_lever_arm_telemetry_observed": (
             camera_lever_arm_telemetry_observed
@@ -1623,6 +1721,18 @@ def evaluate_case(
         "velocity_feedback_telemetry": velocity_feedback_telemetry_summary,
         "velocity_feedback_telemetry_observed": (
             velocity_feedback_telemetry_observed
+        ),
+        "longitudinal_authority_telemetry": (
+            longitudinal_authority_telemetry_summary
+        ),
+        "longitudinal_authority_telemetry_observed": (
+            longitudinal_authority_telemetry_observed
+        ),
+        "opposing_vx_integral_deficit_reset_enabled": (
+            controller_cfg.reset_opposing_vx_integral_on_directional_deficit
+        ),
+        "vx_integral_reset_reference_deadband_mps": (
+            controller_cfg.vx_integral_reset_reference_deadband_mps
         ),
         "recovery_telemetry_observed": recovery_telemetry_observed,
         "camera_lever_arm_compensation_enabled": (
@@ -1823,6 +1933,12 @@ def main() -> int:
         "tracking_profile": tracking_profile_name(),
         "total_pitch_reference_limit_enabled": args.limit_total_pitch_reference,
         "total_pitch_reference_limit_rad": TOTAL_PITCH_REFERENCE_LIMIT_RAD,
+        "opposing_vx_integral_deficit_reset_enabled": (
+            args.reset_opposing_vx_integral_on_directional_deficit
+        ),
+        "vx_integral_reset_reference_deadband_mps": (
+            args.vx_integral_reset_reference_deadband_mps
+        ),
         "tracking_recovery_velocity_cap_enabled": (
             args.tracking_maximum_linear_velocity_mps is not None
         ),
@@ -1861,6 +1977,16 @@ def main() -> int:
                 "wheel_difference_kp": args.controller_wheel_difference_kp,
                 "limit_total_pitch_reference": (
                     True if args.limit_total_pitch_reference else None
+                ),
+                "reset_opposing_vx_integral_on_directional_deficit": (
+                    True
+                    if args.reset_opposing_vx_integral_on_directional_deficit
+                    else None
+                ),
+                "vx_integral_reset_reference_deadband_mps": (
+                    args.vx_integral_reset_reference_deadband_mps
+                    if args.reset_opposing_vx_integral_on_directional_deficit
+                    else None
                 ),
             }.items()
             if value is not None
@@ -1981,6 +2107,12 @@ def write_runtime_failure(exc: Exception) -> None:
         "tracking_profile": tracking_profile_name(),
         "total_pitch_reference_limit_enabled": args.limit_total_pitch_reference,
         "total_pitch_reference_limit_rad": TOTAL_PITCH_REFERENCE_LIMIT_RAD,
+        "opposing_vx_integral_deficit_reset_enabled": (
+            args.reset_opposing_vx_integral_on_directional_deficit
+        ),
+        "vx_integral_reset_reference_deadband_mps": (
+            args.vx_integral_reset_reference_deadband_mps
+        ),
         "tracking_recovery_velocity_cap_enabled": (
             args.tracking_maximum_linear_velocity_mps is not None
         ),

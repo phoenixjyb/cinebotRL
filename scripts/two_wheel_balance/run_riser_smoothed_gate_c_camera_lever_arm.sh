@@ -451,6 +451,17 @@ case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
     CASE_TIMEOUT_SECONDS=2800
     STAMP="20260720_gate_c_smoothed_case41_v16_camera_lever_arm_v1_exclusive"
     ;;
+  AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V17_STATIC_MARGIN_PREVIEW055_G125_V1)
+    PORTFOLIO_STAMP="20260720_smoothed_plan_all79_v17_case42_static_margin_preview055_g125_cpu"
+    MANIFEST_SHA256="57f6eab7453d0d1d3f2c244b7d429bb5ac1fa95184f63b4212770dc9fefb1a51"
+    PLANNER_COMMIT="8e78e6c7d825f178fd4b49eb30aedf1adab77393"
+    CASE_A=42
+    CASE_B=""
+    CASE_A_PLAN_SHA256="b2057b0a23c9b5172f09a5373a020b18583cf118d55886624332f1d4e861a298"
+    CASE_B_PLAN_SHA256=""
+    CASE_TIMEOUT_SECONDS=2000
+    STAMP="20260720_gate_c_smoothed_case42_v17_static_margin_preview055_g125_v1_exclusive"
+    ;;
   *)
     printf 'camera lever-arm Gate C authorization is absent or unknown\n' >&2
     exit 7

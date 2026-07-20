@@ -2868,3 +2868,29 @@ and must state whether its candidate was accepted or rejected.
   smoothed geometry, planner commit, and fresh output namespace under a
   proactive static-margin derivation contract. That contract must keep Isaac,
   residual capture, BC, PPO, and training closed before any route is added.
+
+## Round 86: hash-bound case-42 margin derivation and v17 route
+
+- Add the dedicated proactive static-margin derivation contract at `8e78e6c`.
+  It admits only a closed CPU parent whose position p95 lies in
+  `0.14-0.15 m`, requires at least `0.03 m` improvement in both p95 and max
+  error, preserves exact-source arrays and parent smoothed geometry, and keeps
+  Isaac, capture, BC, PPO, and training closed. The authoritative `.98` suite
+  passes `342/342`.
+- Derive case 42 in
+  `20260720_smoothed_plan_case42_static_margin_preview055_g125_cpu`. The
+  replacement plan hash is
+  `b2057b0a23c9b5172f09a5373a020b18583cf118d55886624332f1d4e861a298`;
+  source/execution clocks are `32.453601/48.297533 s`. Static p95/max improve
+  from `0.148363/0.197051 m` to `0.051280/0.081235 m`; all immutable static
+  gates pass. Derivation manifest hash is
+  `b37e61c34a74e179ab095de04fb3da2b0cc94225e9b2a3cac094a00252bed20a`.
+- Compose v17 in
+  `20260720_smoothed_plan_all79_v17_case42_static_margin_preview055_g125_cpu`.
+  It contains all 79 cases, retains 70 static admissions, and improves the
+  accepted-duration median to `1.499110`. Its manifest hash is
+  `57f6eab7453d0d1d3f2c244b7d429bb5ac1fa95184f63b4212770dc9fefb1a51`.
+  All runtime and learning flags remain false.
+- Prepare exactly one unchanged default-profile case-42 route in
+  `20260720_gate_c_smoothed_case42_v17_static_margin_preview055_g125_v1_exclusive`
+  with a `2000 s` wall bound. Case 43 and all learning stages remain closed.

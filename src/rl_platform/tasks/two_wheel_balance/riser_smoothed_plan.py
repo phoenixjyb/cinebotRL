@@ -1436,6 +1436,12 @@ def load_smoothed_riser_plan(path: Path) -> tuple[RiserPlaybackPlan, dict[str, o
             vertical_shift_m=float(metadata["smoothed_target"]["vertical_shift_m"]),
             planning_strategy=str(metadata["smoothed_target"]["planning_strategy"]),
             source_time_s=np.asarray(data["source_time_s"], dtype=np.float64),
+            initialization_time_s=np.asarray(
+                data["initialization_time_s"], dtype=np.float64
+            ),
+            initialization_state=np.asarray(
+                data["initialization_state"], dtype=np.float64
+            ),
         )
     plan.validate()
     return plan, metadata

@@ -7,6 +7,7 @@ import pytest
 from rl_platform.tasks.two_wheel_balance.riser_playback import (
     PLAYBACK_PLANNING_BASE_YAW_RATE_RAD_S,
     RiserPlaybackPlan,
+    interpolate_riser_initialization,
     interpolate_riser_playback_plan,
     load_riser_playback_plan,
     phase_scaled_feedforward,
@@ -92,6 +93,62 @@ def test_playback_roundtrip_preserves_unequal_source_and_execution_clocks(
     np.testing.assert_array_equal(loaded.source_time_s, [0.0, 0.04, 0.08])
     np.testing.assert_array_equal(loaded.time_s, [0.0, 0.1, 0.2])
     assert loaded.source_time_s[-1] != loaded.time_s[-1]
+
+
+def test_playback_roundtrip_and_interpolate_explicit_initialization(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "case.npz"
+    initialization_time = np.array([0.0, 0.5, 1.0])
+    initialization_state = np.array(
+        [
+            [-0.1, 0.0, 0.0, -0.1, 0.0, 0.0, 178.0],
+            [-0.05, 0.0, 0.0, -0.05, 0.0, 0.0, 178.5],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 179.0],
+        ],
+        dtype=np.float64,
+    )
+    initialization_state[:, 6] = np.deg2rad(initialization_state[:, 6])
+    plan = RiserPlaybackPlan(
+        **{
+            **_plan().__dict__,
+            "initialization_time_s": initialization_time,
+            "initialization_state": initialization_state,
+        }
+    )
+    save_riser_playback_plan(path, plan)
+    loaded = load_riser_playback_plan(path)
+    sample = interpolate_riser_initialization(loaded, 0.25)
+    np.testing.assert_allclose(sample.base_xy_yaw, [-0.075, 0.0, 0.0])
+    assert sample.riser_q == pytest.approx(-0.075)
+    assert sample.feedforward_v_mps == pytest.approx(0.1)
+    assert np.rad2deg(sample.proxy_gimbal_q[2]) == pytest.approx(178.25)
+    np.testing.assert_array_equal(loaded.source_time_s, _plan().time_s)
+    np.testing.assert_array_equal(loaded.time_s, _plan().time_s)
+
+
+def test_playback_rejects_initialization_that_does_not_join_execution() -> None:
+    plan = _plan()
+    bad = RiserPlaybackPlan(
+        **{
+            **plan.__dict__,
+            "initialization_time_s": np.array([0.0, 1.0]),
+            "initialization_state": np.zeros((2, 7)),
+        }
+    )
+    with pytest.raises(ValueError, match="initialization"):
+        bad.validate()
+
+
+def test_playback_rejects_half_specified_initialization() -> None:
+    plan = RiserPlaybackPlan(
+        **{
+            **_plan().__dict__,
+            "initialization_time_s": np.array([0.0, 1.0]),
+        }
+    )
+    with pytest.raises(ValueError, match="initialization"):
+        plan.validate()
 
 
 def _rewrite_npz_metadata(

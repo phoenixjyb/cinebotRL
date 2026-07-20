@@ -54,6 +54,8 @@ class RiserPlaybackPlan:
     vertical_shift_m: float
     planning_strategy: str
     source_time_s: np.ndarray | None = None
+    initialization_time_s: np.ndarray | None = None
+    initialization_state: np.ndarray | None = None
 
     def validate(self) -> None:
         count = len(self.time_s)
@@ -103,6 +105,43 @@ class RiserPlaybackPlan:
                 and bool(np.all(np.diff(self.source_time_s) > 0.0))
                 and bool(np.isfinite(self.source_time_s).all())
             )
+        initialization_time = self.initialization_time_s
+        initialization_state = self.initialization_state
+        if initialization_time is None and initialization_state is None:
+            checks["initialization"] = True
+        elif initialization_time is None or initialization_state is None:
+            checks["initialization"] = False
+        elif initialization_time.shape == (0,):
+            checks["initialization"] = initialization_state.shape == (0, 7)
+        else:
+            initialization_count = len(initialization_time)
+            execution_initial_state = np.concatenate(
+                (
+                    self.base_xy_yaw[0],
+                    np.array([self.riser_q[0]]),
+                    self.proxy_gimbal_q[0],
+                )
+            )
+            checks["initialization"] = (
+                initialization_time.shape == (initialization_count,)
+                and initialization_count >= 2
+                and initialization_time[0] == 0.0
+                and bool(np.all(np.diff(initialization_time) > 0.0))
+                and initialization_state.shape == (initialization_count, 7)
+                and bool(np.isfinite(initialization_time).all())
+                and bool(np.isfinite(initialization_state).all())
+                and bool(
+                    np.allclose(
+                        initialization_state[-1],
+                        execution_initial_state,
+                        atol=1e-10,
+                        rtol=0.0,
+                    )
+                )
+                and bool(
+                    np.max(np.abs(np.diff(initialization_state[:, 6]))) < math.pi
+                )
+            )
         arrays = (
             self.time_s,
             self.target_position_world_m,
@@ -139,6 +178,54 @@ class RiserPlaybackSample:
     feedforward_wz_rad_s: float
     feedforward_riser_velocity_mps: float
     feedforward_proxy_velocity_rad_s: np.ndarray
+
+
+@dataclass(frozen=True)
+class RiserInitializationSample:
+    base_xy_yaw: np.ndarray
+    riser_q: float
+    proxy_gimbal_q: np.ndarray
+    feedforward_v_mps: float
+    feedforward_wz_rad_s: float
+    feedforward_riser_velocity_mps: float
+    feedforward_proxy_velocity_rad_s: np.ndarray
+
+
+def interpolate_riser_initialization(
+    plan: RiserPlaybackPlan,
+    elapsed_s: float,
+) -> RiserInitializationSample:
+    """Interpolate the separate pre-roll clock without advancing source phase."""
+
+    plan.validate()
+    time_s = plan.initialization_time_s
+    state = plan.initialization_state
+    if time_s is None or state is None or len(time_s) < 2:
+        raise ValueError("playback plan has no explicit initialization pre-roll")
+    if not math.isfinite(elapsed_s):
+        raise ValueError("initialization time must be finite")
+    elapsed = float(np.clip(elapsed_s, time_s[0], time_s[-1]))
+    upper = int(np.searchsorted(time_s, elapsed, side="right"))
+    upper = min(max(upper, 1), len(time_s) - 1)
+    lower = upper - 1
+    dt = float(time_s[upper] - time_s[lower])
+    alpha = float(np.clip((elapsed - time_s[lower]) / dt, 0.0, 1.0))
+    sample = (1.0 - alpha) * state[lower] + alpha * state[upper]
+    derivative = (state[upper] - state[lower]) / dt
+    midpoint_yaw = 0.5 * (state[lower, 2] + state[upper, 2])
+    forward_velocity = (
+        math.cos(midpoint_yaw) * derivative[0]
+        + math.sin(midpoint_yaw) * derivative[1]
+    )
+    return RiserInitializationSample(
+        base_xy_yaw=sample[:3],
+        riser_q=float(sample[3]),
+        proxy_gimbal_q=sample[4:].copy(),
+        feedforward_v_mps=float(forward_velocity),
+        feedforward_wz_rad_s=float(derivative[2]),
+        feedforward_riser_velocity_mps=float(derivative[3]),
+        feedforward_proxy_velocity_rad_s=derivative[4:].copy(),
+    )
 
 
 def phase_scaled_feedforward(
@@ -367,6 +454,16 @@ def save_riser_playback_plan(path: Path, plan: RiserPlaybackPlan) -> None:
         source_time_s=(
             plan.time_s if plan.source_time_s is None else plan.source_time_s
         ),
+        initialization_time_s=(
+            np.empty(0, dtype=np.float64)
+            if plan.initialization_time_s is None
+            else plan.initialization_time_s
+        ),
+        initialization_state=(
+            np.empty((0, 7), dtype=np.float64)
+            if plan.initialization_state is None
+            else plan.initialization_state
+        ),
     )
 
 
@@ -427,6 +524,22 @@ def load_riser_playback_plan(path: Path) -> RiserPlaybackPlan:
             vertical_shift_m=float(plan_metadata["vertical_shift_m"]),
             planning_strategy=str(plan_metadata["planning_strategy"]),
             source_time_s=source_time_s,
+            initialization_time_s=np.asarray(
+                (
+                    data["initialization_time_s"]
+                    if "initialization_time_s" in data.files
+                    else np.empty(0, dtype=np.float64)
+                ),
+                dtype=np.float64,
+            ),
+            initialization_state=np.asarray(
+                (
+                    data["initialization_state"]
+                    if "initialization_state" in data.files
+                    else np.empty((0, 7), dtype=np.float64)
+                ),
+                dtype=np.float64,
+            ),
         )
     plan.validate()
     return plan

@@ -52,3 +52,18 @@ def test_preroll_rejects_short_or_low_rate_clock() -> None:
         initialization_state_and_metrics(arrays(), 0.5, 200.0)
     with pytest.raises(ValueError, match="policy rate"):
         initialization_state_and_metrics(arrays(), 2.0, 20.0)
+
+
+def test_portfolio_composer_admits_preroll_replacement_schema() -> None:
+    source = (
+        ROOT
+        / "scripts/two_wheel_balance/compose_riser_smoothed_plan_portfolio.py"
+    ).read_text(encoding="utf-8")
+    assert "cinebotrl_two_wheel_riser_initialization_preroll_derivation_v1" in source
+    derivation = (
+        ROOT
+        / "scripts/two_wheel_balance/derive_riser_smoothed_initialization_preroll.py"
+    ).read_text(encoding="utf-8")
+    assert '"parent_plan_sha256": args.expected_parent_plan_sha256' in derivation
+    assert '"item": replacement_item' in derivation
+    assert '"source_manifest_sha256"' in derivation

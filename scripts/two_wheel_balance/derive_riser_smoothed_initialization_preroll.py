@@ -238,6 +238,19 @@ def derive(args: argparse.Namespace) -> dict[str, object]:
         }
     require(all(immutable.values()), "candidate mutated scored/source arrays")
     output_hash = sha256_file(output_plan)
+    replacement_item = {
+        **parent_item,
+        "case": args.expected_case,
+        "file": output_plan.name,
+        "plan_sha256": output_hash,
+        "parent_plan_sha256": args.expected_parent_plan_sha256,
+        "initialization_preroll": metadata["initialization_preroll"],
+        "initialization_metrics": metrics,
+        "passed": True,
+        "timing_transition_kinematic_gate_passed": True,
+        "valid_for_training": False,
+        "replacement_selected": True,
+    }
     payload = {
         "schema": SCHEMA,
         "case": args.expected_case,
@@ -247,6 +260,10 @@ def derive(args: argparse.Namespace) -> dict[str, object]:
         "reject_gate_sha256": args.expected_reject_gate_sha256,
         "file": output_plan.name,
         "plan_sha256": output_hash,
+        "source_manifest_sha256": parent_manifest.get(
+            "source_manifest_sha256"
+        ),
+        "item": replacement_item,
         "source_and_scored_arrays_immutable": immutable,
         "initialization_metrics": metrics,
         "source_duration_s": float(arrays["source_time_s"][-1]),

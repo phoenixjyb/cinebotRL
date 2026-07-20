@@ -3425,3 +3425,125 @@ and must state whether its candidate was accepted or rejected.
   dynamic quality, thermal admission, runtime contract, total-pitch evidence,
   and residual-label envelope as independent outcomes; stop after the first
   result with no automatic retry.
+
+## Round 101: symmetric physical-pitch authority repairs case 42 but does not yet admit it
+
+- The one authorized exclusive canary ran from clean pushed commit `7dfd503`
+  in namespace
+  `20260720_gate_c_smoothed_case42_v20_zero_progress_hold_cap020_total_pitch_limit_v1_exclusive`.
+  It reused the unchanged v20 portfolio and case-42 plan, retained the exact
+  phase-hold candidate and `0.2 m/s` command cap, enabled the default-off total
+  physical pitch target limit at `+/-6 deg`, and wrote no learned action or
+  dataset.
+- The runner closed fail-closed with execution phase
+  `43.916637/48.297533 s` after `28,980` scored steps. Dynamic quality remains
+  false because `completed_reference` failed and position p95 was
+  `0.167272 m` against the unchanged `0.150 m` gate. Position max now passes
+  at `0.192288 m`; no safety termination occurred.
+- This is a structural improvement over the otherwise identical capped
+  exact-hold canary: position p95/max fell from `11.776149/12.494410 m` to
+  `0.167272/0.192288 m`, and completed phase increased from
+  `3.208039/48.297533 s` to `43.916637/48.297533 s`. Case 42 is still an
+  honest reject and is not added to the dynamic union.
+- The independent contracts passed. Total physical pitch target aggregate max
+  was exactly `0.104720 rad` (`6 deg`), while velocity-generated pitch offset
+  reached `0.140887 rad` (about `8.07 deg`), proving nonzero-bias compensation
+  was active without widening the physical target. Runtime, thermal,
+  controller, total-pitch, and residual-label-envelope evidence passed;
+  action saturation was zero, thermal load max was `0.001513`, and internal
+  attitude IK had zero failures.
+- Balance and auxiliary tracking remained bounded: attitude p95/max were
+  `0.131599/1.745864 deg`, pitch p95/max were `5.694907/6.784310 deg`, and
+  riser p95/max were `0.011161/0.013356 m`. Effective base velocity reference
+  max was `0.174813 m/s`, and root-versus-wheel velocity mismatch RMS was
+  `0.003971 m/s`.
+- Exact zero-progress holds were rare: `35` scored steps in three segments,
+  while mean progress scale was `0.303082`. The dominant p95 failure is a
+  localized mid-route XY lag over phase approximately `24.17-26.69 s`, not a
+  terminal divergence. At the one-hertz peak near phase `24.7838 s`, position
+  error was about `0.191925 m`, primarily world-X lag, while yaw and vertical
+  tracking remained healthy. The final sampled error recovered to about
+  `0.11165 m`; the run exhausted the frozen `3x` horizon with approximately
+  `4.381 s` of execution phase still unconsumed.
+- Residual-label admission remained false despite its independent envelope
+  pass. Residual action stayed zero, and no dataset, residual capture, BC, PPO,
+  training, case 43, or obstacle work started. The dynamic union remains
+  `42/70`.
+- Sealed hashes are admission
+  `c0d52639321ba58ecbe9c619a29a5dfe4559cc81827d22799be6c8a622fcbd4b`,
+  gate `9b3d50b5f92ab4592fbbb7a91d2b8761beb530a80d10e302f9a5f2af1ba2873a`,
+  log `2362f9a41468f81b091a116607aa1e41dac45c69b52373c00d2b6793a465bb2c`,
+  exit-code evidence
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+  and summary
+  `de00d91f8a1cfb252fbd2a83eeec6c6c996158bdf400a3c498dd7da213780579`.
+
+## Next round after Round 101
+
+- Stay CPU-only. Quantify execution-clock demand and controller progress across
+  the localized phase `24.17-26.69 s` lag and the remaining completion budget.
+- Derive at most one bounded execution-clock/progress candidate. It must keep
+  every authoritative source anchor and source timestamp immutable, preserve
+  source order and endpoint, retain symmetric total-pitch authority and all
+  frozen safety/quality gates, and recover time only from already healthy
+  regions rather than globally extending the `3x` horizon.
+- Add regression and evidence-contract tests and perform a no-gate-relaxation
+  diff audit before requesting a new runtime authorization. Do not create a
+  namespace, launch Isaac, case 43, residual capture, BC, PPO, or training
+  during this CPU stage.
+
+## Round 102: commanded-base phase-governor candidate
+
+- A rate-slack audit rejects a duration-preserving, state-identical retime.
+  Slowing the phase `24.17-26.69 s` window from its saturated `0.4 m/s`
+  feed-forward toward `0.2 m/s` needs approximately `2.533 s` of additional
+  execution time, while every other interval together contains only
+  `0.057343 s` of legal rate slack. Recovering that time elsewhere would
+  exceed an unchanged base, yaw, riser, or proxy rate limit.
+- The runtime phase governor currently uses error to the nominal plan base
+  allocation even after camera-lever compensation shifts the base command by
+  up to `0.05 m`. That nominal base state is an internal decomposition target,
+  not the physical `cam_link` quality target. The corrected deterministic
+  ownership is to use error to the base command actually sent to the tracking
+  controller, while still taking the minimum with physical camera-position
+  error, balance pitch, and the existing camera-recovery governor.
+- A read-only reconstruction of all `145` one-hertz Round-101 trace samples
+  reproduces the recorded legacy progress scale with zero numerical error.
+  Substituting the already-recorded compensated command target changes base
+  error by mean `-0.044370 m` and never more than the frozen `0.05 m` lever
+  correction. On the same recorded states, mean progress would increase from
+  `0.306371` to `0.518858`, representing `30.8106 s` of sampled phase budget
+  versus the observed `4.3809 s` completion deficit. This is counterfactual
+  diagnosis only, not dynamic pass evidence.
+- Commit `5e6a9b1` adds a default-off
+  `--use-commanded-base-progress-error` candidate. It is rejected unless both
+  camera-lever compensation and the phase governor are active. Default behavior
+  still selects the nominal plan base error exactly; enabling the candidate
+  changes only phase-progress error ownership, not the base command, LQR,
+  source/plan arrays, either clock, gains, velocity cap, total-pitch limit,
+  runtime horizon, safety limits, or quality thresholds.
+- Policy-rate evidence separately records nominal, commanded, and selected
+  base errors, the selected source, p95/max and selected-versus-nominal deltas.
+  Missing or internally inconsistent samples fail controller evidence. The
+  established tracking-profile identifier is unchanged; the candidate has a
+  separate explicit contract field.
+- Focused Mac syntax and candidate tests pass `6/6`. The broader Mac mirror
+  reaches `52` passes with only two unrelated failures caused by its missing
+  legacy whole-body URDF. A detached `.98` CPU worktree with the authoritative
+  hardware-envelope fixture passes the full suite `390/390` in `26.67 s`.
+  The temporary worktree was removed afterward. No route, authorization token,
+  runtime namespace, Isaac process, dataset, residual capture, BC, PPO, or
+  training was created.
+
+## Next round after Round 102
+
+- Review the `5e6a9b1` candidate and its no-gate-relaxation diff. If accepted,
+  add one separate hash-bound case-42 authorization route that keeps the v20
+  source, plan, both clocks, initialization, `0.2 m/s` cap, exact-hold floor,
+  symmetric total-pitch target, `3x` horizon, and all current physical/quality
+  gates unchanged.
+- Require runtime evidence to prove the selected error equals the compensated
+  commanded-base error at every policy step, its difference from nominal base
+  error never exceeds the `0.05 m` correction, and residual action remains
+  zero. Stop after one result with no automatic retry.
+- Do not launch case 43, residual capture, BC, PPO, training, or obstacle work.

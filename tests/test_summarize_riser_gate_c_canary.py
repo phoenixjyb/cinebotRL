@@ -214,6 +214,96 @@ def _enable_camera_error_governor_contract(path: Path) -> None:
     path.write_text(json.dumps(payload))
 
 
+def _enable_initialization_preroll_evidence(path: Path) -> None:
+    payload = json.loads(path.read_text())
+    result = payload["results"][0]
+    result.update(
+        {
+            "initialization_duration_s": 2.0,
+            "initialization_steps": 400,
+            "initialization_completed": True,
+            "initialization_scored_as_source_tracking": False,
+            "initialization_source_metric_samples": 0,
+            "initialization_residual_label_samples": 0,
+            "initialization_terminal_base_error_m": 0.03,
+            "initialization_terminal_base_yaw_error_deg": 0.2,
+            "initialization_terminal_riser_error_m": 0.002,
+            "initialization_terminal_proxy_error_deg": 0.05,
+            "initialization_action_saturation_ratio": 0.0,
+            "initialization_riser_thermal_sample_count": 400,
+            "initialization_riser_thermal_load_max": 0.001,
+            "initialization_riser_effort_max_n": 20.0,
+        }
+    )
+    result["checks"].update(
+        {
+            "initialization_action_saturation_bounded": True,
+            "initialization_riser_thermal_force_observed": True,
+            "initialization_riser_thermal_load_bounded": True,
+            "initialization_riser_peak_force_bounded": True,
+            "initialization_source_metrics_clean": True,
+        }
+    )
+    path.write_text(json.dumps(payload))
+
+
+def test_initialization_evidence_is_separate_and_fail_closed(tmp_path: Path) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    _admission(tmp_path / "admission.json", commit, tmp_path.name)
+    gate = tmp_path / "gates/case_0042.json"
+    _gate(gate, 42, True)
+    _enable_initialization_preroll_evidence(gate)
+    output = tmp_path / "summary.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--git-commit",
+            commit,
+            "--cases",
+            "42",
+            "--output",
+            str(output),
+        ],
+        check=True,
+    )
+    summary = json.loads(output.read_text())
+    row = summary["gate_rows"][0]
+    assert summary["passed"]
+    assert row["initialization_evidence_passed"] is True
+    assert row["initialization_steps"] == 400
+    assert row["initialization_source_metric_samples"] == 0
+
+    payload = json.loads(gate.read_text())
+    payload["results"][0]["initialization_source_metric_samples"] = 1
+    gate.write_text(json.dumps(payload))
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--git-commit",
+            commit,
+            "--cases",
+            "42",
+            "--output",
+            str(output),
+        ],
+        check=True,
+    )
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert summary["first_dynamic_reject"]["classification"] == (
+        "runtime_contract_rejection"
+    )
+
+
 def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path) -> None:
     (tmp_path / "gates").mkdir()
     (tmp_path / "logs").mkdir()

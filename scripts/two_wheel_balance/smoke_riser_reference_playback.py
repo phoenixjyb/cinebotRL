@@ -152,6 +152,7 @@ from rl_platform.tasks.two_wheel_balance.metrics import (
 )
 from rl_platform.tasks.two_wheel_balance.riser_playback import (
     RiserPlaybackPlan,
+    interpolate_riser_initialization,
     interpolate_riser_playback_plan,
     load_riser_playback_plan,
     phase_scaled_feedforward,
@@ -242,9 +243,21 @@ def initialize_case(env, plan: RiserPlaybackPlan) -> tuple[dict[str, torch.Tenso
 
     root_state = robot.data.default_root_state[env_ids].clone()
     root_state[:, :3] += unwrapped.scene.env_origins[env_ids]
-    root_state[0, 0] = plan.base_xy_yaw[0, 0]
-    root_state[0, 1] = plan.base_xy_yaw[0, 1]
-    half_yaw = 0.5 * plan.base_xy_yaw[0, 2]
+    has_initialization = (
+        plan.initialization_time_s is not None
+        and plan.initialization_state is not None
+        and len(plan.initialization_time_s) > 0
+    )
+    initial_state = (
+        plan.initialization_state[0]
+        if has_initialization
+        else np.concatenate(
+            (plan.base_xy_yaw[0], [plan.riser_q[0]], plan.proxy_gimbal_q[0])
+        )
+    )
+    root_state[0, 0] = initial_state[0]
+    root_state[0, 1] = initial_state[1]
+    half_yaw = 0.5 * initial_state[2]
     root_state[0, 3] = math.cos(half_yaw)
     root_state[0, 4] = 0.0
     root_state[0, 5] = 0.0
@@ -252,9 +265,9 @@ def initialize_case(env, plan: RiserPlaybackPlan) -> tuple[dict[str, torch.Tenso
     root_state[0, 7:] = 0.0
     joint_pos = robot.data.default_joint_pos[env_ids].clone()
     joint_vel = robot.data.default_joint_vel[env_ids].clone()
-    joint_pos[0, riser_id] = plan.riser_q[0]
+    joint_pos[0, riser_id] = initial_state[3]
     joint_pos[0, proxy_ids] = torch.as_tensor(
-        plan.proxy_gimbal_q[0], dtype=torch.float32, device=unwrapped.device
+        initial_state[4:], dtype=torch.float32, device=unwrapped.device
     )
     joint_vel.zero_()
     robot.write_root_pose_to_sim(root_state[:, :7], env_ids)
@@ -390,7 +403,185 @@ def evaluate_case(
     previous_proxy_command = plan.proxy_gimbal_q[0].copy()
     if not hasattr(robot.data, "body_com_pos_w"):
         raise RuntimeError("Isaac articulation data does not expose body_com_pos_w")
+    initialization_steps = 0
+    initialization_completed = plan.initialization_time_s is None or len(
+        plan.initialization_time_s
+    ) == 0
+    initialization_duration_s = (
+        0.0
+        if initialization_completed
+        else float(plan.initialization_time_s[-1])
+    )
+    initialization_terminal_base_error_m = 0.0
+    initialization_terminal_base_yaw_error_deg = 0.0
+    initialization_terminal_riser_error_m = 0.0
+    initialization_terminal_proxy_error_deg = 0.0
+    initialization_thermal_monitor = RiserMotorThermalMonitor()
+    initialization_saturated_actions = 0
+    initialization_action_count = 0
+    if not initialization_completed:
+        initialization_step_limit = int(
+            math.ceil(initialization_duration_s * POLICY_HZ)
+        )
+        for initialization_step in range(initialization_step_limit):
+            initialization_elapsed_s = min(
+                initialization_duration_s,
+                (initialization_step + 1) / POLICY_HZ,
+            )
+            initialization_sample = interpolate_riser_initialization(
+                plan, initialization_elapsed_s
+            )
+            root_position = robot.data.root_pos_w[0].detach().cpu().numpy()
+            root_quaternion = robot.data.root_quat_w[0].detach().cpu().numpy()
+            actual_base = np.array(
+                [
+                    root_position[0],
+                    root_position[1],
+                    yaw_from_quaternion_wxyz(root_quaternion),
+                ]
+            )
+            vx_ref, wz_ref, _ = bounded_base_references(
+                initialization_sample.base_xy_yaw,
+                actual_base,
+                initialization_sample.feedforward_v_mps,
+                initialization_sample.feedforward_wz_rad_s,
+                tracking_cfg,
+            )
+            riser_target = torch.tensor(
+                [[initialization_sample.riser_q]],
+                dtype=torch.float32,
+                device=unwrapped.device,
+            )
+            riser_velocity_target = torch.tensor(
+                [[initialization_sample.feedforward_riser_velocity_mps]],
+                dtype=torch.float32,
+                device=unwrapped.device,
+            )
+            actual_proxy = robot.data.joint_pos[0, proxy_ids].detach().cpu().numpy()
+            proxy_command = initialization_sample.proxy_gimbal_q.copy()
+            proxy_command[2] = nearest_equivalent_angle(
+                proxy_command[2], actual_proxy[2]
+            )
+            proxy_target = torch.as_tensor(
+                proxy_command[None, :],
+                dtype=torch.float32,
+                device=unwrapped.device,
+            )
+            robot.set_joint_position_target(riser_target, joint_ids=[riser_id])
+            robot.set_joint_velocity_target(
+                riser_velocity_target, joint_ids=[riser_id]
+            )
+            robot.set_joint_position_target(proxy_target, joint_ids=proxy_ids)
+            if not args.disable_semantic_proxy_state_adapter:
+                proxy_velocity_state = torch.as_tensor(
+                    initialization_sample.feedforward_proxy_velocity_rad_s[None, :],
+                    dtype=torch.float32,
+                    device=unwrapped.device,
+                )
+                robot.write_joint_state_to_sim(
+                    proxy_target,
+                    proxy_velocity_state,
+                    joint_ids=proxy_ids,
+                    env_ids=env_ids,
+                )
 
+            body_com_positions = robot.data.body_com_pos_w[0]
+            center_of_mass_world = (
+                torch.sum(body_masses[:, None] * body_com_positions, dim=0)
+                / torch.sum(body_masses)
+            ).detach().cpu().numpy()
+            com_pitch_bias, _ = equilibrium_pitch_from_world_com(
+                root_position,
+                root_quaternion,
+                center_of_mass_world,
+                WHEEL_RADIUS_M,
+            )
+            unwrapped.vx_ref.fill_(vx_ref)
+            unwrapped.wz_ref.fill_(wz_ref)
+            if initialization_step % control_interval == 0:
+                action, controller_state, _ = cascaded_lqr_action(
+                    current_states,
+                    np.array([vx_ref]),
+                    np.array([wz_ref]),
+                    gain,
+                    controller_state,
+                    control_dt=control_interval / POLICY_HZ,
+                    config=controller_cfg,
+                    pitch_bias_override_rad=np.array([com_pitch_bias]),
+                )
+                action = action.astype(np.float32)
+            obs, _, terminated, truncated, _ = env.step(
+                torch.as_tensor(action, device=unwrapped.device)
+            )
+            initialization_saturated_actions += int(
+                np.count_nonzero(
+                    np.abs(action) >= controller_cfg.action_limit - 1e-6
+                )
+            )
+            initialization_action_count += action.size
+            if hasattr(robot.data, "applied_torque"):
+                initialization_riser_effort = abs(
+                    float(robot.data.applied_torque[0, riser_id].item())
+                )
+                initialization_thermal_monitor.step(
+                    initialization_riser_effort, 1.0 / POLICY_HZ
+                )
+            current_states = (
+                obs["policy"][:, : len(LQR_STATE_NAMES)].detach().cpu().numpy()
+            )
+            initialization_steps = initialization_step + 1
+            if bool((terminated | truncated)[0].item()):
+                raise RuntimeError(
+                    "initialization pre-roll terminated before source phase zero"
+                )
+            if initialization_elapsed_s >= initialization_duration_s:
+                initialization_completed = True
+                break
+
+        root_position = robot.data.root_pos_w[0].detach().cpu().numpy()
+        root_quaternion = robot.data.root_quat_w[0].detach().cpu().numpy()
+        terminal_base = np.array(
+            [
+                root_position[0],
+                root_position[1],
+                yaw_from_quaternion_wxyz(root_quaternion),
+            ]
+        )
+        initialization_terminal_base_error_m = float(
+            np.linalg.norm(terminal_base[:2] - plan.base_xy_yaw[0, :2])
+        )
+        initialization_terminal_base_yaw_error_deg = math.degrees(
+            abs(
+                math.atan2(
+                    math.sin(terminal_base[2] - plan.base_xy_yaw[0, 2]),
+                    math.cos(terminal_base[2] - plan.base_xy_yaw[0, 2]),
+                )
+            )
+        )
+        initialization_terminal_riser_error_m = abs(
+            float(robot.data.joint_pos[0, riser_id].item()) - plan.riser_q[0]
+        )
+        terminal_proxy = robot.data.joint_pos[0, proxy_ids].detach().cpu().numpy()
+        terminal_proxy_error = plan.proxy_gimbal_q[0] - terminal_proxy
+        terminal_proxy_error[2] = continuous_joint_error(
+            plan.proxy_gimbal_q[0, 2], terminal_proxy[2]
+        )
+        initialization_terminal_proxy_error_deg = float(
+            np.max(np.abs(np.rad2deg(terminal_proxy_error)))
+        )
+        previous_proxy_command = plan.proxy_gimbal_q[0].copy()
+
+    initialization_source_metrics_clean = not any(
+        (
+            position_errors,
+            attitude_errors_deg,
+            riser_errors,
+            proxy_errors_deg,
+            raw_residual_commands,
+            normalized_residual_labels,
+            dataset_observations,
+        )
+    )
     for step in range(maximum_steps):
         elapsed_s = step / POLICY_HZ
         sample = interpolate_riser_playback_plan(plan, phase_time_s)
@@ -963,6 +1154,12 @@ def evaluate_case(
         len(camera_recovery_progress_samples) == completed_steps
     )
     dynamic_checks = {
+        "initialization_completed": initialization_completed,
+        "initialization_action_saturation_bounded": (
+            initialization_saturated_actions
+            / max(initialization_action_count, 1)
+            <= args.maximum_saturation_ratio
+        ),
         "completed_reference": phase_time_s >= execution_duration_s,
         "no_termination": termination is None,
         "pitch_bounded": float(np.max(pitches)) <= args.maximum_pitch_deg,
@@ -991,6 +1188,16 @@ def evaluate_case(
         or float(np.max(np.abs(teacher_residual_values))) < 1.0 - 1e-6,
     }
     thermal_checks = {
+        "initialization_riser_thermal_force_observed": (
+            initialization_steps == 0
+            or initialization_thermal_monitor.sample_count == initialization_steps
+        ),
+        "initialization_riser_thermal_load_bounded": (
+            initialization_thermal_monitor.maximum_thermal_load <= 1.0 + 1e-9
+        ),
+        "initialization_riser_peak_force_bounded": (
+            initialization_thermal_monitor.peak_force_violation_count == 0
+        ),
         "riser_thermal_force_observed": (
             riser_thermal_monitor.sample_count == completed_steps
         ),
@@ -1002,6 +1209,9 @@ def evaluate_case(
         ),
     }
     controller_evidence_checks = {
+        "initialization_source_metrics_clean": (
+            initialization_source_metrics_clean
+        ),
         "camera_lever_arm_telemetry_observed": (
             camera_lever_arm_telemetry_observed
         ),
@@ -1052,6 +1262,41 @@ def evaluate_case(
         "maximum_runtime_s": execution_duration_s * args.maximum_duration_scale,
         "completed_phase_time_s": phase_time_s,
         "completed_steps": completed_steps,
+        "initialization_duration_s": initialization_duration_s,
+        "initialization_steps": initialization_steps,
+        "initialization_completed": initialization_completed,
+        "initialization_scored_as_source_tracking": False,
+        "initialization_source_metric_samples": 0,
+        "initialization_residual_label_samples": 0,
+        "initialization_terminal_base_error_m": (
+            initialization_terminal_base_error_m
+        ),
+        "initialization_terminal_base_yaw_error_deg": (
+            initialization_terminal_base_yaw_error_deg
+        ),
+        "initialization_terminal_riser_error_m": (
+            initialization_terminal_riser_error_m
+        ),
+        "initialization_terminal_proxy_error_deg": (
+            initialization_terminal_proxy_error_deg
+        ),
+        "initialization_action_saturation_ratio": (
+            initialization_saturated_actions
+            / max(initialization_action_count, 1)
+        ),
+        "initialization_riser_effort_max_n": (
+            initialization_thermal_monitor.maximum_abs_force_n
+        ),
+        "initialization_riser_thermal_load_max": (
+            initialization_thermal_monitor.maximum_thermal_load
+        ),
+        "initialization_riser_thermal_sample_count": (
+            initialization_thermal_monitor.sample_count
+        ),
+        "total_simulated_duration_s": (
+            initialization_steps + completed_steps
+        )
+        / POLICY_HZ,
         "wall_duration_s": completed_steps / POLICY_HZ,
         "progress_scale_min": float(np.min(progress_samples)),
         "progress_scale_mean": float(np.mean(progress_samples)),
@@ -1224,8 +1469,16 @@ def main() -> int:
     cfg.scene.num_envs = 1
     cfg.robot_cfg = copy.deepcopy(TWO_WHEEL_RISER_CFG)
     cfg.episode_length_s = (
-        max(float(plan.time_s[-1]) for plan in plans.values())
-        * args.maximum_duration_scale
+        max(
+            float(plan.time_s[-1]) * args.maximum_duration_scale
+            + (
+                0.0
+                if plan.initialization_time_s is None
+                or len(plan.initialization_time_s) == 0
+                else float(plan.initialization_time_s[-1])
+            )
+            for plan in plans.values()
+        )
         + 2.0
     )
     cfg.reset_pitch_rad = 0.0

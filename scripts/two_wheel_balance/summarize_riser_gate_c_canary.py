@@ -344,6 +344,41 @@ def main() -> int:
                 ),
             )
         )
+        initialization_duration_s = float(
+            result.get("initialization_duration_s", 0.0)
+        )
+        initialization_evidence_passed = (
+            initialization_duration_s <= 0.0
+            or (
+                result.get("initialization_completed") is True
+                and result.get("initialization_scored_as_source_tracking") is False
+                and result.get("initialization_source_metric_samples") == 0
+                and result.get("initialization_residual_label_samples") == 0
+                and result.get("initialization_steps", 0) > 0
+                and result.get("initialization_riser_thermal_sample_count")
+                == result.get("initialization_steps")
+                and result.get("checks", {}).get(
+                    "initialization_action_saturation_bounded"
+                )
+                is True
+                and result.get("checks", {}).get(
+                    "initialization_riser_thermal_force_observed"
+                )
+                is True
+                and result.get("checks", {}).get(
+                    "initialization_riser_thermal_load_bounded"
+                )
+                is True
+                and result.get("checks", {}).get(
+                    "initialization_riser_peak_force_bounded"
+                )
+                is True
+                and result.get("checks", {}).get(
+                    "initialization_source_metrics_clean"
+                )
+                is True
+            )
+        )
         runtime_contract_passed = (
             payload.get("training_started") is False
             and payload.get("ppo_authorized") is False
@@ -363,6 +398,7 @@ def main() -> int:
             and result.get("raw_residual_label_applied_to_commands") is False
             and camera_lever_arm_evidence_passed
             and camera_error_governor_evidence_passed
+            and initialization_evidence_passed
         )
         row = {
             "case": case,
@@ -377,6 +413,7 @@ def main() -> int:
             "controller_evidence_passed": (
                 camera_lever_arm_evidence_passed
                 and camera_error_governor_evidence_passed
+                and initialization_evidence_passed
                 if args.require_camera_lever_arm_compensation
                 else result.get("controller_evidence_passed")
             ),
@@ -384,6 +421,42 @@ def main() -> int:
                 camera_error_governor_evidence_passed
                 if args.require_camera_error_recovery_governor
                 else None
+            ),
+            "initialization_evidence_passed": initialization_evidence_passed,
+            "initialization_duration_s": initialization_duration_s,
+            "initialization_steps": result.get("initialization_steps", 0),
+            "initialization_completed": result.get(
+                "initialization_completed", initialization_duration_s <= 0.0
+            ),
+            "initialization_scored_as_source_tracking": result.get(
+                "initialization_scored_as_source_tracking", False
+            ),
+            "initialization_source_metric_samples": result.get(
+                "initialization_source_metric_samples", 0
+            ),
+            "initialization_residual_label_samples": result.get(
+                "initialization_residual_label_samples", 0
+            ),
+            "initialization_terminal_base_error_m": result.get(
+                "initialization_terminal_base_error_m"
+            ),
+            "initialization_terminal_base_yaw_error_deg": result.get(
+                "initialization_terminal_base_yaw_error_deg"
+            ),
+            "initialization_terminal_riser_error_m": result.get(
+                "initialization_terminal_riser_error_m"
+            ),
+            "initialization_terminal_proxy_error_deg": result.get(
+                "initialization_terminal_proxy_error_deg"
+            ),
+            "initialization_action_saturation_ratio": result.get(
+                "initialization_action_saturation_ratio"
+            ),
+            "initialization_riser_thermal_load_max": result.get(
+                "initialization_riser_thermal_load_max"
+            ),
+            "initialization_riser_effort_max_n": result.get(
+                "initialization_riser_effort_max_n"
             ),
             "camera_recovery_activation_ratio": result.get(
                 "camera_recovery_activation_ratio"

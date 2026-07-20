@@ -228,6 +228,28 @@ def test_phase_governor_scales_every_playback_derivative() -> None:
         phase_scaled_feedforward(sample, 1.01)
 
 
+def test_runtime_keeps_initialization_separate_from_source_evidence() -> None:
+    source = (
+        PROJECT_ROOT
+        / "scripts/two_wheel_balance/smoke_riser_reference_playback.py"
+    ).read_text(encoding="utf-8")
+    initialization = source.split(
+        "if not initialization_completed:", 1
+    )[1].split("initialization_source_metrics_clean", 1)[0]
+    assert "interpolate_riser_initialization" in initialization
+    assert "cascaded_lqr_action" in initialization
+    assert "controller_state" in initialization
+    assert "position_errors.append" not in initialization
+    assert "raw_residual_commands.append" not in initialization
+    assert "dataset_observations.append" not in initialization
+    assert '"initialization_scored_as_source_tracking": False' in source
+    assert '"initialization_source_metric_samples": 0' in source
+    assert '"initialization_residual_label_samples": 0' in source
+    assert '"initialization_riser_thermal_force_observed"' in source
+    assert "initialization_steps + completed_steps" in source
+    assert "(initialization_step + 1) / POLICY_HZ" in source
+
+
 def test_playback_plan_rejects_wrapped_yaw_servo_jump() -> None:
     plan = _plan()
     wrapped = plan.proxy_gimbal_q.copy()

@@ -2591,3 +2591,39 @@ and must state whether its candidate was accepted or rejected.
   `1600 s` wall bound. No controller or threshold changes are authorized.
 - Case 33 remains invalid for training until its exclusive dynamic result is
   sealed. Residual capture, BC, PPO, and training remain closed.
+
+## Round 74: exclusive case-33 playback passes Gate C
+
+- Published the case-only route at `c1b3859`; the authoritative `.98` suite
+  passed `341/341`. A corrected monitor ignored the runner's short-lived
+  PowerShell ownership query and observed no actual robustness Python process
+  during the full playback.
+- Both clocks completed at `24.515451/36.622524 s` in `13727` steps. Dynamic
+  position p95/max passed at `0.128966/0.166919 m`; attitude p95/max passed at
+  `0.160480/0.244486 deg`; pitch p95/max were `6.205591/6.715392 deg`.
+  Riser servo p95/max were `0.012256/0.012368 m`, effort max was
+  `31.324106 N`, and thermal-load max was `0.001245`. All dynamic, runtime,
+  thermal, controller, IK, rate, saturation, and termination checks passed.
+- The residual envelope independently passed with raw maxima
+  `[0.267019,0.165038,0.012629]` and normalized maxima
+  `[0.890062,0.412594,0.126288]`; action remained zero and unapplied. No
+  dataset, capture, BC, PPO, or training started. The unique dynamic union is
+  now `38/70`.
+- Evidence hashes: admission
+  `44d28179a1cb9de572273f3b6d3b9f9eaed36ee7cbd4dcafa12fdb6853aef9a5`,
+  gate `7abbcb0abe0f8bd760ceeabe3d3b1c9ba593a940551bcfe545a99177a2e205a8`,
+  log `fe9b714927e5f8dcd79867aeebbc49609a05e021ccf313ced8c57e3f7e738b98`,
+  and summary
+  `2ecc682f51d22628eb09477ac856baa130e516611ceb45cb3b3e0278cfb88917`.
+
+## Round 75: case-34 CPU admission and bounded route
+
+- V15 case 34 is statically admitted with plan hash
+  `e2b170f649f9e90542bfaa463c74fa802c0247273d7fad8c26f24922c212b9d4`,
+  `1400` source anchors, source/execution clocks `27.384062/49.749541 s`,
+  ratio `1.816733`, and static position p95/max `0.081825/0.142634 m`.
+  Camera height is `1.344500-1.563395 m`; riser rate max is `0.114369 m/s`.
+- Every source-integrity, path, duration, transition, initialization, rate,
+  workspace, and kinematic gate passes. Prepare one unchanged default-profile
+  route in `20260720_gate_c_smoothed_case34_v15_camera_lever_arm_v1_exclusive`
+  with a `2000 s` wall bound. Learning remains closed.

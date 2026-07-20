@@ -22,6 +22,7 @@ ENABLE_CAMERA_ERROR_RECOVERY=0
 CAMERA_RECOVERY_ERROR_START_M="0.13"
 CAMERA_RECOVERY_ERROR_FULL_M="0.155"
 MINIMUM_CAMERA_RECOVERY_SCALE="0.20"
+REQUIRE_INITIALIZATION_PREROLL=0
 
 case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
   AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE68_66_CAMERA_LEVER_ARM_V1)
@@ -484,6 +485,18 @@ case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
     CASE_TIMEOUT_SECONDS=2200
     STAMP="20260720_gate_c_smoothed_case42_v16_baseline_rollback_v1_exclusive"
     ;;
+  AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V20_INITIALIZATION_PREROLL2S_V1)
+    PORTFOLIO_STAMP="20260720_smoothed_plan_all79_v20_case42_initialization_preroll2s_cpu"
+    MANIFEST_SHA256="3d7f9650a4f701f80a11948364a53ecd34641160bffb6bc3ed697d038d559b72"
+    PLANNER_COMMIT="5a66e3deef01fceacc80fee37b199045705d7f02"
+    CASE_A=42
+    CASE_B=""
+    CASE_A_PLAN_SHA256="ea2e54273c42efa3980eaa3ea9b161109702047467df131d4ad1d2604f063984"
+    CASE_B_PLAN_SHA256=""
+    CASE_TIMEOUT_SECONDS=2200
+    REQUIRE_INITIALIZATION_PREROLL=1
+    STAMP="20260720_gate_c_smoothed_case42_v20_initialization_preroll2s_v1_exclusive"
+    ;;
   *)
     printf 'camera lever-arm Gate C authorization is absent or unknown\n' >&2
     exit 7
@@ -570,6 +583,7 @@ gate = json.loads(Path(sys.argv[1]).read_text())
 case = int(sys.argv[2])
 expected_tracking_profile = sys.argv[3]
 require_camera_recovery = bool(int(sys.argv[4]))
+require_initialization = bool(int(sys.argv[5]))
 result = gate.get("results", [{}])[0]
 correction_max = result.get("camera_lever_arm_correction_max_m")
 raw_max = result.get("camera_lever_arm_raw_correction_max_m")
@@ -600,6 +614,43 @@ recovery_ok = not require_camera_recovery or (
     )
     and 0.0 < recovery_numeric[0] <= 1.0
     and 0.2 - 1e-12 <= recovery_numeric[1] <= recovery_numeric[2] <= 1.0
+)
+initialization_numeric = (
+    result.get("initialization_terminal_base_error_m"),
+    result.get("initialization_terminal_base_yaw_error_deg"),
+    result.get("initialization_terminal_riser_error_m"),
+    result.get("initialization_terminal_proxy_error_deg"),
+    result.get("initialization_action_saturation_ratio"),
+    result.get("initialization_riser_thermal_load_max"),
+    result.get("initialization_riser_effort_max_n"),
+)
+initialization_ok = not require_initialization or (
+    result.get("initialization_duration_s") == 2.0
+    and result.get("initialization_steps") == 400
+    and result.get("initialization_completed") is True
+    and result.get("initialization_scored_as_source_tracking") is False
+    and result.get("initialization_source_metric_samples") == 0
+    and result.get("initialization_residual_label_samples") == 0
+    and result.get("initialization_riser_thermal_sample_count") == 400
+    and all(
+        isinstance(value, (int, float)) and math.isfinite(value) and value >= 0.0
+        for value in initialization_numeric
+    )
+    and result.get("checks", {}).get(
+        "initialization_action_saturation_bounded"
+    ) is True
+    and result.get("checks", {}).get(
+        "initialization_riser_thermal_force_observed"
+    ) is True
+    and result.get("checks", {}).get(
+        "initialization_riser_thermal_load_bounded"
+    ) is True
+    and result.get("checks", {}).get(
+        "initialization_riser_peak_force_bounded"
+    ) is True
+    and result.get("checks", {}).get(
+        "initialization_source_metrics_clean"
+    ) is True
 )
 ok = (
     gate.get("cases") == [case]
@@ -635,6 +686,7 @@ ok = (
     and gate.get("ppo_authorized") is False
     and isinstance(result.get("residual_label_envelope_passed"), bool)
     and recovery_ok
+    and initialization_ok
 )
 raise SystemExit(0 if ok else 6)
 PY
@@ -763,7 +815,8 @@ for CASE in "${CASE_LIST[@]}"; do
   wait_for_gpu_release || exit 5
   if [[ ! -s "$OUTPUT/gates/case_$(printf '%04d' "$CASE").json" ]] \
     || ! case_gate_passed "$OUTPUT/gates/case_$(printf '%04d' "$CASE").json" \
-      "$CASE" "$TRACKING_PROFILE" "$ENABLE_CAMERA_ERROR_RECOVERY"; then
+      "$CASE" "$TRACKING_PROFILE" "$ENABLE_CAMERA_ERROR_RECOVERY" \
+      "$REQUIRE_INITIALIZATION_PREROLL"; then
     python3 "$SUMMARIZER" --root "$OUTPUT" --git-commit "$COMMIT" --cases "$CASES" \
       --expected-tracking-profile "$TRACKING_PROFILE" \
       --require-camera-lever-arm-compensation "${SUMMARY_RECOVERY_ARGS[@]}" \
@@ -777,13 +830,24 @@ python3 "$SUMMARIZER" --root "$OUTPUT" --git-commit "$COMMIT" --cases "$CASES" \
   --expected-tracking-profile "$TRACKING_PROFILE" \
   --require-camera-lever-arm-compensation "${SUMMARY_RECOVERY_ARGS[@]}" \
   --output "$OUTPUT/summary.json" >/dev/null
-python3 - "$OUTPUT/summary.json" "$CASES" <<'PY'
+python3 - "$OUTPUT/summary.json" "$CASES" \
+  "$REQUIRE_INITIALIZATION_PREROLL" <<'PY'
 import json
 from pathlib import Path
 import sys
 
 summary = json.loads(Path(sys.argv[1]).read_text())
 expected_cases = [int(value) for value in sys.argv[2].split(",")]
+require_initialization = bool(int(sys.argv[3]))
+gate_rows = summary.get("gate_rows", [])
+initialization_ok = not require_initialization or (
+    len(gate_rows) == 1
+    and gate_rows[0].get("initialization_evidence_passed") is True
+    and gate_rows[0].get("initialization_duration_s") == 2.0
+    and gate_rows[0].get("initialization_steps") == 400
+    and gate_rows[0].get("initialization_source_metric_samples") == 0
+    and gate_rows[0].get("initialization_residual_label_samples") == 0
+)
 ok = (
     summary.get("requested_cases") == expected_cases
     and summary.get("dynamically_passed_cases") == expected_cases
@@ -797,6 +861,7 @@ ok = (
     and summary.get("ppo_started") is False
     and summary.get("valid_for_final_gate_c") is True
     and summary.get("valid_for_training") is False
+    and initialization_ok
 )
 raise SystemExit(0 if ok else 6)
 PY

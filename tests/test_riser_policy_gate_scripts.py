@@ -569,6 +569,18 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert "8351514a361d3be4e5fbf57f2dbb019a7d8d2f5b86e89cea2553a1cfda3c64a1" in source
     assert "f737f0b2e1fe4877685ae2bc4a976c2179dce5ce8c30491146d14b3994eb4343" in source
     assert "0391190f536a29f65b4c97968b764f29444c9f43" in source
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V20_INITIALIZATION_PREROLL2S_V1" in source
+    assert "20260720_smoothed_plan_all79_v20_case42_initialization_preroll2s_cpu" in source
+    assert "20260720_gate_c_smoothed_case42_v20_initialization_preroll2s_v1_exclusive" in source
+    assert "3d7f9650a4f701f80a11948364a53ecd34641160bffb6bc3ed697d038d559b72" in source
+    assert "ea2e54273c42efa3980eaa3ea9b161109702047467df131d4ad1d2604f063984" in source
+    assert "5a66e3deef01fceacc80fee37b199045705d7f02" in source
+    assert 'REQUIRE_INITIALIZATION_PREROLL=1' in source
+    assert 'result.get("initialization_duration_s") == 2.0' in source
+    assert 'result.get("initialization_steps") == 400' in source
+    assert 'result.get("initialization_source_metric_samples") == 0' in source
+    assert 'result.get("initialization_residual_label_samples") == 0' in source
+    assert 'gate_rows[0].get("initialization_evidence_passed") is True' in source
     assert "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f" in source
     assert "WINDOWS_POWERSHELL=" in source
     assert "Get-CimInstance Win32_Process" in source

@@ -64,6 +64,15 @@ def _zero_residual(value: Any) -> bool:
     return values.shape == (3,) and bool(np.allclose(values, 0.0, atol=1e-12))
 
 
+def candidate_priority(row: dict[str, Any]) -> tuple[bool, bool, bool, str]:
+    return (
+        bool(row["legacy_controller_evidence_fields_observed"]),
+        "camera_lever_arm_v1" in str(row["tracking_profile"]),
+        bool(row["legacy_residual_label_envelope_passed"]),
+        str(row["summary"]),
+    )
+
+
 def audit_candidate(
     *,
     summary_path: Path,
@@ -228,7 +237,12 @@ def main() -> int:
     for case in args.cases:
         rows = candidates[case]
         if rows:
-            selected.append(max(rows, key=lambda row: row["summary"]))
+            selected.append(
+                max(
+                    rows,
+                    key=candidate_priority,
+                )
+            )
     selected.sort(key=lambda row: row["case"])
     selected_cases = [row["case"] for row in selected]
     legacy_envelope_rejects = [

@@ -6,6 +6,10 @@ import sys
 
 import numpy as np
 
+from scripts.two_wheel_balance.audit_riser_initial_teacher_candidates import (
+    candidate_priority,
+)
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = PROJECT_ROOT / "scripts/two_wheel_balance/audit_riser_initial_teacher_candidates.py"
@@ -218,3 +222,19 @@ def test_rejects_explicit_controller_evidence_failure(tmp_path: Path) -> None:
     assert result.returncode == 2
     selected = json.loads(output.read_text(encoding="utf-8"))
     assert selected["selected_cases"] == [1]
+
+
+def test_candidate_priority_prefers_modern_camera_contract() -> None:
+    older = {
+        "legacy_controller_evidence_fields_observed": False,
+        "tracking_profile": "riser_recovery_direction_v4",
+        "legacy_residual_label_envelope_passed": False,
+        "summary": "z_old",
+    }
+    modern = {
+        "legacy_controller_evidence_fields_observed": True,
+        "tracking_profile": "riser_recovery_direction_v4_camera_lever_arm_v1",
+        "legacy_residual_label_envelope_passed": True,
+        "summary": "a_modern",
+    }
+    assert max((older, modern), key=candidate_priority) is modern

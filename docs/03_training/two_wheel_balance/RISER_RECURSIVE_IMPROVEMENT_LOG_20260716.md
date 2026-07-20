@@ -2894,3 +2894,52 @@ and must state whether its candidate was accepted or rejected.
 - Prepare exactly one unchanged default-profile case-42 route in
   `20260720_gate_c_smoothed_case42_v17_static_margin_preview055_g125_v1_exclusive`
   with a `2000 s` wall bound. Case 43 and all learning stages remain closed.
+
+## Round 87: v17 case-42 preview is a reversal-recovery dynamic reject
+
+- Published the v17 case-only route at `a059fb0`; the authoritative `.98`
+  suite passed `342/342`. Both clocks completed at
+  `32.453601/48.297533 s` in `25779` steps with no termination.
+- Dynamic position p95/max failed at `0.385169/0.496077 m`; these were the only
+  physical quality failures. Attitude p95/max passed at
+  `0.138777/0.217521 deg`; pitch p95/max were `6.479553/6.643589 deg`.
+  Riser servo p95/max were `0.012583/0.013783 m`, effort max was
+  `28.722269 N`, and thermal-load max was `0.001714`. Balance, attitude,
+  riser, thermal, controller, IK, proxy-rate, saturation, completion, and
+  runtime gates all passed.
+- The label envelope independently failed: raw maxima were
+  `[0.440000,0.149075,0.013813]`, normalized to
+  `[1.466667,0.372687,0.138125]`. The prospective label was never applied;
+  residual action stayed zero and no dataset, capture, BC, PPO, or training
+  started. The dynamic union remains `42/70`.
+- Evidence hashes: admission
+  `1f62bb1bc6b9a689334dd4f48c332ab0e0b36bcb67171493a348a47b9903ff9e`,
+  gate `aa7d535dbec839d25783c2e6e0b844818c1cebb0bcb85f57c9040700e9d8828c`,
+  log `30f60edab6f21ef38241b541b1648f8f47ff85894e01a650236a0002bcf21e43`,
+  and summary
+  `10c36a40505643598d644ccdaaf5b0e42f56d457bba504e5e5b10a5edc6738f3`.
+
+## Round 88: localized reversal retime produces v18 recovery route
+
+- Trace localization shows the error grows during execution phase
+  `3.47-4.77 s`: the feedforward direction reverses while the chassis remains
+  about `0.52 m` behind, recovery commands stay at `-0.4 m/s`, and phase
+  progress remains at the `0.10` minimum. This is a reversal-transition lag,
+  not a camera-attitude, balance, riser, or thermal failure.
+- Extend the evidence-bound retime contract at `4d5db5a` to accept exactly a
+  completed p95+max rejection; the authoritative suite passes `343/343`.
+  Locally retime immutable intervals `105-291` with peak scale `6.0`. The
+  derived plan preserves all source arrays, targets, base/riser/proxy states,
+  and geometry while reducing local acceleration and command-jump severity to
+  `0.043914` and `0.329382` of the parent values.
+- The replacement plan hash is
+  `df694d8e6702ac0712ff7e1ce597c79ac30e3fc08f072caf63245fe8740e6669`;
+  source/execution clocks are `32.453601/57.348774 s`, ratio `1.767100`.
+  Derivation manifest hash is
+  `308eeb7a27f4b53bcf97bfef1c0b0013a07e62243e22692a7305d10327be6872`.
+- Compose v18 with 79 cases, 70 static admissions, and accepted-duration
+  median `1.499904`. Its manifest hash is
+  `b296a32f64a3e1f22b3a2fb51db2dd426baa2e1374d36cdf0eaaf5a5cdecd5a1`.
+  Prepare exactly one retry in
+  `20260720_gate_c_smoothed_case42_v18_localized_reversal_retime_v1_exclusive`
+  with a `2300 s` wall bound. Learning remains closed.

@@ -559,6 +559,11 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert "20260720_gate_c_smoothed_case42_v17_static_margin_preview055_g125_v1_exclusive" in source
     assert "57f6eab7453d0d1d3f2c244b7d429bb5ac1fa95184f63b4212770dc9fefb1a51" in source
     assert "b2057b0a23c9b5172f09a5373a020b18583cf118d55886624332f1d4e861a298" in source
+    assert "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V18_LOCALIZED_REVERSAL_RETIME_V1" in source
+    assert "20260720_gate_c_smoothed_case42_v18_localized_reversal_retime_v1_exclusive" in source
+    assert "b296a32f64a3e1f22b3a2fb51db2dd426baa2e1374d36cdf0eaaf5a5cdecd5a1" in source
+    assert "df694d8e6702ac0712ff7e1ce597c79ac30e3fc08f072caf63245fe8740e6669" in source
+    assert "4d5db5a5a5c9977c53f25a5d0cc744f94962071e" in source
     assert "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f" in source
     assert "WINDOWS_POWERSHELL=" in source
     assert "Get-CimInstance Win32_Process" in source

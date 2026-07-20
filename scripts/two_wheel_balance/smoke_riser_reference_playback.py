@@ -177,7 +177,9 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
 )
 from rl_platform.tasks.two_wheel_balance.riser_recovery_evidence import (
     RECOVERY_TELEMETRY_SCHEMA,
+    VELOCITY_FEEDBACK_TELEMETRY_SCHEMA,
     RecoveryTelemetryAccumulator,
+    VelocityFeedbackTelemetryAccumulator,
 )
 from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     bounded_base_references,
@@ -369,6 +371,7 @@ def evaluate_case(
     riser_effort_count = 0
     riser_thermal_monitor = RiserMotorThermalMonitor()
     recovery_telemetry = RecoveryTelemetryAccumulator()
+    velocity_feedback_telemetry = VelocityFeedbackTelemetryAccumulator()
     saturated_proxy = 0
     proxy_effort_count = 0
     proxy_axis_saturated = np.zeros(len(PROXY_JOINTS), dtype=np.int64)
@@ -880,7 +883,7 @@ def evaluate_case(
         unwrapped.vx_ref.fill_(vx_ref)
         unwrapped.wz_ref.fill_(wz_ref)
         if step % control_interval == 0:
-            action, controller_state, _ = cascaded_lqr_action(
+            action, controller_state, controller_diagnostics = cascaded_lqr_action(
                 current_states,
                 np.array([vx_ref]),
                 np.array([wz_ref]),
@@ -907,6 +910,28 @@ def evaluate_case(
             obs["policy"][:, : len(LQR_STATE_NAMES)].detach().cpu().numpy()
         )
         state = unwrapped._state_terms()
+        root_velocity_mps = float(state["vx"][0].item())
+        wheel_velocity_mps = WHEEL_RADIUS_M * float(
+            state["mean_wheel_velocity"][0].item()
+        )
+        effective_velocity_reference_mps = float(
+            controller_diagnostics["effective_vx_ref"][0]
+        )
+        pitch_reference_rad = float(
+            controller_diagnostics["pitch_reference"][0]
+        )
+        applied_pitch_bias_rad = float(
+            controller_diagnostics["applied_pitch_bias"][0]
+        )
+        common_action = float(action[0, 0])
+        velocity_feedback_telemetry.step(
+            root_velocity_mps=root_velocity_mps,
+            wheel_velocity_mps=wheel_velocity_mps,
+            effective_reference_mps=effective_velocity_reference_mps,
+            pitch_reference_rad=pitch_reference_rad,
+            applied_pitch_bias_rad=applied_pitch_bias_rad,
+            common_action=common_action,
+        )
         root_position_post = robot.data.root_pos_w[0].detach().cpu().numpy()
         root_quaternion_post = robot.data.root_quat_w[0].detach().cpu().numpy()
         actual_base_post = np.array(
@@ -1068,6 +1093,17 @@ def evaluate_case(
                         sample.target_position_world_m.tolist()
                     ),
                     "actual_yaw_rate_rad_s": float(state["yaw_rate"][0].item()),
+                    "actual_root_velocity_mps": root_velocity_mps,
+                    "wheel_derived_velocity_mps": wheel_velocity_mps,
+                    "root_wheel_velocity_mismatch_mps": (
+                        root_velocity_mps - wheel_velocity_mps
+                    ),
+                    "effective_velocity_reference_mps": (
+                        effective_velocity_reference_mps
+                    ),
+                    "pitch_reference_rad": pitch_reference_rad,
+                    "applied_pitch_bias_rad": applied_pitch_bias_rad,
+                    "common_wheel_action": common_action,
                     "phase_feedforward_v_mps": phase_feedforward_v_mps,
                     "phase_feedforward_wz_rad_s": phase_feedforward_wz_rad_s,
                     "vx_reference_mps": vx_ref,
@@ -1140,9 +1176,16 @@ def evaluate_case(
     riser_saturation_ratio = saturated_riser / max(riser_effort_count, 1)
     proxy_saturation_ratio = saturated_proxy / max(proxy_effort_count, 1)
     recovery_telemetry_summary = recovery_telemetry.summary()
+    velocity_feedback_telemetry_summary = velocity_feedback_telemetry.summary()
     recovery_telemetry_observed = (
         recovery_telemetry_summary["schema"] == RECOVERY_TELEMETRY_SCHEMA
         and recovery_telemetry_summary["policy_rate_sample_count"]
+        == completed_steps
+    )
+    velocity_feedback_telemetry_observed = (
+        velocity_feedback_telemetry_summary["schema"]
+        == VELOCITY_FEEDBACK_TELEMETRY_SCHEMA
+        and velocity_feedback_telemetry_summary["policy_rate_sample_count"]
         == completed_steps
     )
     camera_lever_arm_telemetry_observed = (
@@ -1211,6 +1254,9 @@ def evaluate_case(
     controller_evidence_checks = {
         "initialization_source_metrics_clean": (
             initialization_source_metrics_clean
+        ),
+        "velocity_feedback_telemetry_observed": (
+            velocity_feedback_telemetry_observed
         ),
         "camera_lever_arm_telemetry_observed": (
             camera_lever_arm_telemetry_observed
@@ -1368,6 +1414,10 @@ def evaluate_case(
             riser_thermal_monitor.thermal_time_constant_s
         ),
         "recovery_telemetry": recovery_telemetry_summary,
+        "velocity_feedback_telemetry": velocity_feedback_telemetry_summary,
+        "velocity_feedback_telemetry_observed": (
+            velocity_feedback_telemetry_observed
+        ),
         "recovery_telemetry_observed": recovery_telemetry_observed,
         "camera_lever_arm_compensation_enabled": (
             args.enable_camera_lever_arm_compensation

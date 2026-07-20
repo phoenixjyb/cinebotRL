@@ -304,6 +304,64 @@ def test_initialization_evidence_is_separate_and_fail_closed(tmp_path: Path) -> 
     )
 
 
+def test_velocity_feedback_evidence_is_backward_compatible_and_fail_closed(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    _admission(tmp_path / "admission.json", commit, tmp_path.name)
+    gate = tmp_path / "gates/case_0042.json"
+    _gate(gate, 42, True)
+    output = tmp_path / "summary.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--git-commit",
+            commit,
+            "--cases",
+            "42",
+            "--output",
+            str(output),
+        ],
+        check=True,
+    )
+    summary = json.loads(output.read_text())
+    assert summary["gate_rows"][0]["velocity_feedback_evidence_passed"] is True
+
+    payload = json.loads(gate.read_text())
+    result = payload["results"][0]
+    result["velocity_feedback_telemetry"] = {
+        "schema": "riser_root_vs_wheel_velocity_policy_rate_v1",
+        "policy_rate_sample_count": result["completed_steps"] - 1,
+    }
+    result["velocity_feedback_telemetry_observed"] = True
+    result["checks"]["velocity_feedback_telemetry_observed"] = True
+    gate.write_text(json.dumps(payload))
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--git-commit",
+            commit,
+            "--cases",
+            "42",
+            "--output",
+            str(output),
+        ],
+        check=True,
+    )
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert summary["gate_rows"][0]["velocity_feedback_evidence_passed"] is False
+
+
 def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path) -> None:
     (tmp_path / "gates").mkdir()
     (tmp_path / "logs").mkdir()

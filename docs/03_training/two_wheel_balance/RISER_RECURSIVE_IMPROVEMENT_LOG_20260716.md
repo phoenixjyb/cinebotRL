@@ -3124,3 +3124,57 @@ and must state whether its candidate was accepted or rejected.
 - Do not launch case 43, residual capture, BC, PPO, training, or differential
   work. A case-42 dynamic pass would move the demonstrated union from `42/70`
   to `43/70`; a reject must be sealed and diagnosed CPU-first.
+
+## Round 94: initialization passes, but reversal tracking still rejects case 42
+
+- Added the v20 case-42-only route at `0d7d540`; the authoritative suite
+  passed `360/360`, and HEAD/upstream, tracked state, fresh namespace, WSL,
+  Windows, and GPU ownership checks were clean before launch.
+- The initialization contract passed independently: exactly `400` policy
+  steps over `2.0 s`, completion true, zero source-metric and residual-label
+  samples, zero action saturation, `400` thermal samples, thermal-load max
+  `0.000101`, and riser effort max `19.872696 N`. Terminal base position/yaw,
+  riser, and proxy errors were `0.156443 m`, `1.877245 deg`, `0.011067 m`, and
+  `0.075022 deg`; all are finite evidence and the existing initialization
+  gates pass.
+- The scored reference completed all `48.297533 s` in `25772` steps with no
+  termination. Dynamic position p95/max still fail at
+  `0.407855/0.520446 m`; thermal and controller evidence pass, and the only
+  physical quality failures are position p95/max. Residual-label admission
+  independently fails, labels were not applied, residual action remained zero,
+  and no dataset, capture, BC, PPO, or training started.
+- The pre-roll solved the startup symptom but not the structural reversal:
+  first trace error above `0.15 m` moved from elapsed `1 s` in v17 to `13 s`
+  in v20, and the first-five-second trace mean improved from `0.056194 m` to
+  `0.036496 m`. The dominant error still grows over phase `3.5-4.9 s`; peak
+  trace error is `0.519999 m` at phase `4.202720 s` while the requested
+  velocity remains `-0.4 m/s` and the measured chassis displacement reverses.
+- Sealed hashes are admission
+  `d12eba1967868b0557342fec27855aee6a5e89593a4ad5db1fe7f69225bf411f`,
+  gate `c00323ebc21045d7fee56bb9a37538fb86553fcf545ddd0e1874789a954da025`,
+  log `776821772ca9b37e18bf944d84486c3ac6737cb70fd0574de9eb9bb392c3b1d6`,
+  and summary
+  `07f0fb0f94d4961e393e329a6833cf0cc4398eb69446edb601b5858d1ceba357`.
+- The physical process exited zero and wrote the complete gate. The wrapper's
+  post-run checker then raised `IndexError` because its embedded Python was not
+  passed the newly required fifth argument; the rejection summarizer still
+  produced a valid runtime-contract pass. Fixed the wrapper at `502b2be`, added
+  regression coverage, and retained `360/360` authoritative tests. Do not
+  rerun v20 merely to repair wrapper presentation.
+
+## Next round after Round 94
+
+- Stay CPU-only and inspect the velocity-feedback boundary. The outer cascade
+  currently computes longitudinal error from wheel-derived velocity while the
+  quality gate scores axle/root displacement. The v20 trace shows requested
+  `-0.4 m/s` while finite-difference root motion slows, stops, and reverses;
+  this is now the leading structural hypothesis.
+- Add policy-rate aggregate and existing 1 Hz trace evidence for root-frame
+  longitudinal velocity, wheel-derived longitudinal velocity, their mismatch,
+  effective/governed velocity reference, pitch reference/bias, and common wheel
+  action. Do not change commands in that evidence patch.
+- Use CPU tests and the sealed v20 trace to define one bounded optional
+  root-velocity outer-loop candidate while retaining wheel velocity in the
+  frozen inner LQR. Do not authorize another GPU canary until the evidence
+  contract, backward-compatible default behavior, and synthetic sign/reversal
+  tests pass. Case 43 and all learning stages remain closed.

@@ -379,6 +379,22 @@ def main() -> int:
                 is True
             )
         )
+        velocity_feedback = result.get("velocity_feedback_telemetry")
+        velocity_feedback_evidence_passed = (
+            velocity_feedback is None
+            and result.get("velocity_feedback_telemetry_observed") is None
+        ) or (
+            isinstance(velocity_feedback, dict)
+            and velocity_feedback.get("schema")
+            == "riser_root_vs_wheel_velocity_policy_rate_v1"
+            and velocity_feedback.get("policy_rate_sample_count")
+            == result.get("completed_steps")
+            and result.get("velocity_feedback_telemetry_observed") is True
+            and result.get("checks", {}).get(
+                "velocity_feedback_telemetry_observed"
+            )
+            is True
+        )
         runtime_contract_passed = (
             payload.get("training_started") is False
             and payload.get("ppo_authorized") is False
@@ -399,6 +415,7 @@ def main() -> int:
             and camera_lever_arm_evidence_passed
             and camera_error_governor_evidence_passed
             and initialization_evidence_passed
+            and velocity_feedback_evidence_passed
         )
         row = {
             "case": case,
@@ -414,6 +431,7 @@ def main() -> int:
                 camera_lever_arm_evidence_passed
                 and camera_error_governor_evidence_passed
                 and initialization_evidence_passed
+                and velocity_feedback_evidence_passed
                 if args.require_camera_lever_arm_compensation
                 else result.get("controller_evidence_passed")
             ),
@@ -423,6 +441,9 @@ def main() -> int:
                 else None
             ),
             "initialization_evidence_passed": initialization_evidence_passed,
+            "velocity_feedback_evidence_passed": (
+                velocity_feedback_evidence_passed
+            ),
             "initialization_duration_s": initialization_duration_s,
             "initialization_steps": result.get("initialization_steps", 0),
             "initialization_completed": result.get(
@@ -487,6 +508,12 @@ def main() -> int:
             "riser_thermal_load_max": result.get("riser_thermal_load_max"),
             "riser_effort_max_n": result.get("riser_effort_max_n"),
             "recovery_telemetry": result.get("recovery_telemetry"),
+            "velocity_feedback_telemetry": result.get(
+                "velocity_feedback_telemetry"
+            ),
+            "velocity_feedback_telemetry_observed": result.get(
+                "velocity_feedback_telemetry_observed"
+            ),
             "source_duration_s": result.get("source_duration_s"),
             "execution_duration_s": result.get("execution_duration_s"),
             "completed_steps": result.get("completed_steps"),

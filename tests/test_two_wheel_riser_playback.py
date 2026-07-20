@@ -299,9 +299,7 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert '"camera_recovery_activation_ratio"' in source
     assert '"phase_governor_contract"' in source
     assert '"minimum_progress_scale"' in source
-    assert '"progress_hold_step_count"' in source
-    assert '"progress_hold_ratio"' in source
-    assert '"progress_hold_segment_count"' in source
+    assert "summarize_progress_hold(" in source
     assert '"camera_lever_arm_compensation_contract"' in source
     assert '"camera_lever_arm_compensation_enabled"' in source
     assert '"camera_lever_arm_telemetry_observed"' in source

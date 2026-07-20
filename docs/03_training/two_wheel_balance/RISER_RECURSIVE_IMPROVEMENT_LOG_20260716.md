@@ -4271,3 +4271,50 @@ and must state whether its candidate was accepted or rejected.
   accepted canary before scheduling the 40-plus-case homogeneous recapture.
 - Do not alter the deterministic LQR/safety supervisor, launch PPO, or train
   from historical Gate-C traces.
+
+## Round 120: scale-independent raw capture canary passes
+
+- Added `cinebotrl_two_wheel_riser_executed_raw_teacher_v1`. Raw artifacts hold
+  executed observations, baseline wheel actions, teacher commands, both clocks,
+  and unnormalized residual commands. They explicitly freeze no action scale,
+  apply no residual, and remain `valid_for_training=false`.
+- Added a dedicated auditor and guarded case-2 route. The route pins the exact
+  source, v16 portfolio, case plan, selection, gains, robot USD, code identities,
+  clean pushed HEAD, and exclusive WSL/Windows GPU ownership. Normalized dataset
+  capture, policy rollout, scale freeze, BC, PPO, and training are all closed.
+- Commits `a35b5eb`, `6107129`, `2fd232f`, `ca24fb3`, and `a3ca6f2` were pushed.
+  The authoritative `.98` suite reached `434/434` passes before the canary;
+  subsequent route-focused tests passed `31/31`.
+- A v1 route attempt failed before Isaac because the immutable portfolio's
+  original 70-plan admission threshold was incorrectly passed as 40. This did
+  not change the downstream teacher threshold. A v2 attempt then exposed a
+  Bash/Windows path escaping defect and was preserved fail-closed. Neither
+  failed attempt produced eligible training data.
+- The corrected v2 physical run at commit `ca24fb3` completed case 2 with
+  `9,199` policy steps over `18.241928 s` execution time (`9.439314 s` source).
+  Position p95/max were `0.139830/0.153514 m`, attitude p95/max were
+  `0.137239/0.175777 deg`, and peak pitch was `6.632458 deg`. Dynamic, thermal,
+  and controller-evidence gates all passed with no termination.
+- The raw NPZ SHA-256 is
+  `ffcdd55e946225cf5e3c976013da94dadbf400c6179af4e95a266a10feaae8a8`.
+  Raw residual maxima were `[0.245937,0.145314,0.012289]`, applied residual was
+  exactly zero, and reconstruction error was `2.98e-8`.
+- WSL Python lacked NumPy and the first post-run auditor looked for
+  `completed_reference` at the wrong JSON level. Commit `a3ca6f2` repaired only
+  this CPU evidence route; Isaac was not rerun. The posthoc audit SHA-256 is
+  `43dea4e7e1bbecde9aec3d80b1cac8adf203b51e8394bf75fe5f4297969ee757`,
+  and final-status-v2 SHA-256 is
+  `125cd09b7dd7eda762c1fce20a2aba96f9ce3345595145c2c93c08619e57eced`.
+- The canary passes raw-capture admission but does not freeze scales or admit
+  training. BC and PPO remain disabled.
+
+## Next round after Round 120
+
+- Implement CPU-tested corpus admission and raw-to-normalized relabel tooling.
+  Previous-action observation channels must be rebuilt from the previous
+  normalized teacher action; zero placeholders may not enter BC.
+- Produce a deterministic case-disjoint `30 train / 5 validation / 5 holdout`
+  split only after at least 40 fresh physical raw captures pass.
+- Prepare, hash-bind, and review a fail-fast sequential capture route. Do not
+  launch the long batch, BC, PPO, or obstacle work until that route and corpus
+  admission tests pass.

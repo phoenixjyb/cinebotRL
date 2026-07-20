@@ -65,10 +65,24 @@ The initial learned action remains a bounded residual over base linear speed,
 base yaw rate, and riser target. It does not command wheel torque or physical
 gimbal joints.
 
+## Current admission status
+
+The selection and raw-capture canary stages are complete:
+
+- The sealed selection contains 42 exact-plan candidates and remains
+  `valid_for_training=false`.
+- Case 2 completed a fresh current-schema raw capture with 9,199 policy rows.
+  Dynamic, thermal, controller-evidence, and no-termination gates passed.
+- No residual was applied, no normalized dataset was written, and raw command
+  reconstruction error was `2.98e-8`.
+- The canary recommends only provisional scales `[0.30, 0.40, 0.10]`; one case
+  cannot freeze corpus-wide scales.
+
 ## Exact next task
 
-Run `audit_riser_initial_teacher_candidates.py` against the v16 portfolio and
-the sealed Gate-C evidence. Seal the resulting 42-case selection manifest. Then
-implement raw-command capture that is independent of the provisional action
-scale, test it on a small accepted canary, and only afterward schedule the
-fresh 40-plus-case capture. Do not start BC or PPO from historical gate traces.
+Build the fail-closed corpus tooling before authorizing a long Isaac batch. It
+must audit at least 40 fresh per-case raw artifacts, compute corpus-wide scales,
+rewrite previous-action observation channels during normalization, reconstruct
+teacher commands within `2e-6`, and produce a deterministic case-disjoint
+`30/5/5` split. Only a fully admitted corpus may enable bounded BC. PPO remains
+closed.

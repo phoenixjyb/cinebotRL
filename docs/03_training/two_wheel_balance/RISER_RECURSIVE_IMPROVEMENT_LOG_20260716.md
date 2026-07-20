@@ -3374,16 +3374,17 @@ and must state whether its candidate was accepted or rejected.
   physical pitch target and aggregates the latter at policy rate. The option is
   disabled by default and zero-bias behavior is bitwise-compatible in focused
   tests. The local focused controller/evidence/playback suite passes `56/56`.
-  The Mac cannot collect the full suite because `gymnasium` is absent; the
-  authoritative `.98` environment remains required before any review.
+  The Mac cannot collect the full suite because `gymnasium` is absent. Commit
+  `2889727` was pushed and transferred to `.98` with bundle SHA
+  `4233550056df451efcea9423fbf06186a408d1893b98c88a299485dc65cf1040`;
+  the authoritative `.98` suite passes `382/382` in `26.60 s`.
 
 ## Next round after Round 99
 
-- Diff-audit the candidate for default compatibility, add source-level runner
-  coverage for the default-off option and explicit total-target telemetry, then
-  run the authoritative `.98` CPU suite.
-- Commit and push only the CPU controller/evidence change and this diagnosis.
-  Do not add a route, namespace, authorization token, or launch Isaac.
 - Request review of the physical-target limiting contract before considering
   one bounded case-42 canary. Case 43, residual capture, BC, PPO, training, and
   obstacle work remain closed.
+- If approved, add a separate fail-closed route commit that pins the exact
+  controller, plan, gain, USD, source, total-target limit, cap, hold, thresholds,
+  ownership, and no-learning identities. Do not combine authorization with the
+  reviewed CPU candidate commit.

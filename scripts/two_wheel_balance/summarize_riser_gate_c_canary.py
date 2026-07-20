@@ -24,6 +24,11 @@ ZERO_PROGRESS_HOLD_TRACKING_PROFILE = (
 ZERO_PROGRESS_HOLD_VELOCITY_CAP_TRACKING_PROFILE = (
     "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_velocity_cap_v1"
 )
+ZERO_PROGRESS_HOLD_VELOCITY_CAP_TOTAL_PITCH_TRACKING_PROFILE = (
+    "riser_recovery_direction_v4_camera_lever_arm_"
+    "zero_progress_hold_velocity_cap_total_pitch_limit_v1"
+)
+EXPECTED_TOTAL_PITCH_REFERENCE_LIMIT_RAD = math.radians(6.0)
 PHASE_GOVERNOR_CONTRACT = "position_error_continuous_phase_scale_v1"
 CAMERA_LEVER_ARM_COMPENSATION_CONTRACT = (
     "measured_camera_to_base_xy_offset_v1"
@@ -276,6 +281,39 @@ def contract_identity_rows_passed(admission: dict[str, object]) -> bool:
     return isinstance(contract_blob, str) and len(contract_blob) == 40
 
 
+def total_pitch_reference_limit_passed(
+    payload: dict[str, object],
+    result: dict[str, object],
+    *,
+    required: bool,
+) -> bool:
+    if not required:
+        return True
+    telemetry = result.get("velocity_feedback_telemetry")
+    if not isinstance(telemetry, dict):
+        return False
+    total_max = telemetry.get("total_pitch_reference_abs_max_rad")
+    velocity_offset_max = telemetry.get("pitch_reference_abs_max_rad")
+    return bool(
+        payload.get("total_pitch_reference_limit_enabled") is True
+        and payload.get("total_pitch_reference_limit_rad")
+        == EXPECTED_TOTAL_PITCH_REFERENCE_LIMIT_RAD
+        and result.get("total_pitch_reference_limit_enabled") is True
+        and result.get("total_pitch_reference_limit_rad")
+        == EXPECTED_TOTAL_PITCH_REFERENCE_LIMIT_RAD
+        and payload.get("controller_overrides")
+        == {"wz_kp": 1.05, "limit_total_pitch_reference": True}
+        and isinstance(total_max, (int, float))
+        and math.isfinite(total_max)
+        and EXPECTED_TOTAL_PITCH_REFERENCE_LIMIT_RAD - 1e-9
+        <= total_max
+        <= EXPECTED_TOTAL_PITCH_REFERENCE_LIMIT_RAD + 1e-9
+        and isinstance(velocity_offset_max, (int, float))
+        and math.isfinite(velocity_offset_max)
+        and velocity_offset_max > EXPECTED_TOTAL_PITCH_REFERENCE_LIMIT_RAD + 1e-6
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
@@ -292,6 +330,7 @@ def main() -> int:
             CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE,
             ZERO_PROGRESS_HOLD_TRACKING_PROFILE,
             ZERO_PROGRESS_HOLD_VELOCITY_CAP_TRACKING_PROFILE,
+            ZERO_PROGRESS_HOLD_VELOCITY_CAP_TOTAL_PITCH_TRACKING_PROFILE,
         ),
         default=EXPECTED_TRACKING_PROFILE,
     )
@@ -301,6 +340,7 @@ def main() -> int:
     parser.add_argument("--require-camera-error-recovery-governor", action="store_true")
     parser.add_argument("--require-zero-progress-hold", action="store_true")
     parser.add_argument("--require-recovery-velocity-cap", action="store_true")
+    parser.add_argument("--require-total-pitch-reference-limit", action="store_true")
     parser.add_argument(
         "--expected-maximum-linear-velocity-mps", type=float, default=0.2
     )
@@ -327,6 +367,7 @@ def main() -> int:
             CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE,
             ZERO_PROGRESS_HOLD_TRACKING_PROFILE,
             ZERO_PROGRESS_HOLD_VELOCITY_CAP_TRACKING_PROFILE,
+            ZERO_PROGRESS_HOLD_VELOCITY_CAP_TOTAL_PITCH_TRACKING_PROFILE,
         }
     ):
         parser.error("camera lever-arm compensation requires its tracking profile")
@@ -344,6 +385,7 @@ def main() -> int:
         not in {
             ZERO_PROGRESS_HOLD_TRACKING_PROFILE,
             ZERO_PROGRESS_HOLD_VELOCITY_CAP_TRACKING_PROFILE,
+            ZERO_PROGRESS_HOLD_VELOCITY_CAP_TOTAL_PITCH_TRACKING_PROFILE,
         }
     ):
         parser.error(
@@ -352,11 +394,22 @@ def main() -> int:
     if args.require_recovery_velocity_cap and (
         not args.require_zero_progress_hold
         or args.expected_tracking_profile
-        != ZERO_PROGRESS_HOLD_VELOCITY_CAP_TRACKING_PROFILE
+        not in {
+            ZERO_PROGRESS_HOLD_VELOCITY_CAP_TRACKING_PROFILE,
+            ZERO_PROGRESS_HOLD_VELOCITY_CAP_TOTAL_PITCH_TRACKING_PROFILE,
+        }
         or not 0.0 < args.expected_maximum_linear_velocity_mps <= 0.4
     ):
         parser.error(
             "recovery velocity cap requires the capped hold profile and a limit in (0, 0.4]"
+        )
+    if args.require_total_pitch_reference_limit and (
+        not args.require_recovery_velocity_cap
+        or args.expected_tracking_profile
+        != ZERO_PROGRESS_HOLD_VELOCITY_CAP_TOTAL_PITCH_TRACKING_PROFILE
+    ):
+        parser.error(
+            "total pitch-reference limiting requires the capped hold total-pitch profile"
         )
     requested = [int(value) for value in args.cases.split(",")]
     admission = args.root / "admission.json"
@@ -404,6 +457,19 @@ def main() -> int:
                 admission_payload.get("recovery_velocity_cap_required") is True
                 and admission_payload.get("maximum_linear_velocity_mps")
                 == args.expected_maximum_linear_velocity_mps
+                and (
+                    not args.require_total_pitch_reference_limit
+                    or (
+                        admission_payload.get(
+                            "total_pitch_reference_limit_required"
+                        )
+                        is True
+                        and admission_payload.get(
+                            "total_pitch_reference_limit_rad"
+                        )
+                        == EXPECTED_TOTAL_PITCH_REFERENCE_LIMIT_RAD
+                    )
+                )
             )
         )
         and admission_payload.get("root_velocity_outer_feedback_enabled") is False
@@ -528,6 +594,13 @@ def main() -> int:
                 ),
             )
         )
+        total_pitch_reference_limit_evidence_passed = (
+            total_pitch_reference_limit_passed(
+                payload,
+                result,
+                required=args.require_total_pitch_reference_limit,
+            )
+        )
         runtime_contract_passed = (
             payload.get("training_started") is False
             and payload.get("ppo_authorized") is False
@@ -550,6 +623,7 @@ def main() -> int:
             and initialization_evidence_passed
             and velocity_feedback_evidence_passed
             and zero_progress_hold_evidence_passed
+            and total_pitch_reference_limit_evidence_passed
             and zero_progress_hold_admission_passed
         )
         row = {
@@ -586,6 +660,11 @@ def main() -> int:
             "recovery_velocity_cap_evidence_passed": (
                 zero_progress_hold_evidence_passed
                 if args.require_recovery_velocity_cap
+                else None
+            ),
+            "total_pitch_reference_limit_evidence_passed": (
+                total_pitch_reference_limit_evidence_passed
+                if args.require_total_pitch_reference_limit
                 else None
             ),
             "initialization_duration_s": initialization_duration_s,
@@ -664,6 +743,12 @@ def main() -> int:
             "minimum_progress_scale": result.get("minimum_progress_scale"),
             "maximum_linear_velocity_mps": result.get(
                 "maximum_linear_velocity_mps"
+            ),
+            "total_pitch_reference_limit_enabled": result.get(
+                "total_pitch_reference_limit_enabled"
+            ),
+            "total_pitch_reference_limit_rad": result.get(
+                "total_pitch_reference_limit_rad"
             ),
             "progress_scale_min": result.get("progress_scale_min"),
             "progress_hold_step_count": result.get("progress_hold_step_count"),
@@ -766,6 +851,9 @@ def main() -> int:
         ),
         "zero_progress_hold_required": args.require_zero_progress_hold,
         "recovery_velocity_cap_required": args.require_recovery_velocity_cap,
+        "total_pitch_reference_limit_required": (
+            args.require_total_pitch_reference_limit
+        ),
         "zero_progress_hold_admission_passed": (
             zero_progress_hold_admission_passed
         ),
@@ -778,6 +866,21 @@ def main() -> int:
         "expected_maximum_linear_velocity_mps": (
             args.expected_maximum_linear_velocity_mps
             if args.require_recovery_velocity_cap
+            else None
+        ),
+        "expected_total_pitch_reference_limit_rad": (
+            EXPECTED_TOTAL_PITCH_REFERENCE_LIMIT_RAD
+            if args.require_total_pitch_reference_limit
+            else None
+        ),
+        "total_pitch_reference_limit_evidence_passed": (
+            bool(gate_rows)
+            and len(gate_rows) == len(requested)
+            and all(
+                row["total_pitch_reference_limit_evidence_passed"] is True
+                for row in gate_rows
+            )
+            if args.require_total_pitch_reference_limit
             else None
         ),
         "expected_camera_error_recovery_governor_contract": (

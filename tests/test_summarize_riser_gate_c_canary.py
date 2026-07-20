@@ -1,7 +1,10 @@
 import json
+import math
 from pathlib import Path
 import subprocess
 import sys
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -310,6 +313,57 @@ def _enable_recovery_velocity_cap_admission(path: Path, commit: str) -> None:
     path.write_text(json.dumps(payload))
 
 
+def _enable_total_pitch_reference_limit_contract(path: Path) -> None:
+    _enable_recovery_velocity_cap_contract(path)
+    payload = json.loads(path.read_text())
+    profile = (
+        "riser_recovery_direction_v4_camera_lever_arm_"
+        "zero_progress_hold_velocity_cap_total_pitch_limit_v1"
+    )
+    limit = math.radians(6.0)
+    payload.update(
+        {
+            "tracking_profile": profile,
+            "total_pitch_reference_limit_enabled": True,
+            "total_pitch_reference_limit_rad": limit,
+            "controller_overrides": {
+                "wz_kp": 1.05,
+                "limit_total_pitch_reference": True,
+            },
+        }
+    )
+    result = payload["results"][0]
+    result.update(
+        {
+            "total_pitch_reference_limit_enabled": True,
+            "total_pitch_reference_limit_rad": limit,
+        }
+    )
+    result["velocity_feedback_telemetry"].update(
+        {
+            "total_pitch_reference_abs_max_rad": limit,
+            "pitch_reference_abs_max_rad": math.radians(7.65),
+        }
+    )
+    path.write_text(json.dumps(payload))
+
+
+def _enable_total_pitch_reference_limit_admission(path: Path, commit: str) -> None:
+    _enable_recovery_velocity_cap_admission(path, commit)
+    payload = json.loads(path.read_text())
+    payload.update(
+        {
+            "tracking_profile": (
+                "riser_recovery_direction_v4_camera_lever_arm_"
+                "zero_progress_hold_velocity_cap_total_pitch_limit_v1"
+            ),
+            "total_pitch_reference_limit_required": True,
+            "total_pitch_reference_limit_rad": math.radians(6.0),
+        }
+    )
+    path.write_text(json.dumps(payload))
+
+
 def _enable_initialization_preroll_evidence(path: Path) -> None:
     payload = json.loads(path.read_text())
     result = payload["results"][0]
@@ -575,6 +629,80 @@ def test_recovery_velocity_cap_is_independent_and_fail_closed(tmp_path: Path) ->
     summary = json.loads(output.read_text())
     assert not summary["runtime_contract_passed"]
     assert summary["gate_rows"][0]["recovery_velocity_cap_evidence_passed"] is False
+
+
+def test_summary_requires_total_pitch_reference_limit_evidence(tmp_path: Path) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    _admission(tmp_path / "admission.json", commit, tmp_path.name)
+    _enable_total_pitch_reference_limit_admission(
+        tmp_path / "admission.json", commit
+    )
+    gate = tmp_path / "gates/case_0042.json"
+    _gate(gate, 42, True)
+    _enable_total_pitch_reference_limit_contract(gate)
+    output = tmp_path / "summary.json"
+    profile = (
+        "riser_recovery_direction_v4_camera_lever_arm_"
+        "zero_progress_hold_velocity_cap_total_pitch_limit_v1"
+    )
+    command = [
+        sys.executable,
+        str(SCRIPT),
+        "--root",
+        str(tmp_path),
+        "--git-commit",
+        commit,
+        "--cases",
+        "42",
+        "--expected-tracking-profile",
+        profile,
+        "--require-camera-lever-arm-compensation",
+        "--require-zero-progress-hold",
+        "--require-recovery-velocity-cap",
+        "--expected-maximum-linear-velocity-mps",
+        "0.2",
+        "--require-total-pitch-reference-limit",
+        "--output",
+        str(output),
+    ]
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    row = summary["gate_rows"][0]
+    assert summary["passed"]
+    assert summary["total_pitch_reference_limit_required"] is True
+    assert summary["expected_total_pitch_reference_limit_rad"] == pytest.approx(
+        math.radians(6.0)
+    )
+    assert row["total_pitch_reference_limit_evidence_passed"] is True
+
+    payload = json.loads(gate.read_text())
+    payload["results"][0]["velocity_feedback_telemetry"][
+        "total_pitch_reference_abs_max_rad"
+    ] = math.radians(6.01)
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert (
+        summary["gate_rows"][0]["total_pitch_reference_limit_evidence_passed"]
+        is False
+    )
+
+    payload["results"][0]["velocity_feedback_telemetry"][
+        "total_pitch_reference_abs_max_rad"
+    ] = math.radians(6.0)
+    payload["controller_overrides"] = {"wz_kp": 1.05}
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert not summary["runtime_contract_passed"]
+    assert (
+        summary["gate_rows"][0]["total_pitch_reference_limit_evidence_passed"]
+        is False
+    )
 
 def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path) -> None:
     (tmp_path / "gates").mkdir()

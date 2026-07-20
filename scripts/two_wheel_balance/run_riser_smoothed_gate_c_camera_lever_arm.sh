@@ -28,6 +28,7 @@ REQUIRE_ZERO_PROGRESS_HOLD=0
 TRACKING_MINIMUM_PROGRESS_SCALE=""
 REQUIRE_RECOVERY_VELOCITY_CAP=0
 TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS=""
+REQUIRE_TOTAL_PITCH_REFERENCE_LIMIT=0
 
 case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
   AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE68_66_CAMERA_LEVER_ARM_V1)
@@ -547,6 +548,24 @@ case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
     TRACKING_PROFILE="riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_velocity_cap_v1"
     STAMP="20260720_gate_c_smoothed_case42_v20_zero_progress_hold_cap020_v1_exclusive"
     ;;
+  AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V20_ZERO_PROGRESS_HOLD_CAP020_TOTAL_PITCH_LIMIT_V1)
+    PORTFOLIO_STAMP="20260720_smoothed_plan_all79_v20_case42_initialization_preroll2s_cpu"
+    MANIFEST_SHA256="3d7f9650a4f701f80a11948364a53ecd34641160bffb6bc3ed697d038d559b72"
+    PLANNER_COMMIT="5a66e3deef01fceacc80fee37b199045705d7f02"
+    CASE_A=42
+    CASE_B=""
+    CASE_A_PLAN_SHA256="ea2e54273c42efa3980eaa3ea9b161109702047467df131d4ad1d2604f063984"
+    CASE_B_PLAN_SHA256=""
+    CASE_TIMEOUT_SECONDS=2200
+    REQUIRE_INITIALIZATION_PREROLL=1
+    REQUIRE_ZERO_PROGRESS_HOLD=1
+    TRACKING_MINIMUM_PROGRESS_SCALE="0.0"
+    REQUIRE_RECOVERY_VELOCITY_CAP=1
+    TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS="0.2"
+    REQUIRE_TOTAL_PITCH_REFERENCE_LIMIT=1
+    TRACKING_PROFILE="riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_velocity_cap_total_pitch_limit_v1"
+    STAMP="20260720_gate_c_smoothed_case42_v20_zero_progress_hold_cap020_total_pitch_limit_v1_exclusive"
+    ;;
   *)
     printf 'camera lever-arm Gate C authorization is absent or unknown\n' >&2
     exit 7
@@ -624,7 +643,7 @@ wait_for_gpu_release() {
 }
 
 case_gate_passed() {
-  python3 - "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" <<'PY'
+  python3 - "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" <<'PY'
 import json
 import math
 from pathlib import Path
@@ -641,6 +660,7 @@ require_recovery_velocity_cap = bool(int(sys.argv[8]))
 expected_maximum_linear_velocity_mps = (
     float(sys.argv[9]) if require_recovery_velocity_cap else None
 )
+require_total_pitch_reference_limit = bool(int(sys.argv[10]))
 result = gate.get("results", [{}])[0]
 correction_max = result.get("camera_lever_arm_correction_max_m")
 raw_max = result.get("camera_lever_arm_raw_correction_max_m")
@@ -746,6 +766,25 @@ recovery_velocity_cap_ok = not require_recovery_velocity_cap or (
     and velocity_feedback["effective_reference_abs_max_mps"]
     <= expected_maximum_linear_velocity_mps + 1e-9
 )
+expected_total_pitch_limit_rad = math.radians(6.0)
+total_pitch_reference_limit_ok = not require_total_pitch_reference_limit or (
+    gate.get("total_pitch_reference_limit_enabled") is True
+    and gate.get("total_pitch_reference_limit_rad") == expected_total_pitch_limit_rad
+    and result.get("total_pitch_reference_limit_enabled") is True
+    and result.get("total_pitch_reference_limit_rad") == expected_total_pitch_limit_rad
+    and isinstance(velocity_feedback, dict)
+    and isinstance(
+        velocity_feedback.get("total_pitch_reference_abs_max_rad"), (int, float)
+    )
+    and math.isfinite(velocity_feedback["total_pitch_reference_abs_max_rad"])
+    and expected_total_pitch_limit_rad - 1e-9
+    <= velocity_feedback["total_pitch_reference_abs_max_rad"]
+    <= expected_total_pitch_limit_rad + 1e-9
+    and isinstance(velocity_feedback.get("pitch_reference_abs_max_rad"), (int, float))
+    and math.isfinite(velocity_feedback["pitch_reference_abs_max_rad"])
+    and velocity_feedback["pitch_reference_abs_max_rad"]
+    > expected_total_pitch_limit_rad + 1e-6
+)
 zero_progress_hold_ok = not require_zero_progress_hold or (
     gate.get("phase_governor_enabled") is True
     and gate.get("phase_governor_contract")
@@ -776,7 +815,12 @@ ok = (
     and result.get("thermal_admission_passed") is True
     and gate.get("controller_evidence_passed") is True
     and result.get("controller_evidence_passed") is True
-    and gate.get("controller_overrides") == {"wz_kp": 1.05}
+    and gate.get("controller_overrides")
+    == (
+        {"wz_kp": 1.05, "limit_total_pitch_reference": True}
+        if require_total_pitch_reference_limit
+        else {"wz_kp": 1.05}
+    )
     and gate.get("tracking_profile") == expected_tracking_profile
     and gate.get("camera_lever_arm_compensation_contract")
     == "measured_camera_to_base_xy_offset_v1"
@@ -805,6 +849,7 @@ ok = (
     and root_velocity_feedback_ok
     and zero_progress_hold_ok
     and recovery_velocity_cap_ok
+    and total_pitch_reference_limit_ok
 )
 raise SystemExit(0 if ok else 6)
 PY
@@ -867,9 +912,11 @@ python3 - "$TEMP_ADMISSION" "$COMMIT" "$STAMP" "$CASE_TIMEOUT_SECONDS" \
   "$MINIMUM_CAMERA_RECOVERY_SCALE" "$USE_ROOT_VELOCITY_OUTER_FEEDBACK" \
   "$REQUIRE_ZERO_PROGRESS_HOLD" "$TRACKING_MINIMUM_PROGRESS_SCALE" \
   "$REQUIRE_RECOVERY_VELOCITY_CAP" "$TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS" \
+  "$REQUIRE_TOTAL_PITCH_REFERENCE_LIMIT" \
   "${IDENTITY_ARGS[@]}" <<'PY'
 import hashlib
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -892,10 +939,12 @@ payload["recovery_velocity_cap_required"] = bool(int(sys.argv[13]))
 payload["maximum_linear_velocity_mps"] = (
     float(sys.argv[14]) if sys.argv[14] else 0.4
 )
+payload["total_pitch_reference_limit_required"] = bool(int(sys.argv[15]))
+payload["total_pitch_reference_limit_rad"] = math.radians(6.0)
 payload["camera_recovery_governor_contract"] = (
     "saturated_camera_error_continuous_phase_cap_v1"
 )
-args = sys.argv[15:]
+args = sys.argv[16:]
 payload["runtime_identities"] = {
     args[index]: {
         "path": str(Path(args[index + 1]).resolve()),
@@ -949,6 +998,12 @@ if [[ "$REQUIRE_RECOVERY_VELOCITY_CAP" == 1 ]]; then
     --expected-maximum-linear-velocity-mps "$TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS"
   )
 fi
+TOTAL_PITCH_REFERENCE_ARGS=()
+SUMMARY_TOTAL_PITCH_REFERENCE_ARGS=()
+if [[ "$REQUIRE_TOTAL_PITCH_REFERENCE_LIMIT" == 1 ]]; then
+  TOTAL_PITCH_REFERENCE_ARGS+=(--limit-total-pitch-reference)
+  SUMMARY_TOTAL_PITCH_REFERENCE_ARGS+=(--require-total-pitch-reference-limit)
+fi
 
 for CASE in "${CASE_LIST[@]}"; do
   assert_exclusive_resources || exit 5
@@ -965,6 +1020,7 @@ for CASE in "${CASE_LIST[@]}"; do
     "${ROOT_VELOCITY_ARGS[@]}" \
     "${PROGRESS_HOLD_ARGS[@]}" \
     "${VELOCITY_CAP_ARGS[@]}" \
+    "${TOTAL_PITCH_REFERENCE_ARGS[@]}" \
     "${CAMERA_RECOVERY_ARGS[@]}" \
     --output "$OUTPUT_WIN\gates\case_$(printf '%04d' "$CASE").json" --headless \
     >"$OUTPUT/logs/case_$(printf '%04d' "$CASE").log" 2>&1 || STATUS=$?
@@ -977,12 +1033,14 @@ for CASE in "${CASE_LIST[@]}"; do
       "$USE_ROOT_VELOCITY_OUTER_FEEDBACK" \
       "$REQUIRE_ZERO_PROGRESS_HOLD" \
       "$REQUIRE_RECOVERY_VELOCITY_CAP" \
-      "$TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS"; then
+      "$TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS" \
+      "$REQUIRE_TOTAL_PITCH_REFERENCE_LIMIT"; then
     python3 "$SUMMARIZER" --root "$OUTPUT" --git-commit "$COMMIT" --cases "$CASES" \
       --expected-tracking-profile "$TRACKING_PROFILE" \
       --require-camera-lever-arm-compensation "${SUMMARY_RECOVERY_ARGS[@]}" \
       "${SUMMARY_HOLD_ARGS[@]}" \
       "${SUMMARY_VELOCITY_CAP_ARGS[@]}" \
+      "${SUMMARY_TOTAL_PITCH_REFERENCE_ARGS[@]}" \
       --output "$OUTPUT/summary.json" >/dev/null
     printf 'camera lever-arm Gate C stopped on case %s\n' "$CASE" >&2
     exit 4
@@ -994,14 +1052,17 @@ python3 "$SUMMARIZER" --root "$OUTPUT" --git-commit "$COMMIT" --cases "$CASES" \
   --require-camera-lever-arm-compensation "${SUMMARY_RECOVERY_ARGS[@]}" \
   "${SUMMARY_HOLD_ARGS[@]}" \
   "${SUMMARY_VELOCITY_CAP_ARGS[@]}" \
+  "${SUMMARY_TOTAL_PITCH_REFERENCE_ARGS[@]}" \
   --output "$OUTPUT/summary.json" >/dev/null
 python3 - "$OUTPUT/summary.json" "$CASES" \
   "$REQUIRE_INITIALIZATION_PREROLL" \
   "$USE_ROOT_VELOCITY_OUTER_FEEDBACK" \
   "$REQUIRE_ZERO_PROGRESS_HOLD" \
   "$REQUIRE_RECOVERY_VELOCITY_CAP" \
-  "$TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS" <<'PY'
+  "$TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS" \
+  "$REQUIRE_TOTAL_PITCH_REFERENCE_LIMIT" <<'PY'
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -1014,6 +1075,7 @@ require_recovery_velocity_cap = bool(int(sys.argv[6]))
 expected_maximum_linear_velocity_mps = (
     float(sys.argv[7]) if require_recovery_velocity_cap else None
 )
+require_total_pitch_reference_limit = bool(int(sys.argv[8]))
 gate_rows = summary.get("gate_rows", [])
 initialization_ok = not require_initialization or (
     len(gate_rows) == 1
@@ -1043,6 +1105,12 @@ recovery_velocity_cap_ok = not require_recovery_velocity_cap or (
     and gate_rows[0].get("maximum_linear_velocity_mps")
     == expected_maximum_linear_velocity_mps
 )
+total_pitch_reference_limit_ok = not require_total_pitch_reference_limit or (
+    len(gate_rows) == 1
+    and gate_rows[0].get("total_pitch_reference_limit_evidence_passed") is True
+    and gate_rows[0].get("total_pitch_reference_limit_enabled") is True
+    and gate_rows[0].get("total_pitch_reference_limit_rad") == math.radians(6.0)
+)
 ok = (
     summary.get("requested_cases") == expected_cases
     and summary.get("dynamically_passed_cases") == expected_cases
@@ -1060,6 +1128,7 @@ ok = (
     and root_velocity_feedback_ok
     and zero_progress_hold_ok
     and recovery_velocity_cap_ok
+    and total_pitch_reference_limit_ok
 )
 raise SystemExit(0 if ok else 6)
 PY

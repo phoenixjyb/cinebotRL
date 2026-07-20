@@ -253,11 +253,34 @@ from task_spec import register_isaac_lab_tasks
 
 POLICY_HZ = 200.0
 WHEEL_RADIUS_M = 0.1016
+TOTAL_PITCH_REFERENCE_LIMIT_RAD = cascaded_lqr_config(
+    "structural_robust_v1"
+).pitch_reference_limit_rad
 PROXY_JOINTS = (
     "joint3_gimbal_yaw",
     "joint2_gimbal_roll",
     "joint1_gimbal_pitch",
 )
+
+
+def tracking_profile_name() -> str:
+    if args.tracking_minimum_progress_scale == 0.0:
+        if args.tracking_maximum_linear_velocity_mps is not None:
+            if args.limit_total_pitch_reference:
+                return (
+                    "riser_recovery_direction_v4_camera_lever_arm_"
+                    "zero_progress_hold_velocity_cap_total_pitch_limit_v1"
+                )
+            return (
+                "riser_recovery_direction_v4_camera_lever_arm_"
+                "zero_progress_hold_velocity_cap_v1"
+            )
+        return "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
+    if args.enable_camera_error_recovery_governor:
+        return "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
+    if args.enable_camera_lever_arm_compensation:
+        return "riser_recovery_direction_v4_camera_lever_arm_v1"
+    return "riser_recovery_direction_v4"
 
 
 def parse_cases(value: str) -> list[int]:
@@ -1438,6 +1461,10 @@ def evaluate_case(
         "progress_scale_mean": float(np.mean(progress_samples)),
         "minimum_progress_scale": tracking_cfg.minimum_progress_scale,
         "maximum_linear_velocity_mps": tracking_cfg.maximum_linear_velocity_mps,
+        "total_pitch_reference_limit_enabled": (
+            controller_cfg.limit_total_pitch_reference
+        ),
+        "total_pitch_reference_limit_rad": controller_cfg.pitch_reference_limit_rad,
         **progress_hold_summary,
         "camera_recovery_governor_enabled": (
             args.enable_camera_error_recovery_governor
@@ -1707,26 +1734,9 @@ def main() -> int:
         "training_started": False,
         "ppo_authorized": False,
         "controller_profile": "structural_robust_v1",
-        "tracking_profile": (
-            "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_velocity_cap_v1"
-            if (
-                args.tracking_minimum_progress_scale == 0.0
-                and args.tracking_maximum_linear_velocity_mps is not None
-            )
-            else (
-                "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
-                if args.tracking_minimum_progress_scale == 0.0
-                else (
-                    "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
-                    if args.enable_camera_error_recovery_governor
-                    else (
-                        "riser_recovery_direction_v4_camera_lever_arm_v1"
-                        if args.enable_camera_lever_arm_compensation
-                        else "riser_recovery_direction_v4"
-                    )
-                )
-            )
-        ),
+        "tracking_profile": tracking_profile_name(),
+        "total_pitch_reference_limit_enabled": args.limit_total_pitch_reference,
+        "total_pitch_reference_limit_rad": TOTAL_PITCH_REFERENCE_LIMIT_RAD,
         "tracking_recovery_velocity_cap_enabled": (
             args.tracking_maximum_linear_velocity_mps is not None
         ),
@@ -1878,26 +1888,9 @@ def write_runtime_failure(exc: Exception) -> None:
         "schema": "recomo_two_wheel_riser_reference_playback_failure_v1",
         "training_started": False,
         "ppo_authorized": False,
-        "tracking_profile": (
-            "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_velocity_cap_v1"
-            if (
-                args.tracking_minimum_progress_scale == 0.0
-                and args.tracking_maximum_linear_velocity_mps is not None
-            )
-            else (
-                "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
-                if args.tracking_minimum_progress_scale == 0.0
-                else (
-                    "riser_recovery_direction_v4_camera_lever_arm_error_governor_v1"
-                    if args.enable_camera_error_recovery_governor
-                    else (
-                        "riser_recovery_direction_v4_camera_lever_arm_v1"
-                        if args.enable_camera_lever_arm_compensation
-                        else "riser_recovery_direction_v4"
-                    )
-                )
-            )
-        ),
+        "tracking_profile": tracking_profile_name(),
+        "total_pitch_reference_limit_enabled": args.limit_total_pitch_reference,
+        "total_pitch_reference_limit_rad": TOTAL_PITCH_REFERENCE_LIMIT_RAD,
         "tracking_recovery_velocity_cap_enabled": (
             args.tracking_maximum_linear_velocity_mps is not None
         ),

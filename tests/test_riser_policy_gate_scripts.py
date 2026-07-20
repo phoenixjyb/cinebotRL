@@ -614,6 +614,23 @@ def test_camera_lever_arm_gate_is_ordered_bounded_and_training_closed() -> None:
     assert 'gate.get("tracking_recovery_velocity_cap_enabled") is True' in source
     assert 'velocity_feedback["effective_reference_abs_max_mps"]' in source
     assert 'gate_rows[0].get("recovery_velocity_cap_evidence_passed") is True' in source
+    assert (
+        "AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V20_ZERO_PROGRESS_HOLD_"
+        "CAP020_TOTAL_PITCH_LIMIT_V1" in source
+    )
+    assert (
+        "20260720_gate_c_smoothed_case42_v20_zero_progress_hold_cap020_"
+        "total_pitch_limit_v1_exclusive" in source
+    )
+    assert 'REQUIRE_TOTAL_PITCH_REFERENCE_LIMIT=1' in source
+    assert "--limit-total-pitch-reference" in source
+    assert "--require-total-pitch-reference-limit" in source
+    assert 'gate.get("total_pitch_reference_limit_enabled") is True' in source
+    assert 'velocity_feedback["total_pitch_reference_abs_max_rad"]' in source
+    assert (
+        'gate_rows[0].get("total_pitch_reference_limit_evidence_passed") is True'
+        in source
+    )
     assert "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f" in source
     assert "WINDOWS_POWERSHELL=" in source
     assert "Get-CimInstance Win32_Process" in source

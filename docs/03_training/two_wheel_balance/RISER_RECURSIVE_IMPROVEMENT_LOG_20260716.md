@@ -4318,3 +4318,40 @@ and must state whether its candidate was accepted or rejected.
 - Prepare, hash-bind, and review a fail-fast sequential capture route. Do not
   launch the long batch, BC, PPO, or obstacle work until that route and corpus
   admission tests pass.
+
+## Round 121: corpus admission and relabel tooling complete
+
+- Commit `2a1b5c54c09bb3629fa66edfe2a0be0f1035a808` adds the CPU-only
+  raw-corpus admission and dataset-construction boundary. The authoritative
+  `.98` suite passed `440/440` tests in `31.36 s`.
+- Corpus admission requires at least 40 exact case/gate/raw triples, exact
+  selection and plan hashes, completed physical reference, dynamic/thermal/
+  controller-evidence passes, no termination, zero applied residual, no
+  normalized runtime dataset, matching row counts, and command reconstruction
+  error at most `2e-6`.
+- Frozen scales use corpus-wide raw absolute maxima, a `1.10` margin, and
+  per-channel `0.05` quantization with minimum `[0.30,0.40,0.10]`. No clipping
+  or equality at the normalized action bound is admitted.
+- Raw-to-normalized conversion now replaces the raw artifact's zero
+  previous-action placeholders: row zero remains zero and every later row uses
+  the preceding normalized teacher action. This prevents a train/rollout
+  observation-contract mismatch.
+- The builder deterministically selects exactly 40 admitted cases and emits
+  `30 train / 5 validation / 5 holdout`; any additional captured cases remain
+  coverage-only. It rechecks source hashes, trajectory separation, normalized
+  bounds, prior-action recurrence, and teacher-command reconstruction.
+- A passed dataset is marked `valid_for_bc_initialization=true`, but
+  `bc_authorized=false`, `ppo_authorized=false`, and `training_started=false`.
+  No long capture, BC, PPO, or learned rollout was launched in this round.
+
+## Next round after Round 121
+
+- Implement a fresh, hash-bound, sequential capture scheduler over the sealed
+  42-case selection. It must support resume without overwrite, preserve every
+  case log and exit code, stop on the first physical reject, and generate one
+  corpus admission only after at least 40 cases pass.
+- Estimate the total runtime from the selected execution durations before
+  issuing the one-use batch authorization. Do not let a label-scale result stop
+  deterministic physics.
+- After capture, run corpus admission and construct the `30/5/5` dataset. Stop
+  again for review before any bounded BC process starts.

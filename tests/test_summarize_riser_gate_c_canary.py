@@ -261,6 +261,55 @@ def _enable_zero_progress_hold_admission(path: Path, commit: str) -> None:
     path.write_text(json.dumps(payload))
 
 
+def _enable_recovery_velocity_cap_contract(path: Path) -> None:
+    _enable_zero_progress_hold_contract(path)
+    payload = json.loads(path.read_text())
+    payload.update(
+        {
+            "tracking_profile": (
+                "riser_recovery_direction_v4_camera_lever_arm_"
+                "zero_progress_hold_velocity_cap_v1"
+            ),
+            "tracking_recovery_velocity_cap_enabled": True,
+            "maximum_linear_velocity_mps": 0.2,
+            "tracking_overrides": {
+                "minimum_progress_scale": 0.0,
+                "maximum_linear_velocity_mps": 0.2,
+            },
+        }
+    )
+    result = payload["results"][0]
+    result.update(
+        {
+            "maximum_linear_velocity_mps": 0.2,
+            "velocity_feedback_telemetry": {
+                "schema": "riser_root_vs_wheel_velocity_policy_rate_v1",
+                "policy_rate_sample_count": result["completed_steps"],
+                "effective_reference_abs_max_mps": 0.2,
+            },
+            "velocity_feedback_telemetry_observed": True,
+        }
+    )
+    result["checks"]["velocity_feedback_telemetry_observed"] = True
+    path.write_text(json.dumps(payload))
+
+
+def _enable_recovery_velocity_cap_admission(path: Path, commit: str) -> None:
+    _enable_zero_progress_hold_admission(path, commit)
+    payload = json.loads(path.read_text())
+    payload.update(
+        {
+            "tracking_profile": (
+                "riser_recovery_direction_v4_camera_lever_arm_"
+                "zero_progress_hold_velocity_cap_v1"
+            ),
+            "recovery_velocity_cap_required": True,
+            "maximum_linear_velocity_mps": 0.2,
+        }
+    )
+    path.write_text(json.dumps(payload))
+
+
 def _enable_initialization_preroll_evidence(path: Path) -> None:
     payload = json.loads(path.read_text())
     result = payload["results"][0]
@@ -464,6 +513,68 @@ def test_zero_progress_hold_evidence_is_explicit_and_fail_closed(
     assert not summary["runtime_contract_passed"]
     assert summary["gate_rows"][0]["zero_progress_hold_evidence_passed"] is False
 
+
+def test_recovery_velocity_cap_is_independent_and_fail_closed(tmp_path: Path) -> None:
+    (tmp_path / "gates").mkdir()
+    (tmp_path / "logs").mkdir()
+    commit = "a" * 40
+    _admission(tmp_path / "admission.json", commit, tmp_path.name)
+    _enable_recovery_velocity_cap_admission(tmp_path / "admission.json", commit)
+    gate = tmp_path / "gates/case_0042.json"
+    _gate(gate, 42, True)
+    _enable_recovery_velocity_cap_contract(gate)
+    output = tmp_path / "summary.json"
+    command = [
+        sys.executable,
+        str(SCRIPT),
+        "--root",
+        str(tmp_path),
+        "--git-commit",
+        commit,
+        "--cases",
+        "42",
+        "--expected-tracking-profile",
+        (
+            "riser_recovery_direction_v4_camera_lever_arm_"
+            "zero_progress_hold_velocity_cap_v1"
+        ),
+        "--require-camera-lever-arm-compensation",
+        "--require-zero-progress-hold",
+        "--require-recovery-velocity-cap",
+        "--expected-maximum-linear-velocity-mps",
+        "0.2",
+        "--output",
+        str(output),
+    ]
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    row = summary["gate_rows"][0]
+    assert summary["passed"]
+    assert summary["recovery_velocity_cap_required"] is True
+    assert summary["expected_maximum_linear_velocity_mps"] == 0.2
+    assert row["recovery_velocity_cap_evidence_passed"] is True
+    assert row["maximum_linear_velocity_mps"] == 0.2
+
+    payload = json.loads(gate.read_text())
+    payload["results"][0]["velocity_feedback_telemetry"][
+        "effective_reference_abs_max_mps"
+    ] = 0.2001
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert summary["dynamic_quality_passed"]
+    assert not summary["runtime_contract_passed"]
+    assert summary["gate_rows"][0]["recovery_velocity_cap_evidence_passed"] is False
+
+    payload["results"][0]["velocity_feedback_telemetry"][
+        "effective_reference_abs_max_mps"
+    ] = 0.2
+    payload["tracking_overrides"]["maximum_linear_velocity_mps"] = 0.21
+    gate.write_text(json.dumps(payload))
+    subprocess.run(command, check=True)
+    summary = json.loads(output.read_text())
+    assert not summary["runtime_contract_passed"]
+    assert summary["gate_rows"][0]["recovery_velocity_cap_evidence_passed"] is False
 
 def test_summary_stops_at_first_reject_and_keeps_training_closed(tmp_path: Path) -> None:
     (tmp_path / "gates").mkdir()

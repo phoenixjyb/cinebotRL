@@ -3242,3 +3242,80 @@ and must state whether its candidate was accepted or rejected.
   runtime route. Do not create a namespace or authorization token, launch
   Isaac, case 43, residual capture, BC, PPO, or training in the CPU contract
   change.
+
+## Round 96: exact phase hold is dynamically rejected
+
+- Added the default-off exact-hold contract at `a19a5ba`, its focused test fix
+  at `0d401c9`, and the hash-bound case-42 route at `44b793e`. The authoritative
+  CPU suite passed `374/374` before launch. The route reused the v20 portfolio
+  manifest and case-42 plan without changing source anchors, source/execution
+  clocks, controller gains, safety gates, or quality thresholds.
+- The exclusive zero-progress canary initialized successfully for `2.0 s` and
+  `400` steps, then exhausted its bounded `144.9 s` scored horizon at phase
+  `3.503471/48.297533 s`. One hold segment occupied `25,896/28,980` scored
+  steps (`89.3582%`). Position p95/max failed at `1.306713/1.372330 m`; the
+  only dynamic failures were completion and the two position gates.
+- Balance and the independent subsystems remained bounded: attitude p95/max
+  were `0.148136/2.692105 deg`, pitch p95/max were
+  `5.243685/6.539545 deg`, riser p95/max were `0.009672/0.010626 m`, thermal
+  load max was `0.001422`, and action saturation was zero. The residual-label
+  envelope independently failed, labels were never applied, and no dataset,
+  capture, BC, PPO, or training started.
+- During the hold, the target remained fixed near base XY `(1.157,-0.167) m`
+  and the requested velocity stayed negative, but wheel velocity converged to
+  approximately `+0.093 m/s`. The actual base moved monotonically away from
+  the target. Exact phase hold is therefore structurally rejected and must not
+  be retried unchanged.
+- Sealed hashes are admission
+  `60025a79bb0ac1e6ee14b11e7f7ec8cc3b8753d000cc19c0ca2e7cb75f31a2d0`,
+  gate `206be73921a900fb24cc594e23e4909f87e64e05e4234a462558a47a32e97d8b`,
+  log `cf9cf84f0575a4893923be073a0614ce2ed71cfd4f9f53b8aa827de1512896d2`,
+  exit-code evidence
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+  and summary
+  `8273fe58fb818ec0fc33fc0f947c3189ada18e6dd462b81607b057b778824716`.
+
+## Round 97: longitudinal cancellation diagnosis and bounded recovery cap
+
+- A CPU readback of all `129` one-hertz hold samples decomposed the frozen
+  common action using the exact selected gain. Mean pitch-error contribution
+  was `+0.536747`, mean wheel-velocity contribution was only `-0.000874`, and
+  the remaining pitch-rate contribution was `-0.481058`. The observed common
+  action averaged `+0.054815`. The inferred sampled pitch rate was approximately
+  `-0.340454 rad/s` while sampled pitch stayed near `+3.4 deg`, exposing a
+  policy-rate longitudinal limit cycle aliased by the one-hertz trace.
+- The signed plant contract is internally consistent: positive common effort
+  drives both wheels in `+X`, and the identified input matrix maps positive
+  common effort to negative pitch acceleration and positive wheel acceleration.
+  The case-42 defect is not a simple wheel-sign inversion, and the root-versus-
+  wheel observer hypothesis remains rejected.
+- The promoted deterministic robustness evidence only qualified longitudinal
+  commands at `+/-0.2 m/s`. Case 42 held a `-0.4 m/s` request continuously,
+  outside that demonstrated envelope. Commit `2ed23fd` therefore adds a
+  default-off symmetric tracking-command cap that may reduce but cannot expand
+  the existing `0.4 m/s` limit, exposes exact per-state LQR action
+  contributions, and rejects non-finite/non-positive limits. It does not change
+  default commands, LQR gains, plans, gates, or residual behavior.
+- The intended bounded candidate combines the already rejected exact phase
+  hold with a `0.2 m/s` cap. This tests whether the controller can converge at
+  its qualified longitudinal envelope; it does not claim that the candidate
+  passes dynamically. Focused local tests pass `6/6`; the authoritative `.98`
+  CPU suite passes `379/379`. The transfer bundle SHA is
+  `bbab26ba8094a2d4b7f994143fea36111fced563e67ddde243c114194bc762a8`.
+- The control hierarchy remains fixed: deterministic LQR owns primary balance,
+  deterministic gates own hard safety and limits, and any future learned layer
+  may only provide bounded supervisory residuals above that stack. No runtime
+  authorization, namespace, Isaac process, case 43, residual capture, BC, PPO,
+  or training is opened by this CPU commit.
+
+## Next round after Round 97
+
+- Add one fresh fail-closed case-42 route that pins `2ed23fd`, the unchanged v20
+  portfolio and plan identities, the `0.2 m/s` command cap, exact phase hold,
+  gains, USD, source, thresholds, ownership, and no-learning invariants.
+- Require the output and summarizer to prove both the cap and hold contracts,
+  preserve the existing dynamic/thermal/controller/runtime/label outcome split,
+  and reject missing or conflicting environment overrides before Isaac starts.
+- Run focused route tests and the full authoritative CPU suite. Only then may
+  one exclusive bounded case-42 canary be considered. Case 43, residual capture,
+  BC, PPO, training, and obstacle work remain closed.

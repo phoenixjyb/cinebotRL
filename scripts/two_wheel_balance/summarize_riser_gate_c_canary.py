@@ -21,6 +21,9 @@ CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE = (
 ZERO_PROGRESS_HOLD_TRACKING_PROFILE = (
     "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
 )
+ZERO_PROGRESS_HOLD_VELOCITY_CAP_TRACKING_PROFILE = (
+    "riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_velocity_cap_v1"
+)
 PHASE_GOVERNOR_CONTRACT = "position_error_continuous_phase_scale_v1"
 CAMERA_LEVER_ARM_COMPENSATION_CONTRACT = (
     "measured_camera_to_base_xy_offset_v1"
@@ -196,18 +199,42 @@ def camera_error_governor_telemetry_passed(
 
 
 def zero_progress_hold_telemetry_passed(
-    payload: dict[str, object], result: dict[str, object]
+    payload: dict[str, object],
+    result: dict[str, object],
+    *,
+    expected_maximum_linear_velocity_mps: float | None = None,
 ) -> bool:
     completed_steps = result.get("completed_steps")
     hold_steps = result.get("progress_hold_step_count")
     hold_ratio = result.get("progress_hold_ratio")
     hold_segments = result.get("progress_hold_segment_count")
     progress_min = result.get("progress_scale_min")
+    expected_tracking_overrides = {"minimum_progress_scale": 0.0}
+    if expected_maximum_linear_velocity_mps is not None:
+        expected_tracking_overrides["maximum_linear_velocity_mps"] = (
+            expected_maximum_linear_velocity_mps
+        )
+    velocity_feedback = result.get("velocity_feedback_telemetry")
+    velocity_cap_ok = expected_maximum_linear_velocity_mps is None or (
+        payload.get("tracking_recovery_velocity_cap_enabled") is True
+        and payload.get("maximum_linear_velocity_mps")
+        == expected_maximum_linear_velocity_mps
+        and result.get("maximum_linear_velocity_mps")
+        == expected_maximum_linear_velocity_mps
+        and isinstance(velocity_feedback, dict)
+        and isinstance(
+            velocity_feedback.get("effective_reference_abs_max_mps"),
+            (int, float),
+        )
+        and math.isfinite(velocity_feedback["effective_reference_abs_max_mps"])
+        and velocity_feedback["effective_reference_abs_max_mps"]
+        <= expected_maximum_linear_velocity_mps + 1e-9
+    )
     return (
         payload.get("phase_governor_enabled") is True
         and payload.get("phase_governor_contract") == PHASE_GOVERNOR_CONTRACT
         and payload.get("minimum_progress_scale") == 0.0
-        and payload.get("tracking_overrides") == {"minimum_progress_scale": 0.0}
+        and payload.get("tracking_overrides") == expected_tracking_overrides
         and result.get("minimum_progress_scale") == 0.0
         and result.get("outer_velocity_feedback_source") == "wheel_derived_vx"
         and isinstance(completed_steps, int)
@@ -224,6 +251,7 @@ def zero_progress_hold_telemetry_passed(
         and isinstance(progress_min, (int, float))
         and math.isfinite(progress_min)
         and progress_min == 0.0
+        and velocity_cap_ok
     )
 
 
@@ -263,6 +291,7 @@ def main() -> int:
             CAMERA_LEVER_ARM_TRACKING_PROFILE,
             CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE,
             ZERO_PROGRESS_HOLD_TRACKING_PROFILE,
+            ZERO_PROGRESS_HOLD_VELOCITY_CAP_TRACKING_PROFILE,
         ),
         default=EXPECTED_TRACKING_PROFILE,
     )
@@ -271,6 +300,10 @@ def main() -> int:
     )
     parser.add_argument("--require-camera-error-recovery-governor", action="store_true")
     parser.add_argument("--require-zero-progress-hold", action="store_true")
+    parser.add_argument("--require-recovery-velocity-cap", action="store_true")
+    parser.add_argument(
+        "--expected-maximum-linear-velocity-mps", type=float, default=0.2
+    )
     parser.add_argument("--expected-camera-lever-arm-gain", type=float, default=1.0)
     parser.add_argument(
         "--expected-maximum-camera-lever-arm-correction-m",
@@ -293,6 +326,7 @@ def main() -> int:
             CAMERA_LEVER_ARM_TRACKING_PROFILE,
             CAMERA_ERROR_GOVERNOR_TRACKING_PROFILE,
             ZERO_PROGRESS_HOLD_TRACKING_PROFILE,
+            ZERO_PROGRESS_HOLD_VELOCITY_CAP_TRACKING_PROFILE,
         }
     ):
         parser.error("camera lever-arm compensation requires its tracking profile")
@@ -306,10 +340,23 @@ def main() -> int:
     if args.require_zero_progress_hold and (
         not args.require_camera_lever_arm_compensation
         or args.require_camera_error_recovery_governor
-        or args.expected_tracking_profile != ZERO_PROGRESS_HOLD_TRACKING_PROFILE
+        or args.expected_tracking_profile
+        not in {
+            ZERO_PROGRESS_HOLD_TRACKING_PROFILE,
+            ZERO_PROGRESS_HOLD_VELOCITY_CAP_TRACKING_PROFILE,
+        }
     ):
         parser.error(
             "zero-progress hold requires lever-arm compensation and its tracking profile"
+        )
+    if args.require_recovery_velocity_cap and (
+        not args.require_zero_progress_hold
+        or args.expected_tracking_profile
+        != ZERO_PROGRESS_HOLD_VELOCITY_CAP_TRACKING_PROFILE
+        or not 0.0 < args.expected_maximum_linear_velocity_mps <= 0.4
+    ):
+        parser.error(
+            "recovery velocity cap requires the capped hold profile and a limit in (0, 0.4]"
         )
     requested = [int(value) for value in args.cases.split(",")]
     admission = args.root / "admission.json"
@@ -346,11 +393,19 @@ def main() -> int:
         and admission_payload.get("runtime_commit") == args.git_commit
         and admission_payload.get("upstream_commit") == args.git_commit
         and admission_payload.get("tracking_profile")
-        == ZERO_PROGRESS_HOLD_TRACKING_PROFILE
+        == args.expected_tracking_profile
         and admission_payload.get("zero_progress_hold_required") is True
         and admission_payload.get("phase_governor_contract")
         == PHASE_GOVERNOR_CONTRACT
         and admission_payload.get("minimum_progress_scale") == 0.0
+        and (
+            not args.require_recovery_velocity_cap
+            or (
+                admission_payload.get("recovery_velocity_cap_required") is True
+                and admission_payload.get("maximum_linear_velocity_mps")
+                == args.expected_maximum_linear_velocity_mps
+            )
+        )
         and admission_payload.get("root_velocity_outer_feedback_enabled") is False
         and admission_payload.get("runtime_authorized") is True
         and admission_payload.get("residual_capture_authorized") is False
@@ -463,7 +518,15 @@ def main() -> int:
         )
         zero_progress_hold_evidence_passed = (
             not args.require_zero_progress_hold
-            or zero_progress_hold_telemetry_passed(payload, result)
+            or zero_progress_hold_telemetry_passed(
+                payload,
+                result,
+                expected_maximum_linear_velocity_mps=(
+                    args.expected_maximum_linear_velocity_mps
+                    if args.require_recovery_velocity_cap
+                    else None
+                ),
+            )
         )
         runtime_contract_passed = (
             payload.get("training_started") is False
@@ -519,6 +582,11 @@ def main() -> int:
             ),
             "zero_progress_hold_evidence_passed": (
                 zero_progress_hold_evidence_passed
+            ),
+            "recovery_velocity_cap_evidence_passed": (
+                zero_progress_hold_evidence_passed
+                if args.require_recovery_velocity_cap
+                else None
             ),
             "initialization_duration_s": initialization_duration_s,
             "initialization_steps": result.get("initialization_steps", 0),
@@ -594,6 +662,9 @@ def main() -> int:
                 "outer_velocity_feedback_source"
             ),
             "minimum_progress_scale": result.get("minimum_progress_scale"),
+            "maximum_linear_velocity_mps": result.get(
+                "maximum_linear_velocity_mps"
+            ),
             "progress_scale_min": result.get("progress_scale_min"),
             "progress_hold_step_count": result.get("progress_hold_step_count"),
             "progress_hold_ratio": result.get("progress_hold_ratio"),
@@ -694,6 +765,7 @@ def main() -> int:
             args.require_camera_error_recovery_governor
         ),
         "zero_progress_hold_required": args.require_zero_progress_hold,
+        "recovery_velocity_cap_required": args.require_recovery_velocity_cap,
         "zero_progress_hold_admission_passed": (
             zero_progress_hold_admission_passed
         ),
@@ -702,6 +774,11 @@ def main() -> int:
         ),
         "expected_minimum_progress_scale": (
             0.0 if args.require_zero_progress_hold else None
+        ),
+        "expected_maximum_linear_velocity_mps": (
+            args.expected_maximum_linear_velocity_mps
+            if args.require_recovery_velocity_cap
+            else None
         ),
         "expected_camera_error_recovery_governor_contract": (
             CAMERA_ERROR_GOVERNOR_CONTRACT

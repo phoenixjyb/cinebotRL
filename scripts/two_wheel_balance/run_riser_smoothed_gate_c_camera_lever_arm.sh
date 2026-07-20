@@ -26,6 +26,8 @@ REQUIRE_INITIALIZATION_PREROLL=0
 USE_ROOT_VELOCITY_OUTER_FEEDBACK=0
 REQUIRE_ZERO_PROGRESS_HOLD=0
 TRACKING_MINIMUM_PROGRESS_SCALE=""
+REQUIRE_RECOVERY_VELOCITY_CAP=0
+TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS=""
 
 case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
   AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE68_66_CAMERA_LEVER_ARM_V1)
@@ -528,6 +530,23 @@ case "${RISER_CAMERA_LEVER_ARM_GATE_C_AUTHORIZATION:-}" in
     TRACKING_PROFILE="riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_v1"
     STAMP="20260720_gate_c_smoothed_case42_v20_zero_progress_hold_v1_exclusive"
     ;;
+  AUTHORIZED_RISER_SMOOTHED_GATE_C_CASE42_V20_ZERO_PROGRESS_HOLD_CAP020_V1)
+    PORTFOLIO_STAMP="20260720_smoothed_plan_all79_v20_case42_initialization_preroll2s_cpu"
+    MANIFEST_SHA256="3d7f9650a4f701f80a11948364a53ecd34641160bffb6bc3ed697d038d559b72"
+    PLANNER_COMMIT="5a66e3deef01fceacc80fee37b199045705d7f02"
+    CASE_A=42
+    CASE_B=""
+    CASE_A_PLAN_SHA256="ea2e54273c42efa3980eaa3ea9b161109702047467df131d4ad1d2604f063984"
+    CASE_B_PLAN_SHA256=""
+    CASE_TIMEOUT_SECONDS=2200
+    REQUIRE_INITIALIZATION_PREROLL=1
+    REQUIRE_ZERO_PROGRESS_HOLD=1
+    TRACKING_MINIMUM_PROGRESS_SCALE="0.0"
+    REQUIRE_RECOVERY_VELOCITY_CAP=1
+    TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS="0.2"
+    TRACKING_PROFILE="riser_recovery_direction_v4_camera_lever_arm_zero_progress_hold_velocity_cap_v1"
+    STAMP="20260720_gate_c_smoothed_case42_v20_zero_progress_hold_cap020_v1_exclusive"
+    ;;
   *)
     printf 'camera lever-arm Gate C authorization is absent or unknown\n' >&2
     exit 7
@@ -605,7 +624,7 @@ wait_for_gpu_release() {
 }
 
 case_gate_passed() {
-  python3 - "$1" "$2" "$3" "$4" "$5" "$6" "$7" <<'PY'
+  python3 - "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" <<'PY'
 import json
 import math
 from pathlib import Path
@@ -618,6 +637,10 @@ require_camera_recovery = bool(int(sys.argv[4]))
 require_initialization = bool(int(sys.argv[5]))
 require_root_velocity_feedback = bool(int(sys.argv[6]))
 require_zero_progress_hold = bool(int(sys.argv[7]))
+require_recovery_velocity_cap = bool(int(sys.argv[8]))
+expected_maximum_linear_velocity_mps = (
+    float(sys.argv[9]) if require_recovery_velocity_cap else None
+)
 result = gate.get("results", [{}])[0]
 correction_max = result.get("camera_lever_arm_correction_max_m")
 raw_max = result.get("camera_lever_arm_raw_correction_max_m")
@@ -703,12 +726,32 @@ hold_steps = result.get("progress_hold_step_count")
 hold_ratio = result.get("progress_hold_ratio")
 hold_segments = result.get("progress_hold_segment_count")
 completed_steps = result.get("completed_steps")
+expected_tracking_overrides = {"minimum_progress_scale": 0.0}
+if require_recovery_velocity_cap:
+    expected_tracking_overrides["maximum_linear_velocity_mps"] = (
+        expected_maximum_linear_velocity_mps
+    )
+velocity_feedback = result.get("velocity_feedback_telemetry")
+recovery_velocity_cap_ok = not require_recovery_velocity_cap or (
+    gate.get("tracking_recovery_velocity_cap_enabled") is True
+    and gate.get("maximum_linear_velocity_mps")
+    == expected_maximum_linear_velocity_mps
+    and result.get("maximum_linear_velocity_mps")
+    == expected_maximum_linear_velocity_mps
+    and isinstance(velocity_feedback, dict)
+    and isinstance(
+        velocity_feedback.get("effective_reference_abs_max_mps"), (int, float)
+    )
+    and math.isfinite(velocity_feedback["effective_reference_abs_max_mps"])
+    and velocity_feedback["effective_reference_abs_max_mps"]
+    <= expected_maximum_linear_velocity_mps + 1e-9
+)
 zero_progress_hold_ok = not require_zero_progress_hold or (
     gate.get("phase_governor_enabled") is True
     and gate.get("phase_governor_contract")
     == "position_error_continuous_phase_scale_v1"
     and gate.get("minimum_progress_scale") == 0.0
-    and gate.get("tracking_overrides") == {"minimum_progress_scale": 0.0}
+    and gate.get("tracking_overrides") == expected_tracking_overrides
     and result.get("minimum_progress_scale") == 0.0
     and result.get("progress_scale_min") == 0.0
     and result.get("outer_velocity_feedback_source") == "wheel_derived_vx"
@@ -761,6 +804,7 @@ ok = (
     and initialization_ok
     and root_velocity_feedback_ok
     and zero_progress_hold_ok
+    and recovery_velocity_cap_ok
 )
 raise SystemExit(0 if ok else 6)
 PY
@@ -822,6 +866,7 @@ python3 - "$TEMP_ADMISSION" "$COMMIT" "$STAMP" "$CASE_TIMEOUT_SECONDS" \
   "$CAMERA_RECOVERY_ERROR_START_M" "$CAMERA_RECOVERY_ERROR_FULL_M" \
   "$MINIMUM_CAMERA_RECOVERY_SCALE" "$USE_ROOT_VELOCITY_OUTER_FEEDBACK" \
   "$REQUIRE_ZERO_PROGRESS_HOLD" "$TRACKING_MINIMUM_PROGRESS_SCALE" \
+  "$REQUIRE_RECOVERY_VELOCITY_CAP" "$TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS" \
   "${IDENTITY_ARGS[@]}" <<'PY'
 import hashlib
 import json
@@ -843,10 +888,14 @@ payload["phase_governor_contract"] = "position_error_continuous_phase_scale_v1"
 payload["minimum_progress_scale"] = (
     float(sys.argv[12]) if sys.argv[12] else 0.1
 )
+payload["recovery_velocity_cap_required"] = bool(int(sys.argv[13]))
+payload["maximum_linear_velocity_mps"] = (
+    float(sys.argv[14]) if sys.argv[14] else 0.4
+)
 payload["camera_recovery_governor_contract"] = (
     "saturated_camera_error_continuous_phase_cap_v1"
 )
-args = sys.argv[13:]
+args = sys.argv[15:]
 payload["runtime_identities"] = {
     args[index]: {
         "path": str(Path(args[index + 1]).resolve()),
@@ -889,6 +938,17 @@ if [[ "$REQUIRE_ZERO_PROGRESS_HOLD" == 1 ]]; then
   )
   SUMMARY_HOLD_ARGS+=(--require-zero-progress-hold)
 fi
+VELOCITY_CAP_ARGS=()
+SUMMARY_VELOCITY_CAP_ARGS=()
+if [[ "$REQUIRE_RECOVERY_VELOCITY_CAP" == 1 ]]; then
+  VELOCITY_CAP_ARGS+=(
+    --tracking-maximum-linear-velocity-mps "$TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS"
+  )
+  SUMMARY_VELOCITY_CAP_ARGS+=(
+    --require-recovery-velocity-cap
+    --expected-maximum-linear-velocity-mps "$TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS"
+  )
+fi
 
 for CASE in "${CASE_LIST[@]}"; do
   assert_exclusive_resources || exit 5
@@ -904,6 +964,7 @@ for CASE in "${CASE_LIST[@]}"; do
     --maximum-camera-lever-arm-correction-m "$MAXIMUM_CAMERA_LEVER_ARM_CORRECTION_M" \
     "${ROOT_VELOCITY_ARGS[@]}" \
     "${PROGRESS_HOLD_ARGS[@]}" \
+    "${VELOCITY_CAP_ARGS[@]}" \
     "${CAMERA_RECOVERY_ARGS[@]}" \
     --output "$OUTPUT_WIN\gates\case_$(printf '%04d' "$CASE").json" --headless \
     >"$OUTPUT/logs/case_$(printf '%04d' "$CASE").log" 2>&1 || STATUS=$?
@@ -914,11 +975,14 @@ for CASE in "${CASE_LIST[@]}"; do
       "$CASE" "$TRACKING_PROFILE" "$ENABLE_CAMERA_ERROR_RECOVERY" \
       "$REQUIRE_INITIALIZATION_PREROLL" \
       "$USE_ROOT_VELOCITY_OUTER_FEEDBACK" \
-      "$REQUIRE_ZERO_PROGRESS_HOLD"; then
+      "$REQUIRE_ZERO_PROGRESS_HOLD" \
+      "$REQUIRE_RECOVERY_VELOCITY_CAP" \
+      "$TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS"; then
     python3 "$SUMMARIZER" --root "$OUTPUT" --git-commit "$COMMIT" --cases "$CASES" \
       --expected-tracking-profile "$TRACKING_PROFILE" \
       --require-camera-lever-arm-compensation "${SUMMARY_RECOVERY_ARGS[@]}" \
       "${SUMMARY_HOLD_ARGS[@]}" \
+      "${SUMMARY_VELOCITY_CAP_ARGS[@]}" \
       --output "$OUTPUT/summary.json" >/dev/null
     printf 'camera lever-arm Gate C stopped on case %s\n' "$CASE" >&2
     exit 4
@@ -929,11 +993,14 @@ python3 "$SUMMARIZER" --root "$OUTPUT" --git-commit "$COMMIT" --cases "$CASES" \
   --expected-tracking-profile "$TRACKING_PROFILE" \
   --require-camera-lever-arm-compensation "${SUMMARY_RECOVERY_ARGS[@]}" \
   "${SUMMARY_HOLD_ARGS[@]}" \
+  "${SUMMARY_VELOCITY_CAP_ARGS[@]}" \
   --output "$OUTPUT/summary.json" >/dev/null
 python3 - "$OUTPUT/summary.json" "$CASES" \
   "$REQUIRE_INITIALIZATION_PREROLL" \
   "$USE_ROOT_VELOCITY_OUTER_FEEDBACK" \
-  "$REQUIRE_ZERO_PROGRESS_HOLD" <<'PY'
+  "$REQUIRE_ZERO_PROGRESS_HOLD" \
+  "$REQUIRE_RECOVERY_VELOCITY_CAP" \
+  "$TRACKING_MAXIMUM_LINEAR_VELOCITY_MPS" <<'PY'
 import json
 from pathlib import Path
 import sys
@@ -943,6 +1010,10 @@ expected_cases = [int(value) for value in sys.argv[2].split(",")]
 require_initialization = bool(int(sys.argv[3]))
 require_root_velocity_feedback = bool(int(sys.argv[4]))
 require_zero_progress_hold = bool(int(sys.argv[5]))
+require_recovery_velocity_cap = bool(int(sys.argv[6]))
+expected_maximum_linear_velocity_mps = (
+    float(sys.argv[7]) if require_recovery_velocity_cap else None
+)
 gate_rows = summary.get("gate_rows", [])
 initialization_ok = not require_initialization or (
     len(gate_rows) == 1
@@ -966,6 +1037,12 @@ zero_progress_hold_ok = not require_zero_progress_hold or (
     and gate_rows[0].get("progress_hold_segment_count", 0) > 0
     and gate_rows[0].get("outer_velocity_feedback_source") == "wheel_derived_vx"
 )
+recovery_velocity_cap_ok = not require_recovery_velocity_cap or (
+    len(gate_rows) == 1
+    and gate_rows[0].get("recovery_velocity_cap_evidence_passed") is True
+    and gate_rows[0].get("maximum_linear_velocity_mps")
+    == expected_maximum_linear_velocity_mps
+)
 ok = (
     summary.get("requested_cases") == expected_cases
     and summary.get("dynamically_passed_cases") == expected_cases
@@ -982,6 +1059,7 @@ ok = (
     and initialization_ok
     and root_velocity_feedback_ok
     and zero_progress_hold_ok
+    and recovery_velocity_cap_ok
 )
 raise SystemExit(0 if ok else 6)
 PY

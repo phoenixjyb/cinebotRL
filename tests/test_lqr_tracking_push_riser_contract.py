@@ -11,6 +11,10 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/two_wheel_balance/evaluate_lqr_tracking_push.py"
 RUNNER = ROOT / "scripts/two_wheel_balance/run_riser_lqr_plant_envelope.sh"
+SUMMARIZER = (
+    ROOT
+    / "scripts/two_wheel_balance/summarize_riser_lqr_plant_envelope.py"
+)
 
 
 def source() -> str:
@@ -130,6 +134,13 @@ def test_plant_envelope_runner_pins_current_evaluator_blob() -> None:
     match = re.search(r'readonly EVALUATOR_SHA256="([0-9a-f]{64})"', text)
     assert match is not None
     assert match.group(1) == hashlib.sha256(SCRIPT.read_bytes()).hexdigest()
+    summary_match = re.search(
+        r'readonly SUMMARIZER_SHA256="([0-9a-f]{64})"', text
+    )
+    assert summary_match is not None
+    assert summary_match.group(1) == hashlib.sha256(
+        SUMMARIZER.read_bytes()
+    ).hexdigest()
 
 
 def test_plant_envelope_runner_rejects_unknown_auth_and_overrides_pre_runtime() -> None:

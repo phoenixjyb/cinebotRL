@@ -13,6 +13,7 @@ readonly TRACKING_SHA256="f2cfe1abcaf1f225461b0ccfa9d26ab205e2dc9624047be77edeab
 readonly ROBOT_CONFIG_SHA256="31b84c21baf8fb043c8653bfb592217b97d9edbd7a1a0e17633b86f4f36f05e2"
 readonly GAINS_SHA256="2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6"
 readonly ROBOT_USD_SHA256="89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0"
+readonly SUMMARIZER_SHA256="09302cd2058711de4156e940eb1e15db38f580f755f0c8cc927e56841d686c2d"
 readonly TIMEOUT_SECONDS=420
 
 if [[ $# -ne 1 ]]; then
@@ -74,6 +75,7 @@ readonly GAINS="$ROOT/docs/03_training/two_wheel_balance/evidence_20260714_28kg/
 readonly GAINS_WIN="$WIN_ROOT\docs\03_training\two_wheel_balance\evidence_20260714_28kg\lqr_gains.json"
 readonly ROBOT_USD="$ROOT/assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd"
 readonly RUNNER="$ROOT/scripts/two_wheel_balance/run_riser_lqr_plant_envelope.sh"
+readonly SUMMARIZER="$ROOT/scripts/two_wheel_balance/summarize_riser_lqr_plant_envelope.py"
 readonly OUTPUT="$ROOT/artifacts/two_wheel_riser/$NAMESPACE"
 readonly OUTPUT_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\$NAMESPACE"
 
@@ -117,6 +119,7 @@ wait_for_release() {
 [[ "$(sha256sum "$ROBOT_CONFIG" | awk '{print $1}')" == "$ROBOT_CONFIG_SHA256" ]] || { printf 'robot config hash mismatch\n' >&2; exit 2; }
 [[ "$(sha256sum "$GAINS" | awk '{print $1}')" == "$GAINS_SHA256" ]] || { printf 'gains hash mismatch\n' >&2; exit 2; }
 [[ "$(sha256sum "$ROBOT_USD" | awk '{print $1}')" == "$ROBOT_USD_SHA256" ]] || { printf 'robot USD hash mismatch\n' >&2; exit 2; }
+[[ "$(sha256sum "$SUMMARIZER" | awk '{print $1}')" == "$SUMMARIZER_SHA256" ]] || { printf 'summarizer hash mismatch\n' >&2; exit 2; }
 
 git -C "$ROOT" diff --quiet && git -C "$ROOT" diff --cached --quiet || {
   printf 'tracked worktree changes make runtime provenance ambiguous\n' >&2
@@ -136,7 +139,7 @@ python3 - "$OUTPUT/admission.json" "$COMMIT" "$UPSTREAM" "$SHARD" \
   "$RISER_POSITION_M" "$NAMESPACE" "$AUTHORIZATION" \
   evaluator "$EVALUATOR" controller "$METRICS" tracking "$TRACKING" \
   robot_config "$ROBOT_CONFIG" gains "$GAINS" robot_usd "$ROBOT_USD" \
-  runner "$RUNNER" <<'PY'
+  runner "$RUNNER" summarizer "$SUMMARIZER" <<'PY'
 import hashlib
 import json
 from pathlib import Path
@@ -225,116 +228,11 @@ timeout --signal=TERM --kill-after=30s "$TIMEOUT_SECONDS" \
 printf '%s\n' "$STATUS" >"$OUTPUT/logs/exit_code"
 wait_for_release || exit 5
 
-python3 - "$OUTPUT" "$COMMIT" "$SHARD" "$RISER_POSITION_M" <<'PY'
-import hashlib
-import json
-import math
-from pathlib import Path
-import sys
-
-root = Path(sys.argv[1])
-commit, shard, position_text = sys.argv[2:5]
-position = float(position_text)
-admission_path = root / "admission.json"
-result_path = root / "gates/result.json"
-log_path = root / "logs/runtime.log"
-exit_path = root / "logs/exit_code"
-status = int(exit_path.read_text().strip())
-result = json.loads(result_path.read_text()) if result_path.is_file() else None
-checks = {
-    "runtime_exit_zero": status == 0,
-    "result_written": result is not None,
-}
-if result is not None:
-    controller = result.get("controller", {})
-    command = result.get("command", {})
-    push = result.get("push", {})
-    plant = result.get("plant_uncertainty", {})
-    summary = result.get("summary", {})
-    riser = summary.get("riser_plant") or {}
-    runtime = plant.get("runtime", {})
-    scenarios = result.get("scenarios", [])
-    checks.update(
-        {
-            "schema": result.get("schema")
-            == "recomo_two_wheel_riser_cascaded_lqr_tracking_push_gate_v1",
-            "full_riser_asset": result.get("robot_form") == "riser"
-            and str(result.get("robot_asset_usd", "")).replace("\\", "/").endswith(
-                "/assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd"
-            ),
-            "nominal_mass_28kg": abs(runtime.get("nominal_total_mass_kg", 0.0) - 28.0)
-            <= 0.1,
-            "riser_height": abs(riser.get("riser_position_target_m", -1.0) - position)
-            <= 1e-12,
-            "finite_com_bias": all(
-                math.isfinite(riser.get(name, math.nan))
-                for name in (
-                    "equilibrium_pitch_bias_min_deg",
-                    "equilibrium_pitch_bias_max_deg",
-                )
-            ),
-            "riser_hold": riser.get("riser_hold_error_max_m", math.inf)
-            <= result.get("thresholds", {}).get("maximum_riser_hold_error_m", -1.0),
-            "gimbal_hold": riser.get("gimbal_hold_error_max_deg", math.inf)
-            <= result.get("thresholds", {}).get("maximum_gimbal_hold_error_deg", -1.0),
-            "controller_contract": controller.get("vx_kp") == 0.72
-            and controller.get("vx_ki") == 0.075
-            and controller.get("vx_integral_limit") == 0.7
-            and controller.get("limit_total_pitch_reference") is True
-            and controller.get("reset_opposing_vx_integral_on_directional_deficit")
-            is True
-            and controller.get("vx_integral_reset_reference_deadband_mps") == 0.05
-            and controller.get("use_root_velocity_outer_feedback") is True
-            and controller.get("semantic_proxy_state_adapter") is True
-            and controller.get("pitch_reference_limit_deg") == 6.0
-            and controller.get("action_limit") == 0.8,
-            "command_contract": command.get("vx_m_s") == [-0.2, 0.2]
-            and command.get("wz_rad_s") == [0.0]
-            and push.get("forces_x_n") == [-20.0, 20.0],
-            "provisional_variations": plant.get("profile") == "provisional_prior_v1"
-            and plant.get("variation_count") == 14,
-            "complete_scenarios": summary.get("scenarios") == 56
-            and len(scenarios) == 56
-            and all(item.get("passed") is True for item in scenarios),
-            "direction_symmetry": summary.get("direction_contract_complete") is True
-            and summary.get("direction_speed_asymmetry_mps", math.inf) <= 0.05,
-            "dynamic_pass": result.get("passed") is True
-            and summary.get("success_rate") == 1.0,
-            "no_learning": result.get("learned_action_applied") is False
-            and result.get("residual_dataset") is None
-            and result.get("capture_started") is False
-            and result.get("bc_started") is False
-            and result.get("ppo_started") is False
-            and result.get("training_started") is False,
-        }
-    )
-hashes = {
-    name: hashlib.sha256(path.read_bytes()).hexdigest()
-    for name, path in {
-        "admission": admission_path,
-        "runtime_log": log_path,
-        "exit_code": exit_path,
-        **({"result": result_path} if result_path.is_file() else {}),
-    }.items()
-}
-payload = {
-    "schema": "recomo_two_wheel_riser_lqr_plant_envelope_final_status_v1",
-    "runtime_commit": commit,
-    "shard": shard,
-    "riser_position_m": position,
-    "checks": checks,
-    "hashes": hashes,
-    "passed": all(checks.values()),
-    "first_dynamic_reject": result is not None and result.get("passed") is not True,
-    "capture_started": False,
-    "bc_started": False,
-    "ppo_started": False,
-    "training_started": False,
-}
-(root / "final_status.json").write_text(
-    json.dumps(payload, indent=2) + "\n", encoding="utf-8"
-)
-raise SystemExit(0 if payload["passed"] else 4)
-PY
+python3 "$SUMMARIZER" \
+  --root "$OUTPUT" \
+  --runtime-commit "$COMMIT" \
+  --shard "$SHARD" \
+  --riser-position-m "$RISER_POSITION_M" \
+  --output "$OUTPUT/final_status.json" >/dev/null
 
 printf 'riser plant-envelope shard passed: %s\n' "$OUTPUT"

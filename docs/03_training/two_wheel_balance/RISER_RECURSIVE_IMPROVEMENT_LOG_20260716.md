@@ -3997,3 +3997,48 @@ and must state whether its candidate was accepted or rejected.
 - Run exactly one v2 low shard. Treat all physical, direction, hold, identity,
   and no-learning checks as hard. Stop on any reject; only a complete low pass
   may admit the v2 mid shard.
+
+## Round 113: low-height dynamics pass; final-status float repair
+
+- Commit `10d48a6b66ca4333c1d4a85ed2d5705329e86c67` was pushed and
+  transferred exactly with bundle SHA-256
+  `70d3c79aad4e243053284e26f8d85c6cb85f8737550bf860e3854058bc2f09ca`.
+  The authoritative `.98` suite passed `418/418` in `27.24 s`
+  (`29.21 s` command wall), and clean HEAD/upstream, fresh v2 low namespace,
+  and empty WSL/NVIDIA ownership were verified before one launch.
+- The corrected v2 low simulator result is a physical and scenario pass:
+  `56/56` scenarios passed, survival/balance-recovery/tracking-recovery were all
+  `1.0`, aggregate selected `vx/wz` RMSE was
+  `0.050709/0.000701`, peak pitch was `8.426244 deg`, action saturation was
+  zero, riser/gimbal hold maxima were `0.00000415 m/0.057881 deg`, and
+  forward/reverse achieved-speed asymmetry was `0.017954 m/s`.
+- Result SHA-256 is
+  `d359aa90ae34cb2a59ffdcc130e04914ba3de2344fcaa3b34529befad85dd794`;
+  admission SHA-256 is
+  `75614e75a64f62f016ecf220676e34241e20a31a8db1897ea0988aa8af06b793`;
+  runtime-log SHA-256 is
+  `6e43f238119655680e1da22f317649f726f343ca4817e043dee4dc21577abf92`.
+  No learned action, dataset, capture, BC, PPO, or training was present.
+- The v2 `final_status.json` remained false only because its embedded validator
+  compared the serialized `pitch_reference_limit_deg=6.000000000000001` to
+  `6.0` with exact equality. Every physical, identity, hold, scenario,
+  direction, and no-learning check passed. This is an evidence-validation
+  defect, not a dynamic reject, and no Isaac rerun is justified.
+- Extracted the final-status logic into
+  `summarize_riser_lqr_plant_envelope.py`. It requires all four source evidence
+  files, verifies admission/runtime/shard/height identity, preserves every hard
+  gate, uses absolute-tolerance comparisons only for serialized numeric
+  constants, seals source hashes plus its own blob hash, and emits schema v2.
+  Healthy, roundoff, no-learning-negative, and missing-evidence tests pass.
+  The launcher now pins and records this summarizer rather than embedding a
+  second validator implementation.
+
+## Next round after Round 113
+
+- Commit, push, transfer, and run the full authoritative CPU suite. Preserve the
+  original v1 final status as pre-reseal evidence, then reseal the existing low
+  namespace with the committed summarizer. Verify every check and source hash;
+  do not rerun low-height physics.
+- Only after the resealed low status passes may one fresh v2 mid-height shard
+  run. High, case 42, residual capture, BC, PPO, training, and obstacle work
+  remain closed.

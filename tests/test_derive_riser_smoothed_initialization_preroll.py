@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
 
@@ -36,6 +37,7 @@ def test_preroll_starts_near_rest_and_joins_first_execution_derivative() -> None
     assert metrics["checks"]["terminal_rate_matches_execution"] is True
     assert metrics["checks"]["base_linear_velocity_bounded"] is True
     assert metrics["checks"]["proxy_rate_bounded"] is True
+    json.dumps(metrics)
 
 
 def test_preroll_rejects_overspeed_terminal_derivative() -> None:

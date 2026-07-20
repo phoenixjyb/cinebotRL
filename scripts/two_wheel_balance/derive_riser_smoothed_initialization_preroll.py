@@ -133,7 +133,7 @@ def initialization_state_and_metrics(
         "terminal_state": state[-1].tolist(),
     }
     checks = {
-        "clock_starts_at_zero": time_s[0] == 0.0,
+        "clock_starts_at_zero": bool(time_s[0] == 0.0),
         "clock_strictly_increasing": bool(np.all(dt > 0.0)),
         "state_finite": bool(np.isfinite(state).all()),
         "terminal_state_matches_execution": bool(

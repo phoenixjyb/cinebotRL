@@ -2627,3 +2627,39 @@ and must state whether its candidate was accepted or rejected.
   workspace, and kinematic gate passes. Prepare one unchanged default-profile
   route in `20260720_gate_c_smoothed_case34_v15_camera_lever_arm_v1_exclusive`
   with a `2000 s` wall bound. Learning remains closed.
+
+## Round 76: exclusive case-34 playback passes Gate C
+
+- Published the case-only route at `9e5d8f9`; the authoritative `.98` suite
+  passed `341/341`. A minimal-controller robustness run owned the GPU at the
+  first launch attempt, so the riser runner remained closed until that process
+  exited. Case 34 then started through the unchanged Windows/WSL ownership
+  guard with no competing playback or robustness process.
+- Both source/execution clocks completed at `27.384062/49.749541 s` in `23778`
+  steps. Dynamic position p95/max passed at `0.099618/0.158989 m`; attitude
+  p95/max passed at `0.127229/0.221809 deg`; pitch p95/max were
+  `6.139166/7.020725 deg`. Riser servo p95/max were
+  `0.011750/0.012059 m`, effort max was `21.068913 N`, and thermal-load max
+  was `0.001630`. All completion, physical, runtime, thermal, controller, IK,
+  rate, saturation, and termination checks passed.
+- The prospective residual-label envelope independently passed with raw maxima
+  `[0.285401,0.143052,0.012274]` and normalized maxima
+  `[0.951336,0.357630,0.122740]`. The residual action stayed exactly zero and
+  was not applied; no dataset, capture, BC, PPO, or training started.
+- The unique dynamically qualified union is now `39/70`:
+  `[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,28,30,31,32,33,34,52,53,66,67,68,70,74,77]`.
+- Evidence hashes: admission
+  `7fd8e2e5077bbed64cfdd0e3d4c5cd4a5da51f695c5595156bc66aa2aece7f23`,
+  gate `b7ad17005cd5257169abdbe4680331e626baad707dc967c605b693c93ab92032`,
+  log `f623a95e6e366ba256e6717c784cfec19fe17c376720c60a79b49c33222a7628`,
+  and summary
+  `47f6b053108147121bafbe0e6ad8bc7cdaecbe017914034f1ca91473eee75633`.
+
+## Next round after Round 76
+
+- Preserve case 35 as the existing v15 static reject. Inspect v15 case 36 on
+  CPU and authorize at most one fresh case-only Gate C route if all immutable
+  source, timing, path, transition, workspace, and kinematic checks pass.
+- Keep deterministic commands and all thresholds unchanged. Residual capture,
+  BC, PPO, and training remain closed until the deterministic portfolio is
+  qualified and the final raw residual-envelope audit is complete.

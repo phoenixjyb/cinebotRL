@@ -2779,3 +2779,40 @@ and must state whether its candidate was accepted or rejected.
   `2000 s` wall bound. Preserve case 38 as a static reject because its
   execution/source ratio is `2.190027`, above the immutable `2.0` limit.
   Learning remains closed.
+
+## Round 82: exclusive case-37 playback passes Gate C
+
+- Published the case-only route at `e511169`; the authoritative `.98` suite
+  passed `341/341`. Both clocks completed at `28.823874/46.347559 s` in
+  `22139` steps with no termination.
+- Dynamic position p95/max passed at `0.104540/0.106517 m`; attitude p95/max
+  passed at `0.126702/0.223847 deg`; pitch p95/max were
+  `6.527206/6.789710 deg`. Riser servo p95/max were
+  `0.013522/0.014111 m`, effort max was `21.501381 N`, and thermal-load max
+  was `0.002026`. Every dynamic, runtime, thermal, controller, IK, rate,
+  saturation, and termination check passed.
+- The residual-label envelope independently passed with raw maxima
+  `[0.220701,0.167322,0.014145]` and normalized maxima
+  `[0.735670,0.418304,0.141450]`; action remained zero and unapplied. No
+  dataset, capture, BC, PPO, or training started. The unique dynamic union is
+  now `41/70`.
+- Evidence hashes: admission
+  `6ae2b65fd697c15491ac09c5807b51751dce9115caa0074aeabd463569b90fe5`,
+  gate `4ae9d488f643568f43ddb31bd276301694fd6fb81c609ff2ed88f4d7b92fa7bf`,
+  log `caaee0777f3b033c761cac08a3b857d0df1ffa3cd6c419bb000510431de31d6d`,
+  and summary
+  `0dc58d1b89b4aa6aa7bc75da2be5eeed78ffd9adf264a77f63e4e82e0b772a4f`.
+
+## Round 83: skip cases 38-40 and admit case 41 on CPU
+
+- Preserve v16 cases 38, 39, and 40 as static rejects because each exceeds the
+  immutable `2.0` execution/source duration ratio. None is routed to Isaac.
+- V16 case 41 is statically admitted with plan hash
+  `cf3c1f35fbf20377c23dbc7ff3d24fbca8cdc9ef833cf1eff925d585295a4679`.
+  It preserves all `2023` source anchors and has source/execution clocks
+  `39.991917/70.739720 s`, ratio `1.768850`. Static position p95/max are
+  `0.084243/0.123881 m`; camera height is `1.199417-1.500219 m`; planned
+  riser rate max is `0.107360 m/s`. Every static gate passes.
+- Prepare exactly one unchanged default-profile route in
+  `20260720_gate_c_smoothed_case41_v16_camera_lever_arm_v1_exclusive` with a
+  duration-derived `2800 s` wall bound. Learning remains closed.

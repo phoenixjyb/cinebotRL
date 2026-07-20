@@ -128,6 +128,18 @@ def _fixture(tmp_path: Path, *, applied_residual: bool = False) -> list[str]:
     ]
 
 
+def _promote_admission_to_batch(command: list[str], tmp_path: Path) -> None:
+    admission = tmp_path / "admission.json"
+    payload = json.loads(admission.read_text(encoding="utf-8"))
+    payload["requested_cases"] = [2, 3]
+    payload["selected_plans"] = [
+        {"case": 2, "plan_sha256": "c" * 64},
+        {"case": 3, "plan_sha256": "d" * 64},
+    ]
+    payload.pop("plan_sha256")
+    admission.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def test_audits_scale_independent_capture(tmp_path: Path) -> None:
     command = _fixture(tmp_path)
     result = subprocess.run(
@@ -155,6 +167,18 @@ def test_rejects_capture_if_residual_was_applied(tmp_path: Path) -> None:
     audit = json.loads((tmp_path / "audit.json").read_text(encoding="utf-8"))
     assert not audit["checks"]["zero_applied_residual"]
     assert not audit["capture_admission_passed"]
+
+
+def test_accepts_case_bound_inside_batch_admission(tmp_path: Path) -> None:
+    command = _fixture(tmp_path)
+    _promote_admission_to_batch(command, tmp_path)
+    result = subprocess.run(
+        command, cwd=PROJECT_ROOT, check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    audit = json.loads((tmp_path / "audit.json").read_text(encoding="utf-8"))
+    assert audit["checks"]["admission_case_pinned"]
+    assert audit["checks"]["admission_plan_hash"]
 
 
 def test_canonicalizes_windows_paths_for_wsl_audit() -> None:

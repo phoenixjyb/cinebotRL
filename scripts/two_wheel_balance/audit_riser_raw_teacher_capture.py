@@ -64,6 +64,17 @@ def selected_row(selection: dict[str, Any], case: int) -> dict[str, Any]:
     return rows[0]
 
 
+def admitted_plan_sha256(admission: dict[str, Any], case: int) -> str | None:
+    if admission.get("requested_cases") == [case]:
+        return admission.get("plan_sha256")
+    rows = [
+        row
+        for row in admission.get("selected_plans", [])
+        if isinstance(row, dict) and row.get("case") == case
+    ]
+    return rows[0].get("plan_sha256") if len(rows) == 1 else None
+
+
 def _zero_vector(value: Any) -> bool:
     try:
         vector = np.asarray(value, dtype=np.float64)
@@ -130,14 +141,17 @@ def main() -> int:
         "case_selected": args.case in selection.get("selected_cases", []),
         "selection_still_not_trainable": selection.get("valid_for_training") is False,
         "admission_passed": admission.get("passed") is True,
-        "admission_case_pinned": admission.get("requested_cases") == [args.case],
+        "admission_case_pinned": args.case in admission.get("requested_cases", [])
+        and len(admission.get("requested_cases", []))
+        == len(set(admission.get("requested_cases", []))),
         "admission_selection_hash": admission.get("selection_sha256")
         == sha256(args.selection),
         "admission_source_hash": admission.get("source_manifest_sha256")
         == selection.get("source_manifest_sha256"),
         "admission_portfolio_hash": admission.get("portfolio_manifest_sha256")
         == selection.get("portfolio_manifest_sha256"),
-        "admission_plan_hash": admission.get("plan_sha256") == row.get("plan_sha256"),
+        "admission_plan_hash": admitted_plan_sha256(admission, args.case)
+        == row.get("plan_sha256"),
         "gate_case": result.get("case") == args.case,
         "gate_passed": gate.get("passed") is True and result.get("passed") is True,
         "dynamic_quality_passed": gate.get("dynamic_quality_passed") is True

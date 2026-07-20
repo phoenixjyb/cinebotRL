@@ -895,6 +895,41 @@ def test_raw_teacher_canary_rejects_missing_authorization() -> None:
     assert "authorization is absent or unknown" in result.stderr
 
 
+def test_raw_teacher42_scheduler_is_resumable_homogeneous_and_unissued() -> None:
+    source = _read("run_riser_raw_teacher42_capture.sh")
+    assert 'AUTHORIZATION_SHA256=""' in source
+    assert "raw-teacher batch has no issued runtime authorization" in source
+    assert "RISER_RAW_TEACHER_BATCH_PREFLIGHT" in source
+    assert "output_namespace_created\": False" in source
+    assert "--enable-camera-lever-arm-compensation" in source
+    assert "--controller-wz-kp 1.05" in source
+    assert "--raw-teacher-dir" in source
+    assert "--dataset-dir" not in source
+    assert "--residual-policy" not in source
+    assert "partial case evidence requires manual quarantine" in source
+    assert "cinebotrl_two_wheel_riser_raw_teacher42_progress_v1" in source
+    assert "progress_status.json.tmp" in source
+    assert "runtime_or_physical_reject" in source
+    assert "case_audit_reject" in source
+    assert "completed case audit mismatch" in source
+    assert "stop_on_first_reject\": True" in source
+    assert "--expected-count 42" in source
+    assert "initial_teacher40_30_5_5_v1.npz" in source
+    assert '"bc_authorized": False' in source
+    assert '"ppo_authorized": False' in source
+    assert "Get-CimInstance Win32_Process" in source
+    assert "rev-parse '@{upstream}'" in source
+
+
+def test_raw_teacher42_scheduler_cannot_launch_without_issued_secret() -> None:
+    runner = SCRIPTS / "run_riser_raw_teacher42_capture.sh"
+    result = subprocess.run(
+        ["bash", str(runner)], capture_output=True, text=True, env={}
+    )
+    assert result.returncode == 7
+    assert "no issued runtime authorization" in result.stderr
+
+
 def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:
     source = _read("run_riser_residual_holdout_gate.sh")
     assert "exact_source_v1" in source

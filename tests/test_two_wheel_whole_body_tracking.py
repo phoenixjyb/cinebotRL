@@ -19,6 +19,7 @@ from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     riser_tracking_config,
     select_progress_governor_base_error,
     slew_limited_arm_target,
+    summarize_progress_governor_base_error,
     summarize_progress_hold,
     yaw_from_quaternion_wxyz,
 )
@@ -221,6 +222,50 @@ def test_progress_governor_base_error_rejects_invalid_evidence(
             commanded,
             use_commanded_base_target=True,
         )
+
+
+def test_progress_governor_base_error_summary_accepts_bounded_candidate() -> None:
+    summary = summarize_progress_governor_base_error(
+        np.array([0.20, 0.12]),
+        np.array([0.15, 0.10]),
+        np.array([0.15, 0.10]),
+        use_commanded_base_target=True,
+        maximum_command_correction_m=0.05,
+        expected_sample_count=2,
+    )
+
+    assert summary["progress_base_error_telemetry_observed"] is True
+    assert summary["progress_base_error_selected_source_matches"] is True
+    assert summary["progress_base_error_command_delta_bounded"] is True
+    assert summary["selected_vs_nominal_base_progress_error_abs_max_delta_m"] == pytest.approx(0.05)
+
+
+def test_progress_governor_base_error_summary_rejects_forged_selection() -> None:
+    summary = summarize_progress_governor_base_error(
+        np.array([0.20, 0.12]),
+        np.array([0.15, 0.10]),
+        np.array([0.20, 0.12]),
+        use_commanded_base_target=True,
+        maximum_command_correction_m=0.05,
+        expected_sample_count=2,
+    )
+
+    assert summary["progress_base_error_selected_source_matches"] is False
+    assert summary["progress_base_error_telemetry_observed"] is False
+
+
+def test_progress_governor_base_error_summary_rejects_over_bound_delta() -> None:
+    summary = summarize_progress_governor_base_error(
+        np.array([0.20, 0.12]),
+        np.array([0.14, 0.10]),
+        np.array([0.14, 0.10]),
+        use_commanded_base_target=True,
+        maximum_command_correction_m=0.05,
+        expected_sample_count=2,
+    )
+
+    assert summary["progress_base_error_command_delta_bounded"] is False
+    assert summary["progress_base_error_telemetry_observed"] is False
 
 
 @pytest.mark.parametrize("minimum", [-0.01, 1.01])

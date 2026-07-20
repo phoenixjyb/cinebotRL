@@ -153,6 +153,78 @@ def select_progress_governor_base_error(
     )
 
 
+def summarize_progress_governor_base_error(
+    nominal_base_errors_m: np.ndarray,
+    commanded_base_errors_m: np.ndarray,
+    selected_base_errors_m: np.ndarray,
+    *,
+    use_commanded_base_target: bool,
+    maximum_command_correction_m: float,
+    expected_sample_count: int,
+) -> dict[str, float | int | bool | str]:
+    """Audit policy-rate phase-governor target selection and correction bounds."""
+
+    nominal = np.asarray(nominal_base_errors_m, dtype=np.float64)
+    commanded = np.asarray(commanded_base_errors_m, dtype=np.float64)
+    selected = np.asarray(selected_base_errors_m, dtype=np.float64)
+    arrays = (nominal, commanded, selected)
+    if any(value.ndim != 1 or value.size == 0 for value in arrays):
+        raise ValueError("progress-governor base-error evidence must be non-empty vectors")
+    if not all(np.isfinite(value).all() and np.all(value >= 0.0) for value in arrays):
+        raise ValueError("progress-governor base-error evidence must be finite and non-negative")
+    if not math.isfinite(maximum_command_correction_m) or maximum_command_correction_m <= 0.0:
+        raise ValueError("maximum command correction must be finite and positive")
+    if expected_sample_count <= 0:
+        raise ValueError("expected sample count must be positive")
+
+    lengths_match = all(value.size == expected_sample_count for value in arrays)
+    expected = commanded if use_commanded_base_target else nominal
+    selected_matches_source = bool(
+        selected.shape == expected.shape and np.array_equal(selected, expected)
+    )
+    if nominal.shape == commanded.shape:
+        command_delta = commanded - nominal
+        command_delta_abs_max = float(np.max(np.abs(command_delta)))
+        command_delta_mean = float(np.mean(command_delta))
+    else:
+        command_delta_abs_max = math.inf
+        command_delta_mean = math.nan
+    command_delta_bounded = (
+        command_delta_abs_max <= maximum_command_correction_m + 1e-9
+    )
+    telemetry_observed = bool(
+        lengths_match and selected_matches_source and command_delta_bounded
+    )
+    return {
+        "progress_base_error_source": (
+            "lever_compensated_commanded_base_target"
+            if use_commanded_base_target
+            else "nominal_plan_base_target"
+        ),
+        "progress_base_error_telemetry_sample_count": int(selected.size),
+        "progress_base_error_selected_source_matches": selected_matches_source,
+        "progress_base_error_command_delta_bounded": command_delta_bounded,
+        "progress_base_error_telemetry_observed": telemetry_observed,
+        "nominal_base_progress_error_p95_m": float(np.percentile(nominal, 95)),
+        "nominal_base_progress_error_max_m": float(np.max(nominal)),
+        "commanded_base_progress_error_p95_m": float(
+            np.percentile(commanded, 95)
+        ),
+        "commanded_base_progress_error_max_m": float(np.max(commanded)),
+        "selected_base_progress_error_p95_m": float(np.percentile(selected, 95)),
+        "selected_base_progress_error_max_m": float(np.max(selected)),
+        "selected_vs_nominal_base_progress_error_mean_delta_m": (
+            command_delta_mean if use_commanded_base_target else 0.0
+        ),
+        "selected_vs_nominal_base_progress_error_abs_max_delta_m": (
+            command_delta_abs_max if use_commanded_base_target else 0.0
+        ),
+        "maximum_commanded_base_progress_error_delta_m": (
+            maximum_command_correction_m
+        ),
+    }
+
+
 def summarize_progress_hold(
     progress_scales: np.ndarray,
     *,

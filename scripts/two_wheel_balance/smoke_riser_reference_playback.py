@@ -260,6 +260,7 @@ from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     nearest_equivalent_angle,
     riser_tracking_config,
     select_progress_governor_base_error,
+    summarize_progress_governor_base_error,
     summarize_progress_hold,
     yaw_from_quaternion_wxyz,
 )
@@ -1355,19 +1356,19 @@ def evaluate_case(
     camera_recovery_telemetry_observed = (
         len(camera_recovery_progress_samples) == completed_steps
     )
-    progress_base_error_telemetry_observed = (
-        len(nominal_base_progress_error_samples) == completed_steps
-        and len(commanded_base_progress_error_samples) == completed_steps
-        and len(selected_base_progress_error_samples) == completed_steps
-        and np.array_equal(
-            np.asarray(selected_base_progress_error_samples),
-            np.asarray(
-                commanded_base_progress_error_samples
-                if args.use_commanded_base_progress_error
-                else nominal_base_progress_error_samples
-            ),
-        )
+    progress_base_error_summary = summarize_progress_governor_base_error(
+        np.asarray(nominal_base_progress_error_samples),
+        np.asarray(commanded_base_progress_error_samples),
+        np.asarray(selected_base_progress_error_samples),
+        use_commanded_base_target=args.use_commanded_base_progress_error,
+        maximum_command_correction_m=(
+            args.maximum_camera_lever_arm_correction_m
+        ),
+        expected_sample_count=completed_steps,
     )
+    progress_base_error_telemetry_observed = progress_base_error_summary[
+        "progress_base_error_telemetry_observed"
+    ]
     dynamic_checks = {
         "initialization_completed": initialization_completed,
         "initialization_action_saturation_bounded": (
@@ -1438,6 +1439,16 @@ def evaluate_case(
         ),
         "progress_base_error_telemetry_observed": (
             progress_base_error_telemetry_observed
+        ),
+        "progress_base_error_selected_source_matches": (
+            progress_base_error_summary[
+                "progress_base_error_selected_source_matches"
+            ]
+        ),
+        "progress_base_error_command_delta_bounded": (
+            progress_base_error_summary[
+                "progress_base_error_command_delta_bounded"
+            ]
         ),
     }
     checks = dynamic_checks | thermal_checks | controller_evidence_checks
@@ -1534,45 +1545,7 @@ def evaluate_case(
             args.use_commanded_base_progress_error
         ),
         "phase_governor_contract": phase_governor_contract(),
-        "progress_base_error_source": progress_governor_base_error_source(),
-        "progress_base_error_telemetry_sample_count": len(
-            selected_base_progress_error_samples
-        ),
-        "progress_base_error_telemetry_observed": (
-            progress_base_error_telemetry_observed
-        ),
-        "nominal_base_progress_error_p95_m": float(
-            np.percentile(nominal_base_progress_error_samples, 95)
-        ),
-        "nominal_base_progress_error_max_m": float(
-            np.max(nominal_base_progress_error_samples)
-        ),
-        "commanded_base_progress_error_p95_m": float(
-            np.percentile(commanded_base_progress_error_samples, 95)
-        ),
-        "commanded_base_progress_error_max_m": float(
-            np.max(commanded_base_progress_error_samples)
-        ),
-        "selected_base_progress_error_p95_m": float(
-            np.percentile(selected_base_progress_error_samples, 95)
-        ),
-        "selected_base_progress_error_max_m": float(
-            np.max(selected_base_progress_error_samples)
-        ),
-        "selected_vs_nominal_base_progress_error_mean_delta_m": float(
-            np.mean(
-                np.asarray(selected_base_progress_error_samples)
-                - np.asarray(nominal_base_progress_error_samples)
-            )
-        ),
-        "selected_vs_nominal_base_progress_error_abs_max_delta_m": float(
-            np.max(
-                np.abs(
-                    np.asarray(selected_base_progress_error_samples)
-                    - np.asarray(nominal_base_progress_error_samples)
-                )
-            )
-        ),
+        **progress_base_error_summary,
         "maximum_linear_velocity_mps": tracking_cfg.maximum_linear_velocity_mps,
         "total_pitch_reference_limit_enabled": (
             controller_cfg.limit_total_pitch_reference

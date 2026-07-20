@@ -306,6 +306,7 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert "math.isfinite(args.maximum_camera_lever_arm_correction_m)" in pre_app_source
     assert "bounded_camera_lever_arm_base_target(" in source
     assert "select_progress_governor_base_error(" in source
+    assert "summarize_progress_governor_base_error(" in source
     assert "bounded_camera_recovery_progress_scale(" in source
     assert '"camera_recovery_governor_contract"' in source
     assert '"camera_recovery_telemetry_observed"' in source
@@ -314,6 +315,8 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert '"commanded_base_progress_error_enabled"' in source
     assert '"progress_base_error_source"' in source
     assert '"progress_base_error_telemetry_observed"' in source
+    assert '"progress_base_error_selected_source_matches"' in source
+    assert '"progress_base_error_command_delta_bounded"' in source
     assert '"commanded_base_xy_error_m"' in source
     assert '"progress_base_error_m"' in source
     assert "commanded_base_and_camera_error_continuous_phase_scale_v1" in source

@@ -3013,3 +3013,50 @@ and must state whether its candidate was accepted or rejected.
   and execution clocks separate, prove continuity and all existing kinematic
   limits, and remain dynamically unvalidated/training-ineligible. No runtime
   route may be added until that contract and focused negative tests pass.
+
+## Round 91: explicit initialization schema and case-42 pre-roll candidate
+
+- Added first-class optional initialization support at `d62c3bf`: a separate
+  increasing clock plus `K x 7` state array ordered as base x/y/yaw, riser,
+  and three continuous proxy axes. Non-empty initialization must end exactly
+  at the first execution state; malformed, half-specified, or discontinuous
+  initialization fails closed. Existing empty plans remain compatible.
+- Added independent initialization interpolation and round-trip tests without
+  shifting either source or execution time. The authoritative `.98` suite
+  passed `349/349` after this schema change.
+- Added the hash-bound smooth rest-to-first-derivative derivation at
+  `53fabe4`. The first real attempt produced a valid plan but failed before
+  manifest creation because a NumPy boolean was not JSON serializable. The
+  partial namespace is preserved as
+  `20260720_smoothed_plan_case42_v17_initialization_preroll2s_cpu_FAILED_JSON_SERIALIZATION`.
+  The serialization regression was fixed at `5d3d87e`; the authoritative
+  suite passes `352/352`.
+- Generated the clean CPU-only candidate in
+  `20260720_smoothed_plan_case42_v17_initialization_preroll2s_cpu`. It contains
+  `401` pre-roll samples over `2.0 s`, starts within `1.6e-6` state units per
+  second of rest, and matches the first execution derivative within
+  `6.3e-6` relative error.
+- Initialization maxima are base linear `0.079664 m/s`, lateral
+  `0.007871 m/s`, yaw `0.218336 rad/s`, riser `0.066576 m/s`, and proxy
+  `0.248524 rad/s`; every existing rate bound passes. The candidate plan SHA
+  is `ea2e54273c42efa3980eaa3ea9b161109702047467df131d4ad1d2604f063984`;
+  manifest SHA is
+  `6bb3f04b802761fcae0675430dd820819180296c73f86ddfd83b19b2288f26ce`.
+- All scored execution arrays, authoritative source arrays, and both source
+  and execution clocks are byte-identical to v17. No controller, threshold,
+  runtime route, Isaac process, dataset, capture, BC, PPO, or training was
+  opened. The candidate remains dynamically unvalidated and invalid for
+  training.
+
+## Next round after Round 91
+
+- Add fail-closed playback support that executes the separate pre-roll before
+  source phase zero, excludes it from source tracking metrics, preserves LQR
+  state continuity into the scored run, and reports initialization completion
+  and terminal state/rate evidence independently.
+- Add focused CPU tests proving source phase and metric arrays remain empty
+  during initialization, malformed initialization cannot launch, and plans
+  without initialization retain their current behavior.
+- Do not add a GPU authorization token or runtime namespace until the runner
+  contract and authoritative CPU suite pass. Case 43, residual capture, BC,
+  PPO, and training remain closed.

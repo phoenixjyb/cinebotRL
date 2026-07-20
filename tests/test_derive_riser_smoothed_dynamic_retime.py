@@ -137,17 +137,25 @@ def test_retime_preserves_separate_initialization_arrays(tmp_path: Path) -> None
     output = tmp_path / "output.npz"
     initialization_time = np.array([0.0, 0.5, 1.0])
     initialization_state = np.arange(21, dtype=np.float64).reshape(3, 7)
+    parent_metadata = {
+        "initialization_preroll": {
+            "schema": "rest_to_first_execution_derivative_v1",
+            "scored_as_source_tracking": False,
+        }
+    }
     np.savez_compressed(
         parent,
         initialization_time_s=initialization_time,
         initialization_state=initialization_state,
         execution_time_s=np.array([0.0, 1.0]),
+        metadata_json=np.array(json.dumps(parent_metadata)),
     )
     np.savez_compressed(
         output,
         initialization_time_s=np.empty(0),
         initialization_state=np.empty((0, 7)),
         execution_time_s=np.array([0.0, 2.0]),
+        metadata_json=np.array(json.dumps({"dynamic_margin_retime": {}})),
     )
 
     MODULE._restore_initialization_arrays(parent, output)
@@ -156,3 +164,8 @@ def test_retime_preserves_separate_initialization_arrays(tmp_path: Path) -> None
         assert np.array_equal(candidate["initialization_time_s"], initialization_time)
         assert np.array_equal(candidate["initialization_state"], initialization_state)
         assert np.array_equal(candidate["execution_time_s"], np.array([0.0, 2.0]))
+        metadata = json.loads(str(candidate["metadata_json"].item()))
+        assert metadata["initialization_preroll"] == parent_metadata[
+            "initialization_preroll"
+        ]
+        assert metadata["dynamic_margin_retime"] == {}

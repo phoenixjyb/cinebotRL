@@ -295,10 +295,19 @@ def _restore_initialization_arrays(parent_path: Path, output_path: Path) -> None
     with np.load(parent_path, allow_pickle=False) as parent:
         initialization_time = np.array(parent["initialization_time_s"])
         initialization_state = np.array(parent["initialization_state"])
+        parent_metadata = json.loads(str(parent["metadata_json"].item()))
     with np.load(output_path, allow_pickle=False) as output:
         arrays = {name: np.array(output[name]) for name in output.files}
+    output_metadata = json.loads(str(arrays["metadata_json"].item()))
     arrays["initialization_time_s"] = initialization_time
     arrays["initialization_state"] = initialization_state
+    if "initialization_preroll" in parent_metadata:
+        output_metadata["initialization_preroll"] = parent_metadata[
+            "initialization_preroll"
+        ]
+    else:
+        output_metadata.pop("initialization_preroll", None)
+    arrays["metadata_json"] = np.array(json.dumps(output_metadata, sort_keys=True))
     np.savez_compressed(output_path, **arrays)
 
 
@@ -561,11 +570,34 @@ def main() -> int:
         == parent_metadata.get("path_metrics"),
         "dynamic_retime_recorded": output_metadata.get("dynamic_margin_retime")
         == dynamic_retime,
+        "initialization_preroll_metadata_unchanged": output_metadata.get(
+            "initialization_preroll"
+        )
+        == parent_metadata.get("initialization_preroll"),
         "learning_closed": output_metadata.get("valid_for_training") is False
         and output_metadata.get("residual_capture_started") is False
         and output_metadata.get("bc_started") is False
         and output_metadata.get("ppo_started") is False,
     }
+    audit_checks = dict(audit["checks"])
+    audit_checks.pop("initialization_separate_empty", None)
+    audit_checks.update(
+        {
+            "initialization_separate_preserved": (
+                derivation_checks["initialization_time_s_unchanged"]
+                and derivation_checks["initialization_state_unchanged"]
+            ),
+            "initialization_preroll_metadata_preserved": metadata_checks[
+                "initialization_preroll_metadata_unchanged"
+            ],
+        }
+    )
+    audit_passed = all(audit_checks.values()) and all(
+        audit["kinematic_checks"].values()
+    )
+    audit["checks"] = audit_checks
+    audit["timing_transition_kinematic_gate_passed"] = audit_passed
+    audit["passed"] = audit_passed
     passed = (
         audit["passed"] is True
         and all(derivation_checks.values())

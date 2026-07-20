@@ -4200,3 +4200,31 @@ and must state whether its candidate was accepted or rejected.
 - Derive a fresh v22 ratio-2 candidate and require every source, initialization,
   execution-clock, feedforward, timing, path, transition, and kinematic check to
   pass. Stop before any runtime authorization or Isaac launch.
+
+## Round 118: v22 preserves arrays; audit requires admitted-parent semantics
+
+- Commit `d80e59bd6bcbf3187b600a32680a0ed80eb390a9` was pushed and
+  transferred with bundle SHA-256
+  `63acdbe8f2c9de58627f59b89b772c8c3d1e8d8cd5ddbb94e83ac586f7bd6242`.
+  The authoritative `.98` suite passed `423/423` in `28.36 s`
+  (`30.45 s` command wall time).
+- Fresh v22 successfully preserved both initialization arrays, and all source,
+  execution-clock, feedforward, path, transition, and kinematic checks passed.
+  It still failed closed because the generic static audit always requires empty
+  initialization, even when the hash-bound admitted parent intentionally owns
+  a separate unscored pre-roll. The v22 plan/manifest/summary SHA-256 values are
+  `dc82e3f8dd04e20b28f51bf649bf78bfef5f55dcb303b26c80b62bd425826028`,
+  `981d20aaa0354640df3287d96b5db58ea67b4039590055399245792bf0875cbf`,
+  and `6c7de9a50671a8945797b28c025ad63efa817cc51b645f22e9f373ecb5053372`.
+- The output also revealed that the generic save path did not carry the parent
+  `initialization_preroll` metadata even though the arrays were restored. The
+  repair now preserves that metadata exactly and replaces only the retime
+  audit's empty-initialization assertion with parent-preservation checks. The
+  global static audit remains unchanged for newly exported plans.
+
+## Next round after Round 118
+
+- Pass focused and authoritative CPU tests, commit, push, and transfer the
+  parent-semantics audit repair.
+- Derive a fresh v23 ratio-2 candidate. Require all checks true and stop at the
+  CPU artifact boundary; do not issue authorization or launch Isaac.

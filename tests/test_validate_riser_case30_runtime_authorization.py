@@ -129,7 +129,13 @@ def test_preflight_is_ready_but_not_runtime_authorized(admitted_repo: Path) -> N
     assert result["passed"]
 
 
-def test_exact_mode_0600_token_authorizes(admitted_repo: Path, tmp_path: Path) -> None:
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="runtime authorization token mode is enforced by the WSL wrapper",
+)
+def test_exact_mode_0600_token_authorizes(
+    admitted_repo: Path, tmp_path: Path
+) -> None:
     token = tmp_path / "authorization"
     token.write_text(validator.AUTHORIZATION + "\n")
     os.chmod(token, 0o600)

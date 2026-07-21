@@ -22,6 +22,7 @@ except ImportError:
 
 SCHEMA = "cinebotrl_two_wheel_riser_case30_runtime_authorization_v1"
 REVIEWED_CPU_COMMIT = "8c4a5a662a98088edf053697e27596c2e9ac7803"
+RUNTIME_IMPLEMENTATION_COMMIT = "125955bdebc6f55f50fd650089dbebe682c3b0fb"
 NAMESPACE = "20260721_case30_perturbation_measurement_v1_exclusive"
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/case30_perturbation_runtime_authorization_v1.json"
@@ -159,6 +160,17 @@ def validate(
         ).returncode
         == 0
     )
+    implementation_is_ancestor = (
+        git(
+            repo,
+            "merge-base",
+            "--is-ancestor",
+            RUNTIME_IMPLEMENTATION_COMMIT,
+            head,
+            check=False,
+        ).returncode
+        == 0
+    )
     cpu_contract = repo / CPU_CONTRACT_RELATIVE_PATH
     cpu_admission = validate_cpu_contract(
         cpu_contract,
@@ -172,6 +184,11 @@ def validate(
         "reviewed_cpu_commit_matches": contract.get("reviewed_cpu_commit")
         == REVIEWED_CPU_COMMIT,
         "reviewed_cpu_commit_is_ancestor": parent_is_ancestor,
+        "runtime_implementation_commit_matches": contract.get(
+            "runtime_implementation_commit"
+        )
+        == RUNTIME_IMPLEMENTATION_COMMIT,
+        "runtime_implementation_commit_is_ancestor": implementation_is_ancestor,
         "head_matches_upstream": head == upstream,
         "tracked_worktree_clean": tracked_clean,
         "canonical_contract_path": contract_path == canonical_path,

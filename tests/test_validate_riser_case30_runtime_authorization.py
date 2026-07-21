@@ -62,12 +62,16 @@ def admitted_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _git(repo, "commit", "-m", "reviewed CPU state")
     reviewed_commit = _git(repo, "rev-parse", "HEAD")
     monkeypatch.setattr(validator, "REVIEWED_CPU_COMMIT", reviewed_commit)
+    monkeypatch.setattr(
+        validator, "RUNTIME_IMPLEMENTATION_COMMIT", reviewed_commit
+    )
 
     contract = {
         "schema": validator.SCHEMA,
         "case": 30,
         "split": "train",
         "reviewed_cpu_commit": reviewed_commit,
+        "runtime_implementation_commit": reviewed_commit,
         "namespace": validator.NAMESPACE,
         "runtime_authorized": True,
         "gpu_launch_authorized": True,

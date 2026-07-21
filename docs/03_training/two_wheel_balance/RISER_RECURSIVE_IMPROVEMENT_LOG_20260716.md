@@ -5179,3 +5179,50 @@ and must state whether its candidate was accepted or rejected.
 - Do not apply the split fallback, admit case 78, open holdout, create labels or
   datasets, retrain BC, start PPO, begin obstacle work, or launch another Isaac
   run during this CPU-only repair.
+
+## Round 138: timeout semantics are repaired CPU-only and progress can be preserved
+
+- Commit `ed207f4` adds an optional atomic runtime heartbeat to the deterministic
+  playback without changing controller commands, physics cadence, phase update,
+  source plan, existing 1 Hz in-memory trace, gates, or capture permissions. At
+  a default `2,000`-policy-step cadence it overwrites one lightweight JSON with
+  completed/max steps, emitted host epoch, virtual elapsed/phase clocks,
+  progress scale, current tracking state, running safety maxima, saturation,
+  and termination state. Every snapshot is explicitly non-training and creates
+  no dataset.
+- The same commit adds a canonical-hash wall-bound audit and four focused tests.
+  The complete authoritative `.98` suite passes `563` tests with three
+  intentional platform skips in `59.12 s`. The local focused tests pass `4/4`;
+  the Mac full suite cannot collect because its Python environment lacks
+  `gymnasium`, so `.98` is the authoritative result.
+- The audit proves that case 30's field labeled `wall_duration_s=57.47 s` is
+  exactly `11,494 / 200 Hz`, i.e. virtual policy-step duration. It is not host
+  elapsed time. The sealed admission-to-final filesystem envelope is `440 s`,
+  producing a conservative measured throughput of `26.122727` policy steps/s.
+  This confirms the Round-136 timeout model used the wrong clock.
+- At case 78's fixed maximum `115,381` policy steps, that conservative rate
+  estimates `4,416.881851 s` for the loop. Adding `900 s` for startup, shutdown,
+  and diagnosis and rounding upward to five-minute quanta proposes a `5,400 s`
+  wall limit. This is deliberately a bound proposal, not permission to run for
+  90 minutes or evidence that case 78 will need the full horizon.
+- All canonical input hashes pass, including the case-30 admission/gate/final
+  and case-78 timeout final status. Wall-bound report SHA-256 is
+  `dc99f0a8e48dc859147e93a38b4723a05fb8ea7ee8a2df8e7db054d4faab9663`.
+  It records runtime retry, GPU launch, split change, dataset creation, BC, PPO,
+  and training validity false. No Isaac process or authorization token was
+  created in this round.
+
+## Next round after Round 138
+
+- Build a fresh CPU-only case-78 v2 qualification contract. Pin the new
+  heartbeat-enabled playback/helper, canonical wall-bound report, unchanged
+  plan/controller/gains/USD identities and gates, `2,000`-step cadence,
+  `5,400 s` ceiling, and a fresh namespace. Its preflight must issue no token,
+  create no runtime namespace, and reject execution.
+- The future timeout finalizer must hash and seal the last heartbeat, report its
+  age and host-observed step throughput, and keep timeout, physical quality,
+  thermal/controller admission, data absence, and GPU release independent. A
+  timeout remains a rejection even when the heartbeat is healthy.
+- Do not retry case 78, apply the split fallback, admit labels, open holdout,
+  capture data, retrain BC, start PPO, or begin obstacle work until the v2 CPU
+  contract receives a separate go/no-go review and one-use runtime layer.

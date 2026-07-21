@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from scripts.two_wheel_balance.validate_case78_camera_recovery_contract import (
     EXPECTED_CONTROLLER,
     EXPECTED_IDENTITIES,
@@ -79,6 +82,19 @@ def test_recovery_contract_changes_only_governor_arguments() -> None:
     }
 
 
+def test_checked_in_recovery_contract_matches_semantics() -> None:
+    _, prior_gate, prior_final, recovery_audit = valid_inputs()
+    contract_path = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/case78_camera_recovery_cpu_contract_v1.json"
+    )
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    checks = semantic_checks(
+        contract, prior_gate, prior_final, recovery_audit
+    )
+    assert all(checks.values())
+
+
 def test_recovery_contract_rejects_gate_or_runtime_relaxation() -> None:
     contract, prior_gate, prior_final, recovery_audit = valid_inputs()
     contract["dynamic_gate_thresholds"] = {
@@ -91,4 +107,3 @@ def test_recovery_contract_rejects_gate_or_runtime_relaxation() -> None:
     )
     assert not checks["thresholds_unchanged"]
     assert not checks["cpu_only"]
-

@@ -4537,3 +4537,56 @@ and must state whether its candidate was accepted or rejected.
   original phase-aligned labels. Only a clear, bounded on-policy label gap may
   justify a later DAgger dataset proposal. Holdout, BC, PPO, obstacles, and
   broader rollout remain closed.
+
+## Round 125: case-4 shadow teacher proves an on-policy label gap
+
+- Commit `a5b511287f439dbaa72982afae9f24fd85394a4b` adds a separate
+  `shadow_teacher_trace_v1` contract. During learned playback it records the
+  deterministic teacher command already computed on the policy-visited state
+  before policy overwrite, plus the actually applied policy command and
+  post-step physical outcome. Runtime scales are explicitly
+  `[0.35,0.40,0.10]`; raw/normalized teacher labels and both high-level command
+  paths must reconstruct independently.
+- The contract is measurement-only: shadow commands are never applied, the
+  artifact is not a residual dataset, and labels are explicitly unadmitted for
+  training. The route is validation case 4 only, hash-bound, single-use, and
+  guarded across WSL, Windows, and NVIDIA ownership. The complete `.98` CPU
+  suite passed `496/496` in `45.18 s` before runtime.
+- The exclusive learned rollout reproduced the prior case-4 baseline exactly:
+  all five pinned position, attitude, and pitch metrics match within `1e-9`,
+  all 6,316 policy steps were recorded, dynamic/thermal/controller gates pass,
+  and applied commands reconstruct from policy outputs without any shadow
+  teacher contribution. Learned-gate SHA-256 is
+  `fe5754bf20e20b608e205f7179e1c7a92f079617e8349949abab52b8470c4b46`;
+  shadow-trace SHA-256 is
+  `ccaf6b5f75df9f185e022f192af6771c6c9db12ed6a3de9feed470021a6c0c7a`.
+- The on-policy diagnosis is positive. Policy-to-shadow normalized action-error
+  p95 is `[0.166973,0.161318,0.011368]` for `[vx,wz,riser]`, compared with
+  `[0.068622,0.162376,0.011600]` against the original phase-aligned teacher.
+  On-policy shadow-label shift from the original teacher has p95
+  `[0.165576,0.097817,0.012356]`; `vx` and `wz` cross the fixed material-shift
+  thresholds while riser does not. Aggregate policy-to-shadow RMSE is
+  `0.070146`, versus `0.043487` against phase labels, a `1.613039x` gap.
+- The bounded classification is
+  `on_policy_teacher_gap_supports_bounded_dagger_proposal`. Diagnosis SHA-256
+  is `6580b0a71cdc3d518318ea19d03a34da61e1cb12c9f52e5a5a960e6522d9ab79`;
+  final-status SHA-256 is
+  `28c92a7c321cf165908e9d66bce80ebe8d77cca748358526894e4dff6c372f2a`.
+  GPU/process ownership is empty after closure.
+- This does not make case 4 trainable. Case 4 belongs to validation, so its
+  shadow labels remain diagnostic evidence and cannot enter BC without
+  violating the frozen split. No dataset, DAgger training corpus, BC, PPO,
+  holdout metric, obstacle work, or broader learned rollout was opened.
+
+## Next round after Round 125
+
+- Build a CPU-only similarity ranking over the existing training split to find
+  one or a very small number of training cases that exercise case-4-like
+  teacher actions and physical-state regimes. Do not use validation case 4 or
+  any holdout case as training data.
+- Review a separately hash-bound proposal for shadow-teacher measurements on
+  those selected training cases. Each must remain one-case, unapplied,
+  non-trainable evidence until its runtime and label-gap audit passes.
+- Only after training-split evidence confirms the same on-policy gap may a new,
+  explicitly versioned DAgger dataset admission be proposed. BC retraining,
+  PPO, holdout evaluation, obstacles, and broad rollout remain closed.

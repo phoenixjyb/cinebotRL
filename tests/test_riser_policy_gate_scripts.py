@@ -199,6 +199,28 @@ def test_case4_policy_trace_is_diagnostic_only_and_exclusive() -> None:
     assert '"ppo_authorized": False' in source
     assert "residual_policy.torchscript.pt" in source
     assert "residual capture" not in source.lower()
+
+
+def test_case4_shadow_teacher_route_is_measurement_only_and_guarded() -> None:
+    source = _read("run_riser_case4_shadow_teacher_measurement.sh")
+    assert "20260721_case4_shadow_teacher_measurement_v1_exclusive" in source
+    assert "RISER_CASE4_SHADOW_TEACHER_AUTHORIZATION_FILE" in source
+    assert "assert_gpu_free" in source
+    assert "Get-CimInstance Win32_Process" in source
+    assert "--cases \"$CASE\"" in source
+    assert "--shadow-teacher-trace-dir" in source
+    assert "--residual-policy \"$POLICY_WIN\"" in source
+    assert "diagnose_riser_shadow_teacher_gap.py" in source
+    assert "BASELINE_GATE_SHA256" in source
+    assert "applied_command_reconstruction" in source
+    assert "shadow_teacher_applied_to_commands" in source
+    assert '"dataset_created": False' in source
+    assert '"valid_for_training": False' in source
+    assert '"dagger_authorized": False' in source
+    assert '"bc_authorized": False' in source
+    assert '"ppo_authorized": False' in source
+    assert "--dataset-dir" not in source
+    assert "--raw-teacher-dir" not in source
     assert "rev-parse '@{upstream}'" in source
 
 
@@ -1037,6 +1059,18 @@ def test_runtime_evidence_separates_source_and_execution_clocks() -> None:
     )
     assert '"dynamic_quality_passed": dynamic_quality_passed' in riser
     assert '"residual_label_envelope_passed": residual_label_envelope_ok' in riser
+    assert '"--shadow-teacher-trace-dir"' in riser
+    assert "shadow_teacher_high_level_command = np.array(" in riser
+    assert "raw_residual_command / args.residual_action_scales" in riser
+    assert "shadow_teacher_normalized_actions.append(" in riser
+    assert "save_shadow_teacher_trace(" in riser
+    assert "action_scales=args.residual_action_scales" in riser
+    assert '"shadow_teacher_labels_applied": False' in riser
+    assert '"shadow_teacher_labels_admitted_for_training": False' in riser
+    assert (
+        "shadow teacher trace requires a learned policy and is exclusive"
+        in riser
+    )
 
 
 def test_raw_teacher_canary_is_one_case_scale_independent_and_guarded() -> None:

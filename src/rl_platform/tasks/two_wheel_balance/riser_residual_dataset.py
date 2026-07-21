@@ -14,6 +14,9 @@ from .camera_attitude import quaternion_matrix_wxyz, rotation_error_vector
 DATASET_SCHEMA = "cinebotrl_two_wheel_riser_executed_residual_v2"
 RAW_TEACHER_SCHEMA = "cinebotrl_two_wheel_riser_executed_raw_teacher_v1"
 POLICY_TRACE_SCHEMA = "cinebotrl_two_wheel_riser_policy_trace_v1"
+SHADOW_TEACHER_TRACE_SCHEMA = (
+    "cinebotrl_two_wheel_riser_shadow_teacher_trace_v1"
+)
 LOOKAHEAD_HORIZONS_S = (0.25, 0.50, 1.00)
 BASE_OBSERVATION_NAMES = (
     "pitch_rad",
@@ -503,6 +506,137 @@ def load_policy_trace(
         raise ValueError(f"policy trace artifact is incorrectly training-enabled: {path}")
     case = int(metadata["case"])
     validate_policy_trace(payload, expected_case=case)
+    return metadata, payload
+
+
+def validate_shadow_teacher_trace(
+    payload: dict[str, np.ndarray],
+    *,
+    action_scales: np.ndarray = ACTION_SCALES,
+    expected_case: int | None = None,
+) -> None:
+    validate_policy_trace(payload, expected_case=expected_case)
+    scales = np.asarray(action_scales, dtype=np.float64)
+    if scales.shape != (3,) or not np.isfinite(scales).all() or np.any(scales <= 0):
+        raise ValueError("invalid shadow teacher action scales")
+    required = {
+        "shadow_teacher_raw_residual_commands": 2,
+        "shadow_teacher_normalized_residual_actions": 2,
+        "shadow_teacher_high_level_commands": 2,
+    }
+    count = len(payload["observations"])
+    for name, ndim in required.items():
+        value = np.asarray(payload.get(name))
+        if value.ndim != ndim or len(value) != count or value.shape[1] != 3:
+            raise ValueError(f"missing or invalid shadow teacher field {name}")
+        if not np.isfinite(value).all():
+            raise ValueError(f"shadow teacher field {name} is non-finite")
+    if not np.allclose(
+        payload["shadow_teacher_raw_residual_commands"],
+        payload["shadow_teacher_normalized_residual_actions"] * scales,
+        atol=2e-7,
+    ):
+        raise ValueError("shadow teacher raw/normalized action mismatch")
+    reconstructed = np.column_stack(
+        (
+            payload["observations"][:, OBSERVATION_INDEX["feedforward_vx_m_s"]]
+            + scales[0]
+            * payload["shadow_teacher_normalized_residual_actions"][:, 0],
+            payload["observations"][:, OBSERVATION_INDEX["feedforward_wz_rad_s"]]
+            + scales[1]
+            * payload["shadow_teacher_normalized_residual_actions"][:, 1],
+            payload["observations"][:, OBSERVATION_INDEX["riser_position_m"]]
+            + scales[2]
+            * payload["shadow_teacher_normalized_residual_actions"][:, 2],
+        )
+    )
+    if not np.allclose(
+        reconstructed,
+        payload["shadow_teacher_high_level_commands"],
+        atol=2e-6,
+    ):
+        raise ValueError("shadow teacher command reconstruction failed")
+
+
+def save_shadow_teacher_trace(
+    path: Path,
+    case: int,
+    payload: dict[str, np.ndarray],
+    *,
+    action_scales: np.ndarray = ACTION_SCALES,
+) -> None:
+    scales = np.asarray(action_scales, dtype=np.float64)
+    validate_shadow_teacher_trace(
+        payload, action_scales=scales, expected_case=case
+    )
+    metadata = {
+        "schema": SHADOW_TEACHER_TRACE_SCHEMA,
+        "case": case,
+        "source": "policy_visited_isaac_state_with_shadow_deterministic_teacher",
+        "observation_names": list(OBSERVATION_NAMES),
+        "applied_action_names": list(ACTION_NAMES),
+        "shadow_teacher_raw_action_names": [
+            "residual_vx_m_s",
+            "residual_wz_rad_s",
+            "residual_riser_target_m",
+        ],
+        "shadow_teacher_normalized_action_names": list(ACTION_NAMES),
+        "action_scales": scales.tolist(),
+        "sample_alignment_contract": (
+            "pre_action_policy_visited_state_shadow_teacher_and_applied_policy_"
+            "to_post_step_outcome_v1"
+        ),
+        "shadow_teacher_computed_before_policy_overwrite": True,
+        "shadow_teacher_applied_to_commands": False,
+        "shadow_teacher_labels_present": True,
+        "shadow_teacher_labels_admitted_for_training": False,
+        "residual_dataset_present": False,
+        "trace_only": True,
+        "training_started": False,
+        "bc_authorized": False,
+        "dagger_authorized": False,
+        "ppo_authorized": False,
+        "valid_for_training": False,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(
+        path,
+        metadata_json=np.array(json.dumps(metadata, sort_keys=True)),
+        **payload,
+    )
+
+
+def load_shadow_teacher_trace(
+    path: Path,
+) -> tuple[dict[str, object], dict[str, np.ndarray]]:
+    with np.load(path, allow_pickle=False) as data:
+        metadata = json.loads(str(data["metadata_json"].item()))
+        payload = {
+            name: np.asarray(data[name])
+            for name in data.files
+            if name != "metadata_json"
+        }
+    if metadata.get("schema") != SHADOW_TEACHER_TRACE_SCHEMA:
+        raise ValueError(f"wrong shadow teacher trace schema in {path}")
+    checks = {
+        "trace_only": metadata.get("trace_only") is True,
+        "not_trainable": metadata.get("valid_for_training") is False,
+        "teacher_unapplied": metadata.get("shadow_teacher_applied_to_commands")
+        is False,
+        "labels_unadmitted": metadata.get(
+            "shadow_teacher_labels_admitted_for_training"
+        )
+        is False,
+        "dagger_closed": metadata.get("dagger_authorized") is False,
+    }
+    if not all(checks.values()):
+        raise ValueError(f"shadow teacher trace contract mismatch in {path}: {checks}")
+    case = int(metadata["case"])
+    validate_shadow_teacher_trace(
+        payload,
+        action_scales=np.asarray(metadata.get("action_scales"), dtype=np.float64),
+        expected_case=case,
+    )
     return metadata, payload
 
 

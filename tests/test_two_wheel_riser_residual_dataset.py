@@ -15,10 +15,12 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     build_residual_action,
     load_case_dataset,
     load_policy_trace,
+    load_shadow_teacher_trace,
     load_raw_teacher_case,
     normalize_raw_teacher_payload,
     save_case_dataset,
     save_policy_trace,
+    save_shadow_teacher_trace,
     save_raw_teacher_case,
     normalize_residual_command,
     residual_action_envelope_passed,
@@ -72,6 +74,63 @@ def test_policy_trace_rejects_misaligned_rows_and_mixed_cases(tmp_path) -> None:
     payload["case_ids"][-1] = 5
     with pytest.raises(ValueError, match="mixes trajectories"):
         save_policy_trace(tmp_path / "mixed.npz", 4, payload)
+
+
+def test_shadow_teacher_trace_round_trip_is_unapplied_and_not_trainable(
+    tmp_path,
+) -> None:
+    payload = _policy_trace_payload()
+    payload["shadow_teacher_raw_residual_commands"] = np.zeros(
+        (3, 3), dtype=np.float32
+    )
+    payload["shadow_teacher_normalized_residual_actions"] = np.zeros(
+        (3, 3), dtype=np.float32
+    )
+    payload["shadow_teacher_high_level_commands"] = np.zeros(
+        (3, 3), dtype=np.float32
+    )
+    path = tmp_path / "case_0004_shadow_teacher_trace_v1.npz"
+    save_shadow_teacher_trace(path, 4, payload)
+    metadata, restored = load_shadow_teacher_trace(path)
+    assert metadata["shadow_teacher_labels_present"] is True
+    assert metadata["shadow_teacher_applied_to_commands"] is False
+    assert metadata["shadow_teacher_labels_admitted_for_training"] is False
+    assert metadata["valid_for_training"] is False
+    assert metadata["dagger_authorized"] is False
+    assert "actions" not in restored
+
+
+def test_shadow_teacher_trace_rejects_command_reconstruction_mismatch(
+    tmp_path,
+) -> None:
+    payload = _policy_trace_payload()
+    payload["shadow_teacher_raw_residual_commands"] = np.zeros((3, 3))
+    payload["shadow_teacher_normalized_residual_actions"] = np.zeros((3, 3))
+    payload["shadow_teacher_high_level_commands"] = np.ones((3, 3))
+    with pytest.raises(ValueError, match="command reconstruction"):
+        save_shadow_teacher_trace(tmp_path / "bad.npz", 4, payload)
+
+
+def test_shadow_teacher_trace_uses_runtime_policy_action_scales(tmp_path) -> None:
+    payload = _policy_trace_payload()
+    payload["observations"][:, OBSERVATION_INDEX["feedforward_vx_m_s"]] = 0.1
+    payload["observations"][:, OBSERVATION_INDEX["feedforward_wz_rad_s"]] = -0.2
+    payload["observations"][:, OBSERVATION_INDEX["riser_position_m"]] = 0.8
+    normalized = np.tile([0.2, -0.1, 0.3], (3, 1))
+    scales = np.array([0.35, 0.4, 0.1])
+    payload["shadow_teacher_normalized_residual_actions"] = normalized
+    payload["shadow_teacher_raw_residual_commands"] = normalized * scales
+    payload["shadow_teacher_high_level_commands"] = np.column_stack(
+        (
+            np.full(3, 0.1) + normalized[:, 0] * scales[0],
+            np.full(3, -0.2) + normalized[:, 1] * scales[1],
+            np.full(3, 0.8) + normalized[:, 2] * scales[2],
+        )
+    )
+    path = tmp_path / "scaled.npz"
+    save_shadow_teacher_trace(path, 4, payload, action_scales=scales)
+    metadata, _ = load_shadow_teacher_trace(path)
+    assert metadata["action_scales"] == [0.35, 0.4, 0.1]
 
 
 def test_residual_action_reconstructs_bounded_teacher_command() -> None:

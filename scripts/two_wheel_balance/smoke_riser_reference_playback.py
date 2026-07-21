@@ -148,6 +148,14 @@ parser.add_argument(
     ),
 )
 parser.add_argument(
+    "--shadow-teacher-trace-dir",
+    type=Path,
+    help=(
+        "Record deterministic teacher commands on policy-visited states without "
+        "applying or admitting them for training."
+    ),
+)
+parser.add_argument(
     "--residual-policy",
     type=Path,
     help="Optional gated TorchScript high-level residual policy.",
@@ -298,6 +306,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     save_case_dataset,
     save_policy_trace,
     save_raw_teacher_case,
+    save_shadow_teacher_trace,
 )
 from rl_platform.tasks.two_wheel_balance.riser_recovery_evidence import (
     LONGITUDINAL_AUTHORITY_TELEMETRY_SCHEMA,
@@ -476,6 +485,7 @@ def evaluate_case(
     dataset_dir: Path | None,
     raw_teacher_dir: Path | None,
     policy_trace_dir: Path | None,
+    shadow_teacher_trace_dir: Path | None,
     residual_policy,
     residual_policy_device: torch.device,
     zero_policy_action: bool,
@@ -622,6 +632,9 @@ def evaluate_case(
     policy_trace_pitch = []
     policy_trace_riser_positions = []
     policy_trace_proxy_positions = []
+    shadow_teacher_raw_commands = []
+    shadow_teacher_normalized_actions = []
+    shadow_teacher_high_level_commands = []
     previous_residual_action = np.zeros(3, dtype=np.float32)
     completed_steps = 0
     body_masses = robot.data.default_mass[0].to(unwrapped.device)
@@ -915,6 +928,12 @@ def evaluate_case(
             target_riser_position_m=sample.riser_q,
         )
         normalized_residual_label = normalize_residual_command(raw_residual_command)
+        shadow_teacher_normalized_action = (
+            raw_residual_command / args.residual_action_scales
+        )
+        shadow_teacher_high_level_command = np.array(
+            [vx_ref, wz_ref, sample.riser_q], dtype=np.float64
+        )
         raw_residual_commands.append(raw_residual_command.copy())
         normalized_residual_labels.append(normalized_residual_label.copy())
         if dataset_dir is not None:
@@ -1287,7 +1306,7 @@ def evaluate_case(
         proxy_velocity_samples_deg_s.append(actual_proxy_velocity_deg_s)
         proxy_target_velocity_samples_deg_s.append(target_proxy_velocity_deg_s)
         pitch_samples_deg.append(pitch_deg)
-        if policy_trace_dir is not None:
+        if policy_trace_dir is not None or shadow_teacher_trace_dir is not None:
             policy_trace_observations.append(executed_observation.copy())
             policy_trace_actions.append(applied_residual_action.copy())
             policy_trace_commands.append(
@@ -1303,6 +1322,14 @@ def evaluate_case(
             policy_trace_pitch.append(pitch_deg)
             policy_trace_riser_positions.append(actual_riser)
             policy_trace_proxy_positions.append(actual_proxy.copy())
+        if shadow_teacher_trace_dir is not None:
+            shadow_teacher_raw_commands.append(raw_residual_command.copy())
+            shadow_teacher_normalized_actions.append(
+                shadow_teacher_normalized_action.copy()
+            )
+            shadow_teacher_high_level_commands.append(
+                shadow_teacher_high_level_command.copy()
+            )
         if target_marker is not None:
             target_marker.visualize(sample.target_position_world_m[None, :])
 
@@ -1746,6 +1773,69 @@ def evaluate_case(
                 ),
             },
         )
+    shadow_teacher_trace_path = None
+    if shadow_teacher_trace_dir is not None:
+        shadow_teacher_trace_path = (
+            shadow_teacher_trace_dir
+            / f"case_{plan.case:04d}_shadow_teacher_trace_v1.npz"
+        )
+        count = len(policy_trace_observations)
+        save_shadow_teacher_trace(
+            shadow_teacher_trace_path,
+            plan.case,
+            {
+                "observations": np.asarray(
+                    policy_trace_observations, dtype=np.float32
+                ),
+                "applied_residual_actions": np.asarray(
+                    policy_trace_actions, dtype=np.float32
+                ),
+                "final_high_level_commands": np.asarray(
+                    policy_trace_commands, dtype=np.float32
+                ),
+                "baseline_wheel_actions": np.asarray(
+                    policy_trace_wheel_actions, dtype=np.float32
+                ),
+                "case_ids": np.full(count, plan.case, dtype=np.int16),
+                "elapsed_time_s": np.asarray(
+                    policy_trace_elapsed_time, dtype=np.float64
+                ),
+                "phase_time_s": np.asarray(
+                    policy_trace_phase_time, dtype=np.float64
+                ),
+                "post_step_position_error_m": np.asarray(
+                    policy_trace_position_errors, dtype=np.float32
+                ),
+                "post_step_attitude_error_deg": np.asarray(
+                    policy_trace_attitude_errors, dtype=np.float32
+                ),
+                "post_step_base_xy_yaw": np.asarray(
+                    policy_trace_base_states, dtype=np.float32
+                ),
+                "post_step_camera_position_world_m": np.asarray(
+                    policy_trace_camera_positions, dtype=np.float32
+                ),
+                "post_step_pitch_deg": np.asarray(
+                    policy_trace_pitch, dtype=np.float32
+                ),
+                "post_step_riser_position_m": np.asarray(
+                    policy_trace_riser_positions, dtype=np.float32
+                ),
+                "post_step_proxy_position_rad": np.asarray(
+                    policy_trace_proxy_positions, dtype=np.float32
+                ),
+                "shadow_teacher_raw_residual_commands": np.asarray(
+                    shadow_teacher_raw_commands, dtype=np.float32
+                ),
+                "shadow_teacher_normalized_residual_actions": np.asarray(
+                    shadow_teacher_normalized_actions, dtype=np.float32
+                ),
+                "shadow_teacher_high_level_commands": np.asarray(
+                    shadow_teacher_high_level_commands, dtype=np.float32
+                ),
+            },
+            action_scales=args.residual_action_scales,
+        )
     progress_hold_summary = summarize_progress_hold(
         np.asarray(progress_samples, dtype=np.float64)
     )
@@ -1963,6 +2053,11 @@ def evaluate_case(
             if policy_trace_path is None
             else str(policy_trace_path.resolve())
         ),
+        "executed_shadow_teacher_trace": (
+            None
+            if shadow_teacher_trace_path is None
+            else str(shadow_teacher_trace_path.resolve())
+        ),
         "passed": case_admission_passed,
     }
 
@@ -1992,6 +2087,17 @@ def main() -> int:
         raise ValueError(
             "policy trace, raw teacher capture, and normalized dataset collection "
             "are mutually exclusive"
+        )
+    if args.shadow_teacher_trace_dir is not None and (
+        args.dataset_dir is not None
+        or args.raw_teacher_dir is not None
+        or args.policy_trace_dir is not None
+        or args.residual_policy is None
+        or args.zero_policy_action
+    ):
+        raise ValueError(
+            "shadow teacher trace requires a learned policy and is exclusive with "
+            "dataset, raw teacher, policy trace, and zero-action modes"
         )
     if args.residual_policy is not None and args.zero_policy_action:
         raise ValueError("learned and zero-action policy modes are exclusive")
@@ -2114,6 +2220,7 @@ def main() -> int:
             args.dataset_dir,
             args.raw_teacher_dir,
             args.policy_trace_dir,
+            args.shadow_teacher_trace_dir,
             residual_policy,
             residual_policy_device,
             args.zero_policy_action,
@@ -2258,6 +2365,11 @@ def main() -> int:
         "normalized_dataset_capture_started": args.dataset_dir is not None,
         "policy_trace_started": args.policy_trace_dir is not None,
         "policy_trace_valid_for_training": False,
+        "shadow_teacher_trace_started": (
+            args.shadow_teacher_trace_dir is not None
+        ),
+        "shadow_teacher_labels_applied": False,
+        "shadow_teacher_labels_admitted_for_training": False,
         "dagger_authorized": False,
         "cases": cases,
         "passed_case_count": sum(item["passed"] for item in results),
@@ -2318,6 +2430,11 @@ def write_runtime_failure(exc: Exception) -> None:
         "normalized_dataset_capture_started": args.dataset_dir is not None,
         "policy_trace_started": args.policy_trace_dir is not None,
         "policy_trace_valid_for_training": False,
+        "shadow_teacher_trace_started": (
+            args.shadow_teacher_trace_dir is not None
+        ),
+        "shadow_teacher_labels_applied": False,
+        "shadow_teacher_labels_admitted_for_training": False,
         "dagger_authorized": False,
         "tracking_profile": tracking_profile_name(),
         "controller_vx_kp": (
@@ -2412,6 +2529,7 @@ def write_runtime_failure(exc: Exception) -> None:
                 "executed_residual_dataset": None,
                 "executed_raw_teacher_capture": None,
                 "executed_policy_trace": None,
+                "executed_shadow_teacher_trace": None,
             }
         ],
         "passed": False,

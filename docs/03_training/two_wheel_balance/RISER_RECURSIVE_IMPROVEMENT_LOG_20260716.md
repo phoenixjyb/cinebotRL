@@ -5020,3 +5020,54 @@ and must state whether its candidate was accepted or rejected.
 - Do not launch Isaac, open case 78/holdout, change the split, write a DAgger
   dataset, retrain BC, start PPO, begin obstacle work, or run a broader campaign
   during the coverage audit.
+
+## Round 135: the measured perturbation fails hotspot coverage; split fallback is proposed
+
+- Commits `b91b4a8` and `891a4c6` add and publish a CPU-only coverage audit
+  using the same masked-policy normalization and directed state/action-distance
+  formula as Round 129. Focused `.98` coverage/ranking tests pass `6/6`.
+- The audit compares `2,048` canonical v2 policy-visited case-30 rows against
+  nominal teacher case 30 and the frozen `4,682`-row case-4 material-shift
+  hotspot. The nominal and perturbed scores are `0.941425` and `0.938781`, so
+  the perturbed/nominal ratio is `0.997191`: only `0.280868%` improvement versus
+  the frozen `10%` material threshold. The perturbed/reference ratio is
+  `3.653404`, above the existing `1.50` calibration limit.
+- Therefore both `state_coverage_materially_improved` and
+  `reference_calibrated_coverage_passed` are false. The comparison explicitly
+  uses phase-aligned original case-30 teacher actions, not shadow labels, and
+  states that a nominal-teacher comparison cannot prove causal attribution to
+  the pulse. Coverage-report SHA-256 is
+  `86fab43a35b8c4ca5676be851aedb730923801faa20eaa4cc870c5c02819e9f1`.
+- Combined with Round 134's no-material-label result, this rejects the measured
+  `+20 N` pulse as a DAgger coverage source. It does not prove every possible
+  perturbation is useless, but it provides no basis to escalate force blindly;
+  no stronger pulse is authorized.
+- Commit `370d3b8` adds a non-applying transparent split-reset proposal; focused
+  `.98` proposal/coverage tests pass `4/4`. All proposal input checks pass. It
+  keeps the current split frozen while proposing, only after all future gates,
+  case 4 moving permanently from validation to training and case 78 replacing
+  it in validation. Holdout `[3,5,13,19,24]` is unchanged.
+- Case 78 is exact-source/transition/kinematic clean with `6,870` source and
+  execution states, source/execution clocks `135.487646/192.299567 s`, path
+  length `62.453112 m`, and kinematic position p95/max
+  `0.106876/0.239139 m`. It has no dynamic qualification and remains
+  `valid_for_training=false`; the split is not applied. Proposal SHA-256 is
+  `975bfa46cede07daa70ae36f81c354ea707898a38addf2fe54ec73a75aaf8072`.
+- No Isaac launch, runtime token, split mutation, case-4 label admission,
+  case-78 validation admission, holdout access, dataset, DAgger, BC, PPO, or
+  obstacle work occurred in this round.
+
+## Next round after Round 135
+
+- Build only the CPU-side case-78 deterministic dynamic-qualification contract.
+  Pin the exact plan, controller/gains/USD/playback identities, unchanged
+  dynamic/thermal/controller gates, no-policy/no-capture mode, and one-case
+  stop. Benchmark and justify a wall timeout for the `192.299567 s` execution
+  plan instead of reusing the short case-30 timeout blindly.
+- The CPU contract must issue no runtime token and must not create a namespace.
+  A later separately reviewed exclusive canary may dynamically qualify case 78;
+  only a full pass can permit a new immutable split manifest. A failure leaves
+  the current split unchanged and requires a new fallback decision.
+- Keep case 4 in validation, case 78 unused, holdout closed, and dataset
+  creation, DAgger, BC, PPO, obstacles, and broad rollout disabled until that
+  sequence is satisfied.

@@ -7,9 +7,13 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 import torch
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.two_wheel_balance.rank_riser_dagger_localized_training_cases import (
     MATERIAL_SHIFT_P95,

@@ -22,7 +22,7 @@ except ImportError:
 
 SCHEMA = "cinebotrl_two_wheel_riser_case30_runtime_authorization_v1"
 REVIEWED_CPU_COMMIT = "8c4a5a662a98088edf053697e27596c2e9ac7803"
-RUNTIME_IMPLEMENTATION_COMMIT = "125955bdebc6f55f50fd650089dbebe682c3b0fb"
+RUNTIME_IMPLEMENTATION_COMMIT = "2589c93a97f38a2d0a758cdbd42a7674b87fce7f"
 NAMESPACE = "20260721_case30_perturbation_measurement_v2_exclusive"
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/case30_perturbation_runtime_authorization_v1.json"

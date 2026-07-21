@@ -4678,3 +4678,47 @@ and must state whether its candidate was accepted or rejected.
 - Keep cases 30/31, holdout, dataset creation, BC retraining, PPO, obstacles,
   and broad learned rollout closed until that localized audit identifies and
   justifies one new bounded training-split measurement.
+
+## Round 128: localized coverage audit finds no justified training-case canary
+
+- Commit `84efc1a` adds a reproducible CPU-only localized ranker with synthetic
+  positive and fail-closed coverage tests. The focused `.98` suite passes
+  `50/50`; no Isaac/GPU process, token, runtime namespace, dataset, or training
+  process was created.
+- The audit first isolates case-4 rows where absolute shadow-minus-original
+  phase labels exceed `[0.05,0.05,0.02]` for `[vx,wz,riser]`. This identifies
+  4,682 of 6,316 rows (`74.1292%`), with per-channel counts
+  `[4128,1860,29]`. It then compares 256 deterministic samples from this
+  region with at most 2,048 samples per training case using a directed nearest
+  distance over masked-policy-normalized state (`0.75` weight) and normalized
+  phase-teacher action (`0.25` weight). Previous-action channels remain
+  excluded.
+- Case 4's own offline teacher trajectory is the calibration reference, with
+  score `0.256960`. The nearest training cases are 18, 30, 31, 41, and 14.
+  Their top three scores are `0.936081/0.941425/0.946083`, corresponding to
+  reference ratios `3.642897/3.663695/3.681822`. Case 21 ranks ninth at
+  `4.862837x`, consistent with its negative live shadow-label result.
+- The fixed admission gate requires a candidate score no more than `1.5x` the
+  case-4 calibration. No training case passes, so
+  `coverage_admission_passed=false`, `proposed_runtime_cases=[]`, and the
+  classification is `no_training_case_covers_case4_shadow_shift_region`.
+  Report SHA-256 is
+  `1d4cac1cc1d7eb1f52f56b3f5188df836ccb62527a72e2a8345d30ba75d650bf`.
+- This supersedes the whole-trajectory ranking as a runtime-admission method.
+  It does not invalidate case 21's clean physical pass, but it proves that
+  opening cases 18/30/31 solely because they are nearest would still be blind
+  exploration. No case is authorized and all learning gates remain closed.
+
+## Next round after Round 128
+
+- Build a CPU-only coverage-expansion audit over exact-source trajectories not
+  present in the current 30-case training split. Use immutable source/plan
+  identities and case-4 hotspot target-command features to determine whether a
+  geometrically distinct accepted trajectory can cover the missing region.
+- If no unused accepted source passes the same calibrated coverage principle,
+  prepare a separate proposal for either a newly designed training trajectory
+  or a transparent split reset. Do not silently move case 4 into training or
+  reuse its validation labels.
+- Keep GPU runtime, DAgger capture, BC retraining, PPO, holdout, obstacles, and
+  broad rollout closed until a coverage-expansion proposal is independently
+  reviewable and selects exactly one bounded next measurement.

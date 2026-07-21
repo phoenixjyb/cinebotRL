@@ -69,6 +69,29 @@ def test_initial_teacher40_bc_is_separately_admitted_and_holdout_closed() -> Non
     assert 'report.get("ppo_started") is False' in source
 
 
+def test_initial_bc_case4_render_canary_is_validation_only_and_scale_bound() -> None:
+    source = _read("run_riser_initial_bc_case4_rendered_canary.sh")
+    assert "CASE=4" in source
+    assert 'PROFILE="riser_recovery_direction_v4_camera_lever_arm_v1"' in source
+    assert 'POLICY_SHA256="6d86812d' in source
+    assert 'PLAYBACK_SHA256="83eb26eb' in source
+    assert 'SCALE_BINDING_COMMIT="0ca3e2d' in source
+    assert "RISER_CASE4_RENDER_AUTHORIZATION_FILE" in source
+    assert '"case_is_validation"' in source
+    assert '"holdout_untouched"' in source
+    assert '"frozen_scales"' in source
+    assert "--residual-action-scales 0.35,0.40,0.10" in source
+    assert 'run_rollout zero "--zero-policy-action"' in source
+    assert "--residual-policy $POLICY_WIN" in source
+    assert "--mode validation_canary" in source
+    assert "--maximum-regression-fraction 0.05" in source
+    assert "--minimum-zero-improvement-fraction 0.05" in source
+    assert "case_0004_bc_residual_50fps.mp4" in source
+    assert "case_0004_baseline_vs_bc_residual_50fps.mp4" in source
+    assert '"holdout_opened": False' in source
+    assert '"ppo_authorized": False' in source
+
+
 def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
     source = _read("run_riser_all79_dataset_gate.sh")
     assert "20260717_residual_all79_exact_source_lookahead_v2" in source

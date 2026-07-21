@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly NAMESPACE="20260721_case30_perturbation_measurement_v1_exclusive"
+readonly NAMESPACE="20260721_case30_perturbation_measurement_v2_exclusive"
 readonly CONTRACT_RELATIVE="scripts/two_wheel_balance/case30_perturbation_measurement_contract_v1.json"
 
 reject() {

@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 
-NAMESPACE = "20260721_case30_perturbation_measurement_v1_exclusive"
+NAMESPACE = "20260721_case30_perturbation_measurement_v2_exclusive"
 EXPECTED_ACTION_SCALES = [0.35, 0.4, 0.1]
 EXPECTED_PERTURBATION_PROFILE = {
     "schema": "cinebotrl_two_wheel_riser_deterministic_wrench_pulse_v1",

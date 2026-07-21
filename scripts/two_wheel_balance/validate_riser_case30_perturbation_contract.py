@@ -12,7 +12,7 @@ import subprocess
 
 SCHEMA = "cinebotrl_two_wheel_riser_case30_perturbation_contract_v1"
 REVIEWED_PARENT = "6a8e7a091dc128727bd5e6cded5154eb48c8874c"
-NAMESPACE = "20260721_case30_perturbation_measurement_v1_exclusive"
+NAMESPACE = "20260721_case30_perturbation_measurement_v2_exclusive"
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/case30_perturbation_measurement_contract_v1.json"
 )

@@ -16,3 +16,8 @@ def test_runtime_wrapper_is_one_case_measurement_only() -> None:
     assert source.index('rm -f "$AUTHORIZATION_FILE"') < source.index("$PLAYBACK")
     assert "summarize_riser_case30_perturbation_canary.py" in source
     assert "case_0030.json" in source
+    assert (
+        'OUTPUT_WIN="${WIN_ROOT}\\\\artifacts\\\\two_wheel_riser'
+        '\\\\${NAMESPACE}"'
+    ) in source
+    assert r"\$NAMESPACE" not in source

@@ -18,7 +18,7 @@ def test_summary_keeps_three_outcomes_independent(tmp_path: Path) -> None:
         "runtime_commit": runtime_commit,
         "case": 30,
         "split": "train",
-        "namespace": "20260721_case30_perturbation_measurement_v1_exclusive",
+        "namespace": "20260721_case30_perturbation_measurement_v2_exclusive",
         "dataset_creation_authorized": False,
         "dagger_authorized": False,
         "bc_authorized": False,

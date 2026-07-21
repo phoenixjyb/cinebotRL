@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly NAMESPACE="20260721_case30_perturbation_measurement_v1_exclusive"
+readonly NAMESPACE="20260721_case30_perturbation_measurement_v2_exclusive"
 readonly ROOT="/mnt/g/wSpace/cinebotRL-two-wheel-riser"
 readonly WIN_ROOT="G:\wSpace\cinebotRL-two-wheel-riser"
 readonly PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
@@ -16,7 +16,7 @@ readonly DATASET="$WIN_ROOT\artifacts\two_wheel_riser\20260721_initial_teacher41
 readonly PROFILE="$WIN_ROOT\artifacts\two_wheel_riser\20260721_case30_perturbation_proposal_v1_cpu\case30_wrench_profile.json"
 readonly GAINS="$WIN_ROOT\docs\03_training\two_wheel_balance\evidence_20260714_28kg\lqr_gains.json"
 readonly OUTPUT="$ROOT/artifacts/two_wheel_riser/$NAMESPACE"
-readonly OUTPUT_WIN="$WIN_ROOT\artifacts\two_wheel_riser\$NAMESPACE"
+readonly OUTPUT_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${NAMESPACE}"
 readonly NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
 readonly POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 

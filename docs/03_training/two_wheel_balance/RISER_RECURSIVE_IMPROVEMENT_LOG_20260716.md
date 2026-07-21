@@ -5342,3 +5342,39 @@ and must state whether its candidate was accepted or rejected.
 - Do not relax the p95 gate, widen the residual label scale, increase the camera
   correction cap, alter source geometry, open holdout, capture data, retrain BC,
   start PPO, or begin obstacle work during the CPU contract round.
+
+## Round 142: bounded camera-recovery candidate is CPU-admitted
+
+- Commits `aada1f2` and `8d3bec9` add and seal the CPU-only recovery validator,
+  non-executing preflight, negative/semantic tests, and canonical contract. The
+  checked-in contract changes exactly the existing recovery-governor argument
+  family and pins the prior v2 gate/final evidence plus the CPU trace audit.
+- The candidate enables camera-error recovery with the existing implementation
+  defaults `start=0.13 m`, `full=0.155 m`, and minimum phase scale `0.20`.
+  Case-78 source plan, LQR, `wz_kp=1.05`, duration scale `3.0`, camera
+  lever-arm gain/cap `1.0/0.05 m`, all physical thresholds, heartbeat cadence
+  `2,000`, and wall limit `5,400 s` remain unchanged.
+- The complete authoritative `.98` suite passes `580` tests with four
+  intentional platform skips in `60.37 s`. Live preflight at clean pushed
+  commit `8d3bec9ca02f1079d9d925c39759b92d0a2a6738` passes all 12 identity,
+  semantic, lineage, fresh-namespace, learning-closure, and ownership checks.
+- Contract SHA-256 is
+  `efa707d6bda6cc1428060ff8dac599593b85deb4c3b5d0e1225fa2d8284088ad`;
+  Git blob is `8ca63149fdd0fedc63112f8494e9fe59873f5559`. Explicit
+  `--execute` exits `7` with `runtime_authorization_not_issued`, and namespace
+  `20260722_case78_camera_recovery_v1_exclusive` remains absent.
+- No runtime token, second Isaac launch, split change, label admission, holdout
+  access, dataset, BC, PPO, or obstacle work occurred in this round.
+
+## Next round after Round 142
+
+- Perform a separate go/no-go review of the recovery CPU contract. A GO may add
+  a one-use runtime wrapper/authorization/finalizer pinned to the current blobs
+  and must pass the exact recovery arguments while preserving heartbeat and all
+  v2 no-data/timeout/GPU-release evidence contracts.
+- If authorized, run exactly one fresh-namespace case-78 recovery canary and
+  stop. It must beat the original `0.15 m` p95 gate without regressing any
+  original physical threshold. A physical pass still requires a later immutable
+  split-manifest change; a failure keeps case 4 in validation and case 78 unused.
+- Do not relax thresholds or label scales, change plan/LQR/correction cap, open
+  holdout, create data, retrain BC, start PPO, or begin obstacle work.

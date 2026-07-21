@@ -146,6 +146,23 @@ def test_attenuated_previous_action_bc_runner_is_reject_bound_and_guarded() -> N
     assert "rev-parse '@{upstream}'" in source
 
 
+def test_channel_selective_previous_action_bc_runner_is_channel_evidence_bound() -> None:
+    source = _read("run_riser_channel_selective_previous_action_bc.sh")
+    assert "20260721_initial_teacher40_bc_previous_action_gains010_000_010_v1" in source
+    assert 'SCALAR_FINAL_SHA256="628380b9' in source
+    assert 'SCALAR_COMPARISON_SHA256="f2dfbfb6' in source
+    assert '"longitudinal_improved"' in source
+    assert '"yaw_degraded"' in source
+    assert '"riser_improved"' in source
+    assert "--previous-action-observation-gains 0.10,0.00,0.10" in source
+    assert "case4_previous_action_comparison.json" in source
+    assert '"learned_rollout_authorized": passed' in source
+    assert '"holdout_opened": False' in source
+    assert '"ppo_authorized": False' in source
+    assert "smoke_riser_reference_playback.py" not in source
+    assert "Get-CimInstance Win32_Process" in source
+
+
 def test_masked_bc_case4_canary_is_single_validation_case_and_guarded() -> None:
     source = _read("run_riser_masked_bc_case4_canary.sh")
     assert "CASE=4" in source

@@ -23,6 +23,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from rl_platform.tasks.two_wheel_balance.runtime_heartbeat import (
+    write_runtime_heartbeat,
+)
 from rl_platform.tasks.two_wheel_balance.riser_perturbation import (
     DeterministicWrenchPulse,
     DeterministicWrenchPulseRuntime,
@@ -197,9 +200,24 @@ parser.add_argument(
 # Video frame stride changes rendering only; physics and control remain at 200 Hz.
 parser.add_argument("--video-frame-stride", type=int, default=1)
 parser.add_argument("--video-fps", type=int, default=200)
+parser.add_argument(
+    "--runtime-heartbeat",
+    type=Path,
+    help=(
+        "Atomically overwrite a non-training progress snapshot so an external "
+        "timeout preserves the last completed policy-step evidence."
+    ),
+)
+parser.add_argument(
+    "--runtime-heartbeat-interval-steps",
+    type=int,
+    default=2000,
+)
 parser.add_argument("--output", type=Path, required=True)
 AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
+if args.runtime_heartbeat_interval_steps <= 0:
+    parser.error("--runtime-heartbeat-interval-steps must be positive")
 deterministic_wrench_profile = None
 deterministic_wrench_profile_identity = None
 if args.deterministic_wrench_profile is not None:
@@ -552,6 +570,8 @@ def evaluate_case(
     residual_policy_device: torch.device,
     zero_policy_action: bool,
     wrench_profile: DeterministicWrenchPulse | None,
+    runtime_heartbeat: Path | None,
+    runtime_heartbeat_interval_steps: int,
 ) -> dict[str, object]:
     _, proxy_ids, riser_id = initialize_case(env, plan)
     unwrapped = env.unwrapped
@@ -705,6 +725,34 @@ def evaluate_case(
     shadow_teacher_high_level_commands = []
     previous_residual_action = np.zeros(3, dtype=np.float32)
     completed_steps = 0
+    if runtime_heartbeat is not None:
+        write_runtime_heartbeat(
+            runtime_heartbeat,
+            {
+                "case": plan.case,
+                "stage": "execution_pending",
+                "completed_steps": 0,
+                "maximum_steps": maximum_steps,
+                "policy_hz": POLICY_HZ,
+                "elapsed_s": 0.0,
+                "phase_time_s": 0.0,
+                "source_duration_s": source_duration_s,
+                "execution_duration_s": execution_duration_s,
+                "maximum_simulated_horizon_s": (
+                    execution_duration_s * args.maximum_duration_scale
+                ),
+                "gate_result_written": False,
+                "capture_outputs_enabled": any(
+                    path is not None
+                    for path in (
+                        dataset_dir,
+                        raw_teacher_dir,
+                        policy_trace_dir,
+                        shadow_teacher_trace_dir,
+                    )
+                ),
+            },
+        )
     body_masses = robot.data.default_mass[0].to(unwrapped.device)
     kinematics = UrdfRiserCameraKinematics(
         PROJECT_ROOT
@@ -1564,6 +1612,75 @@ def evaluate_case(
                 }
             )
         completed_steps = step + 1
+        if runtime_heartbeat is not None and (
+            completed_steps == 1
+            or completed_steps % runtime_heartbeat_interval_steps == 0
+            or bool((terminated | truncated)[0].item())
+            or phase_time_s >= execution_duration_s
+        ):
+            write_runtime_heartbeat(
+                runtime_heartbeat,
+                {
+                    "case": plan.case,
+                    "stage": "execution",
+                    "completed_steps": completed_steps,
+                    "maximum_steps": maximum_steps,
+                    "policy_hz": POLICY_HZ,
+                    "elapsed_s": elapsed_s,
+                    "phase_time_s": phase_time_s,
+                    "source_duration_s": source_duration_s,
+                    "execution_duration_s": execution_duration_s,
+                    "maximum_simulated_horizon_s": (
+                        execution_duration_s * args.maximum_duration_scale
+                    ),
+                    "progress_scale": progress_scale,
+                    "tracking_state": {
+                        "position_error_m": position_error,
+                        "attitude_error_deg": attitude_error_deg,
+                        "base_xy_error_m": base_xy_error,
+                        "commanded_base_xy_error_m": commanded_base_xy_error,
+                        "base_yaw_error_deg": math.degrees(base_yaw_error),
+                        "riser_error_m": riser_error,
+                        "proxy_error_max_deg": float(np.max(proxy_error_deg)),
+                    },
+                    "safety_state": {
+                        "pitch_deg": pitch_deg,
+                        "peak_position_error_m": float(np.max(position_errors)),
+                        "peak_attitude_error_deg": float(
+                            np.max(attitude_errors_deg)
+                        ),
+                        "peak_pitch_deg": float(np.max(np.abs(pitch_samples_deg))),
+                        "action_saturation_ratio": (
+                            saturated_actions / action_count
+                            if action_count
+                            else 0.0
+                        ),
+                        "riser_saturation_ratio": (
+                            saturated_riser / riser_effort_count
+                            if riser_effort_count
+                            else 0.0
+                        ),
+                        "proxy_saturation_ratio": (
+                            saturated_proxy / proxy_effort_count
+                            if proxy_effort_count
+                            else 0.0
+                        ),
+                        "termination_pending": bool(
+                            (terminated | truncated)[0].item()
+                        ),
+                    },
+                    "gate_result_written": False,
+                    "capture_outputs_enabled": any(
+                        path is not None
+                        for path in (
+                            dataset_dir,
+                            raw_teacher_dir,
+                            policy_trace_dir,
+                            shadow_teacher_trace_dir,
+                        )
+                    ),
+                },
+            )
         if bool((terminated | truncated)[0].item()):
             termination = {
                 "step": completed_steps,
@@ -2337,6 +2454,8 @@ def main() -> int:
             residual_policy_device,
             args.zero_policy_action,
             deterministic_wrench_profile,
+            args.runtime_heartbeat,
+            args.runtime_heartbeat_interval_steps,
         )
         for case in cases
     ]
@@ -2483,6 +2602,14 @@ def main() -> int:
         ),
         "shadow_teacher_labels_applied": False,
         "shadow_teacher_labels_admitted_for_training": False,
+        "runtime_heartbeat": (
+            None
+            if args.runtime_heartbeat is None
+            else str(args.runtime_heartbeat.resolve())
+        ),
+        "runtime_heartbeat_interval_steps": (
+            args.runtime_heartbeat_interval_steps
+        ),
         "dagger_authorized": False,
         "deterministic_wrench_perturbation_enabled": (
             deterministic_wrench_profile is not None

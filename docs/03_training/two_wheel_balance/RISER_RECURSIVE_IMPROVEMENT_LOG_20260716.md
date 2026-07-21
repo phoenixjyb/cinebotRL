@@ -4955,3 +4955,68 @@ and must state whether its candidate was accepted or rejected.
   state coverage and shadow-label materiality against the case-4 hotspot.
 - Do not change case 4/78 splits, open holdout, create a DAgger dataset, retrain
   BC, start PPO, begin obstacle work, or run a broader campaign.
+
+## Round 134: case-30 perturbation is dynamically clean but does not support DAgger
+
+- Commits `125955b`, `8b66a4d`, `7445d3d`, and `222a834` added the
+  one-use runtime admission, exact committed-blob checks, independent final
+  summarizer, and negative authorization tests. The first v1 playback completed
+  physically, but a wrapper quoting bug routed Windows outputs to the literal
+  sibling `artifacts/two_wheel_riser$NAMESPACE`. Its playback exit was zero,
+  but diagnosis was not run and final admission failed. Both locations are
+  preserved as quarantined path-contract evidence; nothing was moved or
+  relabeled.
+- Commits `2589c93`, `21bb639`, `d887d76`, and `cb52535` repaired only the
+  Windows namespace construction, advanced to a fresh v2 namespace, and
+  resealed both CPU and runtime contracts. The regression test forbids an
+  escaped literal namespace. Diff audit confirms no planner, plan, policy,
+  controller, perturbation profile, physics, threshold, or dataset code changed.
+- The complete authoritative `.98` suite passes `546` tests with two
+  intentional platform skips in `62.21 s`. WSL preflight at clean pushed commit
+  `cb525353b02c8476f61704e70e4b2da25ebd02aa` passes every CPU/runtime identity,
+  lineage, fresh-namespace, training-closure, and ownership check. The token was
+  mode `0600` and was removed before Isaac started.
+- The canonical v2 canary passes. It completes source/execution clocks
+  `18.144412/29.2224881939 s` in `11,494` policy steps. Position p95/max is
+  `0.141947/0.170459 m`; attitude p95/max is `0.154563/0.225145 deg`; pitch max
+  is `7.030357 deg`; riser p95/max is `0.011899/0.014258 m`; all action, riser,
+  and proxy saturation ratios are zero. Dynamic, thermal, controller-evidence,
+  and residual-label-envelope gates all pass with no termination.
+- Perturbation telemetry proves exactly one body-forward `20 N` pulse for
+  `20` policy steps, triggered at phase `15.6668266485 s`, then released. The
+  planner and policy commands were not modified by the pulse contract and no
+  dataset was created. Raw residual maxima are
+  `[0.240709,0.163077,0.017046]`; normalized maxima are
+  `[0.802364,0.407692,0.170461]`, inside the frozen envelope.
+- The independent `11,494`-row shadow diagnosis finds no material p95 shift in
+  `vx`, `wz`, or riser. Shadow-minus-original p95 is
+  `[0.014944,0.016629,0.001968]`; policy-to-shadow RMSE is `0.006761` versus
+  policy-to-phase RMSE `0.008191`, ratio `0.825441`. Therefore
+  `dagger_dataset_proposal_supported=false`. This is a successful measurement,
+  not evidence to admit labels or retrain.
+- Canonical evidence SHA-256 values are admission
+  `b01478172476c6e0b598a2102e721ba745e6ecb2293fe5f0f37d416f74e15382`, gate
+  `5aa269f310399328654c2d37cb235e2b6196cc7edf46785dac8b3c57b3d272cf`, trace
+  `24818981a5d6e43c7e32f77dcb54539f5330f962b85c9c0f3f5147607a91ea53`,
+  diagnosis `6eb3b948297a048d53d11b8ec10b7b5a5772436ad568058bdaa8762bdc59d96e`,
+  and final status
+  `fc08b890ec0dfee0a1f0d05505afd806f68c54ad564afc99fe5e73533e3ebfb6`.
+  WSL and NVIDIA ownership are empty after closure. Dataset creation, split
+  change, holdout access, DAgger, BC, PPO, obstacles, and broad rollout remain
+  closed.
+
+## Next round after Round 134
+
+- Perform one CPU-only visited-state coverage audit. Compare the canonical v2
+  case-30 trace with the frozen case-4 material-shift hotspot under the same
+  masked-policy observation normalization and directed state/action-distance
+  contract used in Round 129. Report perturbed versus nominal case-30 scores,
+  exact improvement ratio, and the existing `1.50x` reference calibration.
+- Keep physical success and label materiality independent. If state coverage
+  did not materially improve, reject this `+20 N` profile as a coverage source;
+  do not create a dataset or infer that a stronger pulse is automatically safe.
+  A later CPU proposal must choose between one separately validated bounded
+  profile change and the transparent split-reset fallback.
+- Do not launch Isaac, open case 78/holdout, change the split, write a DAgger
+  dataset, retrain BC, start PPO, begin obstacle work, or run a broader campaign
+  during the coverage audit.

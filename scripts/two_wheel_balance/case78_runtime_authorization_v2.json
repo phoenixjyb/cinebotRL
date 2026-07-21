@@ -1,0 +1,45 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case78_runtime_authorization_v2",
+  "case": 78,
+  "current_split": "unused",
+  "reviewed_cpu_commit": "8e5a6c5b5a1edd9ba88fff867e762597a9bc9843",
+  "runtime_implementation_commit": "18d1cc6efd0b07a98554d9f5b410ebddbda278ee",
+  "namespace": "20260721_case78_dynamic_qualification_v2_heartbeat_exclusive",
+  "runtime_authorization_token_sha256": "0d94b1d43408f1acec297977362e6c7fda6c21853bfa34722c54382df77ef545",
+  "identities": {
+    "cpu_contract": {
+      "path": "scripts/two_wheel_balance/case78_dynamic_cpu_contract_v2.json",
+      "sha256": "f4244f83a9b31ca0f1c403fe4e2467ce4379eaf82e6b404cc16a523ec7c1a5c7",
+      "git_blob_sha1": "d9e93ead11810d7c2528b9ade69cbcf3b341afdc"
+    },
+    "runtime_wrapper": {
+      "path": "scripts/two_wheel_balance/run_riser_case78_dynamic_canary_v2.sh",
+      "sha256": "8f86dd05105aa53bf1134d1fadfc05c2033f7e84201bf3e32145072c31da36e6",
+      "git_blob_sha1": "a6683f3ca582558606cac58d83c85030701d8545"
+    },
+    "runtime_summarizer": {
+      "path": "scripts/two_wheel_balance/summarize_riser_case78_dynamic_canary_v2.py",
+      "sha256": "21c841b6e88eb40564c30f4cc5e535c694a3225e6629f6a60bfd78f2f11793df",
+      "git_blob_sha1": "2fb7abb92fc4c8532106d23d5d6e9b715fc3e5cc"
+    },
+    "runtime_validator": {
+      "path": "scripts/two_wheel_balance/validate_riser_case78_runtime_authorization_v2.py",
+      "sha256": "39b41317856ae0e6f75a521e2791f80acf05564dc2f23c06045ae4277847822a",
+      "git_blob_sha1": "716521c7a08cdc6673e4fbb4a3d4511a64349542"
+    }
+  },
+  "one_case_only": true,
+  "maximum_runtime_seconds": 5400,
+  "heartbeat_required": true,
+  "heartbeat_interval_policy_steps": 2000,
+  "runtime_authorized": true,
+  "gpu_launch_authorized": true,
+  "dynamic_qualification_authorized": true,
+  "split_change_authorized": false,
+  "dataset_creation_authorized": false,
+  "dagger_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "holdout_opened": false,
+  "valid_for_training": false
+}

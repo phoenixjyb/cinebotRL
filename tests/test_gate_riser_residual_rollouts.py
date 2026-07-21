@@ -16,6 +16,7 @@ def _write_rollout(
     position_p95_m: float,
     *,
     pitch_max_deg: float = 4.0,
+    tracking_profile: str = "riser_phase_consistent_v2",
 ) -> None:
     metrics = {name: 1.0 for name in REGRESSION_METRICS}
     metrics.update(
@@ -36,7 +37,7 @@ def _write_rollout(
         "cases": [case],
         "passed": True,
         "trajectory_command_source": source,
-        "tracking_profile": "riser_phase_consistent_v2",
+        "tracking_profile": tracking_profile,
         "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
         "results": [result],
     }
@@ -105,3 +106,35 @@ def test_all79_mode_requires_the_complete_case_set(tmp_path: Path) -> None:
             mode="all79",
             maximum_regression_fraction=0.05,
         )
+
+
+def test_validation_canary_accepts_explicit_current_tracking_profile(
+    tmp_path: Path,
+) -> None:
+    teacher = tmp_path / "teacher"
+    zero = tmp_path / "zero"
+    learned = tmp_path / "learned"
+    policy = tmp_path / "policy.pt"
+    policy.write_bytes(b"policy")
+    profile = "riser_recovery_direction_v4_camera_lever_arm_v1"
+    _write_rollout(
+        teacher, 4, "deterministic_teacher", 0.10, tracking_profile=profile
+    )
+    _write_rollout(
+        zero, 4, "zero_policy_action_baseline", 0.15, tracking_profile=profile
+    )
+    _write_rollout(
+        learned, 4, "torchscript_residual_policy", 0.102, tracking_profile=profile
+    )
+    summary = gate_rollouts(
+        teacher_dir=teacher,
+        zero_dir=zero,
+        learned_dir=learned,
+        cases=[4],
+        policy=policy,
+        mode="validation_canary",
+        maximum_regression_fraction=0.05,
+        expected_tracking_profile=profile,
+    )
+    assert summary["passed"]
+    assert summary["expected_tracking_profile"] == profile

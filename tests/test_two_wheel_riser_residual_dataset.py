@@ -51,6 +51,17 @@ def test_residual_action_clips_final_base_and_riser_commands() -> None:
     np.testing.assert_allclose(command, [0.4, -0.4, 1.2])
 
 
+def test_residual_action_uses_explicit_frozen_scales() -> None:
+    command = apply_residual_action(
+        0.10,
+        -0.10,
+        0.40,
+        np.array([0.5, 0.25, -0.2]),
+        action_scales=np.array([0.35, 0.40, 0.10]),
+    )
+    np.testing.assert_allclose(command, [0.275, 0.0, 0.38])
+
+
 def test_residual_teacher_action_rejects_scale_clipping() -> None:
     with pytest.raises(ValueError, match="scale is too small"):
         build_residual_action(

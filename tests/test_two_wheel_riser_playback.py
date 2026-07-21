@@ -281,6 +281,9 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert "np.abs(actual_proxy - sample.proxy_gimbal_q)" not in source
     assert "set_joint_velocity_target(proxy_velocity_target" not in source
     assert 'parser.add_argument("--video-fps", type=int, default=200)' in source
+    assert '"--residual-action-scales"' in source
+    assert "action_scales=args.residual_action_scales" in source
+    assert '"residual_action_scales": args.residual_action_scales.tolist()' in source
     assert '"riser_recovery_direction_v4"' in source
     assert '"--enable-camera-lever-arm-compensation"' in source
     assert '"--use-commanded-base-progress-error"' in source

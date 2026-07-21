@@ -22,6 +22,13 @@ os.environ.setdefault("GYMNASIUM_DISABLE_PLUGIN_ENTRYPOINTS", "1")
 from isaaclab.app import AppLauncher
 
 
+def parse_action_scales(value: str) -> np.ndarray:
+    scales = np.asarray([float(item) for item in value.split(",")], dtype=np.float64)
+    if scales.shape != (3,) or not np.isfinite(scales).all() or np.any(scales <= 0):
+        raise argparse.ArgumentTypeError("expected three positive residual action scales")
+    return scales
+
+
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--gains", type=Path, required=True)
 parser.add_argument("--plan-dir", type=Path, required=True)
@@ -146,6 +153,12 @@ parser.add_argument(
     "--zero-policy-action",
     action="store_true",
     help="Evaluate the null high-level policy action above the frozen balance LQR.",
+)
+parser.add_argument(
+    "--residual-action-scales",
+    type=parse_action_scales,
+    default=parse_action_scales("0.30,0.40,0.10"),
+    help="Physical [vx,wz,riser] scales for normalized residual policy actions.",
 )
 # RecordVideo receives one frame per 200 Hz policy step.  Encoding at the same
 # rate preserves simulation time; viewing derivatives may be transcoded to 50.
@@ -963,6 +976,7 @@ def evaluate_case(
                 phase_feedforward_wz_rad_s,
                 actual_riser_pre,
                 applied_residual_action,
+                action_scales=args.residual_action_scales,
                 maximum_linear_velocity_m_s=tracking_cfg.maximum_linear_velocity_mps,
                 maximum_yaw_rate_rad_s=tracking_cfg.maximum_yaw_rate_radps,
                 riser_bounds_m=(kinematics.riser_lower, kinematics.riser_upper),
@@ -2114,6 +2128,7 @@ def main() -> int:
         "residual_policy": (
             None if args.residual_policy is None else str(args.residual_policy.resolve())
         ),
+        "residual_action_scales": args.residual_action_scales.tolist(),
         "raw_teacher_capture_started": args.raw_teacher_dir is not None,
         "normalized_dataset_capture_started": args.dataset_dir is not None,
         "cases": cases,

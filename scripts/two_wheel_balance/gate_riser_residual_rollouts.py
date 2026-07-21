@@ -35,12 +35,17 @@ def parse_cases(value: str) -> list[int]:
     return cases
 
 
-def load_result(path: Path, case: int, expected_source: str) -> tuple[dict, dict]:
+def load_result(
+    path: Path,
+    case: int,
+    expected_source: str,
+    expected_tracking_profile: str = TRACKING_PROFILE,
+) -> tuple[dict, dict]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if (
         payload.get("cases") != [case]
         or payload.get("trajectory_command_source") != expected_source
-        or payload.get("tracking_profile") != TRACKING_PROFILE
+        or payload.get("tracking_profile") != expected_tracking_profile
         or payload.get("phase_feedforward_contract") != PHASE_CONTRACT
         or len(payload.get("results", [])) != 1
         or payload["results"][0].get("case") != case
@@ -69,13 +74,14 @@ def gate_rollouts(
     maximum_regression_fraction: float,
     zero_dir: Path | None = None,
     minimum_zero_improvement_fraction: float = 0.05,
+    expected_tracking_profile: str = TRACKING_PROFILE,
 ) -> dict:
-    if mode not in {"holdout", "all79"}:
+    if mode not in {"validation_canary", "holdout", "all79"}:
         raise ValueError("unknown rollout gate mode")
     if mode == "all79" and cases != list(range(1, 80)):
         raise ValueError("all79 mode requires cases 1 through 79")
-    if mode == "holdout" and zero_dir is None:
-        raise ValueError("holdout mode requires zero-policy-action rollouts")
+    if mode in {"validation_canary", "holdout"} and zero_dir is None:
+        raise ValueError(f"{mode} mode requires zero-policy-action rollouts")
     if not 0.0 <= maximum_regression_fraction < 1.0:
         raise ValueError("invalid regression fraction")
     if not 0.0 < minimum_zero_improvement_fraction < 1.0:
@@ -85,14 +91,28 @@ def gate_rollouts(
     for case in cases:
         name = f"case_{case:04d}.json"
         teacher_payload, teacher = load_result(
-            teacher_dir / name, case, "deterministic_teacher"
+            teacher_dir / name,
+            case,
+            "deterministic_teacher",
+            expected_tracking_profile,
         )
         learned_payload, learned = load_result(
-            learned_dir / name, case, LEARNED_SOURCE
+            learned_dir / name, case, LEARNED_SOURCE, expected_tracking_profile
         )
         zero = None
+        profile_checks = {
+            "teacher_tracking_profile": teacher_payload.get("tracking_profile")
+            == expected_tracking_profile,
+            "learned_tracking_profile": learned_payload.get("tracking_profile")
+            == expected_tracking_profile,
+        }
         if zero_dir is not None:
-            _, zero = load_result(zero_dir / name, case, ZERO_SOURCE)
+            zero_payload, zero = load_result(
+                zero_dir / name, case, ZERO_SOURCE, expected_tracking_profile
+            )
+            profile_checks["zero_tracking_profile"] = (
+                zero_payload.get("tracking_profile") == expected_tracking_profile
+            )
         checks = {
             "learned_hard_gate": learned_payload.get("passed") is True
             and learned.get("passed") is True,
@@ -101,6 +121,7 @@ def gate_rollouts(
             "bounded_residual": max(learned["residual_action_abs_max"])
             <= 1.0 + 1e-6,
         }
+        checks.update(profile_checks)
         checks.update(
             {
                 f"regression_{metric}": passed
@@ -161,6 +182,7 @@ def gate_rollouts(
         "minimum_zero_improvement_fraction": (
             minimum_zero_improvement_fraction if zero_dir is not None else None
         ),
+        "expected_tracking_profile": expected_tracking_profile,
         "means": means,
         "aggregate_checks": aggregate_checks,
         "rows": rows,
@@ -171,7 +193,9 @@ def gate_rollouts(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("holdout", "all79"), required=True)
+    parser.add_argument(
+        "--mode", choices=("validation_canary", "holdout", "all79"), required=True
+    )
     parser.add_argument("--teacher-dir", type=Path, required=True)
     parser.add_argument("--learned-dir", type=Path, required=True)
     parser.add_argument("--zero-dir", type=Path)
@@ -182,6 +206,7 @@ def main() -> int:
     parser.add_argument(
         "--minimum-zero-improvement-fraction", type=float, default=0.05
     )
+    parser.add_argument("--expected-tracking-profile", default=TRACKING_PROFILE)
     args = parser.parse_args()
     summary = gate_rollouts(
         teacher_dir=args.teacher_dir,
@@ -192,6 +217,7 @@ def main() -> int:
         mode=args.mode,
         maximum_regression_fraction=args.maximum_regression_fraction,
         minimum_zero_improvement_fraction=args.minimum_zero_improvement_fraction,
+        expected_tracking_profile=args.expected_tracking_profile,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

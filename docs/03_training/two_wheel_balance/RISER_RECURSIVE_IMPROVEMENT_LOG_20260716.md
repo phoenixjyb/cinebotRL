@@ -5121,3 +5121,61 @@ and must state whether its candidate was accepted or rejected.
 - Do not create a runtime contract and token in the same unreviewed change. Keep
   case 4 in validation, case 78 unused, holdout closed, and all learning and
   obstacle work disabled meanwhile.
+
+## Round 137: case-78 qualification times out fail-closed; split fallback remains blocked
+
+- Commits `d3b541d`, `8f81b8f`, and `3002580` add and seal the separate
+  one-use runtime wrapper, final summarizer, authorization validator, negative
+  tests, and immutable runtime contract. The runtime contract pins the reviewed
+  CPU checkpoint `dacb00b`, implementation commit `d3b541d`, exact case 78,
+  current `unused` split, namespace
+  `20260721_case78_dynamic_qualification_v1_exclusive`, four committed runtime
+  identities, one-case limit, and `900 s` timeout. Split mutation, holdout
+  access, dataset creation, DAgger, BC, and PPO remain false.
+- The authoritative `.98` suite passes `559` tests with three intentional
+  platform skips in `58.35 s`. At clean pushed commit
+  `3002580988ca72432b15864296a03c35a69daf4e`, preflight passes every CPU and
+  runtime identity, lineage, canonical-path, fresh-namespace, learning-closure,
+  and ownership check. The mode-`0600` token is consumed before Isaac starts.
+- The sole deterministic case-78 canary reaches the exact `900 s` wrapper
+  limit and exits `124`; observed wall duration is `900.020283 s`. The process
+  does not write `case_0078.json`, so source/execution completion, physical
+  quality, thermal admission, and controller evidence are unproven and fail
+  closed. This is a runtime-horizon rejection, not a physical trajectory pass
+  or a case-78 validation admission.
+- GPU release passes after timeout. The final status records
+  `physical_quality_passed=false`, `dynamic_qualification_passed=false`,
+  `case78_validation_admitted=false`, `split_changed=false`,
+  `dataset_created=false`, and `valid_for_training=false`. Case 4 remains in
+  validation, case 78 remains unused, and holdout `[3,5,13,19,24]` is unopened.
+- Canonical evidence SHA-256 values are admission
+  `8a2f3fd15141520d257e462e6a9f1143362148a139e0a9b6e38326ba6027558f`,
+  playback log
+  `8a86a8486fcbe4d371017bbb38c58cb512946dc8dba833858c27b6e950bf207f`,
+  and final status
+  `94fe6c39ae9550802979ddd68fcbf45ef3d1964600db8afa01a69ddd804defb8`.
+  NVIDIA compute ownership is empty after closure.
+- The timeout derivation in Round 136 is disproven for this case. Ratios from
+  completed case 1/52 executions do not bound a run whose progress governor can
+  consume the full `3x` step horizon, and the current runner keeps its 1 Hz
+  trace in memory until normal completion. Consequently the timeout preserves
+  no last phase/step/controller state, which is an evidence-contract gap rather
+  than a reason to enlarge the timeout blindly.
+
+## Next round after Round 137
+
+- CPU-only, add a lightweight atomic runtime heartbeat/checkpoint at a bounded
+  cadence. It must expose completed policy steps, elapsed and phase clocks,
+  current progress scale, tracking/safety state, and the fixed maximum-step
+  horizon without changing commands, simulation cadence, the existing 1 Hz
+  final trace, source/plan geometry, or gates. A timeout finalizer must seal the
+  last checkpoint and independently state that no gate result or dataset was
+  produced.
+- Replace the completed-trajectory wall/execution timeout estimate with a
+  conservative policy-step-throughput contract derived from measured bounded
+  runs plus explicit startup/shutdown margin. Review the new evidence and bound
+  separately before considering one fresh-namespace retry; do not reuse the
+  consumed token or current namespace.
+- Do not apply the split fallback, admit case 78, open holdout, create labels or
+  datasets, retrain BC, start PPO, begin obstacle work, or launch another Isaac
+  run during this CPU-only repair.

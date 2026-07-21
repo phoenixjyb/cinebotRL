@@ -5071,3 +5071,53 @@ and must state whether its candidate was accepted or rejected.
 - Keep case 4 in validation, case 78 unused, holdout closed, and dataset
   creation, DAgger, BC, PPO, obstacles, and broad rollout disabled until that
   sequence is satisfied.
+
+## Round 136: case-78 deterministic qualification is CPU-admitted; runtime stays closed
+
+- Commits `d105ffd` and `a21fedb` add the case-78 CPU validator, non-executing
+  preflight wrapper, negative tests, and canonical hash-sealed contract. The
+  complete authoritative `.98` suite passes `554` tests with two intentional
+  platform skips in `60.76 s`.
+- The contract pins the split-reset and failed-coverage proposals, exact case-78
+  plan/manifest/summary, LQR gains, robot build audit/URDF/USD, deterministic
+  playback, plan loader, tracking, riser-control and recovery-evidence modules,
+  timing handoff, wrapper, and validator. All 17 identities pass SHA-256 and,
+  where applicable, committed Git-blob checks.
+- The future canary is frozen to one case 78 in deterministic-teacher mode with
+  no residual policy, zero-policy baseline, capture, or dataset. Controller
+  values remain `wz_kp=1.05`, duration scale `3.0`, camera lever-arm gain `1.0`,
+  and correction cap `0.05 m`; all existing dynamic, thermal, controller, and
+  saturation thresholds remain unchanged.
+- Timeout is derived rather than copied from a short run. Deterministic case 1
+  observed `102.425/77.833030=1.315958x` wall/execution time; case 52 observed
+  `354.76/292.740729=1.211857x`. Case 78's worst allowed simulated horizon is
+  `192.299567*3=576.898702 s`; scaling by the larger observed ratio gives
+  `759.174473 s`. The proposed `900 s` wall timeout retains `140.825527 s` for
+  startup and shutdown.
+- Live `.98` preflight at clean pushed commit
+  `a21fedb4d4838f80b2efceafbe8dc477247a3f8b` passes every semantic, identity,
+  lineage, fresh-namespace, training-closure, and WSL/Windows/NVIDIA ownership
+  check. Contract SHA-256 is
+  `c3d77a1110a46c5b2a1e60dd1a33d3fa19ca22cb6c3b992d5ebcfee80b9950e5`;
+  Git blob is `95fe36ca25d9b4e1041e15e54391f7e270ae6e26`.
+- Explicit `.98 --execute` exits `7` with reason
+  `runtime_authorization_not_issued`, records runtime/GPU/dynamic/split/dataset
+  flags false, and leaves the namespace absent before and after. No token,
+  Isaac process, split change, case-4 label admission, case-78 validation
+  admission, holdout access, dataset, DAgger, BC, PPO, or obstacle work occurred.
+
+## Next round after Round 136
+
+- Perform a separate go/no-go review of the sealed CPU contract. A GO may add a
+  one-use runtime authorization contract and deterministic runner pinned to the
+  `900 s` bound and current blobs. The runner must consume its token before
+  Isaac, preserve partial logs, write a machine-readable final status on every
+  exit, and stop after case 78.
+- A physical pass must independently prove complete reference execution,
+  unchanged dynamic/thermal/controller gates, no termination, and no dataset.
+  It admits case 78 only for the proposed validation role; it does not itself
+  apply the split or authorize case-4 labels. A physical failure keeps the
+  current split unchanged and ends this fallback path for review.
+- Do not create a runtime contract and token in the same unreviewed change. Keep
+  case 4 in validation, case 78 unused, holdout closed, and all learning and
+  obstacle work disabled meanwhile.

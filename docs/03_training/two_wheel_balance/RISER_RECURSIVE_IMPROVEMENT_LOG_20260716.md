@@ -5226,3 +5226,44 @@ and must state whether its candidate was accepted or rejected.
 - Do not retry case 78, apply the split fallback, admit labels, open holdout,
   capture data, retrain BC, start PPO, or begin obstacle work until the v2 CPU
   contract receives a separate go/no-go review and one-use runtime layer.
+
+## Round 139: heartbeat-enabled case-78 v2 qualification is CPU-admitted
+
+- Commits `d1b4c8f` and `8251aed` add the v2 CPU validator, non-executing
+  preflight wrapper, negative/semantic tests, and canonical contract. The
+  contract pins the unchanged case-78 plan, fallback proposal, LQR gains,
+  robot build/URDF/USD, plan loader, tracking/control/recovery code, timing
+  handoff and dynamic thresholds, plus the heartbeat-enabled playback/helper,
+  prior timeout final status, and corrected wall-bound audit.
+- The future deterministic command line remains unchanged apart from adding an
+  observational heartbeat. The contract fixes heartbeat cadence at `2,000`
+  policy steps, maximum steps at `115,381`, and wall ceiling at `5,400 s`.
+  The heartbeat is atomic, cannot alter commands, and cannot create a dataset.
+- The complete authoritative `.98` suite passes `568` tests with three
+  intentional platform skips in `58.58 s`. Live preflight at clean pushed
+  commit `8251aedc9d2fa2b29ef29cef07f1c8c23aa5a261` passes all 19 identity,
+  semantic, lineage, canonical-path, fresh-namespace, training-closure, and
+  WSL/Windows/NVIDIA ownership checks.
+- Contract SHA-256 is
+  `f4244f83a9b31ca0f1c403fe4e2467ce4379eaf82e6b404cc16a523ec7c1a5c7`;
+  Git blob is `d9e93ead11810d7c2528b9ade69cbcf3b341afdc`. Explicit
+  `--execute` exits `7` with `runtime_authorization_not_issued`, and namespace
+  `20260721_case78_dynamic_qualification_v2_heartbeat_exclusive` remains absent.
+- No runtime token, Isaac launch, split change, case-78 validation admission,
+  case-4 label admission, holdout access, dataset, DAgger, BC, PPO, or obstacle
+  work occurred in this round.
+
+## Next round after Round 139
+
+- Perform a separate go/no-go review of the v2 CPU contract and its unusually
+  long `5,400 s` bound. A GO may add a new one-use runtime authorization layer
+  and timeout finalizer pinned to the current blobs; it must seal the last
+  heartbeat and preserve separate runtime, physical, thermal/controller,
+  no-data, GPU-release, and split outcomes on every exit.
+- If authorized, launch exactly one deterministic case-78 canary in the fresh
+  v2 namespace and stop afterward. A full physical pass may support a later
+  immutable split-manifest proposal; timeout or any physical/evidence failure
+  leaves case 4 in validation and case 78 unused.
+- Do not create the runtime contract and token in one unreviewed change. Do not
+  launch case 78, open holdout, create data, retrain BC, start PPO, or begin
+  obstacle work during the review.

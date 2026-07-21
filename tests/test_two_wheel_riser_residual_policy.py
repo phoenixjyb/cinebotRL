@@ -86,3 +86,30 @@ def test_residual_policy_rejects_bad_mask_index() -> None:
             torch.ones(len(OBSERVATION_NAMES)),
             masked_observation_indices=(len(OBSERVATION_NAMES),),
         )
+
+
+def test_previous_action_gain_attenuates_normalized_inputs_and_is_scriptable() -> None:
+    policy = RiserResidualPolicy(
+        torch.zeros(len(OBSERVATION_NAMES)),
+        torch.ones(len(OBSERVATION_NAMES)),
+        state_hidden_sizes=(16,),
+        lookahead_hidden_sizes=(8,),
+        fusion_hidden_sizes=(16,),
+        previous_action_observation_gain=0.1,
+    ).eval()
+    assert policy.observation_mask[list(PREVIOUS_ACTION_INDICES)].tolist() == pytest.approx(
+        [0.1, 0.1, 0.1]
+    )
+    scripted = torch.jit.script(policy)
+    observations = torch.randn(4, len(OBSERVATION_NAMES))
+    with torch.inference_mode():
+        torch.testing.assert_close(scripted(observations), policy(observations))
+
+
+def test_previous_action_gain_rejects_out_of_range_value() -> None:
+    with pytest.raises(ValueError, match="gain"):
+        RiserResidualPolicy(
+            torch.zeros(len(OBSERVATION_NAMES)),
+            torch.ones(len(OBSERVATION_NAMES)),
+            previous_action_observation_gain=1.01,
+        )

@@ -433,6 +433,51 @@ def test_mask_and_scheduled_previous_action_modes_are_exclusive(tmp_path: Path) 
     assert "exclusive" in result.stderr
 
 
+def test_attenuated_previous_action_contract_is_recorded(tmp_path: Path) -> None:
+    dataset = tmp_path / "zero_labels.npz"
+    _write_dataset(dataset, np.repeat(np.arange(3, dtype=np.int8), 2))
+    output = tmp_path / "policy"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/two_wheel_balance/train_riser_residual_bc.py",
+            "--dataset",
+            str(dataset),
+            "--output-dir",
+            str(output),
+            "--source-commit",
+            "a" * 40,
+            "--epochs",
+            "1",
+            "--batch-size",
+            "2",
+            "--state-hidden-sizes",
+            "8",
+            "--lookahead-hidden-sizes",
+            "4",
+            "--fusion-hidden-sizes",
+            "8",
+            "--device",
+            "cpu",
+            "--previous-action-observation-gain",
+            "0.1",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    report = json.loads((output / "report.json").read_text(encoding="utf-8"))
+    assert report["policy_architecture"] == (
+        "state_shared_lookahead_fusion_previous_action_attenuated_v1"
+    )
+    assert report["previous_action_observation_gain"] == 0.1
+    assert report["previous_action_observation_contract"] == (
+        "attenuated_after_normalization_v1"
+    )
+
+
 def test_admitted_bc_is_reproducible_for_the_same_seed(tmp_path: Path) -> None:
     torch = pytest.importorskip("torch")
     dataset = tmp_path / "learnable.npz"

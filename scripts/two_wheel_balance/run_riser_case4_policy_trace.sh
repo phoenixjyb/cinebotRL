@@ -193,6 +193,7 @@ TEACHER_STATUS=0
 run_playback teacher || TEACHER_STATUS=$?
 LEARNED_STATUS=99
 if [[ "$TEACHER_STATUS" == 0 ]]; then
+  LEARNED_STATUS=0
   run_playback learned || LEARNED_STATUS=$?
 fi
 printf '%s\n' "$LEARNED_STATUS" >"$OUTPUT/logs/learned.exit_code"

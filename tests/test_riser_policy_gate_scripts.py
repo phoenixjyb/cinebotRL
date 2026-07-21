@@ -188,6 +188,7 @@ def test_case4_policy_trace_is_diagnostic_only_and_exclusive() -> None:
     assert "run_playback teacher" in source
     assert "run_playback learned" in source
     assert "if [[ \"$TEACHER_STATUS\" == 0 ]]" in source
+    assert source.index("LEARNED_STATUS=0") < source.index("run_playback learned")
     assert "--policy-trace-dir" in source
     assert "--dataset-dir" not in source
     assert "--raw-teacher-dir" not in source

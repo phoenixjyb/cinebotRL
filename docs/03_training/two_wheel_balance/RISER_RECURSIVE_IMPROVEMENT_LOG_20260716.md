@@ -4477,3 +4477,63 @@ and must state whether its candidate was accepted or rejected.
   validation-only DAgger-style teacher relabel capture on policy-visited states.
   Keep the deterministic LQR/safety supervisor unchanged, preserve the original
   40-case corpus, and do not open holdout, PPO, obstacles, or broader rollout.
+
+## Round 124: full-rate trace narrows the gap but does not prove one precursor
+
+- Commits `9fd4cf3` and `a24d8bb` first compared the existing 1 Hz teacher and
+  masked-policy traces. They found base state to be the only coarse non-output
+  precursor candidate, but only 32/33 rows were available and the exact 65D
+  policy observation, lookahead, and policy-rate action were absent. The v2
+  coarse report SHA-256 is
+  `177d431dc8278513fe484540a79440df53e26ffb79eff37af32b17c5a8f7e0af`.
+- Commit `31d10059ba20e8d1ba41290f327645e6885caabd` added a default-off,
+  non-trainable `policy_trace_v1` contract and one-use case-4 route. It records
+  the exact pre-action 65D observation, applied residual, final high-level
+  command, balance-wheel command, both clocks, and post-step physical outcome.
+  It hard-codes `valid_for_training=false`, contains no teacher label or
+  residual dataset, and leaves DAgger, BC, and PPO unauthorized. The complete
+  `.98` CPU suite passed `487/487` before runtime.
+- The exclusive trace route produced 6,172 deterministic-teacher rows and
+  6,316 masked-policy rows. Teacher position p95/max were
+  `0.128736/0.151724 m`; masked-policy p95/max reproduced at
+  `0.137441/0.167322 m`. Both runs completed the immutable execution phase and
+  passed dynamic, thermal, and controller-evidence gates. Trace SHA-256 values
+  are `1999de74dc1206c4a3aed04b375bbafe5a81755f9424df5d1dee333406cdc9bb`
+  for teacher and
+  `99c5969305e20cdc73ad2750d9609ed62c8094ed5b626d5ba2ebe6aa374f4ef7`
+  for learned.
+- The route's first final status failed closed because successful learned
+  playback left a shell sentinel at `99`. Commit
+  `f190c10d7a23475328379328f9880172685117dc` clears the sentinel before launch.
+  No Isaac rerun was performed. A posthoc audit resealed the existing JSON,
+  NPZ, and logs at final-status-v2 SHA-256
+  `d2dcde485d88c1483259f8b1bd434828784826a29e91c914a65bbca3ce031f8d`.
+- Commit `557cddc15b9606fa28f61d2826c20c5714e6436f` added the reproducible
+  policy-normalized diagnosis. Its `.98` focused suite passed `53/53`; report
+  SHA-256 is
+  `9e64301f49ce1a3b7ff7d41c2228c4be6cecb0514fb1fdb271fbf322515af945`.
+  The learned excess position error is `0.035086 m` p95 and `0.038592 m` max.
+  The strongest non-output association is feed-forward divergence at only
+  `r=0.127`; the strongest positive signal is the outcome-coupled `+0.25 s`
+  camera-error lookahead at `r=0.679`. Pitch-rate and camera-attitude shifts are
+  larger in magnitude but weakly or negatively associated with excess error.
+- Phase-aligned learned-vs-teacher normalized action-error p95 is
+  `[0.068622,0.162376,0.011600]` for `[vx,wz,riser]`, but every magnitude
+  correlation with excess error is negative. The bounded classification is
+  therefore `no_single_non_output_policy_input_precursor_proven`, not a proven
+  base-only or action-history failure. No holdout, DAgger capture, BC, PPO,
+  obstacle work, or broader learned rollout was opened. GPU ownership is empty.
+
+## Next round after Round 124
+
+- Do not tune another BC architecture or infer causality from magnitude-only
+  shifts. Preserve the masked checkpoint as the best diagnostic near-pass.
+- Design one separately authorized, validation-only case-4 shadow-teacher
+  measurement. During the learned rollout, record the deterministic
+  pre-overwrite `[vx,wz,riser]` teacher command already computed on the same
+  policy-visited state, but do not apply it, create a training dataset, or alter
+  the learned command.
+- Compare the on-policy shadow-teacher labels with applied residuals and the
+  original phase-aligned labels. Only a clear, bounded on-policy label gap may
+  justify a later DAgger dataset proposal. Holdout, BC, PPO, obstacles, and
+  broader rollout remain closed.

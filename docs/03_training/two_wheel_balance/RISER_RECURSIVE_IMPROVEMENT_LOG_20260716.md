@@ -4908,3 +4908,50 @@ and must state whether its candidate was accepted or rejected.
   regardless of physical or coverage outcome.
 - Keep the case-4 validation split, case-78 status, holdout, dataset creation,
   DAgger, BC, PPO, obstacle work, and broad rollout unchanged and closed.
+
+## Round 133: case-30 CPU admission contract is sealed; runtime stays closed
+
+- Commits `8d27c95`, `97f85ba`, and `86c3cfb` add the preflight-only
+  wrapper, validator, pinned gate values, and canonical case-30 contract;
+  `ff349c8` separates WSL wrapper execution tests from platform-neutral source
+  checks. The full authoritative `.98` suite passes `537/537` with one
+  intentional Windows-only skip in `53.32 s`.
+- The contract pins the Round-132 proposal/profile, exact case-30 plan, masked
+  policy and its final/report evidence, frozen teacher dataset, LQR gains,
+  robot build audit/URDF/USD, playback, perturbation runtime, shadow diagnosis,
+  wrapper, and validator. All SHA-256 and committed Git-blob identities pass.
+- Controller arguments are frozen at `wz_kp=1.05`, duration scale `3.0`, camera
+  lever-arm compensation gain `1.0`, correction cap `0.05 m`, and CUDA policy
+  execution. Residual scales remain `[0.35,0.40,0.10]`; all existing dynamic,
+  thermal, controller-evidence, and residual-label thresholds remain unchanged.
+- Live `.98` preflight at commit
+  `ff349c85c80586314d572de1f71f0c45815eb6f3` proves clean pushed HEAD,
+  canonical tracked contract/blob, reviewed-parent ancestry, fresh namespace,
+  exact profile/action/gate values, all artifact identities, and exclusive
+  WSL/Windows/NVIDIA ownership. Contract SHA-256 is
+  `2e567b5a00adab72a488714a9a6fef6ab66a36931521466ccb4fc46a705d0993`;
+  contract Git blob is `3279a41f16ef7493d6b3093bab1ad42bdef3e431`.
+- The wrapper has no Isaac playback command and no valid authorization token.
+  An explicit `.98 --execute` attempt exits `7` with machine-readable reason
+  `runtime_authorization_not_issued`; it creates no namespace and records
+  `runtime_started=false`, `dataset_created=false`, and all learning gates
+  false.
+- Decision: **GO** to prepare a separate, reviewed one-use runtime authorization
+  change for exactly case 30; **NO-GO** to launch from the current commit. This
+  distinction preserves CPU-contract readiness without converting it into GPU
+  or training authorization.
+
+## Next round after Round 133
+
+- Only after explicit review, add a separate one-use runtime authorization
+  contract and bounded execution path pinned to the current CPU contract. The
+  route must consume the token before Isaac starts, enforce a `600 s` timeout,
+  preserve partial logs on failure, clear the wrench, and always write a final
+  machine-readable status with physical, perturbation, and label outcomes kept
+  independent.
+- Run exactly one case-30 learned-policy shadow-teacher measurement. Stop after
+  case 30 regardless of outcome. A dynamic failure ends the path; a dynamic
+  pass still creates no training data and only permits CPU comparison of visited
+  state coverage and shadow-label materiality against the case-4 hotspot.
+- Do not change case 4/78 splits, open holdout, create a DAgger dataset, retrain
+  BC, start PPO, begin obstacle work, or run a broader campaign.

@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="${RISER_ROOT:-/mnt/g/wSpace/cinebotRL-two-wheel-riser}"
 WIN_ROOT="${RISER_WIN_ROOT:-G:\\wSpace\\cinebotRL-two-wheel-riser}"
 PY="${RISER_TRAIN_PYTHON:-/mnt/g/isaaclab_venv/Scripts/python.exe}"
+NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
+POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 MODE="${1:---preflight}"
 DATASET_STAMP="20260721_initial_teacher41_subset_30_5_5_v1"
 POLICY_STAMP="20260721_initial_teacher40_bc_v1"
@@ -34,6 +36,37 @@ fi
 
 sha256() { sha256sum "$1" | awk '{print $1}'; }
 identity_matches() { [[ -s "$1" && "$(sha256 "$1")" == "$2" ]]; }
+
+assert_gpu_free() {
+  local wsl_owners compute_owners windows_owners
+  wsl_owners="$(
+    ps -ef | grep -E '[p]ython(\.exe)? .*(smoke_.*playback|train_riser_residual_bc)\.py' || true
+  )"
+  compute_owners="$(
+    "$NVIDIA_SMI" --query-compute-apps=pid,process_name --format=csv,noheader
+  )"
+  windows_owners="$(
+    "$POWERSHELL" -NoProfile -NonInteractive -Command '
+      $ErrorActionPreference = "Stop"
+      $queryProcessId = $PID
+      Get-CimInstance Win32_Process |
+        Where-Object {
+          $_.ProcessId -ne $queryProcessId -and (
+            $_.Name -eq "kit.exe" -or
+            $_.CommandLine -match "smoke_.*playback|train_riser_residual_bc"
+          )
+        } |
+        ForEach-Object { "{0}`t{1}" -f $_.ProcessId, $_.CommandLine }
+    ' | tr -d '\r'
+  )"
+  if [[ -n "$wsl_owners" || -n "$compute_owners" || -n "$windows_owners" ]]; then
+    printf 'GPU has an existing playback/training owner\n' >&2
+    [[ -z "$wsl_owners" ]] || printf '%s\n' "$wsl_owners" >&2
+    [[ -z "$compute_owners" ]] || printf '%s\n' "$compute_owners" >&2
+    [[ -z "$windows_owners" ]] || printf '%s\n' "$windows_owners" >&2
+    return 1
+  fi
+}
 
 HEAD="$(git -C "$ROOT" rev-parse HEAD)"
 UPSTREAM="$(git -C "$ROOT" rev-parse '@{upstream}')"
@@ -129,15 +162,7 @@ AUTHORIZATION_FILE="${RISER_INITIAL_BC_AUTHORIZATION_FILE:-}"
   exit 5
 }
 
-if ps -eo args | grep -E 'smoke_riser_reference_playback|train_riser_residual_bc' | grep -v grep >/dev/null; then
-  printf 'competing riser playback/training process exists\n' >&2
-  exit 5
-fi
-if /mnt/c/Windows/System32/nvidia-smi.exe \
-  --query-compute-apps=pid --format=csv,noheader 2>/dev/null | tr -d '\r' | grep -Eq '[0-9]'; then
-  printf 'GPU has an existing compute owner\n' >&2
-  exit 5
-fi
+assert_gpu_free || exit 5
 
 mkdir -p "$POLICY_ROOT"
 python3 - "$POLICY_ROOT/admission.json" "$HEAD" "$DATASET" "$SUMMARY" \

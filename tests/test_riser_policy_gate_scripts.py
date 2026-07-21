@@ -52,6 +52,8 @@ def test_initial_teacher40_bc_is_separately_admitted_and_holdout_closed() -> Non
     assert '[[ "$HEAD" == "$UPSTREAM" ]]' in source
     assert 'status --porcelain --untracked-files=no' in source
     assert "RISER_INITIAL_BC_AUTHORIZATION_FILE" in source
+    assert 'NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"' in source
+    assert "assert_gpu_free || exit 5" in source
     assert '"bc_training_authorized": True' in source
     assert '"learned_rollout_authorized": False' in source
     assert '"ppo_authorized": False' in source

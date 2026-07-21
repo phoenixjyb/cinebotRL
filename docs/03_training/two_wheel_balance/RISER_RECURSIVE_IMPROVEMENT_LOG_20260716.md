@@ -5267,3 +5267,78 @@ and must state whether its candidate was accepted or rejected.
 - Do not create the runtime contract and token in one unreviewed change. Do not
   launch case 78, open holdout, create data, retrain BC, start PPO, or begin
   obstacle work during the review.
+
+## Round 140: case 78 completes dynamically but narrowly fails position p95
+
+- Commits `18d1cc6`, `8b6492a`, and `cf4a6d8` add, pin, and seal the separate
+  heartbeat-enabled one-use runtime layer. Its synthetic success, timeout,
+  stale-heartbeat, wrapper, and token tests pass `7/7`. The complete
+  authoritative `.98` suite passes `574` tests with four intentional platform
+  skips in `58.47 s`; runtime preflight passes all CPU/runtime identities at
+  clean pushed commit `cf4a6d820de7ca9606a7625ac848605bed46edbf`.
+- The mode-`0600` token is consumed before Isaac starts. Exactly one
+  deterministic case-78 canary runs in namespace
+  `20260721_case78_dynamic_qualification_v2_heartbeat_exclusive`; no residual
+  policy, capture output, dataset, split mutation, holdout access, BC, or PPO is
+  enabled.
+- The run completes rather than timing out: source/execution clocks are
+  `135.487646/192.299567 s`, completed phase is exact, policy steps are
+  `85,760`, and measured host wall time is `2,904.385536 s` at
+  `29.549360` steps/s. The last atomic heartbeat is only `2.123 s` old at
+  finalization. Runtime, heartbeat, wall-bound, GPU-release, thermal,
+  controller-evidence, no-termination, and no-data checks all pass.
+- Dynamic quality fails only `position_p95_bounded`: position p95/max is
+  `0.162650/0.229624 m` against `0.15/0.25 m`. The p95 miss is `12.65 mm`;
+  pitch max is `8.179473 deg`, attitude p95/max is
+  `0.146361/0.284986 deg`, riser max is `0.013981 m`, proxy max is
+  `0.225347 deg`, proxy rate is `44.229582 deg/s`, and all saturation ratios
+  are zero. Every other physical check passes.
+- Residual-label envelope independently fails because raw vx residual reaches
+  `0.36 m/s`, or `1.20x` the frozen `0.30 m/s` label scale. That label was not
+  applied to commands and no label dataset exists. Physical failure and label
+  envelope failure remain independent.
+- Canonical SHA-256 values are admission
+  `8f840b1214ecaf3904b77ee8a7c4178e050b1cabca9a545a4beb0574b4bc6c3e`,
+  heartbeat
+  `a470d7a65abaacc922cc83d0069cb788d54c34ff3011efed78784a0af7d9d31f`,
+  gate `46ab1f27d2ed16271853e068e21497d66f6cacfb8599f98dde0c72df6d31c97a`,
+  final status
+  `7de1e760f7431a03a7d783107ad0ebf638819d45022aa2c8b94495bd06390a3e`,
+  and playback log
+  `e88b6285dd0f4fdf8167df6c5c914717d30e4132e10a7da0bf89f25239774feb`.
+  GPU ownership is empty after closure. Case 4 remains validation and case 78
+  remains unused.
+
+## Round 141: existing camera-recovery governor is the bounded CPU candidate
+
+- Commit `ccb7875` adds a canonical-hash CPU trace audit with two focused tests;
+  the complete `.98` suite passes `576` tests with four intentional skips in
+  `59.30 s`.
+- The sealed 430-sample 1 Hz trace confirms only position p95 failed. Camera
+  lever-arm correction was saturated for `96.9767%` of trace samples, while
+  `5.1163%` of samples exceeded `0.15 m`. The existing recovery governor is
+  therefore structurally relevant: it slows phase only when correction is
+  saturated and camera error approaches the unchanged gate.
+- Offline application of the existing default governor
+  (`start=0.13 m`, `full=0.155 m`, minimum scale `0.20`) changes trace mean
+  progress from `0.447660` to `0.439303`. The conservative trace projection is
+  a `1.019023x` step multiplier, or `87,392` steps versus `85,760`, still below
+  the fixed `115,381` horizon.
+- The audit changes no source plan, inner LQR, correction cap, dynamic threshold,
+  or training boundary. It explicitly states that the trace estimate is not
+  physical proof and issues no runtime/GPU authorization. Report SHA-256 is
+  `3c07fbca71b521be24179bb866f45cee38992b6bb18c3948f9719326ec1ba7cf`.
+
+## Next round after Round 141
+
+- Build a CPU-only case-78 recovery contract that changes exactly one runtime
+  argument: enable the existing camera-error recovery governor with its frozen
+  `0.13/0.155 m` range and `0.20` minimum scale. Pin the v2 failure evidence,
+  recovery audit, unchanged plan/controller/gains/USD/gates, heartbeat, and one
+  fresh namespace. Issue no token and reject execution.
+- A later separately reviewed canary must keep the same `5,400 s` wall bound,
+  stop after case 78, and require every original physical threshold. A pass can
+  support a later split-manifest proposal but cannot apply the split itself.
+- Do not relax the p95 gate, widen the residual label scale, increase the camera
+  correction cap, alter source geometry, open holdout, capture data, retrain BC,
+  start PPO, or begin obstacle work during the CPU contract round.

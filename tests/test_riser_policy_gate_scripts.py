@@ -129,6 +129,23 @@ def test_scheduled_previous_action_bc_runner_is_bounded_and_comparative() -> Non
     assert "rev-parse '@{upstream}'" in source
 
 
+def test_attenuated_previous_action_bc_runner_is_reject_bound_and_guarded() -> None:
+    source = _read("run_riser_attenuated_previous_action_bc.sh")
+    assert "20260721_initial_teacher40_bc_previous_action_gain010_v1" in source
+    assert 'SCHEDULED_FINAL_SHA256="abab8f87' in source
+    assert 'SCHEDULED_COMPARISON_SHA256="1173da5c' in source
+    assert "recursive_aggregate_beats_masked_by_one_percent" in source
+    assert "--previous-action-observation-gain 0.10" in source
+    assert "state_shared_lookahead_fusion_previous_action_attenuated_v1" in source
+    assert "case4_previous_action_comparison.json" in source
+    assert '"learned_rollout_authorized": passed' in source
+    assert '"holdout_opened": False' in source
+    assert '"ppo_authorized": False' in source
+    assert "smoke_riser_reference_playback.py" not in source
+    assert "Get-CimInstance Win32_Process" in source
+    assert "rev-parse '@{upstream}'" in source
+
+
 def test_masked_bc_case4_canary_is_single_validation_case_and_guarded() -> None:
     source = _read("run_riser_masked_bc_case4_canary.sh")
     assert "CASE=4" in source

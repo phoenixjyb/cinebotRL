@@ -4590,3 +4590,42 @@ and must state whether its candidate was accepted or rejected.
 - Only after training-split evidence confirms the same on-policy gap may a new,
   explicitly versioned DAgger dataset admission be proposed. BC retraining,
   PPO, holdout evaluation, obstacles, and broad rollout remain closed.
+
+## Round 126: training-split DAgger shadow proposal selects case 21
+
+- Commit `4219768f76bae720d1973b6088af1987a57f8a67` adds a deterministic,
+  CPU-only similarity ranker and proposal builder. Focused `.98` tests pass
+  `64/64`; no Isaac or GPU process was launched.
+- Ranking compares normalized teacher-action quantiles, masked-policy-effective
+  observation means and standard deviations, and execution duration. The
+  frozen weights are `0.40/0.25/0.25/0.10`; previous-action channels remain
+  masked and do not affect ranking. Ranking SHA-256 is
+  `6019780884c6c4d9279742d918d99f32e426c737b6938735a46e46c100cf12db`.
+- The nearest training cases to validation case 4 are `[21,30,31]`. Case 21 is
+  rank 1 with score `0.369645`, 5,486 samples, and `27.425 s` duration. Cases
+  30 and 31 score `0.396646/0.398475` but are both about `57.5 s`; the bounded
+  first proposal therefore selects case 21 only.
+- The proposal proves case 21 belongs to training and that its existing
+  deterministic teacher gate passes dynamic, thermal, and controller-evidence
+  checks. Its plan SHA-256 is
+  `81c0da4be22d5b800978d1d46ca9705912f72007f7c615b31715c672dd86a1d4`;
+  teacher-gate SHA-256 is
+  `35a72e768d12d162d7522d15500434268d020e90d58657fe27cef2c19d7068de`.
+- Validation cases `[4,8,16,22,32]` and holdout cases `[3,5,13,19,24]` are
+  explicitly excluded. Proposal SHA-256 is
+  `5bc65581cda29cca7668a16d40d77df3cda717b43f87bc2744d4676dd0d3ef7d`.
+  It issues no authorization token, starts no runtime, creates no dataset, and
+  leaves DAgger, BC, PPO, holdout, obstacles, and broad rollout closed.
+
+## Next round after Round 126
+
+- Review and, only if accepted, add one fresh hash-bound case-21
+  shadow-teacher route using the unchanged masked policy, plan, action scales,
+  controller, and safety/quality gates. It must remain a measurement, not a
+  DAgger dataset.
+- Stop after case 21. If physical dynamics pass and the on-policy label-gap
+  audit reproduces the material `vx/wz` shift, prepare a separate dataset
+  admission proposal. If either condition fails, preserve the first reject and
+  do not open cases 30/31.
+- Do not use case-4 validation labels for training and do not open holdout,
+  BC retraining, PPO, obstacle work, or broader learned rollout.

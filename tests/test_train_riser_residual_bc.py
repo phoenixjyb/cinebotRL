@@ -14,6 +14,7 @@ from scripts.two_wheel_balance.train_riser_residual_bc import (  # noqa: E402
     case_balanced_mse,
     load_dataset,
     predict_recursive_previous_action_windows,
+    previous_action_observation_gains,
     scheduled_sampling_probability,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
@@ -160,6 +161,21 @@ def test_scheduled_sampling_probability_has_bounded_deterministic_ramp() -> None
     np.testing.assert_allclose(values, [0.0, 0.0, 0.2, 0.4, 0.6, 0.8, 0.8, 0.8])
     with pytest.raises(ValueError, match="maximum"):
         scheduled_sampling_probability(1, maximum=1.1, warmup_epochs=0, ramp_epochs=1)
+
+
+def test_previous_action_channel_gain_parser_is_fail_closed() -> None:
+    args = type(
+        "Args",
+        (),
+        {
+            "previous_action_observation_gain": 1.0,
+            "previous_action_observation_gains": "0.1,0.0,0.1",
+        },
+    )()
+    assert previous_action_observation_gains(args) == (0.1, 0.0, 0.1)
+    args.previous_action_observation_gains = "0.1,0.0"
+    with pytest.raises(ValueError, match="three values"):
+        previous_action_observation_gains(args)
 
 
 def test_sequence_windows_never_cross_case_boundaries() -> None:
@@ -473,9 +489,53 @@ def test_attenuated_previous_action_contract_is_recorded(tmp_path: Path) -> None
         "state_shared_lookahead_fusion_previous_action_attenuated_v1"
     )
     assert report["previous_action_observation_gain"] == 0.1
+    assert report["previous_action_observation_gains"] == [0.1, 0.1, 0.1]
     assert report["previous_action_observation_contract"] == (
         "attenuated_after_normalization_v1"
     )
+
+
+def test_channel_selective_previous_action_contract_is_recorded(tmp_path: Path) -> None:
+    dataset = tmp_path / "zero_labels.npz"
+    _write_dataset(dataset, np.repeat(np.arange(3, dtype=np.int8), 2))
+    output = tmp_path / "policy"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/two_wheel_balance/train_riser_residual_bc.py",
+            "--dataset",
+            str(dataset),
+            "--output-dir",
+            str(output),
+            "--source-commit",
+            "a" * 40,
+            "--epochs",
+            "1",
+            "--batch-size",
+            "2",
+            "--state-hidden-sizes",
+            "8",
+            "--lookahead-hidden-sizes",
+            "4",
+            "--fusion-hidden-sizes",
+            "8",
+            "--device",
+            "cpu",
+            "--previous-action-observation-gains",
+            "0.1,0.0,0.1",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    report = json.loads((output / "report.json").read_text(encoding="utf-8"))
+    assert report["policy_architecture"] == (
+        "state_shared_lookahead_fusion_previous_action_attenuated_v1"
+    )
+    assert report["previous_action_observation_gain"] is None
+    assert report["previous_action_observation_gains"] == [0.1, 0.0, 0.1]
 
 
 def test_admitted_bc_is_reproducible_for_the_same_seed(tmp_path: Path) -> None:

@@ -89,6 +89,10 @@ def parse_args() -> argparse.Namespace:
         default=1.0,
         help="Fixed gain on normalized previous-action channels inside the policy.",
     )
+    parser.add_argument(
+        "--previous-action-observation-gains",
+        help="Optional comma-separated per-channel gains for vx,wz,riser history.",
+    )
     return parser.parse_args()
 
 
@@ -274,6 +278,24 @@ def scheduled_sampling_probability(
     return maximum * progress
 
 
+def previous_action_observation_gains(args: argparse.Namespace) -> tuple[float, ...]:
+    if args.previous_action_observation_gains is None:
+        gains = (float(args.previous_action_observation_gain),) * len(
+            PREVIOUS_ACTION_INDICES
+        )
+    else:
+        if args.previous_action_observation_gain != 1.0:
+            raise ValueError("scalar and per-channel previous-action gains are exclusive")
+        gains = tuple(
+            float(item) for item in args.previous_action_observation_gains.split(",")
+        )
+    if len(gains) != len(PREVIOUS_ACTION_INDICES) or any(
+        not 0.0 <= gain <= 1.0 for gain in gains
+    ):
+        raise ValueError("previous-action gains must be three values in [0, 1]")
+    return gains
+
+
 def build_sequence_windows(case_ids: np.ndarray, sequence_length: int) -> np.ndarray:
     if case_ids.ndim != 1 or not len(case_ids):
         raise ValueError("case IDs must be a non-empty vector")
@@ -414,13 +436,13 @@ def main() -> int:
     if not 0.0 < args.minimum_improvement_fraction < 1.0:
         raise ValueError("minimum improvement fraction must be in (0, 1)")
     scheduled_sampling_enabled = args.scheduled_previous_action_max_probability > 0.0
-    if not 0.0 <= args.previous_action_observation_gain <= 1.0:
-        raise ValueError("previous-action observation gain must be in [0, 1]")
+    previous_action_gains = previous_action_observation_gains(args)
+    attenuated_previous_action = any(gain < 1.0 for gain in previous_action_gains)
     if args.mask_previous_action_observations and scheduled_sampling_enabled:
         raise ValueError("masking and scheduled previous-action sampling are exclusive")
-    if args.mask_previous_action_observations and args.previous_action_observation_gain != 1.0:
+    if args.mask_previous_action_observations and attenuated_previous_action:
         raise ValueError("masking and previous-action attenuation are exclusive")
-    if scheduled_sampling_enabled and args.previous_action_observation_gain != 1.0:
+    if scheduled_sampling_enabled and attenuated_previous_action:
         raise ValueError("scheduled sampling and previous-action attenuation are exclusive")
     if not 0.0 <= args.scheduled_previous_action_max_probability <= 1.0:
         raise ValueError("scheduled previous-action maximum must be in [0, 1]")
@@ -471,7 +493,7 @@ def main() -> int:
     )
     if masked_observation_indices:
         policy_architecture = MASKED_PREVIOUS_ACTION_POLICY_ARCHITECTURE
-    elif args.previous_action_observation_gain < 1.0:
+    elif attenuated_previous_action:
         policy_architecture = ATTENUATED_PREVIOUS_ACTION_POLICY_ARCHITECTURE
     else:
         policy_architecture = POLICY_ARCHITECTURE
@@ -482,7 +504,7 @@ def main() -> int:
         lookahead_hidden_sizes,
         fusion_hidden_sizes,
         masked_observation_indices,
-        args.previous_action_observation_gain,
+        previous_action_gains,
     ).to(device)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
@@ -710,9 +732,7 @@ def main() -> int:
                 "masked_observation_indices": list(masked_observation_indices),
                 "scheduled_previous_action_enabled": scheduled_sampling_enabled,
                 "scheduled_sequence_length": args.scheduled_sequence_length,
-                "previous_action_observation_gain": (
-                    args.previous_action_observation_gain
-                ),
+                "previous_action_observation_gains": list(previous_action_gains),
                 "dataset_sha256": sha256(args.dataset),
                 "source_commit": args.source_commit,
                 "best_epoch": best_epoch,
@@ -748,7 +768,12 @@ def main() -> int:
         "epochs_run": len(history),
         "observation_normalization_from_train_only": True,
         "masked_observation_indices": list(masked_observation_indices),
-        "previous_action_observation_gain": args.previous_action_observation_gain,
+        "previous_action_observation_gain": (
+            previous_action_gains[0]
+            if len(set(previous_action_gains)) == 1
+            else None
+        ),
+        "previous_action_observation_gains": list(previous_action_gains),
         "previous_action_observation_contract": (
             "masked_after_normalization_v1"
             if masked_observation_indices
@@ -757,7 +782,7 @@ def main() -> int:
                 if scheduled_sampling_enabled
                 else (
                     "attenuated_after_normalization_v1"
-                    if args.previous_action_observation_gain < 1.0
+                    if attenuated_previous_action
                     else "teacher_previous_action_v1"
                 )
             )

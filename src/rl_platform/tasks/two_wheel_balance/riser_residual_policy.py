@@ -53,7 +53,7 @@ class RiserResidualPolicy(nn.Module):
         lookahead_hidden_sizes: Sequence[int] = (64, 64),
         fusion_hidden_sizes: Sequence[int] = (256, 128),
         masked_observation_indices: Sequence[int] = (),
-        previous_action_observation_gain: float = 1.0,
+        previous_action_observation_gain: float | Sequence[float] = 1.0,
     ) -> None:
         super().__init__()
         mean = torch.as_tensor(observation_mean, dtype=torch.float32).reshape(-1)
@@ -69,11 +69,18 @@ class RiserResidualPolicy(nn.Module):
         indices = tuple(sorted(set(int(index) for index in masked_observation_indices)))
         if any(index < 0 or index >= len(OBSERVATION_NAMES) for index in indices):
             raise ValueError("masked observation index is out of range")
-        gain = float(previous_action_observation_gain)
-        if not 0.0 <= gain <= 1.0:
-            raise ValueError("previous-action observation gain must be in [0, 1]")
+        if isinstance(previous_action_observation_gain, (int, float)):
+            gains = (float(previous_action_observation_gain),) * len(
+                PREVIOUS_ACTION_INDICES
+            )
+        else:
+            gains = tuple(float(value) for value in previous_action_observation_gain)
+        if len(gains) != len(PREVIOUS_ACTION_INDICES) or any(
+            not 0.0 <= gain <= 1.0 for gain in gains
+        ):
+            raise ValueError("previous-action observation gains must be three values in [0, 1]")
         observation_mask = torch.ones(len(OBSERVATION_NAMES), dtype=torch.float32)
-        observation_mask[list(PREVIOUS_ACTION_INDICES)] = gain
+        observation_mask[list(PREVIOUS_ACTION_INDICES)] = torch.tensor(gains)
         if indices:
             observation_mask[list(indices)] = 0.0
         self.register_buffer("observation_mask", observation_mask)

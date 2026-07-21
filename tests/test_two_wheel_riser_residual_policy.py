@@ -113,3 +113,17 @@ def test_previous_action_gain_rejects_out_of_range_value() -> None:
             torch.ones(len(OBSERVATION_NAMES)),
             previous_action_observation_gain=1.01,
         )
+
+
+def test_previous_action_channel_gains_are_applied_independently() -> None:
+    policy = RiserResidualPolicy(
+        torch.zeros(len(OBSERVATION_NAMES)),
+        torch.ones(len(OBSERVATION_NAMES)),
+        state_hidden_sizes=(16,),
+        lookahead_hidden_sizes=(8,),
+        fusion_hidden_sizes=(16,),
+        previous_action_observation_gain=(0.1, 0.0, 0.1),
+    )
+    assert policy.observation_mask[list(PREVIOUS_ACTION_INDICES)].tolist() == pytest.approx(
+        [0.1, 0.0, 0.1]
+    )

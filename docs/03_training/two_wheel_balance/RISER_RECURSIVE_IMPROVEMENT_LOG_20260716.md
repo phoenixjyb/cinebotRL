@@ -4767,3 +4767,48 @@ and must state whether its candidate was accepted or rejected.
 - Do not authorize case 78, a perturbation canary, dataset creation, BC, PPO,
   obstacles, or broad rollout until the proposal defines provenance, leakage
   controls, dynamic gates, and one bounded first measurement.
+
+## Round 130: coverage-recovery architecture selects controlled perturbation
+
+- Commit `f0243bf3c31da4077e5cd5ce824633dcbecef373` adds a fail-closed,
+  CPU-only architecture proposal generator and focused negative tests. The
+  authoritative `.98` coverage/DAgger suite passes `22/22`; no Isaac, GPU,
+  runtime namespace, authorization token, dataset, or training process was
+  created.
+- The proposal binds the frozen `30/5/5` split, case-4 and case-21 shadow
+  measurements, the localized state/action audit, the all-79 nominal-plan
+  coverage audit, and the shared teacher-dataset identity. Every input contract
+  check passes. Holdout `[3,5,13,19,24]` remains unchanged and unopened.
+- Controlled perturbation is ranked first. Case 30 is the sole proposed first
+  bounded measurement because it is the nearest existing training case in the
+  nominal command/lookahead audit. The missing state deviation would be added
+  by one deterministic horizontal wrench pulse, disabled by default, without
+  altering plan geometry/timing, teacher commands, or learned commands. Pulse
+  values remain intentionally unset pending a separate CPU review.
+- A transparent split reset is retained only as a fallback. It would
+  permanently retire case 4 from validation, add it to training, and nominate
+  case 78 as the replacement validation candidate. This split is not applied:
+  case 78 currently has kinematic plan admission only and would first require
+  deterministic dynamic qualification, a new immutable split manifest, and a
+  source-tagged/weighted dataset schema.
+- The proposal explicitly keeps case-4 shadow labels unadmitted and records
+  `case4_split_changed=false`, `case78_validation_admitted=false`,
+  `runtime_authorized=false`, `dataset_created=false`,
+  `dagger_authorized=false`, `bc_authorized=false`, and
+  `ppo_authorized=false`. Proposal SHA-256 is
+  `91e50fdf8ec246b86767b5dedc069e20f70cc22e5ff57e91c051a3d1dd197146`.
+
+## Next round after Round 130
+
+- Implement only the CPU-side, disabled-by-default deterministic wrench-pulse
+  contract in riser reference playback. It must be hash-bound, reject missing
+  or conflicting profile fields, emit compact perturbation telemetry, and
+  prove that the disabled/zero profile is command-identical to current
+  playback.
+- Define one bounded case-30 measurement proposal after the runner change. The
+  existing dynamic/safety gates remain unchanged; the measurement must remain
+  trace-only and must independently report physical passage, visited-state
+  coverage relative to the case-4 hotspot, and shadow-teacher label gap.
+- Do not issue a runtime token or launch the canary while implementing the CPU
+  contract. Do not create a DAgger dataset, change the split, open holdout,
+  retrain BC, start PPO, or begin obstacle work.

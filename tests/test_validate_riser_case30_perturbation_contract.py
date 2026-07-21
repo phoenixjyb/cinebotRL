@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import subprocess
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/two_wheel_balance/validate_riser_case30_perturbation_contract.py"
@@ -210,7 +212,15 @@ def test_contract_rejects_runtime_or_training_authorization(tmp_path, monkeypatc
     assert not result["passed"]
 
 
-def test_wrapper_has_no_executable_runtime_path_or_token(tmp_path) -> None:
+def test_wrapper_source_has_no_executable_runtime_path_or_token() -> None:
+    source = WRAPPER.read_text(encoding="utf-8")
+    assert "smoke_riser_reference_playback.py" not in source
+    assert "AUTHORIZED_CASE30" not in source
+    assert "mkdir" not in source
+
+
+@pytest.mark.skipif(os.name == "nt", reason="wrapper executes under WSL bash")
+def test_wrapper_rejects_execute_and_environment_override() -> None:
     execute = subprocess.run(
         ["bash", str(WRAPPER), "--execute"], capture_output=True, text=True
     )
@@ -228,7 +238,3 @@ def test_wrapper_has_no_executable_runtime_path_or_token(tmp_path) -> None:
     )
     assert override.returncode == 7
     assert "conflicting_environment_override" in override.stderr
-    source = WRAPPER.read_text(encoding="utf-8")
-    assert "smoke_riser_reference_playback.py" not in source
-    assert "AUTHORIZED_CASE30" not in source
-    assert "mkdir" not in source

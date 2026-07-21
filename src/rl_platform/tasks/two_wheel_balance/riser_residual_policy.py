@@ -17,6 +17,9 @@ from .riser_residual_dataset import (
 
 
 POLICY_ARCHITECTURE = "state_shared_lookahead_fusion_v1"
+MASKED_PREVIOUS_ACTION_POLICY_ARCHITECTURE = (
+    "state_shared_lookahead_fusion_previous_action_masked_v1"
+)
 
 
 def _encoder(
@@ -45,6 +48,7 @@ class RiserResidualPolicy(nn.Module):
         state_hidden_sizes: Sequence[int] = (128, 128),
         lookahead_hidden_sizes: Sequence[int] = (64, 64),
         fusion_hidden_sizes: Sequence[int] = (256, 128),
+        masked_observation_indices: Sequence[int] = (),
     ) -> None:
         super().__init__()
         mean = torch.as_tensor(observation_mean, dtype=torch.float32).reshape(-1)
@@ -57,6 +61,13 @@ class RiserResidualPolicy(nn.Module):
             raise ValueError("observation standard deviations must be positive")
         self.register_buffer("observation_mean", mean)
         self.register_buffer("observation_std", std)
+        indices = tuple(sorted(set(int(index) for index in masked_observation_indices)))
+        if any(index < 0 or index >= len(OBSERVATION_NAMES) for index in indices):
+            raise ValueError("masked observation index is out of range")
+        observation_mask = torch.ones(len(OBSERVATION_NAMES), dtype=torch.float32)
+        if indices:
+            observation_mask[list(indices)] = 0.0
+        self.register_buffer("observation_mask", observation_mask)
         self.state_observation_count = len(BASE_OBSERVATION_NAMES)
         self.lookahead_count = len(LOOKAHEAD_HORIZONS_S)
         self.lookahead_channel_count = len(LOOKAHEAD_CHANNEL_NAMES)
@@ -75,7 +86,11 @@ class RiserResidualPolicy(nn.Module):
         nn.init.zeros_(self.action_head.bias)
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
-        normalized = (observations - self.observation_mean) / self.observation_std
+        normalized = (
+            (observations - self.observation_mean)
+            / self.observation_std
+            * self.observation_mask
+        )
         state_embedding = self.state_encoder(
             normalized[:, : self.state_observation_count]
         )

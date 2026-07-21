@@ -96,6 +96,21 @@ def test_initial_bc_case4_render_canary_is_validation_only_and_scale_bound() -> 
     assert '"ppo_authorized": False' in source
 
 
+def test_masked_previous_action_bc_runner_is_diagnosis_bound_and_guarded() -> None:
+    source = _read("run_riser_masked_previous_action_bc.sh")
+    assert 'DIAGNOSIS_COMMIT="6f5940c' in source
+    assert 'DIAGNOSIS_SHA256="9c81451e' in source
+    assert "autoregressive_previous_action_exposure_bias" in source
+    assert "--mask-previous-action-observations" in source
+    assert '"masked_observation_indices": [23, 24, 25]' in source
+    assert "state_shared_lookahead_fusion_previous_action_masked_v1" in source
+    assert "RISER_MASKED_BC_AUTHORIZATION_FILE" in source
+    assert "Get-CimInstance Win32_Process" in source
+    assert "rev-parse '@{upstream}'" in source
+    assert '"holdout_opened": False' in source
+    assert '"ppo_authorized": False' in source
+
+
 def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
     source = _read("run_riser_all79_dataset_gate.sh")
     assert "20260717_residual_all79_exact_source_lookahead_v2" in source

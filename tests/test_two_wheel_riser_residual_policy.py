@@ -9,6 +9,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
     LOOKAHEAD_CHANNEL_NAMES,
     LOOKAHEAD_HORIZONS_S,
     OBSERVATION_NAMES,
+    PREVIOUS_ACTION_INDICES,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa: E402
     POLICY_ARCHITECTURE,
@@ -57,4 +58,31 @@ def test_residual_policy_rejects_bad_normalization() -> None:
         RiserResidualPolicy(
             torch.zeros(len(OBSERVATION_NAMES)),
             torch.zeros(len(OBSERVATION_NAMES)),
+        )
+
+
+def test_masked_previous_actions_are_invariant_and_scriptable() -> None:
+    policy = RiserResidualPolicy(
+        torch.zeros(len(OBSERVATION_NAMES)),
+        torch.ones(len(OBSERVATION_NAMES)),
+        state_hidden_sizes=(16,),
+        lookahead_hidden_sizes=(8,),
+        fusion_hidden_sizes=(16,),
+        masked_observation_indices=PREVIOUS_ACTION_INDICES,
+    ).eval()
+    first = torch.randn(4, len(OBSERVATION_NAMES))
+    second = first.clone()
+    second[:, PREVIOUS_ACTION_INDICES] = torch.randn(4, 3) * 100.0
+    scripted = torch.jit.script(policy)
+    with torch.inference_mode():
+        torch.testing.assert_close(policy(first), policy(second))
+        torch.testing.assert_close(scripted(first), scripted(second))
+
+
+def test_residual_policy_rejects_bad_mask_index() -> None:
+    with pytest.raises(ValueError, match="out of range"):
+        RiserResidualPolicy(
+            torch.zeros(len(OBSERVATION_NAMES)),
+            torch.ones(len(OBSERVATION_NAMES)),
+            masked_observation_indices=(len(OBSERVATION_NAMES),),
         )

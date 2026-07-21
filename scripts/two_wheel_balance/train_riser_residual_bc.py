@@ -31,6 +31,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
     PREVIOUS_ACTION_INDICES,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa: E402
+    MASKED_PREVIOUS_ACTION_POLICY_ARCHITECTURE,
     POLICY_ARCHITECTURE,
     RiserResidualPolicy,
 )
@@ -60,6 +61,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=20260716)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--minimum-improvement-fraction", type=float, default=0.05)
+    parser.add_argument(
+        "--mask-previous-action-observations",
+        action="store_true",
+        help="Mask teacher-forced previous-action channels inside the policy.",
+    )
     return parser.parse_args()
 
 
@@ -273,12 +279,21 @@ def main() -> int:
     observation_std = np.maximum(observation_std, 1e-4)
     action_std = train_actions.std(axis=0, dtype=np.float64).astype(np.float32)
     channel_scale = np.maximum(action_std, 0.02)
+    masked_observation_indices = (
+        PREVIOUS_ACTION_INDICES if args.mask_previous_action_observations else ()
+    )
+    policy_architecture = (
+        MASKED_PREVIOUS_ACTION_POLICY_ARCHITECTURE
+        if masked_observation_indices
+        else POLICY_ARCHITECTURE
+    )
     model = RiserResidualPolicy(
         torch.from_numpy(observation_mean),
         torch.from_numpy(observation_std),
         state_hidden_sizes,
         lookahead_hidden_sizes,
         fusion_hidden_sizes,
+        masked_observation_indices,
     ).to(device)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
@@ -399,13 +414,14 @@ def main() -> int:
         torch.save(
             {
                 "schema": "cinebotrl_two_wheel_riser_residual_policy_v2",
-                "policy_architecture": POLICY_ARCHITECTURE,
+                "policy_architecture": policy_architecture,
                 "model_state_dict": model.state_dict(),
                 "state_hidden_sizes": state_hidden_sizes,
                 "lookahead_hidden_sizes": lookahead_hidden_sizes,
                 "fusion_hidden_sizes": fusion_hidden_sizes,
                 "observation_names": OBSERVATION_NAMES,
                 "action_names": ACTION_NAMES,
+                "masked_observation_indices": list(masked_observation_indices),
                 "dataset_sha256": sha256(args.dataset),
                 "source_commit": args.source_commit,
                 "best_epoch": best_epoch,
@@ -419,7 +435,7 @@ def main() -> int:
     report = {
         "schema": "cinebotrl_two_wheel_riser_residual_bc_gate_v2",
         "training_method": "offline_behavior_cloning",
-        "policy_architecture": POLICY_ARCHITECTURE,
+        "policy_architecture": policy_architecture,
         "source_commit": args.source_commit,
         "ppo_started": False,
         "learned_rollout_started": False,
@@ -436,6 +452,12 @@ def main() -> int:
         "best_epoch": best_epoch,
         "epochs_run": len(history),
         "observation_normalization_from_train_only": True,
+        "masked_observation_indices": list(masked_observation_indices),
+        "previous_action_observation_contract": (
+            "masked_after_normalization_v1"
+            if masked_observation_indices
+            else "teacher_previous_action_v1"
+        ),
         "case_balanced_training_loss": True,
         "case_balanced_validation_gate": True,
         "deterministic_algorithms_enabled": True,

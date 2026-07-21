@@ -10,8 +10,11 @@ import pytest
 pytest.importorskip("torch")
 
 from scripts.two_wheel_balance.train_riser_residual_bc import (  # noqa: E402
+    build_sequence_windows,
     case_balanced_mse,
     load_dataset,
+    predict_recursive_previous_action_windows,
+    scheduled_sampling_probability,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
     ACTION_NAMES,
@@ -145,6 +148,60 @@ def test_case_balanced_metric_does_not_overweight_long_cases() -> None:
     cases = np.array([1, 2, 2, 2], dtype=np.int16)
     np.testing.assert_allclose(case_balanced_mse(target, prediction, cases), [0.5])
     np.testing.assert_allclose(np.mean(np.square(prediction - target), axis=0), [0.25])
+
+
+def test_scheduled_sampling_probability_has_bounded_deterministic_ramp() -> None:
+    values = [
+        scheduled_sampling_probability(
+            epoch, maximum=0.8, warmup_epochs=2, ramp_epochs=4
+        )
+        for epoch in range(1, 9)
+    ]
+    np.testing.assert_allclose(values, [0.0, 0.0, 0.2, 0.4, 0.6, 0.8, 0.8, 0.8])
+    with pytest.raises(ValueError, match="maximum"):
+        scheduled_sampling_probability(1, maximum=1.1, warmup_epochs=0, ramp_epochs=1)
+
+
+def test_sequence_windows_never_cross_case_boundaries() -> None:
+    cases = np.array([4, 4, 4, 4, 7, 7, 7], dtype=np.int16)
+    windows = build_sequence_windows(cases, 3)
+    np.testing.assert_array_equal(
+        windows,
+        np.array([[0, 1, 2], [3, -1, -1], [4, 5, 6]], dtype=np.int64),
+    )
+    for window in windows:
+        active = window[window >= 0]
+        assert len(set(cases[active].tolist())) == 1
+    with pytest.raises(ValueError, match="not contiguous"):
+        build_sequence_windows(np.array([1, 2, 1], dtype=np.int16), 2)
+
+
+def test_recursive_prediction_is_bounded_by_windows_and_cases() -> None:
+    torch = pytest.importorskip("torch")
+
+    class PreviousActionIncrement(torch.nn.Module):
+        def forward(self, observations):
+            return observations[:, PREVIOUS_ACTION_INDICES] + 0.1
+
+    observations = np.zeros((7, len(OBSERVATION_NAMES)), dtype=np.float32)
+    observations[:, PREVIOUS_ACTION_INDICES] = np.array(
+        [[0.0, 0.0, 0.0], [0.8, 0.8, 0.8], [0.8, 0.8, 0.8],
+         [0.5, 0.5, 0.5], [0.0, 0.0, 0.0], [0.7, 0.7, 0.7],
+         [0.7, 0.7, 0.7]],
+        dtype=np.float32,
+    )
+    cases = np.array([4, 4, 4, 4, 7, 7, 7], dtype=np.int16)
+    prediction = predict_recursive_previous_action_windows(
+        PreviousActionIncrement(),
+        observations,
+        cases,
+        torch.device("cpu"),
+        sequence_length=3,
+        window_batch_size=2,
+    )
+    np.testing.assert_allclose(
+        prediction[:, 0], [0.1, 0.2, 0.3, 0.6, 0.1, 0.2, 0.3], atol=1e-6
+    )
 
 
 def test_bc_loader_rejects_source_leakage(tmp_path) -> None:
@@ -289,6 +346,91 @@ def test_masked_previous_action_contract_is_recorded(tmp_path: Path) -> None:
     assert report["previous_action_observation_contract"] == (
         "masked_after_normalization_v1"
     )
+
+
+def test_scheduled_previous_action_contract_is_recorded(tmp_path: Path) -> None:
+    dataset = tmp_path / "zero_labels.npz"
+    _write_dataset(dataset, np.repeat(np.arange(3, dtype=np.int8), 2))
+    output = tmp_path / "policy"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/two_wheel_balance/train_riser_residual_bc.py",
+            "--dataset",
+            str(dataset),
+            "--output-dir",
+            str(output),
+            "--source-commit",
+            "a" * 40,
+            "--epochs",
+            "1",
+            "--batch-size",
+            "2",
+            "--state-hidden-sizes",
+            "8",
+            "--lookahead-hidden-sizes",
+            "4",
+            "--fusion-hidden-sizes",
+            "8",
+            "--device",
+            "cpu",
+            "--scheduled-previous-action-max-probability",
+            "1.0",
+            "--scheduled-previous-action-ramp-epochs",
+            "1",
+            "--scheduled-sequence-length",
+            "2",
+            "--scheduled-sequence-batch-size",
+            "2",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    report = json.loads((output / "report.json").read_text(encoding="utf-8"))
+    assert report["training_method"] == (
+        "offline_behavior_cloning_deterministic_scheduled_sampling"
+    )
+    assert report["policy_architecture"] == "state_shared_lookahead_fusion_v1"
+    assert report["masked_observation_indices"] == []
+    assert report["previous_action_observation_contract"] == (
+        "deterministic_scheduled_policy_previous_action_v1"
+    )
+    assert report["scheduled_previous_action_enabled"]
+    assert report["sequence_windows_cross_case_boundaries"] is False
+    assert report["scheduled_sampling_detaches_previous_prediction"]
+    assert report["recursive_previous_action_split_results"]
+    assert report["recursive_improvement_checks"]["validation"] == [False] * 3
+    assert report["history"][0]["scheduled_previous_action_probability"] == 1.0
+    assert report["history"][0]["scheduled_previous_action_rows"] == 1
+
+
+def test_mask_and_scheduled_previous_action_modes_are_exclusive(tmp_path: Path) -> None:
+    dataset = tmp_path / "zero_labels.npz"
+    _write_dataset(dataset, np.repeat(np.arange(3, dtype=np.int8), 2))
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/two_wheel_balance/train_riser_residual_bc.py",
+            "--dataset",
+            str(dataset),
+            "--output-dir",
+            str(tmp_path / "policy"),
+            "--source-commit",
+            "a" * 40,
+            "--mask-previous-action-observations",
+            "--scheduled-previous-action-max-probability",
+            "0.5",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "exclusive" in result.stderr
 
 
 def test_admitted_bc_is_reproducible_for_the_same_seed(tmp_path: Path) -> None:

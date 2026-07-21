@@ -28,6 +28,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
     ACTION_NAMES,
     LOOKAHEAD_HORIZONS_S,
     OBSERVATION_NAMES,
+    PREVIOUS_ACTION_INDICES,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa: E402
     POLICY_ARCHITECTURE,
@@ -35,7 +36,11 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa:
 )
 
 
-EXPECTED_DATASET_SCHEMA = "cinebotrl_two_wheel_riser_residual_merged_v2"
+SUPPORTED_DATASET_SCHEMAS = {
+    "cinebotrl_two_wheel_riser_residual_merged_v2",
+    "cinebotrl_two_wheel_riser_residual_merged_v3",
+}
+INITIAL_TEACHER_DATASET_SCHEMA = "cinebotrl_two_wheel_riser_residual_merged_v3"
 SPLIT_CODES = {"train": 0, "validation": 1, "holdout": 2}
 
 
@@ -69,15 +74,18 @@ def sha256(path: Path) -> str:
 def load_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarray]]:
     with np.load(path, allow_pickle=False) as data:
         metadata = json.loads(str(data["metadata_json"].item()))
-        required = (
+        schema = metadata.get("schema")
+        required = [
             "observations",
             "actions",
             "case_ids",
             "split_labels",
             "source_index",
-        )
+        ]
+        if schema == INITIAL_TEACHER_DATASET_SCHEMA:
+            required.append("action_valid_mask")
         arrays = {name: np.asarray(data[name]) for name in required}
-    if metadata.get("schema") != EXPECTED_DATASET_SCHEMA:
+    if schema not in SUPPORTED_DATASET_SCHEMAS:
         raise ValueError("wrong merged dataset schema")
     if metadata.get("observation_names") != list(OBSERVATION_NAMES):
         raise ValueError("merged observation contract mismatch")
@@ -137,6 +145,42 @@ def load_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarray]]:
         observed = sorted(int(case) for case in np.unique(case_ids[labels == code]))
         if declared != observed:
             raise ValueError(f"metadata {name} cases mismatch")
+    if schema == INITIAL_TEACHER_DATASET_SCHEMA:
+        scales = np.asarray(metadata.get("action_scales"), dtype=np.float64)
+        valid_mask = arrays["action_valid_mask"]
+        v3_checks = {
+            "dataset_admitted": metadata.get("dataset_admission_passed") is True,
+            "valid_for_initialization": metadata.get("valid_for_bc_initialization")
+            is True,
+            "training_closed": metadata.get("bc_authorized") is False
+            and metadata.get("ppo_authorized") is False
+            and metadata.get("training_started") is False,
+            "frozen_scales": scales.shape == (3,)
+            and np.isfinite(scales).all()
+            and bool(np.all(scales > 0.0)),
+            "zero_clip": metadata.get("action_clip_ratio") == [0.0, 0.0, 0.0],
+            "previous_contract": metadata.get("previous_action_contract")
+            == "previous_normalized_teacher_action_v1"
+            and metadata.get("previous_action_rebuilt") is True,
+            "action_mask_shape": valid_mask.shape == actions.shape,
+            "all_actions_valid": valid_mask.shape == actions.shape
+            and bool(np.all(valid_mask == 1.0)),
+            "no_source_actions": metadata.get("source_action_labels_used") is False,
+            "no_physical_gimbal_actions": metadata.get(
+                "physical_gimbal_labels_used_as_actions"
+            )
+            is False,
+        }
+        if not all(v3_checks.values()):
+            raise ValueError(f"v3 dataset admission failed: {v3_checks}")
+        for case in unique_cases:
+            mask = case_ids == case
+            case_actions = actions[mask]
+            previous = observations[mask][:, PREVIOUS_ACTION_INDICES]
+            if not np.allclose(previous[0], 0.0, atol=1e-12) or not np.allclose(
+                previous[1:], case_actions[:-1], atol=1e-7
+            ):
+                raise ValueError(f"v3 previous-action recurrence failed for case {case}")
     return metadata, arrays
 
 

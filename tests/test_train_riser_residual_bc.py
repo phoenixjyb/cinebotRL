@@ -17,13 +17,16 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
     ACTION_NAMES,
     LOOKAHEAD_HORIZONS_S,
     OBSERVATION_NAMES,
+    PREVIOUS_ACTION_INDICES,
 )
 
 
-def _write_dataset(path, split_labels: np.ndarray) -> None:
+def _write_dataset(
+    path, split_labels: np.ndarray, *, schema: str = "cinebotrl_two_wheel_riser_residual_merged_v2"
+) -> None:
     row_count = len(split_labels)
     metadata = {
-        "schema": "cinebotrl_two_wheel_riser_residual_merged_v2",
+        "schema": schema,
         "case_count": 3,
         "row_count": row_count,
         "trajectory_leakage": False,
@@ -32,16 +35,35 @@ def _write_dataset(path, split_labels: np.ndarray) -> None:
         "lookahead_horizons_s": list(LOOKAHEAD_HORIZONS_S),
         "split_cases": {"train": [1], "validation": [2], "holdout": [3]},
     }
+    observations = np.zeros((row_count, len(OBSERVATION_NAMES)), dtype=np.float32)
+    actions = np.zeros((row_count, len(ACTION_NAMES)), dtype=np.float32)
+    extra = {}
+    if schema == "cinebotrl_two_wheel_riser_residual_merged_v3":
+        metadata.update(
+            {
+                "dataset_admission_passed": True,
+                "valid_for_bc_initialization": True,
+                "bc_authorized": False,
+                "ppo_authorized": False,
+                "training_started": False,
+                "action_scales": [0.35, 0.4, 0.1],
+                "action_clip_ratio": [0.0, 0.0, 0.0],
+                "previous_action_contract": "previous_normalized_teacher_action_v1",
+                "previous_action_rebuilt": True,
+                "source_action_labels_used": False,
+                "physical_gimbal_labels_used_as_actions": False,
+            }
+        )
+        extra["action_valid_mask"] = np.ones_like(actions, dtype=np.float32)
     np.savez_compressed(
         path,
         metadata_json=np.array(json.dumps(metadata)),
-        observations=np.zeros(
-            (row_count, len(OBSERVATION_NAMES)), dtype=np.float32
-        ),
-        actions=np.zeros((row_count, len(ACTION_NAMES)), dtype=np.float32),
+        observations=observations,
+        actions=actions,
         case_ids=np.repeat(np.arange(1, 4, dtype=np.int16), 2),
         split_labels=split_labels,
         source_index=np.repeat(np.arange(3, dtype=np.int16), 2),
+        **extra,
     )
 
 
@@ -86,6 +108,35 @@ def test_bc_loader_accepts_case_disjoint_splits(tmp_path) -> None:
     metadata, arrays = load_dataset(path)
     assert metadata["case_count"] == 3
     assert arrays["observations"].shape == (6, len(OBSERVATION_NAMES))
+
+
+def test_bc_loader_accepts_admitted_v3_previous_action_dataset(tmp_path) -> None:
+    path = tmp_path / "accepted_v3.npz"
+    _write_dataset(
+        path,
+        np.repeat(np.arange(3, dtype=np.int8), 2),
+        schema="cinebotrl_two_wheel_riser_residual_merged_v3",
+    )
+    metadata, arrays = load_dataset(path)
+    assert metadata["valid_for_bc_initialization"]
+    assert arrays["action_valid_mask"].shape == arrays["actions"].shape
+
+
+def test_bc_loader_rejects_broken_v3_previous_action_recurrence(tmp_path) -> None:
+    path = tmp_path / "broken_v3.npz"
+    _write_dataset(
+        path,
+        np.repeat(np.arange(3, dtype=np.int8), 2),
+        schema="cinebotrl_two_wheel_riser_residual_merged_v3",
+    )
+    with np.load(path, allow_pickle=False) as data:
+        payload = {name: np.asarray(data[name]) for name in data.files}
+    observations = payload["observations"].copy()
+    observations[1, PREVIOUS_ACTION_INDICES[0]] = 0.5
+    payload["observations"] = observations
+    np.savez_compressed(path, **payload)
+    with pytest.raises(ValueError, match="previous-action recurrence"):
+        load_dataset(path)
 
 
 def test_case_balanced_metric_does_not_overweight_long_cases() -> None:

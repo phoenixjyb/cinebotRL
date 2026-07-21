@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from scripts.two_wheel_balance.validate_riser_case78_dynamic_contract_v2 import (
     EXPECTED_CONTROLLER,
     EXPECTED_HEARTBEAT,
@@ -72,6 +75,19 @@ def test_v2_semantic_contract_is_cpu_only_and_ready() -> None:
     assert all(checks.values())
 
 
+def test_checked_in_v2_contract_matches_semantic_contract() -> None:
+    _, fallback, summary, wall_audit, timeout_final = valid_inputs()
+    contract_path = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/case78_dynamic_cpu_contract_v2.json"
+    )
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    checks = semantic_checks(
+        contract, fallback, summary, wall_audit, timeout_final
+    )
+    assert all(checks.values())
+
+
 def test_v2_semantic_contract_rejects_runtime_or_timeout_mutation() -> None:
     contract, fallback, summary, wall_audit, timeout_final = valid_inputs()
     contract["runtime_authorized"] = True
@@ -93,4 +109,3 @@ def test_v2_semantic_contract_rejects_heartbeat_command_mutation() -> None:
         contract, fallback, summary, wall_audit, timeout_final
     )
     assert not checks["heartbeat_contract_matches"]
-

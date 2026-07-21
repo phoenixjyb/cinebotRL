@@ -1,0 +1,159 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case78_dynamic_cpu_contract_v2",
+  "case": 78,
+  "current_split": "unused",
+  "reviewed_parent_commit": "ed207f41a04c492ce7a2be52bda80fc106eb8d92",
+  "namespace": "20260721_case78_dynamic_qualification_v2_heartbeat_exclusive",
+  "plan_contract": {
+    "case": 78,
+    "plan_sha256": "28c69e20778e738d1ac4a0ae299160ed5764089094c2a0f9a018c49790860569",
+    "source_pose_count": 6870,
+    "execution_state_count": 6870,
+    "source_duration_s": 135.487646,
+    "execution_duration_s": 192.29956737098348
+  },
+  "controller_arguments": {
+    "trajectory_command_source": "deterministic_teacher",
+    "controller_wz_kp": 1.05,
+    "maximum_duration_scale": 3.0,
+    "camera_lever_arm_compensation_enabled": true,
+    "camera_lever_arm_compensation_gain": 1.0,
+    "maximum_camera_lever_arm_correction_m": 0.05,
+    "residual_policy": null,
+    "zero_policy_action": false
+  },
+  "dynamic_gate_thresholds": {
+    "maximum_pitch_deg": 12.0,
+    "maximum_position_p95_m": 0.15,
+    "maximum_position_error_m": 0.25,
+    "maximum_attitude_p95_deg": 5.0,
+    "maximum_attitude_error_deg": 10.0,
+    "maximum_riser_servo_error_m": 0.03,
+    "maximum_proxy_servo_error_deg": 5.0,
+    "maximum_internal_proxy_rate_deg_s": 360.0,
+    "maximum_saturation_ratio": 0.2
+  },
+  "runtime_heartbeat": {
+    "schema": "cinebotrl_two_wheel_riser_runtime_heartbeat_v1",
+    "relative_path": "runtime_heartbeat.json",
+    "interval_policy_steps": 2000,
+    "atomic_replace": true,
+    "changes_commands": false,
+    "creates_dataset": false
+  },
+  "wall_timeout_derivation": {
+    "reference_case": 30,
+    "reference_completed_steps": 11494,
+    "reference_virtual_step_duration_s": 57.47,
+    "reference_host_filesystem_envelope_s": 440.0,
+    "conservative_policy_step_rate_hz": 26.12272727272727,
+    "target_maximum_steps": 115381,
+    "estimated_maximum_loop_wall_s": 4416.881851400731,
+    "startup_shutdown_and_diagnosis_margin_s": 900.0,
+    "wall_timeout_s": 5400
+  },
+  "identities": {
+    "fallback_proposal": {
+      "path": "artifacts/two_wheel_riser/20260721_case4_split_reset_fallback_proposal_v1_cpu/proposal.json",
+      "sha256": "975bfa46cede07daa70ae36f81c354ea707898a38addf2fe54ec73a75aaf8072"
+    },
+    "case78_plan": {
+      "path": "artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu/case_0078_smoothed_riser_plan_v1.npz",
+      "sha256": "28c69e20778e738d1ac4a0ae299160ed5764089094c2a0f9a018c49790860569"
+    },
+    "plan_manifest": {
+      "path": "artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu/manifest.json",
+      "sha256": "8351514a361d3be4e5fbf57f2dbb019a7d8d2f5b86e89cea2553a1cfda3c64a1"
+    },
+    "plan_summary": {
+      "path": "artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu/summary.json",
+      "sha256": "72bdb9b64f71bde125507944a0f43f244bfb766e445e996693fba67270cb104d"
+    },
+    "lqr_gains": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+      "sha256": "2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6",
+      "git_blob_sha1": "70ecdd8ae6b7ce09574a97a8581229cb90add623"
+    },
+    "robot_build_audit": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/build_audit.json",
+      "sha256": "8be2b59a03a6c22838795ad361a86bf0f60a7534aeacd62893013f0ee27b40d9",
+      "git_blob_sha1": "83f8715d05be714dd8dcb2b0a9f47ef3f4bec8e9"
+    },
+    "robot_urdf": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.urdf",
+      "sha256": "603cecfc5b54e659f5d030023a69a3b42d6567f66d2771fbb7127d186f1a9afa",
+      "git_blob_sha1": "c70bf24a3189ccd24553287590dcfd191737ab33"
+    },
+    "robot_usd": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd",
+      "sha256": "89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0",
+      "git_blob_sha1": "b25242c27c781b5aad4fadefb0cbf54398a9a75a"
+    },
+    "playback": {
+      "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+      "sha256": "a2bf0cbb3714d1d5d61b12ec2ad85c74079fc336fe2d9d77adcbee6e5d71a0cf",
+      "git_blob_sha1": "05d85d75caf3f9c66b42ca6ee64b75033c19fdb2"
+    },
+    "heartbeat_helper": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/runtime_heartbeat.py",
+      "sha256": "042d210bd6e0cc4d26d650f43efd73fc443d76404095f8f25619dbe6300867a9",
+      "git_blob_sha1": "450f5fbd61e165ff3a741325438e0a61098d8d1c"
+    },
+    "riser_loader": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_playback.py",
+      "sha256": "6bdd456385cf32a274fc6d119def2b7fb1c5a9049b628ce3fb92a52d00eba6ae",
+      "git_blob_sha1": "d60f4f2ed8022fac520356a7d0d5ea8ac305a762"
+    },
+    "tracking": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/whole_body_tracking.py",
+      "sha256": "f2cfe1abcaf1f225461b0ccfa9d26ab205e2dc9624047be77edeab9f67f754e7",
+      "git_blob_sha1": "e86d8578b5c9dcbfe634949355b01191e1cf2996"
+    },
+    "riser_control": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_control.py",
+      "sha256": "1bbd9c892f565fcfdea2be3567038db14454bc9d2b864df1326cfac5adc16738",
+      "git_blob_sha1": "a56aaa6810f5e75ddbdd9f4897b183df4b1540ff"
+    },
+    "recovery_evidence": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_recovery_evidence.py",
+      "sha256": "bae6830c63fad14323008ea774fa4a70583181a4d614c52ed08bdb2510173750",
+      "git_blob_sha1": "bb86eac22a91a3129f9e0082e81679a5cff297b8"
+    },
+    "timing_handoff": {
+      "path": "docs/03_training/two_wheel_balance/RISER_SMOOTHED_PLAN_HANDOFF_20260717.md",
+      "sha256": "73f56600f831d0df3545ee07d8eced7e7d2e8c87bbc2c11a69f4dfcb72aab56d",
+      "git_blob_sha1": "782eb03200410801c6c89f4f03789ace9c9a17dc"
+    },
+    "wall_bound_audit": {
+      "path": "artifacts/two_wheel_riser/20260721_case78_runtime_wall_bound_v2_cpu/report.json",
+      "sha256": "dc99f0a8e48dc859147e93a38b4723a05fb8ea7ee8a2df8e7db054d4faab9663"
+    },
+    "runtime_timeout_final": {
+      "path": "artifacts/two_wheel_riser/20260721_case78_dynamic_qualification_v1_exclusive/final_status.json",
+      "sha256": "94fe6c39ae9550802979ddd68fcbf45ef3d1964600db8afa01a69ddd804defb8"
+    },
+    "validator_v2": {
+      "path": "scripts/two_wheel_balance/validate_riser_case78_dynamic_contract_v2.py",
+      "sha256": "9656493e8a2c34aebc89d44815f8625000783838f5bb0333e8e65d1bd8d173f6",
+      "git_blob_sha1": "7d1ccfebc008bc59e02eb74b4050a41d9084f7e9"
+    },
+    "preflight_wrapper_v2": {
+      "path": "scripts/two_wheel_balance/run_riser_case78_dynamic_preflight_v2.sh",
+      "sha256": "b8a76cc511871e58cc901499dab723e4b34767bb9801f822e99c2e50c8ce95cf",
+      "git_blob_sha1": "87fb9b863fc9d8eebc85dca507001b3f7e612da7"
+    }
+  },
+  "one_case_only": true,
+  "maximum_runtime_seconds": 5400,
+  "cpu_preflight_ready": true,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "dynamic_qualification_authorized": false,
+  "split_change_authorized": false,
+  "dataset_creation_authorized": false,
+  "dagger_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "holdout_opened": false,
+  "valid_for_training": false
+}

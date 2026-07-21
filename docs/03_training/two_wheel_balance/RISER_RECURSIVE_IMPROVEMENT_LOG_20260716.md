@@ -4722,3 +4722,48 @@ and must state whether its candidate was accepted or rejected.
 - Keep GPU runtime, DAgger capture, BC retraining, PPO, holdout, obstacles, and
   broad rollout closed until a coverage-expansion proposal is independently
   reviewable and selects exactly one bounded next measurement.
+
+## Round 129: unused exact-source plans do not close the missing coverage
+
+- Commit `6939ba0` adds a CPU-only plan-command coverage audit. Focused `.98`
+  tests pass `49/49`. It verifies all 79 v16 plan files, the sealed
+  manifest/summary, 70 timing/transition/kinematic passes, 40 current dataset
+  cases, 30 existing training cases, and 30 unused admitted cases. No Isaac,
+  token, runtime namespace, dataset, or training process was created.
+- The unused admitted pool is
+  `[20,42,43,44,46,47,48,49,50,51,54,55,56,57,58,59,60,61,62,63,64,65,69,72,73,75,76,77,78,79]`.
+  Current train, validation, and holdout cases are excluded. The nine v16
+  kinematic rejects `[1,27,29,35,38,39,40,45,71]` are also excluded.
+- The comparison uses 42 nominal plan features: current
+  `[vx,wz,riser-rate]` plus `0.25/0.50/1.00 s` lookahead base, camera,
+  attitude, riser, and feed-forward deltas. Features are normalized over all
+  70 admitted plans. Target times are the same 256 deterministic samples from
+  case 4's 4,682-row shadow-shift region; no simulated-state or dynamic-pass
+  claim is inferred from plan similarity.
+- Existing training case 30 is the strongest command-region baseline with
+  score `0.831104`; cases 31 and 18 follow at `0.839955/0.904083`. Best unused
+  case 78 scores `1.021636`, followed by case 20 at `1.022422` and case 64 at
+  `1.092030`. Case 78 is therefore worse than the existing baseline, with
+  unused-to-existing ratio `1.229252` against the fixed `<=0.80` material
+  improvement gate.
+- The fail-closed result is
+  `no_unused_admitted_plan_materially_improves_command_coverage`, with
+  `proposed_shadow_measurement_cases=[]`. Report SHA-256 is
+  `9af02fb895d23a3fea0bf76bf41db219c65a172bd987b90f31c7deebd1ed37d4`.
+  Case 78 and every other unused plan remain runtime-disabled; case-4 labels,
+  holdout, DAgger, BC, and PPO remain closed.
+
+## Next round after Round 129
+
+- Prepare a CPU-only architecture proposal comparing two honest ways to add
+  the missing state coverage: a transparent split reset that permanently
+  retires case 4 as validation before admitting its on-policy shadow labels,
+  versus controlled perturbation of an existing training trajectory with
+  separately generated on-policy teacher labels.
+- Preserve holdout `[3,5,13,19,24]` unchanged and unopened. A split reset must
+  nominate a fresh, dynamically qualified validation replacement before case
+  4 can enter training; it must never continue reporting case-4 validation
+  metrics after that change.
+- Do not authorize case 78, a perturbation canary, dataset creation, BC, PPO,
+  obstacles, or broad rollout until the proposal defines provenance, leakage
+  controls, dynamic gates, and one bounded first measurement.

@@ -224,6 +224,38 @@ def test_case4_shadow_teacher_route_is_measurement_only_and_guarded() -> None:
     assert "rev-parse '@{upstream}'" in source
 
 
+def test_case21_shadow_teacher_route_is_train_split_measurement_only() -> None:
+    source = _read("run_riser_case21_shadow_teacher_measurement.sh")
+    assert "20260721_case21_shadow_teacher_measurement_v1_exclusive" in source
+    assert "RISER_CASE21_SHADOW_TEACHER_AUTHORIZATION_FILE" in source
+    assert 'CASE=21' in source
+    assert 'PADDED=0021' in source
+    assert 'PROPOSAL_SHA256="5bc65581' in source
+    assert 'RANKING_SHA256="60197808' in source
+    assert 'TEACHER_GATE_SHA256="35a72e76' in source
+    assert 'TEACHER_GATE_WIN="$WIN_ROOT' in source
+    assert '"proposed_cases") == [21]' in source
+    assert '"proposed_case_split") == "train"' in source
+    assert '"split": "train"' in source
+    assert "assert_gpu_free" in source
+    assert "Get-CimInstance Win32_Process" in source
+    assert "--shadow-teacher-trace-dir" in source
+    assert "--residual-policy \"$POLICY_WIN\"" in source
+    assert "diagnose_riser_shadow_teacher_gap.py" in source
+    assert "applied_command_reconstruction" in source
+    assert '"dataset_created": False' in source
+    assert '"valid_for_training": False' in source
+    assert '"dagger_authorized": False' in source
+    assert '"bc_authorized": False' in source
+    assert '"ppo_authorized": False' in source
+    assert "--dataset-dir" not in source
+    assert "--raw-teacher-dir" not in source
+    assert "rev-parse '@{upstream}'" in source
+    assert 'if gate_path.is_file()' in source
+    assert 'if trace_path.is_file()' in source
+    assert 'if diagnosis_path.is_file()' in source
+
+
 def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
     source = _read("run_riser_all79_dataset_gate.sh")
     assert "20260717_residual_all79_exact_source_lookahead_v2" in source

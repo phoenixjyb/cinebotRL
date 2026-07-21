@@ -221,6 +221,48 @@ def analyze_fields(
     return rows, groups, peak_index, excess
 
 
+def interpret_groups(groups: dict[str, dict]) -> dict[str, object]:
+    magnitude_dominant = max(
+        groups,
+        key=lambda name: groups[name]["normalized_envelope_pre_peak_max"],
+    )
+    tracking_associated = max(
+        groups,
+        key=lambda name: groups[name]["correlation_with_positive_excess_error"],
+    )
+    precursor_candidates = [
+        name
+        for name in groups
+        if name != "camera"
+        and groups[name]["onset_phase_time_s"] is not None
+        and groups[name]["correlation_with_positive_excess_error"] > 0.0
+    ]
+    precursor = (
+        max(
+            precursor_candidates,
+            key=lambda name: groups[name]["correlation_with_positive_excess_error"],
+        )
+        if precursor_candidates
+        else None
+    )
+    response_like = sorted(
+        [
+            name
+            for name in groups
+            if groups[name]["onset_phase_time_s"] is not None
+            and groups[name]["correlation_with_positive_excess_error"] < 0.0
+        ],
+        key=lambda name: groups[name]["normalized_envelope_pre_peak_max"],
+        reverse=True,
+    )
+    return {
+        "magnitude_dominant_group": magnitude_dominant,
+        "tracking_outcome_associated_group": tracking_associated,
+        "non_output_precursor_candidate_group": precursor,
+        "response_like_anticorrelated_groups": response_like,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--teacher-gate", type=Path, required=True)
@@ -287,7 +329,7 @@ def main() -> int:
         key=lambda name: groups[name]["normalized_envelope_pre_peak_max"],
         reverse=True,
     )
-    dominant_group = ranked_groups[0]
+    interpretation = interpret_groups(groups)
     peak_phase = float(learned["phase_time_s"][peak_index])
     peak_error = float(learned["position_error_m"][peak_index])
     aligned_teacher = align_teacher_to_learned(teacher, learned)
@@ -354,7 +396,7 @@ def main() -> int:
     for metrics in groups.values():
         metrics.pop("normalized_envelope")
     report = {
-        "schema": "cinebotrl_two_wheel_riser_coarse_physical_covariate_shift_v1",
+        "schema": "cinebotrl_two_wheel_riser_coarse_physical_covariate_shift_v2",
         "case": args.case,
         "split": "validation",
         "inputs": {
@@ -383,11 +425,26 @@ def main() -> int:
             "trace_peak_position_error_m": peak_error,
             "trace_peak_excess_position_error_m": float(excess[peak_index]),
         },
-        "dominant_pre_peak_group": dominant_group,
+        "group_interpretation": interpretation,
         "ranked_groups": ranked_groups,
         "group_metrics": groups,
         "ranked_field_metrics": field_rows,
-        "classification": "coarse_physical_state_covariate_shift_observed",
+        "classification": (
+            f"coarse_{interpretation['non_output_precursor_candidate_group']}_state_"
+            "covariate_shift_candidate"
+            if interpretation["non_output_precursor_candidate_group"] is not None
+            else "coarse_state_covariate_shift_without_positive_precursor"
+        ),
+        "causal_interpretation": {
+            "camera_group_is_tracking_outcome_coupled": True,
+            "negative_correlation_is_not_precursor_evidence": True,
+            "precursor_selection_excludes_camera_group": True,
+            "statement": (
+                "Magnitude-dominant gimbal/balance deviations may be compensatory. "
+                "The selected non-output precursor is only a candidate until a "
+                "policy-rate full-observation trace establishes temporal ordering."
+            ),
+        },
         "limitations": [
             "The runtime JSON trace is nominally 1 Hz, not policy rate.",
             "The full 65-D learned observation, lookahead vectors, and policy-rate actions were not persisted.",

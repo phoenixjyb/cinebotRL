@@ -5,6 +5,7 @@ from scripts.two_wheel_balance.diagnose_riser_physical_covariate_shift import (
     align_teacher_to_learned,
     analyze_fields,
     flatten_trace,
+    interpret_groups,
     wrapped_delta,
 )
 
@@ -66,3 +67,30 @@ def test_analysis_localizes_pre_peak_base_shift() -> None:
     assert groups["base"]["onset_phase_time_s"] == 1.0
     assert excess[-1] == pytest.approx(0.12)
     assert fields[0]["group"] == "base"
+    interpretation = interpret_groups(groups)
+    assert interpretation["non_output_precursor_candidate_group"] == "base"
+
+
+def test_interpretation_does_not_confuse_anticorrelated_magnitude_with_precursor() -> None:
+    groups = {
+        "gimbal": {
+            "normalized_envelope_pre_peak_max": 3.0,
+            "correlation_with_positive_excess_error": -0.4,
+            "onset_phase_time_s": 2.0,
+        },
+        "camera": {
+            "normalized_envelope_pre_peak_max": 0.8,
+            "correlation_with_positive_excess_error": 0.9,
+            "onset_phase_time_s": None,
+        },
+        "base": {
+            "normalized_envelope_pre_peak_max": 2.0,
+            "correlation_with_positive_excess_error": 0.6,
+            "onset_phase_time_s": 3.0,
+        },
+    }
+    result = interpret_groups(groups)
+    assert result["magnitude_dominant_group"] == "gimbal"
+    assert result["tracking_outcome_associated_group"] == "camera"
+    assert result["non_output_precursor_candidate_group"] == "base"
+    assert result["response_like_anticorrelated_groups"] == ["gimbal"]

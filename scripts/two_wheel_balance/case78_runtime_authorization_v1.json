@@ -1,0 +1,43 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case78_runtime_authorization_v1",
+  "case": 78,
+  "current_split": "unused",
+  "reviewed_cpu_commit": "dacb00b222cce46289789f12e576764fbc326d2e",
+  "runtime_implementation_commit": "d3b541dfcf1b8a9f2f099fecb8b4a13dc8e0088e",
+  "namespace": "20260721_case78_dynamic_qualification_v1_exclusive",
+  "runtime_authorization_token_sha256": "889abdbb2362968fa7e3c05e4ba84e23ee9cf3b52eaf1da05e0a1655d64faa28",
+  "identities": {
+    "cpu_contract": {
+      "path": "scripts/two_wheel_balance/case78_dynamic_cpu_contract_v1.json",
+      "sha256": "c3d77a1110a46c5b2a1e60dd1a33d3fa19ca22cb6c3b992d5ebcfee80b9950e5",
+      "git_blob_sha1": "95fe36ca25d9b4e1041e15e54391f7e270ae6e26"
+    },
+    "runtime_wrapper": {
+      "path": "scripts/two_wheel_balance/run_riser_case78_dynamic_canary.sh",
+      "sha256": "2f85e6daa56cbbfa788abc70b9e099436a7c3a7224f1cb63fdbd130baaf9863b",
+      "git_blob_sha1": "92df3d2d5a31c0d7e5c559f183e3041be467c1ac"
+    },
+    "runtime_summarizer": {
+      "path": "scripts/two_wheel_balance/summarize_riser_case78_dynamic_canary.py",
+      "sha256": "0aaeef346aafa4e09e23879f14aa6a02db6497c388fd1e8131841724d0f7df57",
+      "git_blob_sha1": "31b4600b69ff63c5255fbcdb3b257233a0606b27"
+    },
+    "runtime_validator": {
+      "path": "scripts/two_wheel_balance/validate_riser_case78_runtime_authorization.py",
+      "sha256": "1a93b1959b2f0b491d8e8798991e6680422fead2dc06ae87e893c8dea024c901",
+      "git_blob_sha1": "df817b4d151604f588f8275118de19562d2b6335"
+    }
+  },
+  "one_case_only": true,
+  "maximum_runtime_seconds": 900,
+  "runtime_authorized": true,
+  "gpu_launch_authorized": true,
+  "dynamic_qualification_authorized": true,
+  "split_change_authorized": false,
+  "dataset_creation_authorized": false,
+  "dagger_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "holdout_opened": false,
+  "valid_for_training": false
+}

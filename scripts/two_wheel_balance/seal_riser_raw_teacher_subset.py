@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import re
 import subprocess
 from typing import Any
 
@@ -35,10 +37,28 @@ def identity(path: Path) -> dict[str, str]:
     return {"path": str(path.resolve()), "sha256": sha256(path)}
 
 
+def windows_to_wsl_path(value: str) -> str:
+    match = re.match(r"^([A-Za-z]):[\\/](.*)$", value)
+    if match is None:
+        raise ValueError(f"cannot translate Windows path to WSL: {value}")
+    drive, suffix = match.groups()
+    normalized_suffix = suffix.replace("\\", "/")
+    return f"/mnt/{drive.lower()}/{normalized_suffix}"
+
+
 def git_value(*args: str) -> str:
-    return subprocess.check_output(
-        ["git", *args], cwd=PROJECT_ROOT, text=True
-    ).strip()
+    try:
+        return subprocess.check_output(
+            ["git", *args], cwd=PROJECT_ROOT, text=True, stderr=subprocess.PIPE
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        if os.name != "nt":
+            raise
+        # WSL-launched Windows Python can inherit a Git shim with an invalid cwd.
+        wsl_root = windows_to_wsl_path(str(PROJECT_ROOT))
+        return subprocess.check_output(
+            ["wsl.exe", "--exec", "git", "-C", wsl_root, *args], text=True
+        ).strip()
 
 
 def parse_cases(value: str) -> list[int]:

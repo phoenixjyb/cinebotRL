@@ -166,3 +166,10 @@ def test_rejects_forged_retained_raw_hash(tmp_path: Path, monkeypatch) -> None:
     assert not payload["passed"]
     row = next(row for row in payload["retained_case_evidence"] if row["case"] == 7)
     assert not row["checks"]["raw_hash"]
+
+
+def test_translates_windows_repository_path_for_internal_wsl_git() -> None:
+    assert (
+        sealer.windows_to_wsl_path(r"G:\wSpace\cinebotRL-two-wheel-riser")
+        == "/mnt/g/wSpace/cinebotRL-two-wheel-riser"
+    )

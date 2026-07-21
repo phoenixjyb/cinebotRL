@@ -111,6 +111,24 @@ def test_masked_previous_action_bc_runner_is_diagnosis_bound_and_guarded() -> No
     assert '"ppo_authorized": False' in source
 
 
+def test_scheduled_previous_action_bc_runner_is_bounded_and_comparative() -> None:
+    source = _read("run_riser_scheduled_previous_action_bc.sh")
+    assert "20260721_initial_teacher40_bc_scheduled_previous_action_v1" in source
+    assert "--scheduled-previous-action-max-probability 1.0" in source
+    assert "--scheduled-previous-action-warmup-epochs 5" in source
+    assert "--scheduled-previous-action-ramp-epochs 25" in source
+    assert "--scheduled-sequence-length 32" in source
+    assert "--recursive-validation-weight 0.75" in source
+    assert "case4_previous_action_comparison.json" in source
+    assert "recursive_offline_gate" in source
+    assert '"learned_rollout_authorized": passed' in source
+    assert '"holdout_opened": False' in source
+    assert '"ppo_authorized": False' in source
+    assert "smoke_riser_reference_playback.py" not in source
+    assert "Get-CimInstance Win32_Process" in source
+    assert "rev-parse '@{upstream}'" in source
+
+
 def test_masked_bc_case4_canary_is_single_validation_case_and_guarded() -> None:
     source = _read("run_riser_masked_bc_case4_canary.sh")
     assert "CASE=4" in source

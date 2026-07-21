@@ -4629,3 +4629,52 @@ and must state whether its candidate was accepted or rejected.
   do not open cases 30/31.
 - Do not use case-4 validation labels for training and do not open holdout,
   BC retraining, PPO, obstacle work, or broader learned rollout.
+
+## Round 127: case-21 shadow measurement passes physics but rejects DAgger admission
+
+- Commit `76260c518fda3aeedbbd767130027754b95e61d4` adds the fresh,
+  hash-bound case-21 route. It pins the Round-126 proposal and ranking, the
+  case-21 plan and deterministic teacher gate, the unchanged masked policy,
+  action scales, playback, diagnosis, and LQR gains. The authoritative `.98`
+  CPU suite passed `503/503` in `45.98 s`; the exclusive preflight passed
+  before the one-use token was transferred and consumed.
+- The learned policy completed all 5,486 steps. Dynamic quality, thermal
+  admission, controller evidence, trace reconstruction, and every no-learning
+  check pass. Position p95/max are `0.101943/0.107746 m`, attitude p95/max are
+  `0.191831/0.267455 deg`, and pitch max is `6.360049 deg`. Relative to the
+  deterministic teacher, position p95/max improve by `0.000763/0.000475 m`;
+  attitude p95 improves by `0.000971 deg`, while attitude max and pitch max
+  increase by only `0.052254/0.059543 deg` and remain within unchanged gates.
+- The 5,486-row shadow trace is measurement-only and reconstructs the applied
+  commands exactly. Shadow commands were not applied, labels were not admitted,
+  and no residual dataset, raw-teacher capture, policy trace, BC, DAgger, or PPO
+  run was created. Final-status SHA-256 is
+  `285531d78f31755e3dec816b46266ce6261d4b3811b2c4c0a6572e6bd7bcdef7`;
+  trace SHA-256 is
+  `79baf7d5000ced7da2dd2b5295f5e732dbe6dde2b5be1fba66d9f3f804d7028d`.
+- Unlike validation case 4, case 21 does not reproduce a material on-policy
+  label shift. Material `[vx,wz,riser]` flags are `[false,false,false]`.
+  Policy-to-shadow p95 is `[0.013513,0.013489,0.001259]`; shadow-to-original
+  phase-label p95 is `[0.008312,0.010334,0.001941]`. Aggregate policy-shadow
+  RMSE is `0.005507`, below policy-phase RMSE `0.006448`, for a `0.854003x`
+  ratio. Diagnosis SHA-256 is
+  `b5fd73518c3df537efc68770af702f6cc118c6adb750a2a6a141e7f7eb1228e6`.
+- The fail-closed classification is
+  `on_policy_teacher_gap_does_not_yet_support_dagger_proposal`. Therefore case
+  21 is not admitted as a DAgger seed, cases 30/31 remain unopened, and no
+  training stage advances. The one-use token is absent and WSL, Windows, and
+  NVIDIA ownership are empty after closure.
+
+## Next round after Round 127
+
+- Do not broaden the case-4 finding into a training-data claim. The current
+  offline similarity score did not select a training case that reproduces the
+  case-4 on-policy state-distribution shift.
+- Perform a CPU-only feature audit comparing the actual case-4 shadow-shift
+  intervals against all existing training trajectories. Rank candidates using
+  the state/action regions where the shadow-vs-phase label difference occurs,
+  rather than whole-trajectory aggregate means, standard deviations, and
+  duration. This is a new proposal only and must not authorize runtime.
+- Keep cases 30/31, holdout, dataset creation, BC retraining, PPO, obstacles,
+  and broad learned rollout closed until that localized audit identifies and
+  justifies one new bounded training-split measurement.

@@ -4418,3 +4418,62 @@ and must state whether its candidate was accepted or rejected.
   may receive one exclusive case-4 canary. Holdout, PPO, obstacle work, and
   broader learned rollout remain closed until that canary passes unchanged
   absolute and teacher-relative gates.
+
+## Round 123: action-history alternatives fail offline; masked policy remains best
+
+- Commit `8e2b58224571d216a895bf26fab8a1ef886067b1` added deterministic
+  sequence-window scheduled sampling, recursive validation model selection, and
+  fail-closed case isolation. Commit `a3548ca929050e51843d6a0e668df04b80590ef3`
+  added a validation-only comparator against the original and masked policies.
+  The `.98` focused suite passed `59/59` before training.
+- The scheduled candidate used 32-row windows, a five-epoch warmup, a 25-epoch
+  ramp to fully policy-generated previous actions, and `0.75` recursive
+  validation weight. Training passed its teacher and bounded-recursive
+  validation gates at best epoch `50` and stopped after `60` epochs, but the
+  full-recursive case-4 comparator rejected it. Aggregate MSE was `0.004731`,
+  versus `0.008875` original and `0.003492` masked. No learned playback began.
+  Final-status SHA-256 is
+  `abab8f8726dc0ac545ae3f45f147e3e10e590ef507682ebe5197d0d80b5f447e`;
+  comparison SHA-256 is
+  `1173da5c72ca3fe0d2f75059a0571af6333b6f1d8bf36ed93f4229f8d1571009`.
+- Commit `5401fa3f31ea7416595b87bf4541b5f685a7007a` added a fixed normalized
+  previous-action gain, and commits
+  `25aa5c9640de78db9a44e3027b405af49ed80dbc` and
+  `c22d4725afa30969a18ecc97faceed5762c2ebcc` added its guarded route.
+  The scalar `0.10` candidate passed row-wise validation at best epoch `76`, but
+  full-recursive case-4 aggregate MSE was `0.003978`, still worse than masking.
+  It improved longitudinal and riser MSE over masking (`0.004909` vs `0.006160`,
+  `1.44e-5` vs `1.97e-5`) but degraded yaw (`0.007010` vs `0.004297`).
+  Final-status SHA-256 is
+  `628380b9f9ae8f7a837ccea30906bfb5f9f3518d01124ea6dd4eb92e40f685bf`;
+  comparison SHA-256 is
+  `f2dfbfb631890a477ab31a705759ee4f27bce6dbd3183771d9b89e7c98ee9949`.
+- The channel evidence justified one final non-sweep candidate. Commit
+  `ae30ea6ad2fcc476f5c2d420382e9625568fc5d9` added per-channel gains, and
+  commit `cd236182abf2e087dacaf43ac5280f879f55230a` added the guarded
+  `[0.10,0.00,0.10]` route. The `.98` suite passed `67/67` before training.
+  This candidate stopped at best epoch `29` after `39` epochs. Its recursive
+  case-4 aggregate MSE was `0.003836`: yaw and riser slightly beat masking, but
+  longitudinal MSE regressed to `0.007404` and teacher-state aggregate MSE also
+  became worse than masking. Final-status SHA-256 is
+  `4e1190078383c94c987540c70790c27ef953af3995360fe131e8874c18455aa6`;
+  comparison SHA-256 is
+  `8699a85753e5a912fb2c72598c50159b297f6980bc914ccf332351560e224db3`.
+- All three alternatives were rejected before Isaac. The masked policy remains
+  the best demonstrated learned playback: absolute position p95 passes at
+  `0.137441 m`, but its unchanged teacher-relative gate still misses by
+  `0.002268 m`. Holdout, PPO, obstacle work, and broader rollout remain closed.
+  GPU/process ownership was clean after the final offline comparison.
+
+## Next round after Round 123
+
+- Stop tuning previous-action architecture or gains. The evidence now shows that
+  no tested action-history dependence beats full masking recursively.
+- Perform a CPU-first physical-state covariate-shift diagnosis using the masked
+  case-4 teacher and learned-rollout traces. Localize which non-action
+  observations diverge before the tracking-error peak and distinguish base,
+  riser, camera, lookahead, and balance-state contributions.
+- If the traces prove a state-distribution gap, prepare one bounded
+  validation-only DAgger-style teacher relabel capture on policy-visited states.
+  Keep the deterministic LQR/safety supervisor unchanged, preserve the original
+  40-case corpus, and do not open holdout, PPO, obstacles, or broader rollout.

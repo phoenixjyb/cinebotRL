@@ -45,6 +45,7 @@ def _fixture(tmp_path: Path, *, applied_case: int | None = None) -> list[str]:
     admission.write_text(
         json.dumps(
             {
+                "schema": "cinebotrl_two_wheel_riser_smoothed_representative_admission_v1",
                 "passed": True,
                 "requested_cases": cases,
                 "selection_sha256": _sha(selection),
@@ -157,3 +158,97 @@ def test_rejects_corpus_with_applied_residual(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "raw corpus case 7 failed" in result.stderr
+
+
+def _make_subset_admission(tmp_path: Path, *, forge_excluded: bool = False) -> list[str]:
+    command = _fixture(tmp_path)
+    admission_path = tmp_path / "admission.json"
+    admission = json.loads(admission_path.read_text(encoding="utf-8"))
+    parent = tmp_path / "parent.json"
+    parent.write_text(json.dumps({"passed": True}), encoding="utf-8")
+    progress = tmp_path / "progress.json"
+    progress.write_text(json.dumps({"stopped_case": 41}), encoding="utf-8")
+    excluded_gate = tmp_path / "gates/case_0041.json"
+    excluded_gate.write_text(
+        json.dumps(
+            {
+                "passed": False,
+                "dynamic_quality_passed": False,
+                "results": [
+                    {
+                        "case": 41,
+                        "passed": False,
+                        "dynamic_quality_passed": False,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    admission.update(
+        {
+            "schema": "cinebotrl_two_wheel_riser_raw_teacher_subset_admission_v1",
+            "parent_admission": {"path": str(parent), "sha256": _sha(parent)},
+            "progress_status": {
+                "path": str(progress),
+                "sha256": _sha(progress),
+            },
+            "retained_case_evidence": [
+                {
+                    "case": case,
+                    "gate": {
+                        "sha256": _sha(tmp_path / f"gates/case_{case:04d}.json")
+                    },
+                    "raw_case": {
+                        "sha256": _sha(
+                            tmp_path
+                            / f"raw/case_{case:04d}_executed_raw_teacher_v1.npz"
+                        )
+                    },
+                }
+                for case in range(1, 41)
+            ],
+            "excluded_case_evidence": [
+                {
+                    "case": 41,
+                    "gate": {
+                        "sha256": "0" * 64
+                        if forge_excluded
+                        else _sha(excluded_gate)
+                    },
+                }
+            ],
+            "corpus_audit_authorized": True,
+            "runtime_authorized": False,
+            "new_raw_teacher_capture_authorized": False,
+        }
+    )
+    admission_path.write_text(json.dumps(admission), encoding="utf-8")
+    return command
+
+
+def test_accepts_provenance_bound_subset_with_extra_rejected_gate(
+    tmp_path: Path,
+) -> None:
+    result = subprocess.run(
+        _make_subset_admission(tmp_path),
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    audit = json.loads((tmp_path / "audit.json").read_text(encoding="utf-8"))
+    assert audit["top_checks"]["subset_provenance"]
+    assert audit["subset_checks"]["excluded_are_dynamic_rejects"]
+
+
+def test_rejects_subset_with_forged_excluded_gate_hash(tmp_path: Path) -> None:
+    result = subprocess.run(
+        _make_subset_admission(tmp_path, forge_excluded=True),
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    audit = json.loads((tmp_path / "audit.json").read_text(encoding="utf-8"))
+    assert not audit["subset_checks"]["excluded_gate_hashes"]

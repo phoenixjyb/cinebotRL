@@ -26,6 +26,14 @@ from scripts.two_wheel_balance.audit_riser_residual_capture import (  # noqa: E4
 )
 
 
+PARENT_ADMISSION_SCHEMA = (
+    "cinebotrl_two_wheel_riser_smoothed_representative_admission_v1"
+)
+SUBSET_ADMISSION_SCHEMA = (
+    "cinebotrl_two_wheel_riser_raw_teacher_subset_admission_v1"
+)
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -77,11 +85,15 @@ def main() -> int:
 
     selection = load_json(args.selection)
     admission = load_json(args.admission)
+    requested = sorted(int(case) for case in admission.get("requested_cases", []))
+    if len(requested) != args.expected_count or len(requested) != len(set(requested)):
+        raise ValueError("admission requested cases do not match expected count")
     gate_paths = sorted(args.gate_dir.glob("case_*.json"))
     raw_paths = sorted(args.raw_dir.glob("case_*_executed_raw_teacher_v1.npz"))
-    if len(gate_paths) != args.expected_count or len(raw_paths) != args.expected_count:
+    if len(raw_paths) != args.expected_count or len(gate_paths) < args.expected_count:
         raise ValueError(
-            f"expected {args.expected_count} gates/raw cases, found "
+            f"expected at least {args.expected_count} gates and exactly that many "
+            "raw cases, found "
             f"{len(gate_paths)}/{len(raw_paths)}"
         )
 
@@ -174,8 +186,9 @@ def main() -> int:
         )
     rows.sort(key=lambda row: row["case"])
     cases = [row["case"] for row in rows]
-    requested = sorted(int(case) for case in admission.get("requested_cases", []))
-    if cases != requested or set(cases) != set(gates):
+    requested_gates = {case: item for case, item in gates.items() if case in requested}
+    extra_gates = {case: item for case, item in gates.items() if case not in requested}
+    if cases != requested or set(cases) != set(requested_gates):
         raise ValueError("admission, gate, and raw case sets do not match")
     if not set(cases).issubset(selection.get("selected_cases", [])):
         raise ValueError("capture includes a case outside the sealed selection")
@@ -185,7 +198,58 @@ def main() -> int:
     scales = recommended_scales(
         raw_abs_max, args.minimum_scales, args.scale_quantums, args.scale_margin
     )
+    rows_by_case = {int(row["case"]): row for row in rows}
+    admission_schema = admission.get("schema")
+    subset_checks: dict[str, bool] = {}
+    if admission_schema == SUBSET_ADMISSION_SCHEMA:
+        parent_identity = admission.get("parent_admission", {})
+        progress_identity = admission.get("progress_status", {})
+        parent_path = Path(parent_identity.get("path", ""))
+        progress_path = Path(progress_identity.get("path", ""))
+        excluded_rows = {
+            int(row["case"]): row
+            for row in admission.get("excluded_case_evidence", [])
+        }
+        retained_rows = {
+            int(row["case"]): row
+            for row in admission.get("retained_case_evidence", [])
+        }
+        subset_checks = {
+            "corpus_audit_authorized": admission.get("corpus_audit_authorized")
+            is True,
+            "runtime_closed": admission.get("runtime_authorized") is False,
+            "new_capture_closed": admission.get("new_raw_teacher_capture_authorized")
+            is False,
+            "parent_identity": parent_path.is_file()
+            and parent_identity.get("sha256") == sha256(parent_path),
+            "progress_identity": progress_path.is_file()
+            and progress_identity.get("sha256") == sha256(progress_path),
+            "retained_evidence_complete": set(retained_rows) == set(requested),
+            "retained_gate_hashes": all(
+                retained_rows.get(case, {}).get("gate", {}).get("sha256")
+                == sha256(requested_gates[case][0])
+                for case in requested
+            ),
+            "retained_raw_hashes": all(
+                retained_rows.get(case, {}).get("raw_case", {}).get("sha256")
+                == sha256(Path(rows_by_case[case]["raw_case"]))
+                for case in requested
+            ),
+            "excluded_gate_set": set(excluded_rows) == set(extra_gates),
+            "excluded_gate_hashes": all(
+                excluded_rows.get(case, {}).get("gate", {}).get("sha256")
+                == sha256(extra_gates[case][0])
+                for case in extra_gates
+            ),
+            "excluded_are_dynamic_rejects": all(
+                extra_gates[case][1].get("dynamic_quality_passed") is False
+                and extra_gates[case][1].get("passed") is False
+                for case in extra_gates
+            ),
+        }
     top_checks = {
+        "admission_schema": admission_schema
+        in {PARENT_ADMISSION_SCHEMA, SUBSET_ADMISSION_SCHEMA},
         "selection_schema": selection.get("schema")
         == "cinebotrl_two_wheel_riser_initial_teacher_selection_v1",
         "selection_passed": selection.get("passed") is True,
@@ -206,6 +270,9 @@ def main() -> int:
         "bc_closed": admission.get("bc_authorized") is False,
         "ppo_closed": admission.get("ppo_authorized") is False,
         "count_met": len(rows) == args.expected_count,
+        "extra_gates_bound": not extra_gates
+        or admission_schema == SUBSET_ADMISSION_SCHEMA,
+        "subset_provenance": all(subset_checks.values()),
     }
     passed = all(top_checks.values())
     output = {
@@ -223,6 +290,7 @@ def main() -> int:
         "scale_quantums": args.scale_quantums.tolist(),
         "action_scale_frozen": passed,
         "top_checks": top_checks,
+        "subset_checks": subset_checks,
         "rows": rows,
         "capture_admission_passed": passed,
         "valid_for_bc_initialization": passed,

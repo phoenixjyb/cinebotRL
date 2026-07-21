@@ -1,0 +1,130 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case30_perturbation_contract_v1",
+  "case": 30,
+  "split": "train",
+  "reviewed_parent_commit": "6a8e7a091dc128727bd5e6cded5154eb48c8874c",
+  "namespace": "20260721_case30_perturbation_measurement_v1_exclusive",
+  "profile_payload": {
+    "schema": "cinebotrl_two_wheel_riser_deterministic_wrench_pulse_v1",
+    "case": 30,
+    "start_phase_time_s": 15.666592937559889,
+    "duration_steps": 20,
+    "force_body_x_n": 20.0,
+    "application_height_m": 0.5
+  },
+  "controller_arguments": {
+    "controller_wz_kp": 1.05,
+    "maximum_duration_scale": 3.0,
+    "camera_lever_arm_compensation_enabled": true,
+    "camera_lever_arm_compensation_gain": 1.0,
+    "maximum_camera_lever_arm_correction_m": 0.05,
+    "residual_policy_device": "cuda"
+  },
+  "residual_action_scales": [
+    0.35,
+    0.4,
+    0.1
+  ],
+  "unchanged_dynamic_gate_thresholds": {
+    "maximum_pitch_deg": 12.0,
+    "maximum_position_p95_m": 0.15,
+    "maximum_position_error_m": 0.25,
+    "maximum_attitude_p95_deg": 5.0,
+    "maximum_attitude_error_deg": 10.0,
+    "maximum_riser_servo_error_m": 0.03,
+    "maximum_proxy_servo_error_deg": 5.0,
+    "maximum_internal_proxy_rate_deg_s": 360.0,
+    "maximum_saturation_ratio": 0.2
+  },
+  "measurement_contract": {
+    "shadow_teacher_applied_to_commands": false,
+    "perturbation_applied_to_planner_commands": false,
+    "perturbation_applied_to_policy_actions": false,
+    "dynamic_and_perturbation_outcomes_independent": true,
+    "stop_after_case30": true,
+    "maximum_runtime_seconds": 600
+  },
+  "cpu_preflight_ready": true,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "dataset_creation_authorized": false,
+  "dagger_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "holdout_opened": false,
+  "identities": {
+    "proposal": {
+      "path": "artifacts/two_wheel_riser/20260721_case30_perturbation_proposal_v1_cpu/proposal.json",
+      "sha256": "4490a35794988de2cf56fd18a06d1a77c7df8c99267e66c98d9c801b6223e65b"
+    },
+    "profile": {
+      "path": "artifacts/two_wheel_riser/20260721_case30_perturbation_proposal_v1_cpu/case30_wrench_profile.json",
+      "sha256": "6ab2fe1212f88e3baecac4f64156bb9820069203136758a22a2cb632813a5907"
+    },
+    "case30_plan": {
+      "path": "artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu/case_0030_smoothed_riser_plan_v1.npz",
+      "sha256": "1722bfdc7c1aeabc5a9d3920cf6a47bc789afbc96e6ef5c8e540695dc3c97dcb"
+    },
+    "masked_policy": {
+      "path": "artifacts/two_wheel_riser/20260721_initial_teacher40_bc_previous_action_masked_v1/residual_policy.torchscript.pt",
+      "sha256": "34fa67192f8c66b879eb7d11a83c96ffd2320932e6807f2224cdfa2f74a4c0e4"
+    },
+    "policy_final": {
+      "path": "artifacts/two_wheel_riser/20260721_initial_teacher40_bc_previous_action_masked_v1/final_status.json",
+      "sha256": "ded00f25dde299207dc0e3af0b611418e09d5368d4fc9e7cab53b57df9a36bba"
+    },
+    "policy_report": {
+      "path": "artifacts/two_wheel_riser/20260721_initial_teacher40_bc_previous_action_masked_v1/report.json",
+      "sha256": "3f0efb4a2707b343a775dd5dd8b0ad49d6506474da627d8449ca81556cbbcd3e"
+    },
+    "teacher_dataset": {
+      "path": "artifacts/two_wheel_riser/20260721_initial_teacher41_subset_30_5_5_v1/initial_teacher40_30_5_5_v1.npz",
+      "sha256": "53f3b679e227446c6008ba8bcd9191ae877b946dd86644388c43f89723bb9d44"
+    },
+    "lqr_gains": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+      "sha256": "2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6",
+      "git_blob_sha1": "70ecdd8ae6b7ce09574a97a8581229cb90add623"
+    },
+    "robot_build_audit": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/build_audit.json",
+      "sha256": "8be2b59a03a6c22838795ad361a86bf0f60a7534aeacd62893013f0ee27b40d9",
+      "git_blob_sha1": "83f8715d05be714dd8dcb2b0a9f47ef3f4bec8e9"
+    },
+    "robot_urdf": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.urdf",
+      "sha256": "603cecfc5b54e659f5d030023a69a3b42d6567f66d2771fbb7127d186f1a9afa",
+      "git_blob_sha1": "c70bf24a3189ccd24553287590dcfd191737ab33"
+    },
+    "robot_usd": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd",
+      "sha256": "89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0",
+      "git_blob_sha1": "b25242c27c781b5aad4fadefb0cbf54398a9a75a"
+    },
+    "playback": {
+      "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+      "sha256": "cbe96aaa9ee775454f915a223f2ed15b23dfa51dbfbdc9965d62a368542c611b",
+      "git_blob_sha1": "7f3a56b4055cd6b8639ea51826e45a858100da08"
+    },
+    "perturbation_runtime": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_perturbation.py",
+      "sha256": "37ac835f888b1d4cdfacc3e40a1854bb1d9801cd251dbdb03d80e4bbd5e01897",
+      "git_blob_sha1": "24c8166e9a66e07018126efecab8e78e4d4ed8d8"
+    },
+    "shadow_diagnosis": {
+      "path": "scripts/two_wheel_balance/diagnose_riser_shadow_teacher_gap.py",
+      "sha256": "2655bc957c8524c4c9b0ae3fba964b2333f63e0b5ed20bafc2d8012a0a4fb870",
+      "git_blob_sha1": "2b6e214ad62ffcbbe58cdcb13b7ca1817bf5dc2b"
+    },
+    "preflight_wrapper": {
+      "path": "scripts/two_wheel_balance/run_riser_case30_perturbation_measurement.sh",
+      "sha256": "ed71685042b1cc4a749a3da627bea2a8e9849b4251ead153f8964708fe4b3743",
+      "git_blob_sha1": "0c8e2d44ccf07b9347bfba825f942a59806e9a8f"
+    },
+    "contract_validator": {
+      "path": "scripts/two_wheel_balance/validate_riser_case30_perturbation_contract.py",
+      "sha256": "a5797bc7d7ffc265dabff96c466338599e9f72297072f567e483246ce48c5b7e",
+      "git_blob_sha1": "eb8afd2f5549df4a2664684d0cd71bccb6a7ab2d"
+    }
+  }
+}

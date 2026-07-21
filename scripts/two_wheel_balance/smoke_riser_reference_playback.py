@@ -160,8 +160,8 @@ parser.add_argument(
     default=parse_action_scales("0.30,0.40,0.10"),
     help="Physical [vx,wz,riser] scales for normalized residual policy actions.",
 )
-# RecordVideo receives one frame per 200 Hz policy step.  Encoding at the same
-# rate preserves simulation time; viewing derivatives may be transcoded to 50.
+# Video frame stride changes rendering only; physics and control remain at 200 Hz.
+parser.add_argument("--video-frame-stride", type=int, default=1)
 parser.add_argument("--video-fps", type=int, default=200)
 parser.add_argument("--output", type=Path, required=True)
 AppLauncher.add_app_launcher_args(parser)
@@ -325,6 +325,21 @@ PROXY_JOINTS = (
     "joint2_gimbal_roll",
     "joint1_gimbal_pitch",
 )
+
+
+class StridedRecordVideo(gym.wrappers.RecordVideo):
+    """Record every Nth control step without changing environment stepping."""
+
+    def __init__(self, *args, frame_stride: int, **kwargs):
+        self.frame_stride = frame_stride
+        self.capture_call_count = 0
+        super().__init__(*args, **kwargs)
+
+    def _capture_frame(self) -> None:
+        should_capture = self.capture_call_count % self.frame_stride == 0
+        self.capture_call_count += 1
+        if should_capture:
+            super()._capture_frame()
 
 
 def tracking_profile_name() -> str:
@@ -1879,6 +1894,8 @@ def main() -> int:
         raise ValueError("learned and zero-action policy modes are exclusive")
     if args.video_fps <= 0:
         raise ValueError("video fps must be positive")
+    if args.video_frame_stride <= 0:
+        raise ValueError("video frame stride must be positive")
     plans = {
         case: load_riser_playback_plan(
             plan_path(args.plan_dir, args.plan_filename_template, case)
@@ -1968,10 +1985,12 @@ def main() -> int:
                 plans[cases[0]].time_s[-1]
                 * args.maximum_duration_scale
                 * POLICY_HZ
+                / args.video_frame_stride
             )
         ) + 1
-        env = gym.wrappers.RecordVideo(
+        env = StridedRecordVideo(
             raw_env,
+            frame_stride=args.video_frame_stride,
             video_folder=str(args.video_dir),
             step_trigger=lambda step: step == 0,
             video_length=video_length,
@@ -2129,6 +2148,8 @@ def main() -> int:
             None if args.residual_policy is None else str(args.residual_policy.resolve())
         ),
         "residual_action_scales": args.residual_action_scales.tolist(),
+        "video_frame_stride": args.video_frame_stride,
+        "video_fps": args.video_fps,
         "raw_teacher_capture_started": args.raw_teacher_dir is not None,
         "normalized_dataset_capture_started": args.dataset_dir is not None,
         "cases": cases,

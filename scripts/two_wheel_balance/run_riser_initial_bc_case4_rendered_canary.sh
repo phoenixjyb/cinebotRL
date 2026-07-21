@@ -16,7 +16,7 @@ PLAN_STAMP="20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu
 CAPTURE_STAMP="20260721_initial_teacher42_raw_capture_v1_exclusive"
 DATASET_STAMP="20260721_initial_teacher41_subset_30_5_5_v1"
 POLICY_STAMP="20260721_initial_teacher40_bc_v1"
-OUTPUT_STAMP="20260721_initial_teacher40_bc_case4_rendered_canary_v2"
+OUTPUT_STAMP="20260721_initial_teacher40_bc_case4_rendered_canary_v3"
 PLAN_ROOT="$ROOT/artifacts/two_wheel_riser/$PLAN_STAMP"
 CAPTURE_ROOT="$ROOT/artifacts/two_wheel_riser/$CAPTURE_STAMP"
 DATASET_ROOT="$ROOT/artifacts/two_wheel_riser/$DATASET_STAMP"
@@ -44,13 +44,13 @@ DATASET_SUMMARY_SHA256="815463ffa133addbaec4f09a453fd9dae8e63eb690b37f56fd0a5c18
 POLICY_FINAL_SHA256="05771143d93cbce0abd20124a787c1d7348cc482238b3fdb52dd6ad2ea038cdf"
 POLICY_REPORT_SHA256="44437ed005aa69718c244fda8c8fddb58ebf95c308c9387d11d85e4ff62ce104"
 POLICY_SHA256="6d86812d3ef63093e00d938e8aa4120146dd30f52dce007af569c3ece989d1dd"
-PLAYBACK_SHA256="83eb26eb20a96a7fbab8c7fb252bd59494d2e63b8fcfe4195894fa6582b1fb03"
+PLAYBACK_SHA256="ff078ee6e6ed6cbb23d814547f4c4cb275c238a995c4cb1110796c49dc4e4904"
 ROLLOUT_GATE_SHA256="e3e327f2b7bc7f3bdc5f7c27ba36edcf2f3660e5ed4c8b4e4324325764927f5b"
 GAINS_SHA256="2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6"
 ROBOT_USD_SHA256="89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0"
 POLICY_COMMIT="d093b10bda36ef8dfbb588d07ee0359a2680401b"
 SCALE_BINDING_COMMIT="0ca3e2df89ab9efd421896750683d78ec9b0f3fb"
-AUTHORIZATION_SHA256="7c2910e13c83cfaec09d99d16701ee2376de26e923bb9867bb709894bf85132d"
+AUTHORIZATION_SHA256="9e7975341a5396b69c9f08ca38a3401d85b264d5338438863dc8a6158142f0be"
 
 if [[ "$MODE" != --preflight && "$MODE" != --execute ]]; then
   printf 'usage: %s [--preflight|--execute]\n' "$0" >&2
@@ -165,7 +165,8 @@ print(json.dumps({
     "split": "validation",
     "modes": ["zero_policy_action_baseline", "torchscript_residual_policy"],
     "residual_action_scales": [0.35, 0.4, 0.1],
-    "video_fps_raw": 200,
+    "video_frame_stride": 8,
+    "video_fps_raw": 25,
     "video_fps_delivery": 50,
     "output": sys.argv[2],
     "holdout_opened": False,
@@ -233,7 +234,8 @@ run_rollout() {
     --camera-lever-arm-compensation-gain 1.0 \
     --maximum-camera-lever-arm-correction-m 0.05 \
     --residual-action-scales 0.35,0.40,0.10 \
-    $extra --video-dir "$OUTPUT_WIN\\videos\\${name}_raw" --video-fps 200 \
+    $extra --video-dir "$OUTPUT_WIN\\videos\\${name}_raw" \
+    --video-frame-stride 8 --video-fps 25 \
     --output "$OUTPUT_WIN\\$name\\case_${PADDED}.json" \
     --headless --enable_cameras --experience "$D3D12_EXPERIENCE" \
     >"$OUTPUT/logs/${name}.log" 2>&1 || status=$?

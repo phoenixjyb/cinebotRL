@@ -74,7 +74,7 @@ def test_initial_bc_case4_render_canary_is_validation_only_and_scale_bound() -> 
     assert "CASE=4" in source
     assert 'PROFILE="riser_recovery_direction_v4_camera_lever_arm_v1"' in source
     assert 'POLICY_SHA256="6d86812d' in source
-    assert 'PLAYBACK_SHA256="83eb26eb' in source
+    assert 'PLAYBACK_SHA256="ff078ee6' in source
     assert 'SCALE_BINDING_COMMIT="0ca3e2d' in source
     assert "RISER_CASE4_RENDER_AUTHORIZATION_FILE" in source
     assert "isaaclab.python.headless.rendering.d3d12.kit" in source
@@ -83,6 +83,7 @@ def test_initial_bc_case4_render_canary_is_validation_only_and_scale_bound() -> 
     assert '"holdout_untouched"' in source
     assert '"frozen_scales"' in source
     assert "--residual-action-scales 0.35,0.40,0.10" in source
+    assert "--video-frame-stride 8 --video-fps 25" in source
     assert '--headless --enable_cameras --experience "$D3D12_EXPERIENCE"' in source
     assert 'run_rollout zero "--zero-policy-action"' in source
     assert "--residual-policy $POLICY_WIN" in source

@@ -281,6 +281,10 @@ def test_playback_commands_semantic_proxy_position_without_motor_velocity() -> N
     assert "np.abs(actual_proxy - sample.proxy_gimbal_q)" not in source
     assert "set_joint_velocity_target(proxy_velocity_target" not in source
     assert 'parser.add_argument("--video-fps", type=int, default=200)' in source
+    assert 'parser.add_argument("--video-frame-stride", type=int, default=1)' in source
+    assert "class StridedRecordVideo" in source
+    assert "self.capture_call_count % self.frame_stride == 0" in source
+    assert "* POLICY_HZ\n                / args.video_frame_stride" in source
     assert '"--residual-action-scales"' in source
     assert "action_scales=args.residual_action_scales" in source
     assert '"residual_action_scales": args.residual_action_scales.tolist()' in source

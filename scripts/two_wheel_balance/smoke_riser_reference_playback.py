@@ -19,6 +19,16 @@ os.environ.setdefault("ACCEPT_EULA", "YES")
 os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "yes")
 os.environ.setdefault("GYMNASIUM_DISABLE_PLUGIN_ENTRYPOINTS", "1")
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from rl_platform.tasks.two_wheel_balance.riser_perturbation import (
+    DeterministicWrenchPulse,
+    DeterministicWrenchPulseRuntime,
+    load_deterministic_wrench_profile,
+)
+
 from isaaclab.app import AppLauncher
 
 
@@ -156,6 +166,14 @@ parser.add_argument(
     ),
 )
 parser.add_argument(
+    "--deterministic-wrench-profile",
+    type=Path,
+    help=(
+        "Hash-bound, measurement-only body-longitudinal wrench pulse; requires "
+        "one learned-policy shadow-teacher case and cannot create a dataset."
+    ),
+)
+parser.add_argument(
     "--residual-policy",
     type=Path,
     help="Optional gated TorchScript high-level residual policy.",
@@ -182,6 +200,35 @@ parser.add_argument("--video-fps", type=int, default=200)
 parser.add_argument("--output", type=Path, required=True)
 AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
+deterministic_wrench_profile = None
+deterministic_wrench_profile_identity = None
+if args.deterministic_wrench_profile is not None:
+    try:
+        (
+            deterministic_wrench_profile,
+            deterministic_wrench_profile_identity,
+        ) = load_deterministic_wrench_profile(args.deterministic_wrench_profile)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        parser.error(str(exc))
+    requested_cases = [
+        int(item) for item in args.cases.split(",") if item.strip()
+    ]
+    if requested_cases != [deterministic_wrench_profile.case]:
+        parser.error(
+            "deterministic wrench profile requires its one pinned case only"
+        )
+    if (
+        args.residual_policy is None
+        or args.shadow_teacher_trace_dir is None
+        or args.zero_policy_action
+        or args.dataset_dir is not None
+        or args.raw_teacher_dir is not None
+        or args.policy_trace_dir is not None
+    ):
+        parser.error(
+            "deterministic wrench profile requires learned-policy shadow-teacher "
+            "measurement mode and forbids every dataset/capture mode"
+        )
 for name in ("tracking_along_kp", "tracking_cross_kp", "tracking_yaw_kp"):
     value = getattr(args, name)
     if value is not None and value < 0.0:
@@ -257,10 +304,6 @@ if args.controller_vx_kp is not None and not (
 ):
     parser.error("--controller-vx-kp must be in (0, 1]")
 app = AppLauncher(args).app
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
-sys.path.insert(0, str(PROJECT_ROOT))
 
 import gymnasium as gym
 import torch
@@ -427,6 +470,25 @@ def current_lqr_state(unwrapped) -> np.ndarray:
     )
 
 
+def set_base_longitudinal_wrench(
+    unwrapped,
+    force_body_x_n: float,
+    application_height_m: float,
+) -> None:
+    """Apply a body-frame force and its equivalent pitch moment."""
+
+    force = torch.zeros((1, 1, 3), device=unwrapped.device)
+    torque = torch.zeros_like(force)
+    force[0, 0, 0] = force_body_x_n
+    torque[0, 0, 1] = force_body_x_n * application_height_m
+    unwrapped.robot.set_external_force_and_torque(
+        forces=force,
+        torques=torque,
+        body_ids=unwrapped._base_body_idx,
+        is_global=False,
+    )
+
+
 def initialize_case(env, plan: RiserPlaybackPlan) -> tuple[dict[str, torch.Tensor], list[int], int]:
     obs, _ = env.reset(seed=20260716 + plan.case)
     unwrapped = env.unwrapped
@@ -489,11 +551,17 @@ def evaluate_case(
     residual_policy,
     residual_policy_device: torch.device,
     zero_policy_action: bool,
+    wrench_profile: DeterministicWrenchPulse | None,
 ) -> dict[str, object]:
     _, proxy_ids, riser_id = initialize_case(env, plan)
     unwrapped = env.unwrapped
     robot = unwrapped.robot
     env_ids = torch.zeros(1, dtype=torch.long, device=unwrapped.device)
+    perturbation_runtime = DeterministicWrenchPulseRuntime(wrench_profile)
+    if wrench_profile is not None:
+        set_base_longitudinal_wrench(
+            unwrapped, 0.0, wrench_profile.application_height_m
+        )
     cam_ids = robot.find_bodies("cam_link")[0]
     if len(cam_ids) != 1:
         raise RuntimeError(f"expected one physical cam_link, got {cam_ids}")
@@ -1165,6 +1233,16 @@ def evaluate_case(
             np.count_nonzero(np.abs(action) >= controller_cfg.action_limit - 1e-6)
         )
         action_count += action.size
+        perturbation_force_body_x_n = perturbation_runtime.command(
+            step=step,
+            phase_time_s=phase_time_s,
+        )
+        if wrench_profile is not None:
+            set_base_longitudinal_wrench(
+                unwrapped,
+                perturbation_force_body_x_n,
+                wrench_profile.application_height_m,
+            )
         obs, _, terminated, truncated, _ = env.step(
             torch.as_tensor(action, device=unwrapped.device)
         )
@@ -1477,6 +1555,12 @@ def evaluate_case(
                     "motion_direction": base_tracking_diagnostics[
                         "motion_direction"
                     ],
+                    "perturbation_active": (
+                        abs(perturbation_force_body_x_n) > 0.0
+                    ),
+                    "perturbation_force_body_x_n": (
+                        perturbation_force_body_x_n
+                    ),
                 }
             )
         completed_steps = step + 1
@@ -1495,6 +1579,14 @@ def evaluate_case(
             execution_duration_s,
             phase_time_s + progress_scale / POLICY_HZ,
         )
+
+    if wrench_profile is not None:
+        set_base_longitudinal_wrench(
+            unwrapped, 0.0, wrench_profile.application_height_m
+        )
+        perturbation_runtime.mark_released()
+    perturbation_telemetry = perturbation_runtime.summary()
+    perturbation_contract_checks = perturbation_runtime.contract_checks()
 
     position = np.asarray(position_errors, dtype=np.float64)
     attitude = np.asarray(attitude_errors_deg, dtype=np.float64)
@@ -1661,14 +1753,23 @@ def evaluate_case(
             ]
         ),
     }
-    checks = dynamic_checks | thermal_checks | controller_evidence_checks
+    checks = (
+        dynamic_checks
+        | thermal_checks
+        | controller_evidence_checks
+        | perturbation_contract_checks
+    )
     dynamic_quality_passed = all(dynamic_checks.values())
     thermal_admission_passed = all(thermal_checks.values())
     controller_evidence_passed = all(controller_evidence_checks.values())
+    perturbation_contract_passed = all(
+        perturbation_contract_checks.values()
+    )
     case_admission_passed = (
         dynamic_quality_passed
         and thermal_admission_passed
         and controller_evidence_passed
+        and perturbation_contract_passed
     )
     residual_label_envelope_ok = all(
         residual_action_envelope_passed(value)
@@ -2027,6 +2128,10 @@ def evaluate_case(
         "dynamic_quality_passed": dynamic_quality_passed,
         "thermal_admission_passed": thermal_admission_passed,
         "controller_evidence_passed": controller_evidence_passed,
+        "perturbation_contract_passed": perturbation_contract_passed,
+        "deterministic_wrench_perturbation": perturbation_telemetry,
+        "perturbation_applied_to_planner_commands": False,
+        "perturbation_applied_to_policy_actions": False,
         "residual_label_envelope_passed": residual_label_envelope_ok,
         "residual_label_admission_passed": (
             case_admission_passed and residual_label_envelope_ok
@@ -2113,6 +2218,13 @@ def main() -> int:
     }
     if any(plan.case != case for case, plan in plans.items()):
         raise ValueError("playback case metadata mismatch")
+    if deterministic_wrench_profile is not None and not (
+        deterministic_wrench_profile.start_phase_time_s
+        < float(plans[deterministic_wrench_profile.case].time_s[-1])
+    ):
+        raise ValueError(
+            "deterministic wrench start phase must precede plan completion"
+        )
     residual_policy_device = torch.device(args.residual_policy_device)
     residual_policy = None
     if args.residual_policy is not None:
@@ -2224,6 +2336,7 @@ def main() -> int:
             residual_policy,
             residual_policy_device,
             args.zero_policy_action,
+            deterministic_wrench_profile,
         )
         for case in cases
     ]
@@ -2371,6 +2484,18 @@ def main() -> int:
         "shadow_teacher_labels_applied": False,
         "shadow_teacher_labels_admitted_for_training": False,
         "dagger_authorized": False,
+        "deterministic_wrench_perturbation_enabled": (
+            deterministic_wrench_profile is not None
+        ),
+        "deterministic_wrench_profile": (
+            deterministic_wrench_profile_identity
+        ),
+        "deterministic_wrench_contract": (
+            "body_longitudinal_single_phase_trigger_execution_step_bounded_v1"
+        ),
+        "perturbation_measurement_only": True,
+        "perturbation_applied_to_planner_commands": False,
+        "perturbation_applied_to_policy_actions": False,
         "cases": cases,
         "passed_case_count": sum(item["passed"] for item in results),
         "dynamic_quality_passed": all(
@@ -2381,6 +2506,9 @@ def main() -> int:
         ),
         "controller_evidence_passed": all(
             item["controller_evidence_passed"] for item in results
+        ),
+        "perturbation_contract_passed": all(
+            item["perturbation_contract_passed"] for item in results
         ),
         "residual_label_envelope_passed": all(
             item["residual_label_envelope_passed"] for item in results
@@ -2436,6 +2564,15 @@ def write_runtime_failure(exc: Exception) -> None:
         "shadow_teacher_labels_applied": False,
         "shadow_teacher_labels_admitted_for_training": False,
         "dagger_authorized": False,
+        "deterministic_wrench_perturbation_enabled": (
+            deterministic_wrench_profile is not None
+        ),
+        "deterministic_wrench_profile": (
+            deterministic_wrench_profile_identity
+        ),
+        "perturbation_measurement_only": True,
+        "perturbation_applied_to_planner_commands": False,
+        "perturbation_applied_to_policy_actions": False,
         "tracking_profile": tracking_profile_name(),
         "controller_vx_kp": (
             args.controller_vx_kp
@@ -2494,6 +2631,7 @@ def write_runtime_failure(exc: Exception) -> None:
         "dynamic_quality_passed": False,
         "thermal_admission_passed": False,
         "controller_evidence_passed": False,
+        "perturbation_contract_passed": False,
         "residual_label_envelope_passed": False,
         "residual_label_admission_passed": False,
         "results": [

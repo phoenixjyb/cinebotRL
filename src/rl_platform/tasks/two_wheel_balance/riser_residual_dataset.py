@@ -13,6 +13,7 @@ from .camera_attitude import quaternion_matrix_wxyz, rotation_error_vector
 
 DATASET_SCHEMA = "cinebotrl_two_wheel_riser_executed_residual_v2"
 RAW_TEACHER_SCHEMA = "cinebotrl_two_wheel_riser_executed_raw_teacher_v1"
+POLICY_TRACE_SCHEMA = "cinebotrl_two_wheel_riser_policy_trace_v1"
 LOOKAHEAD_HORIZONS_S = (0.25, 0.50, 1.00)
 BASE_OBSERVATION_NAMES = (
     "pitch_rad",
@@ -389,6 +390,120 @@ def validate_raw_teacher_case(
     previous = payload["observations"][:, PREVIOUS_ACTION_INDICES]
     if not np.allclose(previous, 0.0, atol=1e-12):
         raise ValueError("raw teacher previous-action placeholders must be zero")
+
+
+def validate_policy_trace(
+    payload: dict[str, np.ndarray], *, expected_case: int | None = None
+) -> None:
+    required = {
+        "observations": 2,
+        "applied_residual_actions": 2,
+        "final_high_level_commands": 2,
+        "baseline_wheel_actions": 2,
+        "case_ids": 1,
+        "elapsed_time_s": 1,
+        "phase_time_s": 1,
+        "post_step_position_error_m": 1,
+        "post_step_attitude_error_deg": 1,
+        "post_step_base_xy_yaw": 2,
+        "post_step_camera_position_world_m": 2,
+        "post_step_pitch_deg": 1,
+        "post_step_riser_position_m": 1,
+        "post_step_proxy_position_rad": 2,
+    }
+    for name, ndim in required.items():
+        if name not in payload or np.asarray(payload[name]).ndim != ndim:
+            raise ValueError(f"missing or invalid policy trace field {name}")
+    count = len(payload["observations"])
+    if count < 2 or any(len(payload[name]) != count for name in required):
+        raise ValueError("policy trace row counts do not match")
+    dimensions = {
+        "observations": len(OBSERVATION_NAMES),
+        "applied_residual_actions": len(ACTION_NAMES),
+        "final_high_level_commands": 3,
+        "baseline_wheel_actions": 2,
+        "post_step_base_xy_yaw": 3,
+        "post_step_camera_position_world_m": 3,
+        "post_step_proxy_position_rad": 3,
+    }
+    for name, width in dimensions.items():
+        if payload[name].shape[1] != width:
+            raise ValueError(f"policy trace {name} dimension mismatch")
+    if not all(np.isfinite(np.asarray(payload[name])).all() for name in required):
+        raise ValueError("policy trace contains non-finite values")
+    if np.max(np.abs(payload["applied_residual_actions"])) > 1.0 + 1e-6:
+        raise ValueError("policy trace action exceeds normalized bounds")
+    cases = np.unique(payload["case_ids"])
+    if len(cases) != 1 or (
+        expected_case is not None and int(cases[0]) != expected_case
+    ):
+        raise ValueError("policy trace mixes trajectories")
+    if abs(float(payload["elapsed_time_s"][0])) > 1e-9 or not np.all(
+        np.diff(payload["elapsed_time_s"]) > 0
+    ):
+        raise ValueError("policy trace timestamps must start at zero and increase")
+    if not np.all(np.diff(payload["phase_time_s"]) >= 0):
+        raise ValueError("policy trace phase time must be monotonic")
+
+
+def save_policy_trace(
+    path: Path, case: int, payload: dict[str, np.ndarray]
+) -> None:
+    validate_policy_trace(payload, expected_case=case)
+    metadata = {
+        "schema": POLICY_TRACE_SCHEMA,
+        "case": case,
+        "source": "executed_isaac_policy_rate_trace",
+        "observation_names": list(OBSERVATION_NAMES),
+        "action_names": list(ACTION_NAMES),
+        "final_high_level_command_names": [
+            "commanded_vx_m_s",
+            "commanded_wz_rad_s",
+            "commanded_riser_target_m",
+        ],
+        "observation_contract": "executed_state_with_execution_time_lookahead_v2",
+        "sample_alignment_contract": "pre_action_observation_and_command_to_post_step_outcome_v1",
+        "lookahead_horizons_s": list(LOOKAHEAD_HORIZONS_S),
+        "camera_observation_frame": "physical_cam_link_fk",
+        "target_attitude_contract": "semantic_dfr_to_physical_cam_v1",
+        "teacher_labels_present": False,
+        "residual_dataset_present": False,
+        "trace_only": True,
+        "training_started": False,
+        "bc_authorized": False,
+        "dagger_authorized": False,
+        "ppo_authorized": False,
+        "valid_for_training": False,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(
+        path,
+        metadata_json=np.array(json.dumps(metadata, sort_keys=True)),
+        **payload,
+    )
+
+
+def load_policy_trace(
+    path: Path,
+) -> tuple[dict[str, object], dict[str, np.ndarray]]:
+    with np.load(path, allow_pickle=False) as data:
+        metadata = json.loads(str(data["metadata_json"].item()))
+        payload = {
+            name: np.asarray(data[name])
+            for name in data.files
+            if name != "metadata_json"
+        }
+    if metadata.get("schema") != POLICY_TRACE_SCHEMA:
+        raise ValueError(f"wrong policy trace schema in {path}")
+    if metadata.get("observation_names") != list(OBSERVATION_NAMES):
+        raise ValueError(f"policy trace observation contract mismatch in {path}")
+    if metadata.get("trace_only") is not True:
+        raise ValueError(f"policy trace artifact is not trace-only: {path}")
+    if metadata.get("valid_for_training") is not False:
+        raise ValueError(f"policy trace artifact is incorrectly training-enabled: {path}")
+    case = int(metadata["case"])
+    validate_policy_trace(payload, expected_case=case)
+    return metadata, payload
 
 
 def save_raw_teacher_case(

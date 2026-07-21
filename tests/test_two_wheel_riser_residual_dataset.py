@@ -14,13 +14,64 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     build_raw_residual_command,
     build_residual_action,
     load_case_dataset,
+    load_policy_trace,
     load_raw_teacher_case,
     normalize_raw_teacher_payload,
     save_case_dataset,
+    save_policy_trace,
     save_raw_teacher_case,
     normalize_residual_command,
     residual_action_envelope_passed,
 )
+
+
+def _policy_trace_payload(count: int = 3, case: int = 4) -> dict[str, np.ndarray]:
+    return {
+        "observations": np.zeros((count, len(OBSERVATION_NAMES)), dtype=np.float32),
+        "applied_residual_actions": np.zeros((count, 3), dtype=np.float32),
+        "final_high_level_commands": np.zeros((count, 3), dtype=np.float32),
+        "baseline_wheel_actions": np.zeros((count, 2), dtype=np.float32),
+        "case_ids": np.full(count, case, dtype=np.int16),
+        "elapsed_time_s": np.arange(count, dtype=np.float64) * 0.005,
+        "phase_time_s": np.arange(count, dtype=np.float64) * 0.004,
+        "post_step_position_error_m": np.zeros(count, dtype=np.float32),
+        "post_step_attitude_error_deg": np.zeros(count, dtype=np.float32),
+        "post_step_base_xy_yaw": np.zeros((count, 3), dtype=np.float32),
+        "post_step_camera_position_world_m": np.zeros((count, 3), dtype=np.float32),
+        "post_step_pitch_deg": np.zeros(count, dtype=np.float32),
+        "post_step_riser_position_m": np.zeros(count, dtype=np.float32),
+        "post_step_proxy_position_rad": np.zeros((count, 3), dtype=np.float32),
+    }
+
+
+def test_policy_trace_round_trip_is_diagnostic_only(tmp_path) -> None:
+    path = tmp_path / "case_0004_policy_trace_v1.npz"
+    payload = _policy_trace_payload()
+    save_policy_trace(path, 4, payload)
+    metadata, restored = load_policy_trace(path)
+    assert metadata["trace_only"] is True
+    assert metadata["teacher_labels_present"] is False
+    assert metadata["residual_dataset_present"] is False
+    assert metadata["valid_for_training"] is False
+    assert metadata["bc_authorized"] is False
+    assert metadata["dagger_authorized"] is False
+    assert metadata["ppo_authorized"] is False
+    assert metadata["sample_alignment_contract"] == (
+        "pre_action_observation_and_command_to_post_step_outcome_v1"
+    )
+    assert "actions" not in restored
+    np.testing.assert_array_equal(restored["case_ids"], payload["case_ids"])
+
+
+def test_policy_trace_rejects_misaligned_rows_and_mixed_cases(tmp_path) -> None:
+    payload = _policy_trace_payload()
+    payload["post_step_position_error_m"] = np.zeros(2, dtype=np.float32)
+    with pytest.raises(ValueError, match="row counts"):
+        save_policy_trace(tmp_path / "bad_rows.npz", 4, payload)
+    payload = _policy_trace_payload()
+    payload["case_ids"][-1] = 5
+    with pytest.raises(ValueError, match="mixes trajectories"):
+        save_policy_trace(tmp_path / "mixed.npz", 4, payload)
 
 
 def test_residual_action_reconstructs_bounded_teacher_command() -> None:

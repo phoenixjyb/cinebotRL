@@ -177,6 +177,27 @@ def test_masked_bc_case4_canary_is_single_validation_case_and_guarded() -> None:
     assert '"holdout_opened": False' in source
     assert '"ppo_authorized": False' in source
     assert "Get-CimInstance Win32_Process" in source
+
+
+def test_case4_policy_trace_is_diagnostic_only_and_exclusive() -> None:
+    source = _read("run_riser_case4_policy_trace.sh")
+    assert "20260721_case4_policy_rate_trace_teacher_masked_v1_exclusive" in source
+    assert "RISER_CASE4_POLICY_TRACE_AUTHORIZATION_FILE" in source
+    assert "assert_gpu_free" in source
+    assert "Get-CimInstance Win32_Process" in source
+    assert "run_playback teacher" in source
+    assert "run_playback learned" in source
+    assert "if [[ \"$TEACHER_STATUS\" == 0 ]]" in source
+    assert "--policy-trace-dir" in source
+    assert "--dataset-dir" not in source
+    assert "--raw-teacher-dir" not in source
+    assert '"trace_only": True' in source
+    assert '"valid_for_training": False' in source
+    assert '"dagger_authorized": False' in source
+    assert '"bc_authorized": False' in source
+    assert '"ppo_authorized": False' in source
+    assert "residual_policy.torchscript.pt" in source
+    assert "residual capture" not in source.lower()
     assert "rev-parse '@{upstream}'" in source
 
 
@@ -998,6 +1019,21 @@ def test_runtime_evidence_separates_source_and_execution_clocks() -> None:
     assert "teacher_residual_action\n                if dataset_dir is not None" in riser
     assert '"raw_teacher_capture_started": args.raw_teacher_dir is not None' in riser
     assert "raw teacher capture, normalized dataset collection, and policy rollout" in riser
+    assert '"--policy-trace-dir"' in riser
+    assert "policy_trace_observations.append(executed_observation.copy())" in riser
+    assert "policy_trace_actions.append(applied_residual_action.copy())" in riser
+    assert "[vx_ref, wz_ref, commanded_riser_target]" in riser
+    assert "if policy_trace_dir is not None:" in riser
+    assert "save_policy_trace(" in riser
+    assert riser.index("        save_raw_teacher_case(") < riser.index(
+        "policy_trace_path = None"
+    )
+    assert '"policy_trace_valid_for_training": False' in riser
+    assert '"dagger_authorized": False' in riser
+    assert (
+        "policy trace, raw teacher capture, and normalized dataset collection"
+        in riser
+    )
     assert '"dynamic_quality_passed": dynamic_quality_passed' in riser
     assert '"residual_label_envelope_passed": residual_label_envelope_ok' in riser
 

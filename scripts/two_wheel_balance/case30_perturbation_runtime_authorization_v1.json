@@ -1,0 +1,48 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case30_runtime_authorization_v1",
+  "case": 30,
+  "split": "train",
+  "reviewed_cpu_commit": "8c4a5a662a98088edf053697e27596c2e9ac7803",
+  "runtime_implementation_commit": "125955bdebc6f55f50fd650089dbebe682c3b0fb",
+  "namespace": "20260721_case30_perturbation_measurement_v1_exclusive",
+  "runtime_authorized": true,
+  "gpu_launch_authorized": true,
+  "one_case_only": true,
+  "maximum_runtime_seconds": 600,
+  "runtime_authorization_token_sha256": "b4762429e0a8bdd15015d12f12f8a90e5000c4dd0dbd56bae5bac8bdce4ff137",
+  "identities": {
+    "cpu_contract": {
+      "path": "scripts/two_wheel_balance/case30_perturbation_measurement_contract_v1.json",
+      "sha256": "2e567b5a00adab72a488714a9a6fef6ab66a36931521466ccb4fc46a705d0993",
+      "git_blob_sha1": "3279a41f16ef7493d6b3093bab1ad42bdef3e431"
+    },
+    "runtime_wrapper": {
+      "path": "scripts/two_wheel_balance/run_riser_case30_perturbation_canary.sh",
+      "sha256": "02630d4f1d8ec75cfdb6169e91e64709a46cc5c147f3114b1006830ba6f693c4",
+      "git_blob_sha1": "17f6281f2bee98ddb3ad58b25ba23d263c5f31d1"
+    },
+    "runtime_summarizer": {
+      "path": "scripts/two_wheel_balance/summarize_riser_case30_perturbation_canary.py",
+      "sha256": "0a88d134a925fd7ddf37195a970f03b3a7ecbbd8081fa292722061273a475ceb",
+      "git_blob_sha1": "82589ca73b41cf41fefba668c84b483945ae0f22"
+    },
+    "runtime_validator": {
+      "path": "scripts/two_wheel_balance/validate_riser_case30_runtime_authorization.py",
+      "sha256": "8e848d66e17b3701bcc168b6425633deb425cef30d2e423068f48ce2088b3504",
+      "git_blob_sha1": "ed253105a6669a192df3211d3bcf35a6f4d99dbe"
+    }
+  },
+  "measurement_contract": {
+    "deterministic_wrench_profile": "body_x_positive_20N_20_steps_at_phase_15.666592937559889s",
+    "dynamic_commands_unchanged": true,
+    "physical_and_label_outcomes_independent": true,
+    "shadow_teacher_trace_only": true,
+    "stop_after_case30": true
+  },
+  "dataset_creation_authorized": false,
+  "dagger_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "holdout_opened": false,
+  "valid_for_training": false
+}

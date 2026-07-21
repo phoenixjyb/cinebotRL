@@ -43,6 +43,30 @@ def test_bc_gate_requires_complete_quality_qualified_exact_source_dataset() -> N
     assert '"state_shared_lookahead_fusion_v1"' in source
 
 
+def test_initial_teacher40_bc_is_separately_admitted_and_holdout_closed() -> None:
+    source = _read("run_riser_initial_teacher40_bc.sh")
+    assert "initial_teacher40_30_5_5_v1.npz" in source
+    assert 'DATASET_SHA256="53f3b679' in source
+    assert 'FINAL_SHA256="5d0771af' in source
+    assert 'REVIEWED_DATASET_LOADER_COMMIT="aec787b' in source
+    assert '[[ "$HEAD" == "$UPSTREAM" ]]' in source
+    assert 'status --porcelain --untracked-files=no' in source
+    assert "RISER_INITIAL_BC_AUTHORIZATION_FILE" in source
+    assert '"bc_training_authorized": True' in source
+    assert '"learned_rollout_authorized": False' in source
+    assert '"ppo_authorized": False' in source
+    assert '"validation_only_model_selection": True' in source
+    assert '"holdout_opened": False' in source
+    assert "--epochs 80" in source
+    assert "--batch-size 4096" in source
+    assert "--patience 10" in source
+    assert "--device cuda" in source
+    assert 'report.get("offline_gate_splits") == ["validation"]' in source
+    assert 'report.get("holdout_metrics_computed") is False' in source
+    assert 'report.get("learned_rollout_started") is False' in source
+    assert 'report.get("ppo_started") is False' in source
+
+
 def test_all79_capture_is_bound_to_one_clean_source_revision() -> None:
     source = _read("run_riser_all79_dataset_gate.sh")
     assert "20260717_residual_all79_exact_source_lookahead_v2" in source

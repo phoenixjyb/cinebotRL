@@ -3,8 +3,8 @@
   "case": 30,
   "split": "train",
   "reviewed_cpu_commit": "8c4a5a662a98088edf053697e27596c2e9ac7803",
-  "runtime_implementation_commit": "125955bdebc6f55f50fd650089dbebe682c3b0fb",
-  "namespace": "20260721_case30_perturbation_measurement_v1_exclusive",
+  "runtime_implementation_commit": "2589c93a97f38a2d0a758cdbd42a7674b87fce7f",
+  "namespace": "20260721_case30_perturbation_measurement_v2_exclusive",
   "runtime_authorized": true,
   "gpu_launch_authorized": true,
   "one_case_only": true,
@@ -13,23 +13,23 @@
   "identities": {
     "cpu_contract": {
       "path": "scripts/two_wheel_balance/case30_perturbation_measurement_contract_v1.json",
-      "sha256": "2e567b5a00adab72a488714a9a6fef6ab66a36931521466ccb4fc46a705d0993",
-      "git_blob_sha1": "3279a41f16ef7493d6b3093bab1ad42bdef3e431"
+      "sha256": "90b1f9c628e0dc13db786c81b6c2afd16b3b7898ee87d06ca7798c3aab5388d1",
+      "git_blob_sha1": "c4c9463ea94d6d0a4f686e098725b428bf563d4c"
     },
     "runtime_wrapper": {
       "path": "scripts/two_wheel_balance/run_riser_case30_perturbation_canary.sh",
-      "sha256": "02630d4f1d8ec75cfdb6169e91e64709a46cc5c147f3114b1006830ba6f693c4",
-      "git_blob_sha1": "17f6281f2bee98ddb3ad58b25ba23d263c5f31d1"
+      "sha256": "106c825908ba3e6259648aa86062e32f8eacaa73c4a370f2503dfc497665e751",
+      "git_blob_sha1": "bc4c349e8c7acf57ec61b5915738f735354b853f"
     },
     "runtime_summarizer": {
       "path": "scripts/two_wheel_balance/summarize_riser_case30_perturbation_canary.py",
-      "sha256": "0a88d134a925fd7ddf37195a970f03b3a7ecbbd8081fa292722061273a475ceb",
-      "git_blob_sha1": "82589ca73b41cf41fefba668c84b483945ae0f22"
+      "sha256": "9be31697a7a3cc88db07f3d740c1128f03453beaee508313180d2aa8b9495f55",
+      "git_blob_sha1": "377287313e82040a6a6f69698f9d50d11524917e"
     },
     "runtime_validator": {
       "path": "scripts/two_wheel_balance/validate_riser_case30_runtime_authorization.py",
-      "sha256": "8e848d66e17b3701bcc168b6425633deb425cef30d2e423068f48ce2088b3504",
-      "git_blob_sha1": "ed253105a6669a192df3211d3bcf35a6f4d99dbe"
+      "sha256": "e2c4c65153d50e12b37b54a44723ce8e4eb781b698c44d1ef933340afa1d045a",
+      "git_blob_sha1": "f3dda248d7e64c6b0f8ba47cee7c94dd62c8cf94"
     }
   },
   "measurement_contract": {

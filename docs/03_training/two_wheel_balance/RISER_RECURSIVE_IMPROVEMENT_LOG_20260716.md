@@ -4355,3 +4355,66 @@ and must state whether its candidate was accepted or rejected.
   deterministic physics.
 - After capture, run corpus admission and construct the `30/5/5` dataset. Stop
   again for review before any bounded BC process starts.
+
+## Round 122: previous-action exposure bias diagnosed; masked BC is a near-pass
+
+- The fresh 40-case corpus, case-disjoint `30 train / 5 validation / 5 holdout`
+  split, bounded BC initialization, and rendered case-4 rollout were completed
+  under the existing no-PPO boundary. Holdout remained unopened. The original
+  policy completed case 4 but missed the unchanged position gate at
+  `0.181195/0.221956 m` p95/max.
+- Commit `6f5940c2fb19bfcfad1472a6bfb4bbf17db2cf8d` added a CPU-only
+  teacher-forcing diagnosis. On immutable case-4 teacher states, the original
+  policy's MSE ratio to a zero predictor was `0.030837`; recursively replacing
+  only observation indices `23:26` with the policy's own previous output raised
+  the ratio to `0.549984`. Teacher-state action correlations remained
+  `0.965/0.989/0.993`. The bounded classification is therefore
+  `autoregressive_previous_action_exposure_bias`, not insufficient trajectory
+  coverage or a failed deterministic controller.
+- The diagnosis artifact is
+  `20260721_initial_teacher40_bc_case4_cpu_diagnosis_v1`; its report SHA-256 is
+  `9c81451eeb4549da1504f4ae6baa141aa67aa415ababb481c9b37e202917766c`.
+  Lever-arm saturation also occurs in successful teacher playback, so it is an
+  operating condition and possible error amplifier, not the demonstrated root
+  cause.
+- Commit `7932a9efc35b99e5b87c3a7e8eb653647fce471b` added the
+  `state_shared_lookahead_fusion_previous_action_masked_v1` architecture. It
+  masks normalized previous-action inputs inside the model, records the mask in
+  the TorchScript/evidence contract, and passed `52/52` focused CPU tests.
+- The masked BC run completed at best epoch `32` after `42` epochs and passed
+  aggregate offline validation. Its final-status SHA-256 is
+  `ded00f25dde299207dc0e3af0b611418e09d5368d4fc9e7cab53b57df9a36bba`,
+  report SHA-256 is
+  `3f0efb4a2707b343a775dd5dd8b0ad49d6506474da627d8449ca81556cbbcd3e`,
+  and TorchScript SHA-256 is
+  `34fa67192f8c66b879eb7d11a83c96ffd2320932e6807f2224cdfa2f74a4c0e4`.
+- Commit `a1a5e9394db1f372669eef4f2f4a7b939021d3cb` added the guarded,
+  single-case learned-playback route. The exclusive case-4 canary completed all
+  `21.514453 s` of execution in `6,316` policy steps with dynamic, thermal, and
+  controller-evidence gates true. Position p95/max improved to
+  `0.137441/0.167322 m`, a `24.1%` p95 improvement over the original BC policy;
+  attitude p95/max were `0.184099/0.214760 deg`, and pitch max was
+  `6.160219 deg`.
+- The masked policy now passes the absolute `0.15 m` dynamic p95 gate, but it is
+  not admitted. It misses the unchanged teacher-plus-5-percent p95 budget
+  (`0.135173 m`) by `0.002268 m` and also misses the corresponding max-error
+  budget by about `0.008012 m`. Gate-summary SHA-256 is
+  `ff483e5ee8b975419fc75efbdf7c22e013a5c5dccc56df17e538d9113d35abdc`;
+  final-status SHA-256 is
+  `1a4fbcd16fa3490d9b187b4af90298c8c04f7d674060189ae8116cd500257cdb`.
+  No holdout metric, residual capture, PPO process, or obstacle curriculum was
+  opened.
+
+## Next round after Round 122
+
+- Keep the masked checkpoint as a diagnostic near-pass, not an admitted policy.
+  Do not relax either the absolute or teacher-relative gates.
+- Implement bounded sequence-aware BC that exposes training to policy-generated
+  previous actions using a deterministic scheduled-sampling contract. Preserve
+  case-disjoint validation, teacher actions, scales, controller commands, and
+  all safety gates.
+- First compare the candidate offline against the original and masked policies,
+  including recursive previous-action diagnostics. Only an offline improvement
+  may receive one exclusive case-4 canary. Holdout, PPO, obstacle work, and
+  broader learned rollout remain closed until that canary passes unchanged
+  absolute and teacher-relative gates.

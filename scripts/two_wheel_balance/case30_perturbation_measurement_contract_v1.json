@@ -3,7 +3,7 @@
   "case": 30,
   "split": "train",
   "reviewed_parent_commit": "6a8e7a091dc128727bd5e6cded5154eb48c8874c",
-  "namespace": "20260721_case30_perturbation_measurement_v1_exclusive",
+  "namespace": "20260721_case30_perturbation_measurement_v2_exclusive",
   "profile_payload": {
     "schema": "cinebotrl_two_wheel_riser_deterministic_wrench_pulse_v1",
     "case": 30,
@@ -118,13 +118,13 @@
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_riser_case30_perturbation_measurement.sh",
-      "sha256": "ed71685042b1cc4a749a3da627bea2a8e9849b4251ead153f8964708fe4b3743",
-      "git_blob_sha1": "0c8e2d44ccf07b9347bfba825f942a59806e9a8f"
+      "sha256": "fa2f9b4824d7366fe2e4ba7dd5933fb850442d2a544af8c5b8086aa0812018af",
+      "git_blob_sha1": "d56b01f13342a48499def7fae598c72b25998af1"
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_riser_case30_perturbation_contract.py",
-      "sha256": "a5797bc7d7ffc265dabff96c466338599e9f72297072f567e483246ce48c5b7e",
-      "git_blob_sha1": "eb8afd2f5549df4a2664684d0cd71bccb6a7ab2d"
+      "sha256": "501543d7619edba8698eca26e19a198e7a378289d1f48a54f27bc0b37a611067",
+      "git_blob_sha1": "ad4b451990628a38c8f72931ca3643aa8b416226"
     }
   }
 }

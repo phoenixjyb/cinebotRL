@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="${RISER_ROOT:-/mnt/g/wSpace/cinebotRL-two-wheel-riser}"
 WIN_ROOT="${RISER_WIN_ROOT:-G:\\wSpace\\cinebotRL-two-wheel-riser}"
 PY="${ISAAC_PYTHON:-/mnt/g/isaaclab_venv/Scripts/python.exe}"
+D3D12_EXPERIENCE="${ISAAC_D3D12_EXPERIENCE:-G:\\isaaclab\\apps\\isaaclab.python.headless.rendering.d3d12.kit}"
+D3D12_EXPERIENCE_WSL="${ISAAC_D3D12_EXPERIENCE_WSL:-/mnt/g/isaaclab/apps/isaaclab.python.headless.rendering.d3d12.kit}"
 NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
 POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 MODE="${1:---preflight}"
@@ -14,7 +16,7 @@ PLAN_STAMP="20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu
 CAPTURE_STAMP="20260721_initial_teacher42_raw_capture_v1_exclusive"
 DATASET_STAMP="20260721_initial_teacher41_subset_30_5_5_v1"
 POLICY_STAMP="20260721_initial_teacher40_bc_v1"
-OUTPUT_STAMP="20260721_initial_teacher40_bc_case4_rendered_canary_v1"
+OUTPUT_STAMP="20260721_initial_teacher40_bc_case4_rendered_canary_v2"
 PLAN_ROOT="$ROOT/artifacts/two_wheel_riser/$PLAN_STAMP"
 CAPTURE_ROOT="$ROOT/artifacts/two_wheel_riser/$CAPTURE_STAMP"
 DATASET_ROOT="$ROOT/artifacts/two_wheel_riser/$DATASET_STAMP"
@@ -48,7 +50,7 @@ GAINS_SHA256="2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6"
 ROBOT_USD_SHA256="89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0"
 POLICY_COMMIT="d093b10bda36ef8dfbb588d07ee0359a2680401b"
 SCALE_BINDING_COMMIT="0ca3e2df89ab9efd421896750683d78ec9b0f3fb"
-AUTHORIZATION_SHA256="53ef6efc3790cf195d591982f83c46679c4320851984c224aa18550b5815165f"
+AUTHORIZATION_SHA256="7c2910e13c83cfaec09d99d16701ee2376de26e923bb9867bb709894bf85132d"
 
 if [[ "$MODE" != --preflight && "$MODE" != --execute ]]; then
   printf 'usage: %s [--preflight|--execute]\n' "$0" >&2
@@ -56,6 +58,10 @@ if [[ "$MODE" != --preflight && "$MODE" != --execute ]]; then
 fi
 [[ -x "$PY" && -x /usr/bin/ffmpeg ]] || {
   printf 'missing Isaac Python or ffmpeg\n' >&2
+  exit 2
+}
+[[ -f "$D3D12_EXPERIENCE_WSL" ]] || {
+  printf 'missing D3D12 render experience: %s\n' "$D3D12_EXPERIENCE_WSL" >&2
   exit 2
 }
 
@@ -228,7 +234,8 @@ run_rollout() {
     --maximum-camera-lever-arm-correction-m 0.05 \
     --residual-action-scales 0.35,0.40,0.10 \
     $extra --video-dir "$OUTPUT_WIN\\videos\\${name}_raw" --video-fps 200 \
-    --output "$OUTPUT_WIN\\$name\\case_${PADDED}.json" --headless \
+    --output "$OUTPUT_WIN\\$name\\case_${PADDED}.json" \
+    --headless --enable_cameras --experience "$D3D12_EXPERIENCE" \
     >"$OUTPUT/logs/${name}.log" 2>&1 || status=$?
   printf '%s\n' "$status" >"$OUTPUT/logs/${name}.exit_code"
   wait_for_gpu_release || return 5

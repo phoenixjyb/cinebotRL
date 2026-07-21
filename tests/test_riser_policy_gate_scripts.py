@@ -77,10 +77,13 @@ def test_initial_bc_case4_render_canary_is_validation_only_and_scale_bound() -> 
     assert 'PLAYBACK_SHA256="83eb26eb' in source
     assert 'SCALE_BINDING_COMMIT="0ca3e2d' in source
     assert "RISER_CASE4_RENDER_AUTHORIZATION_FILE" in source
+    assert "isaaclab.python.headless.rendering.d3d12.kit" in source
+    assert "missing D3D12 render experience" in source
     assert '"case_is_validation"' in source
     assert '"holdout_untouched"' in source
     assert '"frozen_scales"' in source
     assert "--residual-action-scales 0.35,0.40,0.10" in source
+    assert '--headless --enable_cameras --experience "$D3D12_EXPERIENCE"' in source
     assert 'run_rollout zero "--zero-policy-action"' in source
     assert "--residual-policy $POLICY_WIN" in source
     assert "--mode validation_canary" in source

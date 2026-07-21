@@ -64,6 +64,7 @@ def _fixture(tmp_path: Path):
         "case": 30,
         "split": "train",
         "profile": {"sha256": _sha(profile)},
+        "case30_plan": {"sha256": _sha(files["plan"])},
         "runtime_authorized": False,
         "dataset_created": False,
     }))
@@ -80,6 +81,7 @@ def _fixture(tmp_path: Path):
         }
         for name, path in files.items()
     }
+    identities["case30_plan"] = identities.pop("plan")
     contract = repo / "scripts/two_wheel_balance/case30_perturbation_measurement_contract_v1.json"
     contract.parent.mkdir(parents=True)
     contract.write_text(json.dumps({
@@ -89,7 +91,34 @@ def _fixture(tmp_path: Path):
         "reviewed_parent_commit": parent,
         "namespace": "fresh-case30",
         "profile_payload": json.loads(profile.read_text()),
+        "controller_arguments": {
+            "controller_wz_kp": 1.05,
+            "maximum_duration_scale": 3.0,
+            "camera_lever_arm_compensation_enabled": True,
+            "camera_lever_arm_compensation_gain": 1.0,
+            "maximum_camera_lever_arm_correction_m": 0.05,
+            "residual_policy_device": "cuda",
+        },
         "residual_action_scales": [0.35, 0.4, 0.1],
+        "unchanged_dynamic_gate_thresholds": {
+            "maximum_pitch_deg": 12.0,
+            "maximum_position_p95_m": 0.15,
+            "maximum_position_error_m": 0.25,
+            "maximum_attitude_p95_deg": 5.0,
+            "maximum_attitude_error_deg": 10.0,
+            "maximum_riser_servo_error_m": 0.03,
+            "maximum_proxy_servo_error_deg": 5.0,
+            "maximum_internal_proxy_rate_deg_s": 360.0,
+            "maximum_saturation_ratio": 0.2,
+        },
+        "measurement_contract": {
+            "shadow_teacher_applied_to_commands": False,
+            "perturbation_applied_to_planner_commands": False,
+            "perturbation_applied_to_policy_actions": False,
+            "dynamic_and_perturbation_outcomes_independent": True,
+            "stop_after_case30": True,
+            "maximum_runtime_seconds": 600,
+        },
         "cpu_preflight_ready": True,
         "runtime_authorized": False,
         "gpu_launch_authorized": False,

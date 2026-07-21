@@ -25,6 +25,33 @@ EXPECTED_PROFILE = {
     "application_height_m": 0.5,
 }
 EXPECTED_ACTION_SCALES = [0.35, 0.4, 0.1]
+EXPECTED_CONTROLLER_ARGUMENTS = {
+    "controller_wz_kp": 1.05,
+    "maximum_duration_scale": 3.0,
+    "camera_lever_arm_compensation_enabled": True,
+    "camera_lever_arm_compensation_gain": 1.0,
+    "maximum_camera_lever_arm_correction_m": 0.05,
+    "residual_policy_device": "cuda",
+}
+EXPECTED_DYNAMIC_THRESHOLDS = {
+    "maximum_pitch_deg": 12.0,
+    "maximum_position_p95_m": 0.15,
+    "maximum_position_error_m": 0.25,
+    "maximum_attitude_p95_deg": 5.0,
+    "maximum_attitude_error_deg": 10.0,
+    "maximum_riser_servo_error_m": 0.03,
+    "maximum_proxy_servo_error_deg": 5.0,
+    "maximum_internal_proxy_rate_deg_s": 360.0,
+    "maximum_saturation_ratio": 0.2,
+}
+EXPECTED_MEASUREMENT_CONTRACT = {
+    "shadow_teacher_applied_to_commands": False,
+    "perturbation_applied_to_planner_commands": False,
+    "perturbation_applied_to_policy_actions": False,
+    "dynamic_and_perturbation_outcomes_independent": True,
+    "stop_after_case30": True,
+    "maximum_runtime_seconds": 600,
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -149,6 +176,14 @@ def validate(
         and contract.get("profile_payload") == EXPECTED_PROFILE,
         "action_scales_match": contract.get("residual_action_scales")
         == EXPECTED_ACTION_SCALES,
+        "controller_arguments_match": contract.get("controller_arguments")
+        == EXPECTED_CONTROLLER_ARGUMENTS,
+        "dynamic_thresholds_match": contract.get(
+            "unchanged_dynamic_gate_thresholds"
+        )
+        == EXPECTED_DYNAMIC_THRESHOLDS,
+        "measurement_contract_matches": contract.get("measurement_contract")
+        == EXPECTED_MEASUREMENT_CONTRACT,
         "proposal_contract": proposal.get("schema")
         == "cinebotrl_two_wheel_riser_case30_perturbation_proposal_v1"
         and proposal.get("decision_status")
@@ -157,6 +192,8 @@ def validate(
         and proposal.get("split") == "train"
         and proposal.get("profile", {}).get("sha256")
         == rows.get("profile", {}).get("sha256")
+        and proposal.get("case30_plan", {}).get("sha256")
+        == rows.get("case30_plan", {}).get("sha256")
         and proposal.get("runtime_authorized") is False
         and proposal.get("dataset_created") is False,
         "all_identity_hashes_match": bool(rows)

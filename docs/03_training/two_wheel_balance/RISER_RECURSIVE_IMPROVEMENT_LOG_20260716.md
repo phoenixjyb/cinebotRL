@@ -4812,3 +4812,50 @@ and must state whether its candidate was accepted or rejected.
 - Do not issue a runtime token or launch the canary while implementing the CPU
   contract. Do not create a DAgger dataset, change the split, open holdout,
   retrain BC, start PPO, or begin obstacle work.
+
+## Round 131: deterministic case-30 perturbation plumbing is CPU-complete
+
+- Commit `2f993c9aee021c2d641f5e401598529459919aa0` adds the
+  disabled-by-default deterministic wrench-pulse contract to riser reference
+  playback. The complete authoritative `.98` CPU suite passes `528/528` in
+  `46.39 s`.
+- The profile schema is exact and hash-bound. It currently admits case 30 only,
+  a single body-longitudinal force pulse of at most `40 N`, at most `50` policy
+  steps (`0.25 s` at `200 Hz`), and application height at most `1.0 m`.
+  Missing/extra fields, case mismatch, zero/oversized force, invalid duration,
+  invalid height, and non-finite clocks fail closed.
+- Pulse onset is indexed by immutable execution-phase time; pulse duration is
+  counted in policy steps so a phase-governor hold cannot extend the force.
+  Telemetry independently records trigger step/phase, exact active-step count,
+  release, and the frozen assertions that the perturbation was not applied to
+  planner commands or policy actions. Only two compact pulse fields are added
+  to the existing 1 Hz trace.
+- The runtime mode requires one learned-policy shadow-teacher case and forbids
+  normalized dataset, raw-teacher, policy-trace, and zero-action modes. The
+  independent perturbation contract joins final admission without changing the
+  existing dynamic, thermal, controller-evidence, or residual-label outcomes.
+  Disabled mode emits zero force and remains command-identical.
+- Diff audit confirms that this commit changes only the playback seam, the new
+  pure perturbation module, and its tests. No planner, source/plan geometry,
+  controller, gate-threshold, dataset builder, BC, or PPO file changed.
+  Playback/module/test SHA-256 values are respectively
+  `cbe96aaa9ee775454f915a223f2ed15b23dfa51dbfbdc9965d62a368542c611b`,
+  `37ac835f888b1d4cdfacc3e40a1854bb1d9801cd251dbdb03d80e4bbd5e01897`,
+  and `45e8a3b768a3048fba62353a594cf4afdd31ed3679925b30e378a1ee1d6cc494`.
+- No pulse profile, runtime namespace, authorization token, Isaac process,
+  residual dataset, BC, or PPO run was created. WSL and NVIDIA compute-process
+  checks were empty after the CPU suite.
+
+## Next round after Round 131
+
+- Build a CPU-only case-30 pulse-design proposal. Bind the case-4 hotspot,
+  case-30 plan/policy/teacher identities, and choose one phase-localized pulse
+  profile from the existing validated LQR push envelope. Do not infer a force
+  from trajectory distance alone; document the state-coverage hypothesis and
+  stop conditions.
+- The proposal may write a non-authorizing profile candidate, but it must not
+  create a runtime namespace or token. A later, separately reviewed canary must
+  still prove unchanged physical gates, exact pulse telemetry, improved
+  case-4-hotspot state coverage, and independent shadow-label materiality.
+- Keep case 4 in validation, case 78 unadmitted, holdout unopened, and DAgger
+  dataset creation, BC, PPO, obstacles, and broad rollout closed.

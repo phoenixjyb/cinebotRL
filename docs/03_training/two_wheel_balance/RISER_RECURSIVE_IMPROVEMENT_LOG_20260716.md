@@ -4859,3 +4859,52 @@ and must state whether its candidate was accepted or rejected.
   case-4-hotspot state coverage, and independent shadow-label materiality.
 - Keep case 4 in validation, case 78 unadmitted, holdout unopened, and DAgger
   dataset creation, BC, PPO, obstacles, and broad rollout closed.
+
+## Round 132: case-30 pulse profile is localized and remains non-authorizing
+
+- Commit `354ffdd` adds a reproducible CPU-only case-30 pulse designer. The
+  complete authoritative `.98` suite passes `532/532` in `45.28 s`; focused
+  design/coverage/perturbation tests pass `25/25`.
+- The designer binds the frozen teacher dataset, masked policy, case-4 shadow
+  trace/diagnosis, localized and unused-plan audits, Round-130 architecture
+  proposal, all-70 plan summary, exact case-30 plan, and three passed LQR
+  disturbance-envelope results. Every identity and semantic input check passes.
+- All 70 admitted plans define the feature normalization. A local-16 directed
+  search maps the case-4 material-shift command/lookahead region to case 30 at
+  plan index `474`, phase `15.6665929376 s` of `29.2224881939 s`. This leaves
+  `2 s` startup and `5 s` terminal-recovery margins. The selected context has
+  feed-forward `vx=0.192157 m/s`, `wz=0.250420 rad/s`, riser rate
+  `0.006626 m/s`, and riser position `0.781915 m`.
+- The candidate profile requests one body-forward `+20 N` pulse for exactly
+  `20` policy steps (`0.1 s`) at `0.5 m` height. The sign is an explicit
+  hypothesis: case 4's shadow-minus-original normalized `vx` label has signed
+  mean `-0.058188`, so a forward disturbance may induce the same negative
+  correction. No claim is made that this will reproduce the material `wz`
+  shift without measurement.
+- The scalar force/duration/height prior is backed by three LQR gates covering
+  riser positions `[0.0,0.6,1.2] m`, `168` provisional-plant scenarios,
+  `100%` success, peak pitch `9.383906 deg`, and zero action saturation. Those
+  gates used global-X force while the proposed pulse is body-X, so
+  `frame_transfer_dynamically_validated=false`; this is the canary hypothesis,
+  not prior safety proof.
+- Profile SHA-256 is
+  `6ab2fe1212f88e3baecac4f64156bb9820069203136758a22a2cb632813a5907`;
+  proposal SHA-256 is
+  `4490a35794988de2cf56fd18a06d1a77c7df8c99267e66c98d9c801b6223e65b`.
+  Independent Mac readback matches both. No runtime namespace, token, Isaac
+  process, dataset, DAgger, BC, PPO, split change, or holdout access occurred.
+
+## Next round after Round 132
+
+- Build a CPU-only single-case admission wrapper that pins the Round-132
+  proposal/profile, case-30 plan, masked policy, controller gains, playback
+  code, action scales, and unchanged dynamic/thermal/controller/label gates.
+  It must reject every conflicting environment override before Isaac starts,
+  require fresh exclusive WSL/Windows/NVIDIA ownership, and write a bounded
+  failure summary.
+- Do not issue or consume a runtime token as part of the wrapper change. After
+  the wrapper and full CPU suite are clean, perform a separate go/no-go review
+  for exactly one case-30 measurement. If later authorized, stop after case 30
+  regardless of physical or coverage outcome.
+- Keep the case-4 validation split, case-78 status, holdout, dataset creation,
+  DAgger, BC, PPO, obstacle work, and broad rollout unchanged and closed.

@@ -6603,3 +6603,61 @@ and must state whether its candidate was accepted or rejected.
 - If the archive is admitted, open only a CPU-reviewed conversion proposal. If
   it fails, diagnose CPU-only without changing gates or issuing a second token.
   BC and PPO remain closed in either case.
+
+## Round 171: the one-shot case-30 capture is rejected at the v1 archive boundary
+
+- Commit `a898eb4` issued exactly one separately reviewed mode-`0600` token for
+  namespace
+  `20260722_model_based_corrective_teacher_case30_capture_v1_exclusive`. The
+  authoritative `.98` suite passed `771` tests with eleven intentional skips
+  and two warnings in `72.52 s` before launch. The wrapper consumed the token
+  before Isaac and did not leave a reusable authorization file.
+- The physical execution reached the same complete corrective trajectory at
+  `11,411` steps, source duration `18.144412 s`, execution duration
+  `29.2224881939 s`, position peak `0.1597901051 m`, attitude peak
+  `0.2215529015 deg`, and pitch peak `7.0453213458 deg`. The GPU/process owner
+  was released after the bounded run.
+- Archive creation then failed closed with
+  `ValueError: final command was clipped or does not reconstruct`. The v1
+  schema required the final safety-supervised command to equal the complete
+  model command plus the requested corrective residual. At least one requested
+  channel was clipped by the unchanged runtime supervisor, so this equality is
+  not a valid training-target contract. No NPZ was written.
+- The rejected gate JSON SHA-256 is
+  `9efeec937f9e4445b1e9c7d3004aa781205a1493ad8332d095574f42a795efd1`;
+  heartbeat SHA-256 is
+  `159e8513bdd6f0cc2ef58c2da24b5441e04021a798cff9d46577cfbbf25e6a45`;
+  final-status SHA-256 is
+  `7a68218bc7851801f936d25ecdc8b9bc9148328a92ef2a11ac6726c915a635a4`;
+  playback-log SHA-256 is
+  `801d86f47ffde3fe503872cbfff36a9b86e192243364abc7b4fe800c18e67816`.
+  The final status preserves contract SHA-256
+  `143be187f83364d3475f638251aa9201e002ad88af6ea64f4c9077df51195c3a`
+  and admission SHA-256
+  `9f5010c36a34c828169afaa47560f2bb298a0b39fb9134ab05054c2686bdc138`.
+- Two evidence defects were also exposed: the failure JSON reports
+  `deterministic_teacher` instead of the active
+  `model_based_planner_plus_corrective_teacher` source, and the heartbeat
+  reports capture outputs disabled because its check omits the dedicated
+  corrective-capture directory. Both must fail closed in the replacement
+  contract.
+- The rejected evidence is preserved under
+  `evidence_20260722_case30_corrective_capture_v1_rejected`. It remains
+  `capture_admitted_for_dataset_conversion=false`,
+  `valid_for_training=false`, with normalized-dataset creation, BC, PPO, and
+  training all false.
+
+## Next round after Round 171
+
+- Replace the v1 archive contract CPU-only. Preserve requested teacher intent
+  and separately record the effective residual equal to final supervised
+  command minus complete model command. The effective normalized residual is
+  the only candidate BC target because it exactly reconstructs behavior that
+  the bounded runtime can apply.
+- Record per-channel clipping and requested-versus-effective deltas without
+  relaxing command, safety, dynamic, thermal, or reserved-action limits. Fix
+  corrective-source and heartbeat evidence, and require both in the finalizer.
+- Move to a fresh v2 namespace, revoke the v1 token/hash, run focused and full
+  authoritative CPU tests, and stop for a new explicit go/no-go. Do not issue a
+  token or launch Isaac; dataset conversion, BC, PPO, validation, and holdout
+  access remain closed.

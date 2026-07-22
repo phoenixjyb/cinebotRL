@@ -7036,3 +7036,50 @@ and must state whether its candidate was accepted or rejected.
 - A passed pair would establish only that the case-specific correction offers
   safe measurable improvement. Corrective label capture, conversion, corpus
   merge, BC, PPO, and training each remain separate later decisions.
+
+## Round 180: case-23 route repaired and quantitatively admitted CPU-only
+
+- Review found a real route defect after Round 179: the deterministic wrench
+  loader still hardcoded case 30, so the tracked case-23 wrench profile would
+  have failed before simulation after any future authorization. The loader now
+  keeps case 30 as its default but accepts another case only through an
+  explicit positive `expected_case`; playback supplies the sole requested
+  case. Multi-case and mismatched profiles remain fail-closed.
+- A new deterministic readiness audit binds the exact case-23 proposal,
+  tranche selection, plan SHA, historical dynamic gate SHA, provisional plant
+  prior, case-30 paired precedent, corrective profile, and wrench profile.
+  Audit SHA-256 is
+  `335e4cd0181edce3c1bb0dd7c0b13c99df040f648b788d65b0fce1a34bf3a198`.
+- The pulse is `20 N` for `0.10 s`, exactly `2.0 N*s`, matching the edge of
+  the provisional accepted signed impulse envelope. Its free-body displacement
+  estimate is `0.003571 m`; this is used only as an observability screen, not
+  as a closed-loop prediction.
+- At the exact midpoint, local limit fractions are base `0.5919`, yaw
+  `0.0120`, riser `0.0772`, and proxy `0.1217`. Historical case-23 margins to
+  unchanged gates remain `0.04455 m` p95 position, `0.14436 m` max position,
+  `6.255 deg` pitch, `0.01902 m` riser error, and `0.19882` saturation ratio.
+- The same pulse previously produced a safe case-30 paired p95 improvement of
+  `0.006324 m` (`4.456%`). This is precedent for one measurement, not proof
+  that case 23 will improve.
+- Implementation commit `f74d9223c626f47da9ad97e2f891417572076bdf`
+  passes the authoritative `.98` suite with `818 passed, 11 skipped, 2
+  warnings` in `77.62 s`. The canonical no-token preflight passes all
+  readiness and identity checks.
+- The repaired contract SHA-256 is
+  `510d34d2e50d2708b654dbb348e4797a88132014b78a2d99023d807c7dd8e949`
+  with Git blob `cbf9ff0e1635b2dc62b98d8760005dc8acd8f469`. The Round 179 contract hash is
+  retained as historical evidence and is superseded for future case-23 use.
+- Decision is `recommend_exactly_one_bounded_case23_pair_canary`. Runtime,
+  GPU, capture, dataset, BC, PPO, training, and training validity remain false;
+  no namespace or Isaac process was created.
+
+## Next round after Round 180
+
+- The next useful runtime action is exactly one authorized case-23 paired
+  canary under the repaired contract: baseline first, candidate only after a
+  baseline dynamic pass, unchanged thresholds, no capture, then stop.
+- Do not infer authorization from this CPU recommendation. A later explicit
+  one-use token revision and user authorization are still required.
+- If the pair passes measurable-improvement and no-regression gates, separately
+  review one corrective capture. If it rejects, preserve the pair and diagnose
+  case 23 rather than changing thresholds or escalating the pulse.

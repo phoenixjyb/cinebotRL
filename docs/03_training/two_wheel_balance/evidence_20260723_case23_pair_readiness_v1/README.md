@@ -24,3 +24,12 @@ Key results:
 - Historical case-23 pitch margin: `6.255 deg`.
 - Case-30 same-pulse p95 improvement: `0.006324 m` (`4.456%`).
 - Decision: `recommend_exactly_one_bounded_case23_pair_canary`.
+
+Verification at implementation commit
+`f74d9223c626f47da9ad97e2f891417572076bdf`:
+
+- Authoritative `.98` CPU suite: `818 passed, 11 skipped, 2 warnings`.
+- Canonical no-token preflight: passed.
+- Repaired contract SHA-256:
+  `510d34d2e50d2708b654dbb348e4797a88132014b78a2d99023d807c7dd8e949`.
+- Runtime, GPU, capture, dataset, BC, PPO, and training remain unauthorized.

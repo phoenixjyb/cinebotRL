@@ -6956,3 +6956,47 @@ and must state whether its candidate was accepted or rejected.
   max, attitude, pitch, riser error, or saturation.
 - Do not authorize the case-23 GPU pair until that contract, negative tests,
   identities, and clean pushed state are independently reviewed.
+
+## Round 178: case-23 paired-canary proposal is sealed CPU-only
+
+- Case 23 is a useful diversity canary because it combines low plan error and
+  modest base/riser rates with a `0.558596 m` camera-height span. Its baseline
+  may already be too accurate for a corrective teacher to clear the measurable
+  improvement gate; such a paired reject is an acceptable result.
+- The corrective-profile loader now supports an explicitly supplied positive
+  expected case while preserving case 30 as the default. Playback accepts a
+  profile only when it matches the sole requested case. The new case-23
+  profile is therefore a distinct identity, not reuse of the case-30 file.
+- The CPU proposal binds tranche selection SHA-256
+  `93aa25e99409ad926d4c4cf0b15075e6ea3532dd1c01d5217a45daffc37db7c0`,
+  portfolio SHA-256
+  `8351514a361d3be4e5fbf57f2dbb019a7d8d2f5b86e89cea2553a1cfda3c64a1`,
+  case-23 plan SHA-256
+  `ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6`,
+  and profile SHA-256
+  `808e2e295bb4639288efc84f5bdf7a1954a6e2aa96f6854d808b02306e9324e3`.
+- It proposes the unchanged conservative gains/limits and a case-specific
+  20-step, 20 N pulse at execution midpoint `4.964847 s`. Baseline must run
+  first; candidate requires baseline dynamic pass; same plan, seeds, physics,
+  clocks, and perturbation are mandatory.
+- The measurable-improvement and no-regression gates remain unchanged:
+  position p95 at least `0.003 m` and `2%` better, position max allowance
+  `0.005 m`, attitude `0.10 deg`, pitch `0.50 deg`, riser error `0.002 m`,
+  and no saturation regression.
+- Focused local and authoritative proposal/profile/runtime tests pass `36/36`.
+  Proposal SHA-256 is
+  `ef520558f4240add67667e1cbd3146c987d7b67aafaf6ad781b2dc9c576a2387`.
+  Runtime route, token issuance, GPU, capture, merge, BC, PPO, and training all
+  remain false.
+
+## Next round after Round 178
+
+- Independently review the case-23 proposal, especially whether the midpoint
+  pulse is sufficient to create measurable but safe corrective demand on this
+  already accurate trajectory.
+- Only after review, implement a fresh case-23 guarded pair wrapper, finalizer,
+  canonical validator, identities, and no-token preflight. Keep execute mode
+  fail-closed until a separate explicit authorization.
+- Do not infer capture eligibility from a passed pair implementation. Label
+  capture would require an actual same-seed candidate improvement and a later
+  separate one-use capture contract.

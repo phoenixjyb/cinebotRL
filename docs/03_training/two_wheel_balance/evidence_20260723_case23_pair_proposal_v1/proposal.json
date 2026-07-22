@@ -1,0 +1,93 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_corrective_case23_pair_proposal_v1",
+  "case": 23,
+  "split": "train",
+  "checks": {
+    "selection_schema": true,
+    "selection_passed_closed": true,
+    "selection_binds_portfolio": true,
+    "case_selected_for_pair": true,
+    "case_not_validation_or_holdout": true,
+    "case30_profile_reuse_closed": true,
+    "portfolio_schema": true,
+    "plan_admitted": true,
+    "plan_hash_matches_selection": true,
+    "plan_file_hash": true,
+    "case_specific_profile": true,
+    "profile_margin": true
+  },
+  "identities": {
+    "selection": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_pair_tranche_v1_cpu\\selection.json",
+      "sha256": "93aa25e99409ad926d4c4cf0b15075e6ea3532dd1c01d5217a45daffc37db7c0"
+    },
+    "portfolio": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu\\manifest.json",
+      "sha256": "8351514a361d3be4e5fbf57f2dbb019a7d8d2f5b86e89cea2553a1cfda3c64a1"
+    },
+    "plan": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu\\case_0023_smoothed_riser_plan_v1.npz",
+      "sha256": "ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6"
+    },
+    "corrective_profile": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\scripts\\two_wheel_balance\\model_based_corrective_teacher_case23_profile_v1.json",
+      "sha256": "808e2e295bb4639288efc84f5bdf7a1954a6e2aa96f6854d808b02306e9324e3"
+    }
+  },
+  "source_duration_s": 9.929694,
+  "execution_duration_s": 9.929693999999989,
+  "controller_arguments": {
+    "configuration_seed": 20260716,
+    "reset_seed": 20260739,
+    "controller_wz_kp": 1.05,
+    "maximum_duration_scale": 3.0,
+    "camera_lever_arm_compensation_enabled": true,
+    "camera_lever_arm_compensation_gain": 1.0,
+    "maximum_camera_lever_arm_correction_m": 0.05,
+    "policy_command_base": "model_based_planner",
+    "zero_policy_action": true,
+    "residual_action_scales": [
+      0.05,
+      0.05,
+      0.02
+    ]
+  },
+  "proposed_perturbation": {
+    "schema": "cinebotrl_two_wheel_riser_deterministic_wrench_pulse_v1",
+    "case": 23,
+    "start_phase_time_s": 4.9648469999999945,
+    "duration_steps": 20,
+    "force_body_x_n": 20.0,
+    "application_height_m": 0.5
+  },
+  "paired_admission_contract": "same_seed_paired_dynamic_improvement_before_label_capture_v1",
+  "paired_experiment": {
+    "baseline": "complete_model_based_planner_plus_exact_zero_residual",
+    "candidate": "complete_model_based_planner_plus_corrective_teacher",
+    "rollout_order": [
+      "baseline",
+      "candidate"
+    ],
+    "same_plan_seed_physics_and_perturbation_required": true,
+    "candidate_requires_baseline_dynamic_pass": true,
+    "minimum_position_p95_improvement_m": 0.003,
+    "minimum_position_p95_relative_improvement": 0.02,
+    "position_max_regression_allowance_m": 0.005,
+    "attitude_max_regression_allowance_deg": 0.1,
+    "pitch_regression_allowance_deg": 0.5,
+    "riser_error_regression_allowance_m": 0.002,
+    "saturation_regression_allowed": false
+  },
+  "runtime_route_implemented": false,
+  "authorization_token_issued": false,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_created": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

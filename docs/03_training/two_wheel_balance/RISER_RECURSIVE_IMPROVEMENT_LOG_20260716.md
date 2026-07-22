@@ -5666,3 +5666,65 @@ and must state whether its candidate was accepted or rejected.
   parallel, the immutable teacher-40 corpus remains the valid initialization
   corpus for a separately reviewed BC authorization. PPO and obstacle work
   remain closed.
+
+## Round 150: case-78 deterministic shadow labels pass at policy rate
+
+- Commits `54d1712`, `20cdfdf`, `a078bf6`, `9168e51`, and `54aa067` add,
+  lineage-pin, authorize, repair, and reseal the one-use runtime/finalizer
+  layer. Tokenless live preflight passes all 20 contract checks. The complete
+  pre-run `.98` suite passes `628` tests with nine intentional platform skips
+  in `59.84 s`.
+- A mode-`0600` token containing only
+  `AUTHORIZED_CASE78_DETERMINISTIC_SHADOW_LABEL_V1` is hash-verified and
+  consumed before Isaac. Exactly one deterministic case-78 run executes in
+  `20260722_case78_shadow_label_measurement_v1_exclusive`; no residual policy,
+  zero-policy shortcut, raw-teacher capture, normalized dataset, BC, or PPO is
+  enabled.
+- The run exits zero after `2,843.285444 s`, completing exact source/execution
+  clocks `135.487646/192.299567 s` in `83,050` policy steps. Position p95/max
+  is `0.116601/0.184238 m`; pitch max is `7.568641 deg`; attitude p95/max is
+  `0.147844/0.298857 deg`; riser max is `0.013690 m`; proxy max/rate are
+  `0.283882 deg` and `54.511654 deg/s`; no termination occurs.
+- The shadow trace contains exactly `83,050` policy-rate rows over `415.245 s`.
+  Raw residual signed minima/maxima are
+  `[-0.302604,-0.142180,-0.000532]` and
+  `[0.109112,0.185892,0.013768]`. Absolute p50/p90/p95/p99/p99.9 values are
+  `[0.053185,0.033577,0.010074]`,
+  `[0.094985,0.081567,0.011788]`,
+  `[0.110629,0.103015,0.012245]`,
+  `[0.215335,0.137043,0.012785]`, and
+  `[0.291322,0.164892,0.013412]`.
+- Absolute maxima `[0.302604,0.185892,0.013768]` normalize to
+  `[0.864583,0.464730,0.137677]` under `[0.35,0.40,0.10]`. Overflow sample
+  counts and durations are exactly zero for all channels. Applied residual
+  actions are exactly zero; raw-normalization, teacher-command reconstruction,
+  and deterministic-command match maximum errors are `2.38e-8`, `2.98e-8`,
+  and `0.0` respectively.
+- Every admission, heartbeat, gate, physical, trace, and filesystem check
+  passes. Final status SHA-256 is
+  `63004e41d1185a8589c8715e620a5c976db44bfb6a130786214109a1ab2d5bd7`;
+  gate is
+  `ad0dc3ee618819ec808ac4d0318bda711dc2cba38dd041119a1f78584e97e459`;
+  trace is
+  `dc04cbef0aab9960018579292b9ff9ee25e8bd427cd4be641b4a9d96e04525e3`;
+  admission is
+  `7acab3500762f55546d33335df6a60f172d8989b80f88aa6cd37d189aa7cc7b0`.
+- Post-run WSL, Windows `kit`, and NVIDIA ownership are independently empty;
+  the token is absent and exactly one trace exists. The trace remains
+  non-trainable evidence: label admission, dataset creation, BC, PPO, and
+  holdout access are still false.
+
+## Next round after Round 150
+
+- Perform a CPU-only label-admission audit pinned to the Round-150 final, gate,
+  trace, admission, and Round-148 scale audit. It must independently verify the
+  deterministic source, exact clocks, zero applied actions, command
+  reconstruction, zero scale overflow, semantic camera contract, and no
+  training side effects.
+- If admitted, convert the trace immutably into the existing scale-independent
+  raw-teacher schema and rebuild a new 31/5/5 dataset from the 40 accepted raw
+  teachers plus case 78, consuming the sealed split manifest. Preserve the old
+  403,569-row dataset and keep holdout cases unopened during policy selection.
+- Dataset/schema/split admission and BC authorization remain separate CPU
+  decisions. Do not start BC, PPO, or obstacle work merely because the shadow
+  trace passed.

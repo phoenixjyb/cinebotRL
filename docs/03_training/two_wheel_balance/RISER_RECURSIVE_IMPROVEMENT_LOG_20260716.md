@@ -5867,3 +5867,83 @@ and must state whether its candidate was accepted or rejected.
   the deterministic teacher and zero residual under unchanged hard gates.
 - Do not authorize case 78 or broad rollout unless case 8 passes both absolute
   dynamic gates and the separately declared teacher-regression budget.
+
+## Round 154: case-8 learned-policy runtime contract is admitted CPU-only
+
+- Commit `b0fa962` adds a committed case-8 CPU contract and fail-closed
+  validator. The contract pins the exact v9 dynamic-retime plan, both case-8
+  deterministic teacher records, the teacher-41 masked TorchScript policy,
+  frozen 28 kg LQR/controller/robot identities, and the semantic DFR-to-physical
+  camera contract. It contains no runtime token and authorizes no GPU launch,
+  dataset, case 78, holdout, BC, or PPO work.
+- The selected plan is
+  `20260718_smoothed_plan_all79_v9_case8_dynamic_retime_cpu/case_0008_smoothed_riser_plan_v1.npz`,
+  SHA-256
+  `f07ff020128dee70ea9c8c2d806dc75c8e0ef3964dccb4e0aabfd1b0048f3655`.
+  It preserves `663/663` source/execution states with distinct source/execution
+  durations `12.940941/18.1173174 s` and passed all timing, transition, and
+  kinematic checks.
+- The deterministic teacher reference remains
+  `20260718_gate_c_smoothed_case8_dynamic_retime_v1_exclusive/gates/case_0008.json`,
+  SHA-256
+  `19506045f9b6ec04cee58efa1b5d2d5600824ce166b1534db05a4895596cf1e0`.
+  Its position p95/max errors are `0.131254/0.143331 m` under the unchanged
+  camera lever-arm and structural controller settings.
+- Real-artifact CPU admission is
+  `20260722_initial_teacher41_masked_bc_case8_canary_contract_v1_cpu/admission.json`,
+  SHA-256
+  `59b270beb7ef6e9b6a919ef85ec54599465a0ff10a2b5842c1f268326e7ff057`.
+  All 32 semantic, identity, Git, namespace, and learning-closed checks pass.
+  The canonical contract SHA-256 is
+  `18c48f566fe4ed04977f601cebccb0bbea062359695d541aef9eaf65353025f6`.
+- Commit `02bcdfc` adds the one-use zero-then-learned runtime wrapper and a
+  robust finalizer. The authorization is consumed before Isaac, both runs use
+  the same case/plan/controller/scales, and no capture option is available.
+  The complete authoritative IsaacLab Python suite passes `647` tests with
+  nine intentional skips in `62.74 s`.
+
+## Round 155: teacher-41 masked BC passes the case-8 dynamic canary
+
+- The exclusive namespace is
+  `20260722_initial_teacher41_masked_bc_case8_canary_v1_exclusive`, run at
+  commit `02bcdfc`. The one-use token is absent after the run; WSL playback,
+  Windows Kit, and NVIDIA compute ownership are empty, and the tracked worktree
+  remains clean.
+- The zero-residual baseline does not complete the reference: it reaches phase
+  `6.851671/18.117317 s` in `10,872` steps with position p95/max
+  `1.438923/1.502709 m`. It terminates only at the bounded horizon, with no
+  physical termination and no residual action or dataset.
+- The learned policy completes the full reference in `6,611` steps. Position
+  p95/max are `0.133671/0.144092 m`; attitude p95/max are
+  `0.155519/0.231078 deg`; pitch p95/max are `5.969875/6.144382 deg`; riser
+  servo p95/max are `0.010924/0.011907 m`; proxy servo p95/max are
+  `0.120648/0.198412 deg`. Saturation is zero and there is no termination.
+- Normalized residual absolute maxima are `[0.658091,0.357680,0.125535]`,
+  inside the unit envelope. Learned position p95 is only `1.84%` above the
+  deterministic teacher and `90.71%` below the zero baseline, so it passes the
+  fixed 5% teacher-regression and minimum-zero-improvement budgets. Every
+  per-metric hard and comparison check passes.
+- Runtime admission, zero, learned, comparison summary, and final SHA-256
+  values are respectively
+  `9d6297741250e56c488c7560abf9b3b5c7f36ce48bb823dda529a7a4c76eb314`,
+  `03f4b59df1f5a38021f984ed6d1fa3af72d31f037727b01d96e6d77a3e0dd682`,
+  `f1e1160f7f503ea3e377cf502c58c9d054d8584bd92055d291b70ea6e4e5c971`,
+  `bcf1d892216902590c259fbd325d35b9cb618152ea200bdee16ed31d91948c30`,
+  and
+  `681bdaa0a2e20d4182d5de944f9b2d079b7b9e87a565070c0d976829a2c69446`.
+- This is a successful one-case validation canary, not broad policy admission.
+  No dataset was created, case 78 and broad rollout remain unauthorized,
+  holdout remains unopened, and BC/PPO remain closed.
+
+## Next round after Round 155
+
+- Build a separate CPU-only case-78 learned-policy canary contract. Pin the
+  admitted case-78 plan/teacher evidence, Round-155 case-8 final and summary,
+  the same TorchScript policy, controller, camera contract, and unchanged hard
+  and comparison thresholds.
+- Run case 78 only after a fresh one-use authorization and exclusive ownership
+  check. Compare deterministic teacher, zero residual, and learned residual;
+  do not reuse the prior shadow trace as learned dynamic evidence.
+- If case 78 passes, evaluate the remaining validation cases 16, 22, and 32 as
+  a bounded tranche before any train-split expansion, corrective data capture,
+  holdout access, or PPO decision.

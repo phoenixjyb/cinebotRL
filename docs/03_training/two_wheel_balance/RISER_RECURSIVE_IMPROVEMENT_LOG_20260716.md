@@ -5947,3 +5947,40 @@ and must state whether its candidate was accepted or rejected.
 - If case 78 passes, evaluate the remaining validation cases 16, 22, and 32 as
   a bounded tranche before any train-split expansion, corrective data capture,
   holdout access, or PPO decision.
+
+## Round 156: case-78 learned-first dynamic canary is admitted and active
+
+- Commit `50975ea` adds a CPU-only case-78 contract builder. Its canonical
+  output is
+  `20260722_initial_teacher41_masked_bc_case78_canary_contract_v1_cpu/contract.json`,
+  SHA-256
+  `4eb446d8a205d79796c53aecc30ad4f20b6b00a90ed7f346c3b9f864bed7c334`.
+  All ten case-8 prerequisite, case-78 plan/teacher/label, policy, clock,
+  camera, and learning-closed checks pass.
+- Case 78 uses the admitted v16 plan SHA-256
+  `28c69e20778e738d1ac4a0ae299160ed5764089094c2a0f9a018c49790860569`,
+  with `6,870/6,870` source/execution states and source/execution durations
+  `135.487646/192.29956737098348 s`. The deterministic teacher is the sealed
+  shadow-label gate SHA-256
+  `ad0dc3ee618819ec808ac4d0318bda711dc2cba38dd041119a1f78584e97e459`.
+- The case-78 teacher uses a `0.10 m` camera lever-arm correction cap. This is
+  intentional and differs from case 8's `0.05 m`; the CPU contract rejects
+  silently substituting the case-8 value. Teacher position p95/max are
+  `0.116601/0.184238 m`, and the same run supplied the admitted case-78 labels
+  in the teacher-41 validation split.
+- Commit `0cd6548` adds the generic validation-canary finalizer and the
+  one-use case-78 wrapper. The wrapper is learned-first: a fresh zero baseline
+  is launched only if the learned rollout passes physical gates. Both runs are
+  still required for final admission, but an unsafe learned policy fails early
+  without spending the full zero horizon. Combined timeouts are bounded at
+  `10,800 s`.
+- Runtime preflight passes at commit `0cd6548`; the complete authoritative
+  IsaacLab Python suite passes `656` tests with nine intentional skips in
+  `59.55 s`. The one-use token was consumed before Isaac. The exclusive
+  learned rollout is active under wrapper PID `338393` in namespace
+  `20260722_initial_teacher41_masked_bc_case78_canary_v1_exclusive`.
+- At the latest recorded heartbeat (`4,000` policy steps), phase is
+  `7.954837/192.299567 s`; current position error is `0.066356 m`, peak
+  position error is `0.140857 m`, peak attitude error is `0.204020 deg`, and
+  peak pitch is `7.278748 deg`. Saturation, termination, and dataset creation
+  remain zero/false. This is live progress only, not a completed canary claim.

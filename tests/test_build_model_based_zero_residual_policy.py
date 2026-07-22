@@ -16,6 +16,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa:
 )
 from scripts.two_wheel_balance.build_model_based_zero_residual_policy import (  # noqa: E402
     build_policy,
+    translate_wsl_path_for_windows,
 )
 
 
@@ -93,3 +94,16 @@ def test_rejects_observation_contract_drift() -> None:
     source["observation_names"] = source["observation_names"][:-1]
     with pytest.raises(ValueError, match="input contract failed"):
         build_policy(source, _audit())
+
+
+def test_translates_wsl_worktree_git_dir_for_windows() -> None:
+    assert translate_wsl_path_for_windows(
+        "/mnt/g/wSpace/cinebotRL/.git/worktrees/cinebotRL-two-wheel-riser"
+    ) == (
+        "G:\\wSpace\\cinebotRL\\.git\\worktrees\\cinebotRL-two-wheel-riser"
+    )
+
+
+def test_rejects_non_wsl_git_dir_translation() -> None:
+    with pytest.raises(ValueError, match="unsupported WSL Git metadata path"):
+        translate_wsl_path_for_windows("/Users/yanbo/Projects/cinebotRL/.git")

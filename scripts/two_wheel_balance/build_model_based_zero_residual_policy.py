@@ -6,7 +6,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from pathlib import Path
+import os
+from pathlib import Path, PurePosixPath
 import subprocess
 from typing import Any
 
@@ -50,6 +51,41 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"expected JSON object: {path}")
     return value
+
+
+def translate_wsl_path_for_windows(path: str) -> str:
+    """Translate an absolute WSL mount path for a native Windows subprocess."""
+    parts = PurePosixPath(path).parts
+    if len(parts) < 4 or parts[:2] != ("/", "mnt") or len(parts[2]) != 1:
+        raise ValueError(f"unsupported WSL Git metadata path: {path}")
+    return f"{parts[2].upper()}:\\" + "\\".join(parts[3:])
+
+
+def resolve_git_head(project_root: Path) -> str:
+    """Resolve HEAD even when Windows Python opens a WSL-managed worktree."""
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=project_root, text=True
+        ).strip()
+    except subprocess.CalledProcessError:
+        dot_git = project_root / ".git"
+        if os.name != "nt" or not dot_git.is_file():
+            raise
+        prefix = "gitdir: "
+        pointer = dot_git.read_text(encoding="utf-8").strip()
+        if not pointer.startswith(prefix):
+            raise ValueError(f"invalid Git worktree pointer: {dot_git}")
+        git_dir = translate_wsl_path_for_windows(pointer[len(prefix) :])
+        return subprocess.check_output(
+            [
+                "git",
+                f"--git-dir={git_dir}",
+                f"--work-tree={project_root}",
+                "rev-parse",
+                "HEAD",
+            ],
+            text=True,
+        ).strip()
 
 
 def build_policy(
@@ -139,9 +175,7 @@ def main() -> int:
     args = parser.parse_args()
     if args.output_dir.exists():
         raise ValueError(f"refusing to overwrite policy output: {args.output_dir}")
-    head = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, text=True
-    ).strip()
+    head = resolve_git_head(PROJECT_ROOT)
     if args.source_commit != head:
         raise ValueError("zero residual policy source commit does not match HEAD")
     source_identity = identity(args.source_checkpoint)

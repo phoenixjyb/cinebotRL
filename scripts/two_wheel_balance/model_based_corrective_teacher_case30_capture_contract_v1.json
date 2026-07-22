@@ -1,0 +1,100 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_capture_contract_v1",
+  "reviewed_parent_commit": "a673ea0e2b00b7fa9c64024209431169f3da975f",
+  "case": 30,
+  "split": "train",
+  "namespace": "20260722_model_based_corrective_teacher_case30_capture_v1_exclusive",
+  "residual_action_scales": [0.05, 0.05, 0.02],
+  "capture_schema_contract": {
+    "observation_contract": "current_physical_cam_link_pre_action_with_known_reference_lookahead_v1",
+    "sample_alignment_contract": "pre_action_observation_teacher_and_final_command_v1",
+    "clock_contract": "elapsed_execution_and_authoritative_source_time_separate_v1",
+    "initialization_contract": "separate_and_excluded_from_capture_v1",
+    "teacher_applied_to_commands": true,
+    "dynamic_quality_required_before_save": true,
+    "maximum_normalized_action_exclusive": 0.95,
+    "per_sample_plan_and_commit_identity": true,
+    "amplitude_and_slew_flags": true,
+    "perturbation_activity_flag": true,
+    "normalized_training_dataset_created": false
+  },
+  "identities": {
+    "paired_final_status": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260722_case30_corrective_pair/final_status.json",
+      "sha256": "a966c9a5407a0d5ef91ca0553d00a0c47040fdfdc1c4f9bd9814aa33447fc083",
+      "git_blob_sha1": "cc3390c7052945fd15ceb566f979c520ee661bbc"
+    },
+    "case30_plan": {
+      "path": "artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu/case_0030_smoothed_riser_plan_v1.npz",
+      "sha256": "1722bfdc7c1aeabc5a9d3920cf6a47bc789afbc96e6ef5c8e540695dc3c97dcb"
+    },
+    "perturbation_profile": {
+      "path": "artifacts/two_wheel_riser/20260721_case30_perturbation_proposal_v1_cpu/case30_wrench_profile.json",
+      "sha256": "6ab2fe1212f88e3baecac4f64156bb9820069203136758a22a2cb632813a5907"
+    },
+    "corrective_profile": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case30_profile_v1.json",
+      "sha256": "26df020549f7db60f3e17d78bb3797e1f32630f615361a1e12d359977e7cf45b",
+      "git_blob_sha1": "d39bd4dd2023e1148df8959db8dfbc7691cd8430"
+    },
+    "lqr_gains": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+      "sha256": "2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6",
+      "git_blob_sha1": "70ecdd8ae6b7ce09574a97a8581229cb90add623"
+    },
+    "robot_build_audit": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/build_audit.json",
+      "sha256": "8be2b59a03a6c22838795ad361a86bf0f60a7534aeacd62893013f0ee27b40d9",
+      "git_blob_sha1": "83f8715d05be714dd8dcb2b0a9f47ef3f4bec8e9"
+    },
+    "robot_urdf": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.urdf",
+      "sha256": "603cecfc5b54e659f5d030023a69a3b42d6567f66d2771fbb7127d186f1a9afa",
+      "git_blob_sha1": "c70bf24a3189ccd24553287590dcfd191737ab33"
+    },
+    "robot_usd": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd",
+      "sha256": "89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0",
+      "git_blob_sha1": "b25242c27c781b5aad4fadefb0cbf54398a9a75a"
+    },
+    "playback": {
+      "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+      "sha256": "22b3579164cc2d302c61054a35fca0499c2f7ab48df1c5686ae07e0439064efc",
+      "git_blob_sha1": "8e2a8275672ac77d051ba1e8219b994b5c0d37f1"
+    },
+    "corrective_teacher_runtime": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_corrective_teacher.py",
+      "sha256": "758179ceb0d9e4031ee9e7186169f9d72482decdabab5ad241ccb621d5e3420b",
+      "git_blob_sha1": "487e574f58350d26fb46692f4a1cc92072be0a63"
+    },
+    "corrective_capture_runtime": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_corrective_capture.py",
+      "sha256": "ad917825478b86080c2d2fc1b947d8ce6c61bb3c286a0fef0ade0fd4958c2e4a",
+      "git_blob_sha1": "b119a1be4164530978c9c7e26410fa2a34693342"
+    },
+    "contract_validator": {
+      "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case30_capture.py",
+      "sha256": "ada4c8a028f2eb9e4a02708b3aa69745d830bf4b9e2421907724f73cc3824398",
+      "git_blob_sha1": "3d5fea8b645497d6ac210cbbf01c7a4c3f722ac3"
+    },
+    "preflight_wrapper": {
+      "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case30_capture.sh",
+      "sha256": "95dce35979eeb77155798cc59061312d2cd58f9637a342b804cb119afbc0d6de",
+      "git_blob_sha1": "eb18ea3cc5930d5b5e70c8ed617c3388f24068a6"
+    }
+  },
+  "holdout_cases": [3, 5, 13, 19, 24],
+  "holdout_opened": false,
+  "validation_cases_opened": [],
+  "cpu_preflight_ready": true,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "authorization_token_issued": false,
+  "runtime_authorization_token_sha256": "",
+  "label_capture_authorized": false,
+  "dataset_creation_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false
+}

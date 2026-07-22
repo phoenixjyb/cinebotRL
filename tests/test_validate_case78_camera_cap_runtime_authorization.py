@@ -29,5 +29,7 @@ def test_runtime_token_rejects_symlink(tmp_path: Path) -> None:
     assert checks["authorization_not_symlink"] is False
 
 
-def test_runtime_implementation_pin_must_be_resolved_before_contract() -> None:
-    assert module.RUNTIME_IMPLEMENTATION_COMMIT.endswith("_PENDING")
+def test_runtime_implementation_pin_is_resolved() -> None:
+    assert module.RUNTIME_IMPLEMENTATION_COMMIT == (
+        "8c00406b0a726f1e785d303986a44a3323476478"
+    )

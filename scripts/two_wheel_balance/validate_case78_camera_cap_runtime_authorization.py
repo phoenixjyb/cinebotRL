@@ -19,7 +19,7 @@ except ImportError:
 
 SCHEMA = "cinebotrl_two_wheel_riser_case78_camera_cap_runtime_authorization_v1"
 REVIEWED_CPU_COMMIT = "eee0688f332932c890ed407932505b5f25c7dc54"
-RUNTIME_IMPLEMENTATION_COMMIT = "RUNTIME_IMPLEMENTATION_COMMIT_PENDING"
+RUNTIME_IMPLEMENTATION_COMMIT = "8c00406b0a726f1e785d303986a44a3323476478"
 NAMESPACE = "20260722_case78_camera_cap_v1_exclusive"
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/case78_camera_cap_runtime_authorization_v1.json"

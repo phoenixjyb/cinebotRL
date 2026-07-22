@@ -17,7 +17,7 @@ readonly CORRECTIVE_PROFILE="$WIN_ROOT\\scripts\\two_wheel_balance\\model_based_
 readonly GAINS="$WIN_ROOT\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json"
 readonly PLAYBACK="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 readonly FINALIZER="$WIN_ROOT\\scripts\\two_wheel_balance\\summarize_model_based_corrective_teacher_case30_capture.py"
-readonly AUTHORIZATION_SHA256="26c519b95a729f71b68b3dc4a0fed4f9cc90c0f73944e754476e9e1a3b345e72"
+readonly AUTHORIZATION_SHA256=""
 
 reject() {
   printf '{"reason":"%s","runtime_started":false,"label_capture_started":false,"passed":false}\n' "$1" >&2

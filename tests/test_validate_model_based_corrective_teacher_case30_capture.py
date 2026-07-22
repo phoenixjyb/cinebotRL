@@ -205,17 +205,14 @@ def test_validator_authorizes_only_exact_mode_0600_token(tmp_path, monkeypatch) 
     assert rejected["runtime_authorized"] is False
 
 
-def test_wrapper_has_exact_one_use_v2_authorization() -> None:
+def test_wrapper_has_v2_runtime_route_but_no_authorization() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
     assert "runtime_authorization_not_issued" in source
-    assert (
-        'readonly AUTHORIZATION_SHA256="'
-        '26c519b95a729f71b68b3dc4a0fed4f9cc90c0f73944e754476e9e1a3b345e72"'
-    ) in source
+    assert 'readonly AUTHORIZATION_SHA256=""' in source
     assert "20260722_model_based_corrective_teacher_case30_capture_v2_exclusive" in source
     assert "smoke_riser_reference_playback.py" in source
     assert "--corrective-teacher-capture-dir" in source
     assert "summarize_model_based_corrective_teacher_case30_capture.py" in source
     result = subprocess.run(["bash", str(WRAPPER), "--execute"], capture_output=True, text=True)
     assert result.returncode == 4
-    assert "authorization_file_missing" in result.stderr
+    assert "runtime_authorization_not_issued" in result.stderr

@@ -6828,3 +6828,54 @@ and must state whether its candidate was accepted or rejected.
   once and audit its clipping distribution and rebuilt recurrence. Only then
   decide whether the generic corrective profile can be admitted on additional
   train cases and whether a model-based multi-case merge contract is justified.
+
+## Round 175: one authorized case-30 corrective capture v2 passes
+
+- The user authorized exactly one v2 case-30 corrective capture. Standalone
+  authorization commit `ca755bdcf4498fe39f19735ed666e96ca11bed96`
+  pinned token SHA-256
+  `26c519b95a729f71b68b3dc4a0fed4f9cc90c0f73944e754476e9e1a3b345e72`.
+  Before token creation, canonical `.98` admission passed, a missing-token
+  execution failed closed with exit `4`, and the complete authoritative CPU
+  suite passed `783` with eleven skips and two config warnings in `71.46 s`.
+- One external mode-`0600` token was created and consumed before Isaac. The
+  fixed namespace is
+  `20260722_model_based_corrective_teacher_case30_capture_v2_exclusive`.
+  Exactly one case ran; playback and finalizer both exited `0`, GPU ownership
+  was released, and no second capture, conversion, BC, PPO, holdout, or
+  training process started.
+- The finalizer passed every admission, dynamic, thermal, controller,
+  perturbation, source, heartbeat, archive, and GPU-release check. Dynamic
+  quality passed with peak position error `0.159790 m`, peak pitch
+  `7.045321 deg`, zero action/riser/proxy saturation, and no termination.
+- The v2 archive contains `11,411` aligned samples with `65` observation
+  features. Both clocks are monotonic and end at source `18.144412 s` and
+  execution `29.22248819392579 s`; initialization rows are excluded and
+  exactly `20` perturbation-active rows are present.
+- Requested normalized action maxima are
+  `[0.394906,0.657500,0.900000]`; effective post-supervisor maxima are
+  `[0.394906,0.657500,0.267339]`. Command clipping is explicit on
+  `[200,308,333]` rows by channel, with requested/effective residual deltas,
+  amplitude limiting, and slew limiting preserved. Only effective actions are
+  eligible for the later converter.
+- The admitted capture SHA-256 is
+  `ec0f13030ce755c38e31c138507537f461126312b0c268832bc6bf9a40e4e8cb`;
+  final-status SHA-256 is
+  `e0b9ec3186e677c34289a85e72e4bc91e3cd3d8ce5cfdea16d74e1c0be0554b2`.
+  Immutable evidence is copied to
+  `evidence_20260722_case30_corrective_capture_v2/` with a hash manifest.
+- Authorization is revoked immediately after evidence preservation. The
+  capture is admitted only for a separately reviewed CPU conversion; it is
+  not a normalized training dataset and remains `valid_for_training=false`.
+
+## Next round after Round 175
+
+- Run the sealed effective-label converter in preflight against the preserved
+  archive and final status. If it passes, authorize exactly one CPU-only case
+  conversion, independently audit recurrence reconstruction and clipping, and
+  stop for review.
+- Do not train from this one case. A later multi-case capture/merge proposal
+  must establish case-disjoint train/validation coverage while leaving holdout
+  cases `[3,5,13,19,24]` closed.
+- Keep BC and PPO disabled until the merged model-based dataset and action
+  semantics are explicitly admitted.

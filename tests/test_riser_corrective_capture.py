@@ -46,7 +46,7 @@ def _payload(count: int = 4) -> dict[str, np.ndarray]:
         [[0.0, 0.0, 0.0], [0.1, -0.2, 0.3], [0.2, -0.3, 0.4], [0.3, -0.4, 0.5]],
         dtype=np.float32,
     )[:count]
-    residual = normalized * MODEL_BASED_POLICY_RESIDUAL_SCALES
+    requested_residual = normalized * MODEL_BASED_POLICY_RESIDUAL_SCALES
     model = np.column_stack(
         (
             np.linspace(0.0, 0.1, count),
@@ -57,9 +57,21 @@ def _payload(count: int = 4) -> dict[str, np.ndarray]:
     return {
         "observations": np.zeros((count, len(OBSERVATION_NAMES)), dtype=np.float32),
         "model_based_commands": model.astype(np.float32),
-        "corrective_residual_commands": residual.astype(np.float32),
-        "corrective_normalized_actions": normalized,
-        "final_high_level_commands": (model + residual).astype(np.float32),
+        "requested_corrective_residual_commands": requested_residual.astype(
+            np.float32
+        ),
+        "requested_corrective_normalized_actions": normalized,
+        "effective_corrective_residual_commands": requested_residual.astype(
+            np.float32
+        ),
+        "effective_corrective_normalized_actions": normalized.copy(),
+        "requested_vs_effective_residual_delta": np.zeros(
+            (count, 3), dtype=np.float32
+        ),
+        "command_clipped": np.zeros((count, 3), dtype=bool),
+        "final_high_level_commands": (model + requested_residual).astype(
+            np.float32
+        ),
         "case_ids": np.full(count, 30, dtype=np.int16),
         "elapsed_time_s": np.arange(count, dtype=np.float64) * 0.005,
         "execution_time_s": np.arange(count, dtype=np.float64) * 0.004,
@@ -87,7 +99,7 @@ def _save(path: Path, payload: dict[str, np.ndarray] | None = None) -> None:
 
 
 def test_capture_round_trip_keeps_clocks_identities_and_training_closed(tmp_path) -> None:
-    path = tmp_path / "case_0030_corrective_teacher_capture_v1.npz"
+    path = tmp_path / "case_0030_corrective_teacher_capture_v2.npz"
     _save(path)
     metadata, payload = load_corrective_capture(path)
     assert metadata["case"] == 30
@@ -95,6 +107,7 @@ def test_capture_round_trip_keeps_clocks_identities_and_training_closed(tmp_path
     assert metadata["valid_for_training"] is False
     assert metadata["training_started"] is False
     assert metadata["clock_contract"].startswith("elapsed_execution")
+    assert metadata["training_target_contract"] == "effective_post_supervisor_residual_v1"
     assert np.all(payload["sample_plan_sha256"] == PLAN_SHA)
     assert np.all(payload["sample_runtime_commit"] == COMMIT)
 
@@ -122,29 +135,57 @@ def test_capture_admission_accepts_only_the_bounded_case30_route() -> None:
     validate_capture_admission(_admission())
 
 
-@pytest.mark.parametrize("mutation", ["initialization", "overflow", "clock", "identity", "clip"])
-def test_capture_rejects_leakage_overflow_clock_identity_and_clipping(tmp_path, mutation) -> None:
+@pytest.mark.parametrize(
+    "mutation",
+    ["initialization", "overflow", "clock", "identity", "final_mismatch", "clip_mask"],
+)
+def test_capture_rejects_leakage_overflow_clock_identity_and_mismatch(tmp_path, mutation) -> None:
     payload = _payload()
     if mutation == "initialization":
         payload["initialization_mask"][0] = True
     elif mutation == "overflow":
-        payload["corrective_normalized_actions"][2, 0] = 0.95
-        payload["corrective_residual_commands"] = (
-            payload["corrective_normalized_actions"]
+        payload["requested_corrective_normalized_actions"][2, 0] = 0.95
+        payload["requested_corrective_residual_commands"] = (
+            payload["requested_corrective_normalized_actions"]
             * MODEL_BASED_POLICY_RESIDUAL_SCALES
-        )
-        payload["final_high_level_commands"] = (
-            payload["model_based_commands"]
-            + payload["corrective_residual_commands"]
         )
     elif mutation == "clock":
         payload["source_time_s"][2] = -1.0
     elif mutation == "identity":
         payload["sample_runtime_commit"][1] = "e" * 40
-    else:
+    elif mutation == "final_mismatch":
         payload["final_high_level_commands"][1, 0] += 0.01
+    else:
+        payload["command_clipped"][1, 0] = True
     with pytest.raises(ValueError):
         _save(tmp_path / f"{mutation}.npz", payload)
+
+
+def test_capture_accepts_supervisor_clipping_with_effective_training_target(
+    tmp_path,
+) -> None:
+    payload = _payload()
+    row = 1
+    payload["effective_corrective_residual_commands"][row, 0] = 0.002
+    payload["effective_corrective_normalized_actions"][row, 0] = 0.04
+    delta = (
+        payload["effective_corrective_residual_commands"][row]
+        - payload["requested_corrective_residual_commands"][row]
+    )
+    payload["requested_vs_effective_residual_delta"][row] = delta
+    payload["command_clipped"][row] = np.abs(delta) > 2e-7
+    payload["final_high_level_commands"][row] = (
+        payload["model_based_commands"][row]
+        + payload["effective_corrective_residual_commands"][row]
+    )
+    path = tmp_path / "recorded_clip.npz"
+    _save(path, payload)
+    metadata, loaded = load_corrective_capture(path)
+    assert metadata["training_target_contract"] == "effective_post_supervisor_residual_v1"
+    assert loaded["command_clipped"][row, 0]
+    assert loaded["effective_corrective_normalized_actions"][row, 0] == pytest.approx(
+        0.04
+    )
 
 
 def test_capture_rejects_missing_clock_and_noncausal_metadata(tmp_path) -> None:

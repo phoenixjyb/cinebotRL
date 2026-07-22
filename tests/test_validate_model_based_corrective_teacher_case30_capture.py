@@ -166,7 +166,7 @@ def test_validator_authorizes_only_exact_mode_0600_token(tmp_path, monkeypatch) 
     repo, contract = _fixture(tmp_path, monkeypatch)
     token = tmp_path / "capture.token"
     token.write_bytes(
-        b"CINEBOTRL_CASE30_CORRECTIVE_CAPTURE_V1_AUTHORIZED_ONCE_20260722\n"
+        b"CINEBOTRL_CASE30_CORRECTIVE_CAPTURE_V2_AUTHORIZED_ONCE_20260722\n"
     )
     token.chmod(0o600)
     payload = json.loads(contract.read_text(encoding="utf-8"))
@@ -205,16 +205,14 @@ def test_validator_authorizes_only_exact_mode_0600_token(tmp_path, monkeypatch) 
     assert rejected["runtime_authorized"] is False
 
 
-def test_wrapper_has_one_hash_bound_runtime_route() -> None:
+def test_wrapper_has_v2_runtime_route_but_no_authorization() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
     assert "runtime_authorization_not_issued" in source
-    assert (
-        'readonly AUTHORIZATION_SHA256="540557d4007377d283b6294bdb83f07ee'
-        '07a4778510644be0227aae2e0cd3a51"'
-    ) in source
+    assert 'readonly AUTHORIZATION_SHA256=""' in source
+    assert "20260722_model_based_corrective_teacher_case30_capture_v2_exclusive" in source
     assert "smoke_riser_reference_playback.py" in source
     assert "--corrective-teacher-capture-dir" in source
     assert "summarize_model_based_corrective_teacher_case30_capture.py" in source
     result = subprocess.run(["bash", str(WRAPPER), "--execute"], capture_output=True, text=True)
     assert result.returncode == 4
-    assert "authorization_file_missing" in result.stderr
+    assert "runtime_authorization_not_issued" in result.stderr

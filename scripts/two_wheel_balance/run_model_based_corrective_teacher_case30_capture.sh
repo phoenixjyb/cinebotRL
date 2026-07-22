@@ -2,8 +2,8 @@
 set -euo pipefail
 
 readonly ROOT="/mnt/g/wSpace/cinebotRL-two-wheel-riser"
-readonly NAMESPACE="20260722_model_based_corrective_teacher_case30_capture_v1_exclusive"
-readonly CONTRACT="$ROOT/scripts/two_wheel_balance/model_based_corrective_teacher_case30_capture_contract_v1.json"
+readonly NAMESPACE="20260722_model_based_corrective_teacher_case30_capture_v2_exclusive"
+readonly CONTRACT="$ROOT/scripts/two_wheel_balance/model_based_corrective_teacher_case30_capture_contract_v2.json"
 readonly VALIDATOR="$ROOT/scripts/two_wheel_balance/validate_model_based_corrective_teacher_case30_capture.py"
 readonly NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
 readonly POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
@@ -17,7 +17,7 @@ readonly CORRECTIVE_PROFILE="$WIN_ROOT\\scripts\\two_wheel_balance\\model_based_
 readonly GAINS="$WIN_ROOT\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json"
 readonly PLAYBACK="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 readonly FINALIZER="$WIN_ROOT\\scripts\\two_wheel_balance\\summarize_model_based_corrective_teacher_case30_capture.py"
-readonly AUTHORIZATION_SHA256="540557d4007377d283b6294bdb83f07ee07a4778510644be0227aae2e0cd3a51"
+readonly AUTHORIZATION_SHA256=""
 
 reject() {
   printf '{"reason":"%s","runtime_started":false,"label_capture_started":false,"passed":false}\n' "$1" >&2

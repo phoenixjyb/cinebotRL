@@ -879,8 +879,12 @@ def evaluate_case(
     shadow_teacher_high_level_commands = []
     corrective_capture_observations = []
     corrective_capture_model_commands = []
-    corrective_capture_residual_commands = []
-    corrective_capture_normalized_actions = []
+    corrective_capture_requested_residual_commands = []
+    corrective_capture_requested_normalized_actions = []
+    corrective_capture_effective_residual_commands = []
+    corrective_capture_effective_normalized_actions = []
+    corrective_capture_residual_deltas = []
+    corrective_capture_command_clipped = []
     corrective_capture_final_commands = []
     corrective_capture_elapsed_time = []
     corrective_capture_execution_time = []
@@ -916,6 +920,7 @@ def evaluate_case(
                         raw_teacher_dir,
                         policy_trace_dir,
                         shadow_teacher_trace_dir,
+                        corrective_capture_dir,
                     )
                 ),
             },
@@ -1510,17 +1515,31 @@ def evaluate_case(
             )
             corrective_capture_observations.append(executed_observation.copy())
             corrective_capture_model_commands.append(model_command)
-            corrective_capture_residual_commands.append(
-                corrective_output.applied_residual.copy()
+            requested_residual = corrective_output.applied_residual.copy()
+            requested_normalized = corrective_output.normalized_action.copy()
+            final_command = np.array(
+                [vx_ref, wz_ref, commanded_riser_target], dtype=np.float64
             )
-            corrective_capture_normalized_actions.append(
-                corrective_output.normalized_action.copy()
+            effective_residual = final_command - model_command
+            effective_normalized = effective_residual / args.residual_action_scales
+            residual_delta = effective_residual - requested_residual
+            corrective_capture_requested_residual_commands.append(
+                requested_residual
             )
-            corrective_capture_final_commands.append(
-                np.array(
-                    [vx_ref, wz_ref, commanded_riser_target], dtype=np.float64
-                )
+            corrective_capture_requested_normalized_actions.append(
+                requested_normalized
             )
+            corrective_capture_effective_residual_commands.append(
+                effective_residual
+            )
+            corrective_capture_effective_normalized_actions.append(
+                effective_normalized
+            )
+            corrective_capture_residual_deltas.append(residual_delta)
+            corrective_capture_command_clipped.append(
+                np.abs(residual_delta) > 2e-7
+            )
+            corrective_capture_final_commands.append(final_command)
             corrective_capture_elapsed_time.append(elapsed_s)
             corrective_capture_execution_time.append(phase_time_s)
             corrective_capture_source_time.append(
@@ -1933,6 +1952,7 @@ def evaluate_case(
                             raw_teacher_dir,
                             policy_trace_dir,
                             shadow_teacher_trace_dir,
+                            corrective_capture_dir,
                         )
                     ),
                 },
@@ -2204,7 +2224,7 @@ def evaluate_case(
             raise RuntimeError("corrective capture admission disappeared")
         corrective_capture_path = (
             corrective_capture_dir
-            / f"case_{plan.case:04d}_corrective_teacher_capture_v1.npz"
+            / f"case_{plan.case:04d}_corrective_teacher_capture_v2.npz"
         )
         count = len(corrective_capture_observations)
         save_corrective_capture(
@@ -2216,11 +2236,27 @@ def evaluate_case(
                 "model_based_commands": np.asarray(
                     corrective_capture_model_commands, dtype=np.float32
                 ),
-                "corrective_residual_commands": np.asarray(
-                    corrective_capture_residual_commands, dtype=np.float32
+                "requested_corrective_residual_commands": np.asarray(
+                    corrective_capture_requested_residual_commands,
+                    dtype=np.float32,
                 ),
-                "corrective_normalized_actions": np.asarray(
-                    corrective_capture_normalized_actions, dtype=np.float32
+                "requested_corrective_normalized_actions": np.asarray(
+                    corrective_capture_requested_normalized_actions,
+                    dtype=np.float32,
+                ),
+                "effective_corrective_residual_commands": np.asarray(
+                    corrective_capture_effective_residual_commands,
+                    dtype=np.float32,
+                ),
+                "effective_corrective_normalized_actions": np.asarray(
+                    corrective_capture_effective_normalized_actions,
+                    dtype=np.float32,
+                ),
+                "requested_vs_effective_residual_delta": np.asarray(
+                    corrective_capture_residual_deltas, dtype=np.float32
+                ),
+                "command_clipped": np.asarray(
+                    corrective_capture_command_clipped, dtype=bool
                 ),
                 "final_high_level_commands": np.asarray(
                     corrective_capture_final_commands, dtype=np.float32
@@ -3113,7 +3149,11 @@ def write_runtime_failure(exc: Exception) -> None:
             if args.tracking_maximum_linear_velocity_mps is not None
             else riser_tracking_config().maximum_linear_velocity_mps
         ),
-        "trajectory_command_source": "deterministic_teacher",
+        "trajectory_command_source": (
+            "model_based_planner_plus_corrective_teacher"
+            if corrective_teacher_config is not None
+            else "deterministic_teacher"
+        ),
         "residual_policy": None,
         "camera_lever_arm_compensation_contract": (
             "measured_camera_to_base_xy_offset_v1"

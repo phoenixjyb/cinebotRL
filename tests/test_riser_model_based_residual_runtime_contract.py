@@ -67,3 +67,16 @@ def test_corrective_teacher_is_computed_after_model_planner_and_before_apply() -
     teacher_index = source.index("corrective_output = build_corrective_teacher_action(")
     apply_index = source.index("apply_model_based_policy_residual(", teacher_index)
     assert model_index < teacher_index < apply_index
+
+
+def test_corrective_capture_records_requested_and_effective_supervised_commands() -> None:
+    source = PLAYBACK.read_text(encoding="utf-8")
+    assert "requested_residual = corrective_output.applied_residual.copy()" in source
+    assert "effective_residual = final_command - model_command" in source
+    assert '"requested_corrective_residual_commands"' in source
+    assert '"effective_corrective_residual_commands"' in source
+    assert '"requested_vs_effective_residual_delta"' in source
+    assert '"command_clipped"' in source
+    assert "corrective_capture_dir," in source
+    failure = source.split("def write_runtime_failure", 1)[1]
+    assert '"model_based_planner_plus_corrective_teacher"' in failure

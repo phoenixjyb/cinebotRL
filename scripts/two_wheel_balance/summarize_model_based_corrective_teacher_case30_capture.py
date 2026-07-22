@@ -21,8 +21,8 @@ from rl_platform.tasks.two_wheel_balance.riser_corrective_capture import (  # no
 )
 
 
-NAMESPACE = "20260722_model_based_corrective_teacher_case30_capture_v1_exclusive"
-CAPTURE_NAME = "case_0030_corrective_teacher_capture_v1.npz"
+NAMESPACE = "20260722_model_based_corrective_teacher_case30_capture_v2_exclusive"
+CAPTURE_NAME = "case_0030_corrective_teacher_capture_v2.npz"
 
 
 def _load(path: Path) -> dict[str, object]:
@@ -77,9 +77,31 @@ def summarize(
     perturbation_rows = int(
         np.count_nonzero(capture_payload.get("perturbation_active", []))
     )
-    normalized_max = (
+    requested_normalized_max = (
         np.max(
-            np.abs(capture_payload["corrective_normalized_actions"]), axis=0
+            np.abs(capture_payload["requested_corrective_normalized_actions"]),
+            axis=0,
+        ).tolist()
+        if capture_payload
+        else None
+    )
+    effective_normalized_max = (
+        np.max(
+            np.abs(capture_payload["effective_corrective_normalized_actions"]),
+            axis=0,
+        ).tolist()
+        if capture_payload
+        else None
+    )
+    command_clipped_rows = (
+        np.count_nonzero(capture_payload["command_clipped"], axis=0).tolist()
+        if capture_payload
+        else None
+    )
+    requested_vs_effective_delta_abs_max = (
+        np.max(
+            np.abs(capture_payload["requested_vs_effective_residual_delta"]),
+            axis=0,
         ).tolist()
         if capture_payload
         else None
@@ -149,7 +171,8 @@ def summarize(
         "training_closed": gate.get("training_started") is False
         and gate.get("ppo_authorized") is False,
         "heartbeat": heartbeat.get("case") == 30
-        and int(heartbeat.get("completed_steps", 0)) > 0,
+        and int(heartbeat.get("completed_steps", 0)) > 0
+        and heartbeat.get("capture_outputs_enabled") is True,
         "gpu_released": gpu_release_passed,
     }
     archive_checks = {
@@ -170,8 +193,16 @@ def summarize(
         and isinstance(execution_duration, (int, float))
         and abs(execution_clock_end - float(execution_duration)) <= 1e-6,
         "perturbation_rows": perturbation_rows == 20,
-        "reserved_margin": normalized_max is not None
-        and max(normalized_max) < 0.95 - 1e-6,
+        "requested_reserved_margin": requested_normalized_max is not None
+        and max(requested_normalized_max) < 0.95 - 1e-6,
+        "effective_reserved_margin": effective_normalized_max is not None
+        and max(effective_normalized_max) < 0.95 - 1e-6,
+        "supervisor_contract": capture_metadata.get("safety_supervisor_contract")
+        == "requested_teacher_intent_and_effective_applied_command_separate_v1"
+        and capture_metadata.get("training_target_contract")
+        == "effective_post_supervisor_residual_v1",
+        "clipping_telemetry": command_clipped_rows is not None
+        and requested_vs_effective_delta_abs_max is not None,
         "initialization_excluded": bool(capture_payload)
         and not bool(np.any(capture_payload["initialization_mask"])),
         "training_closed": capture_metadata.get("valid_for_training") is False
@@ -195,7 +226,7 @@ def summarize(
         and all(contract_checks.values())
     )
     return {
-        "schema": "cinebotrl_two_wheel_riser_corrective_teacher_capture_final_v1",
+        "schema": "cinebotrl_two_wheel_riser_corrective_teacher_capture_final_v2",
         "namespace": NAMESPACE,
         "runtime_commit": runtime_commit,
         "case": 30,
@@ -211,7 +242,12 @@ def summarize(
             "source_clock_end_s": source_clock_end,
             "execution_clock_end_s": execution_clock_end,
             "perturbation_active_rows": perturbation_rows,
-            "normalized_action_abs_max": normalized_max,
+            "requested_normalized_action_abs_max": requested_normalized_max,
+            "effective_normalized_action_abs_max": effective_normalized_max,
+            "command_clipped_rows": command_clipped_rows,
+            "requested_vs_effective_residual_delta_abs_max": (
+                requested_vs_effective_delta_abs_max
+            ),
             "amplitude_limited_rows": amplitude_limited_rows,
             "slew_limited_rows": slew_limited_rows,
         },

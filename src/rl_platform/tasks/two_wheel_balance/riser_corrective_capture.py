@@ -16,10 +16,10 @@ from .riser_residual_dataset import (
 
 
 CORRECTIVE_CAPTURE_SCHEMA = (
-    "cinebotrl_two_wheel_riser_corrective_teacher_capture_v1"
+    "cinebotrl_two_wheel_riser_corrective_teacher_capture_v2"
 )
 CORRECTIVE_CAPTURE_ADMISSION_SCHEMA = (
-    "cinebotrl_two_wheel_riser_corrective_teacher_capture_admission_v1"
+    "cinebotrl_two_wheel_riser_corrective_teacher_capture_admission_v2"
 )
 CORRECTIVE_CAPTURE_CASE = 30
 CORRECTIVE_CAPTURE_SPLIT = "train"
@@ -28,8 +28,12 @@ CORRECTIVE_CAPTURE_MAXIMUM_NORMALIZED_ACTION = 0.95
 REQUIRED_ARRAYS = {
     "observations": 2,
     "model_based_commands": 2,
-    "corrective_residual_commands": 2,
-    "corrective_normalized_actions": 2,
+    "requested_corrective_residual_commands": 2,
+    "requested_corrective_normalized_actions": 2,
+    "effective_corrective_residual_commands": 2,
+    "effective_corrective_normalized_actions": 2,
+    "requested_vs_effective_residual_delta": 2,
+    "command_clipped": 2,
     "final_high_level_commands": 2,
     "case_ids": 1,
     "elapsed_time_s": 1,
@@ -62,6 +66,8 @@ REQUIRED_METADATA = {
     "clock_contract",
     "initialization_contract",
     "teacher_applied_to_commands",
+    "safety_supervisor_contract",
+    "training_target_contract",
     "dynamic_quality_required_before_save",
     "normalized_training_dataset_created",
     "bc_authorized",
@@ -133,8 +139,12 @@ def validate_corrective_capture(
     widths = {
         "observations": len(OBSERVATION_NAMES),
         "model_based_commands": 3,
-        "corrective_residual_commands": 3,
-        "corrective_normalized_actions": len(ACTION_NAMES),
+        "requested_corrective_residual_commands": 3,
+        "requested_corrective_normalized_actions": len(ACTION_NAMES),
+        "effective_corrective_residual_commands": 3,
+        "effective_corrective_normalized_actions": len(ACTION_NAMES),
+        "requested_vs_effective_residual_delta": 3,
+        "command_clipped": 3,
         "final_high_level_commands": 3,
         "amplitude_limited": 3,
         "slew_limited": 3,
@@ -173,20 +183,54 @@ def validate_corrective_capture(
 
     if np.any(np.asarray(payload["initialization_mask"], dtype=bool)):
         raise ValueError("initialization samples leaked into corrective capture")
-    normalized = np.asarray(payload["corrective_normalized_actions"], dtype=np.float64)
+    requested_normalized = np.asarray(
+        payload["requested_corrective_normalized_actions"], dtype=np.float64
+    )
+    effective_normalized = np.asarray(
+        payload["effective_corrective_normalized_actions"], dtype=np.float64
+    )
     if (
-        np.max(np.abs(normalized))
+        max(
+            float(np.max(np.abs(requested_normalized))),
+            float(np.max(np.abs(effective_normalized))),
+        )
         >= CORRECTIVE_CAPTURE_MAXIMUM_NORMALIZED_ACTION - 1e-6
     ):
         raise ValueError("corrective capture violates the reserved action margin")
-    residual = np.asarray(payload["corrective_residual_commands"], dtype=np.float64)
-    expected_residual = normalized * MODEL_BASED_POLICY_RESIDUAL_SCALES
-    if not np.allclose(residual, expected_residual, rtol=0.0, atol=2e-7):
-        raise ValueError("corrective residual and normalized target do not reconstruct")
+    requested_residual = np.asarray(
+        payload["requested_corrective_residual_commands"], dtype=np.float64
+    )
+    effective_residual = np.asarray(
+        payload["effective_corrective_residual_commands"], dtype=np.float64
+    )
+    if not np.allclose(
+        requested_residual,
+        requested_normalized * MODEL_BASED_POLICY_RESIDUAL_SCALES,
+        rtol=0.0,
+        atol=2e-7,
+    ):
+        raise ValueError("requested corrective residual does not reconstruct")
+    if not np.allclose(
+        effective_residual,
+        effective_normalized * MODEL_BASED_POLICY_RESIDUAL_SCALES,
+        rtol=0.0,
+        atol=2e-7,
+    ):
+        raise ValueError("effective corrective residual does not reconstruct")
     model = np.asarray(payload["model_based_commands"], dtype=np.float64)
     final = np.asarray(payload["final_high_level_commands"], dtype=np.float64)
-    if not np.allclose(final, model + residual, rtol=0.0, atol=2e-7):
-        raise ValueError("final command was clipped or does not reconstruct")
+    if not np.allclose(final, model + effective_residual, rtol=0.0, atol=2e-7):
+        raise ValueError("effective residual does not reconstruct final command")
+    expected_delta = effective_residual - requested_residual
+    delta = np.asarray(
+        payload["requested_vs_effective_residual_delta"], dtype=np.float64
+    )
+    if not np.allclose(delta, expected_delta, rtol=0.0, atol=2e-7):
+        raise ValueError("requested-versus-effective residual delta mismatch")
+    clipped = np.asarray(payload["command_clipped"], dtype=bool)
+    expected_clipped = np.abs(expected_delta) > 2e-7
+    if not np.array_equal(clipped, expected_clipped):
+        raise ValueError("command clipping mask does not match supervised commands")
 
     plan_sha = metadata.get("plan_sha256")
     runtime_commit = metadata.get("runtime_commit")
@@ -209,12 +253,16 @@ def validate_corrective_capture(
         "causal_observation": metadata.get("observation_contract")
         == "current_physical_cam_link_pre_action_with_known_reference_lookahead_v1",
         "alignment": metadata.get("sample_alignment_contract")
-        == "pre_action_observation_teacher_and_final_command_v1",
+        == "pre_action_observation_requested_and_effective_command_v2",
         "clocks": metadata.get("clock_contract")
         == "elapsed_execution_and_authoritative_source_time_separate_v1",
         "initialization": metadata.get("initialization_contract")
         == "separate_and_excluded_from_capture_v1",
         "teacher_applied": metadata.get("teacher_applied_to_commands") is True,
+        "supervisor": metadata.get("safety_supervisor_contract")
+        == "requested_teacher_intent_and_effective_applied_command_separate_v1",
+        "training_target": metadata.get("training_target_contract")
+        == "effective_post_supervisor_residual_v1",
         "dynamic_gate": metadata.get("dynamic_quality_required_before_save") is True,
         "training_closed": metadata.get("normalized_training_dataset_created")
         is False
@@ -261,13 +309,17 @@ def save_corrective_capture(
             "current_physical_cam_link_pre_action_with_known_reference_lookahead_v1"
         ),
         "sample_alignment_contract": (
-            "pre_action_observation_teacher_and_final_command_v1"
+            "pre_action_observation_requested_and_effective_command_v2"
         ),
         "clock_contract": (
             "elapsed_execution_and_authoritative_source_time_separate_v1"
         ),
         "initialization_contract": "separate_and_excluded_from_capture_v1",
         "teacher_applied_to_commands": True,
+        "safety_supervisor_contract": (
+            "requested_teacher_intent_and_effective_applied_command_separate_v1"
+        ),
+        "training_target_contract": "effective_post_supervisor_residual_v1",
         "dynamic_quality_required_before_save": True,
         "normalized_training_dataset_created": False,
         "bc_authorized": False,

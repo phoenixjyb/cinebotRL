@@ -67,7 +67,12 @@ def _fixture(tmp_path: Path, *, perturbation_rows: int = 20, source_end: float =
     count = 30
     normalized = np.zeros((count, 3), dtype=np.float32)
     normalized[:, 0] = np.linspace(0.0, 0.4, count)
-    residual = normalized * MODEL_BASED_POLICY_RESIDUAL_SCALES
+    requested_residual = normalized * MODEL_BASED_POLICY_RESIDUAL_SCALES
+    effective_residual = requested_residual.copy()
+    effective_residual[5:8, 0] -= 0.001
+    effective_normalized = effective_residual / MODEL_BASED_POLICY_RESIDUAL_SCALES
+    residual_delta = effective_residual - requested_residual
+    command_clipped = np.abs(residual_delta) > 2e-7
     model = np.tile([0.1, 0.0, 0.5], (count, 1))
     perturbation = np.zeros(count, dtype=bool)
     perturbation[:perturbation_rows] = True
@@ -77,9 +82,13 @@ def _fixture(tmp_path: Path, *, perturbation_rows: int = 20, source_end: float =
         {
             "observations": np.zeros((count, len(OBSERVATION_NAMES)), dtype=np.float32),
             "model_based_commands": model,
-            "corrective_residual_commands": residual,
-            "corrective_normalized_actions": normalized,
-            "final_high_level_commands": model + residual,
+            "requested_corrective_residual_commands": requested_residual,
+            "requested_corrective_normalized_actions": normalized,
+            "effective_corrective_residual_commands": effective_residual,
+            "effective_corrective_normalized_actions": effective_normalized,
+            "requested_vs_effective_residual_delta": residual_delta,
+            "command_clipped": command_clipped,
+            "final_high_level_commands": model + effective_residual,
             "case_ids": np.full(count, 30),
             "elapsed_time_s": np.arange(count) / 200.0,
             "execution_time_s": np.linspace(0.0, 29.0, count),
@@ -128,7 +137,14 @@ def _fixture(tmp_path: Path, *, perturbation_rows: int = 20, source_end: float =
     }
     (root / "case_0030.json").write_text(json.dumps(gate), encoding="utf-8")
     (root / "runtime_heartbeat.json").write_text(
-        json.dumps({"case": 30, "completed_steps": count}), encoding="utf-8"
+        json.dumps(
+            {
+                "case": 30,
+                "completed_steps": count,
+                "capture_outputs_enabled": True,
+            }
+        ),
+        encoding="utf-8",
     )
     return root, admission_path
 
@@ -145,6 +161,7 @@ def test_finalizer_admits_only_archive_conversion_not_training(tmp_path) -> None
     assert result["passed"] is True
     assert result["capture_admitted_for_dataset_conversion"] is True
     assert result["capture_metrics"]["perturbation_active_rows"] == 20
+    assert result["capture_metrics"]["command_clipped_rows"] == [3, 0, 0]
     assert result["valid_for_training"] is False
     assert result["bc_authorized"] is False
 
@@ -174,6 +191,23 @@ def test_finalizer_rejects_gate_or_gpu_failure(tmp_path) -> None:
     )
     assert result["gate_checks"]["exit_zero"] is False
     assert result["gate_checks"]["gpu_released"] is False
+    assert result["passed"] is False
+
+
+def test_finalizer_rejects_heartbeat_that_hides_corrective_capture(tmp_path) -> None:
+    root, admission = _fixture(tmp_path)
+    heartbeat_path = root / "runtime_heartbeat.json"
+    heartbeat = json.loads(heartbeat_path.read_text(encoding="utf-8"))
+    heartbeat["capture_outputs_enabled"] = False
+    heartbeat_path.write_text(json.dumps(heartbeat), encoding="utf-8")
+    result = MODULE.summarize(
+        root,
+        admission,
+        runtime_commit=COMMIT,
+        playback_exit_code=0,
+        gpu_release_passed=True,
+    )
+    assert result["gate_checks"]["heartbeat"] is False
     assert result["passed"] is False
 
 

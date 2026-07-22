@@ -19,15 +19,15 @@ from scripts.two_wheel_balance.validate_model_based_corrective_teacher_case30_pa
 )
 
 
-SCHEMA = "cinebotrl_two_wheel_riser_corrective_teacher_capture_contract_v1"
+SCHEMA = "cinebotrl_two_wheel_riser_corrective_teacher_capture_contract_v2"
 ADMISSION_SCHEMA = (
-    "cinebotrl_two_wheel_riser_corrective_teacher_capture_admission_v1"
+    "cinebotrl_two_wheel_riser_corrective_teacher_capture_admission_v2"
 )
-REVIEWED_PARENT = "a673ea0e2b00b7fa9c64024209431169f3da975f"
-NAMESPACE = "20260722_model_based_corrective_teacher_case30_capture_v1_exclusive"
+REVIEWED_PARENT = "f54db86768464c2d83feda9b2ec48c4ea2e732bf"
+NAMESPACE = "20260722_model_based_corrective_teacher_case30_capture_v2_exclusive"
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/"
-    "model_based_corrective_teacher_case30_capture_contract_v1.json"
+    "model_based_corrective_teacher_case30_capture_contract_v2.json"
 )
 EXPECTED_HOLDOUT = [3, 5, 13, 19, 24]
 EXPECTED_SCALES = [0.05, 0.05, 0.02]
@@ -36,13 +36,19 @@ EXPECTED_CAPTURE = {
         "current_physical_cam_link_pre_action_with_known_reference_lookahead_v1"
     ),
     "sample_alignment_contract": (
-        "pre_action_observation_teacher_and_final_command_v1"
+        "pre_action_observation_requested_and_effective_command_v2"
     ),
     "clock_contract": (
         "elapsed_execution_and_authoritative_source_time_separate_v1"
     ),
     "initialization_contract": "separate_and_excluded_from_capture_v1",
     "teacher_applied_to_commands": True,
+    "safety_supervisor_contract": (
+        "requested_teacher_intent_and_effective_applied_command_separate_v1"
+    ),
+    "training_target_contract": "effective_post_supervisor_residual_v1",
+    "requested_and_effective_actions_recorded": True,
+    "per_channel_command_clipping_recorded": True,
     "dynamic_quality_required_before_save": True,
     "maximum_normalized_action_exclusive": 0.95,
     "per_sample_plan_and_commit_identity": True,

@@ -1,0 +1,126 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case78_shadow_label_cpu_contract_v1",
+  "case": 78,
+  "current_split": "validation",
+  "reviewed_parent_commit": "0ebc51d7e8eb5adb7136daa95dd301f976497214",
+  "implementation_commit": "95216534ead0d11cbf985deb57f6e115cc2c1e18",
+  "namespace": "20260722_case78_shadow_label_measurement_v1_exclusive",
+  "plan_contract": {
+    "case": 78,
+    "plan_sha256": "28c69e20778e738d1ac4a0ae299160ed5764089094c2a0f9a018c49790860569",
+    "source_pose_count": 6870,
+    "execution_state_count": 6870,
+    "source_duration_s": 135.487646,
+    "execution_duration_s": 192.29956737098348
+  },
+  "controller_arguments": {
+    "trajectory_command_source": "deterministic_teacher",
+    "controller_wz_kp": 1.05,
+    "maximum_duration_scale": 3.0,
+    "camera_lever_arm_compensation_enabled": true,
+    "camera_lever_arm_compensation_gain": 1.0,
+    "maximum_camera_lever_arm_correction_m": 0.1,
+    "residual_policy": null,
+    "zero_policy_action": false,
+    "shadow_teacher_trace_enabled": true,
+    "residual_action_scales": [0.35, 0.4, 0.1]
+  },
+  "measurement_contract": {
+    "visited_state_source": "deterministic_controller",
+    "raw_labels_applied_to_commands": false,
+    "applied_residual_actions_must_be_zero": true,
+    "trace_only": true,
+    "dataset_present": false,
+    "record_policy_rate_timestamps": true,
+    "record_source_and_execution_clocks": true,
+    "record_raw_and_normalized_labels": true,
+    "record_command_reconstruction_fields": true
+  },
+  "dynamic_gate_thresholds": {
+    "maximum_pitch_deg": 12.0,
+    "maximum_position_p95_m": 0.15,
+    "maximum_position_error_m": 0.25,
+    "maximum_attitude_p95_deg": 5.0,
+    "maximum_attitude_error_deg": 10.0,
+    "maximum_riser_servo_error_m": 0.03,
+    "maximum_proxy_servo_error_deg": 5.0,
+    "maximum_internal_proxy_rate_deg_s": 360.0,
+    "maximum_saturation_ratio": 0.2
+  },
+  "identities": {
+    "case78_plan": {
+      "path": "artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu/case_0078_smoothed_riser_plan_v1.npz",
+      "sha256": "28c69e20778e738d1ac4a0ae299160ed5764089094c2a0f9a018c49790860569"
+    },
+    "lqr_gains": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+      "sha256": "2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6",
+      "git_blob_sha1": "70ecdd8ae6b7ce09574a97a8581229cb90add623"
+    },
+    "robot_usd": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd",
+      "sha256": "89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0",
+      "git_blob_sha1": "b25242c27c781b5aad4fadefb0cbf54398a9a75a"
+    },
+    "playback": {
+      "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+      "sha256": "ffe45cd5747f6e628caebafbc405d589f34df764df944ddc2b36a2efd0926b1d",
+      "git_blob_sha1": "2feaba4c341a8fefed4482b61280364db68aa960"
+    },
+    "residual_dataset_contract": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_residual_dataset.py",
+      "sha256": "98b2e0bcd5341a58fb34ef829c1934543f9bb0ac81d8a9c085ca8cf7b6d153f2",
+      "git_blob_sha1": "47cbb6ab37abfc112e8dc7045184fae785cbfbd0"
+    },
+    "tracking": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/whole_body_tracking.py",
+      "sha256": "f2cfe1abcaf1f225461b0ccfa9d26ab205e2dc9624047be77edeab9f67f754e7",
+      "git_blob_sha1": "e86d8578b5c9dcbfe634949355b01191e1cf2996"
+    },
+    "heartbeat_helper": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/runtime_heartbeat.py",
+      "sha256": "042d210bd6e0cc4d26d650f43efd73fc443d76404095f8f25619dbe6300867a9",
+      "git_blob_sha1": "450f5fbd61e165ff3a741325438e0a61098d8d1c"
+    },
+    "case78_gate": {
+      "path": "artifacts/two_wheel_riser/20260722_case78_camera_cap_v1_exclusive/gates/case_0078.json",
+      "sha256": "304fa9e1202d4099f976e6933e9ffc21a2833e7cc380ab9f95d7473bf2126c73"
+    },
+    "case78_final_status": {
+      "path": "artifacts/two_wheel_riser/20260722_case78_camera_cap_v1_exclusive/final_status.json",
+      "sha256": "e413b0df0b09c3c04ac49130ca2d38c7e495364504c04f3e89d72521e8e5a4f6"
+    },
+    "residual_action_audit": {
+      "path": "artifacts/two_wheel_riser/20260722_case78_residual_action_contract_v1_cpu/audit.json",
+      "sha256": "fd2b97d5e4a6cada368f4fb776086ebcab10403df5b350d7fa16a694163b535c"
+    },
+    "split_admission": {
+      "path": "artifacts/two_wheel_riser/20260722_case4_case78_split_admission_v1_cpu/manifest.json",
+      "sha256": "eac2c8c5389b0a8e3590d5b6355eaa80b50019091d5eb906408a6599c19cb623"
+    },
+    "validator": {
+      "path": "scripts/two_wheel_balance/validate_case78_shadow_label_contract.py",
+      "sha256": "c3535946a37346501a9ee4b220f72f4004854dafb46be455f959a462faf99976",
+      "git_blob_sha1": "0880fb173a52f807672cd0c08a3286f08b1ec334"
+    },
+    "preflight_wrapper": {
+      "path": "scripts/two_wheel_balance/run_case78_shadow_label_preflight.sh",
+      "sha256": "0ac0f38f8fe0cc5a242ef549b3c2a7db5b932acacd7355259fb1e12d65a7ce64",
+      "git_blob_sha1": "812332247db550041b1bc0330f30d1992fa66b0b"
+    }
+  },
+  "one_case_only": true,
+  "maximum_runtime_seconds": 5400,
+  "heartbeat_interval_policy_steps": 2000,
+  "cpu_preflight_ready": true,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "shadow_measurement_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_creation_authorized": false,
+  "dagger_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "holdout_opened": false,
+  "valid_for_training": false
+}

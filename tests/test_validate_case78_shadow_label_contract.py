@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from scripts.two_wheel_balance.validate_case78_shadow_label_contract import (
     EXPECTED_CONTROLLER,
     EXPECTED_IMPLEMENTATION,
@@ -91,6 +94,16 @@ def _inputs() -> tuple[dict, dict, dict, dict, dict]:
 def test_shadow_label_contract_keeps_deterministic_control_and_learning_closed() -> None:
     checks = semantic_checks(*_inputs())
     assert all(checks.values())
+
+
+def test_checked_in_shadow_label_contract_matches_semantics() -> None:
+    values = list(_inputs())
+    contract_path = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/case78_shadow_label_cpu_contract_v1.json"
+    )
+    values[0] = json.loads(contract_path.read_text(encoding="utf-8"))
+    assert all(semantic_checks(*values).values())
 
 
 def test_shadow_label_contract_rejects_zero_policy_or_scale_change() -> None:

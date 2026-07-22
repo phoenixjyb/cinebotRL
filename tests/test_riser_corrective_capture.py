@@ -22,11 +22,11 @@ PAIR_SHA = "c" * 64
 COMMIT = "d" * 40
 
 
-def _admission() -> dict[str, object]:
+def _admission(case: int = 30, split: str = "train") -> dict[str, object]:
     return {
         "schema": CORRECTIVE_CAPTURE_ADMISSION_SCHEMA,
-        "case": 30,
-        "split": "train",
+        "case": case,
+        "split": split,
         "corrective_target_admission_passed": True,
         "runtime_authorized": True,
         "label_capture_authorized": True,
@@ -133,6 +133,28 @@ def test_capture_admission_rejects_unreviewed_or_training_open_state(field, valu
 
 def test_capture_admission_accepts_only_the_bounded_case30_route() -> None:
     validate_capture_admission(_admission())
+
+
+def test_capture_admission_accepts_case23_only_when_explicitly_expected() -> None:
+    admission = _admission(case=23)
+    with pytest.raises(ValueError, match="admission"):
+        validate_capture_admission(admission)
+    validate_capture_admission(admission, expected_case=23)
+
+
+@pytest.mark.parametrize(
+    ("expected_case", "expected_split"),
+    [(0, "train"), (-1, "train"), (True, "train"), (23, "holdout")],
+)
+def test_capture_route_rejects_invalid_case_or_holdout(
+    expected_case, expected_split
+) -> None:
+    with pytest.raises(ValueError, match="expected corrective"):
+        validate_capture_admission(
+            _admission(case=23),
+            expected_case=expected_case,
+            expected_split=expected_split,
+        )
 
 
 @pytest.mark.parametrize(

@@ -23,6 +23,10 @@ def main() -> int:
     parser.add_argument("--capture", type=Path, required=True)
     parser.add_argument("--final-status", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--expected-case", type=int, default=30)
+    parser.add_argument(
+        "--expected-split", choices=("train", "validation"), default="train"
+    )
     parser.add_argument(
         "--execute",
         action="store_true",
@@ -30,11 +34,22 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    metadata, payload = convert_admitted_capture(args.capture, args.final_status)
+    metadata, payload = convert_admitted_capture(
+        args.capture,
+        args.final_status,
+        expected_case=args.expected_case,
+        expected_split=args.expected_split,
+    )
     if args.output.exists():
         raise FileExistsError(f"conversion output already exists: {args.output}")
     if args.execute:
-        save_case_dataset(args.output, metadata, payload)
+        save_case_dataset(
+            args.output,
+            metadata,
+            payload,
+            expected_case=args.expected_case,
+            expected_split=args.expected_split,
+        )
     result = {
         "schema": "cinebotrl_two_wheel_riser_corrective_conversion_result_v1",
         "passed": True,

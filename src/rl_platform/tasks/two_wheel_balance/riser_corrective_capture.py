@@ -24,6 +24,7 @@ CORRECTIVE_CAPTURE_ADMISSION_SCHEMA = (
 CORRECTIVE_CAPTURE_CASE = 30
 CORRECTIVE_CAPTURE_SPLIT = "train"
 CORRECTIVE_CAPTURE_MAXIMUM_NORMALIZED_ACTION = 0.95
+CORRECTIVE_CAPTURE_ALLOWED_SPLITS = frozenset({"train", "validation"})
 
 REQUIRED_ARRAYS = {
     "observations": 2,
@@ -85,11 +86,26 @@ def _exact_digest(value: object, length: int) -> bool:
     )
 
 
-def validate_capture_admission(payload: Mapping[str, object]) -> None:
+def validate_corrective_route(expected_case: int, expected_split: str) -> None:
+    if isinstance(expected_case, bool) or not isinstance(expected_case, int):
+        raise ValueError("expected corrective case must be an integer")
+    if expected_case <= 0:
+        raise ValueError("expected corrective case must be positive")
+    if expected_split not in CORRECTIVE_CAPTURE_ALLOWED_SPLITS:
+        raise ValueError("expected corrective split must be train or validation")
+
+
+def validate_capture_admission(
+    payload: Mapping[str, object],
+    *,
+    expected_case: int = CORRECTIVE_CAPTURE_CASE,
+    expected_split: str = CORRECTIVE_CAPTURE_SPLIT,
+) -> None:
+    validate_corrective_route(expected_case, expected_split)
     checks = {
         "schema": payload.get("schema") == CORRECTIVE_CAPTURE_ADMISSION_SCHEMA,
-        "case_split": payload.get("case") == CORRECTIVE_CAPTURE_CASE
-        and payload.get("split") == CORRECTIVE_CAPTURE_SPLIT,
+        "case_split": payload.get("case") == expected_case
+        and payload.get("split") == expected_split,
         "admitted_pair": payload.get("corrective_target_admission_passed") is True,
         "runtime": payload.get("runtime_authorized") is True,
         "capture": payload.get("label_capture_authorized") is True,
@@ -109,11 +125,18 @@ def validate_capture_admission(payload: Mapping[str, object]) -> None:
         raise ValueError(f"invalid corrective capture admission: {checks}")
 
 
-def load_capture_admission(path: Path) -> dict[str, object]:
+def load_capture_admission(
+    path: Path,
+    *,
+    expected_case: int = CORRECTIVE_CAPTURE_CASE,
+    expected_split: str = CORRECTIVE_CAPTURE_SPLIT,
+) -> dict[str, object]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("corrective capture admission must be an object")
-    validate_capture_admission(payload)
+    validate_capture_admission(
+        payload, expected_case=expected_case, expected_split=expected_split
+    )
     return payload
 
 
@@ -122,7 +145,9 @@ def validate_corrective_capture(
     payload: Mapping[str, np.ndarray],
     *,
     expected_case: int = CORRECTIVE_CAPTURE_CASE,
+    expected_split: str = CORRECTIVE_CAPTURE_SPLIT,
 ) -> None:
+    validate_corrective_route(expected_case, expected_split)
     if set(metadata) != REQUIRED_METADATA:
         raise ValueError("corrective capture metadata fields do not match contract")
     for name, ndim in REQUIRED_ARRAYS.items():
@@ -164,8 +189,8 @@ def validate_corrective_capture(
     cases = np.unique(np.asarray(payload["case_ids"]))
     if cases.tolist() != [expected_case] or metadata.get("case") != expected_case:
         raise ValueError("corrective capture mixes or opens an unreviewed case")
-    if metadata.get("split") != CORRECTIVE_CAPTURE_SPLIT:
-        raise ValueError("corrective capture is not in the training split")
+    if metadata.get("split") != expected_split:
+        raise ValueError("corrective capture split does not match expected route")
 
     elapsed = np.asarray(payload["elapsed_time_s"], dtype=np.float64)
     execution = np.asarray(payload["execution_time_s"], dtype=np.float64)
@@ -289,12 +314,15 @@ def save_corrective_capture(
     runtime_commit: str,
     corrective_profile_sha256: str,
     paired_final_status_sha256: str,
+    case: int = CORRECTIVE_CAPTURE_CASE,
+    split: str = CORRECTIVE_CAPTURE_SPLIT,
 ) -> None:
+    validate_corrective_route(case, split)
     arrays = {name: np.asarray(payload[name]) for name in REQUIRED_ARRAYS}
     metadata = {
         "schema": CORRECTIVE_CAPTURE_SCHEMA,
-        "case": CORRECTIVE_CAPTURE_CASE,
-        "split": CORRECTIVE_CAPTURE_SPLIT,
+        "case": case,
+        "split": split,
         "sample_count": len(arrays["observations"]),
         "source_duration_s": float(source_duration_s),
         "execution_duration_s": float(execution_duration_s),
@@ -327,7 +355,9 @@ def save_corrective_capture(
         "training_started": False,
         "valid_for_training": False,
     }
-    validate_corrective_capture(metadata, arrays)
+    validate_corrective_capture(
+        metadata, arrays, expected_case=case, expected_split=split
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
         path,
@@ -338,9 +368,17 @@ def save_corrective_capture(
 
 def load_corrective_capture(
     path: Path,
+    *,
+    expected_case: int = CORRECTIVE_CAPTURE_CASE,
+    expected_split: str = CORRECTIVE_CAPTURE_SPLIT,
 ) -> tuple[dict[str, object], dict[str, np.ndarray]]:
     with np.load(path, allow_pickle=False) as data:
         metadata = json.loads(str(data["metadata_json"].item()))
         payload = {name: np.asarray(data[name]) for name in REQUIRED_ARRAYS}
-    validate_corrective_capture(metadata, payload)
+    validate_corrective_capture(
+        metadata,
+        payload,
+        expected_case=expected_case,
+        expected_split=expected_split,
+    )
     return metadata, payload

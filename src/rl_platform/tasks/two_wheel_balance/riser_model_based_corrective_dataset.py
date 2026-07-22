@@ -14,6 +14,7 @@ from .riser_corrective_capture import (
     CORRECTIVE_CAPTURE_SCHEMA,
     CORRECTIVE_CAPTURE_SPLIT,
     load_corrective_capture,
+    validate_corrective_route,
 )
 from .riser_residual_dataset import (
     ACTION_NAMES,
@@ -101,7 +102,10 @@ def validate_conversion_source(
     *,
     capture_path: Path,
     capture_metadata: Mapping[str, object],
+    expected_case: int = CORRECTIVE_CAPTURE_CASE,
+    expected_split: str = CORRECTIVE_CAPTURE_SPLIT,
 ) -> None:
+    validate_corrective_route(expected_case, expected_split)
     capture_identity = final_status.get("capture")
     if not isinstance(capture_identity, Mapping):
         capture_identity = {}
@@ -109,8 +113,10 @@ def validate_conversion_source(
     archive_checks = final_status.get("archive_checks")
     checks = {
         "schema": final_status.get("schema") == CAPTURE_FINAL_SCHEMA,
-        "case_split": final_status.get("case") == CORRECTIVE_CAPTURE_CASE
-        and final_status.get("split") == CORRECTIVE_CAPTURE_SPLIT,
+        "case_split": final_status.get("case") == expected_case
+        and final_status.get("split") == expected_split
+        and capture_metadata.get("case") == expected_case
+        and capture_metadata.get("split") == expected_split,
         "capture_admitted": final_status.get(
             "capture_admitted_for_dataset_conversion"
         )
@@ -139,8 +145,13 @@ def validate_conversion_source(
 
 
 def validate_case_dataset(
-    metadata: Mapping[str, object], payload: Mapping[str, np.ndarray]
+    metadata: Mapping[str, object],
+    payload: Mapping[str, np.ndarray],
+    *,
+    expected_case: int = CORRECTIVE_CAPTURE_CASE,
+    expected_split: str = CORRECTIVE_CAPTURE_SPLIT,
 ) -> None:
+    validate_corrective_route(expected_case, expected_split)
     if set(metadata) != REQUIRED_METADATA:
         raise ValueError("model-based corrective dataset metadata fields mismatch")
     for name, ndim in REQUIRED_ARRAYS.items():
@@ -219,7 +230,7 @@ def validate_case_dataset(
     ):
         raise ValueError("effective previous-action recurrence mismatch")
     cases = np.unique(np.asarray(payload["case_ids"]))
-    if cases.tolist() != [CORRECTIVE_CAPTURE_CASE]:
+    if cases.tolist() != [expected_case]:
         raise ValueError("converted dataset opens an unreviewed case")
     elapsed = np.asarray(payload["elapsed_time_s"], dtype=np.float64)
     execution = np.asarray(payload["execution_time_s"], dtype=np.float64)
@@ -232,8 +243,8 @@ def validate_case_dataset(
     metadata_checks = {
         "schema": metadata.get("schema")
         == MODEL_BASED_CORRECTIVE_CASE_DATASET_SCHEMA,
-        "case_split": metadata.get("case") == CORRECTIVE_CAPTURE_CASE
-        and metadata.get("split") == CORRECTIVE_CAPTURE_SPLIT,
+        "case_split": metadata.get("case") == expected_case
+        and metadata.get("split") == expected_split,
         "names": metadata.get("observation_names") == list(OBSERVATION_NAMES)
         and metadata.get("action_names") == list(ACTION_NAMES),
         "scales": metadata.get("action_scales")
@@ -276,9 +287,17 @@ def validate_case_dataset(
 
 
 def convert_admitted_capture(
-    capture_path: Path, final_status_path: Path
+    capture_path: Path,
+    final_status_path: Path,
+    *,
+    expected_case: int = CORRECTIVE_CAPTURE_CASE,
+    expected_split: str = CORRECTIVE_CAPTURE_SPLIT,
 ) -> tuple[dict[str, object], dict[str, np.ndarray]]:
-    capture_metadata, capture = load_corrective_capture(capture_path)
+    capture_metadata, capture = load_corrective_capture(
+        capture_path,
+        expected_case=expected_case,
+        expected_split=expected_split,
+    )
     final_status = json.loads(final_status_path.read_text(encoding="utf-8"))
     if not isinstance(final_status, dict):
         raise ValueError("capture final status must be an object")
@@ -286,6 +305,8 @@ def convert_admitted_capture(
         final_status,
         capture_path=capture_path,
         capture_metadata=capture_metadata,
+        expected_case=expected_case,
+        expected_split=expected_split,
     )
 
     observations = np.asarray(capture["observations"], dtype=np.float32).copy()
@@ -325,8 +346,8 @@ def convert_admitted_capture(
     }
     metadata = {
         "schema": MODEL_BASED_CORRECTIVE_CASE_DATASET_SCHEMA,
-        "case": CORRECTIVE_CAPTURE_CASE,
-        "split": CORRECTIVE_CAPTURE_SPLIT,
+        "case": expected_case,
+        "split": expected_split,
         "sample_count": len(actions),
         "observation_names": list(OBSERVATION_NAMES),
         "action_names": list(ACTION_NAMES),
@@ -356,14 +377,29 @@ def convert_admitted_capture(
         "training_started": False,
         "valid_for_training": False,
     }
-    validate_case_dataset(metadata, payload)
+    validate_case_dataset(
+        metadata,
+        payload,
+        expected_case=expected_case,
+        expected_split=expected_split,
+    )
     return metadata, payload
 
 
 def save_case_dataset(
-    path: Path, metadata: Mapping[str, object], payload: Mapping[str, np.ndarray]
+    path: Path,
+    metadata: Mapping[str, object],
+    payload: Mapping[str, np.ndarray],
+    *,
+    expected_case: int = CORRECTIVE_CAPTURE_CASE,
+    expected_split: str = CORRECTIVE_CAPTURE_SPLIT,
 ) -> None:
-    validate_case_dataset(metadata, payload)
+    validate_case_dataset(
+        metadata,
+        payload,
+        expected_case=expected_case,
+        expected_split=expected_split,
+    )
     if path.exists():
         raise FileExistsError(f"refusing to overwrite converted dataset: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -376,9 +412,17 @@ def save_case_dataset(
 
 def load_case_dataset(
     path: Path,
+    *,
+    expected_case: int = CORRECTIVE_CAPTURE_CASE,
+    expected_split: str = CORRECTIVE_CAPTURE_SPLIT,
 ) -> tuple[dict[str, object], dict[str, np.ndarray]]:
     with np.load(path, allow_pickle=False) as data:
         metadata = json.loads(str(data["metadata_json"].item()))
         payload = {name: np.asarray(data[name]) for name in REQUIRED_ARRAYS}
-    validate_case_dataset(metadata, payload)
+    validate_case_dataset(
+        metadata,
+        payload,
+        expected_case=expected_case,
+        expected_split=expected_split,
+    )
     return metadata, payload

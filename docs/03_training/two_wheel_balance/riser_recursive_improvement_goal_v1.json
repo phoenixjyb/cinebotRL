@@ -206,8 +206,18 @@
         "case23_contract_sha256": "510d34d2e50d2708b654dbb348e4797a88132014b78a2d99023d807c7dd8e949",
         "case23_pair_cpu_ready": true,
         "case23_pair_runtime_authorized": false,
+        "case23_capture_authorized": false,
+        "case23_conversion_authorized": false,
         "capture_authorized": false,
-        "merge_authorized": false
+        "merge_authorized": false,
+        "conversion_route": {
+          "schema": "explicit_expected_case_and_split_v1",
+          "case30_default_preserved": true,
+          "non30_case_requires_explicit_positive_identity": true,
+          "allowed_splits": ["train", "validation"],
+          "holdout_allowed": false
+        },
+        "multi_case_corpus_created": false
       },
       "hardware_readiness": {
         "engineering_sample": "one_instrumented_400w_leadshine_plus_eld2_bench_unit",

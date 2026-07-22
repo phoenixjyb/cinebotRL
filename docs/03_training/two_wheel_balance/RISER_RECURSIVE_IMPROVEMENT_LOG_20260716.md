@@ -7214,3 +7214,42 @@ and must state whether its candidate was accepted or rejected.
   escalation, or skipping directly to cases 6, 2, or 7.
 - BC, PPO, holdout access, multi-case merge, production procurement, and
   hardware transfer remain closed.
+
+## Round 184: corrective archive and conversion route generalized CPU-only
+
+- Audit found that the v2 corrective archive and effective-label converter
+  still hardcoded case 30. A future admitted case-23 capture would therefore
+  have failed conversion even though the profile and paired-canary routes were
+  already case-specific.
+- Capture admission, save/load, final-status conversion, case-dataset
+  validation, save/load, and the conversion CLI now accept an explicit positive
+  expected case and an explicit `train` or `validation` split. Case 30/train
+  remains the default for complete backward compatibility.
+- Non-default evidence fails under the default route. Case 23 succeeds only
+  when every boundary receives `expected_case=23`; a default loader rejects the
+  resulting dataset until the same explicit case is supplied. Holdout is not a
+  legal route and remains structurally rejected.
+- The command contract, effective-only labels, `[0.05,0.05,0.02]` scales,
+  supervisor reconstruction, previous-effective-action recurrence, source
+  hashes, reserved action margin, and all closed learning flags are unchanged.
+- Focused archive/converter tests pass `31/31`; the broader capture,
+  finalizer, goal, and trainer set passes `67/67`. Capture, conversion, merge,
+  BC, PPO, holdout, runtime, and training remain unauthorized.
+- SHA-256 identities are capture runtime
+  `9d2a9bbced92c53849df9fbe0809bc5dd98f26e54feb5f5595edb96ceedebbe6`,
+  case converter
+  `2f73df2eb54bbbb560eaf18b7264c8378da25b5a19b4f04443c3300a75f0e9ca`,
+  CLI `09a58ec62fede0800afc70df1f8e6c47e618ed097ef96a0fedfcba8a6c88b706`,
+  and refreshed goal JSON
+  `16297e048015484b22b26c3959b2f848f0a4234a339a66dd274a1f0b8e3285ca`.
+
+## Next round after Round 184
+
+- Reopen the sealed real case-30 capture and converted dataset on `.98` under
+  the unchanged default route, and run the complete CPU suite before accepting
+  this compatibility change.
+- Do not create case-23 archive or conversion evidence from synthetic tests.
+  Case 23 still requires the paired dynamic pass, then a separate capture
+  proposal and explicit capture authorization before this route may be used.
+- Multi-case merge, DNN training, validation rollout, holdout, and PPO remain
+  closed until multiple real converted case datasets exist.

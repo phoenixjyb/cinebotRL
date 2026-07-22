@@ -65,7 +65,16 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["next_case"] == 23
     assert corrective["case23_pair_cpu_ready"] is True
     assert corrective["case23_pair_runtime_authorized"] is False
+    assert corrective["case23_capture_authorized"] is False
+    assert corrective["case23_conversion_authorized"] is False
     assert corrective["case30_valid_for_training"] is False
+    assert corrective["conversion_route"]["case30_default_preserved"] is True
+    assert corrective["conversion_route"]["allowed_splits"] == [
+        "train",
+        "validation",
+    ]
+    assert corrective["conversion_route"]["holdout_allowed"] is False
+    assert corrective["multi_case_corpus_created"] is False
     assert stage["runtime_authorized"] is False
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False

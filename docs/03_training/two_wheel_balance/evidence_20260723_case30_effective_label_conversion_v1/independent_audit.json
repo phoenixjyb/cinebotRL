@@ -1,5 +1,6 @@
 {
   "schema": "cinebotrl_two_wheel_riser_case30_effective_label_conversion_audit_v1",
+  "case": 30,
   "source_capture_sha256": "ec0f13030ce755c38e31c138507537f461126312b0c268832bc6bf9a40e4e8cb",
   "source_final_status_sha256": "e0b9ec3186e677c34289a85e72e4bc91e3cd3d8ce5cfdea16d74e1c0be0554b2",
   "output_sha256": "191a44147bc44038a0645bf48a63609463bf280d97b37ddaf884200bd8b52447",

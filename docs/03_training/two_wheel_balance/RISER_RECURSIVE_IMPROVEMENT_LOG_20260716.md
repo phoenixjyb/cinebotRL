@@ -7127,3 +7127,42 @@ and must state whether its candidate was accepted or rejected.
   brake behavior, and anti-fall proof.
 - Runtime case-23 authorization remains a separate decision. Do not launch
   Isaac, capture, BC, PPO, or training as part of this hardware audit.
+
+## Round 182: measured riser bench acceptance contract implemented CPU-only
+
+- A new machine-readable measurement template covers complete moving mass,
+  friction, counterbalance, physical stroke, exact camera-height software
+  limits, continuous duty, phase/DC current, thermal behavior, regeneration,
+  emergency stopping, service-brake hold, independent anti-fall, hard limits,
+  end stops, and safety-rated power removal.
+- A result cannot pass from typed summary values alone. It must bind raw logs,
+  force/current/temperature/position calibration records, supplier approval
+  documents, and safety-test video with seven SHA-256 identities.
+- The deterministic auditor preserves the current 400 W motor, ELD2 drive,
+  `3:1`, 70 mm/rev, 1.0 m/s, 1.50 m mechanical stroke, and 0.60--1.80 m camera
+  contracts. It recomputes emergency force margin from measured mass,
+  friction, and counterbalance and requires at least `1.15`.
+- Project engineering gates require a 30-minute/60%-duty run, at least
+  `0.95 m/s` achieved speed, phase-current and `65 V` DC-bus limits, bounded
+  temperature rise and terminal thermal slope, ten full-speed stops within
+  `0.12 m`, a 600-second brake hold, and ten independent anti-fall catches
+  within `0.03 m`.
+- Even a complete pass only sets
+  `ready_for_production_design_review=true`. Automatic production procurement,
+  hardware transfer, runtime, GPU, dataset, BC, PPO, and training are never
+  authorized by this audit.
+- The canonical unmeasured template fails closed with 34 missing numeric/hash
+  fields. Summary SHA-256 is
+  `7e9c48539e9d9ae77fad9143a9bb91936ed195f92a60b517f22c469c74af37df`;
+  decision is `collect_complete_calibrated_bench_measurements`.
+
+## Next round after Round 182
+
+- Run the new bench-audit and full CPU suite on authoritative `.98`, verify
+  host-independent byte identity, then seal and sync a clean checkpoint.
+- When hardware exists, copy the template to a dated evidence namespace,
+  replace every placeholder from calibrated raw evidence, run the auditor, and
+  preserve failing results rather than editing thresholds.
+- On the learning path, the next runtime action remains exactly one separately
+  authorized case-23 paired canary. Do not skip it to capture cases 6, 2, or 7,
+  and do not open BC/PPO from the single converted case-30 teacher.

@@ -5788,3 +5788,39 @@ and must state whether its candidate was accepted or rejected.
 - If separately authorized, train BC only above the frozen LQR/model-based
   controller. PPO, learned Isaac rollout, and expansion beyond the admitted 41
   cases require later independent gates.
+
+## Round 152: masked previous-action BC is selected but not yet authorized
+
+- Commit `56f28b9` adds a CPU-only architecture/admission contract that pins
+  the canonical 41-case dataset, summary, production-loader audit, case-78
+  label admission, and all relevant teacher-40 BC comparison evidence. It
+  verifies clean Git ancestry from dataset implementation commit `3011946`.
+- Historical evidence rejects blind architecture retuning. Original BC passed
+  only its offline gate. Masked previous-action BC was the best dynamic
+  near-pass: case-4 position p95 `0.137441 m` passed the absolute `0.15 m`
+  gate and strongly beat zero residual, but remained worse than the teacher's
+  `0.128736 m`. Scheduled sampling and both attenuated previous-action variants
+  failed their comparison gates.
+- Canonical CPU contract is
+  `20260722_initial_teacher41_masked_bc_contract_v1_cpu/contract.json`, SHA-256
+  `41bef3b5b39eb216ecc69cead67b4668424ab79a28a8b8da9df54b58e653dd84`.
+  It selects architecture
+  `state_shared_lookahead_fusion_previous_action_masked_v1`, 80 epochs maximum,
+  patience 10, batch size 4096, seed `20260722`, and validation-only model
+  selection over `[8,16,22,32,78]`.
+- The contract orders any later dynamic canary as case 8 first and case 78
+  second, with no automatic case-78 or broad rollout. It issues no runtime
+  token and keeps BC training, learned rollout, PPO, holdout access, and
+  runtime validity false.
+
+## Next round after Round 152
+
+- Add a one-use, fail-closed masked-BC training wrapper pinned to the Round-152
+  contract, dataset, production trainer, clean HEAD/upstream identity, and an
+  exclusive GPU ownership check. The token must be consumed before CUDA work.
+- Finalization must independently verify validation-only offline improvement,
+  exact architecture/mask/scales/dataset identities, deterministic seed,
+  checkpoint and TorchScript hashes, no holdout metrics, no learned rollout,
+  and no PPO. Training success alone must not authorize deployment.
+- Only after a separately sealed offline pass may a bounded case-8 Isaac canary
+  be proposed. Do not launch case 78 automatically.

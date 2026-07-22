@@ -7197,6 +7197,11 @@ and must state whether its candidate was accepted or rejected.
   `4c8473fc3688231f018637526daf237056bb213531481aa684a015a7fb25717c`.
   New regression tests prevent candidate/corpus, planner-imitation/residual,
   case-23 authorization, and hardware-readiness states from being conflated.
+- Exact implementation commit
+  `d28bfde7194d427cdb665d5738aa29ee358fd9b0` passes the complete
+  authoritative `.98` CPU-only suite with `842 passed, 11 skipped, 2 warnings`
+  in `78.67 s`. Runtime authorization remains absent and no Isaac, capture,
+  dataset, BC, PPO, or training process ran.
 
 ## Next round after Round 183
 

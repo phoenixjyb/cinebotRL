@@ -6355,3 +6355,52 @@ and must state whether its candidate was accepted or rejected.
 - After a clean authoritative CPU suite, perform a separate go/no-go review.
   Do not issue a token, run Isaac, capture labels, start BC/PPO, or open
   validation/holdout trajectories as part of the preflight implementation.
+
+## Round 166: seal the no-token paired case-30 preflight
+
+- Commit `352a0e1` adds the canonical paired preflight contract, validator,
+  wrapper, and focused negative tests. The wrapper contains no playback command
+  and rejects `--execute` unconditionally before Python/Isaac with
+  `runtime_authorization_not_issued`.
+- The contract binds reviewed controller parent `cc3db43`, training case 30,
+  fixed configuration/reset seeds `20260716/20260746`, the exact v16 plan,
+  deterministic `20 N`/`20`-step perturbation, LQR gains, robot build audit,
+  URDF/USD, corrective profile/runtime, perturbation runtime, playback,
+  wrapper, and validator. All 13 required identities and tracked Git blobs are
+  mandatory.
+- It freezes model-based zero-policy mode, residual scales
+  `[0.05,0.05,0.02]`, controller and camera-lever-arm arguments, unchanged
+  physical thresholds, rollout order `[baseline,candidate]`, same-plan/seed/
+  physics/perturbation parity, and the `3 mm` plus `2%` minimum position-p95
+  improvement gate. Label capture and dataset creation are false for both
+  rollouts.
+- Real `.98` preflight passes every check at clean pushed commit
+  `352a0e10fab000b01d03eec9084acb08166eed1b`. Contract SHA-256 is
+  `dd13e383b15b17426098759cdab886623eee3fc19b24611aaa5c711fbbc4834d`;
+  committed contract blob is `1377dd194ae10dcd36f41c67b05b7f6d7ef38552`.
+  The fresh namespace is
+  `20260722_model_based_corrective_teacher_case30_pair_v1_exclusive`.
+- An explicit `.98 --execute` attempt exits `4`, creates no namespace, and
+  leaves GPU ownership empty. The complete authoritative suite passes `744`
+  tests with nine intentional skips in `63.68 s`. Runtime/GPU authorization,
+  token, label capture, dataset, BC, PPO, training, validation, and holdout
+  access remain false.
+- Review decision: **GO** only to implement a bounded baseline/candidate runner
+  and paired finalizer behind a still-empty authorization gate. **NO-GO** to
+  launch Isaac or use any output as a teacher until that implementation is
+  separately tested, reviewed, authorized once, and dynamically admitted.
+
+## Next round after Round 166
+
+- Add the bounded execution route and paired finalizer without issuing an
+  authorization hash. Baseline must run first; candidate may start only after
+  baseline dynamic passage and complete GPU release. Each rollout has a
+  `600 s` timeout and must preserve its own log, heartbeat, exit code, gate JSON,
+  command-source/profile identity, and zero-capture evidence.
+- The finalizer must call the pure paired-admission contract, independently
+  report dynamic and corrective-target outcomes, require identical plan/seed/
+  physics/perturbation identities, and stop with label capture still false.
+  Failure or weak improvement must reject the candidate without gate relaxation.
+- Keep the runtime token/hash empty during implementation and authoritative CPU
+  testing. Issue at most one token only after another explicit go/no-go review;
+  do not start BC/PPO or open validation/holdout cases.

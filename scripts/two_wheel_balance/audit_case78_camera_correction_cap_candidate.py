@@ -8,13 +8,22 @@ import json
 import math
 from pathlib import Path
 
-from scripts.two_wheel_balance.audit_case78_recovery_outcome import (
-    BASELINE_SHA256,
-    RECOVERY_SHA256,
-    load_result,
-    quantile,
-    sha256_file,
-)
+if __package__:
+    from .audit_case78_recovery_outcome import (
+        BASELINE_SHA256,
+        RECOVERY_SHA256,
+        load_result,
+        quantile,
+        sha256_file,
+    )
+else:
+    from audit_case78_recovery_outcome import (
+        BASELINE_SHA256,
+        RECOVERY_SHA256,
+        load_result,
+        quantile,
+        sha256_file,
+    )
 
 
 CURRENT_CAP_M = 0.05

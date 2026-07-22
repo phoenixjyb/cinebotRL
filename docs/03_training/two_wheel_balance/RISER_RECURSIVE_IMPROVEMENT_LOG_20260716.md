@@ -5728,3 +5728,63 @@ and must state whether its candidate was accepted or rejected.
 - Dataset/schema/split admission and BC authorization remain separate CPU
   decisions. Do not start BC, PPO, or obstacle work merely because the shadow
   trace passed.
+
+## Round 151: case 78 enters a resealed 41-case initialization dataset
+
+- Commit `3011946` adds three CPU-only boundaries: a hash-pinned case-78 label
+  admission, immutable shadow-to-raw conversion, and an explicit teacher-40 plus
+  case-78 dataset builder. The tools pin the Round-150 final/gate/trace/runtime
+  admission, Round-148 scale audit, sealed split manifest, and original
+  teacher-40 dataset identities. They do not launch Isaac or authorize BC/PPO.
+- Canonical case-78 label admission is
+  `20260722_case78_shadow_label_admission_v1_cpu/label_admission.json`, SHA-256
+  `cd752e402c912d7a83767544c8059d2068979d10868dff2408fd93836b71033d`.
+  All 15 checks pass: exact source/execution clocks, deterministic visited
+  states, semantic physical-camera contract, zero applied and previous-action
+  placeholders, exact command reconstruction, and zero overflow under
+  `[0.35,0.40,0.10]`.
+- The immutable raw-teacher conversion contains `83,050` policy-rate rows in
+  `case_0078_executed_raw_teacher_v1.npz`, SHA-256
+  `1dc0dec589ed365683968ca4b8a2b1611e16347dd18a6c183bc8d463dcca6924`.
+  Its summary SHA-256 is
+  `c1456b360de4af15bbf65d7f59ef3b0e3f3c453c3be3857cf41f38e2e56a81df`.
+  The source shadow trace is not modified and raw labels were never applied to
+  physical commands.
+- The first dataset output in
+  `20260722_initial_teacher41_case78_31_5_5_v2_cpu` is preserved as a
+  provisional build because its metadata inherited the historical corpus path
+  and random seed. It is superseded and must not be used for BC. The resealed
+  canonical namespace is
+  `20260722_initial_teacher41_case78_31_5_5_v2_resealed_cpu`.
+- Canonical dataset `initial_teacher41_case78_31_5_5_v2_resealed.npz` has
+  `41` cases and `486,619` rows with exact split `31/5/5`: case 4 moves to
+  train, case 78 enters validation, and holdout remains
+  `[3,5,13,19,24]`. Dataset SHA-256 is
+  `03e3f2b8b4a6b7626a9b43f1fb2a88cbbfdfceb4b6373a51abdb21590bf53497`;
+  summary SHA-256 is
+  `2b7b177f481fdc632aca2134d9eea69cec66814581a5e39d9c6a099e3d8bcbfb`.
+- Production-loader audit SHA-256
+  `7a764d9cc41e9d43dd808251e2b8466e7ef0940bd356cbebeee38ffcd88e34cb`
+  passes all 12 schema, row, case, split, provenance, and learning-closed checks.
+  No holdout policy metrics are computed. The original teacher-40 dataset and
+  summary remain byte-identical at SHA-256
+  `53f3b679e227446c6008ba8bcd9191ae877b946dd86644388c43f89723bb9d44`
+  and `815463ffa133addbaec4f09a453fd9dae8e63eb690b37f56fd0a5c1877879542`.
+- Focused local and `.98` regression sets pass `44/44`. The complete
+  authoritative `.98` suite passes `632` tests with nine intentional skips in
+  `59.43 s`. BC, PPO, learned rollout, obstacle work, and holdout evaluation
+  remain closed.
+
+## Next round after Round 151
+
+- Build a separate CPU-only BC admission pinned to commit `3011946`, the
+  canonical dataset/summary/loader-audit hashes, the label admission, and the
+  original teacher-40 identities. The authorization must select only by the
+  five validation cases and keep holdout unopened.
+- Before issuing any one-use training token, audit the previous teacher-40 BC
+  experiments and choose one bounded architecture/previous-action contract.
+  Do not silently reuse a failed historical policy merely because the new
+  dataset loader passes.
+- If separately authorized, train BC only above the frozen LQR/model-based
+  controller. PPO, learned Isaac rollout, and expansion beyond the admitted 41
+  cases require later independent gates.

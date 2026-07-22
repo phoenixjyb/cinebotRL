@@ -1,0 +1,85 @@
+import json
+from pathlib import Path
+
+
+ROOT = Path(__file__).parents[1]
+GOAL = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/riser_recursive_improvement_goal_v1.json"
+)
+
+
+def _goal() -> dict:
+    return json.loads(GOAL.read_text(encoding="utf-8"))
+
+
+def test_goal_preserves_robot_and_completion_contract() -> None:
+    goal = _goal()
+    robot = goal["robot_contract"]
+    completion = goal["completion_gates"]
+    assert goal["status"] == "active"
+    assert robot["arm_joint_count"] == 0
+    assert robot["camera_height_m"] == [0.6, 1.8]
+    assert robot["riser_speed_mps"] == 1.0
+    assert completion["corrected_reference_pass_count"] == 79
+    assert completion["position_error_p95_m_max"] == 0.15
+
+
+def test_current_status_distinguishes_candidates_from_training_corpus() -> None:
+    stage = _goal()["current_stage"]
+    assert stage["status_as_of"] == "2026-07-23"
+    assert stage["quality_qualified_exact_source_cases_available"] == 42
+    assert stage["quality_qualified_cases_are_candidates_not_training_corpus"]
+    assert stage["model_based_corrective_case_datasets_available"] == 1
+    assert stage["model_based_corrective_training_corpus_cases_available"] == 0
+    assert stage["corrected_reference_cases_available"] == 79
+    assert "corrected_teacher_cases_available" not in stage
+    assert "historical_quarantined_corrected_all79_stage" in stage
+    assert "historical_quarantined_executed_residual_dataset_smoke" in stage
+
+
+def test_planner_imitation_failure_and_residual_layer_are_explicit() -> None:
+    refresh = _goal()["current_stage"]["status_refresh_20260723"]
+    imitation = refresh["planner_imitation_bc"]
+    assert imitation["classification"] == (
+        "encoder_initialization_only_not_final_residual_policy"
+    )
+    assert imitation["case78_position_p95_m"] > imitation["case78_position_p95_gate_m"]
+    assert imitation["case78_dynamic_admission_passed"] is False
+    assert refresh["policy_action_contract"] == (
+        "model_based_planner_plus_bounded_policy_residual_v1"
+    )
+    assert refresh["policy_action_names"] == [
+        "delta_vx",
+        "delta_wz",
+        "delta_riser_target",
+    ]
+    assert refresh["policy_action_scales"] == [0.05, 0.05, 0.02]
+
+
+def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> None:
+    goal = _goal()
+    stage = goal["current_stage"]
+    corrective = stage["status_refresh_20260723"]["model_based_corrective_teacher"]
+    assert corrective["diverse_pair_tranche"] == [30, 23, 6, 2, 7]
+    assert corrective["next_case"] == 23
+    assert corrective["case23_pair_cpu_ready"] is True
+    assert corrective["case23_pair_runtime_authorized"] is False
+    assert corrective["case30_valid_for_training"] is False
+    assert stage["runtime_authorized"] is False
+    assert stage["bc_authorized"] is False
+    assert stage["training_authorized"] is False
+    assert stage["ppo_authorized"] is False
+    assert "exactly_one_baseline_first_same_seed_case23_pair" in goal[
+        "next_iteration"
+    ]["required_change"]
+
+
+def test_hardware_status_remains_measurement_blocked() -> None:
+    hardware = _goal()["current_stage"]["status_refresh_20260723"][
+        "hardware_readiness"
+    ]
+    assert hardware["bench_measurement_missing_fields"] == 34
+    assert hardware["ready_for_production_design_review"] is False
+    assert hardware["valid_for_production_procurement"] is False
+    assert hardware["valid_for_hardware_transfer"] is False

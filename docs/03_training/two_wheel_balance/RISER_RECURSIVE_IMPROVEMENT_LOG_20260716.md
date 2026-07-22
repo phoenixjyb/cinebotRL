@@ -7169,3 +7169,43 @@ and must state whether its candidate was accepted or rejected.
 - On the learning path, the next runtime action remains exactly one separately
   authorized case-23 paired canary. Do not skip it to capture cases 6, 2, or 7,
   and do not open BC/PPO from the single converted case-30 teacher.
+
+## Round 183: active goal status reconciled with current learning evidence
+
+- The machine-readable goal no longer reports the July-17 state of zero
+  dynamically qualified cases and an unmeasured residual envelope. It now
+  distinguishes 79 corrected references, 42 dynamically qualified candidates,
+  one converted model-based corrective case, and zero trainable model-based
+  corrective corpus cases.
+- The old 41-case planner-imitation BC is explicitly classified as encoder
+  initialization only. It completed case 78 but failed position p95 at
+  `0.165018 m` versus the unchanged `0.15 m` gate, and its command layering is
+  not the target final policy contract.
+- The active learned contract is
+  `model_based_planner_plus_bounded_policy_residual_v1` with actions
+  `[delta_vx,delta_wz,delta_riser_target]` and scales `[0.05,0.05,0.02]`.
+  Exact-zero TorchScript preservation passed cases 8 and 78 before any nonzero
+  corrective capture was admitted.
+- Case 30 remains the sole converted effective-label teacher: `11,411` rows,
+  case-merge eligible but not training eligible. The diverse paired tranche is
+  `[30,23,6,2,7]`; case 23 is next and is CPU-ready but runtime unauthorized.
+- Hardware status is included in the same current checkpoint: one 400 W
+  instrumented bench sample is allowed, production remains 750 W-class/resized
+  pending measurements, and the unmeasured bench template still lacks 34
+  fields.
+- Goal JSON SHA-256 is
+  `4c8473fc3688231f018637526daf237056bb213531481aa684a015a7fb25717c`.
+  New regression tests prevent candidate/corpus, planner-imitation/residual,
+  case-23 authorization, and hardware-readiness states from being conflated.
+
+## Next round after Round 183
+
+- Do not issue a case-23 token without explicit user authorization. When
+  authorized, revise only the one-use runtime authorization identity, rerun the
+  canonical preflight and CPU suite, execute baseline first, candidate second
+  only after baseline pass, finalize, and stop.
+- A pair pass opens only a separate corrective-capture review. A pair reject
+  must be preserved and diagnosed without threshold relaxation, pulse
+  escalation, or skipping directly to cases 6, 2, or 7.
+- BC, PPO, holdout access, multi-case merge, production procurement, and
+  hardware transfer remain closed.

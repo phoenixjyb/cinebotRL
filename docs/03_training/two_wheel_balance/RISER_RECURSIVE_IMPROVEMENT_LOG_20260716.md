@@ -5566,3 +5566,52 @@ and must state whether its candidate was accepted or rejected.
   must not inherit primary balance, hard-limit, or emergency authority.
 - Do not capture case-78 labels, rebuild the dataset, run BC/PPO, open holdout,
   or launch Isaac until the new label contract is independently admitted.
+
+## Round 148: the teacher-40 residual scale is retained without opening holdout
+
+- Commits `c7815ed` and `4227228` add and repair a hash-pinned CPU audit of
+  the passed case-78 gate, immutable teacher-40 summary, raw-corpus audit, and
+  admitted split manifest. Focused tests pass `4/4` on both macOS and `.98`;
+  the complete authoritative `.98` suite passes `611` tests with seven
+  intentional platform skips in `61.45 s`.
+- The audit reads only the 35 train/validation raw cases. It verifies every raw
+  NPZ against the source-row SHA-256, covers `360,021` rows and `1,799.93 s`,
+  and skips holdout `[3,5,13,19,24]` before any holdout file is opened.
+- Development-label absolute residual p50/p90/p95/p99/p99.9 values are:
+  `[0.055850,0.022630,0.009903]`,
+  `[0.133988,0.083762,0.011782]`,
+  `[0.166104,0.106735,0.012339]`,
+  `[0.230667,0.143646,0.013442]`, and
+  `[0.273634,0.170230,0.014399]`. Absolute maxima are
+  `[0.294894,0.292132,0.017596]`.
+- The existing teacher-40 normalization `[0.35,0.40,0.10]` has zero observed
+  train/validation overflow samples and zero overflow duration. Combining the
+  whole-corpus aggregate maximum with case 78's full-rate maximum gives
+  `[0.302604,0.292132,0.017596]`, or normalized utilization
+  `[0.864583,0.730330,0.175956]`; therefore no scale change or clipping is
+  required for the current teacher-40 action contract.
+- Case 78 still has only aggregate maxima, not a policy-rate raw-label series.
+  Its old `[0.30,0.40,0.10]` runtime envelope overflow is preserved, and its
+  overflow count, duration, and quantiles remain explicitly unknown. The audit
+  does not infer or fabricate them.
+- Canonical output is
+  `20260722_case78_residual_action_contract_v1_cpu/audit.json`, SHA-256
+  `fd2b97d5e4a6cada368f4fb776086ebcab10403df5b350d7fa16a694163b535c`.
+  It retains the teacher-40 scale while keeping case-78 label capture, dataset
+  creation, BC, PPO, and training false. No Isaac or GPU work occurred.
+
+## Next round after Round 148
+
+- Build a CPU-only, one-case shadow-label measurement contract for case 78. It
+  must retain the passed `0.10 m` camera correction, deterministic LQR/model-
+  based commands, all physical gates, and the `[0.35,0.40,0.10]` candidate
+  normalization, while recording policy-rate raw labels and elapsed/source
+  clocks without applying residuals or creating a dataset.
+- The post-run audit must verify exact command reconstruction, signed minima
+  and maxima, p50/p90/p95/p99/p99.9, and per-channel overflow count/duration.
+  A failed physical gate or any candidate-scale overflow keeps case 78 outside
+  the next dataset.
+- The immutable historical teacher-40 dataset remains usable as the current
+  initialization corpus and must not be rewritten merely to perform this
+  measurement. Do not open holdout, train BC, start PPO, or begin obstacle work
+  while preparing the shadow-only contract.

@@ -29,6 +29,7 @@ except ImportError:
 
 SCHEMA = "cinebotrl_two_wheel_riser_case78_camera_cap_cpu_contract_v1"
 REVIEWED_PARENT = "5751df8cd1b1825dc8ffba4828664fa03992d4a8"
+IMPLEMENTATION_COMMIT = "1981180d9c5f249d79d8ca401b9cc66c0e6bf6bd"
 NAMESPACE = "20260722_case78_camera_cap_v1_exclusive"
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/case78_camera_cap_cpu_contract_v1.json"
@@ -86,6 +87,8 @@ def semantic_checks(
         "namespace_matches": contract.get("namespace") == NAMESPACE,
         "reviewed_parent_matches": contract.get("reviewed_parent_commit")
         == REVIEWED_PARENT,
+        "implementation_commit_matches": contract.get("implementation_commit")
+        == IMPLEMENTATION_COMMIT,
         "identity_set_exact": set(contract.get("identities", {}))
         == EXPECTED_IDENTITIES,
         "plan_contract_unchanged": contract.get("plan_contract") == EXPECTED_PLAN,
@@ -185,6 +188,15 @@ def validate(
             "merge-base",
             "--is-ancestor",
             REVIEWED_PARENT,
+            head,
+            check=False,
+        ).returncode
+        == 0,
+        "implementation_commit_is_ancestor": git(
+            repo,
+            "merge-base",
+            "--is-ancestor",
+            IMPLEMENTATION_COMMIT,
             head,
             check=False,
         ).returncode

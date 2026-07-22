@@ -1,9 +1,13 @@
+import json
+from pathlib import Path
+
 from scripts.two_wheel_balance.validate_case78_camera_cap_contract import (
     EXPECTED_CAP_CONTROLLER,
     EXPECTED_CONTROLLER,
     EXPECTED_IDENTITIES,
     EXPECTED_PLAN,
     EXPECTED_THRESHOLDS,
+    IMPLEMENTATION_COMMIT,
     NAMESPACE,
     REVIEWED_PARENT,
     SCHEMA,
@@ -18,6 +22,7 @@ def valid_inputs() -> tuple[dict, dict, dict, dict, dict]:
         "current_split": "unused",
         "namespace": NAMESPACE,
         "reviewed_parent_commit": REVIEWED_PARENT,
+        "implementation_commit": IMPLEMENTATION_COMMIT,
         "identities": {name: {} for name in EXPECTED_IDENTITIES},
         "plan_contract": EXPECTED_PLAN,
         "controller_arguments": EXPECTED_CAP_CONTROLLER,
@@ -76,6 +81,16 @@ def test_camera_cap_contract_changes_only_correction_cap() -> None:
         if EXPECTED_CAP_CONTROLLER.get(name) != EXPECTED_CONTROLLER.get(name)
     }
     assert changed == {"maximum_camera_lever_arm_correction_m"}
+
+
+def test_checked_in_camera_cap_contract_matches_semantics() -> None:
+    inputs = list(valid_inputs())
+    contract_path = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/case78_camera_cap_cpu_contract_v1.json"
+    )
+    inputs[0] = json.loads(contract_path.read_text(encoding="utf-8"))
+    assert all(semantic_checks(*inputs).values())
 
 
 def test_camera_cap_contract_rejects_gate_or_runtime_relaxation() -> None:

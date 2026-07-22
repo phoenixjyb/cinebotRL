@@ -24,10 +24,17 @@ import torch  # noqa: E402
 from torch import nn  # noqa: E402
 from torch.utils.data import DataLoader, TensorDataset  # noqa: E402
 
+from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_corpus import (  # noqa: E402
+    MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA,
+    SPLIT_CODES as MODEL_BASED_SPLIT_CODES,
+    load_corpus,
+)
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
     ACTION_NAMES,
     ACTION_SCALES,
     LOOKAHEAD_HORIZONS_S,
+    MODEL_BASED_POLICY_RESIDUAL_CONTRACT,
+    MODEL_BASED_POLICY_RESIDUAL_SCALES,
     OBSERVATION_NAMES,
     PREVIOUS_ACTION_INDICES,
 )
@@ -42,6 +49,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa:
 SUPPORTED_DATASET_SCHEMAS = {
     "cinebotrl_two_wheel_riser_residual_merged_v2",
     "cinebotrl_two_wheel_riser_residual_merged_v3",
+    MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA,
 }
 INITIAL_TEACHER_DATASET_SCHEMA = "cinebotrl_two_wheel_riser_residual_merged_v3"
 LEGACY_POLICY_COMMAND_BASE = "phase_feedforward"
@@ -113,6 +121,20 @@ def dataset_action_semantics(metadata: dict[str, object]) -> dict[str, object]:
     schema = metadata.get("schema")
     if schema not in SUPPORTED_DATASET_SCHEMAS:
         raise ValueError("wrong merged dataset schema")
+    if schema == MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA:
+        scales = np.asarray(metadata.get("action_scales"), dtype=np.float64)
+        if (
+            metadata.get("command_contract")
+            != MODEL_BASED_POLICY_RESIDUAL_CONTRACT
+            or scales.shape != (3,)
+            or not np.array_equal(scales, MODEL_BASED_POLICY_RESIDUAL_SCALES)
+        ):
+            raise ValueError("model-based corrective action contract mismatch")
+        return {
+            "policy_command_base": "model_based_planner",
+            "policy_residual_contract": MODEL_BASED_POLICY_RESIDUAL_CONTRACT,
+            "residual_action_scales": scales.tolist(),
+        }
     scales = (
         np.asarray(metadata.get("action_scales"), dtype=np.float64)
         if schema == INITIAL_TEACHER_DATASET_SCHEMA
@@ -140,9 +162,16 @@ def load_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarray]]:
         ]
         if schema == INITIAL_TEACHER_DATASET_SCHEMA:
             required.append("action_valid_mask")
-        arrays = {name: np.asarray(data[name]) for name in required}
+        arrays = (
+            {}
+            if schema == MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA
+            else {name: np.asarray(data[name]) for name in required}
+        )
     if schema not in SUPPORTED_DATASET_SCHEMAS:
         raise ValueError("wrong merged dataset schema")
+    if schema == MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA:
+        metadata, corpus_arrays = load_corpus(path)
+        arrays = {name: corpus_arrays[name] for name in required}
     if metadata.get("observation_names") != list(OBSERVATION_NAMES):
         raise ValueError("merged observation contract mismatch")
     if metadata.get("observation_contract") != (
@@ -170,8 +199,14 @@ def load_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarray]]:
         raise ValueError("dataset contains non-finite values")
     if np.max(np.abs(actions)) > 1.0 + 1e-6:
         raise ValueError("dataset action exceeds normalized bounds")
-    if set(np.unique(labels).tolist()) != set(SPLIT_CODES.values()):
-        raise ValueError("dataset must contain train, validation, and holdout rows")
+    expected_split_codes = (
+        MODEL_BASED_SPLIT_CODES
+        if schema == MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA
+        else SPLIT_CODES
+    )
+    if set(np.unique(labels).tolist()) != set(expected_split_codes.values()):
+        expected_names = ", ".join(expected_split_codes)
+        raise ValueError(f"dataset must contain exactly these splits: {expected_names}")
     if metadata.get("row_count") != len(observations):
         raise ValueError("metadata row count mismatch")
     unique_cases = sorted(int(case) for case in np.unique(case_ids))
@@ -194,9 +229,11 @@ def load_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarray]]:
     if invalid_sources or len(source_cases) != len(unique_cases):
         raise ValueError("source indices do not map one-to-one to cases")
     split_cases = metadata.get("split_cases")
-    if not isinstance(split_cases, dict) or set(split_cases) != set(SPLIT_CODES):
+    if not isinstance(split_cases, dict) or set(split_cases) != set(
+        expected_split_codes
+    ):
         raise ValueError("metadata split cases missing")
-    for name, code in SPLIT_CODES.items():
+    for name, code in expected_split_codes.items():
         declared = sorted(int(case) for case in split_cases[name])
         observed = sorted(int(case) for case in np.unique(case_ids[labels == code]))
         if declared != observed:
@@ -499,6 +536,11 @@ def main() -> int:
         device = torch.device(args.device)
     metadata, arrays = load_dataset(args.dataset)
     action_semantics = dataset_action_semantics(metadata)
+    if metadata["schema"] == MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA:
+        raise ValueError(
+            "model-based corrective corpus is admission-review-only; "
+            "a separately approved training schema is required before BC"
+        )
     observations = arrays["observations"].astype(np.float32)
     actions = arrays["actions"].astype(np.float32)
     labels = arrays["split_labels"]

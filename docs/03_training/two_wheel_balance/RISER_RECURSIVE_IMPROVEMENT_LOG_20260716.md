@@ -7260,3 +7260,42 @@ and must state whether its candidate was accepted or rejected.
   proposal and explicit capture authorization before this route may be used.
 - Multi-case merge, DNN training, validation rollout, holdout, and PPO remain
   closed until multiple real converted case datasets exist.
+
+## Round 185: model-based corrective corpus boundary implemented CPU-only
+
+- The multi-case merge design is no longer an unspecified future step. A new
+  fail-closed corpus builder accepts only independently converted model-based
+  corrective case datasets whose paths and SHA-256 identities are pinned in an
+  exact manifest.
+- Corpus admission requires at least four distinct training cases and two
+  distinct validation cases. Reserved holdouts `[3,5,13,19,24]` are not a
+  legal split and are rejected both from the manifest and from corpus rows.
+- Each source block preserves the converted dataset, capture, final-status,
+  runtime-commit, plan, corrective-profile, and paired-status identities. The
+  loader rechecks dense one-to-one source/case/split mapping, contiguous rows,
+  clocks, command reconstruction, clipping, and previous-effective-action
+  recurrence.
+- The learning target remains the effective post-supervisor residual over the
+  model-based planner, with action scales `[0.05,0.05,0.02]`. Requested actions
+  remain audit-only; no legacy planner-imitation labels can enter this schema.
+- The BC loader can audit the two-split corpus and reports the correct
+  `model_based_planner_plus_bounded_policy_residual_v1` semantics. The training
+  entrypoint deliberately refuses this review-only schema before creating an
+  output directory; a later explicit promotion must define a separately
+  approved training schema.
+- Synthetic coverage proves four-train/two-validation build and round-trip,
+  CLI preflight and no-overwrite behavior, and rejection of holdout, duplicate,
+  insufficient, hash-mismatched, source-leaking, recurrence-broken, and
+  command-tampered inputs. Focused local coverage passes `42/42`.
+- This round created no real corpus because case 30 remains the only admitted
+  converted source. It created no runtime namespace, Isaac process, capture,
+  BC, PPO, policy artifact, holdout read, or training process.
+
+## Next round after Round 185
+
+- Keep the corpus builder unused for real output until at least four admitted
+  train cases and two admitted validation cases exist. Do not fill missing
+  cases with synthetic data or the historical planner-imitation corpus.
+- The next runtime measurement remains exactly one separately authorized
+  case-23 paired canary. A pass opens a separate capture review only; it does
+  not authorize corpus construction or BC.

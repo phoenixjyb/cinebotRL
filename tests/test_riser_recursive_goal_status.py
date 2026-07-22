@@ -74,6 +74,13 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
         "validation",
     ]
     assert corrective["conversion_route"]["holdout_allowed"] is False
+    corpus = corrective["multi_case_corpus_contract"]
+    assert corpus["implemented"] is True
+    assert corpus["minimum_train_cases"] == 4
+    assert corpus["minimum_validation_cases"] == 2
+    assert corpus["reserved_holdout_cases_unopened"] == [3, 5, 13, 19, 24]
+    assert corpus["effective_post_supervisor_labels_only"] is True
+    assert corpus["bc_entrypoint_refuses_review_only_schema"] is True
     assert corrective["multi_case_corpus_created"] is False
     assert stage["runtime_authorized"] is False
     assert stage["bc_authorized"] is False

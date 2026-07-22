@@ -217,6 +217,18 @@
           "allowed_splits": ["train", "validation"],
           "holdout_allowed": false
         },
+        "multi_case_corpus_contract": {
+          "schema": "cinebotrl_two_wheel_riser_model_based_corrective_merged_v1",
+          "implemented": true,
+          "minimum_train_cases": 4,
+          "minimum_validation_cases": 2,
+          "reserved_holdout_cases_unopened": [3, 5, 13, 19, 24],
+          "effective_post_supervisor_labels_only": true,
+          "previous_effective_action_recurrence_required": true,
+          "source_hashes_required": true,
+          "valid_for_bc_admission_review_only": true,
+          "bc_entrypoint_refuses_review_only_schema": true
+        },
         "multi_case_corpus_created": false
       },
       "hardware_readiness": {
@@ -231,7 +243,7 @@
       "completion_gap": [
         "run_and_review_the_case23_same_seed_paired_canary",
         "dynamically_admit_and_convert_multiple_diverse_model_based_corrective_cases",
-        "build_a_case_disjoint_multi_case_model_based_corrective_corpus",
+        "populate_the_implemented_case_disjoint_corpus_with_at_least_4_train_and_2_validation_cases",
         "train_and_validate_a_nonzero_bounded_residual_dnn",
         "pass_case_disjoint_validation_and_full_79_dynamic_policy_gates",
         "record_and_audit_representative_rendered_rollouts",

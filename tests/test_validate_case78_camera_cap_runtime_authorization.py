@@ -1,12 +1,16 @@
 import json
 import hashlib
+import os
 from pathlib import Path
+
+import pytest
 
 from scripts.two_wheel_balance import (
     validate_case78_camera_cap_runtime_authorization as module,
 )
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX token mode is enforced in WSL")
 def test_runtime_token_requires_exact_content_mode_and_hash(tmp_path: Path) -> None:
     token = tmp_path / "token"
     token.write_text(module.AUTHORIZATION + "\n", encoding="utf-8")
@@ -19,6 +23,7 @@ def test_runtime_token_requires_exact_content_mode_and_hash(tmp_path: Path) -> N
     assert not module.token_checks(token, expected)["authorization_mode_0600"]
 
 
+@pytest.mark.skipif(os.name == "nt", reason="symlink contract is enforced in WSL")
 def test_runtime_token_rejects_symlink(tmp_path: Path) -> None:
     target = tmp_path / "target"
     target.write_text(module.AUTHORIZATION + "\n", encoding="utf-8")

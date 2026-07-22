@@ -6507,3 +6507,56 @@ and must state whether its candidate was accepted or rejected.
   clocks, action-envelope overflow, initialization leakage, and dirty/diverged
   Git state. A future capture may be reviewed only after the authoritative CPU
   suite passes; BC and PPO remain closed.
+
+## Round 169: seal the disabled corrective-label capture contract CPU-only
+
+- Commit `a673ea0` adds a dedicated case-30 corrective capture schema and a
+  disabled runtime seam. It does not reuse the historical raw/shadow teacher
+  formats. Each row binds the current physical-`cam_link` pre-action
+  observation, complete model-planner command, bounded corrective residual and
+  normalized target, final applied high-level command, elapsed/execution/source
+  clocks, amplitude/slew flags, perturbation activity, and repeated plan/commit
+  identities.
+- The archive validator requires exact command reconstruction and rejects
+  command clipping, any normalized action at or above `0.95`, non-finite or
+  mismatched rows, initialization samples, nonmonotonic or conflated clocks,
+  validation/holdout cases, identity drift, noncausal metadata, or any opened
+  normalized-dataset/BC/PPO/training flag. A dynamically failed rollout cannot
+  save the archive.
+- Commits `ab2df7b`, `54426a8`, and `904652e` add the canonical no-token
+  preflight, accepted-pair evidence, normalized evidence mode, and updated
+  capture-closure regression contract. The wrapper contains no playback/Isaac
+  command; `--execute` exits `4` with `runtime_authorization_not_issued` and
+  cannot create the namespace.
+- Real `.98` preflight passes every check at clean pushed commit
+  `904652e25fd8626ec6915fcec31605c53859f43d`. Contract SHA-256 is
+  `8729b84d764f1a98e7c36212c80e5b12bd828bcc83907a2da1477deefbea9836`;
+  committed contract blob is `1ea3cea2625b1b89ebe450a37795312da99e65d0`.
+  It binds accepted-pair final-status SHA-256
+  `a966c9a5407a0d5ef91ca0553d00a0c47040fdfdc1c4f9bd9814aa33447fc083`
+  and case-30 plan SHA-256
+  `1722bfdc7c1aeabc5a9d3920cf6a47bc789afbc96e6ef5c8e540695dc3c97dcb`.
+- The focused local capture/playback suite passed `90/90`; after repairing one
+  obsolete static assertion, the complete authoritative `.98` suite passed
+  `766` tests with ten intentional skips and two warnings in `71.90 s`.
+  The future namespace is absent, GPU/process ownership is empty, and runtime,
+  label capture, normalized dataset creation, BC, PPO, training, and
+  valid-for-training remain false.
+
+## Next round after Round 169
+
+- Add a separately reviewed bounded execution wrapper and capture finalizer
+  while keeping the authorization hash empty. The eventual route must consume
+  a one-use mode-`0600` token before Isaac, run only case 30 at the frozen
+  commit/plan/profile/seed/perturbation, apply the admitted corrective teacher,
+  and save only after unchanged dynamic, thermal, controller, perturbation, and
+  archive-schema gates pass.
+- The finalizer must independently hash and reopen the NPZ, require exact
+  source/execution clocks and per-row identities, prove exactly 20 perturbation
+  rows, reject initialization leakage or command clipping, preserve the gate
+  JSON/heartbeat/log/exit code, and leave the captured archive
+  `valid_for_training=false`. It may authorize later dataset conversion only;
+  it must not start BC or PPO.
+- Run focused negative tests and the complete authoritative CPU suite, then
+  perform another explicit go/no-go review. Do not issue a token, create the
+  namespace, or launch Isaac in the implementation commit.

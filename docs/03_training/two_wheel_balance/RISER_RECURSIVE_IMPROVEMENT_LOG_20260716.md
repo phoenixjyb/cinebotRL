@@ -6203,3 +6203,56 @@ and must state whether its candidate was accepted or rejected.
 - Only a separately authorized case-78 preservation pass may open the design of
   residual-target capture. BC, PPO, holdout use, and cases 16/22/32 remain
   closed meanwhile.
+
+## Round 163: exact-zero residual preserves case-78 model-based behavior
+
+- Commits `1f1ea03`, `6e90944`, and `636fd7c` add the CPU contract, fail-closed
+  finalizer, and guarded exclusive wrapper. Commit `067bb57` supplies one
+  authorization hash in a separate change. The canonical CPU contract SHA-256
+  is `cc958c9e6cb182509d4cf787891ca9586aefa08b7928f30f358d0ab5f0a4014c`;
+  it pins plan SHA-256
+  `28c69e20778e738d1ac4a0ae299160ed5764089094c2a0f9a018c49790860569`,
+  deterministic-teacher SHA-256
+  `ad0dc3ee618819ec808ac4d0318bda711dc2cba38dd041119a1f78584e97e459`,
+  exact-zero policy SHA-256
+  `b1494f7af219d44cf966d7ba7781370afc1e8fe9575dd4e414d6ec0b7ea1ab19`,
+  and the intentional case-78 camera lever-arm cap of `0.10 m`.
+- The canonical runtime namespace is
+  `20260722_model_based_zero_residual_case78_canary_v1_exclusive`. Explicit-zero,
+  zero-checkpoint, runtime-admission, and final-status SHA-256 values are
+  respectively
+  `12da451484212726903b87bd79d5d28d0dc98957c1622eaeb92f97528f672584`,
+  `085006f92251db52f3ca5f752cc273b7005ba3f114a9c93a0aa9913de2945cdf`,
+  `cbff2384c6daa9a5b34f6562e7f8fb9b671635c458b7700b29055e6ad0b4eff8`,
+  and `b0b025d1d40da50a1a9273fb2ff5ba32966b4e1970c539ffbea24d753bc7bea3`.
+- Both paths complete the full `192.299567 s` execution reference in `83,050`
+  policy steps. Position p95/max are `0.116601/0.184238 m`; attitude p95/max
+  are `0.147844/0.298857 deg`; pitch max is `7.568641 deg`; riser max error is
+  `0.0136903 m`. Every audited metric is exactly identical between explicit
+  zero and the exact-zero TorchScript checkpoint, and action saturation remains
+  zero.
+- Dynamic quality, thermal admission, completion, policy identity, and
+  zero-action preservation pass. The prospective raw residual-label maximum is
+  `[0.302604,0.185892,0.013768]`, which is normalized as
+  `[1.008680,0.464730,0.137677]` against the historical measurement scales and
+  therefore remains independently inadmissible as a label. It is neither
+  clipped nor applied to commands and does not invalidate the deterministic
+  dynamic pass.
+- Both rollout exit codes and finalization exit code are zero. The one-use token
+  is absent, GPU/playback ownership is empty, and no `.npz`, dataset, capture,
+  BC, PPO, training, or holdout artifact was created. This closes the zero-no-op
+  architecture-preservation sequence; it does not by itself authorize learning.
+
+## Next round after Round 163
+
+- Define a CPU-only corrective residual-target contract around the complete
+  model-based planner. Labels must represent a demonstrably better admissible
+  high-level command minus the exact model-based command, never planner
+  reconstruction minus phase feed-forward and never physical DJI gimbal joints.
+- Keep fixed residual bounds `[0.05 m/s,0.05 rad/s,0.02 m]` for the deployed
+  policy until raw candidate labels are audited. Separate dynamic-quality,
+  label-envelope, split-integrity, and training-admission outcomes; reject
+  clipping and reject any capture from a dynamically failed rollout.
+- Start with CPU schema, provenance, leakage, and synthetic label tests. Do not
+  authorize Isaac capture, BC, PPO, or the unopened holdout cases until that
+  contract proves how a nonzero target improves on the model-based baseline.

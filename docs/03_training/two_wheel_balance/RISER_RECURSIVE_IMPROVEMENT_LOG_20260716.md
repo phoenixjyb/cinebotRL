@@ -5615,3 +5615,54 @@ and must state whether its candidate was accepted or rejected.
   initialization corpus and must not be rewritten merely to perform this
   measurement. Do not open holdout, train BC, start PPO, or begin obstacle work
   while preparing the shadow-only contract.
+
+## Round 149: deterministic case-78 shadow-label measurement is CPU-ready
+
+- Commit `9521653` extends the non-trainable shadow trace so it can observe
+  deterministic-controller states without a residual policy. It does not
+  modify the deterministic command branch. Zero-policy mode remains forbidden
+  because that mode reconstructs commands from feedforward instead of retaining
+  the dynamically passed model-based controller. Historical learned-policy
+  shadow traces remain loadable through explicit legacy-source inference.
+- Commits `0fff1f2`, `df1c45d`, `5aecda0`, `506d688`, `3ae04cd`, and
+  `741babc` add, seal, schema-align, and test the CPU validator and preflight.
+  The canonical contract is
+  `scripts/two_wheel_balance/case78_shadow_label_cpu_contract_v1.json`,
+  SHA-256
+  `3cbe1b816ee78f216232f67f5b0fa387ad52cb11219e60fae692326cc09b4aba`.
+- The contract pins case 78, the exact source/execution clocks and plan hash,
+  passed `0.10 m` camera-cap gate/final evidence, LQR gains, robot USD,
+  playback/serializer/tracking/heartbeat blobs, split admission, and Round-148
+  residual audit. Controller arguments remain deterministic with no residual
+  policy, no zero-policy shortcut, and candidate scales `[0.35,0.40,0.10]`.
+- The trace contract requires policy-rate elapsed/phase clocks, raw and
+  normalized labels, exact teacher-command reconstruction fields, zero applied
+  residual actions, deterministic-controller visited-state metadata, and no
+  dataset or training validity.
+- Final live `.98` preflight at clean pushed commit
+  `741babc6e58cc2f4e11b4d4dad1795859fde2e88` passes all 17 semantic,
+  identity, lineage, namespace, and ownership checks. Preflight output SHA-256
+  is `625a18f5a8cf3f7e2af2191d7e7231c10b9cd8991c2f0fc3c171684931c88a6f`.
+  The complete authoritative `.98` suite passes `623` tests with seven
+  intentional platform skips in `58.75 s`.
+- Runtime authorization, GPU launch, shadow measurement, label capture,
+  dataset creation, BC, PPO, holdout access, and training remain false. No
+  namespace, token, Isaac process, or new trace was created in this round.
+
+## Next round after Round 149
+
+- Review the sealed CPU contract independently. If approved, create a separate
+  one-use runtime/finalizer layer pinned to the current contract and blobs. The
+  token must be mode `0600`, consumed before Isaac, and authorize exactly one
+  case-78 deterministic shadow trace in the fresh namespace with a `5,400 s`
+  wall bound and `2,000`-policy-step heartbeat.
+- Finalization must independently require unchanged dynamic/thermal/controller
+  gates, zero applied residual actions, exact command reconstruction, both
+  clocks, full-rate signed extrema and p50/p90/p95/p99/p99.9, and per-channel
+  overflow count/duration against `[0.35,0.40,0.10]`. It must always verify GPU
+  release and preserve failed evidence.
+- A successful shadow measurement may admit case-78 labels for a future split
+  rebuild; it does not itself authorize dataset creation or training. In
+  parallel, the immutable teacher-40 corpus remains the valid initialization
+  corpus for a separately reviewed BC authorization. PPO and obstacle work
+  remain closed.

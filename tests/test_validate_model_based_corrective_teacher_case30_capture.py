@@ -1,8 +1,11 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
+
+import pytest
 
 
 ROOT = Path(__file__).parents[1]
@@ -155,6 +158,51 @@ def test_validator_rejects_alternate_contract_and_weak_pair(tmp_path, monkeypatc
     payload["paired_admission"]["position_p95_absolute_improvement_m"] = 0.001
     _write(pair, payload)
     assert MODULE.validate(contract, repo, namespace=MODULE.NAMESPACE)["passed"] is False
+
+
+def test_validator_authorizes_only_exact_mode_0600_token(tmp_path, monkeypatch) -> None:
+    if os.name == "nt":
+        pytest.skip("POSIX token mode is exercised by the WSL preflight")
+    repo, contract = _fixture(tmp_path, monkeypatch)
+    token = tmp_path / "capture.token"
+    token.write_bytes(
+        b"CINEBOTRL_CASE30_CORRECTIVE_CAPTURE_V1_AUTHORIZED_ONCE_20260722\n"
+    )
+    token.chmod(0o600)
+    payload = json.loads(contract.read_text(encoding="utf-8"))
+    payload.update(
+        {
+            "runtime_authorized": True,
+            "gpu_launch_authorized": True,
+            "authorization_token_issued": True,
+            "runtime_authorization_token_sha256": hashlib.sha256(
+                token.read_bytes()
+            ).hexdigest(),
+            "label_capture_authorized": True,
+        }
+    )
+    _write(contract, payload)
+    _run("git", "add", ".", cwd=repo)
+    _run("git", "commit", "-m", "authorize once", cwd=repo)
+    _run("git", "push", cwd=repo)
+    result = MODULE.validate(
+        contract,
+        repo,
+        namespace=MODULE.NAMESPACE,
+        authorization_file=token,
+    )
+    assert result["passed"] is True
+    assert result["runtime_authorized"] is True
+    assert result["label_capture_authorized"] is True
+    token.chmod(0o644)
+    rejected = MODULE.validate(
+        contract,
+        repo,
+        namespace=MODULE.NAMESPACE,
+        authorization_file=token,
+    )
+    assert rejected["passed"] is False
+    assert rejected["runtime_authorized"] is False
 
 
 def test_wrapper_has_guarded_runtime_route_but_no_authorization() -> None:

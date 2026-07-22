@@ -6560,3 +6560,46 @@ and must state whether its candidate was accepted or rejected.
 - Run focused negative tests and the complete authoritative CPU suite, then
   perform another explicit go/no-go review. Do not issue a token, create the
   namespace, or launch Isaac in the implementation commit.
+
+## Round 170: guarded capture runner and finalizer pass CPU review
+
+- Commit `37ee83a` adds the latent one-shot case-30 runner and independent
+  capture finalizer while leaving `AUTHORIZATION_SHA256` empty. The wrapper
+  contains the exact admitted case/plan/profile/perturbation/controller route,
+  a `600 s` timeout, exclusive GPU checks, one-use token consumption before
+  Isaac, heartbeat/log/exit-code preservation, and final GPU-release checking.
+- The finalizer reopens the NPZ through the canonical archive validator. It
+  requires dynamic, thermal, controller, and perturbation passage; exact
+  admission/contract/plan/profile/pair/runtime identities; complete source and
+  execution clocks; sample/heartbeat/telemetry count equality; exactly `20`
+  perturbation-active rows; action margin below `0.95`; initialization
+  exclusion; and all legacy dataset/BC/PPO/training paths closed. Even a pass
+  authorizes only later dataset conversion and remains
+  `valid_for_training=false`.
+- Real `.98` preflight passes every check at clean pushed commit
+  `37ee83a693176a22333cd0543c1020d6380d5545`. Contract SHA-256 is
+  `c04614ed965900b318e416a52c383513a5b81b995dd2465977e5eb8631fa4806`.
+  Explicit `--execute` exits `4` with `runtime_authorization_not_issued`, the
+  namespace remains absent, and no Isaac/GPU process starts.
+- Focused archive/runner/finalizer tests pass `86/86`; the complete
+  authoritative `.98` suite passes `771` tests with ten intentional skips and
+  two warnings in `72.79 s`. A further POSIX regression proves that only the
+  exact mode-`0600` token can turn runtime/capture admission true.
+- Diff review from capture-seam parent `a673ea0` finds no change to playback,
+  controller, plan generation, robot/USD, LQR gains, corrective profile,
+  residual scales, or physical gates. Review decision: **GO** for exactly one
+  separately authorized case-30 corrective capture; **NO-GO** for normalized
+  dataset creation, BC, PPO, validation/holdout cases, or any second capture.
+
+## Next round after Round 170
+
+- In a separate commit, issue exactly one token SHA and update only the wrapper
+  identity plus runtime/GPU/capture authorization fields. Rerun the focused and
+  complete CPU suites, canonical preflight, fresh-namespace check, and exclusive
+  GPU check before creating the external mode-`0600` token.
+- Run the one bounded capture and stop after the finalizer regardless of
+  outcome. Independently hash/reopen the gate, heartbeat, admission, contract,
+  capture, final status, and logs; verify token consumption and GPU release.
+- If the archive is admitted, open only a CPU-reviewed conversion proposal. If
+  it fails, diagnose CPU-only without changing gates or issuing a second token.
+  BC and PPO remain closed in either case.

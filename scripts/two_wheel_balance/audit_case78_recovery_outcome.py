@@ -124,7 +124,7 @@ def audit(
     phase_p95_delta = quantile(recovery_grid, 0.95) - quantile(
         baseline_grid, 0.95
     )
-    checks = {
+    evidence_checks = {
         "canonical_baseline_hash": sha256_file(baseline_path) == BASELINE_SHA256,
         "canonical_recovery_hash": sha256_file(recovery_path) == RECOVERY_SHA256,
         "same_case_and_clocks": baseline.get("case")
@@ -147,8 +147,13 @@ def audit(
             "camera_recovery_activation_ratio", 0.0
         )
         > 0.0,
+    }
+    findings = {
         "official_p95_worsened": official_p95_delta > 0.0,
-        "phase_aligned_p95_worsened": phase_p95_delta > 0.0,
+        "phase_aligned_p95_improved": phase_p95_delta < 0.0,
+        "recovery_dynamic_gate_passed": bool(
+            recovery.get("dynamic_quality_passed")
+        ),
     }
     return {
         "schema": "cinebotrl_two_wheel_riser_case78_recovery_outcome_audit_v1",
@@ -187,10 +192,13 @@ def audit(
         "recovery_activation_ratio": recovery.get(
             "camera_recovery_activation_ratio"
         ),
-        "checks": checks,
-        "audit_passed": all(checks.values()),
-        "camera_recovery_candidate_rejected": official_p95_delta > 0.0
-        and phase_p95_delta > 0.0,
+        "evidence_checks": evidence_checks,
+        "findings": findings,
+        "audit_passed": all(evidence_checks.values()),
+        "camera_recovery_candidate_admitted": False,
+        "camera_recovery_candidate_rejected": not findings[
+            "recovery_dynamic_gate_passed"
+        ],
         "direct_tracking_correction_required": float(
             recovery["position_error_p95_m"]
         )

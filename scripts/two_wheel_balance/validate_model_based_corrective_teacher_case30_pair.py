@@ -8,6 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import stat
 
 
 SCHEMA = "cinebotrl_two_wheel_riser_corrective_teacher_case30_pair_contract_v1"
@@ -128,7 +129,27 @@ def _load_identity_json(rows: dict[str, dict[str, object]], name: str) -> dict[s
     return json.loads(Path(str(row["path"])).read_text(encoding="utf-8"))
 
 
-def validate(contract_path: Path, repo: Path, *, namespace: str) -> dict[str, object]:
+def token_checks(path: Path | None, expected_sha256: object) -> dict[str, bool]:
+    exists = path is not None and path.is_file()
+    mode = stat.S_IMODE(path.stat().st_mode) if exists else None
+    actual_sha = sha256_file(path) if exists else None
+    return {
+        "authorization_file_present": exists,
+        "authorization_mode_0600": mode == 0o600,
+        "authorization_not_symlink": exists and not path.is_symlink(),
+        "authorization_hash_matches": exists
+        and isinstance(expected_sha256, str)
+        and actual_sha == expected_sha256,
+    }
+
+
+def validate(
+    contract_path: Path,
+    repo: Path,
+    *,
+    namespace: str,
+    authorization_file: Path | None = None,
+) -> dict[str, object]:
     repo = repo.resolve()
     contract_path = contract_path.resolve()
     canonical_path = (repo / CONTRACT_RELATIVE_PATH).resolve()
@@ -237,11 +258,12 @@ def validate(contract_path: Path, repo: Path, *, namespace: str) -> dict[str, ob
         == EXPECTED_DYNAMIC_THRESHOLDS,
         "pair_contract_exact": contract.get("paired_experiment_contract")
         == EXPECTED_PAIR_CONTRACT,
-        "cpu_preflight_only": contract.get("cpu_preflight_ready") is True
-        and contract.get("runtime_authorized") is False
-        and contract.get("gpu_launch_authorized") is False,
-        "no_runtime_authorization": "runtime_authorization_token_sha256" not in contract
-        and contract.get("authorization_token_issued") is False,
+        "cpu_preflight_ready": contract.get("cpu_preflight_ready") is True,
+        "runtime_authorization_issued": contract.get("runtime_authorized") is True
+        and contract.get("gpu_launch_authorized") is True
+        and contract.get("authorization_token_issued") is True
+        and contract.get("runtime_authorization_token_sha256")
+        == "fbe18e0ad2be7ded17decce1eaaa3c90e3d0e7fab683b592c52e84b83086e16a",
         "capture_and_training_closed": contract.get("label_capture_authorized") is False
         and contract.get("dataset_creation_authorized") is False
         and contract.get("bc_authorized") is False
@@ -250,7 +272,18 @@ def validate(contract_path: Path, repo: Path, *, namespace: str) -> dict[str, ob
         "holdout_closed": contract.get("holdout_cases") == EXPECTED_HOLDOUT
         and contract.get("holdout_opened") is False,
     }
-    passed = all(checks.values())
+    authorization_checks = token_checks(
+        authorization_file, contract.get("runtime_authorization_token_sha256")
+    )
+    cpu_passed = all(checks.values())
+    runtime_authorized = bool(
+        cpu_passed
+        and authorization_file is not None
+        and all(authorization_checks.values())
+    )
+    passed = cpu_passed and (
+        authorization_file is None or all(authorization_checks.values())
+    )
     return {
         "schema": ADMISSION_SCHEMA,
         "contract": str(contract_path),
@@ -267,9 +300,19 @@ def validate(contract_path: Path, repo: Path, *, namespace: str) -> dict[str, ob
         "corrective_profile_checks": corrective_profile_checks,
         "perturbation_checks": perturbation_checks,
         "checks": checks,
-        "cpu_contract_ready": passed,
-        "runtime_authorized": False,
-        "gpu_launch_authorized": False,
+        "authorization_checks": authorization_checks,
+        "authorization_file": (
+            None if authorization_file is None else str(authorization_file.resolve())
+        ),
+        "authorization_consumed_before_isaac": runtime_authorized,
+        "authorization_sha256": (
+            contract.get("runtime_authorization_token_sha256")
+            if runtime_authorized
+            else None
+        ),
+        "cpu_contract_ready": cpu_passed,
+        "runtime_authorized": runtime_authorized,
+        "gpu_launch_authorized": runtime_authorized,
         "label_capture_authorized": False,
         "dataset_creation_authorized": False,
         "bc_authorized": False,
@@ -285,9 +328,15 @@ def main() -> int:
     parser.add_argument("--contract", type=Path, required=True)
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--namespace", required=True)
+    parser.add_argument("--authorization-file", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    result = validate(args.contract, args.repo_root, namespace=args.namespace)
+    result = validate(
+        args.contract,
+        args.repo_root,
+        namespace=args.namespace,
+        authorization_file=args.authorization_file,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))

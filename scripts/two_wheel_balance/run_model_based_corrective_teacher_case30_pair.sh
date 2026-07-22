@@ -19,7 +19,7 @@ readonly CORRECTIVE_PROFILE="$WIN_ROOT\\scripts\\two_wheel_balance\\model_based_
 readonly GAINS="$WIN_ROOT\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json"
 readonly PLAYBACK="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 readonly FINALIZER="$WIN_ROOT\\scripts\\two_wheel_balance\\summarize_model_based_corrective_teacher_case30_pair.py"
-readonly AUTHORIZATION_SHA256=""
+readonly AUTHORIZATION_SHA256="fbe18e0ad2be7ded17decce1eaaa3c90e3d0e7fab683b592c52e84b83086e16a"
 
 reject() {
   printf '{"reason":"%s","runtime_started":false,"passed":false}\n' "$1" >&2
@@ -76,11 +76,16 @@ wait_gpu_free() {
 
 ADMISSION="$(mktemp)"
 trap 'rm -f "$ADMISSION"' EXIT
-python3 "$VALIDATOR" \
-  --contract "$CONTRACT" \
-  --repo-root "$ROOT" \
-  --namespace "$NAMESPACE" \
-  --output "$ADMISSION" >/dev/null
+VALIDATOR_ARGS=(
+  --contract "$CONTRACT"
+  --repo-root "$ROOT"
+  --namespace "$NAMESPACE"
+  --output "$ADMISSION"
+)
+if [[ "$MODE" == --execute ]]; then
+  VALIDATOR_ARGS+=(--authorization-file "$AUTHORIZATION_FILE")
+fi
+python3 "$VALIDATOR" "${VALIDATOR_ARGS[@]}" >/dev/null
 assert_gpu_free || reject "exclusive_gpu_ownership_failed" 5
 if [[ "$MODE" == --preflight ]]; then
   cat "$ADMISSION"
@@ -97,16 +102,7 @@ fi
 [[ ! -e "$OUTPUT" ]] || reject "namespace_not_fresh" 5
 mkdir -p "$OUTPUT/baseline" "$OUTPUT/candidate" "$OUTPUT/logs"
 cp "$CONTRACT" "$OUTPUT/contract.json"
-python3 - "$ADMISSION" "$OUTPUT/admission.json" "$AUTHORIZATION_SHA256" <<'PY'
-import json, pathlib, sys
-source, target, token_sha = map(pathlib.Path, sys.argv[1:])
-payload = json.loads(source.read_text())
-payload["runtime_authorized"] = True
-payload["gpu_launch_authorized"] = True
-payload["authorization_consumed_before_isaac"] = True
-payload["authorization_sha256"] = str(token_sha)
-target.write_text(json.dumps(payload, indent=2) + "\n")
-PY
+cp "$ADMISSION" "$OUTPUT/admission.json"
 rm -f "$AUTHORIZATION_FILE"
 
 COMMON_ARGS=(

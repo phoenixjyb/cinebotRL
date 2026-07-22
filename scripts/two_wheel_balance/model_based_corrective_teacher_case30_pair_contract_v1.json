@@ -95,13 +95,13 @@
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case30_pair.sh",
-      "sha256": "40c3df6943ee52c6e6c38dda6b883f5eb40e39ea822aa13947e94c0d15f2bc68",
-      "git_blob_sha1": "c6c5b100f268e43ee484b018eeff38cad2b76dfe"
+      "sha256": "e25cb55eeb187b35fe6469ed09ad79ee958bc2db9ba34870d3d23cbbb2e1dbe0",
+      "git_blob_sha1": "b6d815bc53de4e90f90f17f276338c53ce650972"
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case30_pair.py",
-      "sha256": "16d6f18548cf60b7f4d4092f7d87f8799186cb924d7acf95378d32d03116246b",
-      "git_blob_sha1": "6a4d38c7bbc647fb4d5116ff386172f967620bb4"
+      "sha256": "ccc65c53d1da2022e069137f63bc3018fab068606e130e24f379bf0621777c50",
+      "git_blob_sha1": "14e45ced79ce45e48aa0f902d18b8fdb29da5a63"
     },
     "paired_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case30_pair.py",
@@ -112,9 +112,10 @@
   "holdout_cases": [3, 5, 13, 19, 24],
   "holdout_opened": false,
   "cpu_preflight_ready": true,
-  "runtime_authorized": false,
-  "gpu_launch_authorized": false,
-  "authorization_token_issued": false,
+  "runtime_authorized": true,
+  "gpu_launch_authorized": true,
+  "authorization_token_issued": true,
+  "runtime_authorization_token_sha256": "fbe18e0ad2be7ded17decce1eaaa3c90e3d0e7fab683b592c52e84b83086e16a",
   "label_capture_authorized": false,
   "dataset_creation_authorized": false,
   "bc_authorized": false,

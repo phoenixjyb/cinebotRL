@@ -126,9 +126,12 @@ def _fixture_repo(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
         "holdout_cases": MODULE.EXPECTED_HOLDOUT,
         "holdout_opened": False,
         "cpu_preflight_ready": True,
-        "runtime_authorized": False,
-        "gpu_launch_authorized": False,
-        "authorization_token_issued": False,
+        "runtime_authorized": True,
+        "gpu_launch_authorized": True,
+        "authorization_token_issued": True,
+        "runtime_authorization_token_sha256": (
+            "fbe18e0ad2be7ded17decce1eaaa3c90e3d0e7fab683b592c52e84b83086e16a"
+        ),
         "label_capture_authorized": False,
         "dataset_creation_authorized": False,
         "bc_authorized": False,
@@ -151,6 +154,26 @@ def test_validator_accepts_clean_pushed_canonical_contract(tmp_path, monkeypatch
     assert result["passed"] is True
     assert result["runtime_authorized"] is False
     assert result["label_capture_authorized"] is False
+
+
+def test_validator_authorizes_only_exact_mode_0600_token(tmp_path, monkeypatch) -> None:
+    repo, contract = _fixture_repo(tmp_path, monkeypatch)
+    token = tmp_path / "token"
+    token.write_bytes(
+        b"CINEBOTRL_CASE30_CORRECTIVE_PAIR_V1_AUTHORIZED_ONCE_20260722\n"
+    )
+    token.chmod(0o600)
+    result = MODULE.validate(
+        contract, repo, namespace=MODULE.NAMESPACE, authorization_file=token
+    )
+    assert result["passed"] is True
+    assert result["runtime_authorized"] is True
+    token.chmod(0o644)
+    rejected = MODULE.validate(
+        contract, repo, namespace=MODULE.NAMESPACE, authorization_file=token
+    )
+    assert rejected["passed"] is False
+    assert rejected["runtime_authorized"] is False
 
 
 def test_validator_rejects_alternate_contract_path(tmp_path, monkeypatch) -> None:
@@ -188,12 +211,12 @@ def test_wrapper_execute_is_unconditionally_unauthorized() -> None:
         ["bash", str(WRAPPER), "--execute"], capture_output=True, text=True
     )
     assert result.returncode == 4
-    assert "runtime_authorization_not_issued" in result.stderr
+    assert "authorization_file_missing" in result.stderr
 
 
 def test_wrapper_keeps_execution_behind_empty_authorization_gate() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
-    gate_index = source.index('readonly AUTHORIZATION_SHA256=""')
+    gate_index = source.index('readonly AUTHORIZATION_SHA256="fbe18e0a')
     execute_check = source.index('[[ -n "$AUTHORIZATION_SHA256" ]]')
     playback_index = source.index('timeout --signal=TERM --kill-after=30s 600')
     assert gate_index < execute_check < playback_index
@@ -210,11 +233,13 @@ def test_committed_contract_keeps_runtime_and_learning_closed() -> None:
     assert payload["reviewed_parent_commit"] == MODULE.REVIEWED_PARENT
     assert set(payload["identities"]) == MODULE.REQUIRED_IDENTITIES
     assert payload["paired_experiment_contract"] == MODULE.EXPECTED_PAIR_CONTRACT
-    assert "runtime_authorization_token_sha256" not in payload
+    assert payload["runtime_authorized"] is True
+    assert payload["gpu_launch_authorized"] is True
+    assert payload["authorization_token_issued"] is True
+    assert payload["runtime_authorization_token_sha256"] == (
+        "fbe18e0ad2be7ded17decce1eaaa3c90e3d0e7fab683b592c52e84b83086e16a"
+    )
     for field in (
-        "runtime_authorized",
-        "gpu_launch_authorized",
-        "authorization_token_issued",
         "label_capture_authorized",
         "dataset_creation_authorized",
         "bc_authorized",

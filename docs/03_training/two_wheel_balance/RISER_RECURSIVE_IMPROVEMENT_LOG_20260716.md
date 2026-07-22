@@ -6256,3 +6256,59 @@ and must state whether its candidate was accepted or rejected.
 - Start with CPU schema, provenance, leakage, and synthetic label tests. Do not
   authorize Isaac capture, BC, PPO, or the unopened holdout cases until that
   contract proves how a nonzero target improves on the model-based baseline.
+
+## Round 164: define a paired corrective-teacher experiment CPU-only
+
+- Commit `88f6992` adds the pure
+  `model_based_planner_plus_camera_error_corrective_teacher_v1` candidate and
+  the fail-closed
+  `same_seed_paired_dynamic_improvement_before_label_capture_v1` admission
+  contract. No playback/runtime flag or command path is added by this commit.
+- The teacher candidate uses only causal physical-camera position error in the
+  base frame. Longitudinal, lateral-to-yaw, and vertical gains are
+  `[0.20,0.30,0.30]`; deadbands are `[0.01,0.01,0.005] m`; physical residual
+  limits are `[0.045 m/s,0.045 rad/s,0.018 m]`, strictly inside the deployed
+  `[0.05,0.05,0.02]` policy envelope. Slew limits are
+  `[0.10 m/s^2,0.10 rad/s^2,0.04 m/s]`.
+- The first proposed paired experiment is training case 30 under the same plan,
+  seed, physics, clocks, and previously measured deterministic perturbation.
+  The complete model-based planner plus exact zero runs first; the corrective
+  candidate may run only if that baseline passes. Neither rollout may capture
+  labels or create a dataset.
+- Corrective-target admission requires both rollouts to pass unchanged dynamic
+  gates, a nonzero action below `0.95` normalized magnitude, position-p95
+  improvement of at least `0.003 m` and `2%`, and bounded position-max,
+  attitude, pitch, riser, and saturation regressions. Passing the pair remains
+  diagnostic and does not itself authorize capture or training.
+- The focused local suite passes `43/43`. The complete authoritative `.98`
+  suite passes `731` tests with nine intentional skips in `58.58 s`. The
+  canonical CPU proposal is
+  `20260722_model_based_corrective_teacher_case30_proposal_v1_cpu/proposal.json`,
+  SHA-256
+  `51770e682ecaaa0a47495301a51e4304aa7dbc855db601c78cf8cb1b806b9a24`.
+- The proposal binds case-8 preservation SHA-256
+  `24922a7a08e9262b6159732aac5dbee6689ffe13a46b0bb95d29182437c66d9d`,
+  case-78 preservation SHA-256
+  `b0b025d1d40da50a1a9273fb2ff5ba32966b4e1970c539ffbea24d753bc7bea3`,
+  case-30 perturbation SHA-256
+  `fc08b890ec0dfee0a1f0d05505afd806f68c54ad564afc99fe5e73533e3ebfb6`,
+  and split-summary SHA-256
+  `2b7b177f481fdc632aca2134d9eea69cec66814581a5e39d9c6a099e3d8bcbfb6`.
+  Case 30 is in train; cases 8/78 remain validation; holdout
+  `[3,5,13,19,24]` is unchanged. Runtime, namespace, token, label capture,
+  dataset, BC, PPO, training, and valid-for-training flags remain false.
+
+## Next round after Round 164
+
+- Add a separately reviewed, disabled-by-default runtime seam for this exact
+  corrective candidate and paired telemetry. The baseline and candidate must
+  expose the same model-planner command, corrective delta, final command,
+  amplitude/slew-limit counts, plan/seed/physics identities, and independent
+  dynamic outcomes.
+- Keep the runtime authorization hash empty in that implementation commit and
+  run the authoritative CPU suite plus negative override tests. Do not create a
+  namespace or issue a token until a separate go/no-go review.
+- If a later paired canary fails to improve case 30, reject this teacher rather
+  than relaxing gates or treating its commands as labels. Only an admitted
+  paired improvement can open a fresh, training-split corrective-label capture
+  proposal; BC and PPO remain closed meanwhile.

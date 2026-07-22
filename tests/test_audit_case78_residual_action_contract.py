@@ -1,4 +1,5 @@
 import hashlib
+import json
 from pathlib import Path
 
 import numpy as np
@@ -95,6 +96,7 @@ def _inputs() -> tuple[dict, dict, dict, dict, dict]:
 
 def test_retains_teacher_scale_but_requires_case78_series() -> None:
     report = build_report(*_inputs())
+    json.dumps(report)
     assert report["teacher40_action_contract_retained"] is True
     assert report["candidate_scale_normalized_abs_max"][0] < 1.0
     assert report["case78_runtime_scale_overflow_channels"] == [True, False, False]

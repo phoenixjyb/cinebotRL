@@ -189,10 +189,12 @@ def build_report(
         "case78_completed_separate_clocks": case78.get("source_duration_s", 0.0) > 0.0
         and case78.get("execution_duration_s", 0.0)
         > case78.get("source_duration_s", 0.0)
-        and np.isclose(
-            case78.get("completed_phase_time_s", -1.0),
-            case78.get("execution_duration_s", 0.0),
-            atol=1e-9,
+        and bool(
+            np.isclose(
+                case78.get("completed_phase_time_s", -1.0),
+                case78.get("execution_duration_s", 0.0),
+                atol=1e-9,
+            )
         ),
         "case78_label_was_observational_only": case78.get(
             "raw_residual_label_applied_to_commands"
@@ -207,11 +209,13 @@ def build_report(
         and gate.get("residual_label_admission_passed") is False
         and case78.get("residual_label_envelope_passed") is False
         and case78.get("residual_label_admission_passed") is False,
-        "case78_runtime_normalization_reconstructs": np.allclose(
-            case78_raw_max / runtime_scales,
-            case78_normalized,
-            atol=2e-9,
-            rtol=0.0,
+        "case78_runtime_normalization_reconstructs": bool(
+            np.allclose(
+                case78_raw_max / runtime_scales,
+                case78_normalized,
+                atol=2e-9,
+                rtol=0.0,
+            )
         ),
         "teacher40_summary_is_valid_and_immutable": summary.get("passed") is True
         and summary.get("valid_for_bc_initialization") is True
@@ -225,24 +229,30 @@ def build_report(
         )
         is False
         and summary.get("source_action_labels_used") is False
-        and np.all(summary_clip_ratio == 0.0)
-        and np.all(summary_action_max < 1.0),
+        and bool(np.all(summary_clip_ratio == 0.0))
+        and bool(np.all(summary_action_max < 1.0)),
         "corpus_audit_freezes_same_scale": corpus_audit.get("passed") is True
         and corpus_audit.get("valid_for_bc_initialization") is True
         and corpus_audit.get("action_scale_frozen") is True
         and corpus_audit.get("case_count") == 41
         and corpus_audit.get("row_count") == 406837
-        and np.allclose(
-            vector3(corpus_audit.get("frozen_action_scales"), "audit scales"),
-            frozen_scales,
-            atol=1e-12,
-            rtol=0.0,
+        and bool(
+            np.allclose(
+                vector3(
+                    corpus_audit.get("frozen_action_scales"), "audit scales"
+                ),
+                frozen_scales,
+                atol=1e-12,
+                rtol=0.0,
+            )
         ),
-        "summary_normalization_reconstructs_corpus_max": np.allclose(
-            summary_action_max * frozen_scales,
-            corpus_raw_max,
-            atol=2e-8,
-            rtol=0.0,
+        "summary_normalization_reconstructs_corpus_max": bool(
+            np.allclose(
+                summary_action_max * frozen_scales,
+                corpus_raw_max,
+                atol=2e-8,
+                rtol=0.0,
+            )
         ),
         "development_distribution_preserves_holdout": distribution.get(
             "skipped_holdout_cases"

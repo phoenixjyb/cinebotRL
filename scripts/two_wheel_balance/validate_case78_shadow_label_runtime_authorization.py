@@ -33,6 +33,7 @@ except ImportError:
 
 SCHEMA = "cinebotrl_two_wheel_riser_case78_shadow_label_runtime_authorization_v1"
 NAMESPACE = EXPECTED_NAMESPACE
+RUNTIME_IMPLEMENTATION_COMMIT = "54d171247ab25153b07e9dd286a4ed3db7d25bcc"
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/case78_shadow_label_runtime_authorization_v1.json"
 )
@@ -121,6 +122,19 @@ def validate(
             check=False,
         ).returncode
         == 0,
+        "runtime_implementation_commit": contract.get(
+            "runtime_implementation_commit"
+        )
+        == RUNTIME_IMPLEMENTATION_COMMIT,
+        "runtime_implementation_commit_is_ancestor": git(
+            repo,
+            "merge-base",
+            "--is-ancestor",
+            RUNTIME_IMPLEMENTATION_COMMIT,
+            head,
+            check=False,
+        ).returncode
+        == 0,
         "cpu_lineage_preserved": cpu_contract.get("reviewed_parent_commit")
         == EXPECTED_REVIEWED_PARENT
         and cpu_contract.get("implementation_commit") == EXPECTED_IMPLEMENTATION
@@ -177,6 +191,7 @@ def validate(
         "case": 78,
         "current_split": "validation",
         "namespace": namespace,
+        "runtime_implementation_commit": RUNTIME_IMPLEMENTATION_COMMIT,
         "identities": rows,
         "checks": checks,
         "authorization_checks": authorization_checks,

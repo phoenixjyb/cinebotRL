@@ -43,3 +43,6 @@ def test_shadow_runtime_identity_scope_is_exact() -> None:
     assert module.NAMESPACE == (
         "20260722_case78_shadow_label_measurement_v1_exclusive"
     )
+    assert module.RUNTIME_IMPLEMENTATION_COMMIT == (
+        "54d171247ab25153b07e9dd286a4ed3db7d25bcc"
+    )

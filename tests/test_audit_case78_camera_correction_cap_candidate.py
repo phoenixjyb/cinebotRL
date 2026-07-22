@@ -60,3 +60,22 @@ def test_projection_rejects_non_increasing_or_nonfinite_cap(candidate: float) ->
             [trace_item(lever_error_x=0.20, position_error_x=0.20)],
             candidate_cap_m=candidate,
         )
+
+
+def test_learning_output_contract_requires_all_null() -> None:
+    absent = {
+        "executed_residual_dataset": None,
+        "executed_policy_trace": None,
+        "executed_raw_teacher_capture": None,
+        "executed_shadow_teacher_trace": None,
+    }
+    assert module.learning_outputs_absent(absent) is True
+    assert module.learning_outputs_absent({}) is False
+    assert (
+        module.learning_outputs_absent({"executed_policy_trace": "trace.npz"})
+        is False
+    )
+    assert (
+        module.learning_outputs_absent({"executed_residual_dataset": False})
+        is False
+    )

@@ -126,6 +126,18 @@ def failed_checks(result: dict[str, object]) -> list[str]:
     )
 
 
+def learning_outputs_absent(result: dict[str, object]) -> bool:
+    return all(
+        name in result and result[name] is None
+        for name in (
+            "executed_residual_dataset",
+            "executed_policy_trace",
+            "executed_raw_teacher_capture",
+            "executed_shadow_teacher_trace",
+        )
+    )
+
+
 def audit(baseline_path: Path, recovery_path: Path) -> dict[str, object]:
     _, baseline = load_result(baseline_path)
     _, recovery = load_result(recovery_path)
@@ -164,10 +176,7 @@ def audit(baseline_path: Path, recovery_path: Path) -> dict[str, object]:
             for projection in (baseline_projection, recovery_projection)
         ),
         "learning_outputs_absent": all(
-            result.get("executed_residual_dataset") is False
-            and result.get("executed_policy_trace") is False
-            and result.get("executed_raw_teacher_capture") is False
-            for result in (baseline, recovery)
+            learning_outputs_absent(result) for result in (baseline, recovery)
         ),
     }
     candidate_checks = {

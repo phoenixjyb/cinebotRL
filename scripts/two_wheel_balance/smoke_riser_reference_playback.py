@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import math
 import os
@@ -36,6 +37,10 @@ from rl_platform.tasks.two_wheel_balance.riser_corrective_teacher import (
     CorrectiveTeacherTelemetry,
     build_corrective_teacher_action,
     load_corrective_teacher_profile,
+)
+from rl_platform.tasks.two_wheel_balance.riser_corrective_capture import (
+    load_capture_admission,
+    save_corrective_capture,
 )
 
 from isaaclab.app import AppLauncher
@@ -191,6 +196,20 @@ parser.add_argument(
     ),
 )
 parser.add_argument(
+    "--corrective-teacher-capture-dir",
+    type=Path,
+    help=(
+        "Write one admitted case-30 corrective-label archive. Requires a "
+        "separate hash-bound runtime admission and never creates a normalized "
+        "training dataset."
+    ),
+)
+parser.add_argument(
+    "--corrective-teacher-capture-admission",
+    type=Path,
+    help="Runtime admission paired with --corrective-teacher-capture-dir.",
+)
+parser.add_argument(
     "--residual-policy",
     type=Path,
     help="Optional gated TorchScript high-level residual policy.",
@@ -265,6 +284,41 @@ if args.corrective_teacher_profile is not None:
             "corrective teacher requires model-based zero-policy mode without "
             "a TorchScript policy"
         )
+corrective_capture_admission = None
+if (
+    args.corrective_teacher_capture_dir is not None
+    or args.corrective_teacher_capture_admission is not None
+):
+    if (
+        args.corrective_teacher_capture_dir is None
+        or args.corrective_teacher_capture_admission is None
+    ):
+        parser.error("corrective capture directory and admission are required together")
+    if corrective_teacher_config is None or corrective_teacher_profile_identity is None:
+        parser.error("corrective capture requires the reviewed corrective profile")
+    try:
+        corrective_capture_admission = load_capture_admission(
+            args.corrective_teacher_capture_admission
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        parser.error(str(exc))
+    if corrective_capture_admission["case"] != corrective_teacher_case:
+        parser.error("corrective capture admission case mismatch")
+    if (
+        corrective_capture_admission["corrective_profile_sha256"]
+        != corrective_teacher_profile_identity["sha256"]
+    ):
+        parser.error("corrective capture profile identity mismatch")
+    if any(
+        path is not None
+        for path in (
+            args.dataset_dir,
+            args.raw_teacher_dir,
+            args.policy_trace_dir,
+            args.shadow_teacher_trace_dir,
+        )
+    ):
+        parser.error("corrective capture is exclusive with every legacy capture path")
 if args.policy_command_base == "model_based_planner":
     if args.residual_policy is None and not args.zero_policy_action:
         parser.error("model-based policy command base requires learned or zero policy mode")
@@ -316,6 +370,11 @@ if args.deterministic_wrench_profile is not None:
         and args.raw_teacher_dir is None
         and args.policy_trace_dir is None
     )
+    corrective_teacher_capture = (
+        corrective_teacher_measurement
+        and corrective_capture_admission is not None
+        and args.corrective_teacher_capture_dir is not None
+    )
     model_based_zero_measurement = (
         corrective_teacher_config is None
         and args.policy_command_base == "model_based_planner"
@@ -329,6 +388,7 @@ if args.deterministic_wrench_profile is not None:
     if not (
         legacy_shadow_measurement
         or corrective_teacher_measurement
+        or corrective_teacher_capture
         or model_based_zero_measurement
     ):
         parser.error(
@@ -663,6 +723,9 @@ def evaluate_case(
     wrench_profile: DeterministicWrenchPulse | None,
     runtime_heartbeat: Path | None,
     runtime_heartbeat_interval_steps: int,
+    corrective_capture_dir: Path | None,
+    corrective_capture_admission: dict[str, object] | None,
+    plan_sha256: str,
 ) -> dict[str, object]:
     _, proxy_ids, riser_id = initialize_case(env, plan)
     unwrapped = env.unwrapped
@@ -814,6 +877,17 @@ def evaluate_case(
     shadow_teacher_raw_commands = []
     shadow_teacher_normalized_actions = []
     shadow_teacher_high_level_commands = []
+    corrective_capture_observations = []
+    corrective_capture_model_commands = []
+    corrective_capture_residual_commands = []
+    corrective_capture_normalized_actions = []
+    corrective_capture_final_commands = []
+    corrective_capture_elapsed_time = []
+    corrective_capture_execution_time = []
+    corrective_capture_source_time = []
+    corrective_capture_amplitude_limited = []
+    corrective_capture_slew_limited = []
+    corrective_capture_perturbation_active = []
     previous_residual_action = np.zeros(3, dtype=np.float32)
     previous_corrective_teacher_residual = np.zeros(3, dtype=np.float64)
     corrective_teacher_telemetry = CorrectiveTeacherTelemetry()
@@ -1212,6 +1286,7 @@ def evaluate_case(
             ),
             lookahead_feedforward_v_wz_riser=lookahead_feedforward,
         )
+        corrective_output = None
         if residual_policy is None and not zero_policy_action:
             applied_residual_action = (
                 teacher_residual_action
@@ -1422,6 +1497,44 @@ def evaluate_case(
             step=step,
             phase_time_s=phase_time_s,
         )
+        if corrective_capture_dir is not None:
+            if corrective_output is None or corrective_capture_admission is None:
+                raise RuntimeError("corrective capture lost its admitted teacher output")
+            model_command = np.array(
+                [
+                    model_based_vx_ref,
+                    model_based_wz_ref,
+                    model_based_riser_target,
+                ],
+                dtype=np.float64,
+            )
+            corrective_capture_observations.append(executed_observation.copy())
+            corrective_capture_model_commands.append(model_command)
+            corrective_capture_residual_commands.append(
+                corrective_output.applied_residual.copy()
+            )
+            corrective_capture_normalized_actions.append(
+                corrective_output.normalized_action.copy()
+            )
+            corrective_capture_final_commands.append(
+                np.array(
+                    [vx_ref, wz_ref, commanded_riser_target], dtype=np.float64
+                )
+            )
+            corrective_capture_elapsed_time.append(elapsed_s)
+            corrective_capture_execution_time.append(phase_time_s)
+            corrective_capture_source_time.append(
+                float(np.interp(phase_time_s, plan.time_s, plan.source_time_s))
+            )
+            corrective_capture_amplitude_limited.append(
+                corrective_output.amplitude_limited.copy()
+            )
+            corrective_capture_slew_limited.append(
+                corrective_output.slew_limited.copy()
+            )
+            corrective_capture_perturbation_active.append(
+                abs(perturbation_force_body_x_n) > 1e-12
+            )
         if wrench_profile is not None:
             set_base_longitudinal_wrench(
                 unwrapped,
@@ -2085,6 +2198,69 @@ def evaluate_case(
                 ),
             },
         )
+    corrective_capture_path = None
+    if corrective_capture_dir is not None and case_admission_passed:
+        if corrective_capture_admission is None:
+            raise RuntimeError("corrective capture admission disappeared")
+        corrective_capture_path = (
+            corrective_capture_dir
+            / f"case_{plan.case:04d}_corrective_teacher_capture_v1.npz"
+        )
+        count = len(corrective_capture_observations)
+        save_corrective_capture(
+            corrective_capture_path,
+            {
+                "observations": np.asarray(
+                    corrective_capture_observations, dtype=np.float32
+                ),
+                "model_based_commands": np.asarray(
+                    corrective_capture_model_commands, dtype=np.float32
+                ),
+                "corrective_residual_commands": np.asarray(
+                    corrective_capture_residual_commands, dtype=np.float32
+                ),
+                "corrective_normalized_actions": np.asarray(
+                    corrective_capture_normalized_actions, dtype=np.float32
+                ),
+                "final_high_level_commands": np.asarray(
+                    corrective_capture_final_commands, dtype=np.float32
+                ),
+                "case_ids": np.full(count, plan.case, dtype=np.int16),
+                "elapsed_time_s": np.asarray(
+                    corrective_capture_elapsed_time, dtype=np.float64
+                ),
+                "execution_time_s": np.asarray(
+                    corrective_capture_execution_time, dtype=np.float64
+                ),
+                "source_time_s": np.asarray(
+                    corrective_capture_source_time, dtype=np.float64
+                ),
+                "initialization_mask": np.zeros(count, dtype=bool),
+                "amplitude_limited": np.asarray(
+                    corrective_capture_amplitude_limited, dtype=bool
+                ),
+                "slew_limited": np.asarray(
+                    corrective_capture_slew_limited, dtype=bool
+                ),
+                "perturbation_active": np.asarray(
+                    corrective_capture_perturbation_active, dtype=bool
+                ),
+                "sample_plan_sha256": np.full(count, plan_sha256),
+                "sample_runtime_commit": np.full(
+                    count, corrective_capture_admission["runtime_commit"]
+                ),
+            },
+            source_duration_s=source_duration_s,
+            execution_duration_s=execution_duration_s,
+            plan_sha256=plan_sha256,
+            runtime_commit=str(corrective_capture_admission["runtime_commit"]),
+            corrective_profile_sha256=str(
+                corrective_capture_admission["corrective_profile_sha256"]
+            ),
+            paired_final_status_sha256=str(
+                corrective_capture_admission["paired_final_status_sha256"]
+            ),
+        )
     policy_trace_path = None
     if policy_trace_dir is not None:
         policy_trace_path = (
@@ -2388,7 +2564,7 @@ def evaluate_case(
         ).tolist(),
         "corrective_teacher_telemetry": corrective_teacher_telemetry_summary,
         "corrective_teacher_profile": corrective_teacher_profile_identity,
-        "corrective_teacher_labels_captured": False,
+        "corrective_teacher_labels_captured": corrective_capture_path is not None,
         "raw_residual_command_abs_max": np.max(
             np.abs(raw_residual_values), axis=0
         ).tolist(),
@@ -2433,6 +2609,11 @@ def evaluate_case(
             None
             if shadow_teacher_trace_path is None
             else str(shadow_teacher_trace_path.resolve())
+        ),
+        "executed_corrective_teacher_capture": (
+            None
+            if corrective_capture_path is None
+            else str(corrective_capture_path.resolve())
         ),
         "passed": case_admission_passed,
     }
@@ -2488,6 +2669,21 @@ def main() -> int:
     }
     if any(plan.case != case for case, plan in plans.items()):
         raise ValueError("playback case metadata mismatch")
+    plan_identities = {
+        case: hashlib.sha256(
+            plan_path(args.plan_dir, args.plan_filename_template, case).read_bytes()
+        ).hexdigest()
+        for case in cases
+    }
+    if corrective_capture_admission is not None:
+        capture_case = int(corrective_capture_admission["case"])
+        if plans[capture_case].source_time_s is None:
+            raise ValueError("corrective capture requires authoritative source time")
+        if (
+            plan_identities[capture_case]
+            != corrective_capture_admission["plan_sha256"]
+        ):
+            raise ValueError("corrective capture plan identity mismatch")
     if deterministic_wrench_profile is not None and not (
         deterministic_wrench_profile.start_phase_time_s
         < float(plans[deterministic_wrench_profile.case].time_s[-1])
@@ -2609,6 +2805,9 @@ def main() -> int:
             deterministic_wrench_profile,
             args.runtime_heartbeat,
             args.runtime_heartbeat_interval_steps,
+            args.corrective_teacher_capture_dir,
+            corrective_capture_admission,
+            plan_identities[case],
         )
         for case in cases
     ]
@@ -2762,7 +2961,17 @@ def main() -> int:
         ),
         "corrective_teacher_enabled": corrective_teacher_config is not None,
         "corrective_teacher_profile": corrective_teacher_profile_identity,
-        "corrective_teacher_label_capture_authorized": False,
+        "corrective_teacher_label_capture_authorized": (
+            corrective_capture_admission is not None
+        ),
+        "corrective_teacher_capture_started": (
+            args.corrective_teacher_capture_dir is not None
+        ),
+        "corrective_teacher_capture_admission": (
+            None
+            if corrective_capture_admission is None
+            else str(args.corrective_teacher_capture_admission.resolve())
+        ),
         "residual_policy": (
             None if args.residual_policy is None else str(args.residual_policy.resolve())
         ),
@@ -2866,6 +3075,12 @@ def write_runtime_failure(exc: Exception) -> None:
         ),
         "shadow_teacher_labels_applied": False,
         "shadow_teacher_labels_admitted_for_training": False,
+        "corrective_teacher_capture_started": (
+            args.corrective_teacher_capture_dir is not None
+        ),
+        "corrective_teacher_label_capture_authorized": (
+            corrective_capture_admission is not None
+        ),
         "dagger_authorized": False,
         "deterministic_wrench_perturbation_enabled": (
             deterministic_wrench_profile is not None

@@ -6879,3 +6879,43 @@ and must state whether its candidate was accepted or rejected.
   cases `[3,5,13,19,24]` closed.
 - Keep BC and PPO disabled until the merged model-based dataset and action
   semantics are explicitly admitted.
+
+## Round 176: case-30 effective-label conversion passes CPU-only
+
+- Local and authoritative `.98` preflights both reopened the sealed capture
+  and final status, reported `11,411` rows, and bound source SHA-256 values
+  `ec0f13030ce755c38e31c138507537f461126312b0c268832bc6bf9a40e4e8cb`
+  and
+  `e0b9ec3186e677c34289a85e72e4bc91e3cd3d8ce5cfdea16d74e1c0be0554b2`.
+  Focused authoritative capture/converter tests passed `24/24` with two
+  config warnings.
+- Exactly one CPU conversion wrote
+  `case_0030_model_based_corrective_case_dataset_v1.npz` in namespace
+  `20260723_model_based_corrective_case30_conversion_v1_cpu`. No Isaac, GPU,
+  capture, merge, holdout, BC, PPO, or training process ran.
+- Candidate labels are byte-for-byte equal to
+  `effective_corrective_normalized_actions`; requested actions are preserved
+  only as audit data. Effective action maxima remain
+  `[0.394906,0.657500,0.267339]`, below the unchanged reserved margin.
+- The converter rebuilt the three previous-action observation channels from
+  the preceding effective label. Independent audit found exact recurrence,
+  `841` changed history rows, maximum history correction `0.900000`, and exact
+  preservation of all other observation channels, clocks, case IDs, and the
+  clipping mask `[200,308,333]`.
+- Final-command and requested/effective-delta reconstruction errors are bounded
+  by `1.1921e-07` and `3.0994e-09`. Output SHA-256 is
+  `191a44147bc44038a0645bf48a63609463bf280d97b37ddaf884200bd8b52447`.
+- The artifact is `valid_for_case_merge=true` only. It remains
+  `merged_dataset_created=false`, `valid_for_training=false`, with BC, PPO,
+  and training unauthorized.
+
+## Next round after Round 176
+
+- Do not train one case. Design and test a fail-closed multi-case capture and
+  merge contract using the same model-based command semantics, effective-only
+  labels, `[0.05,0.05,0.02]` scales, and case-disjoint splits.
+- Before another GPU capture, perform CPU-only eligibility analysis over the
+  accepted train cases to select the smallest diverse corrective-teacher
+  tranche. Keep holdout cases `[3,5,13,19,24]` unopened.
+- Require every additional capture to pass its own dynamic gate and v2 archive
+  audit before conversion; do not infer admission from case 30.

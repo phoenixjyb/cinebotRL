@@ -6118,3 +6118,44 @@ and must state whether its candidate was accepted or rejected.
 - Keep cases 16/22/32, residual target capture, BC retraining, PPO, holdout
   access, and wider trajectory expansion closed until the zero-residual
   preservation sequence passes.
+
+## Round 161: admit the case-8 zero-residual preservation canary CPU-only
+
+- Commit `28709a2` adds the canonical CPU-only case-8 preservation contract and
+  validator. The sealed contract SHA-256 is
+  `47d4de888b0eeba0dbebad066f7ef106f3042fe9d63bf174f551dfddfbc1185b`;
+  the `.98` admission SHA-256 is
+  `001a27c14305d3c04f502a203da7f8474c451a842f11b3f0848d1b8da2f4a0de`.
+  Every pinned plan, teacher, robot, LQR, planner, runtime, checkpoint, and
+  committed-blob identity passes at runtime commit `28709a2`.
+- The two admitted command paths are model-based planner plus explicit zero
+  policy action and the same model-based planner plus the exact-zero
+  TorchScript checkpoint. Both use fixed scales `[0.05,0.05,0.02]`; the old
+  phase-feedforward planner-imitation path and `[0.35,0.40,0.10]` scales are
+  explicitly rejected.
+- Commit `e1f02ea` adds a fail-closed finalizer. It requires both rollouts to
+  complete case 8, pass unchanged physical gates, report zero residual action,
+  create no dataset, and remain within declared metric-delta tolerances. It
+  does not itself authorize case 78, capture, training, PPO, or holdout use.
+- Commit `140cc78` adds the complete exclusive wrapper with the runtime
+  authorization hash intentionally empty. `--execute` therefore exits before
+  environment inspection, namespace creation, or Isaac. The full authoritative
+  `.98` suite passes `701` tests with nine intentional skips in `64.57 s`.
+- Read-only preflight passes at `140cc78`; HEAD equals upstream, tracked files
+  are clean, every pinned hash matches, GPU ownership is empty, and the fresh
+  namespace is
+  `20260722_model_based_zero_residual_case8_canary_v1_exclusive`. No runtime
+  token, namespace, Isaac process, dataset, BC, PPO, or holdout artifact exists.
+
+## Next round after Round 161
+
+- Review and issue exactly one runtime authorization in a separate commit,
+  create one mode-0600 token, and rerun the same preflight immediately before
+  execution. Consume the token before the first Isaac process.
+- Execute explicit zero first. Only if its result exists and GPU ownership is
+  released may the exact-zero TorchScript rollout start. Finalize from the two
+  sealed JSON outputs and stop on any physical, completion, zero-action,
+  metric-preservation, identity, or dataset-absence failure.
+- Do not start case 78, residual capture, BC, PPO, or holdout evaluation from a
+  case-8 failure. A case-8 pass is only the prerequisite for a separately
+  bounded case-78 preservation contract.

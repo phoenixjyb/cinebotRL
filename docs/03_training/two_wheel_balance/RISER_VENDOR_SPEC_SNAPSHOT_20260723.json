@@ -1,0 +1,55 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_vendor_spec_snapshot_v1",
+  "verified_date": "2026-07-23",
+  "leadshine_motor": {
+    "model": "ELVM6040V48EH-M17-HD",
+    "source": "https://www.leadshine.com/product-detail/ELVM6040V48EH-M17-HD.html",
+    "rated_voltage_vdc": 48.0,
+    "rated_power_w": 400.0,
+    "rated_torque_nm": 1.27,
+    "peak_torque_nm": 3.81,
+    "rated_speed_rpm": 3000.0,
+    "peak_speed_rpm": 4000.0,
+    "rated_current_a": 10.0,
+    "peak_current_a": 31.0,
+    "brake": true,
+    "encoder": "17_bit_magnetic_multi_turn_absolute",
+    "protection": "IP65"
+  },
+  "leadshine_drive": {
+    "model": "ELD2-CAN7010B",
+    "source": "https://www.leadshine.com/network-detail/fieldbus/CANopen/ELD2-CAN7010B.html",
+    "main_power_voltage_vdc": [24.0, 70.0],
+    "rated_current_arms": 10.0,
+    "peak_current_apeak": 42.5,
+    "direct_brake_output_vdc": 24.0,
+    "direct_brake_output_a": 0.5,
+    "external_brake_resistor_required_for_regeneration": true,
+    "published_safe_function": false,
+    "protocol": "CANopen_CiA301_CiA402"
+  },
+  "igus_axis": {
+    "models": ["ZLW-1040 Standard 02", "ZLW-1080 Standard"],
+    "source": "https://www.igus.com/info/linear-guides-toothed-belt-axis-technical-data",
+    "transmission_mm_per_rev": 70.0,
+    "maximum_standard_stroke_m": 2.0,
+    "maximum_radial_load_n": 300.0,
+    "maximum_speed_mps_at_60_percent_duty": 5.0,
+    "published_load_test_orientation": "horizontal",
+    "vertical_mobile_robot_application_approved": false
+  },
+  "sitema_safety_principle": {
+    "source": "https://www.sitema.com/gfx_content/pdf/en/Safety_Catchers/SITEMA-TI-A10-EN.pdf",
+    "holding_force_minimum_multiple_of_admissible_load": 2.0,
+    "holding_force_maximum_multiple_of_admissible_load": 3.5,
+    "fail_safe_on_power_pressure_or_emergency_stop": true,
+    "specific_product_selected": false
+  },
+  "snapshot_limitations": [
+    "catalog values do not approve vertical mobile-robot duty",
+    "phase current is not battery branch current",
+    "holding brake is not a dynamic emergency brake",
+    "gearbox and telescoping mechanism remain unselected",
+    "all values require supplier confirmation before production procurement"
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_hardware_procurement_candidate_v1",
+  "checks": {
+    "vendor_snapshot_current": true,
+    "motor_rating_self_consistent": true,
+    "drive_continuous_current_matches_motor": true,
+    "drive_peak_current_covers_motor": true,
+    "drive_requires_external_regen_design": true,
+    "drive_has_no_published_safe_function": true,
+    "axis_matches_70mm_transmission": true,
+    "axis_catalog_speed_exceeds_target": true,
+    "axis_catalog_stroke_covers_recommendation": true,
+    "axis_vertical_application_not_yet_approved": true,
+    "hardware_envelope_passed": true,
+    "three_to_one_8kg_normal_passes": true,
+    "three_to_one_8kg_emergency_passes_nominal_rating": true,
+    "emergency_margin_below_production_target": true,
+    "safety_principle_is_fail_safe": true,
+    "specific_safety_catcher_not_selected": true
+  },
+  "calculated": {
+    "motor_mechanical_power_from_rating_w": 398.98226700590374,
+    "rated_linear_force_n": 292.3970042486123,
+    "normal_8kg_motor_torque_nm": 0.99446709704578,
+    "emergency_8kg_motor_torque_nm": 1.2029507651895495,
+    "emergency_8kg_rated_torque_margin_ratio": 1.0557373059236432,
+    "production_emergency_margin_requirement": 1.15,
+    "maximum_moving_mass_at_production_margin_kg": 7.233567338420348,
+    "motor_speed_at_1mps_rpm": 2571.4285714285716,
+    "full_speed_stopping_distance_m": 0.12000000000000001,
+    "recommended_mechanical_stroke_m": 1.5
+  },
+  "recommendation": {
+    "engineering_sample": "one Leadshine 400W brake motor plus ELD2-CAN7010B for an instrumented non-riding bench prototype",
+    "prototype_mechanism": "70mm_per_rev_guided_belt_axis_with_3_to_1_reduction",
+    "production_default_until_measurement": "750W_class_or_resized_drive_unless_measured_mass_counterbalance_friction_and_regeneration_prove_at_least_15_percent_emergency_margin",
+    "fixed_vs_telescoping": "fixed_1p5m_mechanical_stroke_if_collapsed_height_allows; otherwise supplier-qualified_two_stage_synchronized_telescoping_mast",
+    "safety": "external_regen_path_plus_independent_anti_fall_hard_limits_absorbing_end_stops_and_safety_rated_power_removal",
+    "battery_branch": "do_not_size_fuse_or_cable from motor phase current; use drive input-current and regenerative-energy measurements"
+  },
+  "required_before_production_procurement": [
+    "measure complete moving mass including cables and carriage",
+    "measure eccentric camera and gimbal moments",
+    "select and verify gearbox continuous input speed braking torque and backlash",
+    "obtain supplier vertical-axis duty life and tooth-jump approval",
+    "measure 1mps duty cycle temperature and carriage force",
+    "select external regenerative resistor or battery absorption path",
+    "select independent anti-fall device and safety-rated stop architecture",
+    "verify 1p5m mechanical stroke or implement the position-dependent governor"
+  ],
+  "single_engineering_sample_purchase_recommended": true,
+  "valid_for_production_procurement": false,
+  "valid_for_hardware_transfer": false,
+  "valid_for_training": false,
+  "gpu_work_started": false,
+  "passed": true,
+  "inputs": {
+    "vendor_snapshot": {
+      "path": "docs/03_training/two_wheel_balance/RISER_VENDOR_SPEC_SNAPSHOT_20260723.json",
+      "sha256": "9e8c9b7675ea0ce338f703646f5a0478614a688a3d1f7123b63ecf82e798e54c"
+    },
+    "hardware_envelope_script": {
+      "path": "scripts/two_wheel_balance/calculate_riser_hardware_envelope.py",
+      "sha256": "f57369e72bb9e20ae326267c75baad81a97ade8339a26e7e1543143996317df9"
+    }
+  }
+}

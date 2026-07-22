@@ -7083,3 +7083,41 @@ and must state whether its candidate was accepted or rejected.
 - If the pair passes measurable-improvement and no-regression gates, separately
   review one corrective capture. If it rejects, preserve the pair and diagnose
   case 23 rather than changing thresholds or escalating the pulse.
+
+## Round 181: riser engineering-sample procurement boundary sealed CPU-only
+
+- Current official vendor specifications are frozen in
+  `RISER_VENDOR_SPEC_SNAPSHOT_20260723.json`; the snapshot covers the Leadshine
+  400 W brake motor, ELD2 CANopen drive, igus 70 mm/rev belt-axis catalog data,
+  and the generic SITEMA fail-safe catcher principle. Catalog data is not
+  treated as vertical mobile-robot approval.
+- A deterministic procurement audit recomputes `292.397 N` rated linear force,
+  `398.982 W` mechanical rated power, `2571.43 rpm` at `1 m/s`, and the existing
+  `1.5 m` mechanical-stroke recommendation.
+- The 8 kg emergency case needs `1.20295 N m` versus the motor's `1.27 N m`, so
+  the nominal margin is only `1.05574`. A new fail-closed production threshold
+  of `1.15` permits only about `7.2336 kg` under the same assumptions.
+- Decision: one 400 W + ELD2 unit is recommended only for an instrumented,
+  non-riding engineering bench sample. Production defaults to a 750 W-class or
+  otherwise resized solution unless measurements prove at least 15% emergency
+  margin and close regeneration, thermal, vertical-duty, gearbox, and anti-fall
+  requirements.
+- The report separately requires an external regeneration path, independent
+  anti-fall device, hard limits, absorbing end stops, and safety-rated power
+  removal. Motor phase current must not be used directly to size the battery
+  branch.
+- Evidence SHA-256 is
+  `0733dac3f19ccbb6aa74986efa09f70f609c7bb008f5050feff12dea0bdbcf0b`.
+  Production procurement, hardware transfer, training, and GPU work remain
+  false.
+
+## Next round after Round 181
+
+- Run the new procurement audit and full CPU suite on authoritative `.98`, then
+  seal and sync a clean commit if the host-independent summary is byte-identical.
+- Do not convert the engineering-sample recommendation into bulk procurement.
+  The next hardware step is a measured bench campaign: moving mass, carriage
+  force, current, temperature, regeneration voltage/energy, stopping distance,
+  brake behavior, and anti-fall proof.
+- Runtime case-23 authorization remains a separate decision. Do not launch
+  Isaac, capture, BC, PPO, or training as part of this hardware audit.

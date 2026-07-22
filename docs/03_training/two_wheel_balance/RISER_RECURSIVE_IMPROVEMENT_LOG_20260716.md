@@ -5378,3 +5378,92 @@ and must state whether its candidate was accepted or rejected.
   split-manifest change; a failure keeps case 4 in validation and case 78 unused.
 - Do not relax thresholds or label scales, change plan/LQR/correction cap, open
   holdout, create data, retrain BC, start PPO, or begin obstacle work.
+
+## Round 143: camera-error recovery completes but remains dynamically rejected
+
+- Commits `23ea37c`, `e578055`, and `56e424c` add, pin, and seal the separate
+  one-use recovery runtime. The authoritative `.98` CPU suite passes `584`
+  tests with five intentional skips. Its mode-`0600` authorization is consumed
+  before Isaac starts, and exactly one case-78 run executes in namespace
+  `20260722_case78_camera_recovery_v1_exclusive` with no policy, capture,
+  dataset, split mutation, holdout access, BC, or PPO.
+- The run completes the exact `135.487646/192.299567 s` source/execution clocks
+  in `88,922` policy steps and `2,966.443678 s` host wall time. Runtime,
+  heartbeat, GPU release, safety, thermal, controller evidence, no-termination,
+  and no-data checks all pass.
+- Dynamic quality still fails only `position_p95_bounded`. Position p95 worsens
+  from the baseline `0.162650 m` to `0.173540 m`, while max improves slightly
+  from `0.229624 m` to `0.226585 m`. Recovery activates for `9.7917%` of the
+  run and adds `3,162` policy steps. The residual label envelope independently
+  remains false, but no residual is applied and no labels are written.
+- Canonical recovery evidence SHA-256 values are gate
+  `ced834a3f0787ca11e33bc23c9134e041bd6d4ee4159249c05c0f7ef6e32eb50`,
+  admission
+  `e7c9fdec97017a3542e4464fb18f533115b01158856f1c3445daf4e3bd55563b`,
+  heartbeat
+  `6f6ecef8a36ba64099d0438bf441a3bef91b82036de4974eef72f429c4e88aa7`,
+  final status
+  `bd92e4f5c8c8bf277096fb86270a65058c21572840f0eef4ceb0ad54e20d2fd5`,
+  and log
+  `ee32bb959d69854b5baf2684680eef32b69e40722cb0435c502399e0c648bbcc`.
+  Case 4 remains validation and case 78 remains unused.
+
+## Round 144: phase audit rejects dwell recovery and selects one direct correction
+
+- Commits `571982b`, `d31f85d`, `b30b2a9`, and `5751df8` add and harden two
+  canonical-hash CPU audits. The recovery outcome audit separates evidence
+  validity from candidate admission and passes all evidence checks.
+- Phase alignment at `0.25 s` shows that recovery improves phase-matched p95 by
+  `4.983 mm`, from `0.141361 m` to `0.136378 m`, but time spent dwelling at
+  high error worsens the official time-weighted p95 by `10.890 mm`. The
+  recovery governor is therefore rejected as a dynamic candidate even though
+  it is not a broad per-phase regression. Report SHA-256 is
+  `96c0a66c937addb28a9ed6dc7f9a222cdf4af59a108cfa1adf36c81556767dee`.
+- Both sealed traces reconstruct the current camera lever-arm correction to
+  numerical precision. The `0.05 m` cap is saturated in nearly every sampled
+  state, while base tracking and all non-position physical gates pass. An
+  ideal unit-transfer replay selects one bounded direct change: keep recovery
+  disabled and increase only the correction cap from `0.05 m` to `0.10 m`.
+- The idealized `0.10 m` replay projects baseline p95/max to
+  `0.123593/0.199190 m` and recovery-evidence p95/max to
+  `0.132212/0.231080 m`, retaining at least `15 mm` projection margin under
+  both unchanged gates. The calculation explicitly does not model closed-loop
+  dynamics and is not physical proof. Candidate report SHA-256 is
+  `ed910cb9651e264613d96dd04e30375e75ce1604f97e15778e325a6adddccfe3`.
+
+## Round 145: case-78 direct-cap candidate is CPU-admitted; runtime stays closed
+
+- Commits `1981180`, `127978f`, and `2c1a5d9` add the non-executing wrapper,
+  hash/lineage validator, negative tests, and sealed CPU contract. The only
+  controller delta from the heartbeat baseline is
+  `maximum_camera_lever_arm_correction_m: 0.05 -> 0.10`; source plan, LQR,
+  `wz_kp=1.05`, duration scale `3.0`, USD, heartbeat, physical thresholds,
+  and all training boundaries remain unchanged.
+- The complete authoritative `.98` suite passes `600` tests with five
+  intentional skips in `55.56 s`. Live preflight at clean pushed commit
+  `2c1a5d9e0c1a240435255300d5e2fea92b36ca23` passes every canonical-path,
+  exact-identity, Git-blob, reviewed-parent/implementation lineage,
+  fresh-namespace, no-learning, and WSL/Windows/NVIDIA ownership check.
+- Contract SHA-256 is
+  `1c864557d6302613d111eccbafd914673d88316c2bcbc659e1afb028c7fec176`;
+  Git blob is `bad4fb8f9ce7ffdc493d4ad9de86016e7c5c642b`. Explicit
+  `--execute` exits `7` with `runtime_authorization_not_issued`, and namespace
+  `20260722_case78_camera_cap_v1_exclusive` remains absent.
+- No runtime token, Isaac launch, dynamic proof, split change, case-78
+  admission, label admission, holdout access, dataset, BC, PPO, or obstacle
+  work occurred in this round.
+
+## Next round after Round 145
+
+- Perform a separate go/no-go review of the sealed CPU contract. A GO may add
+  a one-use runtime/finalizer layer in a separate commit, pinned to the current
+  blobs and exact `0.10 m` cap. It must keep recovery disabled, preserve the
+  `5,400 s` wall bound and `2,000`-step heartbeat, consume its token before
+  Isaac, and stop after exactly one case 78.
+- Only a complete physical pass under every unchanged dynamic, thermal,
+  controller-evidence, no-data, heartbeat, and GPU-release check can support a
+  later immutable split decision. Failure leaves case 4 in validation and case
+  78 unused.
+- Do not create the runtime contract and token in the same unreviewed change.
+  Do not open holdout, create labels/data, retrain BC, start PPO, or begin
+  obstacle work during the runtime-contract review.

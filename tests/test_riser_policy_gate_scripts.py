@@ -1100,9 +1100,15 @@ def test_runtime_evidence_separates_source_and_execution_clocks() -> None:
     assert '"shadow_teacher_labels_applied": False' in riser
     assert '"shadow_teacher_labels_admitted_for_training": False' in riser
     assert (
-        "shadow teacher trace requires a learned policy and is exclusive"
+        "shadow teacher trace is exclusive with dataset, raw teacher, policy"
         in riser
     )
+    assert '"deterministic_controller"' in riser
+    shadow_validation = riser.split(
+        "if args.shadow_teacher_trace_dir is not None and (", 1
+    )[1].split("if args.residual_policy is not None", 1)[0]
+    assert "args.residual_policy is None" not in shadow_validation
+    assert "args.zero_policy_action" in shadow_validation
 
 
 def test_raw_teacher_canary_is_one_case_scale_independent_and_guarded() -> None:

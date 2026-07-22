@@ -1,0 +1,340 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_pair_tranche_selection_v1",
+  "identities": {
+    "portfolio": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu\\manifest.json",
+      "sha256": "8351514a361d3be4e5fbf57f2dbb019a7d8d2f5b86e89cea2553a1cfda3c64a1"
+    },
+    "dynamic_selection": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260720_initial_teacher42_selection_v1\\selection.json",
+      "sha256": "e0f1d2b44061aabfe64ad2ffa3d23f57bf9b3e51015b2e3fa0703ba24316bb06"
+    },
+    "split_admission": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260722_case4_case78_split_admission_v1_cpu\\manifest.json",
+      "sha256": "eac2c8c5389b0a8e3590d5b6355eaa80b50019091d5eb906408a6599c19cb623"
+    },
+    "case30_conversion_audit": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\docs\\03_training\\two_wheel_balance\\evidence_20260723_case30_effective_label_conversion_v1\\independent_audit.json",
+      "sha256": "765d3eea2d72fc9660020508e80016d74c3c291b3c7d7e3cb2ed591bd72f69b5"
+    }
+  },
+  "checks": {
+    "portfolio_schema": true,
+    "portfolio_cpu_only": true,
+    "dynamic_schema": true,
+    "dynamic_passed_closed": true,
+    "dynamic_binds_portfolio": true,
+    "split_schema": true,
+    "split_admitted_closed": true,
+    "case_splits_disjoint": true,
+    "holdout_exact": true,
+    "conversion_schema": true,
+    "conversion_anchor_passed_closed": true,
+    "anchor_is_train_only": true
+  },
+  "feature_contract": [
+    "log1p_source_duration_s",
+    "execution_source_duration_ratio",
+    "log1p_source_path_length_m",
+    "position_error_p95_m",
+    "maximum_abs_base_linear_velocity_mps",
+    "maximum_abs_base_yaw_rate_radps",
+    "maximum_abs_riser_rate_mps",
+    "maximum_abs_raw_proxy_target_rate_radps",
+    "target_camera_height_span_m",
+    "dynamic_raw_residual_vx_fraction",
+    "dynamic_raw_residual_wz_fraction",
+    "dynamic_raw_residual_riser_fraction"
+  ],
+  "eligible_train_cases": [
+    2,
+    4,
+    6,
+    7,
+    9,
+    10,
+    11,
+    12,
+    14,
+    15,
+    17,
+    18,
+    21,
+    23,
+    25,
+    26,
+    28,
+    30,
+    31,
+    33,
+    34,
+    36,
+    37,
+    41,
+    52,
+    53,
+    66,
+    67,
+    68,
+    70,
+    74
+  ],
+  "eligible_case_count": 31,
+  "tranche_size": 5,
+  "anchor_case": 30,
+  "selected_cases": [
+    30,
+    23,
+    6,
+    2,
+    7
+  ],
+  "selected_rows": [
+    {
+      "case": 30,
+      "plan_sha256": "1722bfdc7c1aeabc5a9d3920cf6a47bc789afbc96e6ef5c8e540695dc3c97dcb",
+      "dynamic_gate_sha256": "76274cd5373c296910089d6c139ac3384e54ffa1e921673dcbf3f588f4e857e9",
+      "features": {
+        "log1p_source_duration_s": 2.9520108714777145,
+        "execution_source_duration_ratio": 1.6105503002205743,
+        "log1p_source_path_length_m": 2.2482248664826607,
+        "position_error_p95_m": 0.1353367890612026,
+        "maximum_abs_base_linear_velocity_mps": 0.4000000000000311,
+        "maximum_abs_base_yaw_rate_radps": 0.4000000000000792,
+        "maximum_abs_riser_rate_mps": 1.0000000000000162,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.41887902047874465,
+        "target_camera_height_span_m": 0.543995,
+        "dynamic_raw_residual_vx_fraction": 0.804779241896992,
+        "dynamic_raw_residual_wz_fraction": 0.4127644563611027,
+        "dynamic_raw_residual_riser_fraction": 0.17296101892382176
+      },
+      "checks": {
+        "portfolio_passed": true,
+        "plan_file_hash": true,
+        "dynamic_plan_hash": true,
+        "dynamic_checks": true,
+        "individual_dynamic_quality": true,
+        "training_case_only": true
+      },
+      "selection_rank": 1,
+      "selection_role": "converted_pilot_anchor",
+      "minimum_normalized_distance_at_selection": 0.0,
+      "normalized_features": {
+        "log1p_source_duration_s": 0.6300227050855736,
+        "execution_source_duration_ratio": 0.6358899282046251,
+        "log1p_source_path_length_m": 0.6858942105208293,
+        "position_error_p95_m": 0.9673606292823307,
+        "maximum_abs_base_linear_velocity_mps": 0.9999999999988518,
+        "maximum_abs_base_yaw_rate_radps": 0.9999999999990759,
+        "maximum_abs_riser_rate_mps": 0.9999999999999915,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.9999999999990642,
+        "target_camera_height_span_m": 0.5187825356106188,
+        "dynamic_raw_residual_vx_fraction": 0.6515925176927359,
+        "dynamic_raw_residual_wz_fraction": 0.7179466580431575,
+        "dynamic_raw_residual_riser_fraction": 1.0
+      }
+    },
+    {
+      "case": 23,
+      "plan_sha256": "ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6",
+      "dynamic_gate_sha256": "82825f871bf60493a6870b6e29ecb002e66639c4fe7e22ace185c8d95d27cc48",
+      "features": {
+        "log1p_source_duration_s": 2.3914833054561946,
+        "execution_source_duration_ratio": 0.9999999999999989,
+        "log1p_source_path_length_m": 1.086145371586797,
+        "position_error_p95_m": 0.010693572402178404,
+        "maximum_abs_base_linear_velocity_mps": 0.23674079478247576,
+        "maximum_abs_base_yaw_rate_radps": 0.2367407947824685,
+        "maximum_abs_riser_rate_mps": 0.08828941196005752,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.24791438056454476,
+        "target_camera_height_span_m": 0.5585960000000001,
+        "dynamic_raw_residual_vx_fraction": 0.6733438725820948,
+        "dynamic_raw_residual_wz_fraction": 0.09554077116406758,
+        "dynamic_raw_residual_riser_fraction": 0.11021598593398352
+      },
+      "checks": {
+        "portfolio_passed": true,
+        "plan_file_hash": true,
+        "dynamic_plan_hash": true,
+        "dynamic_checks": true,
+        "individual_dynamic_quality": true,
+        "training_case_only": true
+      },
+      "selection_rank": 2,
+      "selection_role": "same_seed_paired_canary_required",
+      "minimum_normalized_distance_at_selection": 2.614459039580045,
+      "normalized_features": {
+        "log1p_source_duration_s": 0.3576398966258301,
+        "execution_source_duration_ratio": 0.0,
+        "log1p_source_path_length_m": 0.2370478922352048,
+        "position_error_p95_m": 0.043304998121971514,
+        "maximum_abs_base_linear_velocity_mps": 0.07858967786632061,
+        "maximum_abs_base_yaw_rate_radps": 0.0,
+        "maximum_abs_riser_rate_mps": 0.04816434884124674,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.0,
+        "target_camera_height_span_m": 0.5330189829047579,
+        "dynamic_raw_residual_vx_fraction": 0.4759005178315054,
+        "dynamic_raw_residual_wz_fraction": 0.0,
+        "dynamic_raw_residual_riser_fraction": 0.0
+      }
+    },
+    {
+      "case": 6,
+      "plan_sha256": "b8ac6a9bb226de47a2722f076efb6dcf9586fd3b85740cf6efb5926cd86568aa",
+      "dynamic_gate_sha256": "140a080b1daab4985fe353bfee9e3f86186dfe3c319841d5a8e08f98e8d6b7c7",
+      "features": {
+        "log1p_source_duration_s": 2.829839187398433,
+        "execution_source_duration_ratio": 1.112561520548871,
+        "log1p_source_path_length_m": 1.8265279730068245,
+        "position_error_p95_m": 0.021435478959884523,
+        "maximum_abs_base_linear_velocity_mps": 0.4000000000000764,
+        "maximum_abs_base_yaw_rate_radps": 0.40000000000010033,
+        "maximum_abs_riser_rate_mps": 0.10563955687953464,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.41887902047873504,
+        "target_camera_height_span_m": 0.9288120000000001,
+        "dynamic_raw_residual_vx_fraction": 0.7671434380207988,
+        "dynamic_raw_residual_wz_fraction": 0.21207472902589897,
+        "dynamic_raw_residual_riser_fraction": 0.1191010455746877
+      },
+      "checks": {
+        "portfolio_passed": true,
+        "plan_file_hash": true,
+        "dynamic_plan_hash": true,
+        "dynamic_checks": true,
+        "individual_dynamic_quality": true,
+        "training_case_only": true
+      },
+      "selection_rank": 3,
+      "selection_role": "same_seed_paired_canary_required",
+      "minimum_normalized_distance_at_selection": 1.7234833066639492,
+      "normalized_features": {
+        "log1p_source_duration_s": 0.5706545875459383,
+        "execution_source_duration_ratio": 0.11723315375419026,
+        "log1p_source_path_length_m": 0.5230162844405005,
+        "position_error_p95_m": 0.12294125519323088,
+        "maximum_abs_base_linear_velocity_mps": 0.9999999999991074,
+        "maximum_abs_base_yaw_rate_radps": 0.9999999999992054,
+        "maximum_abs_riser_rate_mps": 0.06627808658189617,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.999999999999008,
+        "target_camera_height_span_m": 0.8939915581699422,
+        "dynamic_raw_residual_vx_fraction": 0.6012840681189271,
+        "dynamic_raw_residual_wz_fraction": 0.2637418626023387,
+        "dynamic_raw_residual_riser_fraction": 0.14160578482990277
+      }
+    },
+    {
+      "case": 2,
+      "plan_sha256": "a2ad28cf4d353c59a9a642e39c8bbf484a0233df50a0b72b7ec18ca746c2cbe7",
+      "dynamic_gate_sha256": "a6479130ef95d0cc1ea48d723f35c858638f2ca776fc6069863019de9b086e68",
+      "features": {
+        "log1p_source_duration_s": 2.3455788714833137,
+        "execution_source_duration_ratio": 1.9325480296266453,
+        "log1p_source_path_length_m": 2.1044961477260706,
+        "position_error_p95_m": 0.13973942026520061,
+        "maximum_abs_base_linear_velocity_mps": 0.4000000000000204,
+        "maximum_abs_base_yaw_rate_radps": 0.40000000000001174,
+        "maximum_abs_riser_rate_mps": 0.05869671497853446,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.41887902047864906,
+        "target_camera_height_span_m": 0.187446,
+        "dynamic_raw_residual_vx_fraction": 0.8197902361104836,
+        "dynamic_raw_residual_wz_fraction": 0.3632842489396135,
+        "dynamic_raw_residual_riser_fraction": 0.12288621132819699
+      },
+      "checks": {
+        "portfolio_passed": true,
+        "plan_file_hash": true,
+        "dynamic_plan_hash": true,
+        "dynamic_checks": true,
+        "individual_dynamic_quality": true,
+        "training_case_only": true
+      },
+      "selection_rank": 4,
+      "selection_role": "same_seed_paired_canary_required",
+      "minimum_normalized_distance_at_selection": 1.392813828471341,
+      "normalized_features": {
+        "log1p_source_duration_s": 0.33533309245732984,
+        "execution_source_duration_ratio": 0.971251507684819,
+        "log1p_source_path_length_m": 0.6303798446541581,
+        "position_error_p95_m": 1.0,
+        "maximum_abs_base_linear_velocity_mps": 0.9999999999987913,
+        "maximum_abs_base_yaw_rate_radps": 0.9999999999986627,
+        "maximum_abs_riser_rate_mps": 0.017269255189315946,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.9999999999985051,
+        "target_camera_height_span_m": 0.17113572742775746,
+        "dynamic_raw_residual_vx_fraction": 0.6716579810989759,
+        "dynamic_raw_residual_wz_fraction": 0.6059621145956039,
+        "dynamic_raw_residual_riser_fraction": 0.20193192656804335
+      }
+    },
+    {
+      "case": 7,
+      "plan_sha256": "a83934dab6e4293cd830397d3c2ffb41d4f4d78545dddec7fdfa630fa0d22f41",
+      "dynamic_gate_sha256": "28b1117eb1dede740e70348f48eb06aa35d87ce86ae3572a740737a83c75605f",
+      "features": {
+        "log1p_source_duration_s": 2.6348299066409138,
+        "execution_source_duration_ratio": 1.4000000000000001,
+        "log1p_source_path_length_m": 1.5703076810235237,
+        "position_error_p95_m": 0.013000636776406444,
+        "maximum_abs_base_linear_velocity_mps": 0.2998704977273021,
+        "maximum_abs_base_yaw_rate_radps": 0.29987049772734425,
+        "maximum_abs_riser_rate_mps": 0.6859824231195146,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.31402365089612344,
+        "target_camera_height_span_m": 1.005452,
+        "dynamic_raw_residual_vx_fraction": 0.7666128584580739,
+        "dynamic_raw_residual_wz_fraction": 0.4030883700031987,
+        "dynamic_raw_residual_riser_fraction": 0.12628383956008626
+      },
+      "checks": {
+        "portfolio_passed": true,
+        "plan_file_hash": true,
+        "dynamic_plan_hash": true,
+        "dynamic_checks": true,
+        "individual_dynamic_quality": true,
+        "training_case_only": true
+      },
+      "selection_rank": 5,
+      "selection_role": "same_seed_paired_canary_required",
+      "minimum_normalized_distance_at_selection": 1.32538585240609,
+      "normalized_features": {
+        "log1p_source_duration_s": 0.47589176268531697,
+        "execution_source_duration_ratio": 0.4166011730564359,
+        "log1p_source_path_length_m": 0.42405271505312575,
+        "position_error_p95_m": 0.060408663155639634,
+        "maximum_abs_base_linear_velocity_mps": 0.4348841964449801,
+        "maximum_abs_base_yaw_rate_radps": 0.38668388015653304,
+        "maximum_abs_riser_rate_mps": 0.6721622753028166,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.3866838801561208,
+        "target_camera_height_span_m": 0.9687180372208847,
+        "dynamic_raw_residual_vx_fraction": 0.6005748329644437,
+        "dynamic_raw_residual_wz_fraction": 0.6960475559654571,
+        "dynamic_raw_residual_riser_fraction": 0.25608168265215486
+      }
+    }
+  ],
+  "validation_cases": [
+    8,
+    16,
+    22,
+    32,
+    78
+  ],
+  "holdout_cases": [
+    3,
+    5,
+    13,
+    19,
+    24
+  ],
+  "same_seed_pair_required_before_capture": true,
+  "case30_profile_reuse_authorized": false,
+  "generic_profile_created": false,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

@@ -6919,3 +6919,40 @@ and must state whether its candidate was accepted or rejected.
   tranche. Keep holdout cases `[3,5,13,19,24]` unopened.
 - Require every additional capture to pass its own dynamic gate and v2 archive
   audit before conversion; do not infer admission from case 30.
+
+## Round 177: diverse corrective pair tranche selected CPU-only
+
+- A new fail-closed selector binds the v16 plan portfolio, the sealed dynamic
+  selection, current admitted split, every selected plan hash, and the passed
+  case-30 conversion audit. It uses twelve normalized duration, path,
+  kinematic, camera-height, and historical dynamic-residual features with
+  deterministic farthest-point selection anchored on case 30.
+- The first authoritative attempt stopped before output because it required
+  the enclosing batch summary to pass for case 6. Audit showed case 6's own
+  row, gate, and result dynamic checks all pass; its batch summary was false
+  only because a later case rejected. Commit `d7fe4a9` correctly uses sealed
+  per-case dynamic evidence and adds regression coverage for this condition.
+- Focused local selector/converter/teacher tests pass `29/29`; authoritative
+  selector tests pass `7/7`. Recomputing the final selection produced
+  byte-identical JSON and independent flag/split checks passed.
+- The eligible pool contains 31 current training cases. The selected five are
+  `[30,23,6,2,7]`: case 30 is the converted pilot anchor; cases 23, 6, 2, and
+  7 are marked `same_seed_paired_canary_required`.
+- Validation cases remain `[8,16,22,32,78]`; holdout remains
+  `[3,5,13,19,24]`. The selector explicitly sets case-30 profile reuse,
+  generic-profile creation, runtime, GPU, capture, merge, BC, PPO, training,
+  and training validity to false.
+- Selection SHA-256 is
+  `93aa25e99409ad926d4c4cf0b15075e6ea3532dd1c01d5217a45daffc37db7c0`.
+  No Isaac or GPU process ran.
+
+## Next round after Round 177
+
+- Build a CPU-only per-case paired-canary contract for the first new candidate,
+  case 23. It must use case 23's pinned plan and a case-specific profile
+  proposal; do not reuse the case-30 profile identity.
+- Keep the baseline-first, same-seed, same-plan, same-clock admission rule and
+  require measurable position-p95 improvement without regressions in position
+  max, attitude, pitch, riser error, or saturation.
+- Do not authorize the case-23 GPU pair until that contract, negative tests,
+  identities, and clean pushed state are independently reviewed.

@@ -28,8 +28,8 @@
     },
     "runtime_wrapper": {
       "path": "scripts/two_wheel_balance/run_case78_shadow_label_measurement.sh",
-      "sha256": "a2f06d593701b1a9f0c939ce1eb93b9a1888cbdb54e93f258cdcaafd0ead7d82",
-      "git_blob_sha1": "3c787d349c0b3a500380521499e032fdf082e796"
+      "sha256": "9be7be3b0f078833409a7e355f8f6b7a6b80c2ae0b684053111bc68492f3455f",
+      "git_blob_sha1": "856e585ac012ccb6488cce448d5440fe3933a576"
     }
   },
   "one_case_only": true,

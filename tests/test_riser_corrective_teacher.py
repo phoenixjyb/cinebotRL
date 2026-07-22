@@ -99,6 +99,18 @@ def test_committed_case30_profile_matches_reviewed_default() -> None:
     assert config == CorrectiveTeacherConfig()
 
 
+def test_committed_case23_profile_requires_explicit_case_identity() -> None:
+    path = (
+        Path(__file__).parents[1]
+        / "scripts/two_wheel_balance/model_based_corrective_teacher_case23_profile_v1.json"
+    )
+    with pytest.raises(ValueError, match="not the reviewed case"):
+        load_corrective_teacher_profile(path)
+    case, config, _ = load_corrective_teacher_profile(path, expected_case=23)
+    assert case == 23
+    assert config == CorrectiveTeacherConfig()
+
+
 def test_corrective_teacher_profile_rejects_extra_fields(tmp_path) -> None:
     path = tmp_path / "profile.json"
     path.write_text(

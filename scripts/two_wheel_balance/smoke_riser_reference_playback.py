@@ -264,15 +264,20 @@ corrective_teacher_case = None
 corrective_teacher_config = None
 corrective_teacher_profile_identity = None
 if args.corrective_teacher_profile is not None:
+    requested_cases = [int(item) for item in args.cases.split(",") if item.strip()]
+    if len(requested_cases) != 1:
+        parser.error("corrective teacher profile requires one pinned case only")
     try:
         (
             corrective_teacher_case,
             corrective_teacher_config,
             corrective_teacher_profile_identity,
-        ) = load_corrective_teacher_profile(args.corrective_teacher_profile)
+        ) = load_corrective_teacher_profile(
+            args.corrective_teacher_profile,
+            expected_case=requested_cases[0],
+        )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
-    requested_cases = [int(item) for item in args.cases.split(",") if item.strip()]
     if requested_cases != [corrective_teacher_case]:
         parser.error("corrective teacher profile requires its one pinned case only")
     if (

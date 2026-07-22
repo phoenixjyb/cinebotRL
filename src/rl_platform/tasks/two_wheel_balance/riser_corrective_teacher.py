@@ -103,6 +103,8 @@ class CorrectiveTeacherOutput:
 
 def load_corrective_teacher_profile(
     path: Path,
+    *,
+    expected_case: int = CORRECTIVE_TEACHER_CASE,
 ) -> tuple[int, CorrectiveTeacherConfig, dict[str, str]]:
     if not path.is_file():
         raise ValueError(f"missing corrective teacher profile: {path}")
@@ -113,7 +115,9 @@ def load_corrective_teacher_profile(
         raise ValueError(f"unexpected corrective teacher profile fields: {fields}")
     if payload["schema"] != CORRECTIVE_TEACHER_PROFILE_SCHEMA:
         raise ValueError("unexpected corrective teacher profile schema")
-    if payload["case"] != CORRECTIVE_TEACHER_CASE:
+    if not isinstance(expected_case, int) or expected_case <= 0:
+        raise ValueError("expected corrective teacher case must be positive")
+    if payload["case"] != expected_case:
         raise ValueError("corrective teacher profile is not the reviewed case")
     config = CorrectiveTeacherConfig(
         longitudinal_gain_s_inv=float(payload["longitudinal_gain_s_inv"]),

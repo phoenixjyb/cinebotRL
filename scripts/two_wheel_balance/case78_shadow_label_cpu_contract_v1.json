@@ -100,8 +100,8 @@
     },
     "validator": {
       "path": "scripts/two_wheel_balance/validate_case78_shadow_label_contract.py",
-      "sha256": "c3535946a37346501a9ee4b220f72f4004854dafb46be455f959a462faf99976",
-      "git_blob_sha1": "0880fb173a52f807672cd0c08a3286f08b1ec334"
+      "sha256": "157ce9acfe66e6c2acb0c3629441e5a37291678fe6a8a88f971d6048b138c9ff",
+      "git_blob_sha1": "fa996b4f073e939044cd0671a7d2ef16cbe3d90a"
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_case78_shadow_label_preflight.sh",

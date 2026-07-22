@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 import math
+from pathlib import Path
 from typing import Mapping
 
 import numpy as np
@@ -17,6 +20,20 @@ CORRECTIVE_TEACHER_CONTRACT = (
 CORRECTIVE_TARGET_ADMISSION_CONTRACT = (
     "same_seed_paired_dynamic_improvement_before_label_capture_v1"
 )
+CORRECTIVE_TEACHER_PROFILE_SCHEMA = (
+    "cinebotrl_two_wheel_riser_corrective_teacher_profile_v1"
+)
+CORRECTIVE_TEACHER_CASE = 30
+CORRECTIVE_TEACHER_PROFILE_FIELDS = {
+    "schema",
+    "case",
+    "longitudinal_gain_s_inv",
+    "lateral_to_yaw_gain_rad_s_m",
+    "vertical_gain",
+    "deadbands_m",
+    "maximum_residuals",
+    "maximum_slew_rates",
+}
 
 
 @dataclass(frozen=True)
@@ -82,6 +99,78 @@ class CorrectiveTeacherOutput:
     normalized_action: np.ndarray
     amplitude_limited: np.ndarray
     slew_limited: np.ndarray
+
+
+def load_corrective_teacher_profile(
+    path: Path,
+) -> tuple[int, CorrectiveTeacherConfig, dict[str, str]]:
+    if not path.is_file():
+        raise ValueError(f"missing corrective teacher profile: {path}")
+    raw_bytes = path.read_bytes()
+    payload = json.loads(raw_bytes)
+    if not isinstance(payload, dict) or set(payload) != CORRECTIVE_TEACHER_PROFILE_FIELDS:
+        fields = sorted(payload) if isinstance(payload, dict) else []
+        raise ValueError(f"unexpected corrective teacher profile fields: {fields}")
+    if payload["schema"] != CORRECTIVE_TEACHER_PROFILE_SCHEMA:
+        raise ValueError("unexpected corrective teacher profile schema")
+    if payload["case"] != CORRECTIVE_TEACHER_CASE:
+        raise ValueError("corrective teacher profile is not the reviewed case")
+    config = CorrectiveTeacherConfig(
+        longitudinal_gain_s_inv=float(payload["longitudinal_gain_s_inv"]),
+        lateral_to_yaw_gain_rad_s_m=float(payload["lateral_to_yaw_gain_rad_s_m"]),
+        vertical_gain=float(payload["vertical_gain"]),
+        deadbands_m=tuple(float(value) for value in payload["deadbands_m"]),
+        maximum_residuals=tuple(
+            float(value) for value in payload["maximum_residuals"]
+        ),
+        maximum_slew_rates=tuple(
+            float(value) for value in payload["maximum_slew_rates"]
+        ),
+    )
+    config.validate()
+    return payload["case"], config, {
+        "path": str(path.resolve()),
+        "sha256": hashlib.sha256(raw_bytes).hexdigest(),
+    }
+
+
+class CorrectiveTeacherTelemetry:
+    def __init__(self) -> None:
+        self.sample_count = 0
+        self.amplitude_limited_count = np.zeros(3, dtype=np.int64)
+        self.slew_limited_count = np.zeros(3, dtype=np.int64)
+        self.unbounded_abs_max = np.zeros(3, dtype=np.float64)
+        self.applied_abs_max = np.zeros(3, dtype=np.float64)
+        self.normalized_abs_max = np.zeros(3, dtype=np.float64)
+
+    def step(self, output: CorrectiveTeacherOutput) -> None:
+        self.sample_count += 1
+        self.amplitude_limited_count += output.amplitude_limited
+        self.slew_limited_count += output.slew_limited
+        self.unbounded_abs_max = np.maximum(
+            self.unbounded_abs_max, np.abs(output.unbounded_residual)
+        )
+        self.applied_abs_max = np.maximum(
+            self.applied_abs_max, np.abs(output.applied_residual)
+        )
+        self.normalized_abs_max = np.maximum(
+            self.normalized_abs_max, np.abs(output.normalized_action)
+        )
+
+    def summary(self, *, enabled: bool) -> dict[str, object]:
+        return {
+            "schema": "cinebotrl_two_wheel_riser_corrective_teacher_telemetry_v1",
+            "enabled": enabled,
+            "sample_count": self.sample_count,
+            "unbounded_residual_abs_max": self.unbounded_abs_max.tolist(),
+            "applied_residual_abs_max": self.applied_abs_max.tolist(),
+            "normalized_action_abs_max": self.normalized_abs_max.tolist(),
+            "amplitude_limited_count": self.amplitude_limited_count.tolist(),
+            "slew_limited_count": self.slew_limited_count.tolist(),
+            "labels_captured": False,
+            "dataset_created": False,
+            "training_started": False,
+        }
 
 
 def _remove_deadband(value: np.ndarray, deadband: np.ndarray) -> np.ndarray:

@@ -43,3 +43,23 @@ def test_model_based_mode_has_distinct_zero_and_learned_sources() -> None:
     source = PLAYBACK.read_text(encoding="utf-8")
     assert '"model_based_planner_plus_zero_policy_residual"' in source
     assert '"model_based_planner_plus_torchscript_residual"' in source
+
+
+def test_corrective_teacher_is_explicit_disabled_and_capture_closed() -> None:
+    source = PLAYBACK.read_text(encoding="utf-8")
+    pre_app = source.split("app = AppLauncher(args).app", 1)[0]
+    assert '"--corrective-teacher-profile"' in pre_app
+    assert "load_corrective_teacher_profile" in pre_app
+    assert "requires its one pinned case only" in pre_app
+    assert "corrective teacher requires model-based zero-policy mode" in pre_app
+    assert "model_based_zero_measurement" in pre_app
+    assert "corrective_teacher_label_capture_authorized\": False" in source
+    assert "corrective_teacher_labels_captured\": False" in source
+
+
+def test_corrective_teacher_is_computed_after_model_planner_and_before_apply() -> None:
+    source = PLAYBACK.read_text(encoding="utf-8")
+    model_index = source.index("model_based_vx_ref = vx_ref")
+    teacher_index = source.index("corrective_output = build_corrective_teacher_action(")
+    apply_index = source.index("apply_model_based_policy_residual(", teacher_index)
+    assert model_index < teacher_index < apply_index

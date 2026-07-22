@@ -31,6 +31,12 @@ from rl_platform.tasks.two_wheel_balance.riser_perturbation import (
     DeterministicWrenchPulseRuntime,
     load_deterministic_wrench_profile,
 )
+from rl_platform.tasks.two_wheel_balance.riser_corrective_teacher import (
+    CORRECTIVE_TEACHER_CONTRACT,
+    CorrectiveTeacherTelemetry,
+    build_corrective_teacher_action,
+    load_corrective_teacher_profile,
+)
 
 from isaaclab.app import AppLauncher
 
@@ -177,6 +183,14 @@ parser.add_argument(
     ),
 )
 parser.add_argument(
+    "--corrective-teacher-profile",
+    type=Path,
+    help=(
+        "Hash-bound, case-30-only corrective teacher above the complete model "
+        "planner; diagnostic paired rollout only and never a capture mode."
+    ),
+)
+parser.add_argument(
     "--residual-policy",
     type=Path,
     help="Optional gated TorchScript high-level residual policy.",
@@ -227,6 +241,30 @@ AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
 if args.runtime_heartbeat_interval_steps <= 0:
     parser.error("--runtime-heartbeat-interval-steps must be positive")
+corrective_teacher_case = None
+corrective_teacher_config = None
+corrective_teacher_profile_identity = None
+if args.corrective_teacher_profile is not None:
+    try:
+        (
+            corrective_teacher_case,
+            corrective_teacher_config,
+            corrective_teacher_profile_identity,
+        ) = load_corrective_teacher_profile(args.corrective_teacher_profile)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        parser.error(str(exc))
+    requested_cases = [int(item) for item in args.cases.split(",") if item.strip()]
+    if requested_cases != [corrective_teacher_case]:
+        parser.error("corrective teacher profile requires its one pinned case only")
+    if (
+        args.policy_command_base != "model_based_planner"
+        or not args.zero_policy_action
+        or args.residual_policy is not None
+    ):
+        parser.error(
+            "corrective teacher requires model-based zero-policy mode without "
+            "a TorchScript policy"
+        )
 if args.policy_command_base == "model_based_planner":
     if args.residual_policy is None and not args.zero_policy_action:
         parser.error("model-based policy command base requires learned or zero policy mode")
@@ -261,17 +299,41 @@ if args.deterministic_wrench_profile is not None:
         parser.error(
             "deterministic wrench profile requires its one pinned case only"
         )
-    if (
-        args.residual_policy is None
-        or args.shadow_teacher_trace_dir is None
-        or args.zero_policy_action
-        or args.dataset_dir is not None
-        or args.raw_teacher_dir is not None
-        or args.policy_trace_dir is not None
+    legacy_shadow_measurement = (
+        args.residual_policy is not None
+        and args.shadow_teacher_trace_dir is not None
+        and not args.zero_policy_action
+        and args.dataset_dir is None
+        and args.raw_teacher_dir is None
+        and args.policy_trace_dir is None
+    )
+    corrective_teacher_measurement = (
+        corrective_teacher_config is not None
+        and args.zero_policy_action
+        and args.residual_policy is None
+        and args.shadow_teacher_trace_dir is None
+        and args.dataset_dir is None
+        and args.raw_teacher_dir is None
+        and args.policy_trace_dir is None
+    )
+    model_based_zero_measurement = (
+        corrective_teacher_config is None
+        and args.policy_command_base == "model_based_planner"
+        and args.zero_policy_action
+        and args.residual_policy is None
+        and args.shadow_teacher_trace_dir is None
+        and args.dataset_dir is None
+        and args.raw_teacher_dir is None
+        and args.policy_trace_dir is None
+    )
+    if not (
+        legacy_shadow_measurement
+        or corrective_teacher_measurement
+        or model_based_zero_measurement
     ):
         parser.error(
             "deterministic wrench profile requires learned-policy shadow-teacher "
-            "measurement mode and forbids every dataset/capture mode"
+            "or model-based paired measurement mode and forbids capture"
         )
 for name in ("tracking_along_kp", "tracking_cross_kp", "tracking_yaw_kp"):
     value = getattr(args, name)
@@ -385,6 +447,7 @@ from rl_platform.tasks.two_wheel_balance.riser_control import (
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     LOOKAHEAD_HORIZONS_S,
     MODEL_BASED_POLICY_RESIDUAL_CONTRACT,
+    OBSERVATION_INDEX,
     apply_residual_action,
     apply_model_based_policy_residual,
     build_raw_residual_command,
@@ -752,6 +815,8 @@ def evaluate_case(
     shadow_teacher_normalized_actions = []
     shadow_teacher_high_level_commands = []
     previous_residual_action = np.zeros(3, dtype=np.float32)
+    previous_corrective_teacher_residual = np.zeros(3, dtype=np.float64)
+    corrective_teacher_telemetry = CorrectiveTeacherTelemetry()
     completed_steps = 0
     if runtime_heartbeat is not None:
         write_runtime_heartbeat(
@@ -1155,7 +1220,27 @@ def evaluate_case(
             )
             commanded_riser_target = sample.riser_q
         else:
-            if zero_policy_action:
+            if corrective_teacher_config is not None:
+                corrective_output = build_corrective_teacher_action(
+                    executed_observation[
+                        [
+                            OBSERVATION_INDEX["camera_target_longitudinal_error_m"],
+                            OBSERVATION_INDEX["camera_target_lateral_error_m"],
+                            OBSERVATION_INDEX["camera_target_vertical_error_m"],
+                        ]
+                    ],
+                    previous_corrective_teacher_residual,
+                    dt_s=1.0 / POLICY_HZ,
+                    config=corrective_teacher_config,
+                )
+                applied_residual_action = corrective_output.normalized_action.astype(
+                    np.float32
+                )
+                previous_corrective_teacher_residual = (
+                    corrective_output.applied_residual.copy()
+                )
+                corrective_teacher_telemetry.step(corrective_output)
+            elif zero_policy_action:
                 applied_residual_action = np.zeros(3, dtype=np.float32)
             else:
                 with torch.inference_mode():
@@ -1762,6 +1847,9 @@ def evaluate_case(
         perturbation_runtime.mark_released()
     perturbation_telemetry = perturbation_runtime.summary()
     perturbation_contract_checks = perturbation_runtime.contract_checks()
+    corrective_teacher_telemetry_summary = corrective_teacher_telemetry.summary(
+        enabled=corrective_teacher_config is not None
+    )
 
     position = np.asarray(position_errors, dtype=np.float64)
     attitude = np.asarray(attitude_errors_deg, dtype=np.float64)
@@ -2298,6 +2386,9 @@ def evaluate_case(
         "residual_action_abs_max": np.max(
             np.abs(applied_residual_values), axis=0
         ).tolist(),
+        "corrective_teacher_telemetry": corrective_teacher_telemetry_summary,
+        "corrective_teacher_profile": corrective_teacher_profile_identity,
+        "corrective_teacher_labels_captured": False,
         "raw_residual_command_abs_max": np.max(
             np.abs(raw_residual_values), axis=0
         ).tolist(),
@@ -2641,28 +2732,37 @@ def main() -> int:
         "maximum_duration_scale": args.maximum_duration_scale,
         "completion_horizon_contract": "bounded_execution_duration_scale_v1",
         "trajectory_command_source": (
-            "deterministic_teacher"
-            if residual_policy is None and not args.zero_policy_action
+            "model_based_planner_plus_corrective_teacher"
+            if corrective_teacher_config is not None
             else (
-                (
-                    "model_based_planner_plus_zero_policy_residual"
-                    if args.zero_policy_action
-                    else "model_based_planner_plus_torchscript_residual"
-                )
-                if args.policy_command_base == "model_based_planner"
+                "deterministic_teacher"
+                if residual_policy is None and not args.zero_policy_action
                 else (
-                    "zero_policy_action_baseline"
-                    if args.zero_policy_action
-                    else "torchscript_residual_policy"
+                    (
+                        "model_based_planner_plus_zero_policy_residual"
+                        if args.zero_policy_action
+                        else "model_based_planner_plus_torchscript_residual"
+                    )
+                    if args.policy_command_base == "model_based_planner"
+                    else (
+                        "zero_policy_action_baseline"
+                        if args.zero_policy_action
+                        else "torchscript_residual_policy"
+                    )
                 )
             )
         ),
         "policy_command_base": args.policy_command_base,
         "policy_residual_contract": (
-            MODEL_BASED_POLICY_RESIDUAL_CONTRACT
+            CORRECTIVE_TEACHER_CONTRACT
+            if corrective_teacher_config is not None
+            else MODEL_BASED_POLICY_RESIDUAL_CONTRACT
             if args.policy_command_base == "model_based_planner"
             else "phase_feedforward_plus_planner_imitation_residual_v1"
         ),
+        "corrective_teacher_enabled": corrective_teacher_config is not None,
+        "corrective_teacher_profile": corrective_teacher_profile_identity,
+        "corrective_teacher_label_capture_authorized": False,
         "residual_policy": (
             None if args.residual_policy is None else str(args.residual_policy.resolve())
         ),

@@ -1,10 +1,14 @@
+import json
+from pathlib import Path
 import numpy as np
 import pytest
 
 from rl_platform.tasks.two_wheel_balance.riser_corrective_teacher import (
     CorrectiveTeacherConfig,
+    CorrectiveTeacherTelemetry,
     assess_paired_corrective_rollouts,
     build_corrective_teacher_action,
+    load_corrective_teacher_profile,
 )
 
 
@@ -60,6 +64,74 @@ def test_corrective_teacher_deadband_emits_exact_zero() -> None:
     )
     np.testing.assert_array_equal(output.applied_residual, np.zeros(3))
     np.testing.assert_array_equal(output.normalized_action, np.zeros(3))
+
+
+def test_corrective_teacher_profile_is_exact_and_hash_bound(tmp_path) -> None:
+    path = tmp_path / "profile.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "cinebotrl_two_wheel_riser_corrective_teacher_profile_v1",
+                "case": 30,
+                "longitudinal_gain_s_inv": 0.2,
+                "lateral_to_yaw_gain_rad_s_m": 0.3,
+                "vertical_gain": 0.3,
+                "deadbands_m": [0.01, 0.01, 0.005],
+                "maximum_residuals": [0.045, 0.045, 0.018],
+                "maximum_slew_rates": [0.1, 0.1, 0.04],
+            }
+        ),
+        encoding="utf-8",
+    )
+    case, config, identity = load_corrective_teacher_profile(path)
+    assert case == 30
+    assert config == CorrectiveTeacherConfig()
+    assert len(identity["sha256"]) == 64
+
+
+def test_committed_case30_profile_matches_reviewed_default() -> None:
+    path = (
+        Path(__file__).parents[1]
+        / "scripts/two_wheel_balance/model_based_corrective_teacher_case30_profile_v1.json"
+    )
+    case, config, _ = load_corrective_teacher_profile(path)
+    assert case == 30
+    assert config == CorrectiveTeacherConfig()
+
+
+def test_corrective_teacher_profile_rejects_extra_fields(tmp_path) -> None:
+    path = tmp_path / "profile.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "cinebotrl_two_wheel_riser_corrective_teacher_profile_v1",
+                "case": 30,
+                "longitudinal_gain_s_inv": 0.2,
+                "lateral_to_yaw_gain_rad_s_m": 0.3,
+                "vertical_gain": 0.3,
+                "deadbands_m": [0.01, 0.01, 0.005],
+                "maximum_residuals": [0.045, 0.045, 0.018],
+                "maximum_slew_rates": [0.1, 0.1, 0.04],
+                "unreviewed": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="unexpected.*fields"):
+        load_corrective_teacher_profile(path)
+
+
+def test_corrective_teacher_telemetry_is_non_training() -> None:
+    output = build_corrective_teacher_action(
+        np.array([0.30, -0.30, 0.10]), np.zeros(3), dt_s=0.005
+    )
+    telemetry = CorrectiveTeacherTelemetry()
+    telemetry.step(output)
+    summary = telemetry.summary(enabled=True)
+    assert summary["sample_count"] == 1
+    assert summary["labels_captured"] is False
+    assert summary["dataset_created"] is False
+    assert max(summary["normalized_action_abs_max"]) < 0.95
 
 
 def test_corrective_teacher_rejects_configuration_without_policy_margin() -> None:

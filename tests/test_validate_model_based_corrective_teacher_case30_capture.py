@@ -95,6 +95,7 @@ def _fixture(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
         "namespace": MODULE.NAMESPACE,
         "residual_action_scales": MODULE.EXPECTED_SCALES,
         "capture_schema_contract": MODULE.EXPECTED_CAPTURE,
+        "execution_contract": MODULE.EXPECTED_EXECUTION,
         "identities": identities,
         "holdout_cases": MODULE.EXPECTED_HOLDOUT,
         "holdout_opened": False,
@@ -156,10 +157,13 @@ def test_validator_rejects_alternate_contract_and_weak_pair(tmp_path, monkeypatc
     assert MODULE.validate(contract, repo, namespace=MODULE.NAMESPACE)["passed"] is False
 
 
-def test_wrapper_has_no_runtime_route_or_authorization() -> None:
+def test_wrapper_has_guarded_runtime_route_but_no_authorization() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
     assert "runtime_authorization_not_issued" in source
-    assert "smoke_riser_reference_playback.py" not in source
+    assert 'readonly AUTHORIZATION_SHA256=""' in source
+    assert "smoke_riser_reference_playback.py" in source
+    assert "--corrective-teacher-capture-dir" in source
+    assert "summarize_model_based_corrective_teacher_case30_capture.py" in source
     result = subprocess.run(["bash", str(WRAPPER), "--execute"], capture_output=True, text=True)
     assert result.returncode == 4
     assert "runtime_authorization_not_issued" in result.stderr

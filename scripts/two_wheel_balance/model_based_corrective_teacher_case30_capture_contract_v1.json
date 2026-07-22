@@ -18,6 +18,17 @@
     "perturbation_activity_flag": true,
     "normalized_training_dataset_created": false
   },
+  "execution_contract": {
+    "case": 30,
+    "rollout": "complete_model_based_planner_plus_corrective_teacher",
+    "maximum_runtime_seconds": 600,
+    "authorization_consumed_before_isaac": true,
+    "fresh_namespace_required": true,
+    "exclusive_gpu_required": true,
+    "dynamic_gate_required_before_save": true,
+    "finalizer_reopens_archive": true,
+    "capture_only": true
+  },
   "identities": {
     "paired_final_status": {
       "path": "docs/03_training/two_wheel_balance/evidence_20260722_case30_corrective_pair/final_status.json",
@@ -74,13 +85,18 @@
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case30_capture.py",
-      "sha256": "ada4c8a028f2eb9e4a02708b3aa69745d830bf4b9e2421907724f73cc3824398",
-      "git_blob_sha1": "3d5fea8b645497d6ac210cbbf01c7a4c3f722ac3"
+      "sha256": "ef88b15f2c0ba886fe35da03b5c3ba6a1dd2f7b2fc4241b28c40507dc5f32084",
+      "git_blob_sha1": "346cd48104c04cb7681fae7541b3bc428348bab2"
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case30_capture.sh",
-      "sha256": "95dce35979eeb77155798cc59061312d2cd58f9637a342b804cb119afbc0d6de",
-      "git_blob_sha1": "eb18ea3cc5930d5b5e70c8ed617c3388f24068a6"
+      "sha256": "58253f4e6c3598a284945aec3bdae1005acab86f645919952834b0eaaec92fc0",
+      "git_blob_sha1": "51b3b3691f2d2e0b874240642ee87a8426dc37e0"
+    },
+    "capture_finalizer": {
+      "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case30_capture.py",
+      "sha256": "0ff599c9cd4be49382de14184e9b477b48bcd5b3616b9d919c5fe47d1587a8e6",
+      "git_blob_sha1": "5f83ec47ac3a35f05ec6fefd19049f9dbfd2c345"
     }
   },
   "holdout_cases": [3, 5, 13, 19, 24],

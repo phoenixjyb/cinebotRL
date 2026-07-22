@@ -15,6 +15,7 @@ from scripts.two_wheel_balance.validate_model_based_corrective_teacher_case30_pa
     git,
     identity_row,
     sha256_file,
+    token_checks,
 )
 
 
@@ -49,6 +50,17 @@ EXPECTED_CAPTURE = {
     "perturbation_activity_flag": True,
     "normalized_training_dataset_created": False,
 }
+EXPECTED_EXECUTION = {
+    "case": 30,
+    "rollout": "complete_model_based_planner_plus_corrective_teacher",
+    "maximum_runtime_seconds": 600,
+    "authorization_consumed_before_isaac": True,
+    "fresh_namespace_required": True,
+    "exclusive_gpu_required": True,
+    "dynamic_gate_required_before_save": True,
+    "finalizer_reopens_archive": True,
+    "capture_only": True,
+}
 REQUIRED_IDENTITIES = {
     "paired_final_status",
     "case30_plan",
@@ -63,6 +75,7 @@ REQUIRED_IDENTITIES = {
     "corrective_capture_runtime",
     "contract_validator",
     "preflight_wrapper",
+    "capture_finalizer",
 }
 TRACKED_IDENTITIES = REQUIRED_IDENTITIES - {
     "case30_plan",
@@ -70,7 +83,13 @@ TRACKED_IDENTITIES = REQUIRED_IDENTITIES - {
 }
 
 
-def validate(contract_path: Path, repo: Path, *, namespace: str) -> dict[str, object]:
+def validate(
+    contract_path: Path,
+    repo: Path,
+    *,
+    namespace: str,
+    authorization_file: Path | None = None,
+) -> dict[str, object]:
     repo = repo.resolve()
     contract_path = contract_path.resolve()
     canonical = (repo / CONTRACT_RELATIVE_PATH).resolve()
@@ -170,22 +189,52 @@ def validate(contract_path: Path, repo: Path, *, namespace: str) -> dict[str, ob
         == paired.get("candidate_metrics", {}).get("plan_sha256"),
         "residual_scales": contract.get("residual_action_scales") == EXPECTED_SCALES,
         "capture_contract": contract.get("capture_schema_contract") == EXPECTED_CAPTURE,
+        "execution_contract": contract.get("execution_contract")
+        == EXPECTED_EXECUTION,
         "holdout_closed": contract.get("holdout_cases") == EXPECTED_HOLDOUT
         and contract.get("holdout_opened") is False
         and contract.get("validation_cases_opened") == [],
         "cpu_ready": contract.get("cpu_preflight_ready") is True,
-        "runtime_closed": contract.get("runtime_authorized") is False
-        and contract.get("gpu_launch_authorized") is False
-        and contract.get("authorization_token_issued") is False
-        and contract.get("runtime_authorization_token_sha256") == "",
-        "capture_closed": contract.get("label_capture_authorized") is False
-        and contract.get("dataset_creation_authorized") is False,
+        "authorization_state_consistent": (
+            (
+                contract.get("runtime_authorized") is False
+                and contract.get("gpu_launch_authorized") is False
+                and contract.get("authorization_token_issued") is False
+                and contract.get("runtime_authorization_token_sha256") == ""
+                and contract.get("label_capture_authorized") is False
+            )
+            or (
+                contract.get("runtime_authorized") is True
+                and contract.get("gpu_launch_authorized") is True
+                and contract.get("authorization_token_issued") is True
+                and isinstance(
+                    contract.get("runtime_authorization_token_sha256"), str
+                )
+                and len(contract.get("runtime_authorization_token_sha256")) == 64
+                and contract.get("label_capture_authorized") is True
+            )
+        ),
+        "normalized_dataset_closed": contract.get("dataset_creation_authorized")
+        is False,
         "training_closed": contract.get("bc_authorized") is False
         and contract.get("ppo_authorized") is False
         and contract.get("training_started") is False
         and contract.get("valid_for_training") is False,
     }
-    passed = all(checks.values())
+    cpu_passed = all(checks.values())
+    authorization_issued = bool(contract.get("authorization_token_issued"))
+    authorization_checks = token_checks(
+        authorization_file, contract.get("runtime_authorization_token_sha256")
+    )
+    runtime_authorized = bool(
+        cpu_passed
+        and authorization_issued
+        and authorization_file is not None
+        and all(authorization_checks.values())
+    )
+    passed = cpu_passed and (
+        authorization_file is None or runtime_authorized
+    )
     return {
         "schema": ADMISSION_SCHEMA,
         "contract": str(contract_path),
@@ -201,11 +250,25 @@ def validate(contract_path: Path, repo: Path, *, namespace: str) -> dict[str, ob
         "paired_checks": paired_checks,
         "corrective_profile_checks": profile_checks,
         "checks": checks,
-        "cpu_contract_ready": passed,
+        "authorization_checks": authorization_checks,
+        "authorization_file": (
+            None
+            if authorization_file is None
+            else str(authorization_file.resolve())
+        ),
+        "authorization_consumed_before_isaac": runtime_authorized,
+        "cpu_contract_ready": cpu_passed,
         "corrective_target_admission_passed": all(paired_checks.values()),
-        "runtime_authorized": False,
-        "gpu_launch_authorized": False,
-        "label_capture_authorized": False,
+        "plan_sha256": identities.get("case30_plan", {}).get("sha256"),
+        "corrective_profile_sha256": identities.get(
+            "corrective_profile", {}
+        ).get("sha256"),
+        "paired_final_status_sha256": identities.get(
+            "paired_final_status", {}
+        ).get("sha256"),
+        "runtime_authorized": runtime_authorized,
+        "gpu_launch_authorized": runtime_authorized,
+        "label_capture_authorized": runtime_authorized,
         "dataset_creation_authorized": False,
         "bc_authorized": False,
         "ppo_authorized": False,
@@ -220,9 +283,15 @@ def main() -> int:
     parser.add_argument("--contract", type=Path, required=True)
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--namespace", required=True)
+    parser.add_argument("--authorization-file", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    result = validate(args.contract, args.repo_root, namespace=args.namespace)
+    result = validate(
+        args.contract,
+        args.repo_root,
+        namespace=args.namespace,
+        authorization_file=args.authorization_file,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))

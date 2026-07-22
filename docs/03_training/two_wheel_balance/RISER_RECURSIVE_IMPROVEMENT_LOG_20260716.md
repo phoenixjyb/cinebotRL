@@ -5531,3 +5531,38 @@ and must state whether its candidate was accepted or rejected.
   must not be used to relabel the current overflow as valid.
 - Do not launch another Isaac run, capture labels, retrain BC, start PPO, or
   begin obstacle work during the split and label-envelope CPU reviews.
+
+## Round 147: case 4/78 role swap is admitted without rewriting historical data
+
+- Commit `0cd792a` adds a canonical-hash CPU builder and focused positive and
+  negative tests for the post-qualification role swap. It binds the pending
+  fallback proposal, immutable 403,569-row teacher summary, and passed case-78
+  final/gate evidence. The complete authoritative `.98` suite passes `607`
+  tests with seven intentional platform skips in `73.08 s`.
+- The resulting manifest is
+  `20260722_case4_case78_split_admission_v1_cpu/manifest.json`, SHA-256
+  `eac2c8c5389b0a8e3590d5b6355eaa80b50019091d5eb906408a6599c19cb623`.
+  Every input contract check passes.
+- Split version `initial_teacher_case4_train_case78_validation_v2` is admitted
+  for the next dataset build. Training contains the original 30 cases plus
+  case 4; validation remains five cases `[8,16,22,32,78]`; holdout remains
+  exactly `[3,5,13,19,24]`. These are the only role changes.
+- The existing teacher artifact remains an immutable historical 30/5/5 split:
+  no rows, arrays, actions, hashes, or source files are rewritten. Case 78 has
+  no labels, so the role manifest does not claim the historical dataset already
+  implements the new split.
+- Split roles are admitted, but label capture, dataset creation, BC, PPO, and
+  training validity remain false. The next dataset builder must consume this
+  manifest explicitly and may not infer admission from case IDs alone.
+
+## Next round after Round 147
+
+- Perform a CPU-only raw-residual audit using the passed case-78 gate and the
+  existing 40-case corpus envelope. Separate physical command authority from
+  learned-label normalization, quantify per-channel maxima/quantiles and
+  overflow duration, and propose one non-clipping action contract.
+- The proposal must preserve the validated LQR/model-based inner controller and
+  safety supervisor. A learned residual remains bounded above those loops; it
+  must not inherit primary balance, hard-limit, or emergency authority.
+- Do not capture case-78 labels, rebuild the dataset, run BC/PPO, open holdout,
+  or launch Isaac until the new label contract is independently admitted.

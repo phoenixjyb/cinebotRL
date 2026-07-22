@@ -6782,3 +6782,49 @@ and must state whether its candidate was accepted or rejected.
 - Design the multi-case merge/split contract only after real converted cases
   exist. Preserve case-disjoint splits, keep holdout unopened until its gate,
   and bind the model-based action scales and command contract end to end.
+
+## Round 174: BC artifacts and legacy rollout gates bind action semantics
+
+- Commit `c296392` closes an independent DNN deployment ambiguity. Previous BC
+  checkpoints and reports identified architecture and observations but omitted
+  the command base and action scales. A normalized policy could therefore be
+  paired accidentally with the wrong physical residual semantics.
+- The trainer now records `dataset_schema`, `policy_command_base`,
+  `policy_residual_contract`, and `residual_action_scales` in both checkpoint
+  and report. Current supported legacy merged datasets are explicitly bound to
+  `phase_feedforward`,
+  `phase_feedforward_plus_bounded_policy_residual_v1`, and either the frozen
+  v2 `[0.30,0.40,0.10]` scales or the exact admitted v3 metadata scales.
+  Invalid or non-positive scales fail closed.
+- The legacy exact-source BC, holdout, and all-79 wrappers now require those
+  report fields. Holdout/all-79 playback explicitly passes
+  `--policy-command-base phase_feedforward` and
+  `--residual-action-scales 0.30,0.40,0.10`; resumable gates must report the
+  same values. These wrappers can no longer silently evaluate the new
+  model-planner residual policy.
+- The future model-based path remains separate and must eventually require
+  `model_based_planner`,
+  `model_based_planner_plus_bounded_policy_residual_v1`, and
+  `[0.05,0.05,0.02]`. No model-based merged dataset or policy is claimed by
+  this change.
+- Runtime commit is
+  `c296392386c7e19e8264b61fd27b852c8074b805`. Trainer SHA-256 is
+  `8a4f0e582deb3e6b7388d9877944133f482a73acb0e8d6c2606704183f85673b`;
+  legacy BC/holdout/all-79 wrapper SHA-256 values are respectively
+  `e80a4954a4c699afd74d6750b671d674cb21b3d3c767eb2925f0ab83fed4f70e`,
+  `5731d22d52dc6d5f6da6fa6c76d325611115c5ac08899a5269a287a5b75b5d88`,
+  and `0daf68098211494125147e1a0a020bfa665a2403ca630be9bf26f803315115b6`.
+- Focused semantics and wrapper tests pass `67/67`. The complete authoritative
+  `.98` suite passes `783` with eleven intentional skips and two config
+  warnings in `71.07 s`. The corrective-capture preflight still passes at
+  clean pushed HEAD with runtime and label capture unauthorized; no Isaac,
+  conversion, BC, PPO, or learned rollout ran.
+
+## Next round after Round 174
+
+- Do not add another policy abstraction in place of evidence. The next useful
+  step is the already reviewed, exactly one-use v2 case-30 corrective capture.
+- After a real archive passes, execute the sealed effective-label conversion
+  once and audit its clipping distribution and rebuilt recurrence. Only then
+  decide whether the generic corrective profile can be admitted on additional
+  train cases and whether a model-based multi-case merge contract is justified.

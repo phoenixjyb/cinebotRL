@@ -86,7 +86,9 @@ def _inputs() -> tuple[dict, dict, dict, dict, dict]:
         "passed": True,
         "dynamic_qualification_passed": True,
         "dataset_created": False,
-        "training_started": False,
+        "bc_authorized": False,
+        "ppo_authorized": False,
+        "valid_for_training": False,
     }
     return contract, audit, split, gate, final
 
@@ -130,3 +132,9 @@ def test_shadow_label_contract_rejects_unpassed_physics() -> None:
     values[3]["results"][0]["dynamic_quality_passed"] = False
     checks = semantic_checks(*values)
     assert not checks["passed_canary_is_bound"]
+
+
+def test_shadow_label_contract_accepts_roundoff_in_frozen_scale() -> None:
+    values = list(_inputs())
+    values[1]["teacher40_candidate_scale"] = [0.35000000000000003, 0.4, 0.1]
+    assert semantic_checks(*values)["residual_audit_retains_candidate_scale"]

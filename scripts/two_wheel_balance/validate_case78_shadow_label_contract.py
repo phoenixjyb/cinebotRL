@@ -51,6 +51,18 @@ def load_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def same_vector(left: Any, right: list[float], *, tolerance: float = 1e-12) -> bool:
+    return bool(
+        isinstance(left, list)
+        and len(left) == len(right)
+        and all(
+            isinstance(value, (int, float))
+            and abs(float(value) - expected) <= tolerance
+            for value, expected in zip(left, right, strict=True)
+        )
+    )
+
+
 def run_git(root: Path, *args: str) -> str:
     return subprocess.run(
         ["git", "-C", str(root), *args],
@@ -129,7 +141,7 @@ def semantic_checks(
         "residual_audit_retains_candidate_scale": audit.get("decision")
         == "retain_teacher40_scale_case78_series_measurement_required"
         and audit.get("teacher40_action_contract_retained") is True
-        and audit.get("teacher40_candidate_scale") == EXPECTED_SCALES
+        and same_vector(audit.get("teacher40_candidate_scale"), EXPECTED_SCALES)
         and audit.get("candidate_scale_maximum_compatibility_passed") is True
         and audit.get("case78_shadow_measurement_required_before_label_capture")
         is True
@@ -154,7 +166,9 @@ def semantic_checks(
         and final.get("passed") is True
         and final.get("dynamic_qualification_passed") is True
         and final.get("dataset_created") is False
-        and final.get("training_started") is False,
+        and final.get("bc_authorized") is False
+        and final.get("ppo_authorized") is False
+        and final.get("valid_for_training") is False,
     }
 
 

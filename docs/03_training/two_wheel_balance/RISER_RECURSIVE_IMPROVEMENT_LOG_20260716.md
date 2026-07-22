@@ -6730,3 +6730,55 @@ and must state whether its candidate was accepted or rejected.
   requested labels.
 - Do not start BC or PPO until conversion is reviewed and the training-split
   dataset contract is admitted. Keep holdout cases `[3,5,13,19,24]` unopened.
+
+## Round 173: effective-label case conversion is sealed CPU-only
+
+- Commit `cbecb6a` adds a distinct
+  `model_based_corrective_case_dataset_v1` path instead of reusing the legacy
+  merged residual dataset. This closes a semantic mismatch: historical
+  phase-feedforward residual data declares scales `[0.30,0.40,0.10]`, while
+  the admitted complete-model-planner residual contract uses
+  `[0.05,0.05,0.02]`. These schemas and labels may not be silently mixed.
+- Conversion requires a passed v2 capture final status, all dynamic/archive
+  checks true, an exact source-capture SHA-256 match, matching runtime commit,
+  and all dataset/BC/PPO/training flags closed. It refuses an existing output
+  and does not write anything unless `--execute` is explicitly supplied.
+- Only `effective_corrective_normalized_actions` become candidate labels.
+  Requested pre-supervisor actions remain audit-only. Effective residuals must
+  reconstruct final command from the complete model command; requested and
+  effective residuals, their delta, and the per-channel clipping mask must all
+  remain mutually consistent and below the unchanged reserved margin.
+- The converter repairs a causal-history mismatch exposed by the v1 run:
+  capture observations contain the previously requested policy action, but the
+  intended target is the effective post-supervisor action. The converted case
+  dataset therefore resets the first previous-action observation to zero and
+  rebuilds every later row from the previous effective label. Any recurrence
+  mismatch fails closed.
+- A converted case is only `valid_for_case_merge=true`; it remains
+  `merged_dataset_created=false`, `valid_for_training=false`, with BC, PPO, and
+  training unauthorized. The existing BC trainer does not accept this case
+  schema directly.
+- Runtime commit is
+  `cbecb6a2d5f706dddf056b204907c166344652b2`. Converter-runtime SHA-256 is
+  `a6b10fb888e9da46bd919c3d421a495f9cf7b2ec98bea84af223968711c82aef`;
+  CLI SHA-256 is
+  `0dded23cc3b6c14ff43f7aaad747bbd6d165d0a8de70aa9259ad06fc30da42bc`;
+  focused-test SHA-256 is
+  `9fb959851c20588e5c273ef5741571d0cb86439ff8453693d9f228167311657d`.
+- Expanded local capture/conversion/trainer tests pass `77/77`. The complete
+  authoritative `.98` suite passes `782` with eleven intentional skips and two
+  config warnings in `73.50 s`. Canonical capture preflight still passes at
+  clean pushed HEAD with runtime and label capture unauthorized; the v2
+  namespace remains absent and no conversion or training artifact was created.
+
+## Next round after Round 173
+
+- Preserve the same explicit boundary: authorize and run exactly one v2
+  case-30 capture, then independently seal it. Do not execute conversion unless
+  the real final status admits it.
+- If admitted, run converter preflight, verify all source/output hashes, execute
+  one case conversion, and stop for review. One case is not a train/validation
+  curriculum and must not be passed directly to BC.
+- Design the multi-case merge/split contract only after real converted cases
+  exist. Preserve case-disjoint splits, keep holdout unopened until its gate,
+  and bind the model-based action scales and command contract end to end.

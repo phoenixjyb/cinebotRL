@@ -1,9 +1,11 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 
+import pytest
 
 ROOT = Path(__file__).parents[1]
 VALIDATOR = (
@@ -157,6 +159,8 @@ def test_validator_accepts_clean_pushed_canonical_contract(tmp_path, monkeypatch
 
 
 def test_validator_authorizes_only_exact_mode_0600_token(tmp_path, monkeypatch) -> None:
+    if os.name == "nt":
+        pytest.skip("POSIX token-mode semantics are validated in WSL preflight")
     repo, contract = _fixture_repo(tmp_path, monkeypatch)
     token = tmp_path / "token"
     token.write_bytes(

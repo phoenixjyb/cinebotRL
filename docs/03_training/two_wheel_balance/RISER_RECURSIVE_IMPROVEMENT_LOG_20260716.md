@@ -5467,3 +5467,67 @@ and must state whether its candidate was accepted or rejected.
 - Do not create the runtime contract and token in the same unreviewed change.
   Do not open holdout, create labels/data, retrain BC, start PPO, or begin
   obstacle work during the runtime-contract review.
+
+## Round 146: the bounded `0.10 m` camera-cap candidate passes dynamically
+
+- Commits `8c00406`, `2034c40`, and `17b5243` add, lineage-pin, and seal the
+  separate one-use runtime wrapper, authorization validator, and final
+  summarizer. Commit `cfe8325` makes only the POSIX token-mode/symlink tests
+  skip on Windows while preserving those checks in the WSL runtime validator.
+  The complete authoritative `.98` suite passes `605` tests with seven
+  intentional platform skips in `58.23 s`.
+- Tokenless runtime preflight at clean pushed commit
+  `cfe8325656ce4679273cfb95a45202f0a96106a2` passes every CPU/runtime
+  identity, committed-blob, lineage, canonical-path, fresh-namespace,
+  no-learning, and WSL/Windows/NVIDIA ownership check. Runtime contract
+  SHA-256 is
+  `2ec51603a2574ee486be9b3f9a2e1e5912ea4162106c3aab146b80a2ee3ae252`.
+- The mode-`0600` token is consumed before Isaac starts. Exactly one case-78
+  deterministic canary runs in namespace
+  `20260722_case78_camera_cap_v1_exclusive`, with camera-error recovery
+  disabled and the only controller change set to
+  `maximum_camera_lever_arm_correction_m=0.10`. No policy, capture, dataset,
+  split mutation, holdout access, BC, or PPO path is enabled.
+- The canary completes the exact `135.487646/192.299567 s` source/execution
+  clocks in `83,050` policy steps and `2,802.755613 s` host wall time at
+  `29.658205` observed policy steps/s. The heartbeat is only `2.519 s` old at
+  finalization. Playback exits zero, does not time out, and post-run WSL,
+  Windows, and NVIDIA ownership is empty.
+- All unchanged dynamic, thermal, controller-evidence, no-termination,
+  heartbeat, wall-bound, GPU-release, and no-data checks pass. Position
+  p95/max improves to `0.116601/0.184238 m`, versus the unchanged
+  `0.15/0.25 m` gates. Pitch max is `7.568641 deg`; attitude p95/max is
+  `0.147844/0.298857 deg`; riser max is `0.013690 m`; proxy max is
+  `0.283882 deg`; proxy rate max is `54.511654 deg/s`; and all saturation
+  ratios are zero.
+- The applied camera correction reaches the exact `0.10 m` cap and remains
+  saturated for `90.1613%` of samples; raw correction reaches `0.241389 m`.
+  This is dynamic proof for the bounded model-based cap, not evidence that the
+  full raw lever-arm request should be applied.
+- The residual-label envelope independently remains false. No residual is
+  applied and no labels are written, so dynamic qualification does not admit a
+  dataset or training. Case 78 also remains `unused` until a separate immutable
+  split change is reviewed and committed.
+- Canonical SHA-256 values are final status
+  `e413b0df0b09c3c04ac49130ca2d38c7e495364504c04f3e89d72521e8e5a4f6`,
+  gate `304fa9e1202d4099f976e6933e9ffc21a2833e7cc380ab9f95d7473bf2126c73`,
+  admission
+  `2f799c7895c342aebb1e93b8617796c06259115d6be8b804bff84afea27523f0`,
+  heartbeat
+  `4bfd81db5187d0890d7a4a32b83e330ef8bd68a243a92c96ca9a0d0138990393`,
+  and playback log
+  `96cc2bfca165de989cd52aefc8dd556ededb48339fa3ae141637c0e33420f9b4`.
+
+## Next round after Round 146
+
+- Build a CPU-only immutable split-admission proposal pinned to the passed
+  case-78 final/gate evidence and the existing transparent split-reset
+  proposal. The change may move case 4 from validation to training and case 78
+  from unused to validation, while keeping holdout `[3,5,13,19,24]` unchanged.
+  Do not alter teacher arrays, source plans, or physical gates.
+- Keep residual-label admission separate. Before creating any dataset, audit
+  the passed run's raw residual distribution and define a new evidence-backed
+  envelope or action contract without clipping. Dynamic qualification alone
+  must not be used to relabel the current overflow as valid.
+- Do not launch another Isaac run, capture labels, retrain BC, start PPO, or
+  begin obstacle work during the split and label-envelope CPU reviews.

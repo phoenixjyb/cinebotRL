@@ -6312,3 +6312,46 @@ and must state whether its candidate was accepted or rejected.
   than relaxing gates or treating its commands as labels. Only an admitted
   paired improvement can open a fresh, training-split corrective-label capture
   proposal; BC and PPO remain closed meanwhile.
+
+## Round 165: add the disabled corrective-teacher runtime seam CPU-only
+
+- Commit `cc3db43` adds an explicit `--corrective-teacher-profile` seam to
+  reference playback. It is disabled by default, restricted to reviewed case
+  30, requires `model_based_planner` plus zero-policy mode, rejects a concurrent
+  TorchScript policy, and remains exclusive with all dataset, raw-teacher,
+  policy-trace, and shadow-trace outputs.
+- The same deterministic wrench profile may now be used for the paired
+  model-based zero baseline and corrective candidate. The model planner is
+  computed first; only then is the bounded corrective action computed from the
+  existing causal physical-camera observation and applied through the existing
+  model-based residual safety clamp. The flag-absent command path is unchanged.
+- Compact policy-rate telemetry records sample count, unbounded/applied/
+  normalized maxima, and per-channel amplitude/slew-limit counts. It always
+  reports `labels_captured=false`, `dataset_created=false`, and
+  `training_started=false`. The gate JSON separately identifies the profile,
+  corrective contract, trajectory command source, and capture authorization.
+- The committed case-30 profile SHA-256 is
+  `26df020549f7db60f3e17d78bb3797e1f32630f615361a1e12d359977e7cf45b`.
+  Playback and corrective-teacher module SHA-256 values are respectively
+  `a3c389376fa53274fc223bb4bbd846d8230c2c286f8bd9b243d191048359002c`
+  and
+  `758179ceb0d9e4031ee9e7186169f9d72482decdabab5ad241ccb621d5e3420b`.
+- Focused pre-app, profile, action, telemetry, perturbation, playback, and gate
+  tests pass `89/89`. The complete authoritative `.98` suite passes `737`
+  tests with nine intentional skips in `58.49 s`. No wrapper, authorization
+  hash/token, runtime namespace, Isaac/GPU process, label capture, dataset, BC,
+  PPO, or training was created.
+
+## Next round after Round 165
+
+- Build a CPU-only paired case-30 preflight contract and wrapper. Pin commit
+  `cc3db43`, proposal/profile, exact case-30 plan and perturbation, gains,
+  robot/USD, playback/module blobs, all unchanged physical gates, one seed, and
+  a fresh baseline/candidate namespace. Leave the authorization hash empty.
+- Add negative tests for conflicting cases, profile, plan, perturbation, seed,
+  scales, controller arguments, capture paths, dirty/diverged Git state, and
+  occupied GPU ownership. The wrapper must stop before Python/Isaac when any
+  check fails.
+- After a clean authoritative CPU suite, perform a separate go/no-go review.
+  Do not issue a token, run Isaac, capture labels, start BC/PPO, or open
+  validation/holdout trajectories as part of the preflight implementation.

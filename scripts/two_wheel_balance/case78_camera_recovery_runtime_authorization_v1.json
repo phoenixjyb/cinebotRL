@@ -1,0 +1,45 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case78_camera_recovery_runtime_authorization_v1",
+  "case": 78,
+  "current_split": "unused",
+  "reviewed_cpu_commit": "4646628645758a5a3b160e035bab3e3e6ce4bb49",
+  "runtime_implementation_commit": "23ea37c0d512cdbee288b4278be596d6fe230a7a",
+  "namespace": "20260722_case78_camera_recovery_v1_exclusive",
+  "runtime_authorization_token_sha256": "87703e2263b00b5f5961f6590ce5b2c4ec53c6e8cbb0c39aaf2637a7319b3119",
+  "identities": {
+    "cpu_contract": {
+      "path": "scripts/two_wheel_balance/case78_camera_recovery_cpu_contract_v1.json",
+      "sha256": "efa707d6bda6cc1428060ff8dac599593b85deb4c3b5d0e1225fa2d8284088ad",
+      "git_blob_sha1": "8ca63149fdd0fedc63112f8494e9fe59873f5559"
+    },
+    "runtime_wrapper": {
+      "path": "scripts/two_wheel_balance/run_case78_camera_recovery_canary.sh",
+      "sha256": "541d7d82cbf5f0f9a61df986363150e04b0938abe0385b21a7d9d5b52abfc6fe",
+      "git_blob_sha1": "4617b0c6d9d00027670086ccb72696882e98b522"
+    },
+    "runtime_summarizer": {
+      "path": "scripts/two_wheel_balance/summarize_case78_camera_recovery_canary.py",
+      "sha256": "d7753eace3715409852674d236a7f27090ebe0fbc78c088970b3ae0a062373cf",
+      "git_blob_sha1": "4b2ce1f79122f786b7dea6b8d6048d223fd9bb25"
+    },
+    "runtime_validator": {
+      "path": "scripts/two_wheel_balance/validate_case78_camera_recovery_runtime_authorization.py",
+      "sha256": "77968da89a7ea0e72bd5f727f73335390e3e25200cddff65138607e40f9b0d7e",
+      "git_blob_sha1": "b662c4763f051c56582feb2ccaff37aa934d5136"
+    }
+  },
+  "one_case_only": true,
+  "maximum_runtime_seconds": 5400,
+  "camera_recovery_governor_required": true,
+  "camera_recovery_error_range_m": [0.13, 0.155],
+  "minimum_camera_recovery_scale": 0.2,
+  "runtime_authorized": true,
+  "gpu_launch_authorized": true,
+  "dynamic_qualification_authorized": true,
+  "split_change_authorized": false,
+  "dataset_creation_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "holdout_opened": false,
+  "valid_for_training": false
+}

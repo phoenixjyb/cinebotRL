@@ -35,6 +35,7 @@ REQUIRED_IDENTITIES = {
     "perturbation_runtime",
     "preflight_wrapper",
     "contract_validator",
+    "paired_finalizer",
 }
 TRACKED_IDENTITIES = REQUIRED_IDENTITIES - {
     "proposal",

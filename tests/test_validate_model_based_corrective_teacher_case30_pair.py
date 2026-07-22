@@ -64,6 +64,7 @@ def _fixture_repo(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
         "perturbation_runtime": "src/perturbation.py",
         "preflight_wrapper": "scripts/wrapper.sh",
         "contract_validator": "scripts/validator.py",
+        "paired_finalizer": "scripts/finalizer.py",
     }
     proposal = {
         "schema": "cinebotrl_two_wheel_riser_corrective_teacher_proposal_v1",
@@ -190,10 +191,17 @@ def test_wrapper_execute_is_unconditionally_unauthorized() -> None:
     assert "runtime_authorization_not_issued" in result.stderr
 
 
-def test_wrapper_contains_no_isaac_launch_command() -> None:
+def test_wrapper_keeps_execution_behind_empty_authorization_gate() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
-    assert "smoke_riser_reference_playback.py" not in source
-    assert "--corrective-teacher-profile" not in source
+    gate_index = source.index('readonly AUTHORIZATION_SHA256=""')
+    execute_check = source.index('[[ -n "$AUTHORIZATION_SHA256" ]]')
+    playback_index = source.index('timeout --signal=TERM --kill-after=30s 600')
+    assert gate_index < execute_check < playback_index
+    assert "--corrective-teacher-profile" in source
+    assert "--dataset-dir" not in source
+    assert "--raw-teacher-dir" not in source
+    assert "--policy-trace-dir" not in source
+    assert "--shadow-teacher-trace-dir" not in source
     assert "runtime_authorization_not_issued" in source
 
 

@@ -17,5 +17,8 @@ def test_shadow_label_runtime_is_one_case_bounded_and_trace_only() -> None:
     assert "--residual-policy" not in source
     assert "--zero-policy-action" not in source
     assert 'rm -f "$AUTHORIZATION_FILE"' in source
+    protected = source.split("for variable in", 1)[1].split("do", 1)[0]
+    assert "RISER_CASE78_SHADOW_AUTHORIZATION_FILE" not in protected
+    assert 'AUTHORIZATION_FILE="${RISER_CASE78_SHADOW_AUTHORIZATION_FILE:-}"' in source
     assert "assert_gpu_free" in source
     assert "wait_for_gpu_release" in source

@@ -81,6 +81,7 @@ def test_repository_input_identities_are_host_independent() -> None:
         "RISER_VENDOR_SPEC_SNAPSHOT_20260723.json"
     )
     assert not str(identity["path"]).startswith("/")
+    assert "\\" not in str(identity["path"])
 
 
 def test_cli_writes_host_independent_lf_json(tmp_path: Path) -> None:

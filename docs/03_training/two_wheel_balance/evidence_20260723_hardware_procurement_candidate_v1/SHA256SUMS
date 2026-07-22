@@ -1,4 +1,4 @@
 0733dac3f19ccbb6aa74986efa09f70f609c7bb008f5050feff12dea0bdbcf0b  summary.json
 9e8c9b7675ea0ce338f703646f5a0478614a688a3d1f7123b63ecf82e798e54c  ../RISER_VENDOR_SPEC_SNAPSHOT_20260723.json
-d5c907e6a120e0527683e199155ec3925926f881e416ab2e2035d0e64a5a1470  ../../../../scripts/two_wheel_balance/audit_riser_hardware_procurement_candidate.py
-40a9c4794ad406a514804e5853808e5011c7298402536609d359ca2ff4cac5eb  ../../../../tests/test_audit_riser_hardware_procurement_candidate.py
+37749f1d8bcefdaa7940d6950149998fed7248fd168b350b2c64b27dddfa6f16  ../../../../scripts/two_wheel_balance/audit_riser_hardware_procurement_candidate.py
+5f7dc620a3b3f2edc8ea71b1fe6ea06037d8ee9b9072fc0448de8a7b8389bcc7  ../../../../tests/test_audit_riser_hardware_procurement_candidate.py

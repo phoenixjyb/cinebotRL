@@ -37,7 +37,7 @@ def _load_hardware_module():
 def _identity(path: Path) -> dict[str, object]:
     resolved = path.resolve()
     try:
-        display_path = str(resolved.relative_to(PROJECT_ROOT))
+        display_path = resolved.relative_to(PROJECT_ROOT).as_posix()
     except ValueError:
         display_path = str(resolved)
     return {

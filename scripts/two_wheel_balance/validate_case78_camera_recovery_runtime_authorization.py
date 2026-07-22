@@ -19,7 +19,7 @@ except ImportError:
 
 SCHEMA = "cinebotrl_two_wheel_riser_case78_camera_recovery_runtime_authorization_v1"
 REVIEWED_CPU_COMMIT = "4646628645758a5a3b160e035bab3e3e6ce4bb49"
-RUNTIME_IMPLEMENTATION_COMMIT = "TO_BE_PINNED"
+RUNTIME_IMPLEMENTATION_COMMIT = "23ea37c0d512cdbee288b4278be596d6fe230a7a"
 NAMESPACE = "20260722_case78_camera_recovery_v1_exclusive"
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/case78_camera_recovery_runtime_authorization_v1.json"
@@ -225,4 +225,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

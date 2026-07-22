@@ -12,6 +12,7 @@ pytest.importorskip("torch")
 from scripts.two_wheel_balance.train_riser_residual_bc import (  # noqa: E402
     build_sequence_windows,
     case_balanced_mse,
+    dataset_action_semantics,
     load_dataset,
     predict_recursive_previous_action_windows,
     previous_action_observation_gains,
@@ -124,6 +125,33 @@ def test_bc_loader_accepts_admitted_v3_previous_action_dataset(tmp_path) -> None
     metadata, arrays = load_dataset(path)
     assert metadata["valid_for_bc_initialization"]
     assert arrays["action_valid_mask"].shape == arrays["actions"].shape
+
+
+def test_dataset_action_semantics_distinguish_legacy_scales() -> None:
+    v2 = dataset_action_semantics(
+        {"schema": "cinebotrl_two_wheel_riser_residual_merged_v2"}
+    )
+    assert v2 == {
+        "policy_command_base": "phase_feedforward",
+        "policy_residual_contract": (
+            "phase_feedforward_plus_bounded_policy_residual_v1"
+        ),
+        "residual_action_scales": [0.3, 0.4, 0.1],
+    }
+    v3 = dataset_action_semantics(
+        {
+            "schema": "cinebotrl_two_wheel_riser_residual_merged_v3",
+            "action_scales": [0.35, 0.4, 0.1],
+        }
+    )
+    assert v3["residual_action_scales"] == [0.35, 0.4, 0.1]
+    with pytest.raises(ValueError, match="invalid residual action scales"):
+        dataset_action_semantics(
+            {
+                "schema": "cinebotrl_two_wheel_riser_residual_merged_v3",
+                "action_scales": [0.0, 0.4, 0.1],
+            }
+        )
 
 
 def test_bc_loader_rejects_broken_v3_previous_action_recurrence(tmp_path) -> None:
@@ -318,6 +346,11 @@ def test_failed_offline_gate_does_not_emit_policy_artifacts(tmp_path: Path) -> N
     assert report["seed"] == 20260716
     assert report["schema"] == "cinebotrl_two_wheel_riser_residual_bc_gate_v2"
     assert report["policy_architecture"] == "state_shared_lookahead_fusion_v1"
+    assert report["policy_command_base"] == "phase_feedforward"
+    assert report["policy_residual_contract"] == (
+        "phase_feedforward_plus_bounded_policy_residual_v1"
+    )
+    assert report["residual_action_scales"] == [0.3, 0.4, 0.1]
 
 
 def test_masked_previous_action_contract_is_recorded(tmp_path: Path) -> None:
@@ -591,6 +624,17 @@ def test_admitted_bc_is_reproducible_for_the_same_seed(tmp_path: Path) -> None:
             "state_shared_lookahead_fusion_v1"
         )
         assert (output / "residual_policy.pt").is_file()
+        checkpoint = torch.load(
+            output / "residual_policy.pt", map_location="cpu", weights_only=False
+        )
+        assert checkpoint["dataset_schema"] == (
+            "cinebotrl_two_wheel_riser_residual_merged_v2"
+        )
+        assert checkpoint["policy_command_base"] == "phase_feedforward"
+        assert checkpoint["policy_residual_contract"] == (
+            "phase_feedforward_plus_bounded_policy_residual_v1"
+        )
+        assert checkpoint["residual_action_scales"] == [0.3, 0.4, 0.1]
         scripted = torch.jit.load(str(output / "residual_policy.torchscript.pt"))
         with torch.inference_mode():
             predictions.append(scripted(torch.from_numpy(probe)).numpy())

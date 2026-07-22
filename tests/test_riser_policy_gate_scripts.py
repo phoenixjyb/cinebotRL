@@ -41,6 +41,9 @@ def test_bc_gate_requires_complete_quality_qualified_exact_source_dataset() -> N
     assert '== [0.25, 0.5, 1.0]' in source
     assert '"cinebotrl_two_wheel_riser_residual_bc_gate_v2"' in source
     assert '"state_shared_lookahead_fusion_v1"' in source
+    assert 'report.get("policy_command_base")' in source
+    assert '"phase_feedforward_plus_bounded_policy_residual_v1"' in source
+    assert 'report.get("residual_action_scales")' in source
 
 
 def test_initial_teacher40_bc_is_separately_admitted_and_holdout_closed() -> None:
@@ -1197,6 +1200,11 @@ def test_holdout_gate_compares_teacher_zero_and_learned_sources() -> None:
     assert 'len(cases) == 8' in source
     assert 'rev-parse HEAD)" == "$POLICY_COMMIT"' in source
     assert '"git_commit": sys.argv[4]' in source
+    assert 'report.get("policy_command_base")' in source
+    assert '"phase_feedforward_plus_bounded_policy_residual_v1"' in source
+    assert 'report.get("residual_action_scales")' in source
+    assert '--policy-command-base phase_feedforward' in source
+    assert '--residual-action-scales 0.30,0.40,0.10' in source
 
 
 def test_all79_policy_gate_requires_holdout_and_all_cases() -> None:
@@ -1215,3 +1223,8 @@ def test_all79_policy_gate_requires_holdout_and_all_cases() -> None:
     assert 'rev-parse HEAD)" == "$POLICY_COMMIT"' in source
     assert '"git_commit": sys.argv[3]' in source
     assert 'holdout.get("case_count") == 8' in source
+    assert 'report.get("policy_command_base")' in source
+    assert '"phase_feedforward_plus_bounded_policy_residual_v1"' in source
+    assert 'report.get("residual_action_scales")' in source
+    assert '--policy-command-base phase_feedforward' in source
+    assert '--residual-action-scales 0.30,0.40,0.10' in source

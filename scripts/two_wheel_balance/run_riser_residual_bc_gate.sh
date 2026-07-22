@@ -145,6 +145,12 @@ checks = {
     == "cinebotrl_two_wheel_riser_residual_bc_gate_v2",
     "policy_architecture": report.get("policy_architecture")
     == "state_shared_lookahead_fusion_v1",
+    "policy_command_base": report.get("policy_command_base")
+    == "phase_feedforward",
+    "policy_residual_contract": report.get("policy_residual_contract")
+    == "phase_feedforward_plus_bounded_policy_residual_v1",
+    "residual_action_scales": report.get("residual_action_scales")
+    == [0.3, 0.4, 0.1],
     "source_commit": report.get("source_commit") == sys.argv[2],
     "offline_gate": report.get("offline_gate_passed") is True,
     "rollout_authorized": report.get("learned_rollout_authorized") is True,

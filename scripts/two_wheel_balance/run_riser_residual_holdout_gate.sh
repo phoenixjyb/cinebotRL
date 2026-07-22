@@ -46,6 +46,12 @@ checks = {
     == "cinebotrl_two_wheel_riser_residual_bc_gate_v2",
     "policy_architecture": report.get("policy_architecture")
     == "state_shared_lookahead_fusion_v1",
+    "policy_command_base": report.get("policy_command_base")
+    == "phase_feedforward",
+    "policy_residual_contract": report.get("policy_residual_contract")
+    == "phase_feedforward_plus_bounded_policy_residual_v1",
+    "residual_action_scales": report.get("residual_action_scales")
+    == [0.3, 0.4, 0.1],
     "observation_contract": report.get("observation_contract")
     == "executed_state_with_execution_time_lookahead_v2",
     "lookahead_horizons": report.get("lookahead_horizons_s")
@@ -123,6 +129,8 @@ valid = (
     and payload.get("tracking_profile") == "riser_phase_consistent_v2"
     and payload.get("phase_feedforward_contract")
     == "derivatives_scaled_by_progress_v1"
+    and payload.get("policy_command_base") == "phase_feedforward"
+    and payload.get("residual_action_scales") == [0.3, 0.4, 0.1]
     and len(payload.get("results", [])) == 1
     and payload["results"][0].get("case") == case
 )
@@ -154,6 +162,8 @@ for case_number in ${EVAL_CASES//,/ }; do
     "$PY" -u -X utf8 "$SCRIPT_WIN" \
       --gains "$GAINS_WIN" --plan-dir "$PLAN_WIN" --cases "$case_number" \
       --residual-policy "$POLICY_WIN" --residual-policy-device cuda \
+      --policy-command-base phase_feedforward \
+      --residual-action-scales 0.30,0.40,0.10 \
       --output "$ROLLOUT_WIN\\learned\\case_$padded.json" --headless \
       >"$ROLLOUT_ROOT/logs/learned_case_$padded.log" 2>&1 || {
         tail -n 80 "$ROLLOUT_ROOT/logs/learned_case_$padded.log" >&2

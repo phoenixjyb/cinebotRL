@@ -26,6 +26,7 @@ from torch.utils.data import DataLoader, TensorDataset  # noqa: E402
 
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
     ACTION_NAMES,
+    ACTION_SCALES,
     LOOKAHEAD_HORIZONS_S,
     OBSERVATION_NAMES,
     PREVIOUS_ACTION_INDICES,
@@ -43,6 +44,10 @@ SUPPORTED_DATASET_SCHEMAS = {
     "cinebotrl_two_wheel_riser_residual_merged_v3",
 }
 INITIAL_TEACHER_DATASET_SCHEMA = "cinebotrl_two_wheel_riser_residual_merged_v3"
+LEGACY_POLICY_COMMAND_BASE = "phase_feedforward"
+LEGACY_POLICY_RESIDUAL_CONTRACT = (
+    "phase_feedforward_plus_bounded_policy_residual_v1"
+)
 SPLIT_CODES = {"train": 0, "validation": 1, "holdout": 2}
 
 
@@ -102,6 +107,24 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def dataset_action_semantics(metadata: dict[str, object]) -> dict[str, object]:
+    schema = metadata.get("schema")
+    if schema not in SUPPORTED_DATASET_SCHEMAS:
+        raise ValueError("wrong merged dataset schema")
+    scales = (
+        np.asarray(metadata.get("action_scales"), dtype=np.float64)
+        if schema == INITIAL_TEACHER_DATASET_SCHEMA
+        else ACTION_SCALES.copy()
+    )
+    if scales.shape != (3,) or not np.isfinite(scales).all() or np.any(scales <= 0.0):
+        raise ValueError("dataset has invalid residual action scales")
+    return {
+        "policy_command_base": LEGACY_POLICY_COMMAND_BASE,
+        "policy_residual_contract": LEGACY_POLICY_RESIDUAL_CONTRACT,
+        "residual_action_scales": scales.tolist(),
+    }
 
 
 def load_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarray]]:
@@ -475,6 +498,7 @@ def main() -> int:
     else:
         device = torch.device(args.device)
     metadata, arrays = load_dataset(args.dataset)
+    action_semantics = dataset_action_semantics(metadata)
     observations = arrays["observations"].astype(np.float32)
     actions = arrays["actions"].astype(np.float32)
     labels = arrays["split_labels"]
@@ -729,6 +753,8 @@ def main() -> int:
                 "fusion_hidden_sizes": fusion_hidden_sizes,
                 "observation_names": OBSERVATION_NAMES,
                 "action_names": ACTION_NAMES,
+                "dataset_schema": metadata["schema"],
+                **action_semantics,
                 "masked_observation_indices": list(masked_observation_indices),
                 "scheduled_previous_action_enabled": scheduled_sampling_enabled,
                 "scheduled_sequence_length": args.scheduled_sequence_length,
@@ -755,6 +781,7 @@ def main() -> int:
         "ppo_started": False,
         "learned_rollout_started": False,
         "dataset_schema": metadata["schema"],
+        **action_semantics,
         "dataset_sha256": sha256(args.dataset),
         "dataset_case_count": metadata["case_count"],
         "dataset_row_count": metadata["row_count"],

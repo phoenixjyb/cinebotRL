@@ -6073,3 +6073,48 @@ and must state whether its candidate was accepted or rejected.
   Seventy-two focused dataset, policy, audit, and teacher-41 tests pass locally.
   No runner mode, checkpoint, runtime authorization, namespace, or GPU process
   is introduced by this CPU-only change.
+
+## Round 160: seal the exact-zero model-based residual initialization
+
+- Commit `d46b70c` integrates the explicit model-based command base into
+  `smoke_riser_reference_playback.py`. In that mode the deterministic planner
+  remains authoritative and the policy may supply only a bounded normalized
+  residual with fixed scales `[0.05,0.05,0.02]`. Dataset, raw-command,
+  policy-trace, and shadow-trace capture remain rejected by the runtime mode.
+- Commit `050f3da` adds the CPU-only checkpoint builder and negative contract
+  tests. Commit `2d7ca8c` repairs native Windows Python access to the
+  WSL-managed Git worktree identity without accepting a caller-provided HEAD.
+  The `.98` authoritative suite passed `685` tests with nine intentional skips
+  at `050f3da`; the final focused builder/dataset/policy/runtime suite passed
+  `43` tests at `2d7ca8c`.
+- The canonical CPU output is
+  `20260722_model_based_zero_residual_policy_v1_cpu`. Its checkpoint,
+  TorchScript, and report SHA-256 values are respectively
+  `60377ad7b8b6618b614f9bd272a596574717ca436fcceaa1da827739d0f9e6d2`,
+  `b1494f7af219d44cf966d7ba7781370afc1e8fe9575dd4e414d6ec0b7ea1ab19`,
+  and `55e3ab5cd1ad2c8ee3aac12b4f834b2db90c5a9704c2fe815dd477f95049ef7e`.
+  It binds source commit `2d7ca8cc4676a5ff680049700562475940fec3b7`,
+  planner-imitation checkpoint SHA-256
+  `dcd7d811b1c882be7fe8c9f5e9361da823591c1e61149f29302ac0cc57fbb52f`,
+  and case-78 failure-audit SHA-256
+  `97c90a0dc56450e4dc71654ac588eeffd09bd5d0db92bc3a4fbae265709241fd`.
+- Independent resealing confirms the transferred encoder and exactly zero
+  eager/TorchScript action head. Runtime authorization, training authorization,
+  training-started, PPO, holdout, and valid-for-training flags are all false.
+  No Isaac process, GPU namespace, residual dataset, or learned action was
+  created during this round.
+
+## Next round after Round 160
+
+- Build a fresh CPU-only, hash-bound case-8 canary contract for the
+  `model_based_planner_plus_bounded_policy_residual_v1` runtime mode. Pin the
+  exact-zero TorchScript artifact, case-8 plan and deterministic teacher,
+  controller/USD identities, unchanged physical gates, and one-use ownership
+  requirements; do not issue a runtime token in the contract-building commit.
+- After authoritative tests and an explicit one-use authorization, run case 8
+  in an exclusive namespace. The zero-residual rollout must reproduce the
+  deterministic planner within a declared deterministic tolerance and create
+  no dataset. Only that proof can admit a bounded case-78 repetition.
+- Keep cases 16/22/32, residual target capture, BC retraining, PPO, holdout
+  access, and wider trajectory expansion closed until the zero-residual
+  preservation sequence passes.

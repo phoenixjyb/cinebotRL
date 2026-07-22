@@ -16,6 +16,19 @@ REVIEWED_CASE78_RUNTIME_COMMIT = "0cd6548e48693ebfef368b09d9cd08b60e7e4201"
 TRACKING_PROFILE = "riser_recovery_direction_v4_camera_lever_arm_v1"
 POLICY_SHA256 = "0d796c600c6dca7dce176da555f4cd1f769163f41093d2b6313f4e6264888db7"
 ACTION_SCALES = [0.35, 0.4, 0.1]
+CASE78_ROOT = (
+    PROJECT_ROOT
+    / "artifacts/two_wheel_riser"
+    / "20260722_initial_teacher41_masked_bc_case78_canary_v1_exclusive"
+)
+CASE78_EVIDENCE_PATHS = {
+    "admission": "admission.json",
+    "learned": "learned/case_0078.json",
+    "zero": "zero/case_0078.json",
+    "comparison_summary": "summary.json",
+    "learned_heartbeat": "learned/runtime_heartbeat.json",
+    "zero_heartbeat": "zero/runtime_heartbeat.json",
+}
 
 EXPECTED_CASES = {
     16: {
@@ -284,20 +297,18 @@ def build_contract(
     }
 
 
-def _verify_final_evidence(final: dict[str, Any]) -> None:
+def _verify_final_evidence(
+    final: dict[str, Any], expected_root: Path = CASE78_ROOT
+) -> None:
     evidence = final.get("evidence", {})
-    required = {
-        "admission",
-        "learned",
-        "zero",
-        "comparison_summary",
-        "learned_heartbeat",
-        "zero_heartbeat",
-    }
+    required = set(CASE78_EVIDENCE_PATHS)
     if set(evidence) != required:
         raise ValueError("case-78 final evidence set is incomplete")
     for name, row in evidence.items():
         path = Path(row.get("path", ""))
+        canonical = expected_root / CASE78_EVIDENCE_PATHS[name]
+        if path.resolve() != canonical.resolve():
+            raise ValueError(f"case-78 sealed evidence path mismatch: {name}")
         if not path.is_file() or sha256_file(path) != row.get("sha256"):
             raise ValueError(f"case-78 sealed evidence mismatch: {name}")
 
@@ -322,6 +333,10 @@ def main() -> int:
 
     if args.output.exists():
         raise ValueError(f"refusing to overwrite tranche contract: {args.output}")
+    if args.case78_final.resolve() != (CASE78_ROOT / "final_status.json").resolve():
+        raise ValueError("case-78 final must come from the canonical runtime namespace")
+    if args.case78_summary.resolve() != (CASE78_ROOT / "summary.json").resolve():
+        raise ValueError("case-78 summary must come from the canonical runtime namespace")
     head = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, text=True
     ).strip()

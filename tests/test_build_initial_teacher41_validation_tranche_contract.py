@@ -1,12 +1,17 @@
 import copy
+import hashlib
+import json
+from pathlib import Path
 
 import pytest
 
 from scripts.two_wheel_balance.build_initial_teacher41_validation_tranche_contract import (
+    CASE78_EVIDENCE_PATHS,
     EXPECTED_CASES,
     POLICY_SHA256,
     REVIEWED_CASE78_RUNTIME_COMMIT,
     TRACKING_PROFILE,
+    _verify_final_evidence,
     build_contract,
 )
 
@@ -214,3 +219,26 @@ def test_rejects_teacher_audit_provenance_drift() -> None:
             teacher_audits=audits,
             source_commit="a" * 40,
         )
+
+
+def test_sealed_case78_evidence_requires_canonical_paths(tmp_path: Path) -> None:
+    evidence = {}
+    for name, relative in CASE78_EVIDENCE_PATHS.items():
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"name": name}), encoding="utf-8")
+        evidence[name] = {
+            "path": str(path),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+    final = {"evidence": evidence}
+    _verify_final_evidence(final, tmp_path)
+
+    alternate = tmp_path / "alternate.json"
+    alternate.write_text("{}", encoding="utf-8")
+    final["evidence"]["comparison_summary"] = {
+        "path": str(alternate),
+        "sha256": hashlib.sha256(alternate.read_bytes()).hexdigest(),
+    }
+    with pytest.raises(ValueError, match="evidence path mismatch"):
+        _verify_final_evidence(final, tmp_path)

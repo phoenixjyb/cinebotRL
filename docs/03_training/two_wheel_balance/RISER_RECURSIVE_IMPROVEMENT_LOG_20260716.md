@@ -5824,3 +5824,46 @@ and must state whether its candidate was accepted or rejected.
   and no PPO. Training success alone must not authorize deployment.
 - Only after a separately sealed offline pass may a bounded case-8 Isaac canary
   be proposed. Do not launch case 78 automatically.
+
+## Round 153: teacher-41 masked BC passes offline without opening runtime
+
+- Commit `68a9443` adds the one-use teacher-41 masked-BC wrapper. It pins the
+  dataset, summary, production-loader audit, Round-152 CPU contract, trainer,
+  policy module, clean pushed HEAD, and reviewed dataset lineage. Preflight
+  passed with WSL, Windows, and NVIDIA ownership empty.
+- A mode-`0600` one-use token was hash-checked and consumed before CUDA work.
+  Offline BC completed in
+  `20260722_initial_teacher41_masked_bc_v1` at training commit `68a9443`, with
+  architecture `state_shared_lookahead_fusion_previous_action_masked_v1`,
+  seed `20260722`, best epoch 74, and all 80 bounded epochs completed.
+- Validation-only case-balanced MSE improved over zero residual in all three
+  channels: candidate `[0.008421,0.000916,0.00000407]` versus zero
+  `[0.060097,0.011948,0.010376]`. Prediction absolute maxima
+  `[0.845344,0.546735,0.135830]` remain inside the normalized action envelope.
+- Admission/report/final SHA-256 values are respectively
+  `dc7a0a0d441917f80e7f5a4bcb806d059dab6d365459e3712e4c5d5193638d99`,
+  `b7915caddea9467847430a247924eae2e856ad486da06135e1b8f543c42b891a`,
+  and `d232ffac1f67d1a4510e2ad7e6670f82742b259433ed0ce6b15727c4e39db3d9`.
+  Checkpoint SHA-256 is
+  `dcd7d811b1c882be7fe8c9f5e9361da823591c1e61149f29302ac0cc57fbb52f`;
+  TorchScript SHA-256 is
+  `0d796c600c6dca7dce176da555f4cd1f769163f41093d2b6313f4e6264888db7`.
+- Finalization passes all 17 identity, architecture, split, offline-gate,
+  checkpoint, no-rollout/no-PPO, and GPU-release checks. The token is absent,
+  no training/playback process remains, and holdout metrics were not computed.
+  The policy is only `case8_canary_proposal_ready`; learned rollout remains
+  unauthorized and case 78 must not launch automatically.
+- The complete authoritative `.98` suite now passes `636` tests with nine
+  intentional skips in `59.56 s`.
+
+## Next round after Round 153
+
+- Build a CPU-only case-8 learned-policy canary contract pinned to the
+  Round-153 final/report/TorchScript, exact case-8 smoothed plan, frozen LQR and
+  controller identities, and deterministic teacher reference evidence.
+- The canary must be exclusive, one case only, preserve the physical camera and
+  semantic DFR attitude contract, apply the same residual scales, write no
+  dataset, and keep holdout/PPO closed. Compare learned tracking against both
+  the deterministic teacher and zero residual under unchanged hard gates.
+- Do not authorize case 78 or broad rollout unless case 8 passes both absolute
+  dynamic gates and the separately declared teacher-regression budget.

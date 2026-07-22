@@ -5984,3 +5984,37 @@ and must state whether its candidate was accepted or rejected.
   position error is `0.140857 m`, peak attitude error is `0.204020 deg`, and
   peak pitch is `7.278748 deg`. Saturation, termination, and dataset creation
   remain zero/false. This is live progress only, not a completed canary claim.
+
+## Round 157: remaining validation tranche is prepared CPU-only
+
+- Commit `a29028a` adds
+  `build_initial_teacher41_validation_tranche_contract.py` and focused
+  fail-closed tests. It prepares cases `[16,22,32]` only after the sealed case
+  78 learned/zero comparison passes; it does not issue an authorization token,
+  create a runtime namespace, open holdout, or authorize capture, BC, or PPO.
+- The pinned case 16/22/32 plan SHA-256 values are respectively
+  `742d1f705d3559916c3e1d7d35caffd5ea9e7200b6e321d1f9f70c8e5a7dad16`,
+  `8f1638cd771cfac32ca251906e2c095bd7091edb2561974f12ae09b0a65d4a79`,
+  and
+  `71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f`.
+  Each preserves source/execution clocks and passes all plan timing,
+  transition, and kinematic checks.
+- Their deterministic teacher gate SHA-256 values are respectively
+  `8915d532633c52a7727fd24514141aa122d87cf593bc123d9a2776f2552a000a`,
+  `115623a6f1239b9e4fc78a7a60087a176b340f275f817f123c90f593e943892a`,
+  and
+  `d2a7477254d6a80426370217d8f08db8fe2bdf65e5f4b892a33247f90cf1ce75`.
+  The contract also pins each raw-capture case audit, proving exact capture
+  admission, both clocks, reconstruction accuracy, zero applied residual, and
+  closed training state.
+- These three cases use the normal `0.05 m` camera lever-arm correction cap;
+  case 78 intentionally retains `0.10 m`. The builder rejects applying the
+  case-78 cap to the remaining tranche.
+- Four new focused tests and the ten related case-78/finalizer tests pass
+  (`14 passed`). At the latest live readback, case 78 had reached `32,000`
+  policy steps and phase `66.224982/192.299567 s`; position error was
+  `0.044472 m`, peak position error remained `0.209184 m`, peak pitch remained
+  `8.140261 deg`, and saturation/termination remained zero/false.
+- The live `.98` worktree deliberately remains at runtime commit `0cd6548`;
+  pushed CPU-only commit `a29028a` must not be pulled there until the case-78
+  wrapper and any conditional zero baseline have closed.

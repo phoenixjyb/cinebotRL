@@ -32,6 +32,28 @@ def test_profile_load_is_exact_and_hash_bound(tmp_path) -> None:
     assert len(identity["sha256"]) == 64
 
 
+def test_profile_requires_explicit_case_identity_for_case23(tmp_path) -> None:
+    payload = _payload()
+    payload["case"] = 23
+    path = tmp_path / "profile.json"
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid deterministic wrench profile"):
+        load_deterministic_wrench_profile(path)
+    profile, identity = load_deterministic_wrench_profile(
+        path, expected_case=23
+    )
+    assert profile.case == 23
+    assert len(identity["sha256"]) == 64
+
+
+@pytest.mark.parametrize("expected_case", [0, -1, True, 23.0])
+def test_profile_rejects_invalid_expected_case(tmp_path, expected_case) -> None:
+    path = tmp_path / "profile.json"
+    path.write_text(json.dumps(_payload()), encoding="utf-8")
+    with pytest.raises(ValueError, match="expected perturbation case"):
+        load_deterministic_wrench_profile(path, expected_case=expected_case)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -114,6 +136,7 @@ def test_playback_wires_measurement_only_body_wrench_without_command_changes() -
     loop = source.split("for step in range(maximum_steps):", 1)[1]
     assert '"--deterministic-wrench-profile"' in pre_app
     assert "load_deterministic_wrench_profile" in pre_app
+    assert "expected_case=requested_cases[0]" in pre_app
     assert "requires its one pinned case only" in pre_app
     assert "requires learned-policy shadow-teacher" in pre_app
     assert "is_global=False" in source

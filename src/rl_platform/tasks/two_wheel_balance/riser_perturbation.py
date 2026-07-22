@@ -15,7 +15,7 @@ PERTURBATION_SCHEMA = (
 MAXIMUM_FORCE_ABS_N = 40.0
 MAXIMUM_DURATION_STEPS = 50
 MAXIMUM_APPLICATION_HEIGHT_M = 1.0
-AUTHORIZED_MEASUREMENT_CASE = 30
+DEFAULT_REVIEWED_CASE = 30
 PROFILE_FIELDS = {
     "schema",
     "case",
@@ -34,11 +34,15 @@ class DeterministicWrenchPulse:
     force_body_x_n: float
     application_height_m: float
 
-    def validate(self) -> None:
+    def validate(self, *, expected_case: int = DEFAULT_REVIEWED_CASE) -> None:
+        if not isinstance(expected_case, int) or isinstance(expected_case, bool):
+            raise ValueError("expected perturbation case must be an integer")
+        if expected_case <= 0:
+            raise ValueError("expected perturbation case must be positive")
         checks = {
             "case": (
                 isinstance(self.case, int)
-                and self.case == AUTHORIZED_MEASUREMENT_CASE
+                and self.case == expected_case
             ),
             "start_phase_time_s": (
                 math.isfinite(self.start_phase_time_s)
@@ -75,6 +79,8 @@ class DeterministicWrenchPulse:
 
 def load_deterministic_wrench_profile(
     path: Path,
+    *,
+    expected_case: int = DEFAULT_REVIEWED_CASE,
 ) -> tuple[DeterministicWrenchPulse, dict[str, str]]:
     if not path.is_file():
         raise ValueError(f"missing deterministic wrench profile: {path}")
@@ -98,7 +104,7 @@ def load_deterministic_wrench_profile(
         force_body_x_n=float(payload["force_body_x_n"]),
         application_height_m=float(payload["application_height_m"]),
     )
-    profile.validate()
+    profile.validate(expected_case=expected_case)
     return profile, {
         "path": str(path.resolve()),
         "sha256": hashlib.sha256(raw_bytes).hexdigest(),

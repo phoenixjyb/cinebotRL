@@ -26,6 +26,8 @@ EXPECTED_SELECTED = [30, 23, 6, 2, 7]
 REQUIRED_IDENTITIES = {
     "proposal",
     "selection",
+    "readiness_audit",
+    "readiness_auditor",
     "case23_plan",
     "perturbation_profile",
     "corrective_profile",
@@ -146,6 +148,7 @@ def validate(
     }
     proposal = _load_identity_json(rows, "proposal")
     selection = _load_identity_json(rows, "selection")
+    readiness_audit = _load_identity_json(rows, "readiness_audit")
     corrective_profile = _load_identity_json(rows, "corrective_profile")
     perturbation_profile = _load_identity_json(rows, "perturbation_profile")
     head = git(repo, "rev-parse", "HEAD").stdout.strip()
@@ -224,6 +227,26 @@ def validate(
         and selection.get("ppo_authorized") is False
         and selection.get("training_started") is False,
     }
+    readiness_checks = {
+        "schema_case_passed": readiness_audit.get("schema")
+        == "cinebotrl_two_wheel_riser_case23_pair_readiness_audit_v1"
+        and readiness_audit.get("case") == 23
+        and readiness_audit.get("passed") is True,
+        "all_checks_passed": bool(readiness_audit.get("checks"))
+        and all(readiness_audit.get("checks", {}).values()),
+        "plan_bound": readiness_audit.get("plan_sha256")
+        == identities.get("case23_plan", {}).get("sha256"),
+        "decision_bounded": readiness_audit.get("decision")
+        == "recommend_exactly_one_bounded_case23_pair_canary",
+        "runtime_learning_closed": readiness_audit.get("runtime_authorized") is False
+        and readiness_audit.get("gpu_launch_authorized") is False
+        and readiness_audit.get("label_capture_authorized") is False
+        and readiness_audit.get("dataset_created") is False
+        and readiness_audit.get("bc_authorized") is False
+        and readiness_audit.get("ppo_authorized") is False
+        and readiness_audit.get("training_started") is False
+        and readiness_audit.get("valid_for_training") is False,
+    }
     corrective_profile_checks = {
         "schema": corrective_profile.get("schema")
         == "cinebotrl_two_wheel_riser_corrective_teacher_profile_v1",
@@ -269,6 +292,7 @@ def validate(
         ),
         "proposal_contract": all(proposal_checks.values()),
         "selection_contract": all(selection_checks.values()),
+        "readiness_contract": all(readiness_checks.values()),
         "corrective_profile_contract": all(corrective_profile_checks.values()),
         "perturbation_contract": all(perturbation_checks.values()),
         "residual_scales_exact": contract.get("residual_action_scales")
@@ -312,6 +336,7 @@ def validate(
         "identities": rows,
         "proposal_checks": proposal_checks,
         "selection_checks": selection_checks,
+        "readiness_checks": readiness_checks,
         "corrective_profile_checks": corrective_profile_checks,
         "perturbation_checks": perturbation_checks,
         "checks": checks,

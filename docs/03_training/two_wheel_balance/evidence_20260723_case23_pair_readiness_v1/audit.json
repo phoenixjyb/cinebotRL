@@ -1,0 +1,124 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case23_pair_readiness_audit_v1",
+  "case": 23,
+  "checks": {
+    "proposal_passed_closed": true,
+    "selection_case23_pair": true,
+    "plan_integrity_and_kinematics": true,
+    "plan_hash_bound": true,
+    "midpoint_in_plan": true,
+    "midpoint_motion_headroom": true,
+    "dynamic_gate_passed": true,
+    "pulse_profile_exact": true,
+    "pulse_within_provisional_impulse_envelope": true,
+    "pulse_observable_by_free_body_lower_model": true,
+    "case30_same_pulse_precedent": true,
+    "corrective_profile_case_and_margin": true,
+    "historical_error_exceeds_deadband": true,
+    "learning_paths_closed": true
+  },
+  "plan_sha256": "ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6",
+  "dynamic_gate_sha256": "82825f871bf60493a6870b6e29ecb002e66639c4fe7e22ace185c8d95d27cc48",
+  "pulse": {
+    "policy_hz": 200.0,
+    "duration_s": 0.1,
+    "impulse_ns": 2.0,
+    "application_moment_impulse_nms": 1.0,
+    "ideal_free_body_delta_velocity_mps": 0.07142857142857142,
+    "ideal_free_body_displacement_during_pulse_m": 0.003571428571428572,
+    "model_limitation": "free-body estimate is an observability screen, not a prediction of the closed-loop Isaac response"
+  },
+  "midpoint": {
+    "requested_phase_time_s": 4.9648469999999945,
+    "plan_index": 265,
+    "plan_time_s": 4.966123368840712,
+    "local_transition_max_abs": {
+      "base_linear_velocity_mps": 0.2367407947824642,
+      "base_yaw_rate_radps": 0.004809954480600435,
+      "riser_rate_mps": 0.07719119742447107,
+      "proxy_rate_radps": 0.0509957358904871
+    },
+    "local_limit_fraction": {
+      "base_linear_velocity_mps": 0.5918519869561605,
+      "base_yaw_rate_radps": 0.012024886201501087,
+      "riser_rate_mps": 0.07719119742447107,
+      "proxy_rate_radps": 0.121743351653697
+    }
+  },
+  "historical_case23_dynamic_metrics": {
+    "position_error_p95_m": 0.10544955642360594,
+    "position_error_max_m": 0.10564056562003962,
+    "pitch_max_deg": 5.744872964671371,
+    "attitude_error_max_deg": 0.20907171987973763,
+    "riser_servo_error_max_m": 0.010978239471718831,
+    "action_saturation_ratio": 0.0011823825007389892
+  },
+  "historical_case23_dynamic_margins": {
+    "position_error_p95_m": 0.04455044357639405,
+    "position_error_max_m": 0.14435943437996038,
+    "pitch_max_deg": 6.255127035328629,
+    "attitude_error_max_deg": 9.790928280120262,
+    "riser_servo_error_max_m": 0.019021760528281167,
+    "action_saturation_ratio": 0.19881761749926102
+  },
+  "expected_longitudinal_correction_from_historical_p95_mps": 0.02108991128472119,
+  "expected_longitudinal_normalized_fraction": 0.42179822569442377,
+  "case30_precedent": {
+    "position_p95_absolute_improvement_m": 0.006323582721442456,
+    "position_p95_relative_improvement": 0.04455911245055357,
+    "corrective_target_admission_passed": true
+  },
+  "decision": "recommend_exactly_one_bounded_case23_pair_canary",
+  "decision_limit": "CPU evidence supports one paired measurement only; dynamic benefit and safety remain unproven until the baseline and candidate pass the unchanged Isaac gates",
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true,
+  "inputs": {
+    "proposal": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\docs\\03_training\\two_wheel_balance\\evidence_20260723_case23_pair_proposal_v1\\proposal.json",
+      "sha256": "ef520558f4240add67667e1cbd3146c987d7b67aafaf6ad781b2dc9c576a2387"
+    },
+    "selection": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\docs\\03_training\\two_wheel_balance\\evidence_20260723_model_based_pair_tranche_v1\\selection.json",
+      "sha256": "93aa25e99409ad926d4c4cf0b15075e6ea3532dd1c01d5217a45daffc37db7c0"
+    },
+    "plan": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu\\case_0023_smoothed_riser_plan_v1.npz",
+      "sha256": "ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6"
+    },
+    "dynamic_gate": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260718_gate_c_smoothed_tranche1_tail_12_11_23_horizon300_wzkp105_v1_exclusive\\gates\\case_0023.json",
+      "sha256": "82825f871bf60493a6870b6e29ecb002e66639c4fe7e22ace185c8d95d27cc48"
+    },
+    "plant_prior": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\docs\\03_training\\two_wheel_balance\\PLANT_PRIOR_PROVISIONAL_V1.json",
+      "sha256": "9c6268ab0f13d5487a41d31b011eb9ac735b0dcf01769752389972304e12762c"
+    },
+    "case30_final": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260722_model_based_corrective_teacher_case30_pair_v1_exclusive\\final_status.json",
+      "sha256": "a966c9a5407a0d5ef91ca0553d00a0c47040fdfdc1c4f9bd9814aa33447fc083"
+    },
+    "case30_baseline": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260722_model_based_corrective_teacher_case30_pair_v1_exclusive\\baseline\\case_0030.json",
+      "sha256": "63554002a9fa9b10cdc52428cf5e55c47c916132ee6302fdb609a2378a1d43eb"
+    },
+    "case30_candidate": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260722_model_based_corrective_teacher_case30_pair_v1_exclusive\\candidate\\case_0030.json",
+      "sha256": "a3fe35831f532d6e689f942df616dfdbc7213a440a7bbb367a0fe07bf560a13e"
+    },
+    "corrective_profile": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\scripts\\two_wheel_balance\\model_based_corrective_teacher_case23_profile_v1.json",
+      "sha256": "808e2e295bb4639288efc84f5bdf7a1954a6e2aa96f6854d808b02306e9324e3"
+    },
+    "wrench_profile": {
+      "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\scripts\\two_wheel_balance\\model_based_corrective_teacher_case23_wrench_profile_v1.json",
+      "sha256": "fb394f19de9f332970430f0a493a45bfeffac35c61d9469e9a475eb16715c304"
+    }
+  }
+}

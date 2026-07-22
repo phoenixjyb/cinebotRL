@@ -344,16 +344,21 @@ if args.policy_command_base == "model_based_planner":
 deterministic_wrench_profile = None
 deterministic_wrench_profile_identity = None
 if args.deterministic_wrench_profile is not None:
+    requested_cases = [
+        int(item) for item in args.cases.split(",") if item.strip()
+    ]
+    if len(requested_cases) != 1:
+        parser.error("deterministic wrench profile requires one pinned case only")
     try:
         (
             deterministic_wrench_profile,
             deterministic_wrench_profile_identity,
-        ) = load_deterministic_wrench_profile(args.deterministic_wrench_profile)
+        ) = load_deterministic_wrench_profile(
+            args.deterministic_wrench_profile,
+            expected_case=requested_cases[0],
+        )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
-    requested_cases = [
-        int(item) for item in args.cases.split(",") if item.strip()
-    ]
     if requested_cases != [deterministic_wrench_profile.case]:
         parser.error(
             "deterministic wrench profile requires its one pinned case only"

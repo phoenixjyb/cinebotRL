@@ -52,6 +52,8 @@ def _fixture_repo(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
     paths = {
         "proposal": "docs/proposal.json",
         "selection": "docs/selection.json",
+        "readiness_audit": "docs/readiness.json",
+        "readiness_auditor": "scripts/readiness.py",
         "case23_plan": "artifacts/case23_plan.npz",
         "perturbation_profile": "scripts/wrench.json",
         "corrective_profile": "scripts/corrective_profile.json",
@@ -129,6 +131,29 @@ def _fixture_repo(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
             }
         ),
     )
+    _write(
+        repo / paths["readiness_audit"],
+        json.dumps(
+            {
+                "schema": (
+                    "cinebotrl_two_wheel_riser_case23_pair_readiness_audit_v1"
+                ),
+                "case": 23,
+                "passed": True,
+                "checks": {"healthy": True},
+                "plan_sha256": plan_sha,
+                "decision": "recommend_exactly_one_bounded_case23_pair_canary",
+                "runtime_authorized": False,
+                "gpu_launch_authorized": False,
+                "label_capture_authorized": False,
+                "dataset_created": False,
+                "bc_authorized": False,
+                "ppo_authorized": False,
+                "training_started": False,
+                "valid_for_training": False,
+            }
+        ),
+    )
     corrective = {
         "schema": "cinebotrl_two_wheel_riser_corrective_teacher_profile_v1",
         "case": 23,
@@ -155,6 +180,7 @@ def _fixture_repo(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
         if name not in {
             "proposal",
             "selection",
+            "readiness_audit",
             "case23_plan",
             "corrective_profile",
             "perturbation_profile",

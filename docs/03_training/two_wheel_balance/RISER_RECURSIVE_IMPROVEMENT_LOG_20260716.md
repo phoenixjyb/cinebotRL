@@ -6661,3 +6661,72 @@ and must state whether its candidate was accepted or rejected.
   authoritative CPU tests, and stop for a new explicit go/no-go. Do not issue a
   token or launch Isaac; dataset conversion, BC, PPO, validation, and holdout
   access remain closed.
+
+## Round 172: v2 supervisor-aware capture contract passes CPU review
+
+- Commit `bd05014` replaces the rejected archive format with
+  `cinebotrl_two_wheel_riser_corrective_teacher_capture_v2`. Every policy-rate
+  row now preserves requested corrective intent and the effective residual
+  equal to final safety-supervised command minus the complete model-planner
+  command. The effective normalized residual is explicitly the only candidate
+  future BC target.
+- The archive separately seals requested/effective residuals and normalized
+  actions, requested-versus-effective delta, per-channel clipping mask, final
+  command, causal observation, source/execution clocks, initialization
+  exclusion, perturbation state, and repeated plan/runtime identities. Both
+  requested and effective labels must remain below the unchanged exclusive
+  `0.95` margin; final command must reconstruct from model command plus the
+  effective residual.
+- The runtime heartbeat now treats the dedicated corrective directory as an
+  enabled capture path, and runtime-failure evidence reports
+  `model_based_planner_plus_corrective_teacher` when that source is active. The
+  finalizer rejects a hidden capture heartbeat, missing supervisor contract,
+  inconsistent clip telemetry, or either action-envelope overflow. Legitimate
+  supervisor clipping no longer changes commands or invalidates an otherwise
+  exact effective target.
+- The fresh closed namespace is
+  `20260722_model_based_corrective_teacher_case30_capture_v2_exclusive`.
+  Contract SHA-256 is
+  `9d2df8b7659979a323737f88f322d326ab63edb21ce36e82dede587a5fa2d014`
+  and committed blob is `868da616e9c921608befc19f33c80b376838f156`.
+  Runtime commit is
+  `bd05014a5af9c866b881fda1943af92da846eddb`; the contract remains bound to
+  reviewed parent `f54db86768464c2d83feda9b2ec48c4ea2e732bf`.
+- Sealed implementation SHA-256 identities are playback
+  `83b585f46526f7dd535416ef513f606c978ac82c575fc8d021cff72dd863f47e`,
+  capture runtime
+  `b74e29b236d5195d9b877279a329c532beadc9bef6ede18c5a26f0d4d3d23c3f`,
+  validator
+  `12405025a4f759825835e5d60a0474d12f31a34daf74825380a24a81b88cb39b`,
+  wrapper
+  `280cee3da4d5152047fec6bd325b0ae9f23fbbd824d1ed571c19bf6b78e27eb6`,
+  and finalizer
+  `d19e68fc812e53b79491ae0c0ffc572c5663258051ae0dabb8055184ff454d24`.
+- Focused local tests pass `51/51`. The Mac full suite cannot collect six
+  unrelated mobile-manipulator modules because that host lacks `gymnasium`.
+  On authoritative `.98`, focused tests pass `50` with one intentional skip;
+  the complete pinned suite passes `775` with eleven intentional skips and two
+  config warnings in `68.56 s`.
+- Canonical `.98` preflight passes every check. Explicit `--execute` exits `4`
+  with `runtime_authorization_not_issued`; the v2 namespace is absent and WSL
+  and NVIDIA compute ownership are empty. The old v1 authorization SHA is
+  absent, no replacement token exists, and capture, dataset conversion, BC,
+  PPO, training, validation, and holdout access remain closed.
+- Diff audit finds no plan, planner-command, LQR/controller, robot/USD, safety
+  limit, perturbation, or dynamic/thermal gate change. Review decision:
+  **GO** for exactly one separately authorized v2 case-30 corrective capture;
+  **NO-GO** for dataset conversion, BC, PPO, a second capture, or any other
+  case.
+
+## Next round after Round 172
+
+- Only after explicit authorization, add one fresh v2 token SHA in a separate
+  commit, rerun canonical preflight and the complete CPU suite, create one
+  external mode-`0600` token, and execute the sole case-30 capture. Stop after
+  the independent finalizer regardless of outcome.
+- If the archive passes, independently hash/reopen it and then open a separate
+  CPU-only conversion proposal whose labels come only from
+  `effective_corrective_normalized_actions`. Do not train directly from
+  requested labels.
+- Do not start BC or PPO until conversion is reviewed and the training-split
+  dataset contract is admitted. Keep holdout cases `[3,5,13,19,24]` unopened.

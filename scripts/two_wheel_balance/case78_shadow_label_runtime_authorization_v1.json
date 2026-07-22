@@ -1,0 +1,48 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case78_shadow_label_runtime_authorization_v1",
+  "case": 78,
+  "current_split": "validation",
+  "reviewed_cpu_commit": "ea126c340ed0ca586fdccd8bc11f9cd9a12efd31",
+  "runtime_implementation_commit": "54d171247ab25153b07e9dd286a4ed3db7d25bcc",
+  "namespace": "20260722_case78_shadow_label_measurement_v1_exclusive",
+  "trajectory_command_source": "deterministic_teacher",
+  "maximum_camera_lever_arm_correction_m": 0.1,
+  "residual_action_scales": [0.35, 0.4, 0.1],
+  "residual_policy": null,
+  "zero_policy_action": false,
+  "identities": {
+    "cpu_contract": {
+      "path": "scripts/two_wheel_balance/case78_shadow_label_cpu_contract_v1.json",
+      "sha256": "3cbe1b816ee78f216232f67f5b0fa387ad52cb11219e60fae692326cc09b4aba",
+      "git_blob_sha1": "6adc7149658c2d22cb0d16fd9dd64b0101a3b0e4"
+    },
+    "runtime_summarizer": {
+      "path": "scripts/two_wheel_balance/summarize_case78_shadow_label_measurement.py",
+      "sha256": "731004d2fda671ae7b95031d886ccc4c29a28f157eaa874a05224668553f6c64",
+      "git_blob_sha1": "ae8d33a75bf8613017a0aa364c2e4c46a640554d"
+    },
+    "runtime_validator": {
+      "path": "scripts/two_wheel_balance/validate_case78_shadow_label_runtime_authorization.py",
+      "sha256": "5d2b07ac36f2d9e32341836ee14d2aa0f8c959bbcbd9402eeff343c70b7a83c2",
+      "git_blob_sha1": "79b0799fa5a281dbcc50984b1cf7d022520f8b35"
+    },
+    "runtime_wrapper": {
+      "path": "scripts/two_wheel_balance/run_case78_shadow_label_measurement.sh",
+      "sha256": "a2f06d593701b1a9f0c939ce1eb93b9a1888cbdb54e93f258cdcaafd0ead7d82",
+      "git_blob_sha1": "3c787d349c0b3a500380521499e032fdf082e796"
+    }
+  },
+  "one_case_only": true,
+  "maximum_runtime_seconds": 5400,
+  "heartbeat_interval_policy_steps": 2000,
+  "runtime_authorization_token_sha256": "49d5d3c37db6b8a257b8c62b7c8561312cf286022ef157095d0a110e22b757dc",
+  "runtime_authorized": true,
+  "gpu_launch_authorized": true,
+  "shadow_measurement_authorized": true,
+  "label_capture_authorized": false,
+  "dataset_creation_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "holdout_opened": false,
+  "valid_for_training": false
+}

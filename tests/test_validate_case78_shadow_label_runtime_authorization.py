@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 from pathlib import Path
 
@@ -46,3 +47,29 @@ def test_shadow_runtime_identity_scope_is_exact() -> None:
     assert module.RUNTIME_IMPLEMENTATION_COMMIT == (
         "54d171247ab25153b07e9dd286a4ed3db7d25bcc"
     )
+
+
+def test_checked_in_shadow_runtime_contract_has_exact_scope() -> None:
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/two_wheel_balance/case78_shadow_label_runtime_authorization_v1.json"
+    )
+    contract = json.loads(path.read_text(encoding="utf-8"))
+    assert contract["schema"] == module.SCHEMA
+    assert contract["case"] == 78
+    assert contract["current_split"] == "validation"
+    assert contract["runtime_implementation_commit"] == (
+        module.RUNTIME_IMPLEMENTATION_COMMIT
+    )
+    assert contract["namespace"] == module.NAMESPACE
+    assert set(contract["identities"]) == module.REQUIRED_IDENTITIES
+    assert contract["runtime_authorized"] is True
+    assert contract["gpu_launch_authorized"] is True
+    assert contract["shadow_measurement_authorized"] is True
+    assert contract["label_capture_authorized"] is False
+    assert contract["dataset_creation_authorized"] is False
+    assert contract["bc_authorized"] is False
+    assert contract["ppo_authorized"] is False
+    assert contract["runtime_authorization_token_sha256"] == hashlib.sha256(
+        (module.AUTHORIZATION + "\n").encode()
+    ).hexdigest()

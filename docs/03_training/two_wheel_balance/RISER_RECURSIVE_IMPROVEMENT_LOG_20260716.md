@@ -6018,3 +6018,58 @@ and must state whether its candidate was accepted or rejected.
 - The live `.98` worktree deliberately remains at runtime commit `0cd6548`;
   pushed CPU-only commit `a29028a` must not be pulled there until the case-78
   wrapper and any conditional zero baseline have closed.
+
+## Round 158: teacher-41 planner-imitation BC fails case 78 position p95
+
+- The learned-first case-78 canary closed at runtime commit `0cd6548` without
+  launching its conditional zero baseline. The learned result, final status,
+  and admission SHA-256 values are respectively
+  `570546d39b4267d20c6c203a1eb1a3a04a7544cb2887270c9d99a6b952ad9c41`,
+  `c14467a93622a887b861b7a8628ec1ff13b9cdf0d1a2380336b8ee9963172f1b`,
+  and
+  `a28229753508c6666e7cb1223b151f57424a3ad4b3480bf65b2a0a163dd1ea6d`.
+- The policy completed the full `192.299567 s` execution reference in `85,923`
+  steps with no termination or saturation. Position max `0.231194 m` passes
+  the unchanged `0.25 m` bound, but position p95 `0.165018 m` fails the
+  unchanged `0.15 m` bound. Every other physical, attitude, balance, riser,
+  proxy, thermal, initialization, and evidence check passes.
+- The fail-closed wrapper recorded learned exit `0`, skipped zero and comparison
+  with status `125`, and finalized with exit `6`. No zero output, comparison
+  summary, dataset, capture, BC, PPO, or holdout artifact was created. GPU and
+  playback ownership are empty and the one-use authorization token is absent.
+- Commit `de5174f` adds a hash-bound CPU failure audit. Its canonical report is
+  `20260722_initial_teacher41_case78_failure_audit_v1_cpu/report.json`,
+  SHA-256
+  `97c90a0dc56450e4dc71654ac588eeffd09bd5d0db92bc3a4fbae265709241fd`.
+  It identifies eight high-error trace intervals and confirms that the only
+  failed dynamic check is `position_p95_bounded`.
+- Compared over all 431 phase-aligned trace samples, inferred normalized action
+  MAE is `0.029019` for `vx` and `0.025637` for `wz`. In the 27 high-error
+  samples it rises to `0.042789/0.062527`; sign mismatch reaches
+  `7.41%/11.11%`. Learned progress mean falls to `0.447620` versus teacher
+  `0.463101`, with 46 progress-hold steps versus zero, increasing time spent in
+  transient camera-error regions.
+
+## Round 159: restore model-based-plus-residual policy layering CPU-only
+
+- The failure audit proves the deployed BC contract was planner imitation:
+  labels were `deterministic_planner_command - phase_feedforward`, and learned
+  mode applied `phase_feedforward + BC_prediction`. This substitutes a learned
+  reconstruction for the complete model-based planner command; it does not
+  satisfy the required `u_final = u_model + bounded_delta_u_policy` contract.
+- The existing TorchScript checkpoint is therefore classified as
+  `planner_imitation_bc_initialization_only`, not a final residual policy.
+  Threshold relaxation, the cases 16/22/32 tranche, corrective capture, BC
+  retraining, PPO, and holdout access remain unauthorized.
+- Commit `97c90e5` adds the explicit
+  `model_based_planner_plus_bounded_policy_residual_v1` command composer. A
+  zero normalized action reproduces an admissible complete model command
+  exactly; normalized overflow fails closed; the safety supervisor still
+  clamps final velocity, yaw-rate, and riser bounds. Initial residual scales
+  are tightly limited to `[0.05 m/s,0.05 rad/s,0.02 m]`.
+- The same commit adds a zero-initialized residual action head and an encoder
+  transfer helper. The accepted BC encoder can be reused, but all residual-head
+  weights and biases reset exactly to zero, including TorchScript execution.
+  Seventy-two focused dataset, policy, audit, and teacher-41 tests pass locally.
+  No runner mode, checkpoint, runtime authorization, namespace, or GPU process
+  is introduced by this CPU-only change.

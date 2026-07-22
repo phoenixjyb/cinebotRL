@@ -65,7 +65,8 @@ def test_wrapper_pins_inputs_and_consumes_future_token_before_isaac() -> None:
 
 def test_preflight_declares_learning_and_case78_closed() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
-    assert '"runtime_authorization_issued": False' in source
+    assert '"runtime_authorization_hash_issued": True' in source
+    assert '"runtime_token_consumed": False' in source
     assert '"dataset_creation_authorized": False' in source
     assert '"case78_authorized": False' in source
     assert '"holdout_opened": False' in source

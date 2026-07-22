@@ -203,8 +203,14 @@ def build_selection(
             "dynamic_checks": isinstance(dynamic.get("checks"), Mapping)
             and bool(dynamic["checks"])
             and all(value is True for value in dynamic["checks"].values()),
-            "dynamic_quality": dynamic.get("batch_summary_dynamic_quality_passed")
-            is True,
+            "individual_dynamic_quality": all(
+                dynamic["checks"].get(name) is True
+                for name in (
+                    "row_dynamic_quality",
+                    "gate_dynamic_quality",
+                    "result_dynamic_quality",
+                )
+            ),
             "training_case_only": case in train
             and case not in validation
             and case not in holdout,

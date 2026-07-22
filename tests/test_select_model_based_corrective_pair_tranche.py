@@ -64,7 +64,12 @@ def _fixture(tmp_path: Path):
                     0.003 + 0.004 * index,
                 ],
                 "batch_summary_dynamic_quality_passed": True,
-                "checks": {"dynamic": True, "thermal": True},
+                "checks": {
+                    "row_dynamic_quality": True,
+                    "gate_dynamic_quality": True,
+                    "result_dynamic_quality": True,
+                    "thermal": True,
+                },
             }
         )
     portfolio = {
@@ -89,6 +94,9 @@ def _fixture(tmp_path: Path):
         "training_started": False,
         "valid_for_training": False,
     }
+    # A later reject may make the enclosing batch summary false without
+    # invalidating this already sealed per-case dynamic result.
+    dynamic["rows"][0]["batch_summary_dynamic_quality_passed"] = False
     _write(dynamic_path, dynamic)
     split_path = tmp_path / "split.json"
     split = {
@@ -168,7 +176,7 @@ def test_selector_rejects_invalid_or_open_sources(tmp_path, failure) -> None:
     elif failure == "plan":
         values[0]["items"][0]["plan_sha256"] = "0" * 64
     else:
-        values[1]["rows"][0]["checks"]["dynamic"] = False
+        values[1]["rows"][0]["checks"]["row_dynamic_quality"] = False
     with pytest.raises(ValueError):
         MODULE.build_selection(
             *values[:4],

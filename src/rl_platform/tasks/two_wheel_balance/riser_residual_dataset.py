@@ -81,6 +81,12 @@ ACTION_NAMES = (
     "residual_riser_target_normalized",
 )
 ACTION_SCALES = np.array([0.30, 0.40, 0.10], dtype=np.float64)
+MODEL_BASED_POLICY_RESIDUAL_SCALES = np.array(
+    [0.05, 0.05, 0.02], dtype=np.float64
+)
+MODEL_BASED_POLICY_RESIDUAL_CONTRACT = (
+    "model_based_planner_plus_bounded_policy_residual_v1"
+)
 SPLIT_NAMES = ("train", "validation", "holdout")
 PREVIOUS_ACTION_NAMES = (
     "previous_residual_vx_normalized",
@@ -312,6 +318,49 @@ def apply_residual_action(
         command[1], -maximum_yaw_rate_rad_s, maximum_yaw_rate_rad_s
     )
     command[2] = np.clip(command[2], *riser_bounds_m)
+    return command
+
+
+def apply_model_based_policy_residual(
+    model_vx_m_s: float,
+    model_wz_rad_s: float,
+    model_riser_target_m: float,
+    action: np.ndarray,
+    *,
+    action_scales: np.ndarray = MODEL_BASED_POLICY_RESIDUAL_SCALES,
+    maximum_linear_velocity_m_s: float = 0.4,
+    maximum_yaw_rate_rad_s: float = 0.4,
+    riser_bounds_m: tuple[float, float] = (0.0, 1.2),
+) -> np.ndarray:
+    """Add a bounded learned correction above a complete model-based command."""
+
+    base_command = np.asarray(
+        [model_vx_m_s, model_wz_rad_s, model_riser_target_m], dtype=np.float64
+    )
+    normalized_action = np.asarray(action, dtype=np.float64)
+    scales = np.asarray(action_scales, dtype=np.float64)
+    if base_command.shape != (3,) or not np.isfinite(base_command).all():
+        raise ValueError("invalid model-based command")
+    if normalized_action.shape != (3,) or not np.isfinite(normalized_action).all():
+        raise ValueError("invalid model-based residual action")
+    if np.max(np.abs(normalized_action)) > 1.0 + 1e-6:
+        raise ValueError("model-based residual action exceeds normalized bounds")
+    if scales.shape != (3,) or not np.isfinite(scales).all() or np.any(scales <= 0):
+        raise ValueError("invalid model-based residual action scales")
+    if maximum_linear_velocity_m_s <= 0.0 or maximum_yaw_rate_rad_s <= 0.0:
+        raise ValueError("base command limits must be positive")
+    lower_riser, upper_riser = riser_bounds_m
+    if not np.isfinite([lower_riser, upper_riser]).all() or lower_riser >= upper_riser:
+        raise ValueError("invalid riser bounds")
+
+    command = base_command + scales * np.clip(normalized_action, -1.0, 1.0)
+    command[0] = np.clip(
+        command[0], -maximum_linear_velocity_m_s, maximum_linear_velocity_m_s
+    )
+    command[1] = np.clip(
+        command[1], -maximum_yaw_rate_rad_s, maximum_yaw_rate_rad_s
+    )
+    command[2] = np.clip(command[2], lower_riser, upper_riser)
     return command
 
 

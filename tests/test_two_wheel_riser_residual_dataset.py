@@ -5,6 +5,8 @@ import pytest
 
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     ACTION_SCALES,
+    MODEL_BASED_POLICY_RESIDUAL_SCALES,
+    MODEL_BASED_POLICY_RESIDUAL_CONTRACT,
     BASE_OBSERVATION_NAMES,
     LOOKAHEAD_CHANNEL_NAMES,
     LOOKAHEAD_HORIZONS_S,
@@ -12,6 +14,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     OBSERVATION_NAMES,
     PREVIOUS_ACTION_INDICES,
     apply_residual_action,
+    apply_model_based_policy_residual,
     build_executed_observation,
     build_raw_residual_command,
     build_residual_action,
@@ -222,6 +225,41 @@ def test_residual_action_uses_explicit_frozen_scales() -> None:
         action_scales=np.array([0.35, 0.40, 0.10]),
     )
     np.testing.assert_allclose(command, [0.275, 0.0, 0.38])
+
+
+def test_zero_model_based_residual_reproduces_complete_planner_command() -> None:
+    command = apply_model_based_policy_residual(
+        0.23,
+        -0.17,
+        0.74,
+        np.zeros(3),
+    )
+    np.testing.assert_array_equal(command, [0.23, -0.17, 0.74])
+    np.testing.assert_array_equal(
+        MODEL_BASED_POLICY_RESIDUAL_SCALES,
+        [0.05, 0.05, 0.02],
+    )
+    assert (
+        MODEL_BASED_POLICY_RESIDUAL_CONTRACT
+        == "model_based_planner_plus_bounded_policy_residual_v1"
+    )
+
+
+def test_model_based_policy_residual_is_tight_and_safety_clamped() -> None:
+    command = apply_model_based_policy_residual(
+        0.38,
+        -0.38,
+        1.19,
+        np.array([1.0, -1.0, 1.0]),
+    )
+    np.testing.assert_allclose(command, [0.4, -0.4, 1.2])
+
+
+def test_model_based_policy_residual_rejects_invalid_or_overflow_action() -> None:
+    with pytest.raises(ValueError, match="normalized bounds"):
+        apply_model_based_policy_residual(0.1, 0.0, 0.5, np.array([1.01, 0.0, 0.0]))
+    with pytest.raises(ValueError, match="invalid model-based residual action"):
+        apply_model_based_policy_residual(0.1, 0.0, 0.5, np.array([0.0, np.nan, 0.0]))
 
 
 def test_residual_teacher_action_rejects_scale_clipping() -> None:

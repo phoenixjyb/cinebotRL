@@ -24,6 +24,9 @@ MASKED_PREVIOUS_ACTION_POLICY_ARCHITECTURE = (
 ATTENUATED_PREVIOUS_ACTION_POLICY_ARCHITECTURE = (
     "state_shared_lookahead_fusion_previous_action_attenuated_v1"
 )
+MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE = (
+    "model_based_shared_encoder_zero_initialized_residual_v1"
+)
 
 
 def _encoder(
@@ -54,6 +57,7 @@ class RiserResidualPolicy(nn.Module):
         fusion_hidden_sizes: Sequence[int] = (256, 128),
         masked_observation_indices: Sequence[int] = (),
         previous_action_observation_gain: float | Sequence[float] = 1.0,
+        zero_initialize_action_head: bool = False,
     ) -> None:
         super().__init__()
         mean = torch.as_tensor(observation_mean, dtype=torch.float32).reshape(-1)
@@ -98,7 +102,10 @@ class RiserResidualPolicy(nn.Module):
             fusion_hidden_sizes,
         )
         self.action_head = nn.Linear(fusion_size, len(ACTION_NAMES))
-        nn.init.orthogonal_(self.action_head.weight, gain=0.01)
+        if zero_initialize_action_head:
+            nn.init.zeros_(self.action_head.weight)
+        else:
+            nn.init.orthogonal_(self.action_head.weight, gain=0.01)
         nn.init.zeros_(self.action_head.bias)
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
@@ -118,3 +125,26 @@ class RiserResidualPolicy(nn.Module):
         )
         fused = torch.cat((state_embedding, lookahead_embedding), dim=1)
         return torch.tanh(self.action_head(self.fusion_encoder(fused)))
+
+
+def initialize_model_based_residual_from_planner_imitation(
+    target: RiserResidualPolicy, source: RiserResidualPolicy
+) -> None:
+    """Reuse planner-imitation encoders while resetting the residual head to zero."""
+
+    target_state = target.state_dict()
+    source_state = source.state_dict()
+    encoder_names = [
+        name for name in target_state if not name.startswith("action_head.")
+    ]
+    if set(encoder_names) != {
+        name for name in source_state if not name.startswith("action_head.")
+    }:
+        raise ValueError("planner-imitation and residual encoder contracts differ")
+    for name in encoder_names:
+        if target_state[name].shape != source_state[name].shape:
+            raise ValueError(f"planner-imitation encoder shape mismatch: {name}")
+        target_state[name] = source_state[name].detach().clone()
+    target.load_state_dict(target_state)
+    nn.init.zeros_(target.action_head.weight)
+    nn.init.zeros_(target.action_head.bias)

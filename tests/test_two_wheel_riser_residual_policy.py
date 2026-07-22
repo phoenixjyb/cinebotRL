@@ -12,8 +12,10 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
     PREVIOUS_ACTION_INDICES,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa: E402
+    MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE,
     POLICY_ARCHITECTURE,
     RiserResidualPolicy,
+    initialize_model_based_residual_from_planner_imitation,
 )
 
 
@@ -127,3 +129,70 @@ def test_previous_action_channel_gains_are_applied_independently() -> None:
     assert policy.observation_mask[list(PREVIOUS_ACTION_INDICES)].tolist() == pytest.approx(
         [0.1, 0.0, 0.1]
     )
+
+
+def test_zero_initialized_model_based_residual_is_exactly_null_and_scriptable() -> None:
+    policy = RiserResidualPolicy(
+        torch.zeros(len(OBSERVATION_NAMES)),
+        torch.ones(len(OBSERVATION_NAMES)),
+        state_hidden_sizes=(16,),
+        lookahead_hidden_sizes=(8,),
+        fusion_hidden_sizes=(16,),
+        zero_initialize_action_head=True,
+    ).eval()
+    observations = torch.randn(32, len(OBSERVATION_NAMES))
+    scripted = torch.jit.script(policy)
+    with torch.inference_mode():
+        torch.testing.assert_close(policy(observations), torch.zeros(32, 3))
+        torch.testing.assert_close(scripted(observations), torch.zeros(32, 3))
+    assert (
+        MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE
+        == "model_based_shared_encoder_zero_initialized_residual_v1"
+    )
+
+
+def test_planner_imitation_encoder_transfer_resets_action_head() -> None:
+    source = RiserResidualPolicy(
+        torch.zeros(len(OBSERVATION_NAMES)),
+        torch.ones(len(OBSERVATION_NAMES)),
+        state_hidden_sizes=(16,),
+        lookahead_hidden_sizes=(8,),
+        fusion_hidden_sizes=(16,),
+    )
+    target = RiserResidualPolicy(
+        torch.zeros(len(OBSERVATION_NAMES)),
+        torch.ones(len(OBSERVATION_NAMES)),
+        state_hidden_sizes=(16,),
+        lookahead_hidden_sizes=(8,),
+        fusion_hidden_sizes=(16,),
+        zero_initialize_action_head=True,
+    )
+    with torch.no_grad():
+        for parameter in source.parameters():
+            parameter.add_(torch.randn_like(parameter))
+    initialize_model_based_residual_from_planner_imitation(target, source)
+    for name, value in target.state_dict().items():
+        if name.startswith("action_head."):
+            torch.testing.assert_close(value, torch.zeros_like(value))
+        else:
+            torch.testing.assert_close(value, source.state_dict()[name])
+
+
+def test_planner_imitation_encoder_transfer_rejects_shape_drift() -> None:
+    source = RiserResidualPolicy(
+        torch.zeros(len(OBSERVATION_NAMES)),
+        torch.ones(len(OBSERVATION_NAMES)),
+        state_hidden_sizes=(16,),
+        lookahead_hidden_sizes=(8,),
+        fusion_hidden_sizes=(16,),
+    )
+    target = RiserResidualPolicy(
+        torch.zeros(len(OBSERVATION_NAMES)),
+        torch.ones(len(OBSERVATION_NAMES)),
+        state_hidden_sizes=(32,),
+        lookahead_hidden_sizes=(8,),
+        fusion_hidden_sizes=(16,),
+        zero_initialize_action_head=True,
+    )
+    with pytest.raises(ValueError, match="shape mismatch"):
+        initialize_model_based_residual_from_planner_imitation(target, source)

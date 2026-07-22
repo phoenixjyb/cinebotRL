@@ -6404,3 +6404,49 @@ and must state whether its candidate was accepted or rejected.
 - Keep the runtime token/hash empty during implementation and authoritative CPU
   testing. Issue at most one token only after another explicit go/no-go review;
   do not start BC/PPO or open validation/holdout cases.
+
+## Round 167: paired runner and finalizer are sealed but unauthorized
+
+- Commit `03a833a` adds the bounded case-30 baseline/candidate route and paired
+  finalizer while keeping `AUTHORIZATION_SHA256` empty. `--execute` therefore
+  still exits before namespace creation, Python/Isaac, or GPU ownership.
+- The future execution route consumes a mode-0600 one-use token before Isaac,
+  runs the model-based exact-zero baseline first with a `600 s` timeout, waits
+  for complete GPU release, and starts the corrective candidate only after the
+  baseline gate and dynamic-quality result pass. The candidate uses the same
+  plan, seeds, physics, perturbation, gains, controller arguments, and gates.
+- Each rollout has an independent heartbeat, gate JSON, log, and exit code.
+  Runtime or GPU-release failure skips the candidate and still reaches the
+  finalizer. No dataset/raw-teacher/policy-trace/shadow-trace option exists in
+  the route.
+- The finalizer binds the copied contract and runtime admission, requires both
+  command sources and profile identities, exact zero baseline action, bounded
+  nonzero candidate action, exact perturbation execution, both heartbeats,
+  capture absence, and GPU release. It calls the pure paired-admission contract
+  and rejects weak improvement, physical regression, identity mismatch, or any
+  capture path while leaving all learning flags false.
+- Focused paired-runner/finalizer and existing runtime tests pass `99/99`.
+  Real `.98` preflight passes every check at clean pushed commit
+  `03a833aa2223124d0e248973a0833b04b1f33847`; resealed contract SHA-256 is
+  `426b625b47ad6fd38cf3b56b04a4d65017b87dc4a8eab20623761a7b7a8a2882`.
+- Explicit `.98 --execute` again exits `4` with
+  `runtime_authorization_not_issued`, creates no namespace, and starts no GPU
+  owner. The complete authoritative suite passes `747` tests with nine
+  intentional skips in `63.66 s`. Label capture, dataset, BC, PPO, training,
+  validation, and holdout access remain false.
+- Review decision: **GO** for exactly one separately authorized case-30 pair.
+  This is not target admission and not training authorization; the measured
+  candidate must still beat the baseline under every frozen paired gate.
+
+## Next round after Round 167
+
+- Add exactly one authorization SHA in a separate commit, create one mode-0600
+  token outside the repository, rerun the complete preflight immediately, and
+  consume the token before the baseline Isaac process. Preserve exclusive GPU
+  ownership throughout the two-rollout sequence.
+- Stop after the finalizer regardless of outcome. If baseline fails, candidate
+  is skipped. If candidate fails or improvement is below `3 mm` and `2%`, keep
+  corrective targets rejected and diagnose CPU-only; do not tune gates in the
+  same run.
+- Even on a paired pass, keep label capture, BC, and PPO closed. A pass may open
+  only a new CPU-reviewed training-split corrective-label capture contract.

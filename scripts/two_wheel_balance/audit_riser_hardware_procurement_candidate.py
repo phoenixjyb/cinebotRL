@@ -232,7 +232,8 @@ def main() -> int:
     if args.output.exists():
         raise FileExistsError(f"refusing to overwrite hardware audit: {args.output}")
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    with args.output.open("w", encoding="utf-8", newline="\n") as output_file:
+        output_file.write(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
     return 0 if report["passed"] else 6
 

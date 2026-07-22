@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import sys
 
 import pytest
@@ -80,3 +81,17 @@ def test_repository_input_identities_are_host_independent() -> None:
         "RISER_VENDOR_SPEC_SNAPSHOT_20260723.json"
     )
     assert not str(identity["path"]).startswith("/")
+
+
+def test_cli_writes_host_independent_lf_json(tmp_path: Path) -> None:
+    output = tmp_path / "report.json"
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--output", str(output)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = output.read_bytes()
+    assert payload.endswith(b"\n")
+    assert b"\r\n" not in payload

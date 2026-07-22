@@ -7110,11 +7110,17 @@ and must state whether its candidate was accepted or rejected.
   `0733dac3f19ccbb6aa74986efa09f70f609c7bb008f5050feff12dea0bdbcf0b`.
   Production procurement, hardware transfer, training, and GPU work remain
   false.
+- The host-independent evidence writer was repaired to force LF JSON and POSIX
+  repository-relative paths. A fresh authoritative `.98` generation is
+  byte-identical to the committed summary at the same SHA-256.
+- The exact implementation checkpoint through
+  `545ffe967884d481ab6e8cfd66d7b07e81971539` passes the authoritative `.98`
+  CPU-only repository suite: `825 passed, 11 skipped, 2 warnings` in `77.93 s`.
+  No Isaac process, runtime namespace, authorization, capture, dataset, BC,
+  PPO, or training was created.
 
 ## Next round after Round 181
 
-- Run the new procurement audit and full CPU suite on authoritative `.98`, then
-  seal and sync a clean commit if the host-independent summary is byte-identical.
 - Do not convert the engineering-sample recommendation into bulk procurement.
   The next hardware step is a measured bench campaign: moving mass, carriage
   force, current, temperature, regeneration voltage/energy, stopping distance,

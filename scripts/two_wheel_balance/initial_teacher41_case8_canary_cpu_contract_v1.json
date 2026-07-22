@@ -1,0 +1,198 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_initial_teacher41_case8_canary_cpu_contract_v1",
+  "case": 8,
+  "split": "validation",
+  "reviewed_policy_parent_commit": "e8a7b7e5748586ecbf95aa1a50ca663c35de13a9",
+  "namespace": "20260722_initial_teacher41_masked_bc_case8_canary_v1_exclusive",
+  "plan_contract": {
+    "case": 8,
+    "plan_sha256": "f07ff020128dee70ea9c8c2d806dc75c8e0ef3964dccb4e0aabfd1b0048f3655",
+    "source_pose_count": 663,
+    "execution_state_count": 663,
+    "source_duration_s": 12.940941,
+    "execution_duration_s": 18.1173174
+  },
+  "common_controller_arguments": {
+    "controller_wz_kp": 1.05,
+    "maximum_duration_scale": 3.0,
+    "camera_lever_arm_compensation_enabled": true,
+    "camera_lever_arm_compensation_gain": 1.0,
+    "maximum_camera_lever_arm_correction_m": 0.05,
+    "residual_action_scales": [0.35, 0.4, 0.1],
+    "tracking_profile": "riser_recovery_direction_v4_camera_lever_arm_v1",
+    "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
+    "position_observation_link": "physical_cam_link_fk",
+    "target_attitude_contract": "semantic_dfr_to_physical_cam_v1",
+    "hardware_proxy_command_contract": "semantic_attitude_position_only"
+  },
+  "rollouts": {
+    "zero": {
+      "trajectory_command_source": "zero_policy_action_baseline",
+      "residual_policy": null,
+      "residual_policy_device": null,
+      "zero_policy_action": true
+    },
+    "learned": {
+      "trajectory_command_source": "torchscript_residual_policy",
+      "residual_policy_identity": "policy_torchscript",
+      "residual_policy_device": "cuda",
+      "zero_policy_action": false
+    }
+  },
+  "dynamic_gate_thresholds": {
+    "maximum_pitch_deg": 12.0,
+    "maximum_position_p95_m": 0.15,
+    "maximum_position_error_m": 0.25,
+    "maximum_attitude_p95_deg": 5.0,
+    "maximum_attitude_error_deg": 10.0,
+    "maximum_riser_servo_error_m": 0.03,
+    "maximum_proxy_servo_error_deg": 5.0,
+    "maximum_internal_proxy_rate_deg_s": 360.0,
+    "maximum_saturation_ratio": 0.2
+  },
+  "comparison_gate": {
+    "mode": "validation_canary",
+    "case": 8,
+    "maximum_teacher_regression_fraction": 0.05,
+    "minimum_zero_improvement_fraction": 0.05,
+    "teacher_reference_identity": "teacher_gate",
+    "zero_reference_created_in_namespace": true,
+    "learned_reference_created_in_namespace": true
+  },
+  "identities": {
+    "case8_plan": {
+      "path": "artifacts/two_wheel_riser/20260718_smoothed_plan_all79_v9_case8_dynamic_retime_cpu/case_0008_smoothed_riser_plan_v1.npz",
+      "sha256": "f07ff020128dee70ea9c8c2d806dc75c8e0ef3964dccb4e0aabfd1b0048f3655"
+    },
+    "plan_manifest": {
+      "path": "artifacts/two_wheel_riser/20260718_smoothed_plan_all79_v9_case8_dynamic_retime_cpu/manifest.json",
+      "sha256": "ac5da6ce721bd0af51b9b851ada86b08f587f190440c9de23172b115bad3c748"
+    },
+    "plan_summary": {
+      "path": "artifacts/two_wheel_riser/20260718_smoothed_plan_all79_v9_case8_dynamic_retime_cpu/summary.json",
+      "sha256": "b1c2fffd4a620c2e5c89303702d809c108bcd3554ceeaa4ccd59392c3d531285"
+    },
+    "case8_plan_report": {
+      "path": "artifacts/two_wheel_riser/20260718_smoothed_plan_all79_v9_case8_dynamic_retime_cpu/case_0008.json",
+      "sha256": "a63508cb366ff239d460a3bae66abd99ae2250d382b4ac33295c363d1a390e31"
+    },
+    "case8_plan_admission": {
+      "path": "artifacts/two_wheel_riser/20260718_smoothed_plan_all79_v9_case8_dynamic_retime_cpu/case8_gate_c_admission.json",
+      "sha256": "5c89760bd220e1684394a73e5fa63b5c3d1b1e35bcb246f656074b817ea87db1"
+    },
+    "teacher_gate": {
+      "path": "artifacts/two_wheel_riser/20260718_gate_c_smoothed_case8_dynamic_retime_v1_exclusive/gates/case_0008.json",
+      "sha256": "19506045f9b6ec04cee58efa1b5d2d5600824ce166b1534db05a4895596cf1e0"
+    },
+    "raw_teacher_gate": {
+      "path": "artifacts/two_wheel_riser/20260721_initial_teacher42_raw_capture_v1_exclusive/gates/case_0008.json",
+      "sha256": "86fff2a8ae35b1521ce045387e530a7b4a1527942ff40e01041fe27dc725d83b"
+    },
+    "policy_final": {
+      "path": "artifacts/two_wheel_riser/20260722_initial_teacher41_masked_bc_v1/final_status.json",
+      "sha256": "d232ffac1f67d1a4510e2ad7e6670f82742b259433ed0ce6b15727c4e39db3d9"
+    },
+    "policy_report": {
+      "path": "artifacts/two_wheel_riser/20260722_initial_teacher41_masked_bc_v1/report.json",
+      "sha256": "b7915caddea9467847430a247924eae2e856ad486da06135e1b8f543c42b891a"
+    },
+    "policy_admission": {
+      "path": "artifacts/two_wheel_riser/20260722_initial_teacher41_masked_bc_v1/admission.json",
+      "sha256": "dc7a0a0d441917f80e7f5a4bcb806d059dab6d365459e3712e4c5d5193638d99"
+    },
+    "policy_torchscript": {
+      "path": "artifacts/two_wheel_riser/20260722_initial_teacher41_masked_bc_v1/residual_policy.torchscript.pt",
+      "sha256": "0d796c600c6dca7dce176da555f4cd1f769163f41093d2b6313f4e6264888db7"
+    },
+    "lqr_gains": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+      "sha256": "2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6",
+      "git_blob_sha1": "70ecdd8ae6b7ce09574a97a8581229cb90add623"
+    },
+    "robot_build_audit": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/build_audit.json",
+      "sha256": "8be2b59a03a6c22838795ad361a86bf0f60a7534aeacd62893013f0ee27b40d9",
+      "git_blob_sha1": "83f8715d05be714dd8dcb2b0a9f47ef3f4bec8e9"
+    },
+    "robot_urdf": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.urdf",
+      "sha256": "603cecfc5b54e659f5d030023a69a3b42d6567f66d2771fbb7127d186f1a9afa",
+      "git_blob_sha1": "c70bf24a3189ccd24553287590dcfd191737ab33"
+    },
+    "robot_usd": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd",
+      "sha256": "89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0",
+      "git_blob_sha1": "b25242c27c781b5aad4fadefb0cbf54398a9a75a"
+    },
+    "playback": {
+      "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+      "sha256": "ffe45cd5747f6e628caebafbc405d589f34df764df944ddc2b36a2efd0926b1d",
+      "git_blob_sha1": "2feaba4c341a8fefed4482b61280364db68aa960"
+    },
+    "rollout_gate": {
+      "path": "scripts/two_wheel_balance/gate_riser_residual_rollouts.py",
+      "sha256": "e3e327f2b7bc7f3bdc5f7c27ba36edcf2f3660e5ed4c8b4e4324325764927f5b",
+      "git_blob_sha1": "26327b5c1d00b4ff0c6f9652cdc05f2027854bbb"
+    },
+    "riser_loader": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_playback.py",
+      "sha256": "6bdd456385cf32a274fc6d119def2b7fb1c5a9049b628ce3fb92a52d00eba6ae",
+      "git_blob_sha1": "d60f4f2ed8022fac520356a7d0d5ea8ac305a762"
+    },
+    "tracking": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/whole_body_tracking.py",
+      "sha256": "f2cfe1abcaf1f225461b0ccfa9d26ab205e2dc9624047be77edeab9f67f754e7",
+      "git_blob_sha1": "e86d8578b5c9dcbfe634949355b01191e1cf2996"
+    },
+    "riser_control": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_control.py",
+      "sha256": "1bbd9c892f565fcfdea2be3567038db14454bc9d2b864df1326cfac5adc16738",
+      "git_blob_sha1": "a56aaa6810f5e75ddbdd9f4897b183df4b1540ff"
+    },
+    "recovery_evidence": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_recovery_evidence.py",
+      "sha256": "bae6830c63fad14323008ea774fa4a70583181a4d614c52ed08bdb2510173750",
+      "git_blob_sha1": "bb86eac22a91a3129f9e0082e81679a5cff297b8"
+    },
+    "balance_controller": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/metrics.py",
+      "sha256": "5041b711eb9d8026f2086898443d8ff4c4fba64662b9b051d27ced5181a51c2e",
+      "git_blob_sha1": "d330c72c28942bbb7d5e21108e544389aeba7c56"
+    },
+    "rs4_attitude": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_rs4_attitude.py",
+      "sha256": "db6caa904da08291078962411f465a52270cc62840d640b0d3ab9e4f52a89c50",
+      "git_blob_sha1": "25869044d63aef1f34458927e815ebf28e4ab751"
+    },
+    "policy_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_residual_policy.py",
+      "sha256": "24ac42885bafa9237a4e9b1bfd7d2bef374c374f3b6f4ef87f5d705837c1bee1",
+      "git_blob_sha1": "94da101512b4ada4202a3863b010ed94199c1883"
+    },
+    "runtime_heartbeat": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/runtime_heartbeat.py",
+      "sha256": "042d210bd6e0cc4d26d650f43efd73fc443d76404095f8f25619dbe6300867a9",
+      "git_blob_sha1": "450f5fbd61e165ff3a741325438e0a61098d8d1c"
+    },
+    "contract_validator": {
+      "path": "scripts/two_wheel_balance/validate_initial_teacher41_case8_canary_contract.py",
+      "sha256": "56a93b9ef827429f6757058ed1670b4c273aa3cdd4e5113ea65b8b3aea0450f7",
+      "git_blob_sha1": "ecf6c9efb399e1a44cc5ab4037ca47acef794cfc"
+    }
+  },
+  "one_case_only": true,
+  "cpu_preflight_ready": true,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "dynamic_canary_authorized": false,
+  "case78_authorized": false,
+  "broad_rollout_authorized": false,
+  "dataset_creation_authorized": false,
+  "raw_teacher_capture_authorized": false,
+  "policy_trace_capture_authorized": false,
+  "shadow_teacher_capture_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "holdout_opened": false,
+  "valid_for_training": false
+}

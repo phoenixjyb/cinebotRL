@@ -20,6 +20,21 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 
 最终归一化动作范围为 `0.30 m/s`、`0.40 rad/s`、`0.10 m`。该范围来自全部诊断轨迹的原始教师命令审计、`1.10x` 余量和 `0.05` 量化，不得从旧 NPZ 的裁剪动作反推。
 
+> **2026-07-22 模型规划器残差合同更新：** 上述
+> `[0.30, 0.40, 0.10]` 只属于以 phase feed-forward 为基准的历史
+> `residual_merged_v2/v3` 路径。当前 case-30 纠偏教师已经改为在完整模型规划器之上
+> 输出小残差，其固定尺度为 `[0.05 m/s, 0.05 rad/s, 0.02 m]`，命令合同为
+> `model_based_planner_plus_bounded_policy_residual_v1`。两套数据不得拼接、重标记或
+> 共用同一个 merged schema。
+>
+> 新的 `model_based_corrective_case_dataset_v1` 转换只接受通过独立 finalizer 的
+> `corrective_teacher_capture_v2`。训练标签必须来自 safety supervisor 之后的
+> `effective_corrective_normalized_actions`；supervisor 之前的 requested action 只保留
+> 作审计，不得作为训练标签。由于采集时 previous-action 观测记录的是 requested
+> action，转换器必须按 effective action 重新构建递推历史：首行归零，其后第 `i`
+> 行等于第 `i-1` 行 effective label。单 case 输出只允许进入后续 merge 评审，保持
+> `valid_for_training=false`、BC/PPO 未授权，不能直接送入现有 BC trainer。
+
 ## 固定运行合同
 
 - 机器人总质量暂定 `28 kg`；

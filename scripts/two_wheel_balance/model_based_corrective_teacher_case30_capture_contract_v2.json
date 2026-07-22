@@ -94,8 +94,8 @@
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case30_capture.sh",
-      "sha256": "280cee3da4d5152047fec6bd325b0ae9f23fbbd824d1ed571c19bf6b78e27eb6",
-      "git_blob_sha1": "229be406c6454465170ad24ba9295555c6f9746c"
+      "sha256": "cfda47b495cd44baa64d7603508f8096a3054f02b9dc30fd91ad700131caae35",
+      "git_blob_sha1": "9f650dcb46d688dbf9f6832d42db38afc070c0f1"
     },
     "capture_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case30_capture.py",
@@ -107,11 +107,11 @@
   "holdout_opened": false,
   "validation_cases_opened": [],
   "cpu_preflight_ready": true,
-  "runtime_authorized": false,
-  "gpu_launch_authorized": false,
-  "authorization_token_issued": false,
-  "runtime_authorization_token_sha256": "",
-  "label_capture_authorized": false,
+  "runtime_authorized": true,
+  "gpu_launch_authorized": true,
+  "authorization_token_issued": true,
+  "runtime_authorization_token_sha256": "26c519b95a729f71b68b3dc4a0fed4f9cc90c0f73944e754476e9e1a3b345e72",
+  "label_capture_authorized": true,
   "dataset_creation_authorized": false,
   "bc_authorized": false,
   "ppo_authorized": false,

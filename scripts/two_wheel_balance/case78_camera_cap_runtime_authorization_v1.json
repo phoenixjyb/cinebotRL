@@ -1,0 +1,45 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case78_camera_cap_runtime_authorization_v1",
+  "case": 78,
+  "current_split": "unused",
+  "reviewed_cpu_commit": "eee0688f332932c890ed407932505b5f25c7dc54",
+  "runtime_implementation_commit": "8c00406b0a726f1e785d303986a44a3323476478",
+  "namespace": "20260722_case78_camera_cap_v1_exclusive",
+  "identities": {
+    "cpu_contract": {
+      "path": "scripts/two_wheel_balance/case78_camera_cap_cpu_contract_v1.json",
+      "sha256": "1c864557d6302613d111eccbafd914673d88316c2bcbc659e1afb028c7fec176",
+      "git_blob_sha1": "bad4fb8f9ce7ffdc493d4ad9de86016e7c5c642b"
+    },
+    "runtime_wrapper": {
+      "path": "scripts/two_wheel_balance/run_case78_camera_cap_canary.sh",
+      "sha256": "3c1cc51b6a609f5194e137b685c5e6284b9ac779ea4957b3bdb17065fe1fda8c",
+      "git_blob_sha1": "e152080323f3ce2a62afc33133209f45d098dedd"
+    },
+    "runtime_summarizer": {
+      "path": "scripts/two_wheel_balance/summarize_case78_camera_cap_canary.py",
+      "sha256": "3317b4c3f050809921d787619a49bf5f3524984570d276bbb70e5ee2cc8432c6",
+      "git_blob_sha1": "ea98b2be91e10f70c9f5d8d248a7c42e4f42281e"
+    },
+    "runtime_validator": {
+      "path": "scripts/two_wheel_balance/validate_case78_camera_cap_runtime_authorization.py",
+      "sha256": "df079ecaa825ac321a0ad55dc3572e932f342048b45cd5f18f465c27da4199b1",
+      "git_blob_sha1": "e58010c7138570976accd4280811cf1a6aeaa148"
+    }
+  },
+  "one_case_only": true,
+  "maximum_runtime_seconds": 5400,
+  "heartbeat_interval_policy_steps": 2000,
+  "camera_recovery_governor_required": false,
+  "maximum_camera_lever_arm_correction_m": 0.1,
+  "runtime_authorization_token_sha256": "2f382ca15e39c0b3cb52c40f37d6117c9dd23dadee7c13a387154e029d4e3ff4",
+  "runtime_authorized": true,
+  "gpu_launch_authorized": true,
+  "dynamic_qualification_authorized": true,
+  "split_change_authorized": false,
+  "dataset_creation_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "holdout_opened": false,
+  "valid_for_training": false
+}

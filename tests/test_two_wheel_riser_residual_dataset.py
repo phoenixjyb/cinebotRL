@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pytest
 
@@ -131,6 +133,56 @@ def test_shadow_teacher_trace_uses_runtime_policy_action_scales(tmp_path) -> Non
     save_shadow_teacher_trace(path, 4, payload, action_scales=scales)
     metadata, _ = load_shadow_teacher_trace(path)
     assert metadata["action_scales"] == [0.35, 0.4, 0.1]
+
+
+def test_shadow_teacher_trace_marks_deterministic_controller_states(tmp_path) -> None:
+    payload = _policy_trace_payload()
+    payload["shadow_teacher_raw_residual_commands"] = np.zeros((3, 3))
+    payload["shadow_teacher_normalized_residual_actions"] = np.zeros((3, 3))
+    payload["shadow_teacher_high_level_commands"] = np.zeros((3, 3))
+    path = tmp_path / "deterministic_shadow.npz"
+    save_shadow_teacher_trace(
+        path,
+        4,
+        payload,
+        visited_state_source="deterministic_controller",
+    )
+    metadata, _ = load_shadow_teacher_trace(path)
+    assert metadata["visited_state_source"] == "deterministic_controller"
+    assert metadata["shadow_teacher_computed_before_policy_overwrite"] is False
+    assert metadata["shadow_label_computed_before_command_application"] is True
+    assert metadata["shadow_teacher_applied_to_commands"] is False
+
+
+def test_shadow_teacher_trace_rejects_unknown_visited_state_source(tmp_path) -> None:
+    payload = _policy_trace_payload()
+    payload["shadow_teacher_raw_residual_commands"] = np.zeros((3, 3))
+    payload["shadow_teacher_normalized_residual_actions"] = np.zeros((3, 3))
+    payload["shadow_teacher_high_level_commands"] = np.zeros((3, 3))
+    with pytest.raises(ValueError, match="visited-state source"):
+        save_shadow_teacher_trace(
+            tmp_path / "bad_source.npz",
+            4,
+            payload,
+            visited_state_source="zero_policy_feedforward",
+        )
+
+
+def test_shadow_teacher_loader_infers_legacy_policy_visited_source(tmp_path) -> None:
+    payload = _policy_trace_payload()
+    payload["shadow_teacher_raw_residual_commands"] = np.zeros((3, 3))
+    payload["shadow_teacher_normalized_residual_actions"] = np.zeros((3, 3))
+    payload["shadow_teacher_high_level_commands"] = np.zeros((3, 3))
+    path = tmp_path / "legacy_shadow.npz"
+    save_shadow_teacher_trace(path, 4, payload)
+    with np.load(path, allow_pickle=False) as data:
+        arrays = {name: np.asarray(data[name]) for name in data.files}
+    metadata = json.loads(str(arrays["metadata_json"].item()))
+    metadata.pop("visited_state_source")
+    arrays["metadata_json"] = np.asarray(json.dumps(metadata))
+    np.savez_compressed(path, **arrays)
+    restored_metadata, _ = load_shadow_teacher_trace(path)
+    assert restored_metadata["visited_state_source"] == "learned_policy"
 
 
 def test_residual_action_reconstructs_bounded_teacher_command() -> None:

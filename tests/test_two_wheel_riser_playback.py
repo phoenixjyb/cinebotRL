@@ -250,6 +250,20 @@ def test_runtime_keeps_initialization_separate_from_source_evidence() -> None:
     assert "(initialization_step + 1) / POLICY_HZ" in source
 
 
+def test_shadow_trace_can_observe_deterministic_controller_without_zero_policy() -> None:
+    source = (
+        PROJECT_ROOT
+        / "scripts/two_wheel_balance/smoke_riser_reference_playback.py"
+    ).read_text(encoding="utf-8")
+    validation = source.split(
+        "if args.shadow_teacher_trace_dir is not None and (", 1
+    )[1].split("if args.residual_policy is not None", 1)[0]
+    assert "args.residual_policy is None" not in validation
+    assert "args.zero_policy_action" in validation
+    assert '"deterministic_controller"' in source
+    assert "if residual_policy is None and not zero_policy_action" in source
+
+
 def test_playback_plan_rejects_wrapped_yaw_servo_jump() -> None:
     plan = _plan()
     wrapped = plan.proxy_gimbal_q.copy()

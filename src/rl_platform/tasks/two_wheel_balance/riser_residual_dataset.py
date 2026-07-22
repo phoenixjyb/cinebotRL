@@ -564,15 +564,23 @@ def save_shadow_teacher_trace(
     payload: dict[str, np.ndarray],
     *,
     action_scales: np.ndarray = ACTION_SCALES,
+    visited_state_source: str = "learned_policy",
 ) -> None:
     scales = np.asarray(action_scales, dtype=np.float64)
+    if visited_state_source not in {"learned_policy", "deterministic_controller"}:
+        raise ValueError("invalid shadow teacher visited-state source")
     validate_shadow_teacher_trace(
         payload, action_scales=scales, expected_case=case
     )
     metadata = {
         "schema": SHADOW_TEACHER_TRACE_SCHEMA,
         "case": case,
-        "source": "policy_visited_isaac_state_with_shadow_deterministic_teacher",
+        "source": (
+            "policy_visited_isaac_state_with_shadow_deterministic_teacher"
+            if visited_state_source == "learned_policy"
+            else "deterministic_controller_visited_isaac_state_with_shadow_labels"
+        ),
+        "visited_state_source": visited_state_source,
         "observation_names": list(OBSERVATION_NAMES),
         "applied_action_names": list(ACTION_NAMES),
         "shadow_teacher_raw_action_names": [
@@ -585,8 +593,14 @@ def save_shadow_teacher_trace(
         "sample_alignment_contract": (
             "pre_action_policy_visited_state_shadow_teacher_and_applied_policy_"
             "to_post_step_outcome_v1"
+            if visited_state_source == "learned_policy"
+            else "pre_action_deterministic_controller_state_shadow_label_to_post_"
+            "step_outcome_v1"
         ),
-        "shadow_teacher_computed_before_policy_overwrite": True,
+        "shadow_teacher_computed_before_policy_overwrite": (
+            visited_state_source == "learned_policy"
+        ),
+        "shadow_label_computed_before_command_application": True,
         "shadow_teacher_applied_to_commands": False,
         "shadow_teacher_labels_present": True,
         "shadow_teacher_labels_admitted_for_training": False,
@@ -618,6 +632,12 @@ def load_shadow_teacher_trace(
         }
     if metadata.get("schema") != SHADOW_TEACHER_TRACE_SCHEMA:
         raise ValueError(f"wrong shadow teacher trace schema in {path}")
+    if (
+        "visited_state_source" not in metadata
+        and metadata.get("source")
+        == "policy_visited_isaac_state_with_shadow_deterministic_teacher"
+    ):
+        metadata["visited_state_source"] = "learned_policy"
     checks = {
         "trace_only": metadata.get("trace_only") is True,
         "not_trainable": metadata.get("valid_for_training") is False,
@@ -628,6 +648,8 @@ def load_shadow_teacher_trace(
         )
         is False,
         "dagger_closed": metadata.get("dagger_authorized") is False,
+        "visited_state_source": metadata.get("visited_state_source")
+        in {"learned_policy", "deterministic_controller"},
     }
     if not all(checks.values()):
         raise ValueError(f"shadow teacher trace contract mismatch in {path}: {checks}")

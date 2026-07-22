@@ -164,8 +164,8 @@ parser.add_argument(
     "--shadow-teacher-trace-dir",
     type=Path,
     help=(
-        "Record deterministic teacher commands on policy-visited states without "
-        "applying or admitting them for training."
+        "Record deterministic teacher labels on learned-policy or deterministic-"
+        "controller visited states without applying or admitting the labels."
     ),
 )
 parser.add_argument(
@@ -2053,6 +2053,11 @@ def evaluate_case(
                 ),
             },
             action_scales=args.residual_action_scales,
+            visited_state_source=(
+                "deterministic_controller"
+                if residual_policy is None
+                else "learned_policy"
+            ),
         )
     progress_hold_summary = summarize_progress_hold(
         np.asarray(progress_samples, dtype=np.float64)
@@ -2314,12 +2319,11 @@ def main() -> int:
         args.dataset_dir is not None
         or args.raw_teacher_dir is not None
         or args.policy_trace_dir is not None
-        or args.residual_policy is None
         or args.zero_policy_action
     ):
         raise ValueError(
-            "shadow teacher trace requires a learned policy and is exclusive with "
-            "dataset, raw teacher, policy trace, and zero-action modes"
+            "shadow teacher trace is exclusive with dataset, raw teacher, policy "
+            "trace, and zero-action modes"
         )
     if args.residual_policy is not None and args.zero_policy_action:
         raise ValueError("learned and zero-action policy modes are exclusive")

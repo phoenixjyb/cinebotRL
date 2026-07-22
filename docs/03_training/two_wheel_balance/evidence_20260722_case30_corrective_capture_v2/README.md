@@ -27,3 +27,9 @@ Key evidence:
   `ec0f13030ce755c38e31c138507537f461126312b0c268832bc6bf9a40e4e8cb`.
 
 Use `SHA256SUMS` to verify the preserved files.
+
+The complete runtime logs remain in the sealed `.98` namespace. Their
+SHA-256 values are `3238e6d347a55d1d38ca9fb08c165711ea8373ee960eb2a783e2286c8016e55f`
+for playback and
+`e0b9ec3186e677c34289a85e72e4bc91e3cd3d8ce5cfdea16d74e1c0be0554b2`
+for finalization.

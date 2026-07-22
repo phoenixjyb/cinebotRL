@@ -35,16 +35,22 @@ POLICY_SHA256="b1494f7af219d44cf966d7ba7781370afc1e8fe9575dd4e414d6ec0b7ea1ab19"
 PLAYBACK_SHA256="320019f164343d113bed74c4352686bcb12eb68404bfe911d23594f5f4fc81a3"
 FINALIZER_SHA256="636975efc4e7758ffd75864b7fb159cd1c32c49b139ff8e5ec259ad61464eb20"
 GAINS_SHA256="2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6"
-# Runtime authorization is intentionally absent in this CPU-only change.
-AUTHORIZATION_SHA256=""
+AUTHORIZATION_SHA256="ed4f0c0e4336da2afcd1469774467bec624517f27904403678689608fb01b60b"
 
 if [[ "$MODE" != --preflight && "$MODE" != --execute ]]; then
   printf 'usage: %s [--preflight|--execute]\n' "$0" >&2
   exit 2
 fi
-if [[ "$MODE" == --execute && -z "$AUTHORIZATION_SHA256" ]]; then
-  printf 'model-based zero-residual case-78 runtime authorization is not issued\n' >&2
-  exit 4
+AUTHORIZATION_FILE="${RISER_MODEL_BASED_ZERO_CASE78_AUTHORIZATION_FILE:-}"
+if [[ "$MODE" == --execute ]]; then
+  [[ -n "$AUTHORIZATION_SHA256" ]] || {
+    printf 'model-based zero-residual case-78 runtime authorization is not issued\n' >&2
+    exit 4
+  }
+  [[ -n "$AUTHORIZATION_FILE" && -f "$AUTHORIZATION_FILE" ]] || {
+    printf 'model-based zero-residual case-78 one-use token is absent\n' >&2
+    exit 4
+  }
 fi
 
 sha256() { sha256sum "$1" | awk '{print $1}'; }
@@ -160,7 +166,8 @@ print(json.dumps({
     "camera_lever_arm_cap_m": 0.1,
     "rollout_order": ["explicit_zero", "zero_checkpoint"],
     "maximum_combined_timeout_s": 10800,
-    "runtime_authorization_issued": False,
+    "runtime_authorization_hash_issued": True,
+    "runtime_token_consumed": False,
     "dataset_creation_authorized": False,
     "case16_22_32_authorized": False,
     "holdout_opened": False,
@@ -172,8 +179,6 @@ PY
   exit 0
 fi
 
-AUTHORIZATION_FILE="${RISER_MODEL_BASED_ZERO_CASE78_AUTHORIZATION_FILE:-}"
-[[ -n "$AUTHORIZATION_FILE" && -f "$AUTHORIZATION_FILE" ]] || exit 4
 [[ ! -L "$AUTHORIZATION_FILE" ]] || exit 4
 [[ "$(stat -c '%a' "$AUTHORIZATION_FILE")" == 600 ]] || exit 4
 [[ "$(sha256 "$AUTHORIZATION_FILE")" == "$AUTHORIZATION_SHA256" ]] || exit 4

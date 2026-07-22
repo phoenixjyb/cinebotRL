@@ -35,7 +35,7 @@ def test_execute_rejects_absent_authorization_before_any_output() -> None:
         check=False,
     )
     assert result.returncode == 4
-    assert "runtime authorization is not issued" in result.stderr
+    assert "one-use token is absent" in result.stderr
 
 
 def test_wrapper_pins_contract_plan_teacher_policy_and_finalizer() -> None:
@@ -50,7 +50,10 @@ def test_wrapper_pins_contract_plan_teacher_policy_and_finalizer() -> None:
         "GAINS_SHA256",
     ):
         assert f'{name}="' in source
-    assert 'AUTHORIZATION_SHA256=""' in source
+    assert (
+        'AUTHORIZATION_SHA256="ed4f0c0e4336da2afcd1469774467bec624517f27904403678689608fb01b60b"'
+        in source
+    )
     assert "timeout --signal=TERM --kill-after=30s 5400" in source
     assert "wait_gpu_free" in source
     assert 'HEAD" == "$UPSTREAM' in source
@@ -67,3 +70,5 @@ def test_future_token_is_consumed_before_isaac_and_next_stages_stay_closed() -> 
     assert '"case16_22_32_authorized": False' in source
     assert '"holdout_opened": False' in source
     assert '"ppo_authorized": False' in source
+    assert '"runtime_authorization_hash_issued": True' in source
+    assert '"runtime_token_consumed": False' in source

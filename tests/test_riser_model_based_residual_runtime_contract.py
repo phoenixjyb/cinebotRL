@@ -45,7 +45,7 @@ def test_model_based_mode_has_distinct_zero_and_learned_sources() -> None:
     assert '"model_based_planner_plus_torchscript_residual"' in source
 
 
-def test_corrective_teacher_is_explicit_disabled_and_capture_closed() -> None:
+def test_corrective_teacher_capture_requires_separate_pre_app_admission() -> None:
     source = PLAYBACK.read_text(encoding="utf-8")
     pre_app = source.split("app = AppLauncher(args).app", 1)[0]
     assert '"--corrective-teacher-profile"' in pre_app
@@ -53,8 +53,12 @@ def test_corrective_teacher_is_explicit_disabled_and_capture_closed() -> None:
     assert "requires its one pinned case only" in pre_app
     assert "corrective teacher requires model-based zero-policy mode" in pre_app
     assert "model_based_zero_measurement" in pre_app
-    assert "corrective_teacher_label_capture_authorized\": False" in source
-    assert "corrective_teacher_labels_captured\": False" in source
+    assert '"--corrective-teacher-capture-admission"' in pre_app
+    assert "load_capture_admission" in pre_app
+    assert "corrective capture is exclusive with every legacy capture path" in pre_app
+    assert '"corrective_teacher_label_capture_authorized": (' in source
+    assert "corrective_capture_admission is not None" in source
+    assert '"corrective_teacher_labels_captured": corrective_capture_path is not None' in source
 
 
 def test_corrective_teacher_is_computed_after_model_planner_and_before_apply() -> None:

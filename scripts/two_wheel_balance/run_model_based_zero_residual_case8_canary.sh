@@ -37,16 +37,22 @@ POLICY_SHA256="b1494f7af219d44cf966d7ba7781370afc1e8fe9575dd4e414d6ec0b7ea1ab19"
 PLAYBACK_SHA256="320019f164343d113bed74c4352686bcb12eb68404bfe911d23594f5f4fc81a3"
 FINALIZER_SHA256="bf17e18934a72c32c0a49b005728e1666058dc7ede9e6d28b0801efee233623e"
 GAINS_SHA256="2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6"
-# Runtime authorization is intentionally absent in this CPU-only change.
-AUTHORIZATION_SHA256=""
+AUTHORIZATION_SHA256="af3cf7748bafb522acaa2827553d49a939771e135c61c367c42d492ecc5a96c0"
 
 if [[ "$MODE" != --preflight && "$MODE" != --execute ]]; then
   printf 'usage: %s [--preflight|--execute]\n' "$0" >&2
   exit 2
 fi
-if [[ "$MODE" == --execute && -z "$AUTHORIZATION_SHA256" ]]; then
-  printf 'model-based zero-residual case-8 runtime authorization is not issued\n' >&2
-  exit 4
+AUTHORIZATION_FILE="${RISER_MODEL_BASED_ZERO_CASE8_AUTHORIZATION_FILE:-}"
+if [[ "$MODE" == --execute ]]; then
+  [[ -n "$AUTHORIZATION_SHA256" ]] || {
+    printf 'model-based zero-residual case-8 runtime authorization is not issued\n' >&2
+    exit 4
+  }
+  [[ -n "$AUTHORIZATION_FILE" && -f "$AUTHORIZATION_FILE" ]] || {
+    printf 'model-based zero-residual case-8 one-use token is absent\n' >&2
+    exit 4
+  }
 fi
 
 sha256() { sha256sum "$1" | awk '{print $1}'; }
@@ -163,8 +169,6 @@ PY
   exit 0
 fi
 
-AUTHORIZATION_FILE="${RISER_MODEL_BASED_ZERO_CASE8_AUTHORIZATION_FILE:-}"
-[[ -n "$AUTHORIZATION_FILE" && -f "$AUTHORIZATION_FILE" ]] || exit 4
 [[ ! -L "$AUTHORIZATION_FILE" ]] || exit 4
 [[ "$(stat -c '%a' "$AUTHORIZATION_FILE")" == 600 ]] || exit 4
 [[ "$(sha256 "$AUTHORIZATION_FILE")" == "$AUTHORIZATION_SHA256" ]] || exit 4

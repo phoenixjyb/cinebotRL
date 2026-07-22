@@ -34,7 +34,7 @@ def test_execute_rejects_absent_authorization_before_any_output() -> None:
         check=False,
     )
     assert result.returncode == 4
-    assert "runtime authorization is not issued" in result.stderr
+    assert "one-use token is absent" in result.stderr
 
 
 def test_wrapper_pins_inputs_and_consumes_future_token_before_isaac() -> None:
@@ -50,7 +50,10 @@ def test_wrapper_pins_inputs_and_consumes_future_token_before_isaac() -> None:
         "GAINS_SHA256",
     ):
         assert f'{name}="' in source
-    assert 'AUTHORIZATION_SHA256=""' in source
+    assert (
+        'AUTHORIZATION_SHA256="af3cf7748bafb522acaa2827553d49a939771e135c61c367c42d492ecc5a96c0"'
+        in source
+    )
     token_delete = source.index('rm -f "$AUTHORIZATION_FILE"')
     first_playback = source.index("timeout --signal=TERM --kill-after=30s 600")
     assert token_delete < first_playback

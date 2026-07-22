@@ -7242,12 +7242,19 @@ and must state whether its candidate was accepted or rejected.
   CLI `09a58ec62fede0800afc70df1f8e6c47e618ed097ef96a0fedfcba8a6c88b706`,
   and refreshed goal JSON
   `16297e048015484b22b26c3959b2f848f0a4234a339a66dd274a1f0b8e3285ca`.
+- On authoritative `.98`, the sealed real case-30 capture passes default-route
+  conversion preflight with `11,411` rows and no output creation. The existing
+  converted dataset reopens under the unchanged default route at SHA-256
+  `191a44147bc44038a0645bf48a63609463bf280d97b37ddaf884200bd8b52447`;
+  case/split remain `30/train` and `valid_for_training=false`.
+- Exact implementation commit
+  `8911ee870a8d05598ba3ec6c06d14e3b4f298d8a` passes the complete
+  authoritative `.98` CPU suite with `849 passed, 11 skipped, 2 warnings` in
+  `77.30 s`. No runtime, capture, conversion output, merge, BC, PPO, holdout,
+  or training process ran.
 
 ## Next round after Round 184
 
-- Reopen the sealed real case-30 capture and converted dataset on `.98` under
-  the unchanged default route, and run the complete CPU suite before accepting
-  this compatibility change.
 - Do not create case-23 archive or conversion evidence from synthetic tests.
   Case 23 still requires the paired dynamic pass, then a separate capture
   proposal and explicit capture authorization before this route may be used.

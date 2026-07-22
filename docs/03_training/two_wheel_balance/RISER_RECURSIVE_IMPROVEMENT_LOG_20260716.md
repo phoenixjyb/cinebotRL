@@ -7000,3 +7000,39 @@ and must state whether its candidate was accepted or rejected.
 - Do not infer capture eligibility from a passed pair implementation. Label
   capture would require an actual same-seed candidate improvement and a later
   separate one-use capture contract.
+
+## Round 179: case-23 guarded pair route passes CPU-only
+
+- A fresh case-23 wrapper, canonical validator, pair finalizer, tracked wrench
+  profile, and sealed contract are implemented at commit
+  `1a626d37ebcf0b8e4fafc9ff814aaa2512c1a354`. No case-30 evidence or runtime
+  route was modified.
+- The contract pins the reviewed parent, proposal, tranche selection, case-23
+  plan, case-specific corrective and perturbation profiles, robot assets,
+  controller/runtime code, wrapper, validator, and finalizer. Contract
+  SHA-256 is
+  `94e87b8eaae122f0c236c3812d9f2c184b54e1dd609713d52a9eb313ab59dd67`
+  and Git blob is `33115952da2c70cadec2275b8561f4915d55b8ac`.
+- The canonical `.98` no-token preflight passed every identity, proposal,
+  selection, controller-argument, unchanged-gate, split, clean-HEAD, and fresh
+  namespace check. It reports `cpu_contract_ready=true` while runtime, GPU,
+  capture, dataset, BC, PPO, training, and training validity remain false.
+- The authoritative `.98` suite passes `808 passed, 11 skipped, 2 warnings`
+  in `78.25 s`. Focused new-route tests pass `11/11`. The sparse Mac riser
+  subset passes `580` tests; its 31 failures are all missing local robot asset
+  files and are covered by the authoritative `.98` run.
+- A direct `--execute` attempt stops before Python/Isaac with exit code `4`
+  and `runtime_authorization_not_issued`. The authorization hash is empty and
+  the target namespace remains absent. No Isaac, capture, dataset, BC, PPO, or
+  training process ran.
+
+## Next round after Round 179
+
+- Stop at the CPU review boundary. Do not issue a token or launch the pair
+  unless the user separately authorizes exactly one case-23 paired canary.
+- If authorized, create a later one-use token/contract revision rather than
+  modifying this no-token evidence. Run baseline first; admit the candidate
+  only if baseline dynamically passes; stop after the candidate and finalizer.
+- A passed pair would establish only that the case-specific correction offers
+  safe measurable improvement. Corrective label capture, conversion, corpus
+  merge, BC, PPO, and training each remain separate later decisions.

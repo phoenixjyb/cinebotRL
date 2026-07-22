@@ -1,0 +1,48 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case23_pair_route_cpu_evidence_v1",
+  "implementation_commit": "1a626d37ebcf0b8e4fafc9ff814aaa2512c1a354",
+  "reviewed_controller_parent": "9d79e355394b01ae330e5288d9c11f77bb920dfe",
+  "namespace": "20260723_model_based_corrective_teacher_case23_pair_v1_exclusive",
+  "contract": {
+    "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case23_pair_contract_v1.json",
+    "sha256": "94e87b8eaae122f0c236c3812d9f2c184b54e1dd609713d52a9eb313ab59dd67",
+    "git_blob_sha1": "33115952da2c70cadec2275b8561f4915d55b8ac"
+  },
+  "authoritative_cpu_tests": {
+    "python": "/mnt/g/isaaclab_venv/Scripts/python.exe",
+    "passed": 808,
+    "skipped": 11,
+    "warnings": 2,
+    "duration_s": 78.25
+  },
+  "canonical_preflight": {
+    "passed": true,
+    "all_identity_hashes_match": true,
+    "tracked_identity_blobs_pinned": true,
+    "head_matches_upstream": true,
+    "tracked_worktree_clean": true,
+    "namespace_exact_and_fresh": true,
+    "cpu_contract_ready": true,
+    "runtime_authorized": false,
+    "gpu_launch_authorized": false,
+    "label_capture_authorized": false,
+    "dataset_creation_authorized": false,
+    "bc_authorized": false,
+    "ppo_authorized": false,
+    "training_started": false,
+    "valid_for_training": false
+  },
+  "execute_negative_proof": {
+    "exit_code": 4,
+    "reason": "runtime_authorization_not_issued",
+    "runtime_started": false,
+    "namespace_created": false
+  },
+  "isaac_launched": false,
+  "capture_started": false,
+  "dataset_created": false,
+  "bc_started": false,
+  "ppo_started": false,
+  "training_started": false,
+  "passed": true
+}

@@ -197,6 +197,15 @@ parser.add_argument(
     default=parse_action_scales("0.30,0.40,0.10"),
     help="Physical [vx,wz,riser] scales for normalized residual policy actions.",
 )
+parser.add_argument(
+    "--policy-command-base",
+    choices=("phase_feedforward", "model_based_planner"),
+    default="phase_feedforward",
+    help=(
+        "Apply policy output over historical phase feedforward or over the complete "
+        "model-based planner command."
+    ),
+)
 # Video frame stride changes rendering only; physics and control remain at 200 Hz.
 parser.add_argument("--video-frame-stride", type=int, default=1)
 parser.add_argument("--video-fps", type=int, default=200)
@@ -218,6 +227,23 @@ AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
 if args.runtime_heartbeat_interval_steps <= 0:
     parser.error("--runtime-heartbeat-interval-steps must be positive")
+if args.policy_command_base == "model_based_planner":
+    if args.residual_policy is None and not args.zero_policy_action:
+        parser.error("model-based policy command base requires learned or zero policy mode")
+    if not np.array_equal(
+        args.residual_action_scales, np.array([0.05, 0.05, 0.02])
+    ):
+        parser.error("model-based policy command base requires scales 0.05,0.05,0.02")
+    if any(
+        path is not None
+        for path in (
+            args.dataset_dir,
+            args.raw_teacher_dir,
+            args.policy_trace_dir,
+            args.shadow_teacher_trace_dir,
+        )
+    ):
+        parser.error("model-based residual canary mode forbids every capture path")
 deterministic_wrench_profile = None
 deterministic_wrench_profile_identity = None
 if args.deterministic_wrench_profile is not None:
@@ -358,7 +384,9 @@ from rl_platform.tasks.two_wheel_balance.riser_control import (
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     LOOKAHEAD_HORIZONS_S,
+    MODEL_BASED_POLICY_RESIDUAL_CONTRACT,
     apply_residual_action,
+    apply_model_based_policy_residual,
     build_raw_residual_command,
     build_executed_observation,
     build_residual_action,
@@ -1043,6 +1071,9 @@ def evaluate_case(
             actual_riser_position_m=actual_riser_pre,
             target_riser_position_m=sample.riser_q,
         )
+        model_based_vx_ref = vx_ref
+        model_based_wz_ref = wz_ref
+        model_based_riser_target = sample.riser_q
         normalized_residual_label = normalize_residual_command(raw_residual_command)
         shadow_teacher_normalized_action = (
             raw_residual_command / args.residual_action_scales
@@ -1144,16 +1175,37 @@ def evaluate_case(
                 or np.max(np.abs(applied_residual_action)) > 1.0 + 1e-6
             ):
                 raise ValueError("residual policy produced an invalid action")
-            vx_ref, wz_ref, commanded_riser_target = apply_residual_action(
-                phase_feedforward_v_mps,
-                phase_feedforward_wz_rad_s,
-                actual_riser_pre,
-                applied_residual_action,
-                action_scales=args.residual_action_scales,
-                maximum_linear_velocity_m_s=tracking_cfg.maximum_linear_velocity_mps,
-                maximum_yaw_rate_rad_s=tracking_cfg.maximum_yaw_rate_radps,
-                riser_bounds_m=(kinematics.riser_lower, kinematics.riser_upper),
-            )
+            if args.policy_command_base == "model_based_planner":
+                vx_ref, wz_ref, commanded_riser_target = (
+                    apply_model_based_policy_residual(
+                        model_based_vx_ref,
+                        model_based_wz_ref,
+                        model_based_riser_target,
+                        applied_residual_action,
+                        action_scales=args.residual_action_scales,
+                        maximum_linear_velocity_m_s=(
+                            tracking_cfg.maximum_linear_velocity_mps
+                        ),
+                        maximum_yaw_rate_rad_s=tracking_cfg.maximum_yaw_rate_radps,
+                        riser_bounds_m=(
+                            kinematics.riser_lower,
+                            kinematics.riser_upper,
+                        ),
+                    )
+                )
+            else:
+                vx_ref, wz_ref, commanded_riser_target = apply_residual_action(
+                    phase_feedforward_v_mps,
+                    phase_feedforward_wz_rad_s,
+                    actual_riser_pre,
+                    applied_residual_action,
+                    action_scales=args.residual_action_scales,
+                    maximum_linear_velocity_m_s=(
+                        tracking_cfg.maximum_linear_velocity_mps
+                    ),
+                    maximum_yaw_rate_rad_s=tracking_cfg.maximum_yaw_rate_radps,
+                    riser_bounds_m=(kinematics.riser_lower, kinematics.riser_upper),
+                )
         applied_residual_actions.append(applied_residual_action.copy())
         if dataset_dir is not None or raw_teacher_dir is not None:
             dataset_observations.append(executed_observation)
@@ -1574,6 +1626,12 @@ def evaluate_case(
                     "common_wheel_action": common_action,
                     "phase_feedforward_v_mps": phase_feedforward_v_mps,
                     "phase_feedforward_wz_rad_s": phase_feedforward_wz_rad_s,
+                    "model_based_vx_reference_mps": model_based_vx_ref,
+                    "model_based_wz_reference_rad_s": model_based_wz_ref,
+                    "model_based_riser_target_m": model_based_riser_target,
+                    "applied_policy_residual_action": (
+                        applied_residual_action.tolist()
+                    ),
                     "vx_reference_mps": vx_ref,
                     "wz_reference_rad_s": wz_ref,
                     "along_track_error_m": base_tracking_diagnostics[
@@ -2586,10 +2644,24 @@ def main() -> int:
             "deterministic_teacher"
             if residual_policy is None and not args.zero_policy_action
             else (
-                "zero_policy_action_baseline"
-                if args.zero_policy_action
-                else "torchscript_residual_policy"
+                (
+                    "model_based_planner_plus_zero_policy_residual"
+                    if args.zero_policy_action
+                    else "model_based_planner_plus_torchscript_residual"
+                )
+                if args.policy_command_base == "model_based_planner"
+                else (
+                    "zero_policy_action_baseline"
+                    if args.zero_policy_action
+                    else "torchscript_residual_policy"
+                )
             )
+        ),
+        "policy_command_base": args.policy_command_base,
+        "policy_residual_contract": (
+            MODEL_BASED_POLICY_RESIDUAL_CONTRACT
+            if args.policy_command_base == "model_based_planner"
+            else "phase_feedforward_plus_planner_imitation_residual_v1"
         ),
         "residual_policy": (
             None if args.residual_policy is None else str(args.residual_policy.resolve())

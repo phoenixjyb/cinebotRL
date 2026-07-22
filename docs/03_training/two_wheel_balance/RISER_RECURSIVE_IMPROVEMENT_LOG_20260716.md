@@ -6450,3 +6450,60 @@ and must state whether its candidate was accepted or rejected.
   same run.
 - Even on a paired pass, keep label capture, BC, and PPO closed. A pass may open
   only a new CPU-reviewed training-split corrective-label capture contract.
+
+## Round 168: the corrective case-30 pair passes its frozen dynamic gate
+
+- Commit `4d47219` issued exactly one external mode-`0600` authorization token;
+  commit `cf19c7b` then scoped the token-mode regression test to POSIX while
+  retaining the real WSL mode check. The complete authoritative `.98` suite
+  passed `747` tests with ten intentional skips and two warnings in `62.74 s`.
+- The guarded runner consumed the token before Isaac and created only
+  `20260722_model_based_corrective_teacher_case30_pair_v1_exclusive`. The
+  copied contract SHA-256 is
+  `7406335fa98f3d446ed92585d2811fd10f5d08fed3cab5dad4cf81afa446a391`;
+  runtime commit and upstream are both
+  `cf19c7b3496ef2090762f1550804f8a225c5e3a1`.
+- The exact-zero baseline passed at `11,485` steps with position p95/max
+  `0.1419144676/0.1694491894 m`, attitude max `0.2297383535 deg`, pitch max
+  `7.0542488300 deg`, riser max error `0.0145935347 m`, and zero action
+  saturation. Its gate JSON SHA-256 is
+  `63554002a9fa9b10cdc52428cf5e55c47c916132ee6302fdb609a2378a1d43eb`.
+- After complete GPU release, the corrective candidate passed at `11,411`
+  steps with position p95/max `0.1355908849/0.1597901051 m`, attitude max
+  `0.2215529015 deg`, pitch max `7.0453213458 deg`, riser max error
+  `0.0118128467 m`, and zero action saturation. Its normalized residual-action
+  maxima were `[0.39490636,0.65749963,0.9]`, below the frozen `0.95` admission
+  margin. Its gate JSON SHA-256 is
+  `a3fe35831f532d6e689f942df616dfdbc7213a440a7bbb367a0fe07bf560a13e`.
+- The paired position-p95 improvement is `0.0063235827 m` or `4.455911%`,
+  exceeding the frozen `0.003 m` and `2%` minima. Position max, attitude max,
+  pitch max, riser error, and saturation all did not regress. Both executions
+  used case 30, plan SHA-256
+  `1722bfdc7c1aeabc5a9d3920cf6a47bc789afbc96e6ef5c8e540695dc3c97dcb`,
+  physics seed `20260746`, source duration `18.144412 s`, execution duration
+  `29.2224881939 s`, and the same measured `20 N`/`20`-step wrench pulse.
+- Final status SHA-256 is
+  `a966c9a5407a0d5ef91ca0553d00a0c47040fdfdc1c4f9bd9814aa33447fc083`.
+  The token is absent, GPU/process ownership is released, and no NPZ, dataset,
+  raw-teacher capture, policy trace, shadow trace, BC, PPO, or training output
+  exists. The final status remains `valid_for_training=false` and label capture
+  remains unauthorized.
+
+## Next round after Round 168
+
+- Build a new CPU-only, disabled-by-default corrective-label capture proposal
+  for training case 30. Bind the admitted pair and hashes above, the exact plan,
+  profile, perturbation, seeds, controller/robot identities, causal observation
+  contract, residual scales, unchanged dynamic gates, and an immutable fresh
+  namespace. Do not issue a runtime authorization hash or token in that change.
+- Define the capture schema before runtime: policy-rate causal observations,
+  complete model-planner commands, bounded corrective targets, final applied
+  commands, source/execution clocks, initialization separation, amplitude/slew
+  flags, perturbation telemetry, and per-sample plan/commit identities. The
+  proposal must reject any validation/holdout case or any action outside the
+  admitted profile.
+- Add negative and synthetic tests for capture-disabled defaults, conflicting
+  output modes, noncausal/future observations, identity mismatch, missing
+  clocks, action-envelope overflow, initialization leakage, and dirty/diverged
+  Git state. A future capture may be reviewed only after the authoritative CPU
+  suite passes; BC and PPO remain closed.

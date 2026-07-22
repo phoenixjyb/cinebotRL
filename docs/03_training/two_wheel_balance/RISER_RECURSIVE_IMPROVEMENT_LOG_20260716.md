@@ -7155,11 +7155,14 @@ and must state whether its candidate was accepted or rejected.
   fields. Summary SHA-256 is
   `7e9c48539e9d9ae77fad9143a9bb91936ed195f92a60b517f22c469c74af37df`;
   decision is `collect_complete_calibrated_bench_measurements`.
+- Exact implementation commit
+  `79dc596b8202cd43e2fb5310696865633c4a2fc1` reproduces that summary
+  byte-for-byte under authoritative `.98` Windows Python. The full `.98`
+  CPU-only suite passes `837 passed, 11 skipped, 2 warnings` in `80.88 s`.
+  No Isaac, playback, capture, dataset, BC, PPO, or training process ran.
 
 ## Next round after Round 182
 
-- Run the new bench-audit and full CPU suite on authoritative `.98`, verify
-  host-independent byte identity, then seal and sync a clean checkpoint.
 - When hardware exists, copy the template to a dated evidence namespace,
   replace every placeholder from calibrated raw evidence, run the auditor, and
   preserve failing results rather than editing thresholds.

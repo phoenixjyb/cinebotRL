@@ -6159,3 +6159,47 @@ and must state whether its candidate was accepted or rejected.
 - Do not start case 78, residual capture, BC, PPO, or holdout evaluation from a
   case-8 failure. A case-8 pass is only the prerequisite for a separately
   bounded case-78 preservation contract.
+
+## Round 162: exact-zero residual preserves case-8 model-based behavior
+
+- Commit `3c45dbd` issues one authorization hash in a separate change; commit
+  `cf0d4d0` corrects preflight evidence to distinguish the issued hash from an
+  unconsumed token. Focused authorization/preflight tests pass, and the final
+  preflight at `cf0d4d0` confirms clean pushed HEAD, all pinned identities, a
+  fresh namespace, and exclusive GPU ownership.
+- The one mode-0600 token was consumed before Isaac. Explicit zero ran first;
+  the exact-zero TorchScript rollout started only after the first result was
+  written and ownership released. Both exit codes are zero, all processes are
+  closed, the token is absent, and GPU compute ownership is empty.
+- The canonical namespace is
+  `20260722_model_based_zero_residual_case8_canary_v1_exclusive`. Explicit-zero,
+  zero-checkpoint, runtime-admission, and final-status SHA-256 values are
+  respectively
+  `5e25d4ddc8184f7e9ee86253118f29aedc7da7a611846fae3d91397a2ac26fa3`,
+  `96ab713c51fd00d93bbb5bf5936d9f996c2e473ea91cec5ed2881db1124fd4bc`,
+  `83f244210eddbd7e49bcd02cca37567fa1d60ce8ea863eda9942d8fe7c5cab4d`,
+  and `24922a7a08e9262b6159732aac5dbee6689ffe13a46b0bb95d29182437c66d9d`.
+- Both paths complete execution time `18.1173174 s` in `6,605` policy steps.
+  Position p95/max are `0.131254/0.143331 m`; attitude p95/max are
+  `0.148800/0.223093 deg`; pitch max is `6.147057 deg`; riser max error is
+  `0.0116785 m`; proxy max error is `0.229141 deg`. Every metric delta between
+  the two executions is exactly zero.
+- All physical, completion, policy identity, zero-action, and dataset-absence
+  checks pass. Residual action remains `[0,0,0]`, saturation and termination
+  remain absent, and no `.npz` is created. This proves the new policy layering
+  starts as an exact no-op on case 8; it does not authorize capture, BC, PPO,
+  holdout access, or case 78 by itself.
+
+## Next round after Round 162
+
+- Build a separate CPU-only case-78 preservation contract that pins the sealed
+  case-8 pass, the admitted case-78 plan and deterministic teacher, the same
+  exact-zero policy, and case 78's intentional `0.10 m` camera lever-arm cap.
+  Keep `[0.05,0.05,0.02]` residual scales and all physical thresholds fixed.
+- Do not reuse the planner-imitation case-78 wrapper or its failed learned
+  result as runtime authorization. The new sequence must compare model-based
+  explicit zero with the exact-zero checkpoint and require the same no-dataset
+  preservation contract.
+- Only a separately authorized case-78 preservation pass may open the design of
+  residual-target capture. BC, PPO, holdout use, and cases 16/22/32 remain
+  closed meanwhile.

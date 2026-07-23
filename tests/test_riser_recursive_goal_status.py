@@ -2116,8 +2116,10 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["learned_all79_admission_schema"] == (
         "cinebotrl_two_wheel_riser_model_based_learned_all79_admission_v1"
     )
-    assert audit["learned_all79_admission_template_sha256"] == (
-        "955cbe3068aa0bb2f8b601dbeddd283b86aab6ebb23034315f0bf1ef4d1ed438"
+    assert audit["learned_all79_admission_template_sha256"] == _sha256(
+        ROOT
+        / "docs/03_training/two_wheel_balance/"
+        "MODEL_BASED_LEARNED_ALL79_ADMISSION_TEMPLATE_20260723.json"
     )
     assert audit["learned_all79_admission_implementation_commit"] == (
         "15a58801ae0fab3fdc5686a1d0a7b0da8b42e6ef"
@@ -2214,6 +2216,22 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     )
     assert audit["learned_render_runtime_authorized"] is False
     assert audit["learned_render_recording_started"] is False
+    assert audit["learned_policy_artifact_inspector_sha256"] == _sha256(
+        ROOT
+        / "src/rl_platform/tasks/two_wheel_balance/"
+        "riser_model_based_policy_artifact.py"
+    )
+    assert audit["learned_policy_artifact_input_dimension"] == 65
+    assert audit["learned_policy_artifact_action_dimension"] == 3
+    assert audit["learned_policy_artifact_parameter_count"] == 142019
+    assert audit["learned_policy_artifact_cpu_smoke_required"] is True
+    assert audit["learned_policy_artifact_valid_live_windows_cpu"] is True
+    assert (
+        audit["learned_policy_artifact_malformed_rejected_live_windows_cpu"]
+        is True
+    )
+    assert audit["learned_preflight_windows_python_wsl_git_bridge_passed"] is True
+    assert audit["learned_policy_artifact_authoritative_windows_cpu_suite"] is None
     assert audit["required_gate_pass_count"] == 6
     assert audit["required_gate_count"] == 10
     assert audit["completion_blockers"] == [

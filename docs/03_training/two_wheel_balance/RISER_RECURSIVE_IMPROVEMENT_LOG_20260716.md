@@ -9254,3 +9254,38 @@ and must state whether its candidate was accepted or rejected.
 
 - The nearest real-data operation is unchanged:
   `Authorize exactly one case-23 v4 CPU conversion.`
+
+## Round 241: learned-policy artifacts fail closed before Isaac
+
+- Audited the validation, holdout, all-79, and rendered-rollout admissions. They
+  previously bound only the TorchScript file hash, so a corrupt or
+  architecture-incompatible artifact could survive admission and fail only
+  after the runtime route started.
+- Added a CPU-only structural inspector that requires a loadable TorchScript
+  policy with `65` observation channels, `26 + 3 * 13` state/lookahead
+  structure, three bounded outputs, finite positive normalization, and exactly
+  `142019` parameters.
+- Validation, holdout, all-79, and render contracts now run this inspection and
+  hash-bind the inspector module as an explicit code dependency.
+- The all-79 admission now revalidates the complete BC execution report and its
+  admission chain rather than trusting only selected result fields.
+- Repaired a pre-existing `.98` execution defect: WSL system Python has neither
+  NumPy nor PyTorch. Learned preflights now run in the Windows Isaac Python,
+  convert every shared artifact path with `wslpath`, and route repository
+  checks through `wsl.exe git` using an explicit `WSLENV` bridge.
+- Live `.98` CPU evidence at commit
+  `49296494a898b07f477f145dffde6f126ee64714` proves the valid policy loads with
+  the exact structure, WSL git reports the synchronized commit, and malformed
+  TorchScript is rejected.
+- The focused `.98` suite passes:
+  `65 passed, 2 warnings in 7.74 s`.
+- No runtime namespace, Isaac/GPU work, capture, conversion, dataset merge, BC,
+  PPO, checkpoint training, or learned rollout was started. Completion remains
+  `6/10`.
+
+## Next round after Round 241
+
+- Run and seal the authoritative `.98` CPU suite for the learned-policy
+  artifact and preflight repair.
+- The nearest real-data operation remains:
+  `Authorize exactly one case-23 v4 CPU conversion.`

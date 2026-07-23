@@ -1,0 +1,102 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_capture_final_v2",
+  "namespace": "20260723_model_based_corrective_teacher_case23_capture_v2_exclusive",
+  "runtime_commit": "71ed62558dc4588b4f9a39a3b598e3faf636bd5f",
+  "case": 23,
+  "split": "train",
+  "playback_exit_code": 1,
+  "admission_checks": {
+    "schema": true,
+    "passed": true,
+    "runtime_commit": true,
+    "runtime_authorized": true,
+    "capture_authorized": true,
+    "pair_admitted": true,
+    "dataset_closed": true,
+    "training_closed": true,
+    "contract_identity": true,
+    "plan_identity": true,
+    "profile_identity": true,
+    "pair_identity": true
+  },
+  "gate_checks": {
+    "exit_zero": false,
+    "single_case": true,
+    "passed": false,
+    "dynamic": false,
+    "thermal": false,
+    "controller": false,
+    "perturbation": false,
+    "source": true,
+    "capture_requested": true,
+    "capture_written": false,
+    "legacy_capture_closed": true,
+    "training_closed": true,
+    "heartbeat": true,
+    "gpu_released": true
+  },
+  "archive_checks": {
+    "loaded": false,
+    "sample_count": false,
+    "plan_identity": false,
+    "runtime_identity": false,
+    "profile_identity": false,
+    "pair_identity": false,
+    "source_clock": false,
+    "execution_clock": false,
+    "perturbation_rows": false,
+    "requested_reserved_margin": false,
+    "effective_reserved_margin": false,
+    "supervisor_contract": false,
+    "clipping_telemetry": false,
+    "initialization_excluded": false,
+    "training_closed": false
+  },
+  "contract_checks": {
+    "namespace": false,
+    "case_split": true,
+    "runtime_commit_descends_reviewed_parent": true
+  },
+  "capture_error": "[Errno 2] No such file or directory: 'G:\\\\wSpace\\\\cinebotRL-two-wheel-riser\\\\artifacts\\\\two_wheel_riser\\\\20260723_model_based_corrective_teacher_case23_capture_v3_exclusive\\\\capture\\\\case_0023_corrective_teacher_capture_v2.npz'",
+  "capture_metrics": {
+    "sample_count": 0,
+    "source_clock_end_s": null,
+    "execution_clock_end_s": null,
+    "perturbation_active_rows": 0,
+    "requested_normalized_action_abs_max": null,
+    "effective_normalized_action_abs_max": null,
+    "command_clipped_rows": null,
+    "requested_vs_effective_residual_delta_abs_max": null,
+    "amplitude_limited_rows": null,
+    "slew_limited_rows": null
+  },
+  "gate": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_teacher_case23_capture_v3_exclusive\\case_0023.json",
+    "sha256": "cd5ac4e8ce0e90bf573adb837bee583b62b73b1a3fbaa7bb974787240283b774",
+    "size_bytes": 3320
+  },
+  "heartbeat": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_teacher_case23_capture_v3_exclusive\\runtime_heartbeat.json",
+    "sha256": "87079884e80b68ed3d595cac4404133a4a3cc8023081b814174ea650825731a7",
+    "size_bytes": 1311
+  },
+  "capture": null,
+  "admission": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_teacher_case23_capture_v3_exclusive\\admission.json",
+    "sha256": "bef8d6b6b26873e8b8a01f7c5c979de1b416084c4bd6a425ada19ff1342e6dc5",
+    "size_bytes": 11057
+  },
+  "contract": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_teacher_case23_capture_v3_exclusive\\contract.json",
+    "sha256": "990a20518288f2878fbd7c495dcdc17b8972ffab067f012db7e70a20cc9e3c7c",
+    "size_bytes": 7549
+  },
+  "dynamic_quality_passed": false,
+  "capture_admitted_for_dataset_conversion": false,
+  "normalized_training_dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": false
+}

@@ -1,0 +1,274 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_capture_admission_v2",
+  "contract": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/scripts/two_wheel_balance/model_based_corrective_teacher_case23_capture_contract_v3.json",
+  "contract_sha256": "990a20518288f2878fbd7c495dcdc17b8972ffab067f012db7e70a20cc9e3c7c",
+  "contract_git_blob_sha1": "6b25a90beb4b7f2c6f7ba769a60e246466c131dd",
+  "reviewed_parent_commit": "f444c7b88d84f66acf6857fff759ee618a7f633b",
+  "runtime_commit": "71ed62558dc4588b4f9a39a3b598e3faf636bd5f",
+  "upstream_commit": "71ed62558dc4588b4f9a39a3b598e3faf636bd5f",
+  "case": 23,
+  "split": "train",
+  "namespace": "20260723_model_based_corrective_teacher_case23_capture_v3_exclusive",
+  "identities": {
+    "paired_final_status": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/docs/03_training/two_wheel_balance/evidence_20260723_case23_corrective_pair_v1/final_status.json",
+      "sha256": "67c8e99a0629a4b1cb4a2981abfe8360c5d9979c4757582dab6d4fb22cd00deb",
+      "git_blob_sha1": "fad8b0f9de7cf8cd9a0b037ab7c185e4295450f8",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "case23_plan": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu/case_0023_smoothed_riser_plan_v1.npz",
+      "sha256": "ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6",
+      "git_blob_sha1": null,
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "perturbation_profile": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/scripts/two_wheel_balance/model_based_corrective_teacher_case23_wrench_profile_v1.json",
+      "sha256": "fb394f19de9f332970430f0a493a45bfeffac35c61d9469e9a475eb16715c304",
+      "git_blob_sha1": "70b2d2d20e5fe12a5fbaa0a4943fd2b028faa53b",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "corrective_profile": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/scripts/two_wheel_balance/model_based_corrective_teacher_case23_profile_v1.json",
+      "sha256": "808e2e295bb4639288efc84f5bdf7a1954a6e2aa96f6854d808b02306e9324e3",
+      "git_blob_sha1": "4a8fabf5e801b7297c8b02d739d645b98f759fa6",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "drive_profile_selection": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json",
+      "sha256": "39a700de3985175e4e8415f1f23beef4264b103daa7ce8847f4ac0fe69f879f7",
+      "git_blob_sha1": "88ce075736da04792acc257362c9fdb555bee9d8",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "lqr_gains": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+      "sha256": "2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6",
+      "git_blob_sha1": "70ecdd8ae6b7ce09574a97a8581229cb90add623",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "robot_build_audit": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/assets_own/recomoProto2_two_wheel_riser/build_audit.json",
+      "sha256": "8be2b59a03a6c22838795ad361a86bf0f60a7534aeacd62893013f0ee27b40d9",
+      "git_blob_sha1": "83f8715d05be714dd8dcb2b0a9f47ef3f4bec8e9",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "robot_urdf": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.urdf",
+      "sha256": "603cecfc5b54e659f5d030023a69a3b42d6567f66d2771fbb7127d186f1a9afa",
+      "git_blob_sha1": "c70bf24a3189ccd24553287590dcfd191737ab33",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "robot_usd": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd",
+      "sha256": "89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0",
+      "git_blob_sha1": "b25242c27c781b5aad4fadefb0cbf54398a9a75a",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "playback": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+      "sha256": "ad29e261f989875d6d320d20393bb87625e8c2f7c4e4da0c4b58aaca79e25bd3",
+      "git_blob_sha1": "6ca42a2e4aa2839ac8d171c22d6633ca85e84198",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "corrective_teacher_runtime": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/src/rl_platform/tasks/two_wheel_balance/riser_corrective_teacher.py",
+      "sha256": "921112be40d49ae19ad06a377450c09455ac8afb5c1c8b9240591043ac47afd0",
+      "git_blob_sha1": "932ef1d6aed6f060acae7aaecc14f67dc481cb17",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "corrective_capture_runtime": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/src/rl_platform/tasks/two_wheel_balance/riser_corrective_capture.py",
+      "sha256": "9d2a9bbced92c53849df9fbe0809bc5dd98f26e54feb5f5595edb96ceedebbe6",
+      "git_blob_sha1": "0edd3b569efc917b8fed8d163ad58905299f75df",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "capture_validator_runtime": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/scripts/two_wheel_balance/validate_model_based_corrective_teacher_case30_capture.py",
+      "sha256": "337eac1a9ebddcb9d2be786a5a95d15147e68ee17180c338014a0009ca4ddf90",
+      "git_blob_sha1": "7e0a387c8fb3be3177c49e1fb5b7fafd716bef08",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "capture_finalizer_runtime": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case30_capture.py",
+      "sha256": "f0a993fbb912314852253548d7188df377d97f3e5cad2c9386bf6c2fa1131b63",
+      "git_blob_sha1": "b3da16fb59f41ce650d2e4bf90e42ac45913d55a",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "contract_validator": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/scripts/two_wheel_balance/validate_model_based_corrective_teacher_case23_capture_v3.py",
+      "sha256": "5da6c210e0933f371d9a23d611b81fb015cc7099dcf44e8d6c6fcc59fe94ff29",
+      "git_blob_sha1": "bd5fc71cff210be158177ff29fea133843e425ab",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "preflight_wrapper": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/scripts/two_wheel_balance/run_model_based_corrective_teacher_case23_capture_v3.sh",
+      "sha256": "b17a621fd590aabba18a05a94326a52b15c5ef5af1e2a5b71d0ede1daddb0ade",
+      "git_blob_sha1": "8c7f857894dcc363619f3e726f492e77b0e49d74",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "capture_finalizer": {
+      "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case23_capture_v2.py",
+      "sha256": "330e7447e62f3d645f2239546bc8348f352e81db119c0e1d471c9214a10bc0da",
+      "git_blob_sha1": "cc81118344cf2afa8999dc37a52204f405baf6b8",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    }
+  },
+  "paired_checks": {
+    "schema": true,
+    "case_split": true,
+    "passed": true,
+    "measurable_improvement": true,
+    "capture_closed": true,
+    "training_closed": true
+  },
+  "corrective_profile_checks": {
+    "schema": true,
+    "case": true,
+    "limits": true
+  },
+  "checks": {
+    "schema": true,
+    "case_split": true,
+    "reviewed_parent": true,
+    "head_matches_upstream": true,
+    "tracked_worktree_clean": true,
+    "canonical_contract": true,
+    "contract_blob_matches_head": true,
+    "fresh_namespace": true,
+    "identity_set": true,
+    "identity_hashes": true,
+    "tracked_blobs": true,
+    "paired_evidence": true,
+    "corrective_profile": true,
+    "plan_identity": true,
+    "residual_scales": true,
+    "capture_contract": true,
+    "execution_contract": true,
+    "holdout_closed": true,
+    "cpu_ready": true,
+    "authorization_state_consistent": true,
+    "normalized_dataset_closed": true,
+    "training_closed": true,
+    "active_drive_profile": true
+  },
+  "authorization_checks": {
+    "authorization_file_present": true,
+    "authorization_mode_0600": true,
+    "authorization_not_symlink": true,
+    "authorization_file_outside_repository": true,
+    "authorization_hash_is_out_of_band": true,
+    "authorization_hash_matches": true
+  },
+  "authorization_file": "/tmp/cinebotrl-case23-v3-authorization.k0H8uc",
+  "authorization_consumed_before_isaac": true,
+  "cpu_contract_ready": true,
+  "corrective_target_admission_passed": true,
+  "plan_sha256": "ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6",
+  "corrective_profile_sha256": "808e2e295bb4639288efc84f5bdf7a1954a6e2aa96f6854d808b02306e9324e3",
+  "paired_final_status_sha256": "67c8e99a0629a4b1cb4a2981abfe8360c5d9979c4757582dab6d4fb22cd00deb",
+  "runtime_authorized": true,
+  "gpu_launch_authorized": true,
+  "label_capture_authorized": true,
+  "dataset_creation_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true,
+  "drive_profile_checks": {
+    "schema": true,
+    "profile_audit_passed": true,
+    "active_profile_is_400w": true,
+    "active_force_and_speed": true,
+    "active_thermal_contract": true,
+    "750w_candidate_not_simulation_enabled": true,
+    "750w_candidate_not_runtime_or_training_enabled": true,
+    "plant_switch_invalidates_prior_evidence": true,
+    "silent_upgrade_rejected": true
+  }
+}

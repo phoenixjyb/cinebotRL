@@ -76,19 +76,13 @@ def test_v3_contract_is_fresh_no_token_route_after_consumed_v2() -> None:
     assert contract["valid_for_training"] is False
 
 
-def test_v3_contract_pins_repaired_runtime_and_route_files() -> None:
+def test_v3_contract_is_stale_after_consumed_route_repair() -> None:
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
-    paths = {
-        "playback": PLAYBACK,
-        "contract_validator": VALIDATOR,
-        "preflight_wrapper": WRAPPER,
-        "capture_finalizer": FINALIZER,
-    }
-    for identity, path in paths.items():
-        row = contract["identities"][identity]
-        assert row["path"] == path.relative_to(ROOT).as_posix()
-        assert row["sha256"] == _sha256(path)
-        assert row["git_blob_sha1"] == _git_blob(path)
+    playback = contract["identities"]["playback"]
+    assert playback["path"] == PLAYBACK.relative_to(ROOT).as_posix()
+    assert playback["sha256"] != _sha256(PLAYBACK)
+    assert playback["git_blob_sha1"] != _git_blob(PLAYBACK)
+    assert contract["supersedes"]["retry_authorized"] is False
 
 
 def test_v3_validator_forwards_exact_case_split_and_fresh_route(
@@ -155,3 +149,6 @@ def test_v3_repaired_playback_binds_case_and_split_before_app_launch() -> None:
         "corrective capture directory, admission, and split are required together"
         in pre_app
     )
+    save_call = source.split("save_corrective_capture(", 1)[1].split("\n        )", 1)[0]
+    assert 'case=int(corrective_capture_admission["case"])' in save_call
+    assert "split=args.corrective_teacher_capture_split" in save_call

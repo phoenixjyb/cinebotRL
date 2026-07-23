@@ -2320,6 +2320,8 @@ def evaluate_case(
             paired_final_status_sha256=str(
                 corrective_capture_admission["paired_final_status_sha256"]
             ),
+            case=int(corrective_capture_admission["case"]),
+            split=args.corrective_teacher_capture_split,
         )
     policy_trace_path = None
     if policy_trace_dir is not None:

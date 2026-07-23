@@ -112,6 +112,32 @@ def test_capture_round_trip_keeps_clocks_identities_and_training_closed(tmp_path
     assert np.all(payload["sample_runtime_commit"] == COMMIT)
 
 
+def test_capture_round_trip_accepts_case23_only_with_explicit_route(tmp_path) -> None:
+    payload = _payload()
+    payload["case_ids"] = np.full(len(payload["case_ids"]), 23, dtype=np.int16)
+    path = tmp_path / "case_0023_corrective_teacher_capture_v2.npz"
+    save_corrective_capture(
+        path,
+        payload,
+        source_duration_s=18.144412,
+        execution_duration_s=29.22248819392579,
+        plan_sha256=PLAN_SHA,
+        runtime_commit=COMMIT,
+        corrective_profile_sha256=PROFILE_SHA,
+        paired_final_status_sha256=PAIR_SHA,
+        case=23,
+        split="train",
+    )
+    with pytest.raises(ValueError, match="unreviewed case"):
+        load_corrective_capture(path)
+    metadata, loaded = load_corrective_capture(
+        path, expected_case=23, expected_split="train"
+    )
+    assert metadata["case"] == 23
+    assert metadata["split"] == "train"
+    assert np.all(loaded["case_ids"] == 23)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

@@ -116,8 +116,8 @@
     },
     "playback": {
       "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
-      "sha256": "f5ccbfb0b5ba15a9f94ee958ffff2f0bb6556a3f1e600555bf73764b21dc22c5",
-      "git_blob_sha1": "6939c38c47c9eff55277d04c153a3e77a92c47d0"
+      "sha256": "aae110e4e2f65baf29ab69f7d4ffa953773f1abb9dfaaec5ada8314809052d38",
+      "git_blob_sha1": "a7b59648ea12e7a2bf0494ac336328151f2245e8"
     },
     "case2_playback_adapter": {
       "path": "scripts/two_wheel_balance/smoke_riser_case2_natural_error_pair.py",

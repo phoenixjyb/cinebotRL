@@ -263,6 +263,36 @@ CASE8_VALIDATION_WRENCH_PROFILE = (
     / "scripts/two_wheel_balance/"
     "model_based_corrective_teacher_case8_validation_wrench_profile_v1.json"
 )
+CASE8_VALIDATION_PAIR_ROUTE_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case8_validation_pair_contract_v1.json"
+)
+CASE8_VALIDATION_PAIR_ROUTE_VALIDATOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "validate_model_based_corrective_teacher_case8_validation_pair.py"
+)
+CASE8_VALIDATION_PAIR_ROUTE_WRAPPER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "run_model_based_corrective_teacher_case8_validation_pair.sh"
+)
+CASE8_VALIDATION_PAIR_ROUTE_FINALIZER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "summarize_model_based_corrective_teacher_case8_validation_pair.py"
+)
+CASE8_VALIDATION_ASSESSMENT = (
+    ROOT
+    / "src/rl_platform/tasks/two_wheel_balance/"
+    "riser_corrective_validation.py"
+)
+CASE8_VALIDATION_PAIR_ROUTE_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case8_validation_pair_route_cpu_v1/summary.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -1225,6 +1255,78 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case8_profile["ppo_authorized"] is False
     assert case8_profile["training_started"] is False
     assert case8_profile["valid_for_training"] is False
+    assert corrective["case8_validation_pair_route_contract_sha256"] == (
+        _sha256(CASE8_VALIDATION_PAIR_ROUTE_CONTRACT)
+    )
+    assert corrective[
+        "case8_validation_pair_route_contract_git_blob_sha1"
+    ] == "2364199fb5c9d766fad3fbd592ab06ab6da27680"
+    assert corrective["case8_validation_pair_route_validator_sha256"] == (
+        _sha256(CASE8_VALIDATION_PAIR_ROUTE_VALIDATOR)
+    )
+    assert corrective["case8_validation_pair_route_wrapper_sha256"] == (
+        _sha256(CASE8_VALIDATION_PAIR_ROUTE_WRAPPER)
+    )
+    assert corrective["case8_validation_pair_route_finalizer_sha256"] == (
+        _sha256(CASE8_VALIDATION_PAIR_ROUTE_FINALIZER)
+    )
+    assert corrective["case8_validation_assessment_sha256"] == _sha256(
+        CASE8_VALIDATION_ASSESSMENT
+    )
+    assert corrective["case8_validation_pair_route_preflight_sha256"] == (
+        _sha256(CASE8_VALIDATION_PAIR_ROUTE_EVIDENCE)
+    )
+    assert corrective["case8_validation_pair_route_identity_count"] == 19
+    assert corrective["case8_validation_pair_route_reset_seed"] == (
+        corrective["case8_validation_pair_route_configuration_seed"] + 8
+    )
+    assert corrective[
+        "case8_validation_pair_route_same_plan_seed_physics_and_perturbation"
+    ] is True
+    assert corrective[
+        "case8_validation_pair_route_cpu_preflight_passed"
+    ] is True
+    assert corrective[
+        "case8_validation_pair_route_contract_ready"
+    ] is True
+    assert corrective[
+        "case8_validation_pair_route_execution_route_complete"
+    ] is True
+    assert corrective[
+        "case8_validation_pair_route_authorization_token_issued"
+    ] is False
+    assert corrective[
+        "case8_validation_pair_route_runtime_authorized"
+    ] is False
+    assert corrective[
+        "case8_validation_pair_route_gpu_launch_authorized"
+    ] is False
+    assert corrective[
+        "case8_validation_pair_route_teacher_admission_authorized"
+    ] is False
+    assert corrective[
+        "case8_validation_pair_route_label_capture_authorized"
+    ] is False
+    assert corrective[
+        "case8_validation_pair_route_dataset_creation_authorized"
+    ] is False
+    assert corrective[
+        "case8_validation_pair_route_training_authorized"
+    ] is False
+    case8_route = json.loads(CASE8_VALIDATION_PAIR_ROUTE_EVIDENCE.read_text())
+    assert case8_route["passed"] is True
+    assert case8_route["case"] == 8
+    assert case8_route["split"] == "validation"
+    assert len(case8_route["identities"]) == 19
+    assert all(case8_route["document_checks"].values())
+    assert all(case8_route["checks"].values())
+    assert case8_route["runtime_authorized"] is False
+    assert case8_route["gpu_launch_authorized"] is False
+    assert case8_route["teacher_admission_authorized"] is False
+    assert case8_route["label_capture_authorized"] is False
+    assert case8_route["dataset_creation_authorized"] is False
+    assert case8_route["training_started"] is False
+    assert case8_route["valid_for_training"] is False
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

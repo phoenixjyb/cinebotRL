@@ -9025,3 +9025,35 @@ and must state whether its candidate was accepted or rejected.
 - The nearest actual data-path action remains exactly one separately
   authorized case-23 v4 CPU conversion. The consumed v4 capture authorization
   cannot be reused.
+
+## Round 234: case-8 held-out validation route is complete but unauthorized
+
+- Added a dedicated validation assessor rather than weakening the existing
+  train-only corrective-teacher admission gate. A passing case-8 pair can
+  report held-out validation improvement but cannot admit teachers, labels, or
+  training data.
+- Added a hash-bound contract, validator, wrapper, and finalizer with `19`
+  identities, validation split, reset seed `20260724`, and the fresh
+  `case8_validation_pair_v1_exclusive` namespace.
+- Preserved baseline-first execution with identical plan, seed, physics,
+  thresholds, and deterministic `18 N`, `0.10 s` perturbation. The candidate
+  is unreachable unless the baseline dynamically passes and releases the GPU.
+- Repaired cross-platform contract validation to use WSL Git from Windows
+  Python and explicit LF serialization. This preserves exact blob and byte
+  identities across macOS, WSL, and Windows.
+- Mac and `.98` preflights pass every check with all `19` identities matching.
+  The `.98` focused suite passes `27` tests.
+- The authoritative `.98` CPU suite passes:
+  `1259 passed, 12 skipped, 2 warnings in 157.03 s`.
+- `.98 --execute` rejects before Python or Isaac with code `4`; the namespace
+  remains absent.
+- No authorization token, runtime, teacher admission, label capture, dataset,
+  BC, PPO, or training was created. Goal completion remains `6/10`.
+
+## Next round after Round 234
+
+- The case-8 validation pair is separately reviewable for exactly one future
+  held-out paired canary. No runtime authorization has been issued.
+- Continue CPU-only preparation with case 16, the second selected validation
+  case, unless a separate case-23 v4 CPU conversion or case-8 runtime
+  authorization is explicitly issued.

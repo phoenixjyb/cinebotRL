@@ -12,6 +12,11 @@ CASE23_CAPTURE_CONTRACT = (
     ROOT
     / "scripts/two_wheel_balance/model_based_corrective_teacher_case23_capture_contract_v1.json"
 )
+CASE23_CAPTURE_RESULT = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_case23_corrective_capture_v1_rejected/final_status.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -129,7 +134,15 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["case23_pair_passed"] is True
     assert corrective["case23_position_p95_improvement_m"] > 0.003
     assert corrective["case23_position_p95_improvement_fraction"] > 0.02
-    assert corrective["case23_capture_review_ready"] is True
+    assert corrective["case23_capture_review_ready"] is False
+    assert corrective["case23_capture_attempted"] is True
+    assert corrective["case23_capture_passed"] is False
+    assert corrective["case23_capture_failure_stage"] == (
+        "runtime_argument_validation_before_isaac_initialization"
+    )
+    assert corrective["case23_capture_result_sha256"] == _sha256(
+        CASE23_CAPTURE_RESULT
+    )
     assert corrective["case23_pair_contract_sha256"] == (
         "e5b5b360efdb0334412fb156d77dba7e0a6eb605651c16bffc280a8076caa043"
     )
@@ -186,7 +199,9 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "case23_capture_only_contract" in goal["next_iteration"]["required_change"]
+    assert "fresh_namespace_case23_capture_contract" in (
+        goal["next_iteration"]["required_change"]
+    )
 
 
 def test_hardware_status_remains_measurement_blocked() -> None:

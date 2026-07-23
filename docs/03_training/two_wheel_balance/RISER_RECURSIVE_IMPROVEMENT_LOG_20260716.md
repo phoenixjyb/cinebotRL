@@ -9331,3 +9331,44 @@ and must state whether its candidate was accepted or rejected.
 - The nearest real-data operation remains separately authorized CPU-only
   conversion:
   `Authorize exactly one case-23 v4 CPU conversion.`
+
+## Round 243: current-code conversion and corrective queue admissions refreshed
+
+- Regenerated the case-23 CPU-conversion no-token preflight and all five
+  pending paired-canary preflights on `.98` from clean synchronized code.
+- The first live sweep correctly found one transitive case-7 drift: its active
+  route contract pinned the historical profile-proposal hash even though the
+  proposal had been resealed after the residual-runtime update.
+- Updated only the case-7 proposal SHA/blob identity and added a committed
+  contract test that opens every pinned identity. The test computes Git blob
+  IDs directly, so it works under both macOS and Windows Python.
+- Repair commit
+  `cec3cdb20904bbe37d5214e859759ff13a7de84a` is pushed and synchronized.
+  Re-running all six no-token preflights at that commit produced six passes:
+  case-23 conversion; train cases 6, 2, and 7; validation cases 8 and 16.
+- Preserved the exact live admissions under
+  `evidence_20260724_pending_corrective_route_queue_cpu_v2`. Its summary
+  SHA-256 is
+  `ff5f54f22877ec653da3aa933a4cc3eaceb083f4a0c1135a44586ed8353bae13`.
+- The case-23 conversion preflight is also preserved independently under
+  `evidence_20260724_case23_corrective_conversion_execution_cpu_v3`, SHA-256
+  `0a7719f26849f2d08ffa8471b670c9b63068015c709541ca15ad22554e8a094a`.
+  It proves CPU readiness while conversion authorization, output creation,
+  corpus merge, BC, PPO, and training remain false.
+- Evidence commit
+  `049094a61a814fd5c2c4a31cf164f60478239f1d` and goal-binding commit
+  `e190d8820303ebc7ef9185be56c66f561296d0fe` are pushed and synchronized.
+- Focused CPU coverage passes `28` tests. The authoritative `.98`
+  Windows-Isaac Python suite passes:
+  `1315 passed, 12 skipped, 2 warnings in 175.14 s`.
+- No token, runtime namespace, Isaac/GPU workload, capture, conversion,
+  dataset output, corpus merge, BC, PPO, checkpoint, or training run was
+  created. Goal completion remains `6/10`.
+
+## Next round after Round 243
+
+- The exact next data-producing operation remains:
+  `Authorize exactly one case-23 v4 CPU conversion.`
+- A future authorized wrapper invocation must recompute admission against its
+  then-current clean synchronized `HEAD`; the preserved v2 queue is evidence,
+  not a reusable authorization.

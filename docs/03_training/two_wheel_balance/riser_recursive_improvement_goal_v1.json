@@ -1049,7 +1049,8 @@
         "pre_training_next_operation_authorized": false,
         "focused_local_cpu_suite": "13_passed_2_warnings_in_2.44s",
         "focused_windows_cpu_suite": "21_passed_2_warnings_in_9.93s",
-        "authoritative_windows_cpu_suite": null
+        "authoritative_windows_cpu_commit": "90f1aad2849e0a9e1029f2834c0db8301e98d0f3",
+        "authoritative_windows_cpu_suite": "1301_passed_12_skipped_2_warnings_in_173.12s"
       },
       "completion_gap": [
         "separately_authorize_and_convert_the_reviewed_case23_v4_capture",

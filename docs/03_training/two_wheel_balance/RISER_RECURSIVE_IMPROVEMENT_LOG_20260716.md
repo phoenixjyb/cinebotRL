@@ -9244,12 +9244,13 @@ and must state whether its candidate was accepted or rejected.
   `507e5a0f7161f89610a551ef7e3fa7493744f9d00f816c42663005e41fa85157`.
 - The focused `.98` CPU suite passes:
   `21 passed, 2 warnings in 9.93 s`.
+- The authoritative `.98` CPU suite passes:
+  `1301 passed, 12 skipped, 2 warnings in 173.12 s`.
 - Completion remains honestly `6/10`. No token, runtime namespace, Isaac/GPU
   work, capture, conversion, dataset merge, BC, PPO, checkpoint, or training
   run was created.
 
 ## Next round after Round 240
 
-- Run and seal the authoritative `.98` CPU suite for audit v2.
 - The nearest real-data operation is unchanged:
   `Authorize exactly one case-23 v4 CPU conversion.`

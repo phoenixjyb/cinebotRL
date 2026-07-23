@@ -102,14 +102,17 @@ def _closed(payload: Mapping[str, object]) -> bool:
     )
 
 
-def _identity(path: Path) -> dict[str, object]:
+def _display_path(path: Path) -> str:
     resolved = path.resolve()
     try:
-        display = resolved.relative_to(PROJECT_ROOT).as_posix()
+        return resolved.relative_to(PROJECT_ROOT).as_posix()
     except ValueError:
-        display = str(resolved)
+        return str(resolved)
+
+
+def _identity(path: Path) -> dict[str, object]:
     return {
-        "path": display,
+        "path": _display_path(path),
         "sha256": _sha256(path),
         "size_bytes": path.stat().st_size,
     }
@@ -125,7 +128,7 @@ def _dataset_row(path: Path, *, case: int, split: str) -> dict[str, object]:
         "case": case,
         "split": split,
         "state": "converted_admitted_for_case_merge",
-        "path": str(path),
+        "path": _display_path(path),
         "sha256": _sha256(path),
         "sample_count": int(metadata["sample_count"]),
         "valid_for_case_merge": True,
@@ -392,10 +395,7 @@ def main() -> int:
         case23_conversion_final_path=args.case23_conversion_final,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(
-        json.dumps(result, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    args.output.write_bytes((json.dumps(result, indent=2) + "\n").encode())
     print(json.dumps(result, indent=2))
     return 0
 

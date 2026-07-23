@@ -210,7 +210,10 @@ def test_cli_writes_closed_readiness_evidence(tmp_path: Path) -> None:
         text=True,
     )
     assert result.returncode == 0, result.stderr
-    payload = json.loads(output.read_text())
+    raw = output.read_bytes()
+    assert raw.endswith(b"\n")
+    assert b"\r\n" not in raw
+    payload = json.loads(raw)
     assert payload["passed"] is True
     assert payload["corpus_manifest_ready"] is False
     assert payload["training_started"] is False

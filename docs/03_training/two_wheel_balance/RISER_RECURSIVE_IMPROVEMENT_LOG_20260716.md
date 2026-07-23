@@ -9086,3 +9086,36 @@ and must state whether its candidate was accepted or rejected.
 - Design a CPU-only case-16 structural natural-error corrective profile with
   no external wrench. Prove projection, command-limit, clock, and held-out
   validation invariants before implementing any runtime route.
+
+## Round 236: case-16 structural natural-error validation profile is ready
+
+- Built a case-specific held-out validation profile from case 16's own
+  zero-residual gate rather than reusing a train-case or case-8 profile.
+- Because the plan has no low-motion pulse window and already reaches the
+  base-linear, yaw, and proxy-rate limits, no external wrench profile was
+  created. Existing tracking error supplies the bounded excitation.
+- The formula retains the smaller of `40%` and the p95 gate-margin fraction.
+  Case 16 resolves to `40%`, with maximum residuals
+  `[0.004255,0.007047,0.001022]` and a `0.40 s` slew horizon.
+- Natural error exceeds `0.03 m` in `52/54` trace samples. The full-plan safety
+  projection is contractive: negative projection counts are `[0,20,0]` and
+  positive counts are `[607,174,0]`.
+- Only effective post-supervisor residuals may be assessed. Requested
+  residuals are not training labels, and held-out validation cannot admit a
+  teacher, label archive, dataset, merge, BC, PPO, or training run.
+- Implementation commit
+  `77139d631ee05b3432d368ce478ff8f8af7bca93` passes the focused `19`-test
+  suite on macOS and `.98`; Windows regenerates byte-identical artifacts.
+- The authoritative `.98` CPU suite passes:
+  `1278 passed, 12 skipped, 2 warnings in 162.65 s`.
+- No token, namespace, Isaac/GPU run, capture, conversion, dataset, BC, PPO,
+  or training was created. Goal completion remains `6/10`.
+
+## Next round after Round 236
+
+- Implement a disabled-by-default, hash-bound case-16 natural-error validation
+  pair contract and CPU preflight without issuing authorization or creating a
+  runtime namespace.
+- The nearest actual data-path action remains exactly one separately
+  authorized case-23 v4 CPU conversion. The consumed case-23 capture
+  authorization cannot be replayed.

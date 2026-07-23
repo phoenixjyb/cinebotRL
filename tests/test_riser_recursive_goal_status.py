@@ -303,6 +303,23 @@ CASE16_VALIDATION_PAIR_READINESS_EVIDENCE = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_case16_validation_pair_readiness_cpu_v1/summary.json"
 )
+CASE16_VALIDATION_NATURAL_ERROR_PROFILE_BUILDER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "build_model_based_corrective_case16_validation_natural_error_profile.py"
+)
+CASE16_VALIDATION_NATURAL_ERROR_PROFILE = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case16_validation_natural_error_"
+    "profile_v1.json"
+)
+CASE16_VALIDATION_NATURAL_ERROR_PROPOSAL = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case16_validation_natural_error_profile_cpu_v1/"
+    "proposal.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -1399,6 +1416,66 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case16["ppo_authorized"] is False
     assert case16["training_started"] is False
     assert case16["valid_for_training"] is False
+    assert corrective[
+        "case16_validation_natural_error_profile_builder_sha256"
+    ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PROFILE_BUILDER)
+    assert corrective[
+        "case16_validation_natural_error_profile_builder_git_blob_sha1"
+    ] == "0a1964bc25a4f2d4e10a2f0b7689c36ca7c708e4"
+    assert corrective[
+        "case16_validation_natural_error_profile_sha256"
+    ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PROFILE)
+    assert corrective[
+        "case16_validation_natural_error_profile_proposal_sha256"
+    ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PROPOSAL)
+    assert corrective[
+        "case16_validation_natural_error_profile_mac_windows_byte_parity"
+    ] is True
+    assert corrective[
+        "case16_validation_natural_error_profile_envelope_retention_fraction"
+    ] == 0.4
+    assert corrective[
+        "case16_validation_natural_error_profile_negative_projection_counts"
+    ] == [0, 20, 0]
+    assert corrective[
+        "case16_validation_natural_error_profile_positive_projection_counts"
+    ] == [607, 174, 0]
+    assert corrective[
+        "case16_validation_natural_error_profile_external_wrench_created"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_profile_cpu_ready"
+    ] is True
+    assert corrective[
+        "case16_validation_natural_error_profile_runtime_route_implemented"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_profile_runtime_authorized"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_profile_label_capture_authorized"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_profile_training_authorized"
+    ] is False
+    case16_profile = json.loads(
+        CASE16_VALIDATION_NATURAL_ERROR_PROPOSAL.read_text()
+    )
+    assert case16_profile["passed"] is True
+    assert case16_profile["case"] == 16
+    assert case16_profile["split"] == "validation"
+    assert all(case16_profile["input_checks"].values())
+    assert all(case16_profile["shape_checks"].values())
+    assert all(case16_profile["gate_checks"].values())
+    assert all(case16_profile["formula_checks"].values())
+    assert all(case16_profile["validation_profile_checks"].values())
+    assert case16_profile["validation_pair_profile_cpu_ready"] is True
+    assert case16_profile["runtime_route_implemented"] is False
+    assert case16_profile["runtime_authorized"] is False
+    assert case16_profile["label_capture_authorized"] is False
+    assert case16_profile["dataset_creation_authorized"] is False
+    assert case16_profile["training_started"] is False
+    assert case16_profile["valid_for_training"] is False
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

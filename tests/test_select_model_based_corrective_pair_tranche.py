@@ -15,6 +15,18 @@ MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(MODULE)
 
+VALIDATION_SCRIPT = (
+    Path(__file__).parents[1]
+    / "scripts/two_wheel_balance/"
+    "select_model_based_corrective_validation_tranche.py"
+)
+VALIDATION_SPEC = importlib.util.spec_from_file_location(
+    "corrective_validation_selector", VALIDATION_SCRIPT
+)
+VALIDATION_MODULE = importlib.util.module_from_spec(VALIDATION_SPEC)
+assert VALIDATION_SPEC.loader is not None
+VALIDATION_SPEC.loader.exec_module(VALIDATION_MODULE)
+
 
 def _write(path: Path, payload: object) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -25,7 +37,9 @@ def _write(path: Path, payload: object) -> str:
 def _fixture(tmp_path: Path):
     portfolio_path = tmp_path / "portfolio/manifest.json"
     portfolio_path.parent.mkdir(parents=True, exist_ok=True)
-    cases = [2, 4, 6, 30, 31, 52]
+    train_cases = [2, 4, 6, 30, 31, 52]
+    validation_cases = [8, 16, 22, 32]
+    cases = train_cases + validation_cases
     items = []
     dynamic_rows = []
     for index, case in enumerate(cases):
@@ -102,8 +116,8 @@ def _fixture(tmp_path: Path):
     split = {
         "schema": MODULE.SPLIT_SCHEMA,
         "admitted_split_cases": {
-            "train": cases,
-            "validation": [8, 16, 22, 32, 78],
+            "train": train_cases,
+            "validation": validation_cases + [78],
             "holdout": MODULE.HOLDOUT_CASES,
         },
         "split_admitted": True,
@@ -162,6 +176,58 @@ def test_selector_is_deterministic_diverse_and_runtime_closed(tmp_path) -> None:
     assert result["bc_authorized"] is False
     assert result["ppo_authorized"] is False
     assert result["valid_for_training"] is False
+
+
+def test_validation_selector_chooses_two_diverse_closed_cases(tmp_path) -> None:
+    values = _fixture(tmp_path)
+    result = VALIDATION_MODULE.build_validation_selection(
+        *values[:4],
+        portfolio_path=values[4],
+        dynamic_path=values[5],
+        split_path=values[6],
+        conversion_audit_path=values[7],
+        tranche_size=2,
+    )
+    assert result["schema"] == VALIDATION_MODULE.SCHEMA
+    assert len(result["selected_cases"]) == 2
+    assert len(set(result["selected_cases"])) == 2
+    assert set(result["selected_cases"]) <= {8, 16, 22, 32}
+    assert result["eligible_validation_cases"] == [8, 16, 22, 32]
+    assert result["excluded_validation_rows"] == [
+        {"case": 78, "reason": "missing_portfolio_case"}
+    ]
+    assert all(
+        row["selection_role"]
+        == "same_seed_validation_paired_canary_required"
+        for row in result["selected_rows"]
+    )
+    assert result["same_seed_pair_required_before_capture"] is True
+    assert result["runtime_authorized"] is False
+    assert result["gpu_launch_authorized"] is False
+    assert result["label_capture_authorized"] is False
+    assert result["dataset_conversion_authorized"] is False
+    assert result["dataset_merge_authorized"] is False
+    assert result["bc_authorized"] is False
+    assert result["ppo_authorized"] is False
+    assert result["valid_for_training"] is False
+
+
+def test_validation_selector_rejects_insufficient_dynamic_candidates(
+    tmp_path,
+) -> None:
+    values = list(_fixture(tmp_path))
+    values[1]["rows"] = [
+        row for row in values[1]["rows"] if row["case"] not in {16, 22, 32}
+    ]
+    with pytest.raises(ValueError, match="not enough dynamically qualified"):
+        VALIDATION_MODULE.build_validation_selection(
+            *values[:4],
+            portfolio_path=values[4],
+            dynamic_path=values[5],
+            split_path=values[6],
+            conversion_audit_path=values[7],
+            tranche_size=2,
+        )
 
 
 @pytest.mark.parametrize("failure", ["portfolio", "split", "audit", "plan", "dynamic"])

@@ -8081,3 +8081,44 @@ and must state whether its candidate was accepted or rejected.
   validation-metric kernel behind a hash-bound BC admission contract, but it
   must remain unusable until a real `4+2` promoted dataset and separate BC
   authorization both exist.
+
+## Round 208: projection-aware optimizer and validation kernels pass CPU review
+
+- Added
+  `exact_case_balanced_projection_aware_gradient_accumulation_v1`. Each current
+  row is paired only with its same-case, same-split predecessor observation.
+  Cross-case or cross-split predecessor mappings fail closed.
+- Minibatch gradients are scaled against whole-split pointwise and valid
+  transition weights, accumulated across the complete split, clipped once,
+  and followed by one optimizer step. A deterministic test proves that one
+  full batch and uneven seven-row batches produce equivalent parameter
+  updates.
+- Added `projected_effective_action_case_balanced_validation_v1`. Validation
+  passes requested outputs through the frozen command supervisor before
+  comparing them with effective targets and reports projected loss,
+  case-balanced per-action MSE, zero-request baseline, clipping, requested
+  output magnitude, and slew violations.
+- A deterministic synthetic three-channel teacher is learned on CPU with
+  effective-target MSE reduced below the bounded test gates. The first invalid
+  fixture placed the riser at its lower command bound while asking for negative
+  residual motion; the safety projection correctly exposed that unreachable
+  target. The corrected fixture uses a valid `0.6 m` mid-stroke command rather
+  than weakening the learning threshold.
+- The adapter SHA-256 is
+  `946e205daf98c36c7141536ec2ddd3073190b7d76f0e8224d066e3e309284a48`.
+  Implementation commit
+  `9dad263fb14ec767cabe912276e80461c9bf4b77` passes the focused suite with
+  `67 passed, 5 warnings` in `21.22 s` and the authoritative `.98` suite with
+  `993 passed, 12 skipped, 2 warnings` in `102.76 s`.
+- The kernel has no executable CLI route and creates no artifact. A real
+  promoted dataset, BC admission, optimizer execution, checkpoint, rollout,
+  PPO, and training all remain absent or unauthorized.
+
+## Next round after Round 208
+
+- The only prepared runtime action remains one separately authorized case-23
+  v4 corrective-label capture.
+- CPU work may define the hash-bound BC execution admission and trainer report
+  schema around the reviewed kernel. The checked-in template must remain
+  unusable, and optimizer execution must stay closed until a real promoted
+  `4+2` dataset receives explicit BC authorization.

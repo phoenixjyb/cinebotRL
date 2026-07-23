@@ -424,6 +424,15 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corpus["projection_training_bc_optimizer_kernel_implemented"] is True
     assert corpus["projection_training_bc_optimizer_kernel_synthetic_only"] is True
     assert corpus["projection_training_bc_optimizer_kernel_creates_artifacts"] is False
+    assert corpus[
+        "projection_training_bc_optimizer_kernel_implementation_commit"
+    ] == ("9dad263fb14ec767cabe912276e80461c9bf4b77")
+    assert corpus["projection_training_bc_optimizer_kernel_focused_cpu_suite"] == (
+        "67_passed_5_warnings_in_21.22s"
+    )
+    assert corpus[
+        "projection_training_bc_optimizer_kernel_authoritative_cpu_suite"
+    ] == ("993_passed_12_skipped_2_warnings_in_102.76s")
     assert corpus["projection_training_bc_optimizer_path_integrated"] is False
     assert corpus["projection_training_bc_authorized"] is False
     assert corpus["projection_training_focused_cpu_suite"] == (

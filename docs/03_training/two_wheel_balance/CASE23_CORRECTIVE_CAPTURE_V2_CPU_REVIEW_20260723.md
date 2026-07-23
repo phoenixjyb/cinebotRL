@@ -18,7 +18,7 @@ training.
 - Reviewed parent:
   `94ebd9b9ba72f74be09934eed495a110d90af419`
 - Implementation and authoritative preflight commit:
-  `9a4570841a4aa6de4543216138c746b0a7bdd6b9`
+  `4a6e45643a2efd6b713054fa5862b0ae4a506e8d`
 - Contract SHA-256:
   `9ef7a279de8266a5b3f6cdb73e6395a2c69985ead1563145e8eb26900a035aeb`
 - Contract Git blob:
@@ -52,9 +52,10 @@ The `.98` preflight proves:
 - effective post-supervisor labels remain the only future training targets;
 - conversion, BC, PPO, holdouts, and training remain closed.
 
-The authoritative `.98` CPU suite at the sanitized `9a45708` passed:
-`938 passed, 12 skipped, 2 warnings` in `83.06 s`. A new authoritative
-suite is required after the out-of-band authorization hardening is committed.
+The focused cross-platform suite passed `14 tests` with two configuration
+warnings. The authoritative `.98` CPU suite at sanitized commit `4a6e456`
+passed `941 tests`, skipped `12`, and emitted two configuration warnings in
+`85.23 s`.
 
 ## Exact Next Gate
 

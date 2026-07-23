@@ -7347,3 +7347,36 @@ and must state whether its candidate was accepted or rejected.
   and a fresh namespace. Do not reuse the consumed pair token.
 - Do not launch capture until separately authorized. Conversion, corpus merge,
   BC, PPO, holdouts, and cases 6/2/7 remain closed.
+
+## Round 187: case-23 corrective capture contract passes CPU-only
+
+- Commit `1bbcdbda3239db88c55b1ae36cd6b941e98ee7ed` adds a dedicated
+  no-token case-23 capture contract, canonical validator, exclusive wrapper,
+  and fail-closed archive finalizer. The generic case-30 validator/finalizer
+  accept explicit case identities so the same archive semantics are enforced
+  without retaining a hidden case-30 loader default.
+- The contract is bound to the passed pair SHA-256
+  `67c8e99a0629a4b1cb4a2981abfe8360c5d9979c4757582dab6d4fb22cd00deb`,
+  case-23 plan SHA-256
+  `ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6`,
+  the tracked case-23 corrective and perturbation profiles, frozen LQR gains,
+  robot assets, capture runtime, validator, wrapper, and finalizer identities.
+- The authoritative `.98` CPU suite passed with `870 passed, 12 skipped,
+  2 warnings` in `79.45 s`. The committed no-token preflight then passed every
+  pair, identity, plan, profile, asset, namespace, clean-HEAD/upstream, capture
+  schema, holdout, and training-closure check. Contract SHA-256 is
+  `1d290b6be77e86e69a5ecf025f616bf5cd3c53c336b2ca4d94185b76f5422756`.
+- Preflight explicitly reports `runtime_authorized=false`,
+  `gpu_launch_authorized=false`, `label_capture_authorized=false`,
+  `dataset_creation_authorized=false`, `bc_authorized=false`,
+  `ppo_authorized=false`, and `training_started=false`. No runtime namespace,
+  token, Isaac process, capture archive, dataset, or training artifact was
+  created in this round.
+
+## Next round after Round 187
+
+- Independently review this exact CPU-ready contract. Only explicit user
+  authorization may add one mode-`0600`, SHA-256-bound, one-use token for the
+  single case-23 capture in the already pinned fresh namespace.
+- A successful capture may be reviewed for dataset conversion; it does not
+  authorize conversion, corpus merge, BC, PPO, holdout access, or cases 6/2/7.

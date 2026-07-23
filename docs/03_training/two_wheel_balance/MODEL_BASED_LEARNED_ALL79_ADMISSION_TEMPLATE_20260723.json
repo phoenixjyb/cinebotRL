@@ -1,0 +1,152 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_learned_all79_admission_v1",
+  "bc_report": {
+    "path": null,
+    "sha256": null
+  },
+  "policy": {
+    "path": null,
+    "sha256": null
+  },
+  "validation_gate_report": {
+    "path": null,
+    "sha256": null
+  },
+  "holdout_gate_report": {
+    "path": null,
+    "sha256": null
+  },
+  "execution_commit": null,
+  "code": {
+    "playback": {
+      "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+      "sha256": null
+    },
+    "rollout_gate": {
+      "path": "scripts/two_wheel_balance/gate_riser_residual_rollouts.py",
+      "sha256": null
+    },
+    "completion_auditor": {
+      "path": "scripts/two_wheel_balance/audit_riser_goal_completion.py",
+      "sha256": null
+    },
+    "admission_contract": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_learned_all79_contract.py",
+      "sha256": null
+    }
+  },
+  "evaluation_config": {
+    "tracking_profile": "riser_phase_consistent_v2",
+    "policy_command_contract": "model_based_planner_plus_bounded_policy_residual_v1",
+    "residual_action_scales": [
+      0.05,
+      0.05,
+      0.02
+    ],
+    "maximum_regression_fraction": 0.05,
+    "minimum_zero_improvement_fraction": 0.05,
+    "position_error_p95_m_max": 0.15,
+    "position_error_max_m_max": 0.25,
+    "attitude_error_p95_deg_max": 5.0,
+    "attitude_error_max_deg_max": 10.0
+  },
+  "validation_cases": [],
+  "holdout_cases": [
+    3,
+    5,
+    13,
+    19,
+    24
+  ],
+  "all79_cases": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79
+  ],
+  "model_selection_complete": false,
+  "validation_gate_passed": false,
+  "holdout_gate_passed": false,
+  "holdout_opened_only_after_model_selection": false,
+  "all79_evaluation_approved": false,
+  "learned_rollout_authorized": false,
+  "residual_capture_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false
+}

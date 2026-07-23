@@ -27,12 +27,18 @@ from rl_platform.tasks.two_wheel_balance import (  # noqa: E402
 from rl_platform.tasks.two_wheel_balance import (  # noqa: E402
     riser_model_based_corrective_training_dataset as training_dataset_contract,
 )
+from rl_platform.tasks.two_wheel_balance import (  # noqa: E402
+    riser_model_based_learned_all79_contract as learned_all79_contract,
+)
 
 
 CODE_IDENTITY_KEYS = bc_contract.CODE_IDENTITY_KEYS
 validate_bc_execution_admission = bc_contract.validate_bc_execution_admission
 validate_bc_execution_report = bc_contract.validate_bc_execution_report
 load_training_dataset = training_dataset_contract.load_training_dataset
+validate_learned_all79_admission = (
+    learned_all79_contract.validate_learned_all79_admission
+)
 
 
 DOC_ROOT = PROJECT_ROOT / "docs/03_training/two_wheel_balance"
@@ -427,6 +433,9 @@ def _optional_learning_evidence(
     training_dataset: Path | None,
     bc_admission: Path | None,
     bc_report: Path | None,
+    learned_all79_admission: Path | None,
+    validation_gate_report: Path | None,
+    holdout_gate_report: Path | None,
     all79_report: Path | None,
     learned_render_report: Path | None,
 ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
@@ -434,6 +443,9 @@ def _optional_learning_evidence(
         "training_dataset": training_dataset,
         "bc_admission": bc_admission,
         "bc_report": bc_report,
+        "learned_all79_admission": learned_all79_admission,
+        "validation_gate_report": validation_gate_report,
+        "holdout_gate_report": holdout_gate_report,
         "all79_report": all79_report,
         "learned_render_report": learned_render_report,
     }
@@ -494,8 +506,48 @@ def _optional_learning_evidence(
 
     all79: dict[str, Any] | None = None
     if all79_report is not None:
-        if report is None:
-            raise ValueError("learned all-79 report requires a validated BC report")
+        if (
+            report is None
+            or bc_report is None
+            or learned_all79_admission is None
+            or validation_gate_report is None
+            or holdout_gate_report is None
+        ):
+            raise ValueError(
+                "learned all-79 report requires BC, admission, validation, and "
+                "holdout evidence"
+            )
+        rollout_admission = _load_json(learned_all79_admission)
+        validation_gate = _load_json(validation_gate_report)
+        holdout_gate = _load_json(holdout_gate_report)
+        policy_path = _resolve_identity(
+            report["torchscript"],
+            directory=bc_report.parent,
+        )
+        rollout_code_paths = {
+            "playback": PROJECT_ROOT
+            / "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+            "rollout_gate": PROJECT_ROOT
+            / "scripts/two_wheel_balance/gate_riser_residual_rollouts.py",
+            "completion_auditor": Path(__file__).resolve(),
+            "admission_contract": SRC_ROOT
+            / "rl_platform/tasks/two_wheel_balance/"
+            "riser_model_based_learned_all79_contract.py",
+        }
+        validate_learned_all79_admission(
+            rollout_admission,
+            identity_root=PROJECT_ROOT,
+            bc_report_path=bc_report,
+            bc_report=report,
+            policy_path=policy_path,
+            validation_report_path=validation_gate_report,
+            validation_report=validation_gate,
+            holdout_report_path=holdout_gate_report,
+            holdout_report=holdout_gate,
+            code_paths=rollout_code_paths,
+            expected_execution_commit=str(report["execution_commit"]),
+            require_authorized=True,
+        )
         all79 = _load_json(all79_report)
         policy_sha = report["torchscript"]["sha256"]
         _validate_all79_report(all79, policy_sha256=policy_sha)
@@ -736,6 +788,9 @@ def main() -> int:
     parser.add_argument("--training-dataset", type=Path)
     parser.add_argument("--bc-admission", type=Path)
     parser.add_argument("--bc-report", type=Path)
+    parser.add_argument("--learned-all79-admission", type=Path)
+    parser.add_argument("--validation-gate-report", type=Path)
+    parser.add_argument("--holdout-gate-report", type=Path)
     parser.add_argument("--all79-report", type=Path)
     parser.add_argument("--learned-render-report", type=Path)
     parser.add_argument("--output", type=Path, required=True)
@@ -757,6 +812,9 @@ def main() -> int:
         training_dataset=args.training_dataset,
         bc_admission=args.bc_admission,
         bc_report=args.bc_report,
+        learned_all79_admission=args.learned_all79_admission,
+        validation_gate_report=args.validation_gate_report,
+        holdout_gate_report=args.holdout_gate_report,
         all79_report=args.all79_report,
         learned_render_report=args.learned_render_report,
     )

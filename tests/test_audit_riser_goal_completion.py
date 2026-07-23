@@ -5,6 +5,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 
 ROOT = Path(__file__).parents[1]
 SCRIPT = ROOT / "scripts/two_wheel_balance/audit_riser_goal_completion.py"
@@ -175,6 +177,9 @@ def test_partial_learning_arguments_are_rejected(tmp_path: Path) -> None:
             training_dataset=fake_dataset,
             bc_admission=None,
             bc_report=None,
+            learned_all79_admission=None,
+            validation_gate_report=None,
+            holdout_gate_report=None,
             all79_report=None,
             learned_render_report=None,
         )
@@ -182,6 +187,27 @@ def test_partial_learning_arguments_are_rejected(tmp_path: Path) -> None:
         assert "must be supplied together" in str(error)
     else:
         raise AssertionError("partial learning evidence was accepted")
+
+
+def test_all79_report_requires_separate_rollout_admission_chain(
+    tmp_path: Path,
+) -> None:
+    all79 = tmp_path / "all79.json"
+    all79.write_text("{}\n", encoding="utf-8")
+    with pytest.raises(
+        ValueError,
+        match="requires BC, admission, validation, and holdout evidence",
+    ):
+        MODULE._optional_learning_evidence(
+            training_dataset=None,
+            bc_admission=None,
+            bc_report=None,
+            learned_all79_admission=None,
+            validation_gate_report=None,
+            holdout_gate_report=None,
+            all79_report=all79,
+            learned_render_report=None,
+        )
 
 
 def test_translates_windows_worktree_path_for_wsl_git() -> None:

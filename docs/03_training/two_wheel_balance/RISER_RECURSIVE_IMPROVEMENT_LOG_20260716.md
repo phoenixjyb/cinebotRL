@@ -7885,3 +7885,48 @@ and must state whether its candidate was accepted or rejected.
   case-23 v3 corrective-label capture.
 - A v3 pass opens only a conversion audit. A rejection stops for diagnosis.
   Corpus merge, BC, PPO, holdouts, and training remain separately closed.
+
+## Round 202: authorized case-23 v3 completes phase but archive rejects
+
+- The user authorized exactly one case-23 v3 corrective-label capture. The
+  wrapper consumed one out-of-repository mode-`0600` token at clean
+  `HEAD == upstream == 71ed62558dc4588b4f9a39a3b598e3faf636bd5f`.
+- Isaac initialized and reached the full `9.929694 s` trajectory phase in
+  `3273` steps. The final heartbeat recorded peak position error
+  `0.067912 m`, peak attitude error `0.257883 deg`, peak pitch
+  `5.642538 deg`, no pending termination, and no dataset.
+- Post-execution archive validation rejected before the dynamic gate result was
+  written. Playback did not forward case/split into `save_corrective_capture`,
+  so the case-30 compatibility default rejected case-23 rows.
+- The v3 wrapper independently invoked the v2-hardcoded finalizer, which
+  reported the obsolete v2 namespace.
+- No capture archive, conversion, corpus merge, BC, PPO, holdout evaluation, or
+  training was created. V3 is consumed and non-retryable.
+- Immutable evidence is preserved in
+  `evidence_20260723_case23_corrective_capture_v3_rejected_save_route`.
+
+## Round 203: case-23 v4 save/finalizer route is CPU-ready
+
+- Playback now forwards the admitted case and split into the archive save.
+  The case-30 compatibility default remains unchanged.
+- V4 uses fresh namespace
+  `20260723_model_based_corrective_teacher_case23_capture_v4_exclusive` and a
+  v4-specific finalizer pinned to case 23 and that namespace.
+- The reviewed parent is
+  `472130ef622ef90afd6f470783f834d014e41ac0`; the implementation and
+  authoritative CPU commit is
+  `2eb9604b7e2c030a867d9ab64e536240561c652f`.
+- Focused tests pass `37/37`. The authoritative `.98` suite passes
+  `959 passed, 12 skipped, 2 warnings` in `90.22 s`.
+- The `.98` no-token preflight passes every identity and closure check. The v4
+  namespace remains absent, with zero GPU owners and zero runtime processes.
+- V4 contains no token or token hash. Runtime, label capture, conversion,
+  corpus merge, BC, PPO, holdouts, and training remain unauthorized.
+
+## Next round after Round 203
+
+- Do not launch v4 without a new explicit instruction authorizing exactly one
+  case-23 v4 corrective-label capture.
+- A pass opens only a separate conversion audit. A rejection stops for
+  diagnosis. Corpus merge, BC, PPO, holdouts, and training remain separately
+  closed.

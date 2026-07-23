@@ -27,6 +27,22 @@ CASE23_CAPTURE_V2_CPU_REVIEW = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260723_case23_corrective_capture_v2_cpu/summary.json"
 )
+CASE23_CAPTURE_V3_REJECTION = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_case23_corrective_capture_v3_rejected_save_route/"
+    "manifest.json"
+)
+CASE23_CAPTURE_V4_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case23_capture_contract_v4.json"
+)
+CASE23_CAPTURE_V4_CPU_REVIEW = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_case23_corrective_capture_v4_cpu/summary.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -180,10 +196,32 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["case23_capture_v2_conversion_authorized"] is False
     assert corrective["case23_capture_v2_authorization_consumed"] is True
     assert corrective["case23_capture_v2_retry_authorized"] is False
-    assert corrective["case23_capture_v3_cpu_ready"] is True
+    assert corrective["case23_capture_v3_pre_runtime_cpu_ready"] is True
+    assert corrective["case23_capture_v3_cpu_ready"] is False
     assert corrective["case23_capture_v3_runtime_authorized"] is False
     assert corrective["case23_capture_v3_capture_case_propagated"] is True
     assert corrective["case23_capture_v3_capture_split_propagated"] is True
+    assert corrective["case23_capture_v3_authorization_consumed"] is True
+    assert corrective["case23_capture_v3_full_execution_phase_reached"] is True
+    assert corrective["case23_capture_v3_dynamic_gate_result_written"] is False
+    assert corrective["case23_capture_v3_passed"] is False
+    assert corrective["case23_capture_v3_capture_files"] == 0
+    assert corrective["case23_capture_v3_rejection_manifest_sha256"] == _sha256(
+        CASE23_CAPTURE_V3_REJECTION
+    )
+    assert corrective["case23_capture_v3_retry_authorized"] is False
+    assert corrective["case23_capture_v4_contract_sha256"] == _sha256(
+        CASE23_CAPTURE_V4_CONTRACT
+    )
+    assert corrective["case23_capture_v4_save_case_propagated"] is True
+    assert corrective["case23_capture_v4_save_split_propagated"] is True
+    assert corrective["case23_capture_v4_finalizer_namespace_pinned"] is True
+    assert corrective["case23_capture_v4_cpu_ready"] is True
+    assert corrective["case23_capture_v4_no_token_preflight_passed"] is True
+    assert corrective["case23_capture_v4_runtime_authorized"] is False
+    assert corrective["case23_capture_v4_label_capture_authorized"] is False
+    assert corrective["case23_capture_v4_conversion_authorized"] is False
+    assert json.loads(CASE23_CAPTURE_V4_CPU_REVIEW.read_text())["passed"] is True
     assert corrective["temporal_projection_audit_sha256"] == _sha256(
         TEMPORAL_PROJECTION_AUDIT
     )

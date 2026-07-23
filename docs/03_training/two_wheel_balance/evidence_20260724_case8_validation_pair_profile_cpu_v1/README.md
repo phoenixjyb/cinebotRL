@@ -31,6 +31,11 @@ non-reuse, plant, and closed-state check passes.
 authorization token, runtime, GPU launch, label capture, conversion, merge,
 BC, PPO, or training is enabled.
 
-The focused case-8/case-7/readiness suite passes
-`34 passed, 2 warnings in 0.72 s` on macOS. Authoritative `.98` verification
-is deferred until this implementation is committed and synchronized.
+The focused case-8/case-7/readiness/status suite passes
+`40 passed, 2 warnings in 0.74 s` on macOS and
+`40 passed, 2 warnings in 1.26 s` on `.98`. Windows regenerates the
+corrective profile, wrench profile, and proposal byte-identically.
+
+The authoritative `.98` CPU suite passes
+`1244 passed, 12 skipped, 2 warnings in 152.91 s` at implementation commit
+`0a671f3bd074a45e96648f22961c8b9a162e5545`.

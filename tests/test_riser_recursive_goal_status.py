@@ -243,6 +243,26 @@ CASE8_VALIDATION_PAIR_READINESS_EVIDENCE = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_case8_validation_pair_readiness_cpu_v1/summary.json"
 )
+CASE8_VALIDATION_PAIR_PROFILE_BUILDER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "build_model_based_corrective_case8_validation_pair_profiles.py"
+)
+CASE8_VALIDATION_PAIR_PROFILE_PROPOSAL = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case8_validation_pair_profile_cpu_v1/proposal.json"
+)
+CASE8_VALIDATION_CORRECTIVE_PROFILE = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case8_validation_profile_v1.json"
+)
+CASE8_VALIDATION_WRENCH_PROFILE = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case8_validation_wrench_profile_v1.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -1118,6 +1138,93 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case8["ppo_authorized"] is False
     assert case8["training_started"] is False
     assert case8["valid_for_training"] is False
+    assert corrective["case8_validation_pair_profile_schema"] == (
+        "cinebotrl_two_wheel_riser_case8_validation_pair_profile_"
+        "proposal_cpu_v1"
+    )
+    assert corrective["case8_validation_pair_profile_builder_sha256"] == (
+        _sha256(CASE8_VALIDATION_PAIR_PROFILE_BUILDER)
+    )
+    assert corrective[
+        "case8_validation_pair_profile_builder_git_blob_sha1"
+    ] == "6cb1b96cc1b209b27276c3d8d2b3d892baa3d5e9"
+    assert corrective[
+        "case8_validation_corrective_profile_sha256"
+    ] == _sha256(CASE8_VALIDATION_CORRECTIVE_PROFILE)
+    assert corrective["case8_validation_wrench_profile_sha256"] == _sha256(
+        CASE8_VALIDATION_WRENCH_PROFILE
+    )
+    assert corrective[
+        "case8_validation_pair_profile_proposal_sha256"
+    ] == _sha256(CASE8_VALIDATION_PAIR_PROFILE_PROPOSAL)
+    assert corrective[
+        "case8_validation_pair_profile_mac_windows_byte_parity"
+    ] is True
+    assert corrective[
+        "case8_validation_pair_profile_authoritative_cpu_suite"
+    ] == "1244_passed_12_skipped_2_warnings_in_152.91s"
+    assert corrective["case8_validation_pair_profile_split"] == "validation"
+    assert corrective[
+        "case8_validation_pair_profile_envelope_retention_fraction"
+    ] == 0.4
+    assert corrective[
+        "case8_validation_pair_profile_slew_horizon_s"
+    ] == 0.4
+    assert corrective[
+        "case8_validation_pair_profile_pulse_force_n"
+    ] == 18.0
+    assert corrective[
+        "case8_validation_pair_profile_pulse_duration_s"
+    ] == 0.1
+    assert corrective[
+        "case8_validation_pair_profile_recovery_tail_s"
+    ] > 15.0
+    assert corrective[
+        "case8_validation_pair_profile_effective_normalized_action_abs_max"
+    ] < 0.31
+    assert corrective[
+        "case8_validation_pair_profile_pulse_window_fully_unclipped"
+    ] is True
+    assert corrective[
+        "case8_validation_pair_profile_train_profile_reuse_authorized"
+    ] is False
+    assert corrective[
+        "case8_validation_pair_profile_cpu_ready"
+    ] is True
+    assert corrective[
+        "case8_validation_pair_profile_runtime_route_implemented"
+    ] is False
+    assert corrective[
+        "case8_validation_pair_profile_authorization_token_issued"
+    ] is False
+    assert corrective[
+        "case8_validation_pair_profile_runtime_authorized"
+    ] is False
+    assert corrective[
+        "case8_validation_pair_profile_label_capture_authorized"
+    ] is False
+    assert corrective[
+        "case8_validation_pair_profile_training_authorized"
+    ] is False
+    case8_profile = json.loads(
+        CASE8_VALIDATION_PAIR_PROFILE_PROPOSAL.read_text()
+    )
+    assert case8_profile["passed"] is True
+    assert case8_profile["split"] == "validation"
+    assert all(case8_profile["validation_profile_checks"].values())
+    assert case8_profile["train_profile_reuse_authorized"] is False
+    assert case8_profile["pair_profile_cpu_ready"] is True
+    assert case8_profile["runtime_route_implemented"] is False
+    assert case8_profile["authorization_token_issued"] is False
+    assert case8_profile["runtime_authorized"] is False
+    assert case8_profile["gpu_launch_authorized"] is False
+    assert case8_profile["label_capture_authorized"] is False
+    assert case8_profile["dataset_conversion_authorized"] is False
+    assert case8_profile["dataset_merge_authorized"] is False
+    assert case8_profile["bc_authorized"] is False
+    assert case8_profile["ppo_authorized"] is False
+    assert case8_profile["training_started"] is False
+    assert case8_profile["valid_for_training"] is False
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

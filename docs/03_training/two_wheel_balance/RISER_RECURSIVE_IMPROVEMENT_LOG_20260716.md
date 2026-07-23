@@ -8988,3 +8988,40 @@ and must state whether its candidate was accepted or rejected.
 - The nearest actual data-path action remains exactly one separately
   authorized case-23 v4 CPU conversion. The consumed v4 capture authorization
   cannot be reused.
+
+## Round 233: case-8 has a dedicated validation profile
+
+- Built a validation-only case-8 corrective profile from its own readiness
+  evidence and selected plan. The implementation reuses the audited formula
+  engine but not any case-30, case-23, case-6, case-2, or case-7 profile file
+  or parameter set.
+- Retained `40%` of the observed case-8 raw residual envelope with maximum
+  residuals `[0.015366,0.008148,0.001003]` and a `0.40 s` slew horizon.
+  This is more conservative than case 7's `50%` and `0.35 s` design.
+- Selected an `18 N`, `0.10 s` longitudinal pulse at execution phase
+  `2.851306 s`, covering four source samples and leaving `15.166011 s` for
+  recovery. This is smaller than case 7's `20 N` pulse.
+- Proved the pulse window is fully unclipped. The full-plan projection is
+  contractive, with only four initial negative riser transitions projected at
+  the lower bound. The maximum effective normalized action is `0.307323`.
+- For the provisional `28 kg` plant, the pulse impulse is `1.8 Ns`; its ideal
+  free-body displacement lower screen is `0.003214 m`. This remains an
+  observability screen, not a closed-loop response claim.
+- Implementation commit
+  `0a671f3bd074a45e96648f22961c8b9a162e5545` passes `40` focused tests
+  on macOS and `.98`. Windows regenerates all profile artifacts byte-for-byte.
+- The authoritative `.98` CPU suite passes:
+  `1244 passed, 12 skipped, 2 warnings in 152.91 s`.
+- `pair_profile_cpu_ready=true`, but the runtime route is not implemented and
+  no authorization token exists. No Isaac/GPU run, label capture, conversion,
+  merge, BC, PPO, or training was created. Goal completion remains `6/10`.
+
+## Next round after Round 233
+
+- Implement a disabled-by-default, hash-bound case-8 validation paired runtime
+  contract and CPU preflight. It must preserve the validation split, exact
+  clocks, identical baseline/candidate seed and physics, and forbid every
+  dataset or training output.
+- The nearest actual data-path action remains exactly one separately
+  authorized case-23 v4 CPU conversion. The consumed v4 capture authorization
+  cannot be reused.

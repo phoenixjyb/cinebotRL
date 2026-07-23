@@ -8005,3 +8005,40 @@ and must state whether its candidate was accepted or rejected.
   projected loss be wired into an authorized BC run. Keep the review-only
   corpus rejection, holdout closure, PPO closure, and learned-rollout closure
   unchanged until their own gates are met.
+
+## Round 206: projection-aware corrective training schema is fail-closed
+
+- Added
+  `cinebotrl_two_wheel_riser_model_based_corrective_training_v1` and its
+  independent admission schema. Promotion requires the implemented
+  case-disjoint review corpus with at least `4` train cases and `2` validation
+  cases while holdouts `[3,5,13,19,24]` remain unopened.
+- Admission binds the source corpus, promotion commit, projection-aware loss
+  module and audit, promotion module, and CLI by SHA-256. The checked-in
+  template deliberately has no corpus SHA or commit and keeps
+  `training_schema_promotion_approved=false`.
+- Promotion preserves every review-corpus array and effective
+  post-supervisor label. It derives only same-case previous-row indices,
+  positive transition times, transition masks, and per-case sample weights
+  that sum to one.
+- Tamper tests reject forged admissions, holdout leakage, broken transition
+  mappings, invalid timing, unbalanced case weights, and opened learning
+  flags. The CLI is preflight-first, refuses overwrite, and the current BC
+  trainer still rejects the new schema.
+- The implementation is commit
+  `6dd9027568ab7afdca68615ad08a9934191ec874`. The local corrective-pipeline
+  suite passes `161 passed, 3 warnings` in `17.59 s`; the authoritative `.98`
+  suite at the same commit passes `989 passed, 12 skipped, 2 warnings` in
+  `95.37 s`.
+- No real multi-case corpus or promoted dataset was created. Runtime, capture,
+  conversion, BC, PPO, learned rollout, checkpoint creation, and training
+  remain closed.
+
+## Next round after Round 206
+
+- The sole prepared runtime action remains exactly one separately authorized
+  case-23 v4 corrective-label capture. V3 is consumed and non-retryable.
+- If v4 passes, audit and convert it separately, then gather enough disjoint
+  train and validation cases to populate the `4+2` review corpus. Only a fresh
+  hash-bound promotion admission may create the training schema, and a further
+  explicit BC authorization is still required before any learning run.

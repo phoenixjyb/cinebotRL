@@ -378,12 +378,16 @@
           "projection_training_admission_template_sha256": "f448037d1b1d7f93f725c1907dc1ac79f6c1fd11e13b35e3120cc813c5eecdbb",
           "projection_training_transition_contract": "same_case_previous_row_elapsed_delta_v1",
           "projection_training_case_balancing_contract": "unit_total_weight_per_case_v1",
+          "projection_training_promotion_implemented": true,
+          "projection_training_implementation_commit": "6dd9027568ab7afdca68615ad08a9934191ec874",
           "projection_training_admission_template_approved": false,
           "projection_training_real_corpus_available": false,
           "projection_training_dataset_created": false,
           "projection_training_bc_entrypoint_integrated": false,
           "projection_training_bc_authorized": false,
-          "projection_training_focused_cpu_suite": "63_passed_5_warnings"
+          "projection_training_focused_cpu_suite": "161_passed_3_warnings_in_17.59s",
+          "projection_training_authoritative_cpu_commit": "6dd9027568ab7afdca68615ad08a9934191ec874",
+          "projection_training_authoritative_cpu_suite": "989_passed_12_skipped_2_warnings_in_95.37s"
         },
         "multi_case_corpus_created": false
       },

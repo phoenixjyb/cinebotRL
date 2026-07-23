@@ -382,13 +382,23 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corpus["projection_training_case_balancing_contract"] == (
         "unit_total_weight_per_case_v1"
     )
+    assert corpus["projection_training_promotion_implemented"] is True
+    assert corpus["projection_training_implementation_commit"] == (
+        "6dd9027568ab7afdca68615ad08a9934191ec874"
+    )
     assert corpus["projection_training_admission_template_approved"] is False
     assert corpus["projection_training_real_corpus_available"] is False
     assert corpus["projection_training_dataset_created"] is False
     assert corpus["projection_training_bc_entrypoint_integrated"] is False
     assert corpus["projection_training_bc_authorized"] is False
     assert corpus["projection_training_focused_cpu_suite"] == (
-        "63_passed_5_warnings"
+        "161_passed_3_warnings_in_17.59s"
+    )
+    assert corpus["projection_training_authoritative_cpu_commit"] == (
+        "6dd9027568ab7afdca68615ad08a9934191ec874"
+    )
+    assert corpus["projection_training_authoritative_cpu_suite"] == (
+        "989_passed_12_skipped_2_warnings_in_95.37s"
     )
     assert corrective["multi_case_corpus_created"] is False
     assert stage["runtime_authorized"] is False

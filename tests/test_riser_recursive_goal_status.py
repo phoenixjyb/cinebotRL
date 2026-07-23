@@ -16,6 +16,11 @@ DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
 )
+TEMPORAL_PROJECTION_AUDIT = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_model_based_corrective_temporal_projection_v1/summary.json"
+)
 
 
 def _goal() -> dict:
@@ -98,6 +103,19 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["case23_capture_cpu_preflight_passed"] is True
     assert corrective["case23_capture_authorized"] is False
     assert corrective["case23_conversion_authorized"] is False
+    assert corrective["temporal_projection_audit_sha256"] == _sha256(
+        TEMPORAL_PROJECTION_AUDIT
+    )
+    assert corrective["temporal_projection_contract"] == (
+        "model_based_residual_safety_projection_v1"
+    )
+    assert corrective["requested_teacher_slew_violation_count"] == [0, 0, 0]
+    assert corrective["effective_label_slew_violation_count"] == [30, 49, 8]
+    assert corrective["effective_label_slew_violation_transition_count"] == 87
+    assert corrective["effective_slew_violations_all_supervisor_clipped"] is True
+    assert corrective["projection_aware_effective_label_loss_required"] is True
+    assert corrective["requested_output_slew_regularization_required"] is True
+    assert corrective["temporal_projection_valid_for_training"] is False
     assert corrective["case30_valid_for_training"] is False
     assert corrective["conversion_route"]["case30_default_preserved"] is True
     assert corrective["conversion_route"]["allowed_splits"] == [

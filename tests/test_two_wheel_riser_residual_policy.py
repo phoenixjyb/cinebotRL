@@ -12,8 +12,10 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
     PREVIOUS_ACTION_INDICES,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa: E402
+    MODEL_BASED_RESIDUAL_SAFETY_PROJECTION,
     MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE,
     POLICY_ARCHITECTURE,
+    ModelBasedResidualSafetyProjection,
     RiserResidualPolicy,
     initialize_model_based_residual_from_planner_imitation,
 )
@@ -196,3 +198,62 @@ def test_planner_imitation_encoder_transfer_rejects_shape_drift() -> None:
     )
     with pytest.raises(ValueError, match="shape mismatch"):
         initialize_model_based_residual_from_planner_imitation(target, source)
+
+
+def test_model_based_residual_safety_projection_is_scriptable() -> None:
+    projection = ModelBasedResidualSafetyProjection().eval()
+    model_commands = torch.tensor(
+        [[0.38, -0.38, 1.19], [0.10, 0.20, 0.70]]
+    )
+    requested_actions = torch.tensor(
+        [[1.0, -1.0, 1.0], [0.4, -0.6, 0.5]]
+    )
+    expected = projection(model_commands, requested_actions)
+    scripted = torch.jit.script(projection)
+    actual = scripted(model_commands, requested_actions)
+    for actual_value, expected_value in zip(actual, expected, strict=True):
+        torch.testing.assert_close(actual_value, expected_value)
+    torch.testing.assert_close(
+        actual[0],
+        torch.tensor([[0.40, -0.40, 1.20], [0.12, 0.17, 0.71]]),
+    )
+    torch.testing.assert_close(
+        actual[1],
+        torch.tensor([[0.4, -0.4, 0.5], [0.4, -0.6, 0.5]]),
+    )
+    assert actual[2].tolist() == [
+        [True, True, True],
+        [False, False, False],
+    ]
+    assert (
+        MODEL_BASED_RESIDUAL_SAFETY_PROJECTION
+        == "model_based_residual_safety_projection_v1"
+    )
+
+
+def test_model_based_residual_safety_projection_is_differentiable() -> None:
+    projection = ModelBasedResidualSafetyProjection()
+    model_commands = torch.tensor([[0.0, 0.0, 0.6]])
+    requested_actions = torch.tensor(
+        [[0.2, -0.3, 0.4]], requires_grad=True
+    )
+    _, effective_actions, _ = projection(model_commands, requested_actions)
+    effective_actions.square().sum().backward()
+    assert requested_actions.grad is not None
+    assert torch.isfinite(requested_actions.grad).all()
+    assert torch.count_nonzero(requested_actions.grad).item() == 3
+
+
+def test_model_based_residual_safety_projection_rejects_invalid_contract() -> None:
+    with pytest.raises(ValueError, match="dimension"):
+        ModelBasedResidualSafetyProjection(action_scales=(0.05, 0.05))
+    with pytest.raises(ValueError, match="limits"):
+        ModelBasedResidualSafetyProjection(action_scales=(0.05, 0.0, 0.02))
+    projection = ModelBasedResidualSafetyProjection()
+    with pytest.raises(ValueError, match="shape"):
+        projection(torch.zeros(3), torch.zeros(3))
+    with pytest.raises(ValueError, match="non-finite"):
+        projection(
+            torch.zeros(1, 3),
+            torch.tensor([[0.0, float("nan"), 0.0]]),
+        )

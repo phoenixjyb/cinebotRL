@@ -27,6 +27,9 @@ ATTENUATED_PREVIOUS_ACTION_POLICY_ARCHITECTURE = (
 MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE = (
     "model_based_shared_encoder_zero_initialized_residual_v1"
 )
+MODEL_BASED_RESIDUAL_SAFETY_PROJECTION = (
+    "model_based_residual_safety_projection_v1"
+)
 
 
 def _encoder(
@@ -125,6 +128,64 @@ class RiserResidualPolicy(nn.Module):
         )
         fused = torch.cat((state_embedding, lookahead_embedding), dim=1)
         return torch.tanh(self.action_head(self.fusion_encoder(fused)))
+
+
+class ModelBasedResidualSafetyProjection(nn.Module):
+    """Project requested residuals through the deterministic command supervisor."""
+
+    def __init__(
+        self,
+        action_scales: Sequence[float] = (0.05, 0.05, 0.02),
+        command_lower_bounds: Sequence[float] = (-0.4, -0.4, 0.0),
+        command_upper_bounds: Sequence[float] = (0.4, 0.4, 1.2),
+    ) -> None:
+        super().__init__()
+        scales = torch.as_tensor(action_scales, dtype=torch.float32).reshape(-1)
+        lower = torch.as_tensor(command_lower_bounds, dtype=torch.float32).reshape(-1)
+        upper = torch.as_tensor(command_upper_bounds, dtype=torch.float32).reshape(-1)
+        if scales.shape != (3,) or lower.shape != (3,) or upper.shape != (3,):
+            raise ValueError("model-based residual projection dimension mismatch")
+        if (
+            not torch.isfinite(scales).all()
+            or not torch.isfinite(lower).all()
+            or not torch.isfinite(upper).all()
+            or torch.any(scales <= 0.0)
+            or torch.any(lower >= upper)
+        ):
+            raise ValueError("model-based residual projection limits are invalid")
+        self.register_buffer("action_scales", scales)
+        self.register_buffer("command_lower_bounds", lower)
+        self.register_buffer("command_upper_bounds", upper)
+
+    def forward(
+        self,
+        model_based_commands: torch.Tensor,
+        requested_normalized_actions: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if (
+            model_based_commands.ndim != 2
+            or requested_normalized_actions.ndim != 2
+            or model_based_commands.shape != requested_normalized_actions.shape
+            or model_based_commands.shape[1] != 3
+        ):
+            raise ValueError("model-based residual projection input shape mismatch")
+        if not torch.isfinite(model_based_commands).all() or not torch.isfinite(
+            requested_normalized_actions
+        ).all():
+            raise ValueError("model-based residual projection input is non-finite")
+        bounded_actions = torch.clamp(requested_normalized_actions, -1.0, 1.0)
+        requested_commands = (
+            model_based_commands + self.action_scales * bounded_actions
+        )
+        effective_commands = torch.maximum(
+            torch.minimum(requested_commands, self.command_upper_bounds),
+            self.command_lower_bounds,
+        )
+        effective_actions = (
+            effective_commands - model_based_commands
+        ) / self.action_scales
+        command_clipped = torch.abs(effective_commands - requested_commands) > 1e-7
+        return effective_commands, effective_actions, command_clipped
 
 
 def initialize_model_based_residual_from_planner_imitation(

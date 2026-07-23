@@ -1,0 +1,132 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_temporal_projection_audit_v1",
+  "case": 30,
+  "audit_script": {
+    "path": "scripts/two_wheel_balance/audit_model_based_corrective_temporal_projection.py",
+    "sha256": "e3a02a110f95d9386969cf5c73101cd151dc326b2898cd0c7a8b507cbfd24b20"
+  },
+  "dataset": {
+    "path": "docs/03_training/two_wheel_balance/evidence_20260723_case30_effective_label_conversion_v1/case_0030_model_based_corrective_case_dataset_v1.npz",
+    "sha256": "191a44147bc44038a0645bf48a63609463bf280d97b37ddaf884200bd8b52447",
+    "sample_count": 11411
+  },
+  "corrective_profile": {
+    "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case30_profile_v1.json",
+    "sha256": "26df020549f7db60f3e17d78bb3797e1f32630f615361a1e12d359977e7cf45b",
+    "maximum_slew_rates": [
+      0.1,
+      0.1,
+      0.04
+    ]
+  },
+  "action_scales": [
+    0.05,
+    0.05,
+    0.02
+  ],
+  "transition_count": 11410,
+  "requested_teacher_intent": {
+    "physical_rate_abs_p95": [
+      0.023705922067153246,
+      0.028734028339371248,
+      0.021820539981129535
+    ],
+    "physical_rate_abs_p99": [
+      0.04014074206352775,
+      0.039954507350901156,
+      0.03893530696629742
+    ],
+    "physical_rate_abs_max": [
+      0.06538994610309595,
+      0.0626967940479419,
+      0.04000008106232485
+    ],
+    "violation_count_per_channel": [
+      0,
+      0,
+      0
+    ],
+    "violation_transition_count": 0,
+    "clipped_violation_count_per_channel": [
+      0,
+      0,
+      0
+    ],
+    "unclipped_violation_count_per_channel": [
+      0,
+      0,
+      0
+    ],
+    "all_violations_associated_with_command_clipping": true,
+    "slew_limit_passed": true
+  },
+  "effective_post_supervisor_labels": {
+    "physical_rate_abs_p95": [
+      0.022180184721944038,
+      0.028174497187154212,
+      0.018895430862899965
+    ],
+    "physical_rate_abs_p99": [
+      0.038230547308926964,
+      0.047489760071051636,
+      0.034640910290176755
+    ],
+    "physical_rate_abs_max": [
+      1.8508812785165454,
+      4.542629718778193,
+      0.09802567027511164
+    ],
+    "violation_count_per_channel": [
+      30,
+      49,
+      8
+    ],
+    "violation_transition_count": 87,
+    "clipped_violation_count_per_channel": [
+      30,
+      49,
+      8
+    ],
+    "unclipped_violation_count_per_channel": [
+      0,
+      0,
+      0
+    ],
+    "all_violations_associated_with_command_clipping": true,
+    "slew_limit_passed": false
+  },
+  "safety_projection": {
+    "contract": "model_based_residual_safety_projection_v1",
+    "final_command_reconstruction_max_error": 1.1920928955078125e-07,
+    "effective_action_reconstruction_max_error": 3.894791007041931e-06,
+    "clipping_mask_exact": true
+  },
+  "recommended_training_contract": {
+    "policy_output_semantics": "requested_bounded_residual_v1",
+    "pointwise_training_target": "effective_post_supervisor_residual_v1",
+    "loss_projection": "model_based_residual_safety_projection_v1",
+    "requested_actions_used_as_pointwise_targets": false,
+    "effective_actions_remain_pointwise_targets": true,
+    "requested_output_slew_regularization_required": true,
+    "effective_label_slew_must_not_be_naively_gated_at_clipped_transitions": true,
+    "runtime_safety_supervisor_remains_final_authority": true
+  },
+  "checks": {
+    "case_dataset_admitted_for_merge_only": true,
+    "training_remains_closed": true,
+    "requested_teacher_intent_obeys_slew": true,
+    "effective_slew_violations_are_observed": true,
+    "effective_violations_are_supervisor_projection_only": true,
+    "projection_reconstructs_final_commands": true,
+    "projection_reconstructs_effective_actions": true,
+    "projection_reconstructs_clipping_mask": true
+  },
+  "passed": true,
+  "valid_for_bc_contract_review": true,
+  "valid_for_training": false,
+  "runtime_authorized": false,
+  "learned_rollout_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false
+}

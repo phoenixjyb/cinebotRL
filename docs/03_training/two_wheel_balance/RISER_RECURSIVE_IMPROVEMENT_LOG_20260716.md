@@ -7596,3 +7596,37 @@ and must state whether its candidate was accepted or rejected.
 - Authorization wording must name the corrective-label capture rather than the
   already-completed paired canary. After a capture pass or reject, stop and
   audit before any conversion or learning action.
+
+## Round 194: effective labels require projection-aware temporal handling
+
+- A CPU-only audit reopens the admitted case-30 converted dataset and its
+  corrective profile. Across `11,410` transitions, requested teacher intent
+  has physical slew violation counts `[0,0,0]` under the unchanged
+  `[0.10,0.10,0.04]` limits.
+- Effective post-supervisor labels have per-channel violation counts
+  `[30,49,8]` across `87` transitions. Every violation touches a transition
+  where the same channel was clipped by the deterministic command supervisor;
+  there are zero unclipped violations.
+- Added `model_based_residual_safety_projection_v1`, a differentiable and
+  TorchScript-compatible projection from requested normalized residuals plus
+  model commands to final commands and effective actions. It reconstructs the
+  tracked case-30 final commands within `1.2e-7`, effective actions within
+  `3.9e-6`, and the clipping mask exactly.
+- Future model-based BC must keep effective post-supervisor actions as
+  pointwise targets but compute loss after this projection. Requested network
+  output slew must be regularized/gated independently; clipped effective-label
+  transitions must not be naively classified as teacher chatter.
+- Audit summary SHA-256 is
+  `e4513b0d7878d6a5c436d9b32d03c4a4ee27c38563a982ad86ccf73cbd5575d7`.
+  It is valid only for BC contract review. Case-23 capture, corpus merge, BC,
+  PPO, learned rollout, and training remain unauthorized, and no Isaac/GPU
+  process was launched.
+
+## Next round after Round 194
+
+- Keep the case-23 capture as the sole prepared runtime action. Do not use this
+  temporal audit to bypass its separate authorization.
+- After at least four train and two validation case datasets are admitted,
+  implement the projection-aware loss and requested-output slew gate in a new
+  explicitly authorized model-based training schema. Do not retrofit the
+  legacy phase-feedforward BC corpus.

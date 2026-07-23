@@ -34,6 +34,18 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 > action，转换器必须按 effective action 重新构建递推历史：首行归零，其后第 `i`
 > 行等于第 `i-1` 行 effective label。单 case 输出只允许进入后续 merge 评审，保持
 > `valid_for_training=false`、BC/PPO 未授权，不能直接送入现有 BC trainer。
+>
+> **2026-07-23 时序投影补充：** case-30 的 `11,410` 个 transition 中，
+> requested teacher intent 在物理 slew 上 `0/0/0` 违规，但 effective
+> post-supervisor label 有 `30/49/8` 个通道 transition 超限；全部 `87`
+> 个超限 transition 都与相同通道的 command clipping 相邻。这些是安全投影导致的
+> effective label 跳变，不能误判成 teacher chatter，也不能简单把 effective label
+> 的逐帧差分作为 policy slew gate。后续 model-based BC 必须把网络输出定义为
+> requested bounded residual，先经过可微的
+> `model_based_residual_safety_projection_v1`，再与 effective label 计算
+> pointwise loss；requested output 的 slew regularization/gate 独立执行。
+> requested action 仍不得作为 pointwise training target，最终 runtime safety
+> supervisor 仍保持最高控制权限。
 
 ## 固定运行合同
 
@@ -115,6 +127,11 @@ teacher-forced 与启用时的递归 validation 预测在每个通道上都必�
 归一化动作幅值 `0.95`，保留执行安全余量。如果某个通道的零动作信号为零，
 则不能把“同样为零”误报为改善。Gate B 不计算 holdout 指标。离线 gate
 失败时只写审计报告，不生成 checkpoint 或 TorchScript。
+
+对 `model_based_corrective_merged_v1` 的后续可训练 schema，Gate B 还必须
+使用 safety-projected effective-action loss，并报告 requested policy output 的
+物理 slew 指标。clipped transition 可参与投影后的 pointwise effective loss，
+但不得直接用于判定 requested policy output 的 teacher-slew 一致性。
 
 Gate B 通过只产生 `offline_policy_candidate_ready=true` 的候选
 checkpoint，不授权任何 Isaac rollout。训练器必须始终写入

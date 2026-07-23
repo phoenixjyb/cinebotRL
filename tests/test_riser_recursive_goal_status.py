@@ -55,6 +55,14 @@ BENCH_750W_TEMPLATE_AUDIT = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260723_riser_bench_750w_template_v1/summary.json"
 )
+BENCH_750W_ASSEMBLER = (
+    ROOT / "scripts/two_wheel_balance/assemble_riser_750w_bench_evidence.py"
+)
+BENCH_750W_ASSEMBLY_CONTRACT = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "RISER_750W_BENCH_ASSEMBLY_CONTRACT_CN_20260723.md"
+)
 
 
 def _goal() -> dict:
@@ -192,9 +200,14 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     assert hardware["production_candidate_ready_for_supplier_and_bench_review"]
     assert hardware["bench_measurement_missing_fields"] == 34
     assert hardware["bench_raw_log_reducer_schema"] == (
+        "cinebotrl_two_wheel_riser_bench_log_reduction_v2"
+    )
+    assert hardware["bench_raw_log_reducer_legacy_schema"] == (
         "cinebotrl_two_wheel_riser_bench_log_reduction_v1"
     )
     assert hardware["bench_raw_log_numeric_reduction_ready"] is True
+    assert hardware["bench_raw_log_candidate_profile_required_for_assembly"]
+    assert hardware["bench_raw_log_legacy_valid_for_candidate_bound_merge"] is False
     assert hardware["bench_raw_log_measurements_collected"] is False
     assert hardware["bench_raw_log_reducer_sha256"] == _sha256(
         BENCH_RAW_LOG_REDUCER
@@ -253,6 +266,20 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     assert hardware["bench_candidate_route_authoritative_cpu_suite"] == (
         "921_passed_12_skipped_2_warnings_in_85.84s"
     )
+    assert hardware["bench_750w_assembly_schema"] == (
+        "cinebotrl_two_wheel_riser_750w_bench_assembly_v1"
+    )
+    assert hardware["bench_750w_assembler_sha256"] == _sha256(
+        BENCH_750W_ASSEMBLER
+    )
+    assert hardware["bench_750w_assembly_contract_sha256"] == _sha256(
+        BENCH_750W_ASSEMBLY_CONTRACT
+    )
+    assert hardware["bench_750w_assembly_cpu_ready"] is True
+    assert hardware["bench_750w_real_evidence_assembled"] is False
+    assert hardware["bench_750w_assembly_valid_for_production_design_review"] is False
+    assert hardware["bench_750w_assembly_valid_for_production_procurement"] is False
+    assert hardware["bench_750w_assembly_valid_for_hardware_transfer"] is False
     assert hardware["ready_for_production_design_review"] is False
     assert hardware["valid_for_production_procurement"] is False
     assert hardware["valid_for_hardware_transfer"] is False

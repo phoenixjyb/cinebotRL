@@ -7748,3 +7748,39 @@ and must state whether its candidate was accepted or rejected.
 - Runtime progress still requires the separate case-23 corrective-label capture
   authorization; hardware progress requires a signed 750 W supplier response
   or real calibrated bench data.
+
+## Round 198: candidate-bound 750 W bench assembly
+
+- The raw telemetry reducer now has a v2 mode that records an explicit 400 W or
+  750 W candidate profile. Legacy v1 output remains available for numeric
+  inspection but is always invalid for candidate-bound final assembly.
+- Added `cinebotrl_two_wheel_riser_750w_bench_assembly_v1`. It accepts only a
+  clean manual 750 W calibration/safety record, a passing v2 reduction bound to
+  `leadshine_750w_production_candidate_v1`, and a passing supplier audit whose
+  exact required-candidate identity matches the 750 W template.
+- Automation-owned manual fields must remain `null/false`; prefilled telemetry,
+  supplier approvals, or evidence hashes are rejected rather than silently
+  overwritten. Legacy-v1, 400 W, crossed drive, or open authority inputs are
+  rejected before output creation.
+- The supplier package hash in the merge fragment must exactly equal the
+  supplier-response input hash sealed by the supplier audit; a well-formed but
+  substituted hash is rejected.
+- Structurally valid inputs are assembled and passed directly to the final
+  bench audit. Missing manual safety/calibration evidence produces a preserved
+  fail-closed result. Even a complete gate pass authorizes only production
+  design review, never procurement, hardware transfer, simulation switching,
+  runtime, GPU, training, BC, or PPO.
+- Assembler and reducer SHA-256 values are
+  `977ac4e099ac34834b42ebe72bccb2b33b3faefb545e91e89e30462394bf950c`
+  and
+  `498aa34d22b0b4c952df35a3b8869d926d4c107e54517a35adf807712d7919b7`.
+  Focused assembly/routing tests pass `47/47`.
+- Only synthetic healthy/rejection fixtures were used. No real supplier,
+  calibration, safety, or telemetry evidence was assembled.
+
+## Next round after Round 198
+
+- Run the authoritative `.98` CPU suite and seal the implementation commit.
+- Real hardware progress then requires the signed 750 W supplier response and
+  calibrated physical logs; software runtime still requires the separate
+  case-23 corrective-label capture authorization.

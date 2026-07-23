@@ -74,6 +74,7 @@ RMS 电流、末段温升斜率和最差停车距离不能依赖人工抄写。
 ```bash
 python3 scripts/two_wheel_balance/reduce_riser_bench_log.py \
   --input /path/to/calibrated_riser_bench.csv \
+  --candidate-profile leadshine_750w_production_candidate_v1 \
   --output /path/to/riser_bench_reduction.json
 ```
 
@@ -84,6 +85,11 @@ python3 scripts/two_wheel_balance/reduce_riser_bench_log.py \
 - `valid_for_hardware_transfer=false`；
 - `valid_for_training=false`；
 - runtime、GPU、BC 和 PPO 未授权。
+
+指定 `--candidate-profile` 时输出 v2 candidate-bound schema，可进入同一候选的
+证据组装。未指定时保留历史 v1 数字归约行为，但
+`valid_for_candidate_bound_bench_merge=false`，不得用于 400 W/750 W
+候选绑定的最终台架组装。
 
 只有将归约结果与完整校准记录、供应商证据和机械/功能安全试验合并后，才能再运行
 `audit_riser_bench_measurements.py`。即使最终台架 gate 全部通过，也只进入生产设计

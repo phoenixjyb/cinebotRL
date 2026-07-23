@@ -15,6 +15,11 @@ import numpy as np
 
 
 SCHEMA = "cinebotrl_two_wheel_riser_bench_log_reduction_v1"
+CANDIDATE_BOUND_SCHEMA = "cinebotrl_two_wheel_riser_bench_log_reduction_v2"
+CANDIDATE_PROFILES = {
+    "leadshine_400w_engineering_sample_v1",
+    "leadshine_750w_production_candidate_v1",
+}
 EXPECTED_COLUMNS = (
     "time_s",
     "phase",
@@ -272,12 +277,19 @@ def _emergency_stop_metrics(data: dict[str, np.ndarray]) -> dict[str, object]:
     }
 
 
-def reduce_log(path: Path) -> dict[str, object]:
+def reduce_log(
+    path: Path,
+    *,
+    candidate_profile: str | None = None,
+) -> dict[str, object]:
+    if candidate_profile is not None and candidate_profile not in CANDIDATE_PROFILES:
+        raise ValueError(f"unsupported riser candidate profile: {candidate_profile}")
     data = load_log(path)
     continuous = _continuous_metrics(data)
     emergency = _emergency_stop_metrics(data)
     return {
-        "schema": SCHEMA,
+        "schema": CANDIDATE_BOUND_SCHEMA if candidate_profile else SCHEMA,
+        "candidate_profile": candidate_profile,
         "raw_log": {
             "path": path.as_posix(),
             "sha256": sha256(path),
@@ -296,6 +308,7 @@ def reduce_log(path: Path) -> dict[str, object]:
         },
         "passed": True,
         "valid_for_bench_measurement_numeric_merge": True,
+        "valid_for_candidate_bound_bench_merge": candidate_profile is not None,
         "manual_calibration_supplier_and_safety_fields_still_required": True,
         "ready_for_production_design_review": False,
         "valid_for_production_procurement": False,
@@ -312,12 +325,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--candidate-profile", choices=tuple(sorted(CANDIDATE_PROFILES)))
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    result = reduce_log(args.input)
+    result = reduce_log(args.input, candidate_profile=args.candidate_profile)
     if args.output.exists():
         raise FileExistsError(f"refusing to overwrite bench reduction: {args.output}")
     args.output.parent.mkdir(parents=True, exist_ok=True)

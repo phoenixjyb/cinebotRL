@@ -560,3 +560,9 @@ python3 scripts/two_wheel_balance/audit_riser_bench_measurements.py \
 `valid_for_bench_supplier_evidence_merge` 固定为 false；只有
 `valid_for_750w_bench_supplier_evidence_merge=true` 且
 `required_candidate` 与 750 W 台架完全一致时，才允许后续专用合并器使用。
+
+专用组装器为
+`scripts/two_wheel_balance/assemble_riser_750w_bench_evidence.py`。它只接受
+绑定同一 750 W profile 的 v2 原始日志归约、供应商审核和人工安全/校准记录，
+随后直接执行最终台架 gate。完整操作合同见
+`RISER_750W_BENCH_ASSEMBLY_CONTRACT_CN_20260723.md`。

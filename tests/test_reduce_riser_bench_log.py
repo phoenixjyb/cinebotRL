@@ -1,5 +1,6 @@
 import csv
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -120,6 +121,34 @@ def test_healthy_log_reduces_numeric_bench_fields(tmp_path: Path) -> None:
     assert not result["valid_for_production_procurement"]
     assert not result["valid_for_hardware_transfer"]
     assert not result["valid_for_training"]
+    assert result["schema"] == MODULE.SCHEMA
+    assert result["candidate_profile"] is None
+    assert not result["valid_for_candidate_bound_bench_merge"]
+
+
+def test_candidate_bound_reduction_records_750w_identity(tmp_path: Path) -> None:
+    path = tmp_path / "bench.csv"
+    _write(path, _healthy_rows())
+    result = MODULE.reduce_log(
+        path,
+        candidate_profile="leadshine_750w_production_candidate_v1",
+    )
+    assert result["schema"] == MODULE.CANDIDATE_BOUND_SCHEMA
+    assert result["candidate_profile"] == (
+        "leadshine_750w_production_candidate_v1"
+    )
+    assert result["valid_for_bench_measurement_numeric_merge"]
+    assert result["valid_for_candidate_bound_bench_merge"]
+    assert not result["valid_for_hardware_transfer"]
+    assert not result["valid_for_training"]
+
+
+def test_unknown_candidate_profile_is_rejected_before_read(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="unsupported riser candidate profile"):
+        MODULE.reduce_log(
+            tmp_path / "does-not-need-to-exist.csv",
+            candidate_profile="unknown",
+        )
 
 
 def test_empty_template_has_exact_columns_and_fails_closed() -> None:
@@ -180,3 +209,30 @@ def test_cli_writes_lf_and_refuses_overwrite(tmp_path: Path) -> None:
     second = subprocess.run(command, check=False, capture_output=True, text=True)
     assert second.returncode != 0
     assert "refusing to overwrite" in second.stderr
+
+
+def test_cli_candidate_profile_emits_v2_reduction(tmp_path: Path) -> None:
+    source = tmp_path / "bench.csv"
+    output = tmp_path / "reduction-v2.json"
+    _write(source, _healthy_rows())
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--input",
+            str(source),
+            "--output",
+            str(output),
+            "--candidate-profile",
+            "leadshine_750w_production_candidate_v1",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["schema"] == MODULE.CANDIDATE_BOUND_SCHEMA
+    assert payload["candidate_profile"] == (
+        "leadshine_750w_production_candidate_v1"
+    )

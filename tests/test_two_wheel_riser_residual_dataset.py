@@ -15,6 +15,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     PREVIOUS_ACTION_INDICES,
     apply_residual_action,
     apply_model_based_policy_residual,
+    apply_model_based_policy_residual_with_effective_action,
     build_executed_observation,
     build_raw_residual_command,
     build_residual_action,
@@ -253,6 +254,38 @@ def test_model_based_policy_residual_is_tight_and_safety_clamped() -> None:
         np.array([1.0, -1.0, 1.0]),
     )
     np.testing.assert_allclose(command, [0.4, -0.4, 1.2])
+
+
+def test_model_based_policy_effective_action_matches_unprojected_request() -> None:
+    command, effective = apply_model_based_policy_residual_with_effective_action(
+        0.20,
+        -0.10,
+        0.70,
+        np.array([0.5, -0.25, 0.75]),
+    )
+    np.testing.assert_allclose(command, [0.225, -0.1125, 0.715])
+    np.testing.assert_allclose(effective, [0.5, -0.25, 0.75])
+
+
+def test_model_based_policy_effective_action_records_supervisor_projection() -> None:
+    command, effective = apply_model_based_policy_residual_with_effective_action(
+        0.38,
+        -0.38,
+        1.19,
+        np.array([1.0, -1.0, 1.0]),
+    )
+    np.testing.assert_allclose(command, [0.4, -0.4, 1.2])
+    np.testing.assert_allclose(effective, [0.4, -0.4, 0.5])
+
+
+def test_model_based_policy_effective_action_rejects_invalid_planner_base() -> None:
+    with pytest.raises(ValueError, match="effective.*exceeds normalized bounds"):
+        apply_model_based_policy_residual_with_effective_action(
+            0.50,
+            0.0,
+            0.7,
+            np.zeros(3),
+        )
 
 
 def test_model_based_policy_residual_rejects_invalid_or_overflow_action() -> None:

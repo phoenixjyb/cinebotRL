@@ -530,10 +530,11 @@ from rl_platform.tasks.two_wheel_balance.riser_control import (
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
     LOOKAHEAD_HORIZONS_S,
+    MODEL_BASED_POLICY_PREVIOUS_ACTION_CONTRACT,
     MODEL_BASED_POLICY_RESIDUAL_CONTRACT,
     OBSERVATION_INDEX,
     apply_residual_action,
-    apply_model_based_policy_residual,
+    apply_model_based_policy_residual_with_effective_action,
     build_raw_residual_command,
     build_executed_observation,
     build_residual_action,
@@ -883,6 +884,8 @@ def evaluate_case(
     dataset_baseline_actions = []
     dataset_teacher_commands = []
     applied_residual_actions = []
+    effective_residual_actions = []
+    residual_projection_deltas = []
     raw_residual_commands = []
     normalized_residual_labels = []
     policy_trace_observations = []
@@ -1323,6 +1326,7 @@ def evaluate_case(
                 else np.zeros(3, dtype=np.float32)
             )
             commanded_riser_target = sample.riser_q
+            effective_residual_action = applied_residual_action.copy()
         else:
             if corrective_teacher_config is not None:
                 corrective_output = build_corrective_teacher_action(
@@ -1365,23 +1369,25 @@ def evaluate_case(
             ):
                 raise ValueError("residual policy produced an invalid action")
             if args.policy_command_base == "model_based_planner":
-                vx_ref, wz_ref, commanded_riser_target = (
-                    apply_model_based_policy_residual(
-                        model_based_vx_ref,
-                        model_based_wz_ref,
-                        model_based_riser_target,
-                        applied_residual_action,
-                        action_scales=args.residual_action_scales,
-                        maximum_linear_velocity_m_s=(
-                            tracking_cfg.maximum_linear_velocity_mps
-                        ),
-                        maximum_yaw_rate_rad_s=tracking_cfg.maximum_yaw_rate_radps,
-                        riser_bounds_m=(
-                            kinematics.riser_lower,
-                            kinematics.riser_upper,
-                        ),
+                (
+                    command,
+                    effective_residual_action,
+                ) = apply_model_based_policy_residual_with_effective_action(
+                    model_based_vx_ref,
+                    model_based_wz_ref,
+                    model_based_riser_target,
+                    applied_residual_action,
+                    action_scales=args.residual_action_scales,
+                    maximum_linear_velocity_m_s=(
+                        tracking_cfg.maximum_linear_velocity_mps
+                    ),
+                    maximum_yaw_rate_rad_s=tracking_cfg.maximum_yaw_rate_radps,
+                    riser_bounds_m=(
+                        kinematics.riser_lower,
+                        kinematics.riser_upper,
                     )
                 )
+                vx_ref, wz_ref, commanded_riser_target = command
             else:
                 vx_ref, wz_ref, commanded_riser_target = apply_residual_action(
                     phase_feedforward_v_mps,
@@ -1395,7 +1401,12 @@ def evaluate_case(
                     maximum_yaw_rate_rad_s=tracking_cfg.maximum_yaw_rate_radps,
                     riser_bounds_m=(kinematics.riser_lower, kinematics.riser_upper),
                 )
+                effective_residual_action = applied_residual_action.copy()
         applied_residual_actions.append(applied_residual_action.copy())
+        effective_residual_actions.append(effective_residual_action.copy())
+        residual_projection_deltas.append(
+            effective_residual_action - applied_residual_action
+        )
         if dataset_dir is not None or raw_teacher_dir is not None:
             dataset_observations.append(executed_observation)
             if dataset_dir is not None:
@@ -1403,7 +1414,9 @@ def evaluate_case(
             dataset_elapsed_time.append(elapsed_s)
             dataset_phase_time.append(phase_time_s)
             dataset_teacher_commands.append([vx_ref, wz_ref, sample.riser_q])
-        previous_residual_action = applied_residual_action
+        previous_residual_action = effective_residual_action.astype(
+            np.float32, copy=True
+        )
         riser_target = torch.tensor(
             [[commanded_riser_target]], dtype=torch.float32, device=unwrapped.device
         )
@@ -1873,6 +1886,12 @@ def evaluate_case(
                     "applied_policy_residual_action": (
                         applied_residual_action.tolist()
                     ),
+                    "effective_policy_residual_action": (
+                        effective_residual_action.tolist()
+                    ),
+                    "policy_residual_projection_delta": (
+                        effective_residual_action - applied_residual_action
+                    ).tolist(),
                     "vx_reference_mps": vx_ref,
                     "wz_reference_rad_s": wz_ref,
                     "along_track_error_m": base_tracking_diagnostics[
@@ -2019,6 +2038,12 @@ def evaluate_case(
     proxy_effort_values = np.asarray(proxy_effort_samples_nm, dtype=np.float64)
     applied_residual_values = np.asarray(
         applied_residual_actions, dtype=np.float64
+    )
+    effective_residual_values = np.asarray(
+        effective_residual_actions, dtype=np.float64
+    )
+    residual_projection_delta_values = np.asarray(
+        residual_projection_deltas, dtype=np.float64
     )
     raw_residual_values = np.asarray(raw_residual_commands, dtype=np.float64)
     normalized_residual_values = np.asarray(
@@ -2624,6 +2649,20 @@ def evaluate_case(
         "residual_action_abs_max": np.max(
             np.abs(applied_residual_values), axis=0
         ).tolist(),
+        "requested_policy_residual_action_abs_max": np.max(
+            np.abs(applied_residual_values), axis=0
+        ).tolist(),
+        "effective_policy_residual_action_abs_max": np.max(
+            np.abs(effective_residual_values), axis=0
+        ).tolist(),
+        "policy_residual_projection_delta_abs_max": np.max(
+            np.abs(residual_projection_delta_values), axis=0
+        ).tolist(),
+        "policy_residual_projection_sample_count": int(
+            np.count_nonzero(
+                np.any(np.abs(residual_projection_delta_values) > 2e-7, axis=1)
+            )
+        ),
         "corrective_teacher_telemetry": corrective_teacher_telemetry_summary,
         "corrective_teacher_profile": corrective_teacher_profile_identity,
         "corrective_teacher_labels_captured": corrective_capture_path is not None,
@@ -3020,6 +3059,11 @@ def main() -> int:
             else MODEL_BASED_POLICY_RESIDUAL_CONTRACT
             if args.policy_command_base == "model_based_planner"
             else "phase_feedforward_plus_planner_imitation_residual_v1"
+        ),
+        "policy_previous_action_contract": (
+            MODEL_BASED_POLICY_PREVIOUS_ACTION_CONTRACT
+            if args.policy_command_base == "model_based_planner"
+            else "previous_requested_policy_action_v1"
         ),
         "corrective_teacher_enabled": corrective_teacher_config is not None,
         "corrective_teacher_profile": corrective_teacher_profile_identity,

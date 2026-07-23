@@ -87,6 +87,9 @@ MODEL_BASED_POLICY_RESIDUAL_SCALES = np.array(
 MODEL_BASED_POLICY_RESIDUAL_CONTRACT = (
     "model_based_planner_plus_bounded_policy_residual_v1"
 )
+MODEL_BASED_POLICY_PREVIOUS_ACTION_CONTRACT = (
+    "previous_effective_post_supervisor_action_v1"
+)
 SPLIT_NAMES = ("train", "validation", "holdout")
 PREVIOUS_ACTION_NAMES = (
     "previous_residual_vx_normalized",
@@ -362,6 +365,43 @@ def apply_model_based_policy_residual(
     )
     command[2] = np.clip(command[2], lower_riser, upper_riser)
     return command
+
+
+def apply_model_based_policy_residual_with_effective_action(
+    model_vx_m_s: float,
+    model_wz_rad_s: float,
+    model_riser_target_m: float,
+    action: np.ndarray,
+    *,
+    action_scales: np.ndarray = MODEL_BASED_POLICY_RESIDUAL_SCALES,
+    maximum_linear_velocity_m_s: float = 0.4,
+    maximum_yaw_rate_rad_s: float = 0.4,
+    riser_bounds_m: tuple[float, float] = (0.0, 1.2),
+) -> tuple[np.ndarray, np.ndarray]:
+    """Apply a policy residual and recover the post-supervisor normalized action."""
+
+    command = apply_model_based_policy_residual(
+        model_vx_m_s,
+        model_wz_rad_s,
+        model_riser_target_m,
+        action,
+        action_scales=action_scales,
+        maximum_linear_velocity_m_s=maximum_linear_velocity_m_s,
+        maximum_yaw_rate_rad_s=maximum_yaw_rate_rad_s,
+        riser_bounds_m=riser_bounds_m,
+    )
+    base_command = np.asarray(
+        [model_vx_m_s, model_wz_rad_s, model_riser_target_m], dtype=np.float64
+    )
+    scales = np.asarray(action_scales, dtype=np.float64)
+    effective_action = (command - base_command) / scales
+    if not np.isfinite(effective_action).all():
+        raise ValueError("effective model-based residual action is non-finite")
+    if np.max(np.abs(effective_action)) > 1.0 + 1e-6:
+        raise ValueError(
+            "effective model-based residual action exceeds normalized bounds"
+        )
+    return command, np.clip(effective_action, -1.0, 1.0)
 
 
 def validate_case_dataset(payload: dict[str, np.ndarray], *, expected_case: int | None = None) -> None:

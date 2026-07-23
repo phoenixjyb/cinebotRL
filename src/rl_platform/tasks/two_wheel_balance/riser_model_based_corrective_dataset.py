@@ -18,6 +18,7 @@ from .riser_corrective_capture import (
 )
 from .riser_residual_dataset import (
     ACTION_NAMES,
+    MODEL_BASED_POLICY_PREVIOUS_ACTION_CONTRACT,
     MODEL_BASED_POLICY_RESIDUAL_CONTRACT,
     MODEL_BASED_POLICY_RESIDUAL_SCALES,
     OBSERVATION_NAMES,
@@ -32,7 +33,7 @@ CAPTURE_FINAL_SCHEMA = (
     "cinebotrl_two_wheel_riser_corrective_teacher_capture_final_v2"
 )
 TRAINING_TARGET_CONTRACT = "effective_post_supervisor_residual_v1"
-PREVIOUS_ACTION_CONTRACT = "previous_effective_post_supervisor_action_v1"
+PREVIOUS_ACTION_CONTRACT = MODEL_BASED_POLICY_PREVIOUS_ACTION_CONTRACT
 
 REQUIRED_ARRAYS = {
     "observations": 2,

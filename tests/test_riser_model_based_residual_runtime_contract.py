@@ -22,7 +22,9 @@ def test_model_based_mode_adds_policy_above_complete_planner_command() -> None:
     source = PLAYBACK.read_text(encoding="utf-8")
     deterministic_index = source.index("model_based_vx_ref = vx_ref")
     policy_index = source.index("policy_output = residual_policy(")
-    apply_index = source.index("apply_model_based_policy_residual(")
+    apply_index = source.index(
+        "apply_model_based_policy_residual_with_effective_action("
+    )
     assert deterministic_index < policy_index < apply_index
     assert "model_based_vx_ref," in source[apply_index : apply_index + 500]
     assert "model_based_wz_ref," in source[apply_index : apply_index + 500]
@@ -35,8 +37,31 @@ def test_model_based_mode_emits_independent_command_telemetry() -> None:
     assert '"model_based_wz_reference_rad_s"' in source
     assert '"model_based_riser_target_m"' in source
     assert '"applied_policy_residual_action"' in source
+    assert '"effective_policy_residual_action"' in source
+    assert '"policy_residual_projection_delta"' in source
+    assert '"policy_residual_projection_delta_abs_max"' in source
+    assert '"policy_residual_projection_sample_count"' in source
     assert '"policy_command_base": args.policy_command_base' in source
     assert "MODEL_BASED_POLICY_RESIDUAL_CONTRACT" in source
+
+
+def test_model_based_previous_action_uses_effective_post_supervisor_action() -> None:
+    source = PLAYBACK.read_text(encoding="utf-8")
+    apply_index = source.index(
+        "apply_model_based_policy_residual_with_effective_action("
+    )
+    observation_index = source.index(
+        "previous_residual_action=previous_residual_action,"
+    )
+    previous_index = source.index(
+        "previous_residual_action = effective_residual_action.astype("
+    )
+    assert observation_index < apply_index < previous_index
+    assert (
+        '"policy_previous_action_contract": (\n'
+        "            MODEL_BASED_POLICY_PREVIOUS_ACTION_CONTRACT"
+    ) in source
+    assert "previous_residual_action = applied_residual_action" not in source
 
 
 def test_model_based_mode_has_distinct_zero_and_learned_sources() -> None:
@@ -77,7 +102,9 @@ def test_corrective_teacher_is_computed_after_model_planner_and_before_apply() -
     source = PLAYBACK.read_text(encoding="utf-8")
     model_index = source.index("model_based_vx_ref = vx_ref")
     teacher_index = source.index("corrective_output = build_corrective_teacher_action(")
-    apply_index = source.index("apply_model_based_policy_residual(", teacher_index)
+    apply_index = source.index(
+        "apply_model_based_policy_residual_with_effective_action(", teacher_index
+    )
     assert model_index < teacher_index < apply_index
 
 

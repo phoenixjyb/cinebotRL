@@ -75,7 +75,30 @@ def test_case23_adapter_passes_exact_configuration_to_generic_validator(monkeypa
 def test_wrapper_is_capture_only_and_closes_consumed_authorization() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
     assert 'readonly AUTHORIZATION_SHA256=""' in source
-    assert 'readonly OUTPUT_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\\\$NAMESPACE"' in source
+    output_line = (
+        'readonly OUTPUT_WIN="${WIN_ROOT}\\\\artifacts\\\\two_wheel_riser'
+        '\\\\${NAMESPACE}"'
+    )
+    assert output_line in source
+    expanded = subprocess.run(
+        [
+            "bash",
+            "-c",
+            "\n".join(
+                [
+                    r'WIN_ROOT="G:\wSpace\cinebotRL-two-wheel-riser"',
+                    f'NAMESPACE="{MODULE.NAMESPACE}"',
+                    output_line.replace("readonly ", "", 1),
+                    "printf '%s' \"$OUTPUT_WIN\"",
+                ]
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert expanded.endswith(f"\\{MODULE.NAMESPACE}")
+    assert "$NAMESPACE" not in expanded
     assert "--cases 23" in source
     assert "--policy-command-base model_based_planner" in source
     assert "--corrective-teacher-capture-dir" in source

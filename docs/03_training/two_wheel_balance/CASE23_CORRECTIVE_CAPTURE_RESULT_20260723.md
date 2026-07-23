@@ -35,9 +35,10 @@ The finalizer exited fail-closed with code `6`.
 - No playback, Isaac, Kit, or compute process remains on the GPU.
 - The rejected namespace is preserved as immutable attempt evidence.
 
-The wrapper path is repaired by using `\\$NAMESPACE`, and the canonical
-contract is returned to a no-token state. That repair is CPU-only and does not
-authorize a second runtime.
+The wrapper path is repaired with explicit braced expansion,
+`${WIN_ROOT}\\...\\${NAMESPACE}`, and the canonical contract is returned to a
+no-token state. That repair is CPU-only and does not authorize a second
+runtime.
 
 ## Evidence
 
@@ -45,4 +46,3 @@ The sealed evidence is under
 `docs/03_training/two_wheel_balance/evidence_20260723_case23_corrective_capture_v1_rejected`.
 Its `final_status.json` records the hashes of the copied runtime admission,
 contract, logs, and exit-code files.
-

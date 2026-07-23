@@ -1,0 +1,139 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case6_pair_readiness_cpu_v1",
+  "case": 6,
+  "selection_checks": {
+    "schema": true,
+    "passed": true,
+    "selected_cases": true,
+    "validation_cases": true,
+    "holdout_cases": true,
+    "case6_role": true,
+    "case6_checks": true,
+    "plan_hash": true,
+    "gate_hash": true,
+    "runtime_closed": true,
+    "learning_closed": true
+  },
+  "plan_checks": {
+    "schema_case": true,
+    "integrity": true,
+    "kinematic_gate": true,
+    "all_plan_checks": true,
+    "all_kinematic_checks": true,
+    "training_closed": true,
+    "array_shapes": true,
+    "arrays_finite": true,
+    "clocks": true
+  },
+  "gate_checks": {
+    "schema_case": true,
+    "passed": true,
+    "result_passed": true,
+    "no_termination": true,
+    "zero_residual_action": true,
+    "raw_label_not_applied": true,
+    "label_margin": true,
+    "non_training_playback": true
+  },
+  "metric_checks": {
+    "base_linear": true,
+    "base_yaw": true,
+    "riser": true,
+    "proxy": true,
+    "camera_height": true
+  },
+  "inputs": {
+    "selection": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_model_based_pair_tranche_v1/selection.json",
+      "sha256": "93aa25e99409ad926d4c4cf0b15075e6ea3532dd1c01d5217a45daffc37db7c0",
+      "size_bytes": 14077
+    },
+    "plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_pair_readiness_cpu_v1/source/case_0006_smoothed_riser_plan_v1.npz",
+      "sha256": "b8ac6a9bb226de47a2722f076efb6dcf9586fd3b85740cf6efb5926cd86568aa",
+      "size_bytes": 195504
+    },
+    "dynamic_gate": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_pair_readiness_cpu_v1/source/case_0006_dynamic_gate.json",
+      "sha256": "140a080b1daab4985fe353bfee9e3f86186dfe3c319841d5a8e08f98e8d6b7c7",
+      "size_bytes": 168997
+    }
+  },
+  "plan": {
+    "sample_count": 807,
+    "transition_count": 806,
+    "source_duration_s": 15.942736,
+    "execution_duration_s": 17.737274605869224,
+    "minimum_target_camera_height_m": 0.6,
+    "maximum_target_camera_height_m": 1.528812,
+    "maximums": {
+      "base_linear_velocity_mps": 0.4000000000000764,
+      "base_yaw_rate_radps": 0.40000000000010033,
+      "riser_rate_mps": 0.10563955687953464,
+      "proxy_rate_radps": 0.41887902047873504
+    },
+    "headroom": {
+      "base_linear_velocity_mps": 0.0,
+      "base_yaw_rate_radps": 0.0,
+      "riser_rate_mps": 0.8943604431204654,
+      "proxy_rate_radps": 0.0
+    }
+  },
+  "zero_residual_dynamic_gate": {
+    "position_error_p95_m": 0.11812505933773185,
+    "position_error_max_m": 0.12708020044068666,
+    "pitch_max_deg": 6.393435711744048,
+    "camera_lever_arm_correction_saturation_ratio": 0.9587098393574297,
+    "normalized_residual_label_abs_max": [
+      0.7671434380207988,
+      0.21207472902589897,
+      0.1191010455746877
+    ],
+    "normalized_residual_label_headroom": [
+      0.1828565619792012,
+      0.737925270974101,
+      0.8308989544253123
+    ],
+    "dynamic_margins": {
+      "position_error_p95_m": 0.03187494066226815,
+      "position_error_max_m": 0.12291979955931334,
+      "pitch_max_deg": 5.606564288255952,
+      "attitude_error_max_deg": 9.542466627791613,
+      "riser_servo_error_max_m": 0.018122295319315834,
+      "action_saturation_ratio": 0.19673694779116466
+    }
+  },
+  "profile_window_contract": {
+    "limits": {
+      "base_linear_velocity_mps": 0.3,
+      "base_yaw_rate_radps": 0.3,
+      "riser_rate_mps": 0.25,
+      "proxy_rate_radps": 0.3
+    },
+    "minimum_duration_s": 0.1,
+    "windows": [
+      {
+        "start_index": 761,
+        "end_index": 782,
+        "start_time_s": 17.185168504529333,
+        "end_time_s": 17.290168504529312,
+        "duration_s": 0.10499999999997911
+      }
+    ],
+    "bounded_window_found": true
+  },
+  "case_specific_profile_required": true,
+  "case23_profile_reuse_authorized": false,
+  "pair_profile_cpu_ready": false,
+  "next_bounded_action": "design_case6_specific_corrective_and_perturbation_profiles_cpu_only",
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

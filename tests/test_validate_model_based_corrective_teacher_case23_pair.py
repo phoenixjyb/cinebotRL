@@ -1,8 +1,11 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
+
+import pytest
 
 
 ROOT = Path(__file__).parents[1]
@@ -210,10 +213,10 @@ def _fixture_repo(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
         "holdout_cases": MODULE.EXPECTED_HOLDOUT,
         "holdout_opened": False,
         "cpu_preflight_ready": True,
-        "runtime_authorized": False,
-        "gpu_launch_authorized": False,
-        "authorization_token_issued": False,
-        "runtime_authorization_token_sha256": "",
+        "runtime_authorized": True,
+        "gpu_launch_authorized": True,
+        "authorization_token_issued": True,
+        "runtime_authorization_token_sha256": MODULE.EXPECTED_AUTHORIZATION_SHA256,
         "label_capture_authorized": False,
         "dataset_creation_authorized": False,
         "bc_authorized": False,
@@ -231,7 +234,7 @@ def _fixture_repo(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
     return repo, contract_path
 
 
-def test_validator_accepts_clean_pushed_closed_contract(tmp_path, monkeypatch) -> None:
+def test_validator_accepts_clean_pushed_canonical_contract(tmp_path, monkeypatch) -> None:
     repo, contract = _fixture_repo(tmp_path, monkeypatch)
     result = MODULE.validate(contract, repo, namespace=MODULE.NAMESPACE)
     assert result["passed"] is True
@@ -240,16 +243,47 @@ def test_validator_accepts_clean_pushed_closed_contract(tmp_path, monkeypatch) -
     assert result["gpu_launch_authorized"] is False
 
 
-def test_validator_rejects_any_authorization_file(tmp_path, monkeypatch) -> None:
+def test_validator_authorizes_only_exact_mode_0600_token(tmp_path, monkeypatch) -> None:
+    if os.name == "nt":
+        pytest.skip("POSIX token-mode semantics are validated in WSL preflight")
     repo, contract = _fixture_repo(tmp_path, monkeypatch)
-    token = tmp_path / "forged-token"
-    token.write_text("not authorized\n", encoding="utf-8")
+    token = tmp_path / "token"
+    token.write_bytes(
+        b"CINEBOTRL_CASE23_CORRECTIVE_PAIR_V1_AUTHORIZED_ONCE_20260723\n"
+    )
+    token.chmod(0o600)
     result = MODULE.validate(
         contract, repo, namespace=MODULE.NAMESPACE, authorization_file=token
     )
-    assert result["checks"]["no_authorization_file"] is False
-    assert result["passed"] is False
-    assert result["runtime_authorized"] is False
+    assert result["passed"] is True
+    assert result["runtime_authorized"] is True
+    token.chmod(0o644)
+    rejected = MODULE.validate(
+        contract, repo, namespace=MODULE.NAMESPACE, authorization_file=token
+    )
+    assert rejected["passed"] is False
+    assert rejected["runtime_authorized"] is False
+
+    token.write_text("wrong token\n", encoding="utf-8")
+    token.chmod(0o600)
+    wrong_hash = MODULE.validate(
+        contract, repo, namespace=MODULE.NAMESPACE, authorization_file=token
+    )
+    assert wrong_hash["authorization_checks"]["authorization_hash_matches"] is False
+    assert wrong_hash["runtime_authorized"] is False
+
+    target = tmp_path / "target-token"
+    target.write_bytes(
+        b"CINEBOTRL_CASE23_CORRECTIVE_PAIR_V1_AUTHORIZED_ONCE_20260723\n"
+    )
+    target.chmod(0o600)
+    symlink = tmp_path / "symlink-token"
+    symlink.symlink_to(target)
+    linked = MODULE.validate(
+        contract, repo, namespace=MODULE.NAMESPACE, authorization_file=symlink
+    )
+    assert linked["authorization_checks"]["authorization_not_symlink"] is False
+    assert linked["runtime_authorized"] is False
 
 
 def test_validator_rejects_alternate_contract_path(tmp_path, monkeypatch) -> None:
@@ -287,12 +321,12 @@ def test_wrapper_execute_is_unconditionally_unauthorized() -> None:
         ["bash", str(WRAPPER), "--execute"], capture_output=True, text=True
     )
     assert result.returncode == 4
-    assert "runtime_authorization_not_issued" in result.stderr
+    assert "authorization_file_missing" in result.stderr
 
 
-def test_wrapper_keeps_runtime_behind_empty_authorization_gate() -> None:
+def test_wrapper_keeps_runtime_behind_one_use_authorization_gate() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
-    gate_index = source.index('readonly AUTHORIZATION_SHA256=""')
+    gate_index = source.index('readonly AUTHORIZATION_SHA256="449ee49d')
     execute_check = source.index('[[ -n "$AUTHORIZATION_SHA256" ]]')
     playback_index = source.index('timeout --signal=TERM --kill-after=30s 600')
     assert gate_index < execute_check < playback_index
@@ -301,17 +335,21 @@ def test_wrapper_keeps_runtime_behind_empty_authorization_gate() -> None:
     assert "--raw-teacher-dir" not in source
     assert "--policy-trace-dir" not in source
     assert "--shadow-teacher-trace-dir" not in source
+    assert 'rm -f "$AUTHORIZATION_FILE"' in source
 
 
-def test_committed_contract_keeps_runtime_and_learning_closed() -> None:
+def test_committed_contract_authorizes_only_runtime_and_keeps_learning_closed() -> None:
     payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
     assert payload["reviewed_parent_commit"] == MODULE.REVIEWED_PARENT
     assert set(payload["identities"]) == MODULE.REQUIRED_IDENTITIES
-    assert payload["runtime_authorization_token_sha256"] == ""
+    assert payload["runtime_authorized"] is True
+    assert payload["gpu_launch_authorized"] is True
+    assert payload["authorization_token_issued"] is True
+    assert (
+        payload["runtime_authorization_token_sha256"]
+        == MODULE.EXPECTED_AUTHORIZATION_SHA256
+    )
     for field in (
-        "runtime_authorized",
-        "gpu_launch_authorized",
-        "authorization_token_issued",
         "label_capture_authorized",
         "dataset_creation_authorized",
         "bc_authorized",

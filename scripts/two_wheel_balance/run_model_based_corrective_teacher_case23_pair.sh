@@ -20,7 +20,7 @@ readonly GAINS="$WIN_ROOT\\docs\\03_training\\two_wheel_balance\\evidence_202607
 readonly PLAYBACK="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 readonly FINALIZER="$WIN_ROOT\\scripts\\two_wheel_balance\\summarize_model_based_corrective_teacher_case23_pair.py"
 # Runtime authorization is intentionally absent from this CPU-only change.
-readonly AUTHORIZATION_SHA256=""
+readonly AUTHORIZATION_SHA256="449ee49db631c440de1ec9b421639790103efb79fab2bf697e029e22ce26d474"
 
 reject() {
   printf '{"reason":"%s","runtime_started":false,"passed":false}\n' "$1" >&2
@@ -77,18 +77,23 @@ wait_gpu_free() {
 
 ADMISSION="$(mktemp)"
 trap 'rm -f "$ADMISSION"' EXIT
-python3 "$VALIDATOR" \
-  --contract "$CONTRACT" \
-  --repo-root "$ROOT" \
-  --namespace "$NAMESPACE" \
-  --output "$ADMISSION" >/dev/null
+VALIDATOR_ARGS=(
+  --contract "$CONTRACT"
+  --repo-root "$ROOT"
+  --namespace "$NAMESPACE"
+  --output "$ADMISSION"
+)
+if [[ "$MODE" == --execute ]]; then
+  VALIDATOR_ARGS+=(--authorization-file "$AUTHORIZATION_FILE")
+fi
+python3 "$VALIDATOR" "${VALIDATOR_ARGS[@]}" >/dev/null
 assert_gpu_free || reject "exclusive_gpu_ownership_failed" 5
 if [[ "$MODE" == --preflight ]]; then
   cat "$ADMISSION"
   exit 0
 fi
 
-# This route remains unreachable until a later reviewed commit pins a token hash.
+# The token is consumed before the output namespace or Isaac process is created.
 [[ ! -L "$AUTHORIZATION_FILE" ]] || reject "authorization_file_is_symlink" 4
 [[ "$(stat -c '%a' "$AUTHORIZATION_FILE")" == 600 ]] || {
   reject "authorization_file_mode_not_0600" 4

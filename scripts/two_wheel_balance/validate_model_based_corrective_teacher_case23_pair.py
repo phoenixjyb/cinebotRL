@@ -8,6 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import stat
 
 
 SCHEMA = "cinebotrl_two_wheel_riser_corrective_teacher_case23_pair_contract_v1"
@@ -79,6 +80,9 @@ EXPECTED_PAIR_CONTRACT = {
     "minimum_position_p95_relative_improvement": 0.02,
     "maximum_runtime_seconds_per_rollout": 600,
 }
+EXPECTED_AUTHORIZATION_SHA256 = (
+    "449ee49db631c440de1ec9b421639790103efb79fab2bf697e029e22ce26d474"
+)
 
 
 def sha256_file(path: Path) -> str:
@@ -127,6 +131,20 @@ def _load_identity_json(rows: dict[str, dict[str, object]], name: str) -> dict[s
     if row.get("passed") is not True:
         return {}
     return json.loads(Path(str(row["path"])).read_text(encoding="utf-8"))
+
+
+def token_checks(path: Path | None, expected_sha256: object) -> dict[str, bool]:
+    exists = path is not None and path.is_file()
+    mode = stat.S_IMODE(path.stat().st_mode) if exists else None
+    actual_sha = sha256_file(path) if exists else None
+    return {
+        "authorization_file_present": exists,
+        "authorization_mode_0600": mode == 0o600,
+        "authorization_not_symlink": exists and not path.is_symlink(),
+        "authorization_hash_matches": exists
+        and isinstance(expected_sha256, str)
+        and actual_sha == expected_sha256,
+    }
 
 
 def validate(
@@ -304,10 +322,11 @@ def validate(
         "pair_contract_exact": contract.get("paired_experiment_contract")
         == EXPECTED_PAIR_CONTRACT,
         "cpu_preflight_ready": contract.get("cpu_preflight_ready") is True,
-        "runtime_authorization_closed": contract.get("runtime_authorized") is False
-        and contract.get("gpu_launch_authorized") is False
-        and contract.get("authorization_token_issued") is False
-        and contract.get("runtime_authorization_token_sha256") == "",
+        "runtime_authorization_issued": contract.get("runtime_authorized") is True
+        and contract.get("gpu_launch_authorized") is True
+        and contract.get("authorization_token_issued") is True
+        and contract.get("runtime_authorization_token_sha256")
+        == EXPECTED_AUTHORIZATION_SHA256,
         "capture_and_training_closed": contract.get("label_capture_authorized") is False
         and contract.get("dataset_creation_authorized") is False
         and contract.get("bc_authorized") is False
@@ -319,9 +338,19 @@ def validate(
         and contract.get("validation_opened") is False
         and contract.get("holdout_cases") == EXPECTED_HOLDOUT
         and contract.get("holdout_opened") is False,
-        "no_authorization_file": authorization_file is None,
     }
+    authorization_checks = token_checks(
+        authorization_file, contract.get("runtime_authorization_token_sha256")
+    )
     cpu_passed = all(checks.values())
+    runtime_authorized = bool(
+        cpu_passed
+        and authorization_file is not None
+        and all(authorization_checks.values())
+    )
+    passed = cpu_passed and (
+        authorization_file is None or all(authorization_checks.values())
+    )
     return {
         "schema": ADMISSION_SCHEMA,
         "contract": str(contract_path),
@@ -340,21 +369,26 @@ def validate(
         "corrective_profile_checks": corrective_profile_checks,
         "perturbation_checks": perturbation_checks,
         "checks": checks,
+        "authorization_checks": authorization_checks,
         "authorization_file": (
             None if authorization_file is None else str(authorization_file.resolve())
         ),
-        "authorization_consumed_before_isaac": False,
-        "authorization_sha256": None,
+        "authorization_consumed_before_isaac": runtime_authorized,
+        "authorization_sha256": (
+            contract.get("runtime_authorization_token_sha256")
+            if runtime_authorized
+            else None
+        ),
         "cpu_contract_ready": cpu_passed,
-        "runtime_authorized": False,
-        "gpu_launch_authorized": False,
+        "runtime_authorized": runtime_authorized,
+        "gpu_launch_authorized": runtime_authorized,
         "label_capture_authorized": False,
         "dataset_creation_authorized": False,
         "bc_authorized": False,
         "ppo_authorized": False,
         "training_started": False,
         "valid_for_training": False,
-        "passed": cpu_passed,
+        "passed": passed,
     }
 
 

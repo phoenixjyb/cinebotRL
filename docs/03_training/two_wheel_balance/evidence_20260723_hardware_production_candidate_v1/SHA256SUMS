@@ -1,0 +1,4 @@
+bc4eaa8673cf389e11d639aec06414c5506fd2461e67bad6c5328d0363fd3bb7  summary.json
+11b08b6a179b395eceb5e797b28d224d8dfcf35c1921a4d6123d6f5a0e363512  ../RISER_PRODUCTION_CANDIDATE_VENDOR_SNAPSHOT_20260723.json
+a29802a1604effc9e499c3523893b58c437dbc5cb22e3ad3cf12ab18ac052e14  ../../../../scripts/two_wheel_balance/audit_riser_hardware_production_candidate.py
+925dbd9026243d67e8ef791253756fe36cf4ffed401113680935e44df556db67  ../../../../tests/test_audit_riser_hardware_production_candidate.py

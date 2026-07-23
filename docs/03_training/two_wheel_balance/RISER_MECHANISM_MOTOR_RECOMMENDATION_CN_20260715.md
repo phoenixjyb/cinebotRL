@@ -415,3 +415,57 @@ SHA-256 为
 当前未测量模板审计 SHA-256 为
 `7e9c48539e9d9ae77fad9143a9bb91936ed195f92a60b517f22c469c74af37df`，
 明确缺少 34 项必需输入，所有采购、迁移、运行和训练状态保持关闭。
+
+## 14. 750 W 生产设计候选
+
+原先的“750 W 级”建议现已收敛为一个明确但仍需台架和供应商审核的候选：
+
+- 电机：Leadshine `ELVM8075V48EH-M17-HD`，48 VDC、750 W、
+  2.39 N m 额定/7.17 N m 峰值、3000/3900 rpm、19 A 额定/59 A
+  峰值、带抱闸、17 bit 多圈绝对磁编码器、IP65；
+- 驱动器：Leadshine `ELD2-CAN7020B`，24--70 VDC、750 W、
+  20 Arms 连续/80 Apeak 峰值、CANopen、外接制动电阻、无公开安全功能；
+- Leadshine 当前产品目录将这两个型号列为匹配组合；
+- 传动仍为 `3:1 + 70 mm/rev`，1 m/s 时电机约 2571.43 rpm，低于
+  3000 rpm 额定转速。
+
+按现有传动效率和保守 8 kg 急停模型复算：
+
+| 项目 | 750 W 候选 |
+|---|---:|
+| 额定机械功率复算 | 750.841 W |
+| 额定等效线性推力 | 550.259 N |
+| 峰值等效线性推力 | 1650.777 N |
+| 8 kg 急停设计力 | 276.960 N |
+| 8 kg 急停额定力裕量 | 1.9868 |
+| 项目最低裕量 | 1.15 |
+| 按当前公式满足 1.15 裕量的最大运动质量 | 14.804 kg |
+
+这说明 750 W 候选解决了 400 W 候选在**当前计算模型**中的额定急停裕量不足，
+但没有解决实机未知量。尤其是 2.7 kg 电机必须底置在固定塔身上，不能作为随
+carriage 升降的运动质量；驱动器仍需外部再生通道，且没有公开 STO 等安全功能。
+抱闸仍只能静态保持，不能作为动态急停制动器。
+
+因此当前分类是
+`candidate_ready_for_supplier_and_bench_review=true`，但
+`valid_for_production_procurement=false`、
+`valid_for_hardware_transfer=false`、`simulation_motor_model_updated=false`
+和 `valid_for_training=false`。供应商必须继续确认垂直移动轴寿命、防跳齿、
+减速器连续转速/急停扭矩/效率/回程间隙；项目仍需完成再生、防坠、限位、端挡、
+断能和完整校准台架。
+
+机器可读快照：
+`RISER_PRODUCTION_CANDIDATE_VENDOR_SNAPSHOT_20260723.json`。
+审计证据：
+`evidence_20260723_hardware_production_candidate_v1/summary.json`，
+SHA-256
+`bc4eaa8673cf389e11d639aec06414c5506fd2461e67bad6c5328d0363fd3bb7`。
+
+新增官方资料：
+
+- 750 W/48 V 带抱闸绝对编码器电机：
+  https://www.leadshine.com/product-detail/ELVM8075V48EH-M17-HD.html
+- 750 W/20 Arms CANopen 驱动器：
+  https://www.leadshine.com/network-detail/c-servo-drives/CANopen/ELD2-CAN7020B.html
+- Leadshine 当前低压伺服产品目录和匹配表：
+  https://m.leadshine.com/upfiles/downloads/4850bb0f1f150d6391f1ec74f11e83dc_1745548352730.pdf

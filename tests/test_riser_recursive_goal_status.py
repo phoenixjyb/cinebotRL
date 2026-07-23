@@ -104,6 +104,11 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     hardware = _goal()["current_stage"]["status_refresh_20260723"][
         "hardware_readiness"
     ]
+    assert hardware["production_design_review_candidate"] == (
+        "leadshine_elvm8075v48eh_m17_hd_plus_eld2_can7020b"
+    )
+    assert hardware["production_candidate_emergency_8kg_margin_ratio"] > 1.15
+    assert hardware["production_candidate_ready_for_supplier_and_bench_review"]
     assert hardware["bench_measurement_missing_fields"] == 34
     assert hardware["ready_for_production_design_review"] is False
     assert hardware["valid_for_production_procurement"] is False

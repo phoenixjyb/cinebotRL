@@ -1,0 +1,69 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_hardware_production_candidate_v1",
+  "checks": {
+    "snapshot_schema": true,
+    "snapshot_current": true,
+    "motor_is_pinned_48v_750w_brake_absolute": true,
+    "motor_rating_self_consistent": true,
+    "drive_is_official_match": true,
+    "drive_power_covers_motor": true,
+    "drive_continuous_current_covers_motor": true,
+    "drive_peak_current_covers_motor": true,
+    "drive_voltage_covers_48v": true,
+    "external_regeneration_still_required": true,
+    "drive_safety_function_still_absent": true,
+    "mechanism_ratio_and_lead_match_envelope": true,
+    "camera_height_ceiling_is_1p8m": true,
+    "mechanical_stroke_preserves_stopping_space": true,
+    "motor_speed_covers_1mps": true,
+    "rated_force_exceeds_required_emergency_margin": true,
+    "hardware_envelope_passed": true,
+    "limitations_remain_fail_closed": true
+  },
+  "calculated": {
+    "motor_mechanical_power_from_rating_w": 750.8406442079606,
+    "rated_linear_force_n": 550.2589292552624,
+    "peak_linear_force_n": 1650.776787765787,
+    "motor_speed_at_1mps_rpm": 2571.4285714285716,
+    "emergency_8kg_design_force_n": 276.96000000000004,
+    "emergency_8kg_motor_torque_nm": 1.2029507651895495,
+    "emergency_8kg_rated_force_margin_ratio": 1.9867812292578795,
+    "required_emergency_force_margin_ratio": 1.15,
+    "maximum_moving_mass_at_required_margin_kg": 14.803714565812243,
+    "full_speed_stopping_distance_m": 0.12000000000000001,
+    "recommended_mechanical_stroke_m": 1.5
+  },
+  "recommendation": {
+    "production_design_review_candidate": "ELVM8075V48EH-M17-HD_plus_ELD2-CAN7020B",
+    "mechanism": "3_to_1_reduction_plus_70mm_per_rev_supplier_qualified_guided_belt_axis_or_two_stage_synchronized_telescoping_mast",
+    "engineering_sample_predecessor": "retain_400w_candidate_for_one_instrumented_bench_sample_only",
+    "selection_reason": "48v_750w_candidate_covers_8kg_emergency_force_with_at_least_15_percent_calculated_margin_under_current_assumptions",
+    "safety_boundary": "holding_brake_is_not_dynamic_brake; external_regeneration_independent_anti_fall_hard_limits_absorbing_end_stops_and_safety_rated_power_removal_remain_required"
+  },
+  "required_before_production_design_review": [
+    "measure complete moving mass friction counterbalance and eccentric moments",
+    "obtain supplier vertical mobile-axis duty and tooth-jump approval",
+    "select and verify gearbox continuous speed braking torque efficiency and backlash",
+    "design and test regenerative resistor or battery absorption path",
+    "select and test independent anti-fall and safety-rated power removal",
+    "complete the calibrated 1mps thermal force stop and limit bench campaign"
+  ],
+  "candidate_ready_for_supplier_and_bench_review": true,
+  "valid_for_production_procurement": false,
+  "valid_for_hardware_transfer": false,
+  "simulation_motor_model_updated": false,
+  "runtime_authorized": false,
+  "gpu_work_started": false,
+  "valid_for_training": false,
+  "passed": true,
+  "inputs": {
+    "vendor_snapshot": {
+      "path": "docs/03_training/two_wheel_balance/RISER_PRODUCTION_CANDIDATE_VENDOR_SNAPSHOT_20260723.json",
+      "sha256": "11b08b6a179b395eceb5e797b28d224d8dfcf35c1921a4d6123d6f5a0e363512"
+    },
+    "hardware_envelope_script": {
+      "path": "scripts/two_wheel_balance/calculate_riser_hardware_envelope.py",
+      "sha256": "f57369e72bb9e20ae326267c75baad81a97ade8339a26e7e1543143996317df9"
+    }
+  }
+}

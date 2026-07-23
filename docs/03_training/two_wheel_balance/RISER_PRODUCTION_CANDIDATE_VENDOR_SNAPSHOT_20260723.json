@@ -1,0 +1,62 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_production_candidate_vendor_snapshot_v1",
+  "verified_date": "2026-07-23",
+  "motor": {
+    "model": "ELVM8075V48EH-M17-HD",
+    "source": "https://www.leadshine.com/product-detail/ELVM8075V48EH-M17-HD.html",
+    "rated_voltage_vdc": 48.0,
+    "rated_power_w": 750.0,
+    "rated_torque_nm": 2.39,
+    "peak_torque_nm": 7.17,
+    "rated_speed_rpm": 3000.0,
+    "peak_speed_rpm": 3900.0,
+    "rated_current_a": 19.0,
+    "peak_current_a": 59.0,
+    "brake": true,
+    "encoder": "17_bit_magnetic_multi_turn_absolute",
+    "protection": "IP65",
+    "mass_kg": 2.7
+  },
+  "drive": {
+    "model": "ELD2-CAN7020B",
+    "source": "https://www.leadshine.com/network-detail/c-servo-drives/CANopen/ELD2-CAN7020B.html",
+    "official_motor_match_source": "https://m.leadshine.com/upfiles/downloads/4850bb0f1f150d6391f1ec74f11e83dc_1745548352730.pdf",
+    "official_motor_match_confirmed": true,
+    "main_power_voltage_vdc": [
+      24.0,
+      70.0
+    ],
+    "rated_power_w": 750.0,
+    "rated_current_arms_at_or_below_48v": 20.0,
+    "rated_current_arms_above_48v": 14.0,
+    "peak_current_apeak": 80.0,
+    "direct_brake_output_vdc": 24.0,
+    "direct_brake_output_a": 1.0,
+    "external_brake_resistor_required_for_regeneration": true,
+    "published_safe_function": false,
+    "protocol": "CANopen_CiA301_CiA402"
+  },
+  "mechanism_contract": {
+    "reduction_ratio": 3.0,
+    "linear_lead_m_per_rev": 0.07,
+    "software_camera_height_range_m": [
+      0.6,
+      1.8
+    ],
+    "software_working_stroke_m": 1.2,
+    "recommended_mechanical_stroke_m": 1.5,
+    "maximum_linear_speed_mps": 1.0,
+    "preferred_fixed_axis": "supplier_qualified_guided_belt_axis",
+    "collapsed_height_alternative": "supplier_qualified_two_stage_synchronized_telescoping_mast"
+  },
+  "limitations": [
+    "candidate is not approved for production procurement",
+    "supplier vertical mobile-axis duty and tooth-jump approval are absent",
+    "gearbox continuous speed braking torque efficiency and backlash remain unselected",
+    "regenerative resistor or battery absorption path remains unselected",
+    "independent anti-fall device and safety-rated stop architecture remain unselected",
+    "complete moving mass eccentric moment friction duty cycle and thermal data remain unmeasured",
+    "motor holding brake is not a dynamic emergency brake",
+    "drive has no published safe function"
+  ]
+}

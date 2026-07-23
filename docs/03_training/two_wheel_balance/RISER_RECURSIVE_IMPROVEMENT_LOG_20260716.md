@@ -8777,3 +8777,42 @@ and must state whether its candidate was accepted or rejected.
 - The nearest actual data-path action remains exactly one separately
   authorized case-23 v4 CPU conversion. Case 6 remains separately reviewable
   as one v2 paired canary.
+
+## Round 227: case-2 uses natural error and projection, not another wrench
+
+- Rejected the case-6 pulse-profile pattern for case 2 because no shared
+  low-motion interval exists and the baseline already runs close to its
+  position-p95 gate.
+- Built a natural-error corrective profile that retains `25%` of the observed
+  raw envelope. Maximum residuals are
+  `[0.010247,0.004541,0.000614]` with a `0.4 s` slew horizon.
+- The existing zero-residual trace provides sufficient excitation without an
+  external wrench: `42/47` trace samples exceed `0.03 m` position error and
+  the trace maximum is `0.153167 m`.
+- Bound the profile to the existing deterministic model-based safety
+  projection. Outward negative linear corrections require projection on
+  `430` transitions, and outward positive yaw corrections on `103`.
+  Projection is contractive, preserves all command limits, and leaves riser
+  corrections unprojected over the frozen plan envelope.
+- Any future corrective capture must store effective projected residuals,
+  never unavailable requested commands. This matches the existing
+  projection-aware BC contract and does not grant capture or training.
+- Implementation commit
+  `2911a0bdb45cf4c83d57a490dfdff9d9a9e90a58` passes `50` focused
+  tests on macOS and `.98`. The authoritative `.98` CPU suite passes:
+  `1161 passed, 12 skipped, 2 warnings in 122.95 s`.
+- The profile SHA-256 is
+  `b08434850b63c3370172788372f9b2f89ee388c07e8292f837838354ba111b50`;
+  proposal SHA-256 is
+  `6af820c7a26094bb2770be2ca80923cf9f378386fca0252c4cbe37eeaf50fdfb`.
+- No token, runtime namespace, Isaac process, GPU workload, label capture,
+  conversion, merge, BC, PPO, or training was created. Goal completion
+  remains `6/10`.
+
+## Next round after Round 227
+
+- Implement a disabled-by-default, hash-bound case-2 natural-error paired
+  runtime contract and CPU validator. It must omit a wrench profile and pin
+  the safety-projection source.
+- The nearest actual data-path action remains exactly one separately
+  authorized case-23 v4 CPU conversion.

@@ -138,6 +138,31 @@ CASE6_WRENCH_PROFILE = (
     / "scripts/two_wheel_balance/"
     "model_based_corrective_teacher_case6_wrench_profile_v1.json"
 )
+CASE2_PAIR_READINESS_SCRIPT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "audit_model_based_corrective_case2_pair_readiness.py"
+)
+CASE2_PAIR_READINESS_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case2_pair_readiness_cpu_v1/summary.json"
+)
+CASE2_NATURAL_ERROR_PROFILE_BUILDER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "build_model_based_corrective_case2_natural_error_profile.py"
+)
+CASE2_NATURAL_ERROR_PROFILE_PROPOSAL = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case2_natural_error_profile_cpu_v1/proposal.json"
+)
+CASE2_NATURAL_ERROR_CORRECTIVE_PROFILE = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case2_natural_error_profile_v1.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -278,7 +303,7 @@ def test_goal_preserves_robot_and_completion_contract() -> None:
 
 def test_current_status_distinguishes_candidates_from_training_corpus() -> None:
     stage = _goal()["current_stage"]
-    assert stage["status_as_of"] == "2026-07-23"
+    assert stage["status_as_of"] == "2026-07-24"
     assert stage["quality_qualified_exact_source_cases_available"] == 42
     assert stage["quality_qualified_cases_are_candidates_not_training_corpus"]
     assert stage["model_based_corrective_case_datasets_available"] == 1
@@ -644,6 +669,117 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case6_profile["runtime_authorized"] is False
     assert case6_profile["label_capture_authorized"] is False
     assert case6_profile["training_started"] is False
+    assert corrective["case2_pair_readiness_schema"] == (
+        "cinebotrl_two_wheel_riser_case2_pair_readiness_cpu_v1"
+    )
+    assert corrective["case2_pair_readiness_implementation_commit"] == (
+        "9a16e5ca18ab4da96d78269234b674eec88d103c"
+    )
+    assert corrective["case2_pair_readiness_script_sha256"] == _sha256(
+        CASE2_PAIR_READINESS_SCRIPT
+    )
+    assert corrective["case2_pair_readiness_script_git_blob_sha1"] == (
+        "f535e9bfb3de7b41e99e7398e81aff86b7c5e5cc"
+    )
+    assert corrective["case2_pair_readiness_summary_sha256"] == _sha256(
+        CASE2_PAIR_READINESS_EVIDENCE
+    )
+    assert corrective["case2_pair_readiness_mac_windows_byte_parity"] is True
+    assert corrective["case2_pair_readiness_focused_cpu_suite"] == (
+        "15_passed_2_warnings"
+    )
+    assert corrective["case2_pair_readiness_authoritative_cpu_suite"] == (
+        "1149_passed_12_skipped_2_warnings_in_124.40s"
+    )
+    assert corrective["case2_pair_readiness_source_states"] == 480
+    assert corrective["case2_pair_readiness_transitions"] == 479
+    assert corrective["case2_pair_readiness_camera_height_range_m"] == [
+        1.174803,
+        1.362249,
+    ]
+    assert corrective["case2_pair_readiness_low_motion_window_found"] is False
+    assert corrective[
+        "case2_pair_readiness_case_specific_profile_required"
+    ] is True
+    assert corrective[
+        "case2_pair_readiness_case23_profile_reuse_authorized"
+    ] is False
+    assert corrective[
+        "case2_pair_readiness_case6_profile_reuse_authorized"
+    ] is False
+    assert corrective["case2_pair_readiness_pair_profile_cpu_ready"] is False
+    assert corrective["case2_pair_readiness_runtime_authorized"] is False
+    assert corrective["case2_pair_readiness_label_capture_authorized"] is False
+    assert corrective["case2_pair_readiness_training_authorized"] is False
+    case2_readiness = json.loads(CASE2_PAIR_READINESS_EVIDENCE.read_text())
+    assert case2_readiness["passed"] is True
+    assert case2_readiness[
+        "safe_window_absent_requires_structural_profile"
+    ] is True
+    assert case2_readiness["case23_profile_reuse_authorized"] is False
+    assert case2_readiness["case6_profile_reuse_authorized"] is False
+    assert case2_readiness["runtime_authorized"] is False
+    assert case2_readiness["label_capture_authorized"] is False
+    assert case2_readiness["training_started"] is False
+    assert corrective["case2_natural_error_profile_schema"] == (
+        "cinebotrl_two_wheel_riser_case2_natural_error_profile_proposal_cpu_v1"
+    )
+    assert corrective[
+        "case2_natural_error_profile_implementation_commit"
+    ] == "2911a0bdb45cf4c83d57a490dfdff9d9a9e90a58"
+    assert corrective["case2_natural_error_profile_builder_sha256"] == _sha256(
+        CASE2_NATURAL_ERROR_PROFILE_BUILDER
+    )
+    assert corrective[
+        "case2_natural_error_profile_builder_git_blob_sha1"
+    ] == "3d9ba69980b6bb8c1a4cb7c0ec592ca1d0317851"
+    assert corrective[
+        "case2_natural_error_profile_proposal_sha256"
+    ] == _sha256(CASE2_NATURAL_ERROR_PROFILE_PROPOSAL)
+    assert corrective[
+        "case2_natural_error_corrective_profile_sha256"
+    ] == _sha256(CASE2_NATURAL_ERROR_CORRECTIVE_PROFILE)
+    assert corrective[
+        "case2_natural_error_profile_mac_windows_byte_parity"
+    ] is True
+    assert corrective[
+        "case2_natural_error_profile_focused_cpu_suite"
+    ] == "50_passed_2_warnings"
+    assert corrective[
+        "case2_natural_error_profile_authoritative_cpu_suite"
+    ] == "1161_passed_12_skipped_2_warnings_in_122.95s"
+    assert corrective[
+        "case2_natural_error_profile_envelope_retention_fraction"
+    ] == 0.25
+    assert corrective["case2_natural_error_profile_maximum_residuals"] == [
+        0.010247377951381045,
+        0.004541053111745168,
+        0.000614431056640985,
+    ]
+    assert corrective["case2_natural_error_profile_slew_horizon_s"] == 0.4
+    assert corrective["case2_natural_error_trace_samples"] == 47
+    assert corrective["case2_natural_error_samples_above_003m"] == 42
+    assert corrective["case2_natural_error_external_wrench_required"] is False
+    assert corrective[
+        "case2_natural_error_outward_linear_projection_transitions"
+    ] == 430
+    assert corrective[
+        "case2_natural_error_outward_yaw_projection_transitions"
+    ] == 103
+    assert corrective["case2_natural_error_pair_profile_cpu_ready"] is True
+    assert corrective["case2_natural_error_runtime_route_implemented"] is False
+    assert corrective["case2_natural_error_runtime_authorized"] is False
+    assert corrective["case2_natural_error_label_capture_authorized"] is False
+    assert corrective["case2_natural_error_training_authorized"] is False
+    case2_profile = json.loads(
+        CASE2_NATURAL_ERROR_PROFILE_PROPOSAL.read_text()
+    )
+    assert case2_profile["passed"] is True
+    assert case2_profile["pair_profile_cpu_ready"] is True
+    assert case2_profile["runtime_route_implemented"] is False
+    assert case2_profile["runtime_authorized"] is False
+    assert case2_profile["label_capture_authorized"] is False
+    assert case2_profile["training_started"] is False
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

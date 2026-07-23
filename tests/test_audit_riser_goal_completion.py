@@ -178,6 +178,13 @@ def test_partial_learning_arguments_are_rejected(tmp_path: Path) -> None:
             bc_admission=None,
             bc_report=None,
             learned_all79_admission=None,
+            learned_all79_preflight_receipt=None,
+            learned_plan_manifest=None,
+            learned_source_manifest=None,
+            learned_lqr_gains=None,
+            learned_robot_build_audit=None,
+            learned_robot_usd=None,
+            learned_drive_profile_selection=None,
             validation_gate_report=None,
             holdout_gate_report=None,
             all79_report=None,
@@ -203,6 +210,13 @@ def test_all79_report_requires_separate_rollout_admission_chain(
             bc_admission=None,
             bc_report=None,
             learned_all79_admission=None,
+            learned_all79_preflight_receipt=None,
+            learned_plan_manifest=None,
+            learned_source_manifest=None,
+            learned_lqr_gains=None,
+            learned_robot_build_audit=None,
+            learned_robot_usd=None,
+            learned_drive_profile_selection=None,
             validation_gate_report=None,
             holdout_gate_report=None,
             all79_report=all79,
@@ -221,7 +235,42 @@ def _rollout_metrics(value: float) -> dict[str, float]:
     return {name: value for name in MODULE.ROLLOUT_METRICS}
 
 
-def _valid_all79_report(policy_sha256: str) -> dict:
+def _valid_all79_report(
+    tmp_path: Path,
+    policy_sha256: str,
+) -> tuple[dict, dict[str, Path | str]]:
+    execution_commit = "a" * 40
+    admission = tmp_path / "admission.json"
+    admission.write_text("{}\n", encoding="utf-8")
+    plan_manifest = tmp_path / "plan_manifest.json"
+    plan_manifest.write_text("{}\n", encoding="utf-8")
+    preflight = tmp_path / "preflight.json"
+    preflight.write_text(
+        json.dumps(
+            {
+                "schema": (
+                    "cinebotrl_two_wheel_riser_model_based_learned_all79_"
+                    "preflight_v1"
+                ),
+                "passed": True,
+                "execution_commit": execution_commit,
+                "head": execution_commit,
+                "runtime_started": False,
+                "dataset_created": False,
+                "residual_capture_started": False,
+                "bc_started": False,
+                "ppo_started": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def artifact(path: Path) -> dict[str, str]:
+        return {
+            "path": path.name,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+
     rows = [
         {
             "case": case,
@@ -234,17 +283,33 @@ def _valid_all79_report(policy_sha256: str) -> dict:
             "teacher": _rollout_metrics(1.0),
             "learned": _rollout_metrics(0.9),
             "learned_residual_action_abs_max": [0.5, 0.4, 0.3],
+            "teacher_rollout": artifact(
+                _write_rollout_identity(tmp_path, case, "teacher")
+            ),
+            "learned_rollout": artifact(
+                _write_rollout_identity(tmp_path, case, "learned")
+            ),
         }
         for case in range(1, 80)
     ]
-    return {
+    report = {
         "schema": "cinebotrl_two_wheel_riser_residual_all79_gate_v1",
         "policy_sha256": policy_sha256,
         "cases": list(range(1, 80)),
         "case_count": 79,
         "maximum_regression_fraction": 0.05,
         "minimum_zero_improvement_fraction": None,
-        "expected_tracking_profile": "riser_phase_consistent_v2",
+        "expected_tracking_profile": (
+            "riser_recovery_direction_v4_camera_lever_arm_v1"
+        ),
+        "policy_command_contract": (
+            "model_based_planner_plus_bounded_policy_residual_v1"
+        ),
+        "residual_action_scales": [0.05, 0.05, 0.02],
+        "rollout_admission": artifact(admission),
+        "preflight_receipt": artifact(preflight),
+        "plan_manifest": artifact(plan_manifest),
+        "execution_commit": execution_commit,
         "means": {
             "teacher_position_p95_m": 1.0,
             "learned_position_p95_m": 0.9,
@@ -257,20 +322,52 @@ def _valid_all79_report(policy_sha256: str) -> dict:
         "passed": True,
         "ppo_authorized": False,
     }
+    return report, {
+        "admission": admission,
+        "preflight": preflight,
+        "plan_manifest": plan_manifest,
+        "execution_commit": execution_commit,
+    }
 
 
-def test_all79_validator_recomputes_every_case_and_aggregate() -> None:
+def _write_rollout_identity(root: Path, case: int, role: str) -> Path:
+    path = root / f"{role}_{case:04d}.json"
+    path.write_text(f"{role}-{case}", encoding="utf-8")
+    return path
+
+
+def test_all79_validator_recomputes_every_case_and_aggregate(
+    tmp_path: Path,
+) -> None:
     policy_sha = "a" * 64
+    report, evidence = _valid_all79_report(tmp_path, policy_sha)
     MODULE._validate_all79_report(
-        _valid_all79_report(policy_sha),
+        report,
         policy_sha256=policy_sha,
+        report_directory=tmp_path,
+        admission_path=evidence["admission"],
+        preflight_path=evidence["preflight"],
+        plan_manifest_path=evidence["plan_manifest"],
+        execution_commit=evidence["execution_commit"],
     )
 
 
-def test_all79_validator_rejects_forged_or_regressed_rows() -> None:
+def test_all79_validator_rejects_forged_or_regressed_rows(
+    tmp_path: Path,
+) -> None:
     policy_sha = "a" * 64
-    for mutation in ("policy", "case", "check", "regression", "mean"):
-        report = _valid_all79_report(policy_sha)
+    for mutation in (
+        "policy",
+        "case",
+        "check",
+        "regression",
+        "mean",
+        "rollout_hash",
+        "preflight_hash",
+    ):
+        mutation_root = tmp_path / mutation
+        mutation_root.mkdir()
+        report, evidence = _valid_all79_report(mutation_root, policy_sha)
         if mutation == "policy":
             report["policy_sha256"] = "b" * 64
         elif mutation == "case":
@@ -279,10 +376,22 @@ def test_all79_validator_rejects_forged_or_regressed_rows() -> None:
             report["rows"][10]["checks"]["learned_hard_gate"] = False
         elif mutation == "regression":
             report["rows"][10]["learned"]["position_error_max_m"] = 1.2
+        elif mutation == "rollout_hash":
+            report["rows"][10]["teacher_rollout"]["sha256"] = "0" * 64
+        elif mutation == "preflight_hash":
+            report["preflight_receipt"]["sha256"] = "0" * 64
         else:
             report["means"]["learned_position_p95_m"] = 0.8
         try:
-            MODULE._validate_all79_report(report, policy_sha256=policy_sha)
+            MODULE._validate_all79_report(
+                report,
+                policy_sha256=policy_sha,
+                report_directory=mutation_root,
+                admission_path=evidence["admission"],
+                preflight_path=evidence["preflight"],
+                plan_manifest_path=evidence["plan_manifest"],
+                execution_commit=evidence["execution_commit"],
+            )
         except ValueError:
             pass
         else:

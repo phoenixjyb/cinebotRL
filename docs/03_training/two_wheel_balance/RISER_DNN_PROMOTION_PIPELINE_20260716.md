@@ -234,10 +234,20 @@ bash scripts/two_wheel_balance/run_riser_residual_holdout_gate.sh
 运行：
 
 ```bash
-bash scripts/two_wheel_balance/run_riser_residual_all79_policy_gate.sh
+bash scripts/two_wheel_balance/run_model_based_learned_all79_policy_gate.sh
 ```
 
 只有 Gate C 通过才允许启动。学习策略必须完成 `79/79`，每条轨迹硬 gate 通过，并在上述所有安全和跟踪指标上保持教师 `5%` 回退预算。该 gate 仍不授权 PPO。
+
+旧的 `run_riser_residual_all79_policy_gate.sh` 属于历史
+`phase_feedforward + [0.3,0.4,0.1]` 合同，不得用于当前
+`model_based_planner + [0.05,0.05,0.02]` 策略。新入口在任何 Isaac 启动前
+必须验证独立的 all-79 admission、BC/validation/holdout 报告、策略、
+exact-source manifest、79 个 plan 文件、LQR、当前 400 W 仿真资产与代码
+哈希。运行采用新 namespace，并支持只恢复 admission/preflight
+逐字节一致且已有 case JSON 重新验证通过的中断任务。最终 summary
+必须哈希 admission、preflight、plan manifest 以及每条 teacher/learned
+rollout JSON。
 
 ## Gate E：渲染与最终晋级
 

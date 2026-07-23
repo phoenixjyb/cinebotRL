@@ -17,6 +17,8 @@ def _write_rollout(
     *,
     pitch_max_deg: float = 4.0,
     tracking_profile: str = "riser_phase_consistent_v2",
+    policy_command_base: str = "phase_feedforward",
+    residual_action_scales: list[float] | None = None,
 ) -> None:
     metrics = {name: 1.0 for name in REGRESSION_METRICS}
     metrics.update(
@@ -39,6 +41,8 @@ def _write_rollout(
         "trajectory_command_source": source,
         "tracking_profile": tracking_profile,
         "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
+        "policy_command_base": policy_command_base,
+        "residual_action_scales": residual_action_scales or [0.3, 0.4, 0.1],
         "results": [result],
     }
     root.mkdir(parents=True, exist_ok=True)
@@ -138,3 +142,56 @@ def test_validation_canary_accepts_explicit_current_tracking_profile(
     )
     assert summary["passed"]
     assert summary["expected_tracking_profile"] == profile
+
+
+def test_model_based_all79_contract_uses_planner_sources_and_scales(
+    tmp_path: Path,
+) -> None:
+    teacher = tmp_path / "teacher"
+    learned = tmp_path / "learned"
+    policy = tmp_path / "policy.pt"
+    policy.write_bytes(b"policy")
+    scales = [0.05, 0.05, 0.02]
+    profile = "riser_recovery_direction_v4_camera_lever_arm_v1"
+    provenance = {}
+    for name in ("admission", "preflight", "plan_manifest"):
+        path = tmp_path / f"{name}.json"
+        path.write_text("{}\n", encoding="utf-8")
+        provenance[name] = path
+    for case in range(1, 80):
+        _write_rollout(
+            teacher,
+            case,
+            "model_based_planner_plus_zero_policy_residual",
+            0.10,
+            tracking_profile=profile,
+            policy_command_base="model_based_planner",
+            residual_action_scales=scales,
+        )
+        _write_rollout(
+            learned,
+            case,
+            "model_based_planner_plus_torchscript_residual",
+            0.09,
+            tracking_profile=profile,
+            policy_command_base="model_based_planner",
+            residual_action_scales=scales,
+        )
+    summary = gate_rollouts(
+        teacher_dir=teacher,
+        learned_dir=learned,
+        cases=list(range(1, 80)),
+        policy=policy,
+        mode="all79",
+        maximum_regression_fraction=0.05,
+        policy_command_contract=(
+            "model_based_planner_plus_bounded_policy_residual_v1"
+        ),
+        expected_tracking_profile=profile,
+        rollout_admission=provenance["admission"],
+        preflight_receipt=provenance["preflight"],
+        plan_manifest=provenance["plan_manifest"],
+        execution_commit="a" * 40,
+    )
+    assert summary["passed"]
+    assert summary["residual_action_scales"] == scales

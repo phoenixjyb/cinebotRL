@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import statistics
 
 
@@ -14,6 +15,26 @@ TRACKING_PROFILE = "riser_phase_consistent_v2"
 PHASE_CONTRACT = "derivatives_scaled_by_progress_v1"
 LEARNED_SOURCE = "torchscript_residual_policy"
 ZERO_SOURCE = "zero_policy_action_baseline"
+LEGACY_POLICY_COMMAND_CONTRACT = "legacy_phase_feedforward_residual_v1"
+MODEL_BASED_POLICY_COMMAND_CONTRACT = (
+    "model_based_planner_plus_bounded_policy_residual_v1"
+)
+POLICY_COMMAND_CONTRACTS = {
+    LEGACY_POLICY_COMMAND_CONTRACT: {
+        "teacher_source": "deterministic_teacher",
+        "learned_source": LEARNED_SOURCE,
+        "zero_source": ZERO_SOURCE,
+        "policy_command_base": "phase_feedforward",
+        "residual_action_scales": [0.3, 0.4, 0.1],
+    },
+    MODEL_BASED_POLICY_COMMAND_CONTRACT: {
+        "teacher_source": "model_based_planner_plus_zero_policy_residual",
+        "learned_source": "model_based_planner_plus_torchscript_residual",
+        "zero_source": "model_based_planner_plus_zero_policy_residual",
+        "policy_command_base": "model_based_planner",
+        "residual_action_scales": [0.05, 0.05, 0.02],
+    },
+}
 REGRESSION_METRICS = (
     "position_error_p95_m",
     "position_error_max_m",
@@ -28,6 +49,13 @@ REGRESSION_METRICS = (
 )
 
 
+def artifact_identity(path: Path) -> dict[str, str]:
+    return {
+        "path": str(path.resolve()),
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+
+
 def parse_cases(value: str) -> list[int]:
     cases = [int(item) for item in value.split(",") if item]
     if not cases or len(cases) != len(set(cases)) or any(case <= 0 for case in cases):
@@ -40,6 +68,8 @@ def load_result(
     case: int,
     expected_source: str,
     expected_tracking_profile: str = TRACKING_PROFILE,
+    expected_policy_command_base: str = "phase_feedforward",
+    expected_residual_action_scales: list[float] | None = None,
 ) -> tuple[dict, dict]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if (
@@ -47,6 +77,9 @@ def load_result(
         or payload.get("trajectory_command_source") != expected_source
         or payload.get("tracking_profile") != expected_tracking_profile
         or payload.get("phase_feedforward_contract") != PHASE_CONTRACT
+        or payload.get("policy_command_base") != expected_policy_command_base
+        or payload.get("residual_action_scales")
+        != (expected_residual_action_scales or [0.3, 0.4, 0.1])
         or len(payload.get("results", [])) != 1
         or payload["results"][0].get("case") != case
     ):
@@ -75,6 +108,11 @@ def gate_rollouts(
     zero_dir: Path | None = None,
     minimum_zero_improvement_fraction: float = 0.05,
     expected_tracking_profile: str = TRACKING_PROFILE,
+    policy_command_contract: str = LEGACY_POLICY_COMMAND_CONTRACT,
+    rollout_admission: Path | None = None,
+    preflight_receipt: Path | None = None,
+    plan_manifest: Path | None = None,
+    execution_commit: str | None = None,
 ) -> dict:
     if mode not in {"validation_canary", "holdout", "all79"}:
         raise ValueError("unknown rollout gate mode")
@@ -86,6 +124,24 @@ def gate_rollouts(
         raise ValueError("invalid regression fraction")
     if not 0.0 < minimum_zero_improvement_fraction < 1.0:
         raise ValueError("invalid null-action improvement fraction")
+    if policy_command_contract not in POLICY_COMMAND_CONTRACTS:
+        raise ValueError("unknown policy command contract")
+    provenance = (
+        rollout_admission,
+        preflight_receipt,
+        plan_manifest,
+        execution_commit,
+    )
+    if (
+        mode == "all79"
+        and policy_command_contract == MODEL_BASED_POLICY_COMMAND_CONTRACT
+        and (
+            any(value is None for value in provenance)
+            or re.fullmatch(r"[0-9a-f]{40}", str(execution_commit)) is None
+        )
+    ):
+        raise ValueError("model-based all79 mode requires bound runtime provenance")
+    command_contract = POLICY_COMMAND_CONTRACTS[policy_command_contract]
 
     rows = []
     for case in cases:
@@ -93,11 +149,18 @@ def gate_rollouts(
         teacher_payload, teacher = load_result(
             teacher_dir / name,
             case,
-            "deterministic_teacher",
+            command_contract["teacher_source"],
             expected_tracking_profile,
+            command_contract["policy_command_base"],
+            command_contract["residual_action_scales"],
         )
         learned_payload, learned = load_result(
-            learned_dir / name, case, LEARNED_SOURCE, expected_tracking_profile
+            learned_dir / name,
+            case,
+            command_contract["learned_source"],
+            expected_tracking_profile,
+            command_contract["policy_command_base"],
+            command_contract["residual_action_scales"],
         )
         zero = None
         profile_checks = {
@@ -108,7 +171,12 @@ def gate_rollouts(
         }
         if zero_dir is not None:
             zero_payload, zero = load_result(
-                zero_dir / name, case, ZERO_SOURCE, expected_tracking_profile
+                zero_dir / name,
+                case,
+                command_contract["zero_source"],
+                expected_tracking_profile,
+                command_contract["policy_command_base"],
+                command_contract["residual_action_scales"],
             )
             profile_checks["zero_tracking_profile"] = (
                 zero_payload.get("tracking_profile") == expected_tracking_profile
@@ -130,18 +198,23 @@ def gate_rollouts(
                 ).items()
             }
         )
+        teacher_path = teacher_dir / name
+        learned_path = learned_dir / name
         row = {
             "case": case,
             "checks": checks,
             "teacher": {metric: teacher[metric] for metric in REGRESSION_METRICS},
             "learned": {metric: learned[metric] for metric in REGRESSION_METRICS},
             "learned_residual_action_abs_max": learned["residual_action_abs_max"],
+            "teacher_rollout": artifact_identity(teacher_path),
+            "learned_rollout": artifact_identity(learned_path),
         }
         if zero is not None:
             row["zero"] = {metric: zero[metric] for metric in REGRESSION_METRICS}
             row["learned_beats_zero_position_p95"] = (
                 learned["position_error_p95_m"] < zero["position_error_p95_m"]
             )
+            row["zero_rollout"] = artifact_identity(zero_dir / name)
         rows.append(row)
 
     teacher_position_mean = statistics.fmean(
@@ -183,6 +256,22 @@ def gate_rollouts(
             minimum_zero_improvement_fraction if zero_dir is not None else None
         ),
         "expected_tracking_profile": expected_tracking_profile,
+        "policy_command_contract": policy_command_contract,
+        "residual_action_scales": command_contract["residual_action_scales"],
+        "rollout_admission": (
+            artifact_identity(rollout_admission)
+            if rollout_admission is not None
+            else None
+        ),
+        "preflight_receipt": (
+            artifact_identity(preflight_receipt)
+            if preflight_receipt is not None
+            else None
+        ),
+        "plan_manifest": (
+            artifact_identity(plan_manifest) if plan_manifest is not None else None
+        ),
+        "execution_commit": execution_commit,
         "means": means,
         "aggregate_checks": aggregate_checks,
         "rows": rows,
@@ -196,6 +285,10 @@ def main() -> int:
     parser.add_argument(
         "--mode", choices=("validation_canary", "holdout", "all79"), required=True
     )
+    parser.add_argument("--rollout-admission", type=Path)
+    parser.add_argument("--preflight-receipt", type=Path)
+    parser.add_argument("--plan-manifest", type=Path)
+    parser.add_argument("--execution-commit")
     parser.add_argument("--teacher-dir", type=Path, required=True)
     parser.add_argument("--learned-dir", type=Path, required=True)
     parser.add_argument("--zero-dir", type=Path)
@@ -207,6 +300,11 @@ def main() -> int:
         "--minimum-zero-improvement-fraction", type=float, default=0.05
     )
     parser.add_argument("--expected-tracking-profile", default=TRACKING_PROFILE)
+    parser.add_argument(
+        "--policy-command-contract",
+        choices=tuple(POLICY_COMMAND_CONTRACTS),
+        default=LEGACY_POLICY_COMMAND_CONTRACT,
+    )
     args = parser.parse_args()
     summary = gate_rollouts(
         teacher_dir=args.teacher_dir,
@@ -218,6 +316,11 @@ def main() -> int:
         maximum_regression_fraction=args.maximum_regression_fraction,
         minimum_zero_improvement_fraction=args.minimum_zero_improvement_fraction,
         expected_tracking_profile=args.expected_tracking_profile,
+        policy_command_contract=args.policy_command_contract,
+        rollout_admission=args.rollout_admission,
+        preflight_receipt=args.preflight_receipt,
+        plan_manifest=args.plan_manifest,
+        execution_commit=args.execution_commit,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

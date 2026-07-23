@@ -12,6 +12,7 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_learned_all79_contrac
     DEFAULT_EVALUATION_CONFIG,
     HOLDOUT_GATE_SCHEMA,
     MODEL_BASED_LEARNED_ALL79_ADMISSION_SCHEMA,
+    PLAN_SOURCE_CHECKS,
     VALIDATION_GATE_SCHEMA,
     validate_learned_all79_admission,
 )
@@ -37,9 +38,21 @@ def _identity(path: Path) -> dict[str, str]:
     }
 
 
-def _gate_report(schema: str, cases: list[int], policy_sha: str) -> dict:
-    rows = [
-        {
+def _gate_report(
+    root: Path,
+    schema: str,
+    cases: list[int],
+    policy_sha: str,
+) -> dict:
+    rows = []
+    for case in cases:
+        identities = {}
+        for role in ("teacher", "learned", "zero"):
+            path = root / f"{schema}_{role}_{case}.json"
+            path.write_text(f"{role}-{case}", encoding="utf-8")
+            identities[f"{role}_rollout"] = _identity(path)
+        rows.append(
+            {
             "case": case,
             "checks": {
                 "learned_hard_gate": True,
@@ -51,9 +64,9 @@ def _gate_report(schema: str, cases: list[int], policy_sha: str) -> dict:
             "zero": {},
             "learned_residual_action_abs_max": [0.5, 0.4, 0.3],
             "learned_beats_zero_position_p95": True,
-        }
-        for case in cases
-    ]
+            **identities,
+            }
+        )
     return {
         "schema": schema,
         "policy_sha256": policy_sha,
@@ -61,7 +74,17 @@ def _gate_report(schema: str, cases: list[int], policy_sha: str) -> dict:
         "case_count": len(cases),
         "maximum_regression_fraction": 0.05,
         "minimum_zero_improvement_fraction": 0.05,
-        "expected_tracking_profile": "riser_phase_consistent_v2",
+        "expected_tracking_profile": (
+            "riser_recovery_direction_v4_camera_lever_arm_v1"
+        ),
+        "policy_command_contract": (
+            "model_based_planner_plus_bounded_policy_residual_v1"
+        ),
+        "residual_action_scales": [0.05, 0.05, 0.02],
+        "rollout_admission": None,
+        "preflight_receipt": None,
+        "plan_manifest": None,
+        "execution_commit": None,
         "means": {
             "teacher_position_p95_m": 0.10,
             "learned_position_p95_m": 0.08,
@@ -100,6 +123,7 @@ def _fixture(tmp_path: Path):
 
     validation_path = tmp_path / "validation.json"
     validation = _gate_report(
+        tmp_path,
         VALIDATION_GATE_SCHEMA,
         VALIDATION_CASES,
         policy_identity["sha256"],
@@ -107,11 +131,81 @@ def _fixture(tmp_path: Path):
     validation_path.write_text(json.dumps(validation), encoding="utf-8")
     holdout_path = tmp_path / "holdout.json"
     holdout = _gate_report(
+        tmp_path,
         HOLDOUT_GATE_SCHEMA,
         DEFAULT_RESERVED_HOLDOUT_CASES,
         policy_identity["sha256"],
     )
     holdout_path.write_text(json.dumps(holdout), encoding="utf-8")
+
+    source_manifest_path = tmp_path / "source_manifest.json"
+    source_items = [
+        {
+            "episode_index": case,
+            "source_json_sha256": f"{case:064x}",
+            "source_pose_count": 10 + case,
+            "source_time_strictly_increasing": True,
+            "trajectory_integrity_contract": "exact_source_v1",
+            "integrity_passed": True,
+        }
+        for case in ALL79_CASES
+    ]
+    source_manifest = {
+        "schema": "gik_exact_source_reference_package_v1",
+        "trajectory_integrity_contract": "exact_source_v1",
+        "episode_count": len(ALL79_CASES),
+        "integrity_passed": True,
+        "items": source_items,
+    }
+    source_manifest_path.write_text(
+        json.dumps(source_manifest),
+        encoding="utf-8",
+    )
+    plan_dir = tmp_path / "plans"
+    plan_dir.mkdir()
+    plan_items = []
+    for case, source_item in zip(ALL79_CASES, source_items, strict=True):
+        plan = plan_dir / f"case_{case:04d}_smoothed_riser_plan_v1.npz"
+        plan.write_bytes(f"plan-{case}".encode())
+        plan_items.append(
+            {
+                "case": case,
+                "file": plan.name,
+                "plan_sha256": hashlib.sha256(plan.read_bytes()).hexdigest(),
+                "source_json_sha256": source_item["source_json_sha256"],
+                "source_pose_count": source_item["source_pose_count"],
+                "checks": {name: True for name in PLAN_SOURCE_CHECKS},
+            }
+        )
+    plan_manifest_path = plan_dir / "manifest.json"
+    plan_manifest = {
+        "schema": "cinebotrl_two_wheel_riser_smoothed_plan_export_v1",
+        "plan_schema": "cinebotrl_two_wheel_riser_smoothed_plan_v1",
+        "source_manifest_sha256": hashlib.sha256(
+            source_manifest_path.read_bytes()
+        ).hexdigest(),
+        "source_package_case_count": len(ALL79_CASES),
+        "requested_cases": ALL79_CASES,
+        "attempted_cases": ALL79_CASES,
+        "portfolio_gate_passed": True,
+        "isaac_started": False,
+        "residual_capture_started": False,
+        "bc_started": False,
+        "ppo_started": False,
+        "items": plan_items,
+    }
+    plan_manifest_path.write_text(json.dumps(plan_manifest), encoding="utf-8")
+
+    runtime_assets = {}
+    for name in (
+        "lqr_gains",
+        "robot_build_audit",
+        "robot_usd",
+        "drive_profile_selection",
+    ):
+        path = tmp_path / name
+        path.write_text(name, encoding="utf-8")
+        runtime_assets[name] = path
 
     code_paths = {}
     code_identities = {}
@@ -124,6 +218,15 @@ def _fixture(tmp_path: Path):
         "schema": MODEL_BASED_LEARNED_ALL79_ADMISSION_SCHEMA,
         "bc_report": _identity(bc_report_path),
         "policy": policy_identity,
+        "plan_manifest": {
+            "path": plan_manifest_path.relative_to(tmp_path).as_posix(),
+            "sha256": hashlib.sha256(plan_manifest_path.read_bytes()).hexdigest(),
+        },
+        "source_manifest": _identity(source_manifest_path),
+        **{
+            name: _identity(path)
+            for name, path in runtime_assets.items()
+        },
         "validation_gate_report": _identity(validation_path),
         "holdout_gate_report": _identity(holdout_path),
         "execution_commit": EXECUTION_COMMIT,
@@ -148,6 +251,9 @@ def _fixture(tmp_path: Path):
         "bc_report_path": bc_report_path,
         "bc_report": bc_report,
         "policy_path": policy,
+        "plan_manifest_path": plan_manifest_path,
+        "source_manifest_path": source_manifest_path,
+        **{f"{name}_path": path for name, path in runtime_assets.items()},
         "validation_report_path": validation_path,
         "validation_report": validation,
         "holdout_report_path": holdout_path,
@@ -163,6 +269,12 @@ def _validate(fixture, *, require_authorized: bool = True) -> None:
         bc_report_path=fixture["bc_report_path"],
         bc_report=fixture["bc_report"],
         policy_path=fixture["policy_path"],
+        plan_manifest_path=fixture["plan_manifest_path"],
+        source_manifest_path=fixture["source_manifest_path"],
+        lqr_gains_path=fixture["lqr_gains_path"],
+        robot_build_audit_path=fixture["robot_build_audit_path"],
+        robot_usd_path=fixture["robot_usd_path"],
+        drive_profile_selection_path=fixture["drive_profile_selection_path"],
         validation_report_path=fixture["validation_report_path"],
         validation_report=fixture["validation_report"],
         holdout_report_path=fixture["holdout_report_path"],
@@ -198,6 +310,10 @@ def test_admission_preserves_majority_zero_baseline_gate_semantics(
     (
         "bc_hash",
         "policy_hash",
+        "plan_hash",
+        "plan_file",
+        "source_hash",
+        "robot_usd_hash",
         "code_hash",
         "validation_failed",
         "holdout_failed",
@@ -217,6 +333,17 @@ def test_admission_rejects_forged_or_open_downstream_state(
         admission["bc_report"]["sha256"] = "0" * 64
     elif mutation == "policy_hash":
         admission["policy"]["sha256"] = "0" * 64
+    elif mutation == "plan_hash":
+        admission["plan_manifest"]["sha256"] = "0" * 64
+    elif mutation == "plan_file":
+        plan = fixture["plan_manifest_path"].parent / (
+            "case_0023_smoothed_riser_plan_v1.npz"
+        )
+        plan.write_bytes(b"tampered-plan")
+    elif mutation == "source_hash":
+        admission["source_manifest"]["sha256"] = "0" * 64
+    elif mutation == "robot_usd_hash":
+        admission["robot_usd"]["sha256"] = "0" * 64
     elif mutation == "code_hash":
         admission["code"]["playback"]["sha256"] = "0" * 64
     elif mutation == "validation_failed":
@@ -242,6 +369,9 @@ def test_checked_in_template_is_structural_but_unusable() -> None:
     template = json.loads(TEMPLATE.read_text(encoding="utf-8"))
     assert template["schema"] == MODEL_BASED_LEARNED_ALL79_ADMISSION_SCHEMA
     assert template["evaluation_config"] == DEFAULT_EVALUATION_CONFIG
+    assert template["plan_manifest"] == {"path": None, "sha256": None}
+    assert template["source_manifest"] == {"path": None, "sha256": None}
+    assert template["robot_usd"]["sha256"] is None
     assert template["validation_cases"] == []
     assert template["holdout_cases"] == DEFAULT_RESERVED_HOLDOUT_CASES
     assert template["all79_cases"] == ALL79_CASES

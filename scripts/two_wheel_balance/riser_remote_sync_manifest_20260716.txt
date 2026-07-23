@@ -49,6 +49,9 @@ scripts/two_wheel_balance/build_riser_urdf.py
 scripts/two_wheel_balance/export_riser_playback_plans.py
 scripts/two_wheel_balance/export_riser_exact_source_plans.py
 scripts/two_wheel_balance/gate_riser_residual_rollouts.py
+scripts/two_wheel_balance/audit_riser_goal_completion.py
+scripts/two_wheel_balance/validate_model_based_learned_all79_admission.py
+scripts/two_wheel_balance/run_model_based_learned_all79_policy_gate.sh
 scripts/two_wheel_balance/run_riser_all79_dataset_gate.sh
 scripts/two_wheel_balance/run_riser_residual_bc_gate.sh
 scripts/two_wheel_balance/run_riser_residual_holdout_gate.sh
@@ -68,6 +71,7 @@ src/rl_platform/robots/two_wheel_balance/config.py
 src/rl_platform/tasks/two_wheel_balance/riser_control.py
 src/rl_platform/tasks/two_wheel_balance/riser_exact_source.py
 src/rl_platform/tasks/two_wheel_balance/riser_kinematics.py
+src/rl_platform/tasks/two_wheel_balance/riser_model_based_learned_all79_contract.py
 src/rl_platform/tasks/two_wheel_balance/riser_playback.py
 src/rl_platform/tasks/two_wheel_balance/riser_reference.py
 src/rl_platform/tasks/two_wheel_balance/riser_residual_dataset.py
@@ -89,6 +93,9 @@ tests/test_two_wheel_riser_residual_policy.py
 tests/test_train_riser_residual_bc.py
 tests/test_riser_policy_gate_scripts.py
 tests/test_gate_riser_residual_rollouts.py
+tests/test_audit_riser_goal_completion.py
+tests/test_riser_model_based_learned_all79_contract.py
+tests/test_validate_model_based_learned_all79_admission.py
 tests/test_relabel_riser_residual_cases.py
 tests/test_validate_riser_exact_source_manifest.py
 tests/test_two_wheel_riser_rs4_attitude.py

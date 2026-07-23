@@ -98,6 +98,12 @@ ALL79_REPORT_FIELDS = {
     "maximum_regression_fraction",
     "minimum_zero_improvement_fraction",
     "expected_tracking_profile",
+    "policy_command_contract",
+    "residual_action_scales",
+    "rollout_admission",
+    "preflight_receipt",
+    "plan_manifest",
+    "execution_commit",
     "means",
     "aggregate_checks",
     "rows",
@@ -110,6 +116,8 @@ ALL79_ROW_FIELDS = {
     "teacher",
     "learned",
     "learned_residual_action_abs_max",
+    "teacher_rollout",
+    "learned_rollout",
 }
 LEARNED_RENDER_REPORT_FIELDS = {
     "schema",
@@ -214,6 +222,11 @@ def _validate_all79_report(
     report: Mapping[str, Any],
     *,
     policy_sha256: str,
+    report_directory: Path,
+    admission_path: Path,
+    preflight_path: Path,
+    plan_manifest_path: Path,
+    execution_commit: str,
 ) -> None:
     cases = list(range(1, 80))
     rows = report.get("rows")
@@ -229,13 +242,49 @@ def _validate_all79_report(
         or isinstance(regression, bool)
         or not 0.0 <= float(regression) <= 0.05
         or report.get("minimum_zero_improvement_fraction") is not None
-        or report.get("expected_tracking_profile") != "riser_phase_consistent_v2"
+        or report.get("expected_tracking_profile")
+        != "riser_recovery_direction_v4_camera_lever_arm_v1"
+        or report.get("policy_command_contract")
+        != "model_based_planner_plus_bounded_policy_residual_v1"
+        or report.get("residual_action_scales") != [0.05, 0.05, 0.02]
+        or report.get("execution_commit") != execution_commit
         or not isinstance(rows, list)
         or len(rows) != len(cases)
         or report.get("passed") is not True
         or report.get("ppo_authorized") is not False
     ):
         raise ValueError("learned all-79 report contract mismatch")
+
+    report_admission = _resolve_identity(
+        report.get("rollout_admission"),
+        directory=report_directory,
+    )
+    if _sha256(report_admission) != _sha256(admission_path):
+        raise ValueError("learned all-79 admission identity mismatch")
+    _resolve_identity(
+        report.get("preflight_receipt"),
+        directory=report_directory,
+        expected_path=preflight_path,
+    )
+    _resolve_identity(
+        report.get("plan_manifest"),
+        directory=report_directory,
+        expected_path=plan_manifest_path,
+    )
+    preflight = _load_json(preflight_path)
+    if (
+        preflight.get("schema")
+        != "cinebotrl_two_wheel_riser_model_based_learned_all79_preflight_v1"
+        or preflight.get("passed") is not True
+        or preflight.get("execution_commit") != execution_commit
+        or preflight.get("head") != execution_commit
+        or preflight.get("runtime_started") is not False
+        or preflight.get("dataset_created") is not False
+        or preflight.get("residual_capture_started") is not False
+        or preflight.get("bc_started") is not False
+        or preflight.get("ppo_started") is not False
+    ):
+        raise ValueError("learned all-79 preflight receipt is invalid")
 
     learned_values: list[float] = []
     teacher_values: list[float] = []
@@ -251,6 +300,14 @@ def _validate_all79_report(
             or not _finite_nonnegative_metrics(row.get("learned"))
         ):
             raise ValueError(f"learned all-79 row {expected_case} is invalid")
+        _resolve_identity(
+            row.get("teacher_rollout"),
+            directory=report_directory,
+        )
+        _resolve_identity(
+            row.get("learned_rollout"),
+            directory=report_directory,
+        )
         residual = row.get("learned_residual_action_abs_max")
         if (
             not isinstance(residual, list)
@@ -434,6 +491,13 @@ def _optional_learning_evidence(
     bc_admission: Path | None,
     bc_report: Path | None,
     learned_all79_admission: Path | None,
+    learned_all79_preflight_receipt: Path | None,
+    learned_plan_manifest: Path | None,
+    learned_source_manifest: Path | None,
+    learned_lqr_gains: Path | None,
+    learned_robot_build_audit: Path | None,
+    learned_robot_usd: Path | None,
+    learned_drive_profile_selection: Path | None,
     validation_gate_report: Path | None,
     holdout_gate_report: Path | None,
     all79_report: Path | None,
@@ -444,6 +508,13 @@ def _optional_learning_evidence(
         "bc_admission": bc_admission,
         "bc_report": bc_report,
         "learned_all79_admission": learned_all79_admission,
+        "learned_all79_preflight_receipt": learned_all79_preflight_receipt,
+        "learned_plan_manifest": learned_plan_manifest,
+        "learned_source_manifest": learned_source_manifest,
+        "learned_lqr_gains": learned_lqr_gains,
+        "learned_robot_build_audit": learned_robot_build_audit,
+        "learned_robot_usd": learned_robot_usd,
+        "learned_drive_profile_selection": learned_drive_profile_selection,
         "validation_gate_report": validation_gate_report,
         "holdout_gate_report": holdout_gate_report,
         "all79_report": all79_report,
@@ -510,6 +581,13 @@ def _optional_learning_evidence(
             report is None
             or bc_report is None
             or learned_all79_admission is None
+            or learned_all79_preflight_receipt is None
+            or learned_plan_manifest is None
+            or learned_source_manifest is None
+            or learned_lqr_gains is None
+            or learned_robot_build_audit is None
+            or learned_robot_usd is None
+            or learned_drive_profile_selection is None
             or validation_gate_report is None
             or holdout_gate_report is None
         ):
@@ -533,6 +611,12 @@ def _optional_learning_evidence(
             "admission_contract": SRC_ROOT
             / "rl_platform/tasks/two_wheel_balance/"
             "riser_model_based_learned_all79_contract.py",
+            "preflight_validator": PROJECT_ROOT
+            / "scripts/two_wheel_balance/"
+            "validate_model_based_learned_all79_admission.py",
+            "execution_wrapper": PROJECT_ROOT
+            / "scripts/two_wheel_balance/"
+            "run_model_based_learned_all79_policy_gate.sh",
         }
         validate_learned_all79_admission(
             rollout_admission,
@@ -540,6 +624,12 @@ def _optional_learning_evidence(
             bc_report_path=bc_report,
             bc_report=report,
             policy_path=policy_path,
+            plan_manifest_path=learned_plan_manifest,
+            source_manifest_path=learned_source_manifest,
+            lqr_gains_path=learned_lqr_gains,
+            robot_build_audit_path=learned_robot_build_audit,
+            robot_usd_path=learned_robot_usd,
+            drive_profile_selection_path=learned_drive_profile_selection,
             validation_report_path=validation_gate_report,
             validation_report=validation_gate,
             holdout_report_path=holdout_gate_report,
@@ -550,7 +640,15 @@ def _optional_learning_evidence(
         )
         all79 = _load_json(all79_report)
         policy_sha = report["torchscript"]["sha256"]
-        _validate_all79_report(all79, policy_sha256=policy_sha)
+        _validate_all79_report(
+            all79,
+            policy_sha256=policy_sha,
+            report_directory=all79_report.parent,
+            admission_path=learned_all79_admission,
+            preflight_path=learned_all79_preflight_receipt,
+            plan_manifest_path=learned_plan_manifest,
+            execution_commit=str(report["execution_commit"]),
+        )
 
     learned_render: dict[str, Any] | None = None
     if learned_render_report is not None:
@@ -789,6 +887,13 @@ def main() -> int:
     parser.add_argument("--bc-admission", type=Path)
     parser.add_argument("--bc-report", type=Path)
     parser.add_argument("--learned-all79-admission", type=Path)
+    parser.add_argument("--learned-all79-preflight-receipt", type=Path)
+    parser.add_argument("--learned-plan-manifest", type=Path)
+    parser.add_argument("--learned-source-manifest", type=Path)
+    parser.add_argument("--learned-lqr-gains", type=Path)
+    parser.add_argument("--learned-robot-build-audit", type=Path)
+    parser.add_argument("--learned-robot-usd", type=Path)
+    parser.add_argument("--learned-drive-profile-selection", type=Path)
     parser.add_argument("--validation-gate-report", type=Path)
     parser.add_argument("--holdout-gate-report", type=Path)
     parser.add_argument("--all79-report", type=Path)
@@ -813,6 +918,13 @@ def main() -> int:
         bc_admission=args.bc_admission,
         bc_report=args.bc_report,
         learned_all79_admission=args.learned_all79_admission,
+        learned_all79_preflight_receipt=args.learned_all79_preflight_receipt,
+        learned_plan_manifest=args.learned_plan_manifest,
+        learned_source_manifest=args.learned_source_manifest,
+        learned_lqr_gains=args.learned_lqr_gains,
+        learned_robot_build_audit=args.learned_robot_build_audit,
+        learned_robot_usd=args.learned_robot_usd,
+        learned_drive_profile_selection=args.learned_drive_profile_selection,
         validation_gate_report=args.validation_gate_report,
         holdout_gate_report=args.holdout_gate_report,
         all79_report=args.all79_report,

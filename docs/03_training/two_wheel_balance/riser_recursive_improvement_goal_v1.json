@@ -344,6 +344,8 @@
         "projected_bc_loss_differentiable": true,
         "projected_bc_loss_torchscript_compatible": true,
         "projected_bc_loss_focused_cpu_suite": "66_passed_13_warnings",
+        "projected_bc_loss_authoritative_cpu_commit": "da0653d39509839bdd48c5eb81de36ca8e391838",
+        "projected_bc_loss_authoritative_cpu_suite": "976_passed_12_skipped_2_warnings_in_89.44s",
         "projected_bc_loss_contract_review_passed": true,
         "projected_bc_loss_valid_for_training": false,
         "review_only_corpus_still_rejected_by_bc_entrypoint": true,

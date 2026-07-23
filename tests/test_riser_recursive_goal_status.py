@@ -317,6 +317,12 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["projected_bc_loss_focused_cpu_suite"] == (
         "66_passed_13_warnings"
     )
+    assert corrective["projected_bc_loss_authoritative_cpu_commit"] == (
+        "da0653d39509839bdd48c5eb81de36ca8e391838"
+    )
+    assert corrective["projected_bc_loss_authoritative_cpu_suite"] == (
+        "976_passed_12_skipped_2_warnings_in_89.44s"
+    )
     assert corrective["projected_bc_loss_contract_review_passed"] is True
     assert corrective["projected_bc_loss_valid_for_training"] is False
     assert corrective["review_only_corpus_still_rejected_by_bc_entrypoint"] is True

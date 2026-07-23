@@ -7968,3 +7968,40 @@ and must state whether its candidate was accepted or rejected.
   requires a new explicit exactly-one authorization. No v4 namespace or token
   exists. Conversion, corpus merge, BC, PPO, holdouts, and training remain
   separately closed.
+
+## Round 205: projection-aware model-based BC loss is implemented CPU-only
+
+- Added `model_based_projected_effective_action_bc_loss_v1`. Network output
+  remains a requested normalized residual; the loss first applies
+  `model_based_residual_safety_projection_v1`, then compares the projected
+  action with the effective post-supervisor teacher label.
+- Added independent
+  `requested_physical_residual_slew_hinge_v1`. It uses explicit previous
+  requested predictions, positive transition time, case-boundary masks, and
+  case-balanced sample weights. Effective-label jumps caused by supervisor
+  clipping do not become false requested-output slew penalties.
+- The loss rejects non-finite or out-of-bound actions, invalid timing, negative
+  weights, non-boolean transition masks, and valid transitions with zero total
+  weight. It is differentiable and TorchScript compatible.
+- The real case-30 audit covers `11,411` rows. Projected pointwise loss is
+  `2.86e-13`; the incorrect direct requested-to-effective MSE is `0.00538`.
+  Requested slew violations are `0/0/0`; effective-label violations remain
+  `30/49/8`, with `0/0/0` outside projection-clipped transitions.
+- The existing trainer still rejects
+  `cinebotrl_two_wheel_riser_model_based_corrective_merged_v1` as
+  admission-review-only. No corpus, checkpoint, TorchScript policy, BC, PPO,
+  learned rollout, capture, or training was created or authorized.
+- Focused tests pass `66/66`. The authoritative `.98` suite at
+  `da0653d39509839bdd48c5eb81de36ca8e391838` passes
+  `976 passed, 12 skipped, 2 warnings` in `89.44 s`.
+
+## Next round after Round 205
+
+- First obtain the separately authorized case-23 v4 corrective capture and
+  convert only if its finalizer admits it. Continue diverse train and
+  validation captures until the implemented `4` train plus `2` validation
+  case-disjoint corpus contract can be populated.
+- Only after that corpus receives a separate training-schema admission may the
+  projected loss be wired into an authorized BC run. Keep the review-only
+  corpus rejection, holdout closure, PPO closure, and learned-rollout closure
+  unchanged until their own gates are met.

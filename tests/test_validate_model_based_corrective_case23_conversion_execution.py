@@ -1,8 +1,11 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
+
+import pytest
 
 
 ROOT = Path(__file__).parents[1]
@@ -78,6 +81,56 @@ def _git_blob(path: Path) -> str:
     ).hexdigest()
 
 
+def _wsl_executable() -> str:
+    return str(
+        Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32/wsl.exe"
+    )
+
+
+def _secure_token(tmp_path: Path) -> Path:
+    if os.name != "nt":
+        token = tmp_path / "authorization"
+        token.write_bytes(b"case23-v4-conversion-test-token\n")
+        token.chmod(0o600)
+        return token
+    wsl_root = "/home/yanbo/.codex_case23_conversion_tests"
+    created = subprocess.run(
+        [
+            _wsl_executable(),
+            "sh",
+            "-lc",
+            f"umask 077; mkdir -p {wsl_root}; mktemp {wsl_root}/token.XXXXXX",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    windows_path = subprocess.run(
+        [_wsl_executable(), "wslpath", "-w", created],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    token = Path(windows_path)
+    token.write_bytes(b"case23-v4-conversion-test-token\n")
+    return token
+
+
+def _chmod(token: Path, mode: int) -> None:
+    if os.name != "nt":
+        token.chmod(mode)
+        return
+    subprocess.run(
+        [
+            _wsl_executable(),
+            "chmod",
+            f"{mode:o}",
+            MODULE._windows_path_to_wsl(str(token)),
+        ],
+        check=True,
+    )
+
+
 def test_execution_contract_is_closed_and_pins_route_files() -> None:
     contract = json.loads(CONTRACT.read_text())
     assert contract["schema"] == MODULE.SCHEMA
@@ -114,34 +167,37 @@ def test_no_token_preflight_is_ready_but_not_authorized() -> None:
 
 
 def test_external_mode_0600_token_opens_only_one_conversion(tmp_path) -> None:
-    token = tmp_path / "authorization"
-    token.write_bytes(b"case23-v4-conversion-test-token\n")
-    token.chmod(0o600)
-    result = _validate(
-        authorization_file=token,
-        authorization_sha256=_sha256(token),
-    )
-    assert result["passed"] is True
-    assert result["conversion_authorized"] is True
-    assert result["authorization_consumed_before_conversion"] is True
-    assert result["merged_dataset_created"] is False
-    assert result["bc_authorized"] is False
-    assert result["ppo_authorized"] is False
+    token = _secure_token(tmp_path)
+    try:
+        result = _validate(
+            authorization_file=token,
+            authorization_sha256=_sha256(token),
+        )
+        assert result["passed"] is True
+        assert result["conversion_authorized"] is True
+        assert result["authorization_consumed_before_conversion"] is True
+        assert result["merged_dataset_created"] is False
+        assert result["bc_authorized"] is False
+        assert result["ppo_authorized"] is False
+    finally:
+        token.unlink(missing_ok=True)
 
 
 def test_bad_token_or_repository_check_fails_closed(tmp_path) -> None:
-    token = tmp_path / "authorization"
-    token.write_bytes(b"case23-v4-conversion-test-token\n")
-    token.chmod(0o644)
-    assert _validate(
-        authorization_file=token,
-        authorization_sha256=_sha256(token),
-    )["passed"] is False
-    token.chmod(0o600)
-    assert _validate(
-        authorization_file=token,
-        authorization_sha256="0" * 64,
-    )["passed"] is False
+    token = _secure_token(tmp_path)
+    try:
+        _chmod(token, 0o644)
+        assert _validate(
+            authorization_file=token,
+            authorization_sha256=_sha256(token),
+        )["passed"] is False
+        _chmod(token, 0o600)
+        assert _validate(
+            authorization_file=token,
+            authorization_sha256="0" * 64,
+        )["passed"] is False
+    finally:
+        token.unlink(missing_ok=True)
 
     checks = _repository_checks()
     checks["head_matches_upstream"] = False
@@ -155,6 +211,22 @@ def test_bad_token_or_repository_check_fails_closed(tmp_path) -> None:
     )
     assert result["passed"] is False
     assert result["conversion_authorized"] is False
+
+
+def test_windows_and_wsl_unc_paths_map_to_the_same_wsl_file() -> None:
+    assert MODULE._windows_path_to_wsl(
+        r"G:\wSpace\cinebotRL-two-wheel-riser"
+    ) == "/mnt/g/wSpace/cinebotRL-two-wheel-riser"
+    assert MODULE._windows_path_to_wsl(
+        r"\\wsl.localhost\Ubuntu\home\yanbo\.codex_authorizations\token"
+    ) == "/home/yanbo/.codex_authorizations/token"
+    assert MODULE._windows_path_to_wsl(
+        r"\\wsl$\Ubuntu\home\yanbo\.codex_authorizations\token"
+    ) == "/home/yanbo/.codex_authorizations/token"
+    with pytest.raises(ValueError):
+        MODULE._windows_path_to_wsl(
+            r"\\wsl.localhost\Other\home\yanbo\.codex_authorizations\token"
+        )
 
 
 def test_wrapper_has_no_embedded_token_and_execute_rejects_without_one() -> None:

@@ -29,6 +29,7 @@ ADMISSION_SCHEMA = (
     "cinebotrl_two_wheel_riser_case23_conversion_execution_admission_v1"
 )
 REVIEWED_PARENT = "9f104149762bf1a0f0691df0dc7bc6da53e3ff4e"
+EXPECTED_WSL_DISTRO = "Ubuntu"
 CASE = 23
 SPLIT = "train"
 NAMESPACE = "20260723_model_based_corrective_case23_conversion_v1_cpu"
@@ -97,9 +98,18 @@ def _git_blob(path: Path) -> str:
 
 
 def _windows_path_to_wsl(value: str) -> str:
-    if len(value) < 3 or value[1:3] not in (":\\", ":/"):
-        raise ValueError(f"cannot map Windows repository path into WSL: {value}")
-    return f"/mnt/{value[0].lower()}/{value[3:].replace(chr(92), '/')}"
+    if len(value) >= 3 and value[1:3] in (":\\", ":/"):
+        return f"/mnt/{value[0].lower()}/{value[3:].replace(chr(92), '/')}"
+    normalized = value.replace("/", "\\")
+    unc_parts = normalized.split("\\")
+    if (
+        len(unc_parts) >= 5
+        and unc_parts[:2] == ["", ""]
+        and unc_parts[2].lower() in {"wsl.localhost", "wsl$"}
+        and unc_parts[3].casefold() == EXPECTED_WSL_DISTRO.casefold()
+    ):
+        return "/" + "/".join(part for part in unc_parts[4:] if part)
+    raise ValueError(f"cannot map Windows path into WSL: {value}")
 
 
 def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:

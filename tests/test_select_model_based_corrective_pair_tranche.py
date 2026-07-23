@@ -28,6 +28,15 @@ VALIDATION_SPEC = importlib.util.spec_from_file_location(
 VALIDATION_MODULE = importlib.util.module_from_spec(VALIDATION_SPEC)
 assert VALIDATION_SPEC.loader is not None
 VALIDATION_SPEC.loader.exec_module(VALIDATION_MODULE)
+VALIDATION_EVIDENCE = (
+    Path(__file__).parents[1]
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_model_based_corrective_validation_tranche_v1/"
+    "selection.json"
+)
+VALIDATION_EVIDENCE_SHA256 = (
+    "5576c696e304eb9b9a173970e5fed06e887eccefe2d65a20678415148e22fa0b"
+)
 
 
 def _write(path: Path, payload: object) -> str:
@@ -224,6 +233,33 @@ def test_validation_selector_cli_imports_from_an_unrelated_cwd(tmp_path) -> None
     )
     assert result.returncode == 0, result.stderr
     assert "--dynamic-selection" in result.stdout
+
+
+def test_committed_validation_selection_is_exact_and_runtime_closed() -> None:
+    raw = VALIDATION_EVIDENCE.read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == VALIDATION_EVIDENCE_SHA256
+    result = json.loads(raw)
+    assert result["schema"] == VALIDATION_MODULE.SCHEMA
+    assert result["selected_cases"] == [8, 16]
+    assert result["eligible_validation_cases"] == [8, 16, 22, 32]
+    assert result["excluded_validation_rows"] == [
+        {"case": 78, "reason": "not_dynamically_quality_qualified"}
+    ]
+    assert result["checks"]["validation_train_disjoint"] is True
+    assert result["checks"]["validation_holdout_disjoint"] is True
+    assert result["same_seed_pair_required_before_capture"] is True
+    for field in (
+        "runtime_authorized",
+        "gpu_launch_authorized",
+        "label_capture_authorized",
+        "dataset_conversion_authorized",
+        "dataset_merge_authorized",
+        "bc_authorized",
+        "ppo_authorized",
+        "training_started",
+        "valid_for_training",
+    ):
+        assert result[field] is False
 
 
 def test_validation_selector_rejects_insufficient_dynamic_candidates(

@@ -216,6 +216,14 @@
         "case30_valid_for_case_merge": true,
         "case30_valid_for_training": false,
         "diverse_pair_tranche": [30, 23, 6, 2, 7],
+        "validation_pair_tranche": [8, 16],
+        "validation_pair_eligible_cases": [8, 16, 22, 32],
+        "validation_pair_excluded_cases": {
+          "78": "not_dynamically_quality_qualified"
+        },
+        "validation_pair_selection_sha256": "5576c696e304eb9b9a173970e5fed06e887eccefe2d65a20678415148e22fa0b",
+        "validation_pair_runtime_authorized": false,
+        "validation_pair_capture_authorized": false,
         "next_case": 23,
         "case23_readiness_audit_sha256": "335e4cd0181edce3c1bb0dd7c0b13c99df040f648b788d65b0fce1a34bf3a198",
         "case23_contract_sha256": "510d34d2e50d2708b654dbb348e4797a88132014b78a2d99023d807c7dd8e949",
@@ -271,6 +279,7 @@
       "completion_gap": [
         "capture_and_convert_case23_under_a_separate_one_shot_authorization",
         "dynamically_admit_and_convert_multiple_diverse_model_based_corrective_cases",
+        "run_separately_authorized_pairs_and_captures_for_validation_cases_8_and_16",
         "populate_the_implemented_case_disjoint_corpus_with_at_least_4_train_and_2_validation_cases",
         "train_and_validate_a_nonzero_bounded_residual_dnn",
         "pass_case_disjoint_validation_and_full_79_dynamic_policy_gates",

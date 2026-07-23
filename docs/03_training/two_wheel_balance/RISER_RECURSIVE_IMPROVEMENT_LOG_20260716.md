@@ -7492,3 +7492,36 @@ and must state whether its candidate was accepted or rejected.
   already reviewed capture-only contract. A successful capture still requires
   separate conversion review and does not authorize BC, holdout evaluation, or
   PPO.
+
+## Round 191: corrective validation tranche is selected CPU-only
+
+- The corpus contract requires at least four train cases and two validation
+  cases. The existing `[30,23,6,2,7]` tranche addressed only training cases, so
+  it could not by itself satisfy the case-disjoint BC admission contract.
+- A deterministic selector now reuses the sealed plan portfolio, per-case
+  dynamic-quality evidence, split admission, case-30 conversion semantics, and
+  the same normalized 12-feature diversity space used by the training tranche.
+- Live `.98` evidence exposes four dynamically qualified validation candidates:
+  `[8,16,22,32]`. Case `78` remains an honest exclusion because it is absent
+  from the dynamic-qualified selection; no threshold was relaxed.
+- Farthest-pair selection chose cases `[8,16]` with normalized feature distance
+  `2.6496234766`. Case 8 covers the high riser-span/rate end, while case 16
+  covers the higher base-speed/yaw-rate and low-height-span end.
+- Selection SHA-256 is
+  `5576c696e304eb9b9a173970e5fed06e887eccefe2d65a20678415148e22fa0b`;
+  selector SHA-256 is
+  `8f95c022743cd633d2399953060a8836d7e901f26ae7265258ffb8b72e8dd460`.
+  Focused `.98` tests passed `10/10`.
+- The selection is proposal evidence only. Cases 8 and 16 each still require a
+  separately reviewed same-seed pair before capture. Runtime, GPU, label
+  capture, conversion, merge, BC, PPO, training, and holdout access remain
+  false, and no Isaac process was launched.
+
+## Next round after Round 191
+
+- Preserve the current ordering: the already reviewed case-23 capture is still
+  the next bounded runtime action and requires separate explicit one-shot
+  authorization.
+- After case 23 is captured and separately converted, prepare case-specific
+  paired-canary proposals for validation cases 8 and 16. Do not reuse the
+  case-30 or case-23 corrective profiles without a new quantitative review.

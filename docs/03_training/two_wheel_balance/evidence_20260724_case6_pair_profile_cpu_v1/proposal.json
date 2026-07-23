@@ -1,0 +1,141 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case6_pair_profile_proposal_cpu_v1",
+  "case": 6,
+  "split": "train",
+  "input_checks": {
+    "readiness_schema": true,
+    "readiness_passed": true,
+    "readiness_case": true,
+    "readiness_requires_case_profile": true,
+    "readiness_forbids_case23_reuse": true,
+    "readiness_not_profile_ready": true,
+    "readiness_closed": true,
+    "readiness_plan_hash": true,
+    "plan_schema_case": true,
+    "plan_integrity": true,
+    "plan_kinematic_gate": true,
+    "normalized_envelope": true
+  },
+  "shape_checks": {
+    "time": true,
+    "feedforward": true,
+    "finite": true,
+    "clocks": true
+  },
+  "formula_checks": {
+    "retained_raw_envelope": true,
+    "policy_margin": true,
+    "slew_horizon": true,
+    "pulse_inside_low_motion_window": true,
+    "recovery_tail": true,
+    "base_residual_headroom": true,
+    "yaw_residual_headroom": true,
+    "riser_target_headroom": true,
+    "proxy_motion_headroom": true,
+    "plant_mass": true,
+    "pulse_impulse_envelope": true,
+    "pulse_observable_lower_bound": true
+  },
+  "identities": {
+    "readiness": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_pair_readiness_cpu_v1/summary.json",
+      "sha256": "0f74c92b93040b126f8e25ac2470603203f8e07df6e923c1462c3cd24891b5ec"
+    },
+    "plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_pair_readiness_cpu_v1/source/case_0006_smoothed_riser_plan_v1.npz",
+      "sha256": "b8ac6a9bb226de47a2722f076efb6dcf9586fd3b85740cf6efb5926cd86568aa"
+    },
+    "plant_prior": {
+      "path": "docs/03_training/two_wheel_balance/PLANT_PRIOR_PROVISIONAL_V1.json",
+      "sha256": "9c6268ab0f13d5487a41d31b011eb9ac735b0dcf01769752389972304e12762c"
+    },
+    "corrective_profile": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case6_profile_v1.json",
+      "sha256": "5959c99a1296200ccf61eb6a481ac6924999bce36472d16c6e863562f58cc24c"
+    },
+    "wrench_profile": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case6_wrench_profile_v1.json",
+      "sha256": "e012cbd1eca35bcd1ead49abc5888c5bcc97f940211a743a06b396736d7a812c"
+    }
+  },
+  "profile_formula": {
+    "policy_residual_scales": [
+      0.05,
+      0.05,
+      0.02
+    ],
+    "observed_normalized_raw_envelope": [
+      0.7671434380207988,
+      0.21207472902589897,
+      0.1191010455746877
+    ],
+    "observed_raw_residual_envelope": [
+      0.03835717190103994,
+      0.010603736451294948,
+      0.002382020911493754
+    ],
+    "retention_fraction": 0.75,
+    "maximum_residuals": [
+      0.028767878925779956,
+      0.007952802338471211,
+      0.0017865156836203155
+    ],
+    "slew_horizon_s": 0.3,
+    "maximum_slew_rates": [
+      0.09589292975259986,
+      0.02650934112823737,
+      0.005955052278734385
+    ]
+  },
+  "pulse_window": {
+    "window_start_index": 761,
+    "window_end_index": 782,
+    "window_start_phase_time_s": 17.185168504529333,
+    "window_end_phase_time_s": 17.290168504529312,
+    "pulse_start_phase_time_s": 17.185168504529333,
+    "pulse_nominal_end_phase_time_s": 17.285168504529334,
+    "pulse_duration_steps": 20,
+    "pulse_duration_s_at_policy_rate": 0.1,
+    "recovery_tail_s": 0.45210610133988993,
+    "local_maximums": {
+      "base_linear_velocity_mps": 0.2893120019496605,
+      "base_yaw_rate_radps": 0.21760812453685996,
+      "riser_rate_mps": 0.0070295181842108916,
+      "proxy_rate_radps": 0.09146675265974834
+    },
+    "local_headroom": {
+      "base_linear_velocity_mps": 0.11068799805033952,
+      "base_yaw_rate_radps": 0.18239187546314006,
+      "riser_rate_mps": 0.9929704818157891,
+      "proxy_rate_radps": 0.3274122678188907
+    },
+    "local_riser_target_range_m": [
+      0.9205602294044094,
+      0.9207725726249301
+    ],
+    "local_riser_target_headroom_m": 0.2792274273750699
+  },
+  "pulse_lower_model": {
+    "total_mass_kg": 28.0,
+    "impulse_ns": 2.0,
+    "application_moment_impulse_nms": 1.0,
+    "ideal_free_body_delta_velocity_mps": 0.07142857142857142,
+    "ideal_free_body_displacement_during_pulse_m": 0.003571428571428572,
+    "limitation": "observability and envelope screen only; not a prediction of closed-loop Isaac response"
+  },
+  "case23_profile_reuse_authorized": false,
+  "pair_profile_cpu_ready": true,
+  "runtime_route_implemented": false,
+  "authorization_token_issued": false,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "next_bounded_action": "implement_case6_pair_runtime_contract_cpu_only_without_authorization",
+  "passed": true
+}

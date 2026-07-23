@@ -1,6 +1,6 @@
 {
   "schema": "cinebotrl_two_wheel_riser_corrective_teacher_case8_validation_pair_contract_v1",
-  "reviewed_parent_commit": "2e83ff1d2c8694ea177404371f48fd0e66f6f23c",
+  "reviewed_parent_commit": "2e83ff1b102f2860988ff6f3f4e6bfc7a399defa",
   "case": 8,
   "split": "validation",
   "namespace": "20260724_model_based_corrective_teacher_case8_validation_pair_v1_exclusive",
@@ -141,8 +141,8 @@
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case8_validation_pair.py",
-      "sha256": "6483b5d380e805a91541d6a9bc1dc37e130ff584802b893050bd13bf45dbcde2",
-      "git_blob_sha1": "0ed16ad85b1dbbd56d4c936d0061b275911a4391"
+      "sha256": "f2e36fdbd2f9459f44021b0f920c3aab62ffdf303a859d905ce15eb6d367b286",
+      "git_blob_sha1": "babfb16ffa9edfffb55077a926483cc305cb89b8"
     },
     "paired_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case8_validation_pair.py",

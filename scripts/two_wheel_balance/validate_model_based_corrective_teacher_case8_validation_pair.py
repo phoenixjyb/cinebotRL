@@ -19,7 +19,7 @@ ADMISSION_SCHEMA = (
     "cinebotrl_two_wheel_riser_corrective_teacher_"
     "case8_validation_pair_admission_v1"
 )
-REVIEWED_PARENT = "2e83ff1d2c8694ea177404371f48fd0e66f6f23c"
+REVIEWED_PARENT = "2e83ff1b102f2860988ff6f3f4e6bfc7a399defa"
 NAMESPACE = (
     "20260724_model_based_corrective_teacher_case8_validation_pair_v1_exclusive"
 )

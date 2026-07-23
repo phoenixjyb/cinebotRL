@@ -9420,3 +9420,53 @@ and must state whether its candidate was accepted or rejected.
   awaits supplier and bench measurements before hardware transfer.
 - The exact next data-producing operation remains separately authorized:
   `Authorize exactly one case-23 v4 CPU conversion.`
+
+## Round 245: BC promotion now tests the runtime action recurrence
+
+- Audited the projection-aware `65 -> 3` BC path after the runtime previous
+  action contract was corrected. Training and validation still consumed
+  teacher-forced previous effective actions, so a model could pass the offline
+  gate without proving stability when its own projected effective action is
+  fed into the next observation.
+- Added deterministic case-reset recursive validation under contract
+  `case_reset_recursive_effective_action_validation_v1`. For each disjoint
+  validation case, the evaluator starts with zero previous action, predicts a
+  requested residual, passes it through the unchanged safety projection, and
+  writes the resulting effective residual into the next observation's previous
+  action channels.
+- The recursive evaluator separately records requested action magnitude,
+  projected action magnitude, projection-clipped rows, requested rate maxima,
+  slew violations, row/case/reset counts, and case-balanced effective-action
+  MSE against the zero-residual planner baseline.
+- Artifact emission now requires both teacher-forced and recursive validation
+  to improve every action channel by at least the admitted fraction, keep
+  requested normalized magnitude below `0.95`, and produce zero request-slew
+  violations. A teacher-forced-only pass is explicitly rejected.
+- Recursive replay is limited to the held-out validation split. It does not
+  serialize the full training corpus through one-row GPU inference and does not
+  open the reserved holdout split.
+- Bumped the validation contract to
+  `projected_effective_action_case_balanced_recursive_validation_v2` and the BC
+  execution report to
+  `cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_report_v2`.
+  The unusable admission template was resealed with current code hashes while
+  dataset, commit, split, approval, and authorization fields remain empty or
+  false.
+- Implementation commit
+  `8ee358e045a8099384dae2556e66093f86d1aa05` and goal-binding commit
+  `c995bea4718dbae47c3f02054952f45eb060f667` are pushed and synchronized to
+  `.98`.
+- Focused `.98` coverage passes `67` tests. The final authoritative `.98`
+  Windows-Isaac Python suite passes:
+  `1324 passed, 12 skipped, 2 warnings in 171.00 s`.
+- This closes an offline promotion false-positive, not the data gap. No
+  conversion, corpus merge, BC execution, checkpoint, learned rollout, Isaac,
+  GPU workload, PPO, or training run was created. Goal completion remains
+  `6/10`.
+
+## Next round after Round 245
+
+- The exact next data-producing operation remains separately authorized:
+  `Authorize exactly one case-23 v4 CPU conversion.`
+- After conversion, the route must be reopened against then-current hashes
+  before cases 6/2/7 and validation cases 8/16 proceed.

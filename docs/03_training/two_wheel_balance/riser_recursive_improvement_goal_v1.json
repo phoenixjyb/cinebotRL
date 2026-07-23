@@ -939,7 +939,7 @@
           "projection_training_bc_execution_contract_initial_implementation_commit": "282c5998ec0c91982d2a1f610b18db7acc5f4e1b",
           "projection_training_bc_execution_contract_implementation_commit": "8ee358e045a8099384dae2556e66093f86d1aa05",
           "projection_training_bc_execution_contract_focused_cpu_suite": "61_passed_2_warnings_in_10.06s",
-          "projection_training_bc_execution_contract_authoritative_cpu_suite": "pending_final_goal_reseal",
+          "projection_training_bc_execution_contract_authoritative_cpu_suite": "1324_passed_12_skipped_2_warnings_in_171.00s",
           "projection_training_bc_execution_admission_template_usable": false,
           "projection_training_bc_execution_trainer_integrated": true,
           "projection_training_bc_execution_synthetic_end_to_end_passed": true,

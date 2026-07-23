@@ -2070,7 +2070,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ] == ("61_passed_2_warnings_in_10.06s")
     assert corpus[
         "projection_training_bc_execution_contract_authoritative_cpu_suite"
-    ] == ("pending_final_goal_reseal")
+    ] == ("1324_passed_12_skipped_2_warnings_in_171.00s")
     assert corpus["projection_training_bc_execution_admission_template_usable"] is False
     assert corpus["projection_training_bc_execution_trainer_integrated"] is True
     assert corpus["projection_training_bc_execution_synthetic_end_to_end_passed"] is True

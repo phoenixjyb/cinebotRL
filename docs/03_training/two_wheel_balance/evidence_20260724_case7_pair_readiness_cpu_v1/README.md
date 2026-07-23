@@ -18,6 +18,11 @@ or opening any capture or training path.
 - Camera lever-arm correction saturation is 0.919479, so case 7 still needs a
   case-specific corrective profile. Reusing case-23, case-6, or case-2
   profiles is forbidden.
+- Implementation commit `b98d1fe1c008372373b300502fb6f0bdbd6200d4`
+  passes 29 focused readiness/goal tests on macOS and `.98`.
+- macOS and `.98` regenerate byte-identical readiness JSON at SHA-256
+  `8652d92eaf8196d77bc3aab33e011029008b0ebdc3b31d035dda29417d2a3df1`.
+- The authoritative `.98` suite passes 1191 tests with 12 skipped.
 
 This evidence does not authorize runtime, GPU use, label capture, dataset
 conversion or merge, BC, PPO, or training.

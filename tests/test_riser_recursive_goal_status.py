@@ -178,6 +178,16 @@ CASE2_NATURAL_ERROR_PAIR_EVIDENCE = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_case2_natural_error_pair_route_cpu_v1/summary.json"
 )
+CASE7_PAIR_READINESS_SCRIPT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "audit_model_based_corrective_case7_pair_readiness.py"
+)
+CASE7_PAIR_READINESS_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case7_pair_readiness_cpu_v1/summary.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -830,6 +840,56 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case2_profile["runtime_authorized"] is False
     assert case2_profile["label_capture_authorized"] is False
     assert case2_profile["training_started"] is False
+    assert corrective["case7_pair_readiness_schema"] == (
+        "cinebotrl_two_wheel_riser_case7_pair_readiness_cpu_v1"
+    )
+    assert corrective["case7_pair_readiness_script_sha256"] == _sha256(
+        CASE7_PAIR_READINESS_SCRIPT
+    )
+    assert corrective["case7_pair_readiness_script_git_blob_sha1"] == (
+        "267afc56c52f749d87b02ac43134fe73532c5a27"
+    )
+    assert corrective["case7_pair_readiness_summary_sha256"] == _sha256(
+        CASE7_PAIR_READINESS_EVIDENCE
+    )
+    assert corrective["case7_pair_readiness_mac_windows_byte_parity"] is True
+    assert corrective["case7_pair_readiness_source_states"] == 663
+    assert corrective["case7_pair_readiness_transitions"] == 662
+    assert corrective["case7_pair_readiness_camera_height_range_m"] == [
+        0.6,
+        1.605452,
+    ]
+    assert corrective["case7_pair_readiness_low_motion_window_count"] == 4
+    assert (
+        corrective["case7_pair_readiness_longest_low_motion_window_s"] > 3.4
+    )
+    assert corrective[
+        "case7_pair_readiness_case_specific_profile_required"
+    ] is True
+    assert corrective[
+        "case7_pair_readiness_case23_profile_reuse_authorized"
+    ] is False
+    assert corrective[
+        "case7_pair_readiness_case6_profile_reuse_authorized"
+    ] is False
+    assert corrective[
+        "case7_pair_readiness_case2_profile_reuse_authorized"
+    ] is False
+    assert corrective["case7_pair_readiness_pair_profile_cpu_ready"] is False
+    assert corrective["case7_pair_readiness_runtime_authorized"] is False
+    assert corrective["case7_pair_readiness_label_capture_authorized"] is False
+    assert corrective["case7_pair_readiness_training_authorized"] is False
+    case7 = json.loads(CASE7_PAIR_READINESS_EVIDENCE.read_text())
+    assert case7["passed"] is True
+    assert case7["case_specific_profile_required"] is True
+    assert case7["profile_window_contract"]["bounded_window_found"] is True
+    assert len(case7["profile_window_contract"]["windows"]) == 4
+    assert case7["case23_profile_reuse_authorized"] is False
+    assert case7["case6_profile_reuse_authorized"] is False
+    assert case7["case2_profile_reuse_authorized"] is False
+    assert case7["runtime_authorized"] is False
+    assert case7["label_capture_authorized"] is False
+    assert case7["training_started"] is False
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

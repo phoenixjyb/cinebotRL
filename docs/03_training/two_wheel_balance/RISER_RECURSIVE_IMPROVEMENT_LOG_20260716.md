@@ -8852,3 +8852,39 @@ and must state whether its candidate was accepted or rejected.
 - Case 6 remains separately reviewable as one v2 paired canary.
 - Case 2 is now separately reviewable as one natural-error paired canary; no
   case-2 runtime authorization has been issued.
+
+## Round 229: case-7 readiness exposes usable windows and lever-arm risk
+
+- Imported the selected case-7 exact-source plan and zero-residual Gate C
+  result from `.98`. Their SHA-256 identities exactly match the diverse
+  tranche manifest.
+- The plan preserves `663` source states and `662` transitions, with separate
+  `12.940941 s` source and `18.1173174 s` execution clocks and an exact
+  one-to-one source-anchor map.
+- Camera height stays within `0.600000-1.605452 m`. Maximum base, yaw, riser,
+  and proxy rates remain below the frozen limits with material headroom.
+- The zero-residual gate passes at `0.130904/0.142948 m` position p95/max and
+  `6.169692 deg` peak pitch.
+- Four conservative low-motion windows are available; the longest lasts
+  `3.431994 s`. Unlike case 2, case 7 can support a bounded perturbation
+  window.
+- Camera lever-arm correction saturation is still `0.919479`, so case 7
+  requires its own profile. Case-23, case-6, and case-2 profile reuse remains
+  forbidden.
+- Implementation commit
+  `b98d1fe1c008372373b300502fb6f0bdbd6200d4` passes `29` focused
+  tests on macOS and `.98`. Both hosts regenerate byte-identical evidence at
+  SHA-256
+  `8652d92eaf8196d77bc3aab33e011029008b0ebdc3b31d035dda29417d2a3df1`.
+- The authoritative `.98` CPU suite passes:
+  `1191 passed, 12 skipped, 2 warnings in 138.28 s`.
+- No token, runtime namespace, Isaac/GPU run, label capture, conversion,
+  merge, BC, PPO, or training was created. Goal completion remains `6/10`.
+
+## Next round after Round 229
+
+- Design a CPU-only case-7 corrective and perturbation profile inside one of
+  the audited low-motion windows. Prove command headroom, source/execution
+  clocks, post-supervisor label margin, and recovery-tail invariants.
+- The nearest actual data-path action remains exactly one separately
+  authorized case-23 v4 CPU conversion.

@@ -95,10 +95,23 @@ def validate(
     *,
     namespace: str,
     authorization_file: Path | None = None,
+    expected_case: int = 30,
+    expected_namespace: str = NAMESPACE,
+    contract_relative_path: str = CONTRACT_RELATIVE_PATH,
+    reviewed_parent: str | None = None,
+    plan_identity_name: str = "case30_plan",
+    pair_schema: str = (
+        "cinebotrl_two_wheel_riser_corrective_teacher_case30_pair_final_v1"
+    ),
+    required_identities: set[str] = REQUIRED_IDENTITIES,
+    tracked_identities: set[str] = TRACKED_IDENTITIES,
+    expected_execution: dict[str, object] = EXPECTED_EXECUTION,
 ) -> dict[str, object]:
+    if reviewed_parent is None:
+        reviewed_parent = REVIEWED_PARENT
     repo = repo.resolve()
     contract_path = contract_path.resolve()
-    canonical = (repo / CONTRACT_RELATIVE_PATH).resolve()
+    canonical = (repo / contract_relative_path).resolve()
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
     identities = contract.get("identities", {})
     rows = {
@@ -126,20 +139,20 @@ def validate(
         and git(repo, "diff", "--cached", "--quiet", check=False).returncode == 0
     )
     tracked = (
-        git(repo, "ls-files", "--error-unmatch", CONTRACT_RELATIVE_PATH, check=False)
+        git(repo, "ls-files", "--error-unmatch", contract_relative_path, check=False)
         .returncode
         == 0
     )
     blob = git(repo, "hash-object", str(contract_path), check=False).stdout.strip()
     committed_blob = git(
-        repo, "rev-parse", f"HEAD:{CONTRACT_RELATIVE_PATH}", check=False
+        repo, "rev-parse", f"HEAD:{contract_relative_path}", check=False
     ).stdout.strip()
     parent_is_ancestor = (
         git(
             repo,
             "merge-base",
             "--is-ancestor",
-            REVIEWED_PARENT,
+            reviewed_parent,
             head,
             check=False,
         ).returncode
@@ -148,8 +161,9 @@ def validate(
     paired_metrics = paired.get("paired_admission", {})
     paired_checks = {
         "schema": paired.get("schema")
-        == "cinebotrl_two_wheel_riser_corrective_teacher_case30_pair_final_v1",
-        "case_split": paired.get("case") == 30 and paired.get("split") == "train",
+        == pair_schema,
+        "case_split": paired.get("case") == expected_case
+        and paired.get("split") == "train",
         "passed": paired.get("passed") is True
         and paired.get("corrective_target_admission_passed") is True,
         "measurable_improvement": (
@@ -167,36 +181,39 @@ def validate(
     profile_checks = {
         "schema": profile.get("schema")
         == "cinebotrl_two_wheel_riser_corrective_teacher_profile_v1",
-        "case": profile.get("case") == 30,
+        "case": profile.get("case") == expected_case,
         "limits": profile.get("maximum_residuals") == [0.045, 0.045, 0.018],
     }
     checks = {
         "schema": contract.get("schema") == SCHEMA,
-        "case_split": contract.get("case") == 30 and contract.get("split") == "train",
-        "reviewed_parent": contract.get("reviewed_parent_commit") == REVIEWED_PARENT
+        "case_split": contract.get("case") == expected_case
+        and contract.get("split") == "train",
+        "reviewed_parent": contract.get("reviewed_parent_commit") == reviewed_parent
         and parent_is_ancestor,
         "head_matches_upstream": head == upstream,
         "tracked_worktree_clean": tracked_clean,
         "canonical_contract": contract_path == canonical and tracked,
         "contract_blob_matches_head": bool(blob) and blob == committed_blob,
-        "fresh_namespace": contract.get("namespace") == namespace == NAMESPACE
+        "fresh_namespace": contract.get("namespace")
+        == namespace
+        == expected_namespace
         and not (repo / "artifacts/two_wheel_riser" / namespace).exists(),
-        "identity_set": set(identities) == REQUIRED_IDENTITIES
-        and set(rows) == REQUIRED_IDENTITIES,
+        "identity_set": set(identities) == required_identities
+        and set(rows) == required_identities,
         "identity_hashes": bool(rows) and all(row.get("passed") for row in rows.values()),
         "tracked_blobs": all(
             isinstance(identities.get(name), dict)
             and bool(identities[name].get("git_blob_sha1"))
-            for name in TRACKED_IDENTITIES
+            for name in tracked_identities
         ),
         "paired_evidence": all(paired_checks.values()),
         "corrective_profile": all(profile_checks.values()),
-        "plan_identity": identities.get("case30_plan", {}).get("sha256")
+        "plan_identity": identities.get(plan_identity_name, {}).get("sha256")
         == paired.get("candidate_metrics", {}).get("plan_sha256"),
         "residual_scales": contract.get("residual_action_scales") == EXPECTED_SCALES,
         "capture_contract": contract.get("capture_schema_contract") == EXPECTED_CAPTURE,
         "execution_contract": contract.get("execution_contract")
-        == EXPECTED_EXECUTION,
+        == expected_execution,
         "holdout_closed": contract.get("holdout_cases") == EXPECTED_HOLDOUT
         and contract.get("holdout_opened") is False
         and contract.get("validation_cases_opened") == [],
@@ -246,10 +263,10 @@ def validate(
         "contract": str(contract_path),
         "contract_sha256": sha256_file(contract_path),
         "contract_git_blob_sha1": blob,
-        "reviewed_parent_commit": REVIEWED_PARENT,
+        "reviewed_parent_commit": reviewed_parent,
         "runtime_commit": head,
         "upstream_commit": upstream,
-        "case": 30,
+        "case": expected_case,
         "split": "train",
         "namespace": namespace,
         "identities": rows,
@@ -265,7 +282,7 @@ def validate(
         "authorization_consumed_before_isaac": runtime_authorized,
         "cpu_contract_ready": cpu_passed,
         "corrective_target_admission_passed": all(paired_checks.values()),
-        "plan_sha256": identities.get("case30_plan", {}).get("sha256"),
+        "plan_sha256": identities.get(plan_identity_name, {}).get("sha256"),
         "corrective_profile_sha256": identities.get(
             "corrective_profile", {}
         ).get("sha256"),

@@ -51,11 +51,15 @@ def summarize(
     runtime_commit: str,
     playback_exit_code: int,
     gpu_release_passed: bool,
+    expected_case: int = 30,
+    expected_namespace: str = NAMESPACE,
+    capture_name: str = CAPTURE_NAME,
+    plan_identity_name: str = "case30_plan",
 ) -> dict[str, object]:
     contract_path = root / "contract.json"
-    gate_path = root / "case_0030.json"
+    gate_path = root / f"case_{expected_case:04d}.json"
     heartbeat_path = root / "runtime_heartbeat.json"
-    capture_path = root / "capture" / CAPTURE_NAME
+    capture_path = root / "capture" / capture_name
     contract = _load(contract_path)
     admission = _load(admission_path)
     gate = _load(gate_path)
@@ -65,12 +69,16 @@ def summarize(
     capture_payload: dict[str, np.ndarray] = {}
     capture_error = None
     try:
-        capture_metadata, capture_payload = load_corrective_capture(capture_path)
+        capture_metadata, capture_payload = load_corrective_capture(
+            capture_path,
+            expected_case=expected_case,
+            expected_split="train",
+        )
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         capture_error = str(exc)
 
     identities = contract.get("identities", {})
-    plan_sha = identities.get("case30_plan", {}).get("sha256")
+    plan_sha = identities.get(plan_identity_name, {}).get("sha256")
     profile_sha = identities.get("corrective_profile", {}).get("sha256")
     pair_sha = identities.get("paired_final_status", {}).get("sha256")
     sample_count = int(capture_metadata.get("sample_count", 0))
@@ -151,7 +159,8 @@ def summarize(
     }
     gate_checks = {
         "exit_zero": playback_exit_code == 0,
-        "single_case": gate.get("cases") == [30] and result.get("case") == 30,
+        "single_case": gate.get("cases") == [expected_case]
+        and result.get("case") == expected_case,
         "passed": gate.get("passed") is True and result.get("passed") is True,
         "dynamic": result.get("dynamic_quality_passed") is True,
         "thermal": result.get("thermal_admission_passed") is True,
@@ -170,7 +179,7 @@ def summarize(
         and gate.get("shadow_teacher_trace_started") is False,
         "training_closed": gate.get("training_started") is False
         and gate.get("ppo_authorized") is False,
-        "heartbeat": heartbeat.get("case") == 30
+        "heartbeat": heartbeat.get("case") == expected_case
         and int(heartbeat.get("completed_steps", 0)) > 0
         and heartbeat.get("capture_outputs_enabled") is True,
         "gpu_released": gpu_release_passed,
@@ -212,8 +221,9 @@ def summarize(
         and capture_metadata.get("training_started") is False,
     }
     contract_checks = {
-        "namespace": contract.get("namespace") == NAMESPACE,
-        "case_split": contract.get("case") == 30 and contract.get("split") == "train",
+        "namespace": contract.get("namespace") == expected_namespace,
+        "case_split": contract.get("case") == expected_case
+        and contract.get("split") == "train",
         "runtime_commit_descends_reviewed_parent": admission.get(
             "reviewed_parent_commit"
         )
@@ -227,9 +237,9 @@ def summarize(
     )
     return {
         "schema": "cinebotrl_two_wheel_riser_corrective_teacher_capture_final_v2",
-        "namespace": NAMESPACE,
+        "namespace": expected_namespace,
         "runtime_commit": runtime_commit,
-        "case": 30,
+        "case": expected_case,
         "split": "train",
         "playback_exit_code": playback_exit_code,
         "admission_checks": admission_checks,

@@ -72,6 +72,16 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 > `bc_authorized=false`、`ppo_authorized=false`、`learned_rollout_authorized=false`
 > 和 `training_started=false` 仍保持不变；BC 入口在单独集成和授权前继续拒绝
 > 新 schema。
+>
+> **2026-07-23 BC 入口预检：** BC 入口现在能够完整加载并验证上述训练
+> schema，但只在显式 `--preflight-only` 下运行 projection-aware loss 的
+> CPU 诊断。预检使用 `requested_actions_audit` 检查 supervisor projection
+> 和时序 slew 合同，不把它当成训练 target；训练 target 仍是 effective
+> post-supervisor label。由于历史 supervisor 还可能包含时序限制，
+> audit request 不要求逐点重建 effective label，重建误差作为独立诊断报告。
+> 预检不创建 output directory、checkpoint 或 TorchScript。相同数据若不带
+> `--preflight-only`，入口会在 optimizer 创建前因缺少独立、hash-bound BC
+> 授权而拒绝；legacy 数据也不能借用这个预检开关。
 
 ## 固定运行合同
 

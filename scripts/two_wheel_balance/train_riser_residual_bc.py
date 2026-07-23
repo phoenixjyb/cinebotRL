@@ -29,6 +29,13 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_corpus imp
     SPLIT_CODES as MODEL_BASED_SPLIT_CODES,
     load_corpus,
 )
+from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_bc_adapter import (  # noqa: E402
+    build_projection_aware_bc_preflight,
+)
+from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_training_dataset import (  # noqa: E402
+    MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA,
+    load_training_dataset,
+)
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
     ACTION_NAMES,
     ACTION_SCALES,
@@ -50,6 +57,7 @@ SUPPORTED_DATASET_SCHEMAS = {
     "cinebotrl_two_wheel_riser_residual_merged_v2",
     "cinebotrl_two_wheel_riser_residual_merged_v3",
     MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA,
+    MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA,
 }
 INITIAL_TEACHER_DATASET_SCHEMA = "cinebotrl_two_wheel_riser_residual_merged_v3"
 LEGACY_POLICY_COMMAND_BASE = "phase_feedforward"
@@ -74,6 +82,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fusion-hidden-sizes", default="256,128")
     parser.add_argument("--seed", type=int, default=20260716)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+    parser.add_argument(
+        "--preflight-only",
+        action="store_true",
+        help=(
+            "Validate a projection-aware training dataset without optimizing, "
+            "writing a checkpoint, or authorizing BC."
+        ),
+    )
     parser.add_argument("--minimum-improvement-fraction", type=float, default=0.05)
     parser.add_argument(
         "--maximum-normalized-prediction-abs",
@@ -127,7 +143,10 @@ def dataset_action_semantics(metadata: dict[str, object]) -> dict[str, object]:
     schema = metadata.get("schema")
     if schema not in SUPPORTED_DATASET_SCHEMAS:
         raise ValueError("wrong merged dataset schema")
-    if schema == MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA:
+    if schema in {
+        MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA,
+        MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA,
+    }:
         scales = np.asarray(metadata.get("action_scales"), dtype=np.float64)
         if (
             metadata.get("command_contract")
@@ -159,6 +178,8 @@ def load_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarray]]:
     with np.load(path, allow_pickle=False) as data:
         metadata = json.loads(str(data["metadata_json"].item()))
         schema = metadata.get("schema")
+        if schema not in SUPPORTED_DATASET_SCHEMAS:
+            raise ValueError("wrong merged dataset schema")
         required = [
             "observations",
             "actions",
@@ -170,14 +191,19 @@ def load_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarray]]:
             required.append("action_valid_mask")
         arrays = (
             {}
-            if schema == MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA
+            if schema
+            in {
+                MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA,
+                MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA,
+            }
             else {name: np.asarray(data[name]) for name in required}
         )
-    if schema not in SUPPORTED_DATASET_SCHEMAS:
-        raise ValueError("wrong merged dataset schema")
     if schema == MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA:
         metadata, corpus_arrays = load_corpus(path)
         arrays = {name: corpus_arrays[name] for name in required}
+    elif schema == MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA:
+        metadata, training_arrays = load_training_dataset(path)
+        arrays = dict(training_arrays)
     if metadata.get("observation_names") != list(OBSERVATION_NAMES):
         raise ValueError("merged observation contract mismatch")
     if metadata.get("observation_contract") != (
@@ -207,7 +233,11 @@ def load_dataset(path: Path) -> tuple[dict[str, object], dict[str, np.ndarray]]:
         raise ValueError("dataset action exceeds normalized bounds")
     expected_split_codes = (
         MODEL_BASED_SPLIT_CODES
-        if schema == MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA
+        if schema
+        in {
+            MODEL_BASED_CORRECTIVE_CORPUS_SCHEMA,
+            MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA,
+        }
         else SPLIT_CODES
     )
     if set(np.unique(labels).tolist()) != set(expected_split_codes.values()):
@@ -503,6 +533,8 @@ def main() -> int:
         raise ValueError("minimum improvement fraction must be in (0, 1)")
     if not 0.0 < args.maximum_normalized_prediction_abs < 1.0:
         raise ValueError("maximum normalized prediction magnitude must be in (0, 1)")
+    if args.preflight_only and args.device != "cpu":
+        raise ValueError("--preflight-only requires explicit --device cpu")
     scheduled_sampling_enabled = args.scheduled_previous_action_max_probability > 0.0
     previous_action_gains = previous_action_observation_gains(args)
     attenuated_previous_action = any(gain < 1.0 for gain in previous_action_gains)
@@ -548,6 +580,27 @@ def main() -> int:
         raise ValueError(
             "model-based corrective corpus is admission-review-only; "
             "a separately approved training schema is required before BC"
+        )
+    if metadata["schema"] == MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA:
+        preflight = {
+            **build_projection_aware_bc_preflight(metadata, arrays),
+            **action_semantics,
+            "dataset_sha256": sha256(args.dataset),
+            "source_commit": args.source_commit,
+            "preflight_only": args.preflight_only,
+            "separate_hash_bound_bc_authorization_required": True,
+        }
+        if args.preflight_only:
+            print(json.dumps(preflight, indent=2))
+            return 0 if preflight["preflight_passed"] else 2
+        raise ValueError(
+            "projection-aware corrective training schema requires a separate "
+            "hash-bound BC authorization; use --preflight-only for CPU review"
+        )
+    if args.preflight_only:
+        raise ValueError(
+            "--preflight-only is reserved for the projection-aware corrective "
+            "training schema"
         )
     observations = arrays["observations"].astype(np.float32)
     actions = arrays["actions"].astype(np.float32)

@@ -296,6 +296,36 @@ def test_bc_loader_rejects_source_that_contains_multiple_cases(tmp_path) -> None
         load_dataset(path)
 
 
+def test_projection_preflight_switch_rejects_legacy_dataset_without_output(
+    tmp_path: Path,
+) -> None:
+    dataset = tmp_path / "legacy.npz"
+    _write_dataset(dataset, np.repeat(np.arange(3, dtype=np.int8), 2))
+    output = tmp_path / "policy"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/two_wheel_balance/train_riser_residual_bc.py",
+            "--dataset",
+            str(dataset),
+            "--output-dir",
+            str(output),
+            "--source-commit",
+            "a" * 40,
+            "--device",
+            "cpu",
+            "--preflight-only",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "reserved for the projection-aware corrective" in result.stderr
+    assert not output.exists()
+
+
 def test_failed_offline_gate_does_not_emit_policy_artifacts(tmp_path: Path) -> None:
     dataset = tmp_path / "zero_labels.npz"
     _write_dataset(dataset, np.repeat(np.arange(3, dtype=np.int8), 2))

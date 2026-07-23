@@ -586,26 +586,47 @@ def test_projection_training_cli_is_preflight_first_and_bc_stays_closed(
     assert "already exists" in second.stderr
 
     trainer_output = tmp_path / "policy"
+    trainer_base = [
+        sys.executable,
+        "scripts/two_wheel_balance/train_riser_residual_bc.py",
+        "--dataset",
+        str(output),
+        "--output-dir",
+        str(trainer_output),
+        "--source-commit",
+        "a" * 40,
+        "--epochs",
+        "1",
+        "--device",
+        "cpu",
+    ]
+    trainer_preflight = subprocess.run(
+        trainer_base + ["--preflight-only"],
+        cwd=Path(__file__).parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert trainer_preflight.returncode == 0, trainer_preflight.stderr
+    trainer_report = json.loads(trainer_preflight.stdout)
+    assert trainer_report["preflight_passed"] is True
+    assert trainer_report["preflight_only"] is True
+    assert trainer_report["dataset_valid_for_projection_aware_bc_input"] is True
+    assert trainer_report["requested_actions_used_as_training_targets"] is False
+    assert trainer_report["effective_actions_remain_training_targets"] is True
+    assert trainer_report["separate_hash_bound_bc_authorization_required"] is True
+    assert trainer_report["bc_authorized"] is False
+    assert trainer_report["training_started"] is False
+    assert trainer_report["checkpoint_created"] is False
+    assert not trainer_output.exists()
+
     rejected = subprocess.run(
-        [
-            sys.executable,
-            "scripts/two_wheel_balance/train_riser_residual_bc.py",
-            "--dataset",
-            str(output),
-            "--output-dir",
-            str(trainer_output),
-            "--source-commit",
-            "a" * 40,
-            "--epochs",
-            "1",
-            "--device",
-            "cpu",
-        ],
+        trainer_base,
         cwd=Path(__file__).parents[1],
         check=False,
         capture_output=True,
         text=True,
     )
     assert rejected.returncode != 0
-    assert "wrong merged dataset schema" in rejected.stderr
+    assert "separate hash-bound BC authorization" in rejected.stderr
     assert not trainer_output.exists()

@@ -1,6 +1,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -177,6 +178,10 @@ def test_v2_validator_uses_only_exact_out_of_band_token_hash(
     token = ROOT.parent / ".case23-v2-test-authorization-token"
     token.write_bytes(b"runtime-only-random-token-fixture\n")
     token.chmod(0o600)
+    if os.name == "nt":
+        # Runtime admission executes under WSL; Windows does not expose POSIX
+        # chmod bits for this cross-platform unit test.
+        monkeypatch.setattr(VALIDATOR_MODULE.stat, "S_IMODE", lambda _: 0o600)
     token_hash = hashlib.sha256(token.read_bytes()).hexdigest()
     try:
         admitted = VALIDATOR_MODULE.validate(

@@ -75,6 +75,7 @@ if [[ "$SPLIT_MODE" == holdout ]]; then
   )
 fi
 RISER_GIT_ROOT_WSL="$ROOT" \
+  WSLENV="${WSLENV:+${WSLENV}:}RISER_GIT_ROOT_WSL" \
   "$ISAAC_PYTHON" "$preflight_win" "${preflight_args[@]}"
 
 if [[ "$RUN_MODE" == --preflight ]]; then

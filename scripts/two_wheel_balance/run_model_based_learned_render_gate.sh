@@ -48,6 +48,7 @@ to_windows_path() {
   fi
 }
 RISER_GIT_ROOT_WSL="$ROOT" \
+  WSLENV="${WSLENV:+${WSLENV}:}RISER_GIT_ROOT_WSL" \
   "$ISAAC_PYTHON" "$(to_windows_path "$PREFLIGHT")" \
   --admission "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_ADMISSION")" \
   --all79-report \

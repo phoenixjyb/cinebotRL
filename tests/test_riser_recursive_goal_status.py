@@ -2013,8 +2013,27 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         "exact_case_balanced_projection_aware_gradient_accumulation_v1"
     )
     assert corpus["projection_training_bc_validation_contract"] == (
-        "projected_effective_action_case_balanced_validation_v1"
+        "projected_effective_action_case_balanced_recursive_validation_v2"
     )
+    assert corpus["projection_training_bc_recursive_validation_contract"] == (
+        "case_reset_recursive_effective_action_validation_v1"
+    )
+    assert (
+        corpus[
+            "projection_training_bc_recursive_validation_uses_previous_effective_action"
+        ]
+        is True
+    )
+    assert corpus[
+        "projection_training_bc_recursive_validation_case_reset_required"
+    ] is True
+    assert corpus["projection_training_bc_recursive_validation_split"] == "validation"
+    assert corpus[
+        "projection_training_bc_recursive_validation_required_for_artifact_emission"
+    ] is True
+    assert corpus[
+        "projection_training_bc_teacher_forced_only_promotion_rejected"
+    ] is True
     assert corpus["projection_training_bc_optimizer_kernel_implemented"] is True
     assert corpus["projection_training_bc_optimizer_kernel_synthetic_only"] is True
     assert corpus["projection_training_bc_optimizer_kernel_creates_artifacts"] is False
@@ -2032,7 +2051,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_admission_v1"
     )
     assert corpus["projection_training_bc_execution_report_schema"] == (
-        "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_report_v1"
+        "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_report_v2"
     )
     assert corpus[
         "projection_training_bc_execution_contract_module_sha256"
@@ -2041,14 +2060,17 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         "projection_training_bc_execution_admission_template_sha256"
     ] == _sha256(PROJECTED_TRAINING_BC_EXECUTION_ADMISSION_TEMPLATE)
     assert corpus[
-        "projection_training_bc_execution_contract_implementation_commit"
+        "projection_training_bc_execution_contract_initial_implementation_commit"
     ] == ("282c5998ec0c91982d2a1f610b18db7acc5f4e1b")
     assert corpus[
+        "projection_training_bc_execution_contract_implementation_commit"
+    ] == ("8ee358e045a8099384dae2556e66093f86d1aa05")
+    assert corpus[
         "projection_training_bc_execution_contract_focused_cpu_suite"
-    ] == ("69_passed_2_warnings_in_27.87s")
+    ] == ("61_passed_2_warnings_in_10.06s")
     assert corpus[
         "projection_training_bc_execution_contract_authoritative_cpu_suite"
-    ] == ("1300_passed_12_skipped_2_warnings_in_170.69s")
+    ] == ("pending_final_goal_reseal")
     assert corpus["projection_training_bc_execution_admission_template_usable"] is False
     assert corpus["projection_training_bc_execution_trainer_integrated"] is True
     assert corpus["projection_training_bc_execution_synthetic_end_to_end_passed"] is True

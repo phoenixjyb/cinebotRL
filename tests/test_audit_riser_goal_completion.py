@@ -142,7 +142,10 @@ def test_cli_writes_incomplete_evidence_without_starting_work(tmp_path: Path) ->
         text=True,
     )
     assert result.returncode == 0, result.stderr
-    report = json.loads(output.read_text(encoding="utf-8"))
+    payload = output.read_bytes()
+    assert payload.endswith(b"\n")
+    assert b"\r\n" not in payload
+    report = json.loads(payload)
     assert report["goal_achieved"] is False
     assert report["runtime_started"] is False
     assert report["bc_started_by_audit"] is False

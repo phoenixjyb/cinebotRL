@@ -6,9 +6,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
+import statistics
 import subprocess
 import sys
 from typing import Any, Mapping
@@ -70,6 +72,66 @@ REQUIRED_COMPLETION_GATES = (
     "learned_policy_all79_dynamic_gate",
     "learned_policy_render_audit",
 )
+ROLLOUT_METRICS = (
+    "position_error_p95_m",
+    "position_error_max_m",
+    "attitude_error_p95_deg",
+    "attitude_error_max_deg",
+    "pitch_p95_deg",
+    "pitch_max_deg",
+    "riser_servo_error_p95_m",
+    "riser_servo_error_max_m",
+    "proxy_servo_error_p95_deg",
+    "proxy_servo_error_max_deg",
+)
+ALL79_REPORT_FIELDS = {
+    "schema",
+    "policy_sha256",
+    "cases",
+    "case_count",
+    "maximum_regression_fraction",
+    "minimum_zero_improvement_fraction",
+    "expected_tracking_profile",
+    "means",
+    "aggregate_checks",
+    "rows",
+    "passed",
+    "ppo_authorized",
+}
+ALL79_ROW_FIELDS = {
+    "case",
+    "checks",
+    "teacher",
+    "learned",
+    "learned_residual_action_abs_max",
+}
+LEARNED_RENDER_REPORT_FIELDS = {
+    "schema",
+    "policy",
+    "source_all79_report",
+    "cases",
+    "videos",
+    "visual_checks",
+    "passed",
+    "training_started",
+    "ppo_authorized",
+}
+LEARNED_RENDER_VIDEO_FIELDS = {
+    "case",
+    "path",
+    "sha256",
+    "codec",
+    "width",
+    "height",
+    "fps",
+    "duration_s",
+}
+LEARNED_RENDER_VISUAL_CHECKS = {
+    "robot_asset_intact",
+    "riser_motion_visible",
+    "camera_and_gimbal_visible",
+    "no_detached_links",
+}
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -94,6 +156,211 @@ def _identity(path: Path) -> dict[str, str]:
     except ValueError:
         display = str(resolved)
     return {"path": display, "sha256": _sha256(resolved)}
+
+
+def _exact_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _resolve_identity(
+    identity: object,
+    *,
+    directory: Path,
+    expected_path: Path | None = None,
+) -> Path:
+    if (
+        not isinstance(identity, Mapping)
+        or set(identity) != {"path", "sha256"}
+        or not isinstance(identity.get("path"), str)
+        or not identity["path"]
+        or not _exact_sha256(identity.get("sha256"))
+    ):
+        raise ValueError("artifact identity fields are invalid")
+    path = Path(identity["path"])
+    path = path if path.is_absolute() else directory / path
+    path = path.resolve()
+    if expected_path is not None and path != expected_path.resolve():
+        raise ValueError("artifact identity path mismatch")
+    if not path.is_file() or _sha256(path) != identity["sha256"]:
+        raise ValueError("artifact identity SHA-256 mismatch")
+    return path
+
+
+def _finite_nonnegative_metrics(value: object) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and set(value) == set(ROLLOUT_METRICS)
+        and all(
+            isinstance(value[name], (int, float))
+            and not isinstance(value[name], bool)
+            and math.isfinite(float(value[name]))
+            and float(value[name]) >= 0.0
+            for name in ROLLOUT_METRICS
+        )
+    )
+
+
+def _validate_all79_report(
+    report: Mapping[str, Any],
+    *,
+    policy_sha256: str,
+) -> None:
+    cases = list(range(1, 80))
+    rows = report.get("rows")
+    regression = report.get("maximum_regression_fraction")
+    if (
+        set(report) != ALL79_REPORT_FIELDS
+        or report.get("schema")
+        != "cinebotrl_two_wheel_riser_residual_all79_gate_v1"
+        or report.get("policy_sha256") != policy_sha256
+        or report.get("cases") != cases
+        or report.get("case_count") != len(cases)
+        or not isinstance(regression, (int, float))
+        or isinstance(regression, bool)
+        or not 0.0 <= float(regression) <= 0.05
+        or report.get("minimum_zero_improvement_fraction") is not None
+        or report.get("expected_tracking_profile") != "riser_phase_consistent_v2"
+        or not isinstance(rows, list)
+        or len(rows) != len(cases)
+        or report.get("passed") is not True
+        or report.get("ppo_authorized") is not False
+    ):
+        raise ValueError("learned all-79 report contract mismatch")
+
+    learned_values: list[float] = []
+    teacher_values: list[float] = []
+    for expected_case, row in zip(cases, rows, strict=True):
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != ALL79_ROW_FIELDS
+            or row.get("case") != expected_case
+            or not isinstance(row.get("checks"), Mapping)
+            or not row["checks"]
+            or not all(value is True for value in row["checks"].values())
+            or not _finite_nonnegative_metrics(row.get("teacher"))
+            or not _finite_nonnegative_metrics(row.get("learned"))
+        ):
+            raise ValueError(f"learned all-79 row {expected_case} is invalid")
+        residual = row.get("learned_residual_action_abs_max")
+        if (
+            not isinstance(residual, list)
+            or len(residual) != 3
+            or any(
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(float(value))
+                or not 0.0 <= float(value) <= 1.0 + 1e-6
+                for value in residual
+            )
+        ):
+            raise ValueError(f"learned all-79 row {expected_case} residual is invalid")
+        for metric in ROLLOUT_METRICS:
+            if float(row["learned"][metric]) > (
+                (1.0 + float(regression)) * float(row["teacher"][metric]) + 1e-9
+            ):
+                raise ValueError(
+                    f"learned all-79 row {expected_case} regresses {metric}"
+                )
+        teacher_values.append(float(row["teacher"]["position_error_p95_m"]))
+        learned_values.append(float(row["learned"]["position_error_p95_m"]))
+
+    expected_means = {
+        "teacher_position_p95_m": statistics.fmean(teacher_values),
+        "learned_position_p95_m": statistics.fmean(learned_values),
+    }
+    means = report.get("means")
+    aggregates = report.get("aggregate_checks")
+    if (
+        not isinstance(means, Mapping)
+        or set(means) != set(expected_means)
+        or any(
+            not math.isclose(
+                float(means[name]),
+                expected,
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            )
+            for name, expected in expected_means.items()
+        )
+        or not isinstance(aggregates, Mapping)
+        or set(aggregates)
+        != {"all_case_checks", "learned_position_mean_within_teacher_budget"}
+        or not all(value is True for value in aggregates.values())
+        or expected_means["learned_position_p95_m"]
+        > (1.0 + float(regression)) * expected_means["teacher_position_p95_m"]
+        + 1e-9
+    ):
+        raise ValueError("learned all-79 aggregate metrics mismatch")
+
+
+def _validate_learned_render_report(
+    report: Mapping[str, Any],
+    *,
+    report_directory: Path,
+    policy_path: Path,
+    policy_sha256: str,
+    all79_report_path: Path,
+) -> None:
+    cases = report.get("cases")
+    videos = report.get("videos")
+    visual_checks = report.get("visual_checks")
+    if (
+        set(report) != LEARNED_RENDER_REPORT_FIELDS
+        or report.get("schema")
+        != "cinebotrl_two_wheel_riser_learned_render_audit_v1"
+        or not isinstance(cases, list)
+        or len(cases) < 3
+        or cases != sorted(set(cases))
+        or any(not isinstance(case, int) or not 1 <= case <= 79 for case in cases)
+        or not isinstance(videos, list)
+        or len(videos) != len(cases)
+        or not isinstance(visual_checks, Mapping)
+        or set(visual_checks) != LEARNED_RENDER_VISUAL_CHECKS
+        or not all(value is True for value in visual_checks.values())
+        or report.get("passed") is not True
+        or report.get("training_started") is not False
+        or report.get("ppo_authorized") is not False
+    ):
+        raise ValueError("learned render report contract mismatch")
+    _resolve_identity(
+        report.get("policy"),
+        directory=report_directory,
+        expected_path=policy_path,
+    )
+    if report["policy"]["sha256"] != policy_sha256:
+        raise ValueError("learned render policy SHA-256 mismatch")
+    _resolve_identity(
+        report.get("source_all79_report"),
+        directory=report_directory,
+        expected_path=all79_report_path,
+    )
+    for expected_case, video in zip(cases, videos, strict=True):
+        if (
+            not isinstance(video, Mapping)
+            or set(video) != LEARNED_RENDER_VIDEO_FIELDS
+            or video.get("case") != expected_case
+            or not isinstance(video.get("codec"), str)
+            or not video["codec"]
+            or not isinstance(video.get("width"), int)
+            or video["width"] < 640
+            or not isinstance(video.get("height"), int)
+            or video["height"] < 360
+            or not isinstance(video.get("fps"), (int, float))
+            or isinstance(video.get("fps"), bool)
+            or float(video["fps"]) <= 0.0
+            or not isinstance(video.get("duration_s"), (int, float))
+            or isinstance(video.get("duration_s"), bool)
+            or float(video["duration_s"]) <= 0.0
+        ):
+            raise ValueError(f"learned render video {expected_case} metadata is invalid")
+        _resolve_identity(
+            {"path": video["path"], "sha256": video["sha256"]},
+            directory=report_directory,
+        )
 
 
 def _windows_to_wsl_path(value: str) -> str:
@@ -230,12 +497,27 @@ def _optional_learning_evidence(
         if report is None:
             raise ValueError("learned all-79 report requires a validated BC report")
         all79 = _load_json(all79_report)
+        policy_sha = report["torchscript"]["sha256"]
+        _validate_all79_report(all79, policy_sha256=policy_sha)
 
     learned_render: dict[str, Any] | None = None
     if learned_render_report is not None:
-        if report is None:
-            raise ValueError("learned render report requires a validated BC report")
+        if report is None or all79 is None or all79_report is None:
+            raise ValueError(
+                "learned render report requires validated BC and all-79 reports"
+            )
         learned_render = _load_json(learned_render_report)
+        policy_path = _resolve_identity(
+            report["torchscript"],
+            directory=bc_report.parent,
+        )
+        _validate_learned_render_report(
+            learned_render,
+            report_directory=learned_render_report.parent,
+            policy_path=policy_path,
+            policy_sha256=report["torchscript"]["sha256"],
+            all79_report_path=all79_report,
+        )
 
     return {
         "training_metadata": training_metadata,
@@ -293,43 +575,8 @@ def build_report(
         and bc_report.get("training_started") is True
         and bc_report.get("ppo_authorized") is False
     )
-    policy_sha = (
-        bc_report.get("torchscript", {}).get("sha256")
-        if isinstance(bc_report, Mapping)
-        and isinstance(bc_report.get("torchscript"), Mapping)
-        else None
-    )
-    all79_ready = (
-        isinstance(all79, Mapping)
-        and all79.get("schema")
-        == "cinebotrl_two_wheel_riser_residual_all79_gate_v1"
-        and all79.get("cases") == list(range(1, 80))
-        and all79.get("case_count") == 79
-        and all79.get("policy_sha256") == policy_sha
-        and all79.get("passed") is True
-        and all79.get("ppo_authorized") is False
-    )
-    render_videos = (
-        learned_render.get("videos", [])
-        if isinstance(learned_render, Mapping)
-        else []
-    )
-    render_ready = (
-        isinstance(learned_render, Mapping)
-        and learned_render.get("schema")
-        == "cinebotrl_two_wheel_riser_learned_render_audit_v1"
-        and learned_render.get("policy_sha256") == policy_sha
-        and learned_render.get("passed") is True
-        and isinstance(render_videos, list)
-        and len(render_videos) >= 3
-        and all(
-            isinstance(item, Mapping)
-            and isinstance(item.get("case"), int)
-            and isinstance(item.get("sha256"), str)
-            and len(item["sha256"]) == 64
-            for item in render_videos
-        )
-    )
+    all79_ready = isinstance(all79, Mapping)
+    render_ready = isinstance(learned_render, Mapping)
 
     gates = {
         "isolated_worktree_and_branch": _gate(
@@ -496,6 +743,7 @@ def main() -> int:
     args = parser.parse_args()
 
     fixed_paths = {
+        "auditor": Path(__file__),
         "goal": args.goal,
         "asset": args.asset_audit,
         "lqr": args.lqr_gate,

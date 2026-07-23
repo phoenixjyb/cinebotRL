@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -26,6 +27,7 @@ def _current_inputs():
     }
     payloads = {name: MODULE._load_json(path) for name, path in paths.items()}
     identities = {name: MODULE._identity(path) for name, path in paths.items()}
+    identities["auditor"] = MODULE._identity(SCRIPT)
     return payloads, identities
 
 
@@ -187,3 +189,160 @@ def test_translates_windows_worktree_path_for_wsl_git() -> None:
         MODULE._windows_to_wsl_path(r"G:\wSpace\cinebotRL-two-wheel-riser")
         == "/mnt/g/wSpace/cinebotRL-two-wheel-riser"
     )
+
+
+def _rollout_metrics(value: float) -> dict[str, float]:
+    return {name: value for name in MODULE.ROLLOUT_METRICS}
+
+
+def _valid_all79_report(policy_sha256: str) -> dict:
+    rows = [
+        {
+            "case": case,
+            "checks": {
+                "learned_hard_gate": True,
+                "teacher_hard_gate": True,
+                "bounded_residual": True,
+                "regression_position_error_p95_m": True,
+            },
+            "teacher": _rollout_metrics(1.0),
+            "learned": _rollout_metrics(0.9),
+            "learned_residual_action_abs_max": [0.5, 0.4, 0.3],
+        }
+        for case in range(1, 80)
+    ]
+    return {
+        "schema": "cinebotrl_two_wheel_riser_residual_all79_gate_v1",
+        "policy_sha256": policy_sha256,
+        "cases": list(range(1, 80)),
+        "case_count": 79,
+        "maximum_regression_fraction": 0.05,
+        "minimum_zero_improvement_fraction": None,
+        "expected_tracking_profile": "riser_phase_consistent_v2",
+        "means": {
+            "teacher_position_p95_m": 1.0,
+            "learned_position_p95_m": 0.9,
+        },
+        "aggregate_checks": {
+            "all_case_checks": True,
+            "learned_position_mean_within_teacher_budget": True,
+        },
+        "rows": rows,
+        "passed": True,
+        "ppo_authorized": False,
+    }
+
+
+def test_all79_validator_recomputes_every_case_and_aggregate() -> None:
+    policy_sha = "a" * 64
+    MODULE._validate_all79_report(
+        _valid_all79_report(policy_sha),
+        policy_sha256=policy_sha,
+    )
+
+
+def test_all79_validator_rejects_forged_or_regressed_rows() -> None:
+    policy_sha = "a" * 64
+    for mutation in ("policy", "case", "check", "regression", "mean"):
+        report = _valid_all79_report(policy_sha)
+        if mutation == "policy":
+            report["policy_sha256"] = "b" * 64
+        elif mutation == "case":
+            report["rows"][10]["case"] = 10
+        elif mutation == "check":
+            report["rows"][10]["checks"]["learned_hard_gate"] = False
+        elif mutation == "regression":
+            report["rows"][10]["learned"]["position_error_max_m"] = 1.2
+        else:
+            report["means"]["learned_position_p95_m"] = 0.8
+        try:
+            MODULE._validate_all79_report(report, policy_sha256=policy_sha)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"forged all-79 report accepted: {mutation}")
+
+
+def _identity(path: Path) -> dict[str, str]:
+    return {
+        "path": path.name,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+
+
+def _valid_render_report(
+    tmp_path: Path,
+) -> tuple[dict, Path, Path]:
+    policy = tmp_path / "policy.pt"
+    policy.write_bytes(b"policy")
+    all79 = tmp_path / "all79.json"
+    all79.write_bytes(b"all79\n")
+    videos = []
+    for case in (1, 31, 73):
+        path = tmp_path / f"case_{case:04d}.mp4"
+        path.write_bytes(f"video-{case}".encode())
+        videos.append(
+            {
+                "case": case,
+                **_identity(path),
+                "codec": "h264",
+                "width": 1280,
+                "height": 720,
+                "fps": 25.0,
+                "duration_s": 10.0,
+            }
+        )
+    return {
+        "schema": "cinebotrl_two_wheel_riser_learned_render_audit_v1",
+        "policy": _identity(policy),
+        "source_all79_report": _identity(all79),
+        "cases": [1, 31, 73],
+        "videos": videos,
+        "visual_checks": {
+            "robot_asset_intact": True,
+            "riser_motion_visible": True,
+            "camera_and_gimbal_visible": True,
+            "no_detached_links": True,
+        },
+        "passed": True,
+        "training_started": False,
+        "ppo_authorized": False,
+    }, policy, all79
+
+
+def test_render_validator_binds_policy_all79_videos_and_visual_review(
+    tmp_path: Path,
+) -> None:
+    report, policy, all79 = _valid_render_report(tmp_path)
+    MODULE._validate_learned_render_report(
+        report,
+        report_directory=tmp_path,
+        policy_path=policy,
+        policy_sha256=hashlib.sha256(policy.read_bytes()).hexdigest(),
+        all79_report_path=all79,
+    )
+
+
+def test_render_validator_rejects_forged_video_and_detached_robot(
+    tmp_path: Path,
+) -> None:
+    for mutation in ("video", "detached"):
+        directory = tmp_path / mutation
+        directory.mkdir()
+        report, policy, all79 = _valid_render_report(directory)
+        if mutation == "video":
+            report["videos"][0]["sha256"] = "0" * 64
+        else:
+            report["visual_checks"]["no_detached_links"] = False
+        try:
+            MODULE._validate_learned_render_report(
+                report,
+                report_directory=directory,
+                policy_path=policy,
+                policy_sha256=hashlib.sha256(policy.read_bytes()).hexdigest(),
+                all79_report_path=all79,
+            )
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"forged render report accepted: {mutation}")

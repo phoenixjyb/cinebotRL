@@ -8546,6 +8546,9 @@ and must state whether its candidate was accepted or rejected.
   SHA-256
   `b1d76609bac8982d3bd4af818c15e18ad58dc88b24093617a8fe90018069f739`.
   Every repository, contract, and identity check passes.
+- Evidence commit `3040a6db2b70b1fced0fd306ea17e2a008009bd3`
+  passes the authoritative `.98` suite:
+  `1096 passed, 12 skipped, 2 warnings in 130.96 s`.
 - No authorization token, conversion namespace, output, merge, BC, PPO,
   training, Isaac process, or GPU workload was created. The route is CPU-ready
   but conversion remains unauthorized.

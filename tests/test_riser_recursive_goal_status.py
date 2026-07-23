@@ -457,6 +457,12 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective[
         "case23_capture_v4_conversion_execution_output_created"
     ] is False
+    assert corrective[
+        "case23_capture_v4_conversion_execution_authoritative_cpu_commit"
+    ] == "3040a6db2b70b1fced0fd306ea17e2a008009bd3"
+    assert corrective[
+        "case23_capture_v4_conversion_execution_authoritative_cpu_suite"
+    ] == "1096_passed_12_skipped_2_warnings_in_130.96s"
     execution_preflight = json.loads(
         CASE23_CONVERSION_EXECUTION_EVIDENCE.read_text()
     )

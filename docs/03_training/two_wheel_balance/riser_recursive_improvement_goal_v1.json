@@ -369,6 +369,8 @@
         "case23_capture_v4_conversion_execution_output_created": false,
         "case23_capture_v4_conversion_execution_focused_suite": "22_passed_2_warnings",
         "case23_capture_v4_conversion_execution_windows_focused_suite": "9_passed_2_warnings",
+        "case23_capture_v4_conversion_execution_authoritative_cpu_commit": "3040a6db2b70b1fced0fd306ea17e2a008009bd3",
+        "case23_capture_v4_conversion_execution_authoritative_cpu_suite": "1096_passed_12_skipped_2_warnings_in_130.96s",
         "case23_capture_v4_conversion_authorized": false,
         "temporal_projection_audit_sha256": "349e61367603d1945774edfc7839040a6eaef66261991425eeeb43bc4a561c47",
         "temporal_projection_contract": "model_based_residual_safety_projection_v1",

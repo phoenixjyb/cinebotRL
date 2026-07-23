@@ -1,0 +1,134 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_mass_drive_traceability_v1",
+  "mass_contract": {
+    "whole_robot_mass_kg": 28.0,
+    "stationary_mass_kg": 23.658,
+    "modeled_riser_moving_mass_kg": 4.342,
+    "modeled_riser_moving_links": [
+      "arm_link_4",
+      "arm_link_5",
+      "arm_link_6",
+      "cam_link",
+      "ee1_tool",
+      "ee_tool",
+      "riser_carriage_link"
+    ],
+    "conservative_drive_sizing_mass_kg": 8.0,
+    "sizing_mass_over_modeled_mass_ratio": 1.842468908337172,
+    "calculated_maximum_moving_mass_at_15pct_force_margin_kg": 14.803714565812243,
+    "whole_robot_mass_is_a_balance_plant_parameter": true,
+    "whole_robot_mass_is_not_a_vertical_axis_payload": true
+  },
+  "force_power_contract": {
+    "candidate": "ELVM8075V48EH-M17-HD_plus_ELD2-CAN7020B",
+    "mechanism": "3_to_1_reduction_plus_70mm_per_rev_supplier_qualified_guided_belt_axis_or_two_stage_synchronized_telescoping_mast",
+    "target_speed_mps": 1.0,
+    "normal_8kg_design_force_n": 228.96,
+    "emergency_8kg_design_force_n": 276.96000000000004,
+    "rated_linear_force_n": 550.2589292552624,
+    "peak_linear_force_n": 1650.776787765787,
+    "emergency_rated_force_margin_ratio": 1.9867812292578795,
+    "rated_linear_power_at_1mps_w": 550.2589292552624,
+    "motor_shaft_power_at_1mps_w": 643.5776950353949,
+    "combined_transmission_efficiency": 0.855,
+    "counterbalance_force_credited_in_sizing_n": 0.0
+  },
+  "stroke_and_safety_contract": {
+    "software_camera_height_range_m": [
+      0.6,
+      1.8
+    ],
+    "software_working_stroke_m": 1.2,
+    "full_speed_stopping_distance_m": 0.12000000000000001,
+    "hard_margin_each_end_m": 0.03,
+    "recommended_mechanical_stroke_m": 1.5,
+    "mechanical_overtravel_does_not_raise_camera_height_limit": true,
+    "minimum_independent_anti_fall_static_force_at_2x_8kg_weight_n": 156.96,
+    "maximum_single_descent_mechanical_energy_for_regen_review_j": 98.176,
+    "holding_brake_is_not_dynamic_or_independent_anti_fall": true
+  },
+  "measurement_boundary": {
+    "measured_complete_moving_mass_available": false,
+    "measured_friction_available": false,
+    "measured_counterbalance_available": false,
+    "measured_duty_and_thermal_available": false,
+    "measured_regeneration_available": false,
+    "supplier_vertical_axis_approval_available": false,
+    "independent_anti_fall_qualified": false,
+    "bench_template_schema": "cinebotrl_two_wheel_riser_bench_measurements_v1"
+  },
+  "checks": {
+    "urdf_total_mass_matches_28kg_plant": true,
+    "riser_moving_mass_is_derived_from_subtree": true,
+    "whole_robot_mass_is_not_used_as_riser_moving_mass": true,
+    "design_mass_conservatively_covers_current_model": true,
+    "riser_joint_preserves_1p2m_working_stroke": true,
+    "riser_joint_preserves_1mps_limit": true,
+    "camera_height_ceiling_remains_1p8m": true,
+    "mechanical_stroke_is_not_camera_height_extension": true,
+    "sizing_credits_no_counterbalance": true,
+    "750w_candidate_closes_8kg_emergency_margin": true,
+    "750w_candidate_power_chain_is_consistent_at_1mps": true,
+    "active_simulation_remains_explicit_400w_profile": true,
+    "production_candidate_is_design_review_only": true,
+    "bench_and_safety_evidence_remain_unmeasured": true,
+    "upstream_calculation_audits_pass": true
+  },
+  "passed": true,
+  "classification": {
+    "calculation_traceability_passed": true,
+    "motor_and_mechanism_recommendation_available": true,
+    "candidate_ready_for_supplier_and_bench_review": true,
+    "valid_for_production_procurement": false,
+    "valid_for_hardware_transfer": false,
+    "physical_riser_bench_qualification_passed": false,
+    "simulation_profile_changed": false,
+    "runtime_authorized": false,
+    "capture_authorized": false,
+    "valid_for_training": false,
+    "bc_authorized": false,
+    "ppo_authorized": false
+  },
+  "inputs": {
+    "auditor": {
+      "path": "scripts/two_wheel_balance/audit_riser_mass_drive_traceability.py",
+      "sha256": "9b9168e280a87dde3d6f37bb2851e3a0b769f3137934c6d0654394a51f30a5bb"
+    },
+    "urdf": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.urdf",
+      "sha256": "603cecfc5b54e659f5d030023a69a3b42d6567f66d2771fbb7127d186f1a9afa"
+    },
+    "plant_prior": {
+      "path": "docs/03_training/two_wheel_balance/PLANT_PRIOR_PROVISIONAL_V1.json",
+      "sha256": "9c6268ab0f13d5487a41d31b011eb9ac735b0dcf01769752389972304e12762c"
+    },
+    "production_vendor_snapshot": {
+      "path": "docs/03_training/two_wheel_balance/RISER_PRODUCTION_CANDIDATE_VENDOR_SNAPSHOT_20260723.json",
+      "sha256": "11b08b6a179b395eceb5e797b28d224d8dfcf35c1921a4d6123d6f5a0e363512"
+    },
+    "bench_measurement_template": {
+      "path": "docs/03_training/two_wheel_balance/RISER_750W_BENCH_MEASUREMENT_TEMPLATE_20260723.json",
+      "sha256": "de3c9f08f35e5a03aea63fd02c5433c1800d74cbc36662dc7b72fd6748657b9e"
+    },
+    "isaac_config": {
+      "path": "src/rl_platform/robots/two_wheel_balance/config.py",
+      "sha256": "31b84c21baf8fb043c8653bfb592217b97d9edbd7a1a0e17633b86f4f36f05e2"
+    },
+    "thermal_control": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_control.py",
+      "sha256": "1bbd9c892f565fcfdea2be3567038db14454bc9d2b864df1326cfac5adc16738"
+    },
+    "hardware_calculator": {
+      "path": "scripts/two_wheel_balance/calculate_riser_hardware_envelope.py",
+      "sha256": "f57369e72bb9e20ae326267c75baad81a97ade8339a26e7e1543143996317df9"
+    },
+    "production_candidate_auditor": {
+      "path": "scripts/two_wheel_balance/audit_riser_hardware_production_candidate.py",
+      "sha256": "ed169bfcb16e5bf68b8c5237a8539dc66698e65a7d89963a50e041865fecd62d"
+    },
+    "drive_profile_auditor": {
+      "path": "scripts/two_wheel_balance/audit_riser_drive_profile_selection.py",
+      "sha256": "f8bcea857b84104fb5cdbf79aab7b3681fd569aac2ff4e0bf6b6a01e75443eff"
+    }
+  }
+}

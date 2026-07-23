@@ -8439,6 +8439,11 @@ and must state whether its candidate was accepted or rejected.
 - Evidence commit `8e3ea24482cb03eefcc0d55e3acfc0846148d196` and mode-normalization
   commit `46370ecf03957b6921c9dd93bff86ae1cdf54df1` pass the authoritative
   `.98` CPU suite: `1082 passed, 12 skipped, 2 warnings in 114.24 s`.
+- Status commit `302bf5ad2fe6ce5b1a760d80608f2934effebb9d` regenerates the
+  completion audit at SHA-256
+  `0b9159e409494430e8c43be468ad02efb12bd41cd6c907b2d505688175c0915b`.
+  The result remains honestly `6/10`: the raw case-23 capture does not count as
+  a converted multi-case corpus or a learned policy.
 - The one-shot authorization is consumed and no retry is authorized. The
   archive is admitted only for a separately reviewed CPU conversion. No
   conversion, corpus merge, BC, PPO, holdout, or training was started.

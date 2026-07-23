@@ -78,6 +78,9 @@ REQUIRED_COMPLETION_GATES = (
     "learned_policy_all79_dynamic_gate",
     "learned_policy_render_audit",
 )
+GOAL_COMPLETION_AUDIT_SCHEMA = (
+    "cinebotrl_two_wheel_riser_goal_completion_audit_v2"
+)
 ROLLOUT_METRICS = (
     "position_error_p95_m",
     "position_error_max_m",
@@ -820,6 +823,10 @@ def build_report(
     inputs: Mapping[str, Any],
 ) -> dict[str, Any]:
     robot_contract = goal.get("robot_contract", {})
+    current_stage = goal.get("current_stage", {})
+    status_refresh = current_stage.get("status_refresh_20260723", {})
+    residual_contract = status_refresh.get("residual_dnn_admission_contract", {})
+    corrective = status_refresh.get("model_based_corrective_teacher", {})
     asset_checks = asset.get("checks", {})
     static = baseline.get("static_height_gate", {})
     dynamic = baseline.get("dynamic_riser_gate", {})
@@ -856,6 +863,62 @@ def build_report(
     )
     all79_ready = isinstance(all79, Mapping)
     render_ready = isinstance(learned_render, Mapping)
+    admitted_architecture = bc_contract.DEFAULT_BC_TRAINING_CONFIG
+    architecture_contract_ready = (
+        isinstance(residual_contract, Mapping)
+        and residual_contract.get("architecture")
+        == admitted_architecture["policy_architecture"]
+        and residual_contract.get("observation_dimension")
+        == admitted_architecture["observation_dimension"]
+        and residual_contract.get("base_observation_dimension")
+        == admitted_architecture["base_observation_dimension"]
+        and residual_contract.get("lookahead_horizon_count")
+        == admitted_architecture["lookahead_horizon_count"]
+        and residual_contract.get("lookahead_channel_count_per_horizon")
+        == admitted_architecture["lookahead_channel_count"]
+        and residual_contract.get("action_dimension")
+        == admitted_architecture["action_dimension"]
+        and residual_contract.get("zero_initialize_action_head")
+        is admitted_architecture["zero_initialize_action_head"]
+        and residual_contract.get("checkpoint_trained") is False
+    )
+    corrective_case_count = current_stage.get(
+        "model_based_corrective_case_datasets_available"
+    )
+    corpus_case_count = current_stage.get(
+        "model_based_corrective_training_corpus_cases_available"
+    )
+    next_case = corrective.get("next_case")
+    pre_training_readiness = {
+        "architecture_contract_passed": architecture_contract_ready,
+        "policy_architecture": admitted_architecture["policy_architecture"],
+        "observation_dimension": admitted_architecture["observation_dimension"],
+        "base_observation_dimension": admitted_architecture[
+            "base_observation_dimension"
+        ],
+        "lookahead_horizon_count": admitted_architecture[
+            "lookahead_horizon_count"
+        ],
+        "lookahead_channel_count_per_horizon": admitted_architecture[
+            "lookahead_channel_count"
+        ],
+        "action_dimension": admitted_architecture["action_dimension"],
+        "zero_initialize_action_head": admitted_architecture[
+            "zero_initialize_action_head"
+        ],
+        "corrective_case_datasets_available": corrective_case_count,
+        "corrective_training_corpus_cases_available": corpus_case_count,
+        "minimum_train_cases": 4,
+        "minimum_validation_cases": 2,
+        "next_case": next_case,
+        "next_operation": "case23_v4_cpu_conversion",
+        "next_operation_authorized": False,
+        "bc_authorized": current_stage.get("bc_authorized") is True,
+        "training_authorized": current_stage.get("training_authorized") is True,
+        "ppo_authorized": current_stage.get("ppo_authorized") is True,
+        "runtime_authorized": current_stage.get("runtime_authorized") is True,
+        "ready_for_bc_execution": training_ready and architecture_contract_ready,
+    }
 
     gates = {
         "isolated_worktree_and_branch": _gate(
@@ -981,13 +1044,14 @@ def build_report(
         if not gates[name]["passed"]
     ]
     return {
-        "schema": "cinebotrl_two_wheel_riser_goal_completion_audit_v1",
+        "schema": GOAL_COMPLETION_AUDIT_SCHEMA,
         "objective": goal.get("objective"),
         "required_completion_gates": list(REQUIRED_COMPLETION_GATES),
         "gates": gates,
         "required_gate_pass_count": len(REQUIRED_COMPLETION_GATES) - len(missing),
         "required_gate_count": len(REQUIRED_COMPLETION_GATES),
         "completion_blockers": missing,
+        "pre_training_readiness": pre_training_readiness,
         "goal_achieved": not missing,
         "obstacle_avoidance_in_scope": False,
         "runtime_started": False,

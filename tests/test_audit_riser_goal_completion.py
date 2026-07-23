@@ -57,6 +57,7 @@ def _build_current(**overrides):
 
 def test_current_goal_audit_passes_foundations_but_not_learning() -> None:
     report = _build_current()
+    assert report["schema"] == MODULE.GOAL_COMPLETION_AUDIT_SCHEMA
     assert report["goal_achieved"] is False
     assert report["required_gate_pass_count"] == 6
     assert report["required_gate_count"] == 10
@@ -82,6 +83,31 @@ def test_current_goal_audit_passes_foundations_but_not_learning() -> None:
     assert report["runtime_started"] is False
     assert report["bc_started_by_audit"] is False
     assert report["ppo_started_by_audit"] is False
+    readiness = report["pre_training_readiness"]
+    assert readiness == {
+        "architecture_contract_passed": True,
+        "policy_architecture": (
+            "model_based_shared_encoder_zero_initialized_residual_v1"
+        ),
+        "observation_dimension": 65,
+        "base_observation_dimension": 26,
+        "lookahead_horizon_count": 3,
+        "lookahead_channel_count_per_horizon": 13,
+        "action_dimension": 3,
+        "zero_initialize_action_head": True,
+        "corrective_case_datasets_available": 1,
+        "corrective_training_corpus_cases_available": 0,
+        "minimum_train_cases": 4,
+        "minimum_validation_cases": 2,
+        "next_case": 23,
+        "next_operation": "case23_v4_cpu_conversion",
+        "next_operation_authorized": False,
+        "bc_authorized": False,
+        "training_authorized": False,
+        "ppo_authorized": False,
+        "runtime_authorized": False,
+        "ready_for_bc_execution": False,
+    }
     assert report["git"] == {
         "branch": MODULE.EXPECTED_BRANCH,
         "head": "a" * 40,
@@ -105,6 +131,19 @@ def test_goal_audit_rejects_arm_or_1p9m_contract_drift() -> None:
     assert report["gates"]["riser_height_and_speed_baseline"]["passed"] is False
     assert "arm_free_robot_asset" in report["completion_blockers"]
     assert "riser_height_and_speed_baseline" in report["completion_blockers"]
+
+
+def test_goal_audit_rejects_residual_architecture_drift() -> None:
+    payloads, _ = _current_inputs()
+    goal = json.loads(json.dumps(payloads["goal"]))
+    residual = goal["current_stage"]["status_refresh_20260723"][
+        "residual_dnn_admission_contract"
+    ]
+    residual["observation_dimension"] = 26
+    report = _build_current(goal=goal)
+    readiness = report["pre_training_readiness"]
+    assert readiness["architecture_contract_passed"] is False
+    assert readiness["ready_for_bc_execution"] is False
 
 
 def test_goal_audit_rejects_dirty_or_diverged_worktree() -> None:

@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -14,6 +15,14 @@ PRODUCTION = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260723_hardware_production_candidate_v1/summary.json"
+)
+EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_riser_drive_profile_selection_v1/summary.json"
+)
+EVIDENCE_SHA256 = (
+    "39a700de3985175e4e8415f1f23beef4264b103daa7ce8847f4ac0fe69f879f7"
 )
 SPEC = importlib.util.spec_from_file_location("riser_drive_profile_audit", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -92,6 +101,28 @@ def test_active_profile_remains_400w_and_750w_is_review_only(
     assert switch["existing_dynamic_evidence_reusable_after_switch"] is False
     assert switch["existing_corrective_captures_reusable_after_switch"] is False
     assert switch["existing_bc_checkpoint_reusable_after_switch"] is False
+
+
+def test_committed_profile_selection_is_exact_and_closed() -> None:
+    raw = EVIDENCE.read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == EVIDENCE_SHA256
+    report = json.loads(raw)
+    assert report["passed"] is True
+    assert report["active_simulation_profile"]["name"] == (
+        "leadshine_400w_engineering_sample_v1"
+    )
+    candidate = report["production_design_candidate"]
+    assert candidate["name"] == "leadshine_750w_production_candidate_v1"
+    assert candidate["simulation_enabled"] is False
+    assert report["classification"]["silent_750w_simulation_upgrade_rejected"]
+    for field in (
+        "gpu_work_started",
+        "isaac_started",
+        "capture_started",
+        "bc_started",
+        "ppo_started",
+    ):
+        assert report[field] is False
 
 
 @pytest.mark.parametrize(

@@ -461,6 +461,23 @@ carriage 升降的运动质量；驱动器仍需外部再生通道，且没有�
 SHA-256
 `bc4eaa8673cf389e11d639aec06414c5506fd2461e67bad6c5328d0363fd3bb7`。
 
+### 14.1 仿真 profile 选择边界
+
+当前 Isaac/URDF 没有切换到 750 W 候选。有效仿真 profile 仍是
+`leadshine_400w_engineering_sample_v1`：`300 N / 1.0 m/s`，连续热参考
+`292.397 N`，峰值参考 `877.191 N`。750 W 方案仅登记为
+`leadshine_750w_production_candidate_v1`，不能通过环境变量或 CLI 临时开启。
+
+750 W profile 只有在供应商垂直轴/减速器确认、完整校准台架、安全回路和防坠试验
+通过后，才能以受审源码修改的方式进入仿真。届时必须一起更新 URDF、Isaac
+actuator、热模型和 USD，并重新执行 static/dynamic/exact-source/full-79 gate。
+由于 plant identity 已改变，旧动态证据、corrective capture 和 BC checkpoint
+均不能直接复用。
+
+机器可读 profile 审计位于
+`evidence_20260723_riser_drive_profile_selection_v1/summary.json`，SHA-256 为
+`39a700de3985175e4e8415f1f23beef4264b103daa7ce8847f4ac0fe69f879f7`。
+
 新增官方资料：
 
 - 750 W/48 V 带抱闸绝对编码器电机：

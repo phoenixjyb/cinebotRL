@@ -7527,3 +7527,35 @@ and must state whether its candidate was accepted or rejected.
 - After case 23 is captured and separately converted, prepare case-specific
   paired-canary proposals for validation cases 8 and 16. Do not reuse the
   case-30 or case-23 corrective profiles without a new quantitative review.
+
+## Round 192: active 400 W and candidate 750 W plants are separated
+
+- A new machine-readable audit traces the generated riser URDF, Isaac actuator,
+  thermal monitor, 400 W engineering envelope, and 750 W production-candidate
+  evidence together.
+- The active simulation remains
+  `leadshine_400w_engineering_sample_v1`: `300 N / 1.0 m/s`, continuous thermal
+  reference `292.397004 N`, and peak reference `877.191013 N`. This is the
+  plant identity under which current dynamic and corrective evidence was
+  produced.
+- The `ELVM8075V48EH-M17-HD + ELD2-CAN7020B` option is explicitly
+  `leadshine_750w_production_candidate_v1`: calculated `550.258929 N` rated and
+  `1650.776788 N` peak, but simulation, runtime, training, procurement, and
+  hardware-transfer status all remain false.
+- No environment or CLI profile switch exists. Activating 750 W requires
+  supplier and calibrated bench evidence, coordinated URDF/Isaac/thermal/USD
+  changes, and complete static, dynamic, exact-source, and full-79
+  requalification. Existing dynamic evidence, corrective captures, and BC
+  checkpoints are explicitly non-reusable across that plant change.
+- Live `.98` focused tests passed `17/17`. Audit SHA-256 is
+  `39a700de3985175e4e8415f1f23beef4264b103daa7ce8847f4ac0fe69f879f7`;
+  audit-script SHA-256 is
+  `f8bcea857b84104fb5cdbf79aab7b3681fd569aac2ff4e0bf6b6a01e75443eff`.
+  No Isaac or GPU work was started.
+
+## Next round after Round 192
+
+- Hardware remains at supplier/bench review; do not upgrade the simulated plant
+  or reuse current training evidence for the 750 W candidate.
+- Learning remains at the separately authorized case-23 capture boundary under
+  the active 400 W plant identity.

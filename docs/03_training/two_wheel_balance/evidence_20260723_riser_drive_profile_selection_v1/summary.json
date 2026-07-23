@@ -1,0 +1,100 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_drive_profile_selection_v1",
+  "checks": {
+    "engineering_envelope_passed": true,
+    "active_urdf_force_is_300n": true,
+    "active_urdf_speed_is_1mps": true,
+    "active_isaac_matches_urdf": true,
+    "active_thermal_contract_is_400w": true,
+    "active_thermal_force_matches_400w": true,
+    "production_candidate_audit_passed": true,
+    "production_candidate_not_simulation_enabled": true,
+    "production_candidate_not_runtime_authorized": true,
+    "production_candidate_not_training_authorized": true,
+    "production_candidate_not_hardware_transfer_ready": true,
+    "current_plant_does_not_claim_750w_force": true,
+    "camera_height_ceiling_remains_1p8m": true,
+    "riser_speed_target_remains_1mps": true
+  },
+  "active_simulation_profile": {
+    "name": "leadshine_400w_engineering_sample_v1",
+    "status": "active_provisional_engineering_profile",
+    "motor_model": "Leadshine ELVM6040V48EH-M17-HD",
+    "simulation_effort_limit_n": 300.0,
+    "simulation_velocity_limit_mps": 1.0,
+    "continuous_force_reference_n": 292.3970042486123,
+    "peak_force_reference_n": 877.1910127458367,
+    "thermal_contract": "leadshine_400w_first_order_monitor_v1",
+    "valid_for_hardware_transfer": false
+  },
+  "production_design_candidate": {
+    "name": "leadshine_750w_production_candidate_v1",
+    "status": "supplier_and_bench_review_only",
+    "motor_and_drive": "ELVM8075V48EH-M17-HD_plus_ELD2-CAN7020B",
+    "rated_linear_force_n": 550.2589292552624,
+    "peak_linear_force_n": 1650.776787765787,
+    "motor_speed_at_1mps_rpm": 2571.4285714285716,
+    "simulation_enabled": false,
+    "runtime_authorized": false,
+    "valid_for_training": false,
+    "valid_for_hardware_transfer": false
+  },
+  "profile_switch_contract": {
+    "environment_or_cli_switch_supported": false,
+    "source_change_and_review_required": true,
+    "required_changes": [
+      "supplier_approve_vertical_axis_gearbox_and_tooth_jump_duty",
+      "bench_measure_moving_mass_friction_force_current_temperature_and_regeneration",
+      "pass_independent_anti_fall_hard_limit_and_safety_power_removal_tests",
+      "update_urdf_and_isaac_effort_limits_together",
+      "replace_400w_thermal_contract_with_bench_identified_750w_contract",
+      "rebuild_usd_and_reseal_all_asset_hashes",
+      "rerun_static_dynamic_exact_source_and_full79_controller_gates",
+      "recapture_corrective_teacher_data_under_the_new_plant_identity"
+    ],
+    "existing_dynamic_evidence_reusable_after_switch": false,
+    "existing_corrective_captures_reusable_after_switch": false,
+    "existing_bc_checkpoint_reusable_after_switch": false
+  },
+  "classification": {
+    "active_profile_is_explicit": true,
+    "silent_750w_simulation_upgrade_rejected": true,
+    "candidate_ready_for_supplier_and_bench_review": true,
+    "valid_for_production_procurement": false,
+    "valid_for_hardware_transfer": false,
+    "runtime_authorized": false,
+    "valid_for_training": false
+  },
+  "passed": true,
+  "gpu_work_started": false,
+  "isaac_started": false,
+  "capture_started": false,
+  "bc_started": false,
+  "ppo_started": false,
+  "inputs": {
+    "production_audit": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_hardware_production_candidate_v1/summary.json",
+      "sha256": "bc4eaa8673cf389e11d639aec06414c5506fd2461e67bad6c5328d0363fd3bb7"
+    },
+    "parity_script": {
+      "path": "scripts/two_wheel_balance/audit_riser_hardware_sim_parity.py",
+      "sha256": "5aa88876d474c6ec5e56de7a303190b3b9212fae6715d209da18621a6d2678fb"
+    },
+    "hardware_script": {
+      "path": "scripts/two_wheel_balance/calculate_riser_hardware_envelope.py",
+      "sha256": "f57369e72bb9e20ae326267c75baad81a97ade8339a26e7e1543143996317df9"
+    },
+    "urdf": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.urdf",
+      "sha256": "603cecfc5b54e659f5d030023a69a3b42d6567f66d2771fbb7127d186f1a9afa"
+    },
+    "isaac_config": {
+      "path": "src/rl_platform/robots/two_wheel_balance/config.py",
+      "sha256": "31b84c21baf8fb043c8653bfb592217b97d9edbd7a1a0e17633b86f4f36f05e2"
+    },
+    "thermal_control": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_control.py",
+      "sha256": "1bbd9c892f565fcfdea2be3567038db14454bc9d2b864df1326cfac5adc16738"
+    }
+  }
+}

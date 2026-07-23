@@ -34,6 +34,8 @@ schema changed.
   `472130ef622ef90afd6f470783f834d014e41ac0`
 - Implementation and authoritative CPU commit:
   `2eb9604b7e2c030a867d9ab64e536240561c652f`
+- Archive-to-finalizer test and latest authoritative CPU commit:
+  `d4fb8b4fea89f953a699e4a090d33049c49936dc`
 - Namespace:
   `20260723_model_based_corrective_teacher_case23_capture_v4_exclusive`
 - Contract SHA-256:
@@ -46,9 +48,14 @@ schema changed.
 ## Verification
 
 - Focused v4/runtime/evidence tests: `37 passed`, two configuration warnings.
-- Authoritative `.98` suite: `959 passed`, `12 skipped`, two configuration
-  warnings in `90.22 s`.
-- `.98` no-token preflight passed at clean `HEAD == upstream == 2eb9604`.
+- Real case-23 archive/save/finalizer/conversion-focused tests: `33 passed`,
+  two configuration warnings.
+- The real-path fixture reopens the v4 archive and requires every archive,
+  dynamic-gate, namespace, and contract check to pass while conversion remains
+  separate and training remains closed.
+- Latest authoritative `.98` suite: `960 passed`, `12 skipped`, two
+  configuration warnings in `82.03 s`.
+- `.98` no-token preflight passed at clean `HEAD == upstream == d4fb8b4`.
 - V4 namespace remains absent.
 - GPU compute owners: `0`
 - V4 runtime processes: `0`

@@ -7918,6 +7918,11 @@ and must state whether its candidate was accepted or rejected.
   `2eb9604b7e2c030a867d9ab64e536240561c652f`.
 - Focused tests pass `37/37`. The authoritative `.98` suite passes
   `959 passed, 12 skipped, 2 warnings` in `90.22 s`.
+- A later real-path synthetic case-23 test exercises the actual v4 finalizer:
+  archive reopening, explicit case/split validation, every archive/gate/contract
+  check, and conversion-only admission all pass. The latest authoritative
+  `.98` suite at `d4fb8b4fea89f953a699e4a090d33049c49936dc`
+  passes `960 passed, 12 skipped, 2 warnings` in `82.03 s`.
 - The `.98` no-token preflight passes every identity and closure check. The v4
   namespace remains absent, with zero GPU owners and zero runtime processes.
 - V4 contains no token or token hash. Runtime, label capture, conversion,

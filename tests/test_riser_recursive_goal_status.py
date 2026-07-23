@@ -216,6 +216,14 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["case23_capture_v4_save_case_propagated"] is True
     assert corrective["case23_capture_v4_save_split_propagated"] is True
     assert corrective["case23_capture_v4_finalizer_namespace_pinned"] is True
+    assert corrective["case23_capture_v4_real_archive_to_finalizer_passed"] is True
+    assert (
+        corrective["case23_capture_v4_all_archive_gate_and_contract_checks_required"]
+        is True
+    )
+    assert corrective["case23_capture_v4_authoritative_cpu_suite"] == (
+        "960_passed_12_skipped_2_warnings_in_82.03s"
+    )
     assert corrective["case23_capture_v4_cpu_ready"] is True
     assert corrective["case23_capture_v4_no_token_preflight_passed"] is True
     assert corrective["case23_capture_v4_runtime_authorized"] is False

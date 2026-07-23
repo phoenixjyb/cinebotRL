@@ -61,7 +61,8 @@ if [[ "$SPLIT_MODE" == holdout ]]; then
     "$RISER_MODEL_BASED_LEARNED_SPLIT_PRIOR_VALIDATION_REPORT"
   )
 fi
-python3 "$PREFLIGHT" "${preflight_args[@]}"
+RISER_POLICY_INSPECTOR_PYTHON="$ISAAC_PYTHON" \
+  python3 "$PREFLIGHT" "${preflight_args[@]}"
 
 if [[ "$RUN_MODE" == --preflight ]]; then
   cat "$receipt"

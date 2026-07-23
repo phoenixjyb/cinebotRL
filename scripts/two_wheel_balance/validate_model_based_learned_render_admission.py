@@ -19,6 +19,11 @@ AUDITOR = ROOT / "scripts/two_wheel_balance/audit_riser_goal_completion.py"
 CODE_PATHS = {
     "playback": ROOT / "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
     "admission_contract": Path(contract.__file__).resolve(),
+    "policy_artifact": (
+        ROOT
+        / "src/rl_platform/tasks/two_wheel_balance/"
+        "riser_model_based_policy_artifact.py"
+    ),
     "preflight_validator": Path(__file__).resolve(),
     "execution_wrapper": (
         ROOT / "scripts/two_wheel_balance/run_model_based_learned_render_gate.sh"

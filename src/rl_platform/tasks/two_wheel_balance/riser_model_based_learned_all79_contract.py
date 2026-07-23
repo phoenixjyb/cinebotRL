@@ -8,7 +8,14 @@ import math
 from pathlib import Path
 from typing import Any, Mapping
 
+from .riser_model_based_corrective_bc_contract import (
+    MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA,
+    validate_bc_execution_report,
+)
 from .riser_model_based_corrective_corpus import DEFAULT_RESERVED_HOLDOUT_CASES
+from .riser_model_based_policy_artifact import (
+    model_based_residual_torchscript_valid,
+)
 
 
 MODEL_BASED_LEARNED_ALL79_ADMISSION_SCHEMA = (
@@ -26,6 +33,7 @@ CODE_IDENTITY_KEYS = {
     "rollout_gate",
     "completion_auditor",
     "admission_contract",
+    "policy_artifact",
     "preflight_validator",
     "execution_wrapper",
 }
@@ -187,6 +195,40 @@ def _same_identity(left: object, right: object) -> bool:
         and isinstance(right, Mapping)
         and left.get("sha256") == right.get("sha256")
         and Path(str(left.get("path"))).name == Path(str(right.get("path"))).name
+    )
+
+
+def _bc_report_valid(
+    report: Mapping[str, Any],
+    *,
+    report_path: Path,
+) -> bool:
+    admission_path = _identity_path(
+        report.get("admission"),
+        directory=report_path.parent,
+    )
+    if admission_path is None or not admission_path.is_file():
+        return False
+    admission = _load_json_object(admission_path)
+    if admission is None:
+        return False
+    try:
+        validate_bc_execution_report(
+            report,
+            admission_path=admission_path,
+            admission=admission,
+            report_directory=report_path.parent,
+        )
+    except ValueError:
+        return False
+    return (
+        report.get("schema") == MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA
+        and report.get("passed") is True
+        and report.get("offline_gate_passed") is True
+        and report.get("valid_for_dynamic_canary") is True
+        and report.get("training_started") is True
+        and report.get("ppo_authorized") is False
+        and report.get("learned_rollout_authorized") is False
     )
 
 
@@ -526,14 +568,8 @@ def validate_learned_all79_admission(
             directory=identity_root,
             expected_path=bc_report_path,
         )
-        and _mapping_matches_json_file(bc_report_path, bc_report),
-        "bc_result": bc_report.get("schema") == BC_REPORT_SCHEMA
-        and bc_report.get("passed") is True
-        and bc_report.get("offline_gate_passed") is True
-        and bc_report.get("valid_for_dynamic_canary") is True
-        and bc_report.get("training_started") is True
-        and bc_report.get("ppo_authorized") is False
-        and bc_report.get("learned_rollout_authorized") is False,
+        and _mapping_matches_json_file(bc_report_path, bc_report)
+        and _bc_report_valid(bc_report, report_path=bc_report_path),
         "policy": _resolve_identity(
             admission.get("policy"),
             directory=identity_root,
@@ -542,7 +578,8 @@ def validate_learned_all79_admission(
         and isinstance(policy_identity, Mapping)
         and admission.get("policy", {}).get("sha256")
         == policy_identity.get("sha256")
-        and _exact_digest(policy_sha, 64),
+        and _exact_digest(policy_sha, 64)
+        and model_based_residual_torchscript_valid(policy_path),
         "source_manifest": _resolve_identity(
             admission.get("source_manifest"),
             directory=identity_root,

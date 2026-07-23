@@ -36,7 +36,7 @@ done
 
 receipt="$(mktemp)"
 trap 'rm -f "$receipt"' EXIT
-python3 "$PREFLIGHT" \
+RISER_POLICY_INSPECTOR_PYTHON="$ISAAC_PYTHON" python3 "$PREFLIGHT" \
   --admission "$RISER_MODEL_BASED_LEARNED_ALL79_ADMISSION" \
   --bc-report "$RISER_MODEL_BASED_LEARNED_ALL79_BC_REPORT" \
   --policy "$RISER_MODEL_BASED_LEARNED_ALL79_POLICY" \

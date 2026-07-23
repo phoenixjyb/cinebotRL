@@ -58,6 +58,10 @@
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_learned_all79_contract.py",
       "sha256": null
     },
+    "policy_artifact": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_policy_artifact.py",
+      "sha256": null
+    },
     "preflight_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_learned_all79_admission.py",
       "sha256": null

@@ -2,25 +2,26 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Mapping
 
 from .riser_model_based_corrective_bc_contract import (
-    MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA,
     sha256_file,
-    validate_bc_execution_report,
 )
 from .riser_model_based_corrective_corpus import DEFAULT_RESERVED_HOLDOUT_CASES
 from .riser_model_based_learned_all79_contract import (
     DEFAULT_EVALUATION_CONFIG,
     VALIDATION_GATE_SCHEMA,
+    _bc_report_valid,
     _exact_digest,
     _exact_source_manifest_valid,
     _gate_report_valid,
     _mapping_matches_json_file,
     _plan_manifest_valid,
     _resolve_identity,
+)
+from .riser_model_based_policy_artifact import (
+    model_based_residual_torchscript_valid,
 )
 
 
@@ -32,6 +33,7 @@ CODE_IDENTITY_KEYS = {
     "playback",
     "rollout_gate",
     "admission_contract",
+    "policy_artifact",
     "preflight_validator",
     "execution_wrapper",
 }
@@ -60,59 +62,6 @@ ADMISSION_FIELDS = {
     "ppo_authorized",
     "training_started",
 }
-
-
-def _load_json_object(path: Path) -> dict[str, Any] | None:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _identity_path(identity: object, directory: Path) -> Path | None:
-    if not isinstance(identity, Mapping) or set(identity) != {"path", "sha256"}:
-        return None
-    value = identity.get("path")
-    if not isinstance(value, str) or not value:
-        return None
-    path = Path(value)
-    path = path if path.is_absolute() else directory / path
-    return path.resolve()
-
-
-def _bc_report_valid(
-    report: Mapping[str, Any],
-    *,
-    report_path: Path,
-) -> bool:
-    admission_path = _identity_path(
-        report.get("admission"),
-        report_path.parent,
-    )
-    if admission_path is None or not admission_path.is_file():
-        return False
-    admission = _load_json_object(admission_path)
-    if admission is None:
-        return False
-    try:
-        validate_bc_execution_report(
-            report,
-            admission_path=admission_path,
-            admission=admission,
-            report_directory=report_path.parent,
-        )
-    except ValueError:
-        return False
-    return (
-        report.get("schema") == MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA
-        and report.get("passed") is True
-        and report.get("offline_gate_passed") is True
-        and report.get("valid_for_dynamic_canary") is True
-        and report.get("training_started") is True
-        and report.get("ppo_authorized") is False
-        and report.get("learned_rollout_authorized") is False
-    )
 
 
 def validate_learned_split_admission(
@@ -211,7 +160,8 @@ def validate_learned_split_admission(
         and isinstance(policy_identity, Mapping)
         and admission.get("policy", {}).get("sha256")
         == policy_identity.get("sha256")
-        and _exact_digest(policy_sha, 64),
+        and _exact_digest(policy_sha, 64)
+        and model_based_residual_torchscript_valid(policy_path),
         "source_manifest": _resolve_identity(
             admission.get("source_manifest"),
             directory=identity_root,

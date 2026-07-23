@@ -153,6 +153,11 @@ def _accept_structural_fixture_dependencies(monkeypatch) -> None:
     monkeypatch.setattr(contract, "_bc_report_valid", lambda *args, **kwargs: True)
     monkeypatch.setattr(
         contract,
+        "model_based_residual_torchscript_valid",
+        lambda *args, **kwargs: True,
+    )
+    monkeypatch.setattr(
+        contract,
         "_exact_source_manifest_valid",
         lambda *args, **kwargs: True,
     )
@@ -189,6 +194,20 @@ def test_cpu_review_passes_but_runtime_requires_separate_authorization(
 def test_exact_authorized_split_passes(tmp_path: Path, mode: str) -> None:
     fixture = _fixture(tmp_path, mode=mode, authorized=True)
     _validate(tmp_path, *fixture, require_authorized=True)
+
+
+def test_split_admission_rejects_invalid_policy_artifact(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        contract,
+        "model_based_residual_torchscript_valid",
+        lambda *args, **kwargs: False,
+    )
+    fixture = _fixture(tmp_path, mode="validation_canary", authorized=True)
+    with pytest.raises(ValueError, match="admission failed"):
+        _validate(tmp_path, *fixture, require_authorized=True)
 
 
 @pytest.mark.parametrize(

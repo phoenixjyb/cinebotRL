@@ -19,6 +19,9 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_learned_all79_contrac
 from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_corpus import (
     DEFAULT_RESERVED_HOLDOUT_CASES,
 )
+from rl_platform.tasks.two_wheel_balance import (
+    riser_model_based_learned_all79_contract as contract,
+)
 
 
 ROOT = Path(__file__).parents[1]
@@ -358,8 +361,40 @@ def _validate(fixture, *, require_authorized: bool = True) -> None:
     )
 
 
+@pytest.fixture(autouse=True)
+def _accept_bc_and_policy_artifact(monkeypatch) -> None:
+    monkeypatch.setattr(contract, "_bc_report_valid", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        contract,
+        "model_based_residual_torchscript_valid",
+        lambda *args, **kwargs: True,
+    )
+
+
 def test_authorized_all79_admission_binds_all_prerequisites(tmp_path: Path) -> None:
     _validate(_fixture(tmp_path))
+
+
+def test_all79_admission_rejects_invalid_policy_artifact(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        contract,
+        "model_based_residual_torchscript_valid",
+        lambda *args, **kwargs: False,
+    )
+    with pytest.raises(ValueError, match="admission failed"):
+        _validate(_fixture(tmp_path))
+
+
+def test_all79_admission_rejects_unvalidated_bc_report(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(contract, "_bc_report_valid", lambda *args, **kwargs: False)
+    with pytest.raises(ValueError, match="admission failed"):
+        _validate(_fixture(tmp_path))
 
 
 def test_admission_preserves_majority_zero_baseline_gate_semantics(

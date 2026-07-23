@@ -149,6 +149,11 @@ def _accept_source_and_plan(monkeypatch) -> None:
         lambda *args, **kwargs: True,
     )
     monkeypatch.setattr(contract, "_plan_manifest_valid", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        contract,
+        "model_based_residual_torchscript_valid",
+        lambda *args, **kwargs: True,
+    )
 
 
 def test_template_is_closed_and_selects_diverse_cases() -> None:
@@ -169,6 +174,19 @@ def test_cpu_review_is_valid_but_runtime_requires_authorization(tmp_path: Path) 
 
 def test_exact_authorized_render_admission_passes(tmp_path: Path) -> None:
     _validate(tmp_path, *_fixture(tmp_path, authorized=True))
+
+
+def test_render_admission_rejects_invalid_policy_artifact(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        contract,
+        "model_based_residual_torchscript_valid",
+        lambda *args, **kwargs: False,
+    )
+    with pytest.raises(ValueError, match="admission failed"):
+        _validate(tmp_path, *_fixture(tmp_path, authorized=True))
 
 
 @pytest.mark.parametrize(

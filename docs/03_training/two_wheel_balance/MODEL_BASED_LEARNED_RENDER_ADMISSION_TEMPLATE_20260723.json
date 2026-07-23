@@ -14,6 +14,7 @@
   "code": {
     "playback": {"path": null, "sha256": null},
     "admission_contract": {"path": null, "sha256": null},
+    "policy_artifact": {"path": null, "sha256": null},
     "preflight_validator": {"path": null, "sha256": null},
     "execution_wrapper": {"path": null, "sha256": null},
     "media_auditor": {"path": null, "sha256": null},

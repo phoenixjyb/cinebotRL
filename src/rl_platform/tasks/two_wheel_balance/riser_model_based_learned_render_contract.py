@@ -15,6 +15,9 @@ from .riser_model_based_learned_all79_contract import (
     _resolve_identity,
     sha256_file,
 )
+from .riser_model_based_policy_artifact import (
+    model_based_residual_torchscript_valid,
+)
 
 
 SCHEMA = "cinebotrl_two_wheel_riser_model_based_learned_render_admission_v1"
@@ -44,6 +47,7 @@ RENDER_CONFIG = {
 CODE_KEYS = {
     "playback",
     "admission_contract",
+    "policy_artifact",
     "preflight_validator",
     "execution_wrapper",
     "media_auditor",
@@ -164,7 +168,8 @@ def validate_render_admission(
             admission.get("policy"),
             directory=identity_root,
             expected_path=policy_path,
-        ),
+        )
+        and model_based_residual_torchscript_valid(policy_path),
         "source": _resolve_identity(
             admission.get("source_manifest"),
             directory=identity_root,

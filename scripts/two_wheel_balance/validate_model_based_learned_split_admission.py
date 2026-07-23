@@ -28,6 +28,11 @@ CODE_PATHS = {
         / "src/rl_platform/tasks/two_wheel_balance/"
         "riser_model_based_learned_split_contract.py"
     ),
+    "policy_artifact": (
+        ROOT
+        / "src/rl_platform/tasks/two_wheel_balance/"
+        "riser_model_based_policy_artifact.py"
+    ),
     "preflight_validator": Path(__file__).resolve(),
     "execution_wrapper": (
         ROOT

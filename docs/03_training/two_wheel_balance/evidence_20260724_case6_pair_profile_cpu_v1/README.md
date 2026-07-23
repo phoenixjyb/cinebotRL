@@ -28,3 +28,7 @@ Every input, shape, formula, timing, headroom, plant, and closed-state check
 passes. `pair_profile_cpu_ready=true`, but `runtime_route_implemented=false`.
 No token, runtime authorization, GPU launch, label capture, conversion, merge,
 BC, PPO, or training is enabled.
+
+The focused suite passes `50` tests on macOS and `.98`. Both platforms
+regenerate byte-identical corrective, wrench, and proposal files at the hashes
+recorded in `SHA256SUMS`.

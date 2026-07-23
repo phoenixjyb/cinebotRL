@@ -8627,3 +8627,31 @@ and must state whether its candidate was accepted or rejected.
   case-23 v4 CPU conversion. The capture authorization cannot be reused for
   conversion or another capture.
 - In parallel, continue CPU-only design of the case-6-specific paired profile.
+
+## Round 223: case-6 corrective profiles are formula-bound
+
+- Added a reproducible CPU-only builder for case-6 corrective and wrench
+  profiles. It retains `75%` of the observed raw case-6 residual envelope under
+  policy scales `[0.05,0.05,0.02]`, producing maximum residuals
+  `[0.028768,0.007953,0.001787]` with a `0.30 s` slew horizon.
+- The proven `20 N`, `20`-step pulse starts at phase `17.185169 s` and fits
+  within the only verified low-motion window. Local base/yaw headroom is
+  `0.110688/0.182392`, riser-target headroom is `0.279227 m`, and the recovery
+  tail is `0.452106 s`.
+- The provisional `28 kg` lower model gives a `2 Ns` impulse and
+  `0.003571 m` free-body displacement. This remains an observability screen,
+  not a closed-loop prediction.
+- Commit `8667320d83c3fd3518927bfca3819b061532cb50` passes `50` focused
+  tests on macOS and `.98`. Both platforms regenerate byte-identical profile
+  and proposal artifacts. Proposal SHA-256 is
+  `649aeaa56333b9172e4a25d0f34a716d09a51da7cfa1f269ca14ab32da384b64`.
+- `pair_profile_cpu_ready=true`, but no runtime route or authorization exists.
+  No token, GPU launch, capture, conversion, merge, BC, PPO, or training was
+  created. Goal completion remains `6/10`.
+
+## Next round after Round 223
+
+- Implement a disabled-by-default, hash-bound case-6 paired-canary runtime
+  contract and CPU validator. Do not issue a token or launch Isaac.
+- The nearest actual data-path action remains the separately authorized
+  case-23 v4 CPU conversion.

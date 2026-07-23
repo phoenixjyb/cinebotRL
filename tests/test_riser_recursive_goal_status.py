@@ -118,6 +118,26 @@ CASE6_PAIR_READINESS_EVIDENCE = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_case6_pair_readiness_cpu_v1/summary.json"
 )
+CASE6_PAIR_PROFILE_BUILDER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "build_model_based_corrective_case6_pair_profiles.py"
+)
+CASE6_PAIR_PROFILE_PROPOSAL = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case6_pair_profile_cpu_v1/proposal.json"
+)
+CASE6_CORRECTIVE_PROFILE = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case6_profile_v1.json"
+)
+CASE6_WRENCH_PROFILE = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case6_wrench_profile_v1.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -569,6 +589,55 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case6["runtime_authorized"] is False
     assert case6["label_capture_authorized"] is False
     assert case6["training_started"] is False
+    assert corrective["case6_pair_profile_schema"] == (
+        "cinebotrl_two_wheel_riser_case6_pair_profile_proposal_cpu_v1"
+    )
+    assert corrective["case6_pair_profile_implementation_commit"] == (
+        "8667320d83c3fd3518927bfca3819b061532cb50"
+    )
+    assert corrective["case6_pair_profile_builder_sha256"] == _sha256(
+        CASE6_PAIR_PROFILE_BUILDER
+    )
+    assert corrective["case6_pair_profile_builder_git_blob_sha1"] == (
+        "00d2ba88d8fa8f2c86ed65b82100d8620a6090ed"
+    )
+    assert corrective["case6_pair_profile_proposal_sha256"] == _sha256(
+        CASE6_PAIR_PROFILE_PROPOSAL
+    )
+    assert corrective["case6_corrective_profile_sha256"] == _sha256(
+        CASE6_CORRECTIVE_PROFILE
+    )
+    assert corrective["case6_wrench_profile_sha256"] == _sha256(
+        CASE6_WRENCH_PROFILE
+    )
+    assert corrective["case6_pair_profile_mac_windows_byte_parity"] is True
+    assert corrective["case6_pair_profile_focused_cpu_suite"] == (
+        "50_passed_2_warnings"
+    )
+    assert corrective[
+        "case6_pair_profile_envelope_retention_fraction"
+    ] == 0.75
+    assert corrective["case6_pair_profile_maximum_residuals"] == [
+        0.028767878925779956,
+        0.007952802338471211,
+        0.0017865156836203155,
+    ]
+    assert corrective["case6_pair_profile_slew_horizon_s"] == 0.3
+    assert corrective["case6_pair_profile_pulse_duration_steps"] == 20
+    assert corrective["case6_pair_profile_pulse_force_body_x_n"] == 20.0
+    assert corrective["case6_pair_profile_recovery_tail_s"] > 0.45
+    assert corrective["case6_pair_profile_cpu_ready"] is True
+    assert corrective["case6_pair_profile_runtime_route_implemented"] is False
+    assert corrective["case6_pair_profile_runtime_authorized"] is False
+    assert corrective["case6_pair_profile_label_capture_authorized"] is False
+    assert corrective["case6_pair_profile_training_authorized"] is False
+    case6_profile = json.loads(CASE6_PAIR_PROFILE_PROPOSAL.read_text())
+    assert case6_profile["passed"] is True
+    assert case6_profile["pair_profile_cpu_ready"] is True
+    assert case6_profile["runtime_route_implemented"] is False
+    assert case6_profile["runtime_authorized"] is False
+    assert case6_profile["label_capture_authorized"] is False
+    assert case6_profile["training_started"] is False
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

@@ -17,6 +17,16 @@ CASE23_CAPTURE_RESULT = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260723_case23_corrective_capture_v1_rejected/final_status.json"
 )
+CASE23_CAPTURE_V2_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case23_capture_contract_v2.json"
+)
+CASE23_CAPTURE_V2_CPU_REVIEW = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_case23_corrective_capture_v2_cpu/summary.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -158,6 +168,16 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["case23_capture_cpu_preflight_passed"] is True
     assert corrective["case23_capture_authorized"] is False
     assert corrective["case23_conversion_authorized"] is False
+    assert corrective["case23_capture_v2_cpu_review_ready"] is True
+    assert corrective["case23_capture_v2_cpu_review_sha256"] == _sha256(
+        CASE23_CAPTURE_V2_CPU_REVIEW
+    )
+    assert corrective["case23_capture_v2_contract_sha256"] == _sha256(
+        CASE23_CAPTURE_V2_CONTRACT
+    )
+    assert corrective["case23_capture_v2_runtime_authorized"] is False
+    assert corrective["case23_capture_v2_label_capture_authorized"] is False
+    assert corrective["case23_capture_v2_conversion_authorized"] is False
     assert corrective["temporal_projection_audit_sha256"] == _sha256(
         TEMPORAL_PROJECTION_AUDIT
     )
@@ -199,7 +219,7 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "fresh_namespace_case23_capture_contract" in (
+    assert "exactly_one_case23_v2_capture" in (
         goal["next_iteration"]["required_change"]
     )
 

@@ -127,6 +127,7 @@
   "gpu_launch_authorized": true,
   "authorization_token_issued": true,
   "runtime_authorization_token_sha256": "REDACTED_CONSUMED_ONE_USE_AUTHORIZATION_HASH",
+  "authorization_hash_redacted_from_git_history": true,
   "label_capture_authorized": true,
   "dataset_creation_authorized": false,
   "bc_authorized": false,

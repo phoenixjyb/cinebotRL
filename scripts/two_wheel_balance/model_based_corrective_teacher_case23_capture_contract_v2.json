@@ -1,6 +1,6 @@
 {
   "schema": "cinebotrl_two_wheel_riser_corrective_teacher_capture_contract_v2",
-  "reviewed_parent_commit": "ff8c0330b331ab8a65a492b2dc4e4f168853af34",
+  "reviewed_parent_commit": "94ebd9b9ba72f74be09934eed495a110d90af419",
   "case": 23,
   "split": "train",
   "namespace": "20260723_model_based_corrective_teacher_case23_capture_v2_exclusive",
@@ -105,13 +105,13 @@
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case23_capture_v2.py",
-      "sha256": "d087629eb04aa98398c2a2554390887ca5efabbff194edf7e9e4ae69b4a469c3",
-      "git_blob_sha1": "9ee398e446904a94b64849481a43b388331437e2"
+      "sha256": "0762acda3ca467303fed6c1e2943d9c86b7f3414f561712d359cb43ea0e9fd40",
+      "git_blob_sha1": "5ecb5773aa5b5a7e66b79dc22a6cc9a389e24bc2"
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case23_capture_v2.sh",
-      "sha256": "609bc3eeabf728edde0de4fc1277246339bb38e94db1a6c6c12e35976a17d9c5",
-      "git_blob_sha1": "d507298cfa9c43ebe40a0c55b92467b72d7b3183"
+      "sha256": "9c1c08a2fbe98d4b113edbac7f2ea16e63d6bdcb1cc3922e7a4649456083a756",
+      "git_blob_sha1": "bbb937c75741a52cc205660f7f38e32fee1dd8b9"
     },
     "capture_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case23_capture_v2.py",
@@ -126,6 +126,7 @@
   "runtime_authorized": false,
   "gpu_launch_authorized": false,
   "authorization_token_issued": false,
+  "runtime_authorization_mode": "out_of_band_sha256_environment_v1",
   "runtime_authorization_token_sha256": "",
   "label_capture_authorized": false,
   "dataset_creation_authorized": false,

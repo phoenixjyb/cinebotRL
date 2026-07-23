@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 import subprocess
 
 
@@ -60,6 +61,9 @@ def test_v2_contract_is_fresh_route_and_keeps_runtime_closed() -> None:
     assert contract["runtime_authorized"] is False
     assert contract["gpu_launch_authorized"] is False
     assert contract["authorization_token_issued"] is False
+    assert contract["runtime_authorization_mode"] == (
+        "out_of_band_sha256_environment_v1"
+    )
     assert contract["runtime_authorization_token_sha256"] == ""
     assert contract["label_capture_authorized"] is False
     assert contract["dataset_creation_authorized"] is False
@@ -142,7 +146,11 @@ def test_v2_wrapper_expands_namespace_and_cannot_execute_without_token() -> None
         rf"\{VALIDATOR_MODULE.NAMESPACE}"
     )
     assert "$NAMESPACE" not in expanded
-    assert 'readonly AUTHORIZATION_SHA256=""' in source
+    assert (
+        'AUTHORIZATION_SHA256="${'
+        'RISER_CORRECTIVE_CASE23_CAPTURE_V2_AUTHORIZATION_SHA256:-}"'
+    ) in source
+    assert re.search(r'AUTHORIZATION_SHA256="[0-9a-f]{64}"', source) is None
     result = subprocess.run(
         ["bash", str(WRAPPER), "--execute"],
         check=False,
@@ -151,6 +159,129 @@ def test_v2_wrapper_expands_namespace_and_cannot_execute_without_token() -> None
     )
     assert result.returncode == 4
     assert "runtime_authorization_not_issued" in result.stderr
+
+
+def test_v2_validator_uses_only_exact_out_of_band_token_hash(
+    monkeypatch, tmp_path: Path
+) -> None:
+    def fake_validate(contract_path, repo, **kwargs):
+        assert kwargs["authorization_file"] is None
+        return {"schema": "base", "passed": True, "checks": {}}
+
+    monkeypatch.setattr(VALIDATOR_MODULE, "validate_capture", fake_validate)
+    monkeypatch.setattr(
+        VALIDATOR_MODULE,
+        "drive_profile_checks",
+        lambda result: {"active_profile": True},
+    )
+    token = ROOT.parent / ".case23-v2-test-authorization-token"
+    token.write_bytes(b"runtime-only-random-token-fixture\n")
+    token.chmod(0o600)
+    token_hash = hashlib.sha256(token.read_bytes()).hexdigest()
+    try:
+        admitted = VALIDATOR_MODULE.validate(
+            CONTRACT,
+            ROOT,
+            namespace=VALIDATOR_MODULE.NAMESPACE,
+            authorization_file=token,
+            authorization_sha256=token_hash,
+        )
+        assert admitted["authorization_checks"][
+            "authorization_file_outside_repository"
+        ] is True
+        assert admitted["runtime_authorized"] is True
+        assert admitted["label_capture_authorized"] is True
+        assert admitted["passed"] is True
+        rejected = VALIDATOR_MODULE.validate(
+            CONTRACT,
+            ROOT,
+            namespace=VALIDATOR_MODULE.NAMESPACE,
+            authorization_file=token,
+            authorization_sha256="0" * 64,
+        )
+        assert rejected["runtime_authorized"] is False
+        assert rejected["label_capture_authorized"] is False
+        assert rejected["passed"] is False
+    finally:
+        token.unlink(missing_ok=True)
+
+
+def test_v2_validator_rejects_token_inside_repository(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        VALIDATOR_MODULE,
+        "validate_capture",
+        lambda *args, **kwargs: {
+            "schema": "base",
+            "passed": True,
+            "checks": {},
+        },
+    )
+    monkeypatch.setattr(
+        VALIDATOR_MODULE,
+        "drive_profile_checks",
+        lambda result: {"active_profile": True},
+    )
+    token = ROOT / ".runtime-secrets" / "case23-v2-test.authorization-token"
+    token.parent.mkdir(exist_ok=True)
+    token.write_bytes(b"must-not-live-in-worktree\n")
+    token.chmod(0o600)
+    token_hash = hashlib.sha256(token.read_bytes()).hexdigest()
+    try:
+        rejected = VALIDATOR_MODULE.validate(
+            CONTRACT,
+            ROOT,
+            namespace=VALIDATOR_MODULE.NAMESPACE,
+            authorization_file=token,
+            authorization_sha256=token_hash,
+        )
+        assert rejected["authorization_checks"][
+            "authorization_file_outside_repository"
+        ] is False
+        assert rejected["runtime_authorized"] is False
+        assert rejected["passed"] is False
+    finally:
+        token.unlink(missing_ok=True)
+
+
+def test_v2_validator_rejects_noncanonical_authorization_hash(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        VALIDATOR_MODULE,
+        "validate_capture",
+        lambda *args, **kwargs: {
+            "schema": "base",
+            "passed": True,
+            "checks": {},
+        },
+    )
+    monkeypatch.setattr(
+        VALIDATOR_MODULE,
+        "drive_profile_checks",
+        lambda result: {"active_profile": True},
+    )
+    token = ROOT.parent / ".case23-v2-test-authorization-token"
+    token.write_bytes(b"runtime-only-random-token-fixture\n")
+    token.chmod(0o600)
+    try:
+        rejected = VALIDATOR_MODULE.validate(
+            CONTRACT,
+            ROOT,
+            namespace=VALIDATOR_MODULE.NAMESPACE,
+            authorization_file=token,
+            authorization_sha256=hashlib.sha256(
+                token.read_bytes()
+            ).hexdigest().upper(),
+        )
+        assert rejected["authorization_checks"][
+            "authorization_hash_is_out_of_band"
+        ] is False
+        assert rejected["runtime_authorized"] is False
+        assert rejected["passed"] is False
+    finally:
+        token.unlink(missing_ok=True)
 
 
 def test_v2_wrapper_remains_capture_only() -> None:

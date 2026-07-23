@@ -9,7 +9,7 @@ rejected before Isaac simulation initialization. It must not be retried without
 a new explicit authorization.
 
 The admission contract passed at runtime commit
-`037aa8dbeb04790276a0515a2203e3d575cb010b`: the token was mode `0600`, its
+`5bbe34376cebd83564f6bd50c5add74666a361ea`: the token was mode `0600`, its
 SHA-256 matched, the namespace was fresh, `HEAD == upstream`, the tracked tree
 was clean, the GPU was exclusive, and the active simulation plant remained
 `leadshine_400w_engineering_sample_v1`.

@@ -4,8 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
 from pathlib import Path
+import re
+import stat
 import sys
 
 
@@ -22,7 +26,7 @@ from scripts.two_wheel_balance.validate_model_based_corrective_teacher_case30_ca
 )
 
 
-REVIEWED_PARENT = "ff8c0330b331ab8a65a492b2dc4e4f168853af34"
+REVIEWED_PARENT = "94ebd9b9ba72f74be09934eed495a110d90af419"
 NAMESPACE = "20260723_model_based_corrective_teacher_case23_capture_v2_exclusive"
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/"
@@ -67,12 +71,13 @@ def validate(
     *,
     namespace: str,
     authorization_file: Path | None = None,
+    authorization_sha256: str | None = None,
 ) -> dict[str, object]:
     result = validate_capture(
         contract_path,
         repo,
         namespace=namespace,
-        authorization_file=authorization_file,
+        authorization_file=None,
         expected_case=23,
         expected_namespace=NAMESPACE,
         contract_relative_path=CONTRACT_RELATIVE_PATH,
@@ -90,12 +95,58 @@ def validate(
     result["cpu_contract_ready"] = bool(
         result.get("cpu_contract_ready") and profile_passed
     )
-    if not profile_passed:
-        result["authorization_consumed_before_isaac"] = False
-        result["runtime_authorized"] = False
-        result["gpu_launch_authorized"] = False
-        result["label_capture_authorized"] = False
-    result["passed"] = bool(result.get("passed") and profile_passed)
+    cpu_passed = bool(result.get("passed") and profile_passed)
+    token_present = authorization_file is not None and authorization_file.is_file()
+    token_mode = (
+        stat.S_IMODE(authorization_file.stat().st_mode)
+        if token_present
+        else None
+    )
+    token_hash = (
+        hashlib.sha256(authorization_file.read_bytes()).hexdigest()
+        if token_present
+        else None
+    )
+    authorization_path_outside_repo = bool(
+        token_present
+        and not authorization_file.resolve().is_relative_to(repo.resolve())
+    )
+    authorization_checks = {
+        "authorization_file_present": token_present,
+        "authorization_mode_0600": token_mode == 0o600,
+        "authorization_not_symlink": token_present
+        and not authorization_file.is_symlink(),
+        "authorization_file_outside_repository": (
+            authorization_path_outside_repo
+        ),
+        "authorization_hash_is_out_of_band": (
+            isinstance(authorization_sha256, str)
+            and re.fullmatch(r"[0-9a-f]{64}", authorization_sha256) is not None
+        )
+        and authorization_sha256
+        not in contract_path.read_text(encoding="utf-8"),
+        "authorization_hash_matches": token_present
+        and isinstance(authorization_sha256, str)
+        and hmac.compare_digest(token_hash, authorization_sha256),
+    }
+    runtime_authorized = bool(
+        cpu_passed
+        and authorization_file is not None
+        and all(authorization_checks.values())
+    )
+    result["authorization_checks"] = authorization_checks
+    result["authorization_file"] = (
+        None
+        if authorization_file is None
+        else str(authorization_file.resolve())
+    )
+    result["authorization_consumed_before_isaac"] = runtime_authorized
+    result["runtime_authorized"] = runtime_authorized
+    result["gpu_launch_authorized"] = runtime_authorized
+    result["label_capture_authorized"] = runtime_authorized
+    result["passed"] = cpu_passed and (
+        authorization_file is None or runtime_authorized
+    )
     result["schema"] = ADMISSION_SCHEMA
     return result
 
@@ -106,6 +157,7 @@ def main() -> int:
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--namespace", required=True)
     parser.add_argument("--authorization-file", type=Path)
+    parser.add_argument("--authorization-sha256")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     result = validate(
@@ -113,6 +165,7 @@ def main() -> int:
         args.repo_root,
         namespace=args.namespace,
         authorization_file=args.authorization_file,
+        authorization_sha256=args.authorization_sha256,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

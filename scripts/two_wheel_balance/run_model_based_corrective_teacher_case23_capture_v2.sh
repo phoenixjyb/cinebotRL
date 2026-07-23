@@ -17,8 +17,6 @@ readonly CORRECTIVE_PROFILE="$WIN_ROOT\scripts\two_wheel_balance\model_based_cor
 readonly GAINS="$WIN_ROOT\docs\03_training\two_wheel_balance\evidence_20260714_28kg\lqr_gains.json"
 readonly PLAYBACK="$WIN_ROOT\scripts\two_wheel_balance\smoke_riser_reference_playback.py"
 readonly FINALIZER="$WIN_ROOT\scripts\two_wheel_balance\summarize_model_based_corrective_teacher_case23_capture_v2.py"
-# A later explicit authorization may pin one token hash in a separate commit.
-readonly AUTHORIZATION_SHA256=""
 
 reject() {
   printf '{"reason":"%s","runtime_started":false,"label_capture_started":false,"passed":false}\n' "$1" >&2
@@ -35,6 +33,7 @@ done
 MODE="${1:---preflight}"
 [[ "$MODE" == --preflight || "$MODE" == --execute ]] || reject "unsupported_mode" 2
 AUTHORIZATION_FILE="${RISER_CORRECTIVE_CASE23_CAPTURE_V2_AUTHORIZATION_FILE:-}"
+AUTHORIZATION_SHA256="${RISER_CORRECTIVE_CASE23_CAPTURE_V2_AUTHORIZATION_SHA256:-}"
 if [[ "$MODE" == --execute ]]; then
   [[ -n "$AUTHORIZATION_SHA256" ]] || reject "runtime_authorization_not_issued" 4
   [[ -n "$AUTHORIZATION_FILE" && -f "$AUTHORIZATION_FILE" ]] || {
@@ -82,7 +81,10 @@ VALIDATOR_ARGS=(
   --output "$ADMISSION"
 )
 if [[ "$MODE" == --execute ]]; then
-  VALIDATOR_ARGS+=(--authorization-file "$AUTHORIZATION_FILE")
+  VALIDATOR_ARGS+=(
+    --authorization-file "$AUTHORIZATION_FILE"
+    --authorization-sha256 "$AUTHORIZATION_SHA256"
+  )
 fi
 python3 "$VALIDATOR" "${VALIDATOR_ARGS[@]}" >/dev/null
 if [[ "$MODE" == --preflight ]]; then

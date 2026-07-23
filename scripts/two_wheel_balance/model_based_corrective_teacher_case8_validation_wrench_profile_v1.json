@@ -1,0 +1,8 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_deterministic_wrench_pulse_v1",
+  "case": 8,
+  "start_phase_time_s": 2.8513062688185196,
+  "duration_steps": 20,
+  "force_body_x_n": 18.0,
+  "application_height_m": 0.5
+}

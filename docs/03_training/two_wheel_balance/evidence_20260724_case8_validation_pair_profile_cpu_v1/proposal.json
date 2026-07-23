@@ -1,0 +1,305 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case8_validation_pair_profile_proposal_cpu_v1",
+  "case": 8,
+  "split": "validation",
+  "input_checks": {
+    "readiness_schema": true,
+    "readiness_case": true,
+    "readiness_passed": true,
+    "readiness_requires_case_profile": true,
+    "readiness_has_low_motion_window": true,
+    "readiness_forbids_case23_reuse": true,
+    "readiness_forbids_case6_reuse": true,
+    "readiness_forbids_case2_reuse": true,
+    "readiness_not_profile_ready": true,
+    "readiness_closed": true,
+    "readiness_plan_hash": true,
+    "plan_schema_case": true,
+    "plan_integrity": true,
+    "plan_kinematic_gate": true,
+    "normalized_envelope": true,
+    "readiness_split_validation": true,
+    "selection_case8_role": true,
+    "selection_forbids_train_profile_reuse": true,
+    "readiness_forbids_case30_reuse": true,
+    "readiness_forbids_case7_reuse": true
+  },
+  "shape_checks": {
+    "state_arrays": true,
+    "transition_arrays": true,
+    "finite": true,
+    "clocks": true,
+    "source_anchor_map": true
+  },
+  "formula_checks": {
+    "retained_raw_envelope": true,
+    "normalized_policy_margin": true,
+    "slew_horizon": true,
+    "pulse_source_samples": true,
+    "recovery_tail": true,
+    "base_residual_headroom": true,
+    "yaw_residual_headroom": true,
+    "riser_target_headroom": true,
+    "proxy_motion_headroom": true,
+    "full_plan_base_yaw_unclipped": true,
+    "full_plan_riser_clipping_bounded": true,
+    "pulse_window_projection_unclipped": true,
+    "projection_contractive": true,
+    "effective_normalized_margin": true,
+    "plant_mass": true,
+    "pulse_impulse_envelope": true,
+    "pulse_observable_lower_bound": true
+  },
+  "identities": {
+    "readiness": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case8_validation_pair_readiness_cpu_v1/summary.json",
+      "sha256": "8ba7d6613b53cca7f266cb0052680b2d0cc4a71e363e10abbadcb8c789526983"
+    },
+    "plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case8_validation_pair_readiness_cpu_v1/source/case_0008_smoothed_riser_plan_v1.npz",
+      "sha256": "f07ff020128dee70ea9c8c2d806dc75c8e0ef3964dccb4e0aabfd1b0048f3655"
+    },
+    "plant_prior": {
+      "path": "docs/03_training/two_wheel_balance/PLANT_PRIOR_PROVISIONAL_V1.json",
+      "sha256": "9c6268ab0f13d5487a41d31b011eb9ac735b0dcf01769752389972304e12762c"
+    },
+    "safety_projection_source": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_residual_dataset.py",
+      "sha256": "b0efa4b9199c6b48e48c98ebc507b07e404c71d21c378a770c9056b4d19008a0"
+    },
+    "corrective_profile": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case8_validation_profile_v1.json",
+      "sha256": "26e5fc5caf9cf041294bbd856862d8ec19e2c6cf2daa5aa2c0138523db3f5ce0"
+    },
+    "wrench_profile": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case8_validation_wrench_profile_v1.json",
+      "sha256": "7fecccc20e485bd3148434a8aa3c7571d6b83ff33530b7e0ee848d5c9d070ac5"
+    },
+    "formula_engine": {
+      "path": "scripts/two_wheel_balance/build_model_based_corrective_case7_pair_profiles.py",
+      "sha256": "35b5202e81a8d5ee3636cb5fbe9df7004bf4bc0964669b8ac614208aa9f81b40"
+    },
+    "case7_corrective_profile_comparison": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_profile_v1.json",
+      "sha256": "adaacdf25fc8255cc3ff1bf61a9c5c76cc4c8460e83a70e9058daafa9fffc75f"
+    },
+    "case7_wrench_profile_comparison": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_wrench_profile_v1.json",
+      "sha256": "0b00bb54bd8ef668417fa80a70bc7ccbe30aa5566278e52dec3b7ade45859e72"
+    }
+  },
+  "source_execution_clock_contract": {
+    "source_state_count": 663,
+    "transition_count": 662,
+    "source_duration_s": 12.940941,
+    "execution_duration_s": 18.1173174,
+    "source_anchor_map_exact": true
+  },
+  "profile_formula": {
+    "policy_residual_scales": [
+      0.05,
+      0.05,
+      0.02
+    ],
+    "observed_normalized_raw_envelope": [
+      0.7683071716210526,
+      0.4073792973451225,
+      0.12531422692375283
+    ],
+    "observed_raw_residual_envelope": [
+      0.03841535858105263,
+      0.020368964867256128,
+      0.0025062845384750568
+    ],
+    "retention_fraction": 0.4,
+    "maximum_residuals": [
+      0.015366143432421054,
+      0.008147585946902451,
+      0.0010025138153900227
+    ],
+    "slew_horizon_s": 0.4,
+    "maximum_slew_rates": [
+      0.03841535858105263,
+      0.020368964867256128,
+      0.0025062845384750563
+    ]
+  },
+  "pulse_window": {
+    "window_index": 1,
+    "window_start_index": 27,
+    "window_end_index": 125,
+    "pulse_start_index": 92,
+    "pulse_start_phase_time_s": 2.8513062688185196,
+    "pulse_nominal_end_phase_time_s": 2.9513062688185197,
+    "pulse_source_sample_count": 4,
+    "recovery_tail_s": 15.166011131181481,
+    "local_maximums": [
+      0.29987049776938346,
+      0.005598014680708196,
+      0.013867142049912483,
+      0.009330357067564144
+    ],
+    "local_headroom": [
+      0.10012950223061656,
+      0.3944019853192918,
+      0.9861328579500875,
+      0.40954866341107493
+    ],
+    "local_riser_target_range_m": [
+      0.0702142657876406,
+      0.07132258139984793
+    ],
+    "local_riser_target_headroom_m": 0.0702142657876406,
+    "selection_key": [
+      0.749676244,
+      0.7998130098968701,
+      2.8513062688185196
+    ],
+    "pulse_duration_steps": 20,
+    "pulse_duration_s_at_policy_rate": 0.1
+  },
+  "projection_envelope": {
+    "full_plan": {
+      "command_lower_bounds": [
+        -0.4,
+        -0.4,
+        0.0
+      ],
+      "command_upper_bounds": [
+        0.4,
+        0.4,
+        1.2
+      ],
+      "directions": {
+        "negative": {
+          "requested_residual": [
+            -0.015366143432421054,
+            -0.008147585946902451,
+            -0.0010025138153900227
+          ],
+          "command_clipped_transition_count": [
+            0,
+            0,
+            4
+          ],
+          "effective_residual_abs_max": [
+            0.01536614343242107,
+            0.008147585946902458,
+            0.0010025138153900714
+          ],
+          "projection_is_contractive": true
+        },
+        "positive": {
+          "requested_residual": [
+            0.015366143432421054,
+            0.008147585946902451,
+            0.0010025138153900227
+          ],
+          "command_clipped_transition_count": [
+            0,
+            0,
+            0
+          ],
+          "effective_residual_abs_max": [
+            0.015366143432421056,
+            0.008147585946902458,
+            0.0010025138153900714
+          ],
+          "projection_is_contractive": true
+        }
+      },
+      "all_requested_commands_unclipped": false,
+      "all_projections_contractive": true
+    },
+    "pulse_window": {
+      "command_lower_bounds": [
+        -0.4,
+        -0.4,
+        0.0
+      ],
+      "command_upper_bounds": [
+        0.4,
+        0.4,
+        1.2
+      ],
+      "directions": {
+        "negative": {
+          "requested_residual": [
+            -0.015366143432421054,
+            -0.008147585946902451,
+            -0.0010025138153900227
+          ],
+          "command_clipped_transition_count": [
+            0,
+            0,
+            0
+          ],
+          "effective_residual_abs_max": [
+            0.015366143432421042,
+            0.008147585946902451,
+            0.001002513815390016
+          ],
+          "projection_is_contractive": true
+        },
+        "positive": {
+          "requested_residual": [
+            0.015366143432421054,
+            0.008147585946902451,
+            0.0010025138153900227
+          ],
+          "command_clipped_transition_count": [
+            0,
+            0,
+            0
+          ],
+          "effective_residual_abs_max": [
+            0.015366143432421042,
+            0.008147585946902451,
+            0.001002513815390016
+          ],
+          "projection_is_contractive": true
+        }
+      },
+      "all_requested_commands_unclipped": true,
+      "all_projections_contractive": true
+    },
+    "effective_normalized_action_abs_max": 0.3073228686484214,
+    "label_contract": "effective_post_supervisor_residual_only"
+  },
+  "pulse_lower_model": {
+    "total_mass_kg": 28.0,
+    "impulse_ns": 1.8,
+    "application_moment_impulse_nms": 0.9,
+    "ideal_free_body_delta_velocity_mps": 0.0642857142857143,
+    "ideal_free_body_displacement_during_pulse_m": 0.003214285714285715,
+    "limitation": "observability and envelope screen only; not a prediction of closed-loop Isaac response"
+  },
+  "case23_profile_reuse_authorized": false,
+  "case6_profile_reuse_authorized": false,
+  "case2_profile_reuse_authorized": false,
+  "pair_profile_cpu_ready": true,
+  "runtime_route_implemented": false,
+  "authorization_token_issued": false,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "next_bounded_action": "implement_case8_validation_pair_runtime_contract_cpu_only_without_authorization",
+  "passed": true,
+  "validation_profile_checks": {
+    "case7_corrective_profile_not_reused": true,
+    "case7_wrench_profile_not_reused": true,
+    "validation_retention_is_more_conservative_than_case7": true,
+    "validation_pulse_is_smaller_than_case7": true
+  },
+  "case30_profile_reuse_authorized": false,
+  "case7_profile_reuse_authorized": false,
+  "train_profile_reuse_authorized": false,
+  "validation_runtime_opened": false,
+  "holdout_opened": false
+}

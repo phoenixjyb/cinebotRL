@@ -19,8 +19,12 @@ own conservative validation profile. Reuse of case-30, case-23, case-6,
 case-2, or case-7 profiles is forbidden.
 
 The local readiness regression suite passes `23 passed, 2 warnings in
-0.45 s`. Authoritative `.98` verification is deferred until the audit is
-committed and synced.
+0.45 s`. The same focused suite on `.98` passes `23 passed, 2 warnings in
+1.45 s`, and regenerates byte-identical evidence at SHA-256
+`8ba7d6613b53cca7f266cb0052680b2d0cc4a71e363e10abbadcb8c789526983`.
+The authoritative `.98` CPU suite passes
+`1232 passed, 12 skipped, 2 warnings in 151.02 s` at implementation commit
+`155affbd7348d6eecae541a08a6908cc31e397ed`.
 
 No validation runtime, holdout, authorization token, GPU launch, label
 capture, conversion, merge, BC, PPO, or training is opened.

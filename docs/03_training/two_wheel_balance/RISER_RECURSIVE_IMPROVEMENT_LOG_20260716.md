@@ -8950,3 +8950,41 @@ and must state whether its candidate was accepted or rejected.
 - The nearest actual data-path action remains exactly one separately
   authorized case-23 v4 CPU conversion. The consumed v4 capture authorization
   cannot be reused.
+
+## Round 232: case-8 validation readiness is hash-bound and CPU-verified
+
+- Bound the first validation case to the dedicated validation-tranche
+  selection instead of reusing the train-tranche selection or any train-case
+  profile.
+- Preserved `663` immutable source anchors and `662` transitions, with
+  separate `12.940941 s` source and `18.1173174 s` execution clocks and an
+  empty, separate initialization phase.
+- Verified the selected zero-residual dynamic gate at
+  `0.131254/0.143331 m` position p95/max and `6.147057 deg` peak pitch.
+  The playback applied zero residual, did not terminate, and produced no
+  training artifact.
+- Found four conservative low-motion windows; the longest is `3.431994 s`.
+  Camera lever-arm correction saturation is `0.920061`, so a dedicated
+  validation profile is required. Reuse of case-30, case-23, case-6, case-2,
+  or case-7 profiles remains forbidden.
+- Implementation commit
+  `155affbd7348d6eecae541a08a6908cc31e397ed` passes the focused `23`-test
+  readiness suite on macOS and `.98`. Both hosts regenerate byte-identical
+  evidence at SHA-256
+  `8ba7d6613b53cca7f266cb0052680b2d0cc4a71e363e10abbadcb8c789526983`.
+- The authoritative `.98` CPU suite passes:
+  `1232 passed, 12 skipped, 2 warnings in 151.02 s`.
+- The repeated case-23 v4 capture request was not replayed: that one-shot
+  authorization was already consumed by the sealed successful capture.
+- No token, runtime namespace, Isaac/GPU run, label capture, conversion,
+  merge, BC, PPO, or training was created. Goal completion remains `6/10`.
+
+## Next round after Round 232
+
+- Design CPU-only case-8 validation corrective and perturbation profiles
+  inside an audited low-motion window. Prove command headroom, unchanged
+  source/execution clocks, post-supervisor label margin, and recovery-tail
+  invariants without reusing a train-case profile.
+- The nearest actual data-path action remains exactly one separately
+  authorized case-23 v4 CPU conversion. The consumed v4 capture authorization
+  cannot be reused.

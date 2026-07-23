@@ -73,6 +73,31 @@ CASE23_CONVERSION_REVIEWER = (
     / "scripts/two_wheel_balance/"
     "audit_model_based_corrective_case23_conversion_readiness.py"
 )
+CASE23_CONVERSION_EXECUTION_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case23_corrective_conversion_execution_cpu/summary.json"
+)
+CASE23_CONVERSION_EXECUTION_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_case23_conversion_execution_contract_v1.json"
+)
+CASE23_CONVERSION_EXECUTION_VALIDATOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "validate_model_based_corrective_case23_conversion_execution.py"
+)
+CASE23_CONVERSION_EXECUTION_WRAPPER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "run_model_based_corrective_case23_conversion_v1.sh"
+)
+CASE23_CONVERSION_EXECUTION_FINALIZER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "finalize_model_based_corrective_case23_conversion.py"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -393,6 +418,61 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective[
         "case23_capture_v4_conversion_review_authoritative_cpu_suite"
     ] == "1087_passed_12_skipped_2_warnings_in_109.31s"
+    assert corrective["case23_capture_v4_conversion_execution_schema"] == (
+        "cinebotrl_two_wheel_riser_case23_conversion_execution_admission_v1"
+    )
+    assert corrective[
+        "case23_capture_v4_conversion_execution_implementation_commit"
+    ] == "02a090e02f03523c0274151202ab7af204585c32"
+    assert corrective[
+        "case23_capture_v4_conversion_execution_contract_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_CONTRACT)
+    assert corrective[
+        "case23_capture_v4_conversion_execution_contract_git_blob_sha1"
+    ] == "a343647b9e48d24170dec29fb5c5fcaa5123a51a"
+    assert corrective[
+        "case23_capture_v4_conversion_execution_validator_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_VALIDATOR)
+    assert corrective[
+        "case23_capture_v4_conversion_execution_wrapper_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_WRAPPER)
+    assert corrective[
+        "case23_capture_v4_conversion_execution_finalizer_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_FINALIZER)
+    assert corrective[
+        "case23_capture_v4_conversion_execution_preflight_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_EVIDENCE)
+    assert corrective[
+        "case23_capture_v4_conversion_execution_cpu_contract_ready"
+    ] is True
+    assert corrective[
+        "case23_capture_v4_conversion_execution_token_present"
+    ] is False
+    assert corrective[
+        "case23_capture_v4_conversion_execution_output_created"
+    ] is False
+    execution_preflight = json.loads(
+        CASE23_CONVERSION_EXECUTION_EVIDENCE.read_text()
+    )
+    assert execution_preflight["passed"] is True
+    assert execution_preflight["cpu_contract_ready"] is True
+    assert all(execution_preflight["repository_checks"].values())
+    assert all(execution_preflight["contract_checks"].values())
+    assert all(
+        identity["passed"]
+        for identity in execution_preflight["identities"].values()
+    )
+    assert execution_preflight["conversion_authorized"] is False
+    assert (
+        execution_preflight["authorization_consumed_before_conversion"]
+        is False
+    )
+    assert execution_preflight["output_created"] is False
+    assert execution_preflight["merged_dataset_created"] is False
+    assert execution_preflight["bc_authorized"] is False
+    assert execution_preflight["ppo_authorized"] is False
+    assert execution_preflight["training_started"] is False
+    assert execution_preflight["valid_for_training"] is False
     assert corrective["case23_capture_v4_conversion_authorized"] is False
     assert json.loads(CASE23_CAPTURE_V4_CPU_REVIEW.read_text())["passed"] is True
     assert corrective["temporal_projection_audit_sha256"] == _sha256(

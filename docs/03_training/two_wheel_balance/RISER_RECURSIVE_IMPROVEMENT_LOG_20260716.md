@@ -8494,3 +8494,34 @@ and must state whether its candidate was accepted or rejected.
   admitting case 23 as the second case dataset.
 - The capture authorization is consumed and does not authorize conversion,
   cases 6/2/7, validation 8/16, corpus merge, BC, PPO, holdout, or runtime.
+
+## Round 219: case-23 v4 conversion execution route is guarded
+
+- Added a committed execution contract, fail-closed validator, one-use shell
+  wrapper, and post-conversion finalizer for exactly one case-23 train-split
+  CPU conversion. Implementation commit is
+  `02a090e02f03523c0274151202ab7af204585c32`.
+- The route pins the passed source capture/final status/review, converter,
+  dataset module, validator, wrapper, finalizer, case, split, namespace, and
+  output path. Execution requires an out-of-repository mode-`0600` token and
+  a separately supplied SHA-256; the token is consumed before conversion.
+- Focused negative, healthy, and synthetic round-trip tests pass:
+  `22 passed, 2 warnings`.
+- Canonical `.98` no-token preflight passes at clean synchronized `02a090e`.
+  Every repository, contract, and identity check is true, and
+  `cpu_contract_ready=true`.
+- Preserved preflight evidence under
+  `evidence_20260724_case23_corrective_conversion_execution_cpu/` at SHA-256
+  `2034291914a515ee633d36d46bcce5d457aec630abbf5da9f4bcd3efc00623d2`.
+- No authorization token was issued or consumed. The production conversion
+  namespace and output are absent; conversion, merge, BC, PPO, and training
+  remain false. Goal completion remains `6/10`.
+
+## Next round after Round 219
+
+- Require a new exact authorization for one CPU-only case-23 v4 conversion.
+  If authorized, run the guarded route once, reopen the produced archive, and
+  admit only if every clock, label, recurrence, provenance, and closed-training
+  check passes.
+- Do not infer conversion permission from the consumed capture authorization
+  or this CPU-ready preflight.

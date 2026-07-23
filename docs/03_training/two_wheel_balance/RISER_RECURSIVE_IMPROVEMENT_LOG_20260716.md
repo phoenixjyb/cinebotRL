@@ -8888,3 +8888,36 @@ and must state whether its candidate was accepted or rejected.
   clocks, post-supervisor label margin, and recovery-tail invariants.
 - The nearest actual data-path action remains exactly one separately
   authorized case-23 v4 CPU conversion.
+
+## Round 230: case-7 profile is CPU-ready without opening runtime
+
+- Built a case-specific corrective profile that retains `50%` of the observed
+  raw envelope. Maximum linear, yaw, and riser residuals are
+  `[0.019165, 0.010077, 0.001263]`, with a `0.35 s` slew horizon.
+- Placed one deterministic `20 N`, `0.10 s` longitudinal pulse at execution
+  phase `2.851306 s` in source window `27..125`. It covers four source
+  samples and leaves `15.166011 s` for recovery.
+- Proved the selected pulse window is fully unclipped. Over the complete plan,
+  base and yaw stay unclipped and only four initial negative riser transitions
+  project at the lower height bound.
+- Kept the effective post-supervisor residual as the only admissible future
+  label. The maximum effective normalized action remains `0.383306`.
+- Implementation commit
+  `9d4777ac7e9b90d3a57061c6f8e1bb2b38b8a0c5` passes the focused
+  `47`-test suite on macOS and `.98`. Builder, test, profile, and proposal
+  hashes match across both hosts.
+- The authoritative `.98` CPU suite passes:
+  `1205 passed, 12 skipped, 2 warnings in 137.71 s`.
+- A repeated case-23 v4 capture authorization was not replayed because the
+  one-shot authorization was already consumed and its successful capture is
+  sealed.
+- No token, runtime namespace, Isaac/GPU run, label capture, conversion,
+  merge, BC, PPO, or training was created. Goal completion remains `6/10`.
+
+## Next round after Round 230
+
+- Implement the CPU-only case-7 paired runtime contract and preflight around
+  the new profiles, without issuing authorization or creating a namespace.
+- The nearest actual data-path action remains exactly one separately
+  authorized case-23 v4 CPU conversion. The consumed v4 capture authorization
+  cannot be reused.

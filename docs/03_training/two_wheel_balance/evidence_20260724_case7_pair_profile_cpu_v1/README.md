@@ -32,5 +32,10 @@ No token, runtime authorization, GPU launch, label capture, conversion, merge,
 BC, PPO, or training is enabled.
 
 The focused profile, corrective-teacher, and perturbation suite passes
-`47 passed, 2 warnings in 0.40 s` on macOS. Authoritative `.98` verification
-is intentionally deferred until this implementation is committed and synced.
+`47 passed, 2 warnings in 0.39 s` on macOS and
+`47 passed, 2 warnings in 0.72 s` on `.98`. Both hosts have identical
+builder, test, profile, and proposal hashes.
+
+The authoritative `.98` CPU suite passes
+`1205 passed, 12 skipped, 2 warnings in 137.71 s` at implementation commit
+`9d4777ac7e9b90d3a57061c6f8e1bb2b38b8a0c5`.

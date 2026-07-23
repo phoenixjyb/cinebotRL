@@ -53,6 +53,8 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_training_d
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
     ACTION_NAMES,
     ACTION_SCALES,
+    BASE_OBSERVATION_NAMES,
+    LOOKAHEAD_CHANNEL_NAMES,
     LOOKAHEAD_HORIZONS_S,
     MODEL_BASED_POLICY_RESIDUAL_CONTRACT,
     MODEL_BASED_POLICY_RESIDUAL_SCALES,
@@ -62,6 +64,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
 from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa: E402
     ATTENUATED_PREVIOUS_ACTION_POLICY_ARCHITECTURE,
     MASKED_PREVIOUS_ACTION_POLICY_ARCHITECTURE,
+    MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE,
     POLICY_ARCHITECTURE,
     RiserResidualPolicy,
 )
@@ -215,6 +218,15 @@ def _clean_execution_commit() -> str:
 
 def _projection_training_config(args: argparse.Namespace) -> dict[str, object]:
     return {
+        "policy_architecture": (
+            MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE
+        ),
+        "observation_dimension": len(OBSERVATION_NAMES),
+        "base_observation_dimension": len(BASE_OBSERVATION_NAMES),
+        "lookahead_horizon_count": len(LOOKAHEAD_HORIZONS_S),
+        "lookahead_channel_count": len(LOOKAHEAD_CHANNEL_NAMES),
+        "action_dimension": len(ACTION_NAMES),
+        "zero_initialize_action_head": True,
         "optimizer": "AdamW",
         "epochs_max": args.epochs,
         "patience": args.patience,
@@ -240,6 +252,26 @@ def _projection_training_config(args: argparse.Namespace) -> dict[str, object]:
         "model_selection_split": "validation",
         "optimizer_steps_per_epoch": 1,
     }
+
+
+def build_projection_aware_residual_policy(
+    observation_mean: np.ndarray | torch.Tensor,
+    observation_std: np.ndarray | torch.Tensor,
+) -> RiserResidualPolicy:
+    """Build the admitted model-based residual policy before optimization."""
+
+    return RiserResidualPolicy(
+        torch.as_tensor(observation_mean, dtype=torch.float32),
+        torch.as_tensor(observation_std, dtype=torch.float32),
+        tuple(DEFAULT_BC_TRAINING_CONFIG["state_hidden_sizes"]),
+        tuple(DEFAULT_BC_TRAINING_CONFIG["lookahead_hidden_sizes"]),
+        tuple(DEFAULT_BC_TRAINING_CONFIG["fusion_hidden_sizes"]),
+        (),
+        (1.0, 1.0, 1.0),
+        zero_initialize_action_head=DEFAULT_BC_TRAINING_CONFIG[
+            "zero_initialize_action_head"
+        ],
+    )
 
 
 def dataset_action_semantics(metadata: dict[str, object]) -> dict[str, object]:
@@ -693,14 +725,9 @@ def run_projection_aware_bc(
         axis=0, dtype=np.float64
     ).astype(np.float32)
     observation_std = np.maximum(observation_std, 1e-4)
-    model = RiserResidualPolicy(
-        torch.from_numpy(observation_mean),
-        torch.from_numpy(observation_std),
-        tuple(DEFAULT_BC_TRAINING_CONFIG["state_hidden_sizes"]),
-        tuple(DEFAULT_BC_TRAINING_CONFIG["lookahead_hidden_sizes"]),
-        tuple(DEFAULT_BC_TRAINING_CONFIG["fusion_hidden_sizes"]),
-        (),
-        (1.0, 1.0, 1.0),
+    model = build_projection_aware_residual_policy(
+        observation_mean,
+        observation_std,
     ).to(device)
     loss = ModelBasedProjectedBCLoss(
         action_scales=metadata["action_scales"],
@@ -800,7 +827,15 @@ def run_projection_aware_bc(
         torch.save(
             {
                 "schema": "cinebotrl_two_wheel_riser_model_based_residual_policy_v1",
-                "policy_architecture": POLICY_ARCHITECTURE,
+                "policy_architecture": (
+                    MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE
+                ),
+                "observation_dimension": len(OBSERVATION_NAMES),
+                "base_observation_dimension": len(BASE_OBSERVATION_NAMES),
+                "lookahead_horizon_count": len(LOOKAHEAD_HORIZONS_S),
+                "lookahead_channel_count": len(LOOKAHEAD_CHANNEL_NAMES),
+                "action_dimension": len(ACTION_NAMES),
+                "zero_initialized_before_optimization": True,
                 "model_state_dict": model.state_dict(),
                 "state_hidden_sizes": DEFAULT_BC_TRAINING_CONFIG[
                     "state_hidden_sizes"

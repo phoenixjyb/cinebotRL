@@ -16,6 +16,9 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_bc_contrac
 from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_training_dataset import (
     MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA,
 )
+from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (
+    MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE,
+)
 
 
 ROOT = Path(__file__).parents[1]
@@ -110,6 +113,14 @@ def _fixture(tmp_path: Path, *, authorized: bool) -> tuple[
 
 def test_checked_in_execution_admission_template_is_unusable() -> None:
     template = json.loads(ADMISSION_TEMPLATE.read_text(encoding="utf-8"))
+    assert template["training_config"] == DEFAULT_BC_TRAINING_CONFIG
+    assert template["training_config"]["policy_architecture"] == (
+        MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE
+    )
+    assert template["training_config"]["observation_dimension"] == 65
+    assert template["training_config"]["base_observation_dimension"] == 26
+    assert template["training_config"]["action_dimension"] == 3
+    assert template["training_config"]["zero_initialize_action_head"] is True
     assert template["dataset"] == {"path": None, "sha256": None}
     assert template["dataset_promotion_commit"] is None
     assert template["execution_commit"] is None

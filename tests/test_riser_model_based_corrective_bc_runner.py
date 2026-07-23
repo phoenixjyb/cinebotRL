@@ -9,6 +9,7 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from scripts.two_wheel_balance.train_riser_residual_bc import (  # noqa: E402
+    build_projection_aware_residual_policy,
     run_projection_aware_bc,
 )
 from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_bc_contract import (  # noqa: E402
@@ -23,6 +24,9 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
     MODEL_BASED_POLICY_RESIDUAL_CONTRACT,
     MODEL_BASED_POLICY_RESIDUAL_SCALES,
     OBSERVATION_NAMES,
+)
+from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa: E402
+    MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE,
 )
 
 
@@ -101,6 +105,22 @@ def _args(tmp_path: Path, dataset: Path) -> argparse.Namespace:
     )
 
 
+def test_projection_aware_policy_starts_as_exact_zero_residual() -> None:
+    mean = np.linspace(-1.0, 1.0, len(OBSERVATION_NAMES), dtype=np.float32)
+    std = np.linspace(0.5, 1.5, len(OBSERVATION_NAMES), dtype=np.float32)
+    model = build_projection_aware_residual_policy(mean, std).eval()
+    observations = torch.from_numpy(
+        np.stack((mean, mean + std, mean - 2.0 * std))
+    )
+    with torch.no_grad():
+        eager = model(observations)
+        scripted = torch.jit.script(model)(observations)
+    assert torch.count_nonzero(model.action_head.weight).item() == 0
+    assert torch.count_nonzero(model.action_head.bias).item() == 0
+    assert torch.count_nonzero(eager).item() == 0
+    assert torch.equal(scripted, eager)
+
+
 def test_guarded_projection_runner_learns_synthetic_data_and_seals_artifacts(
     tmp_path: Path,
 ) -> None:
@@ -159,3 +179,17 @@ def test_guarded_projection_runner_learns_synthetic_data_and_seals_artifacts(
     ] == [0, 0, 0]
     assert (tmp_path / "policy/residual_policy.pt").is_file()
     assert (tmp_path / "policy/residual_policy.torchscript.pt").is_file()
+    checkpoint = torch.load(
+        tmp_path / "policy/residual_policy.pt",
+        map_location="cpu",
+        weights_only=False,
+    )
+    assert checkpoint["policy_architecture"] == (
+        MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE
+    )
+    assert checkpoint["observation_dimension"] == len(OBSERVATION_NAMES) == 65
+    assert checkpoint["base_observation_dimension"] == 26
+    assert checkpoint["lookahead_horizon_count"] == 3
+    assert checkpoint["lookahead_channel_count"] == 13
+    assert checkpoint["action_dimension"] == len(ACTION_NAMES) == 3
+    assert checkpoint["zero_initialized_before_optimization"] is True

@@ -10,7 +10,7 @@
   "code": {
     "trainer": {
       "path": "scripts/two_wheel_balance/train_riser_residual_bc.py",
-      "sha256": "1d74ace025f9c49d5cf2105049fbc7630e225b55638bfdb3bca5d93e906282a1"
+      "sha256": "19c83df9d796342eca13f15f6d693c191b1029d0695c8e1b38d5ed403b800ac9"
     },
     "adapter": {
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_bc_adapter.py",
@@ -30,7 +30,7 @@
     },
     "admission_module": {
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_bc_contract.py",
-      "sha256": "c91f13b8647585f75d233a91c7d7979c92df8fa57320b219d23c4850a19c2077"
+      "sha256": "6ecb07eaa6fe9e5ef95115e91b8b3e8c164a2fb4e9bcea66bb892e30a0bfbe2f"
     }
   },
   "optimizer_contract": "exact_case_balanced_projection_aware_gradient_accumulation_v1",
@@ -38,6 +38,13 @@
   "loss_contract": "model_based_projected_effective_action_bc_loss_v1",
   "projection_contract": "model_based_residual_safety_projection_v1",
   "training_config": {
+    "policy_architecture": "model_based_shared_encoder_zero_initialized_residual_v1",
+    "observation_dimension": 65,
+    "base_observation_dimension": 26,
+    "lookahead_horizon_count": 3,
+    "lookahead_channel_count": 13,
+    "action_dimension": 3,
+    "zero_initialize_action_head": true,
     "optimizer": "AdamW",
     "epochs_max": 200,
     "patience": 20,

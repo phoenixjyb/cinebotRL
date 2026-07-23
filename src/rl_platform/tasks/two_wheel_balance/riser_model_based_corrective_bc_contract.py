@@ -22,7 +22,17 @@ from .riser_model_based_corrective_corpus import (
 from .riser_model_based_corrective_training_dataset import (
     MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA,
 )
-from .riser_residual_policy import MODEL_BASED_RESIDUAL_SAFETY_PROJECTION
+from .riser_residual_dataset import (
+    ACTION_NAMES,
+    BASE_OBSERVATION_NAMES,
+    LOOKAHEAD_CHANNEL_NAMES,
+    LOOKAHEAD_HORIZONS_S,
+    OBSERVATION_NAMES,
+)
+from .riser_residual_policy import (
+    MODEL_BASED_RESIDUAL_SAFETY_PROJECTION,
+    MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE,
+)
 
 MODEL_BASED_CORRECTIVE_BC_EXECUTION_ADMISSION_SCHEMA = (
     "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_admission_v1"
@@ -31,6 +41,15 @@ MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA = (
     "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_report_v1"
 )
 DEFAULT_BC_TRAINING_CONFIG = {
+    "policy_architecture": (
+        MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE
+    ),
+    "observation_dimension": len(OBSERVATION_NAMES),
+    "base_observation_dimension": len(BASE_OBSERVATION_NAMES),
+    "lookahead_horizon_count": len(LOOKAHEAD_HORIZONS_S),
+    "lookahead_channel_count": len(LOOKAHEAD_CHANNEL_NAMES),
+    "action_dimension": len(ACTION_NAMES),
+    "zero_initialize_action_head": True,
     "optimizer": "AdamW",
     "epochs_max": 200,
     "patience": 20,

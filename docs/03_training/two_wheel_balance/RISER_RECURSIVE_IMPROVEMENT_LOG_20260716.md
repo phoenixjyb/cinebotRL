@@ -9470,3 +9470,47 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-23 v4 CPU conversion.`
 - After conversion, the route must be reopened against then-current hashes
   before cases 6/2/7 and validation cases 8/16 proceed.
+
+## Round 246: learned-policy promotion is explicitly balance first
+
+- Audited the validation, reserved-holdout, all-79, render, and final goal
+  admission path against the goal priority `self-balance > tracking`.
+- The playback already failed on termination, excessive pitch, wheel/riser/
+  proxy saturation, thermal force/load, and missing controller evidence, but
+  the learned gate retained only generic `passed` booleans plus tracking
+  regression metrics. This made the final evidence unable to independently
+  prove why a rollout was safe.
+- Added `balance_first_rollout_safety_v1` snapshots for every model-based
+  baseline, learned, and zero-policy rollout. Each snapshot records both
+  payload/result dynamic and thermal outcomes, reference completion,
+  termination absence, pitch, all saturation ratios, thermal load, peak-force
+  violations, and the matching runtime check booleans.
+- Model-based validation, holdout, and all-79 reports are now v2 schemas.
+  Promotion fails closed if any safety field is missing, non-finite, above its
+  bound, inconsistent with the runtime checks, or if tracking improves while
+  balance safety regresses.
+- The downstream render admission validates safety snapshots for all 79 rows,
+  not only the six representative render cases. The completion auditor also
+  recomputes the v2 safety contract before accepting a learned all-79 report.
+- The wrappers pin the same `12 deg` pitch and `0.20` saturation limits for
+  playback and report generation. No source plan, controller command,
+  trajectory, residual scale, or physics setting changed.
+- Implementation commit
+  `5148ab60396eb62f4204b452670d3d95ce793546` and goal-binding commit
+  `18a627ed0345074958c4b6601118029be2178c75` are pushed and synchronized.
+- The first full `.98` run intentionally exposed one stale goal-ledger template
+  hash (`1329 passed`, one failed). After rebinding the changed contract
+  identities, focused `.98` coverage passed `62` tests and the final
+  authoritative Windows-Isaac Python CPU suite passed:
+  `1330 passed, 12 skipped, 2 warnings in 171.96 s`.
+- No Isaac/GPU workload, runtime namespace, conversion, capture, corpus merge,
+  BC, checkpoint, PPO, or training run was created. Goal completion remains
+  `6/10`.
+
+## Next round after Round 246
+
+- The exact next data-producing operation remains separately authorized:
+  `Authorize exactly one case-23 v4 CPU conversion.`
+- After the real case-disjoint corpus exists, every learned policy must pass
+  recursive offline validation followed by the new balance-first dynamic
+  validation, holdout, all-79, and render chain.

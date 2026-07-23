@@ -8701,3 +8701,42 @@ and must state whether its candidate was accepted or rejected.
 - Case 6 may advance only through a separate CPU-only implementation of the
   paired-result finalizer and guarded execution route. That work must remain
   tokenless and must not launch Isaac until separately reviewed and authorized.
+
+## Round 225: case-6 paired route is complete but unauthorized
+
+- Added a v2 contract with a fresh
+  `20260724_model_based_corrective_teacher_case6_pair_v2_exclusive` namespace.
+  It pins `18` identities, adding the paired-result finalizer to the previous
+  plan, profile, controller, robot, playback, validator, and wrapper set.
+- Completed the guarded baseline/candidate route. Both rollouts use the same
+  case-6 plan, reset seed, frozen controller settings, dynamic thresholds, and
+  deterministic wrench. Each rollout has a `600 s` timeout and candidate
+  execution requires a dynamically passing baseline.
+- The finalizer reuses the shared paired-assessment contract and additionally
+  binds case 6, source/execution clocks, plan and profile identities,
+  perturbation telemetry, closed capture paths, heartbeats, and GPU release.
+- Synthetic CPU tests prove admission of one safe measurable improvement and
+  fail-closed rejection of weak improvement, source-clock mismatch, corrective
+  profile mismatch, any capture path, failed GPU release, and unauthorized
+  admission.
+- Implementation commit
+  `0f3e13ee3817d9216bf5cef70541493e519e0abb` passes `50` focused tests on
+  macOS and `.98`. Both hosts validate all `18` identities with no failed
+  checks.
+- The authoritative `.98` CPU suite passes:
+  `1141 passed, 12 skipped, 2 warnings in 124.94 s`.
+- Contract SHA-256 is
+  `ab5760179f4f2f79bce1ef06525316a0127dd97c939325c102d6538fbfa39a1f`.
+  Evidence is preserved under
+  `evidence_20260724_case6_pair_route_cpu_v2/`.
+- The committed authorization hash is empty. `--execute` rejects before
+  Python/Isaac, the v2 namespace remains absent, and no token, capture, dataset,
+  BC, PPO, or training was created. Goal completion remains `6/10`.
+
+## Next round after Round 225
+
+- The nearest actual data-path action remains exactly one separately
+  authorized case-23 v4 CPU conversion.
+- The independent case-6 runtime step is now reviewable as exactly one
+  separately authorized v2 paired canary. Do not issue that authorization or
+  launch Isaac implicitly.

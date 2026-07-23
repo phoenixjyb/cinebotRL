@@ -1,0 +1,5538 @@
+{
+  "schema": "recomo_two_wheel_riser_reference_playback_v1",
+  "training_started": false,
+  "ppo_authorized": false,
+  "controller_profile": "structural_robust_v1",
+  "tracking_profile": "riser_recovery_direction_v4_camera_lever_arm_v1",
+  "camera_lever_arm_compensation_contract": "measured_camera_to_base_xy_offset_v1",
+  "camera_lever_arm_compensation_enabled": true,
+  "camera_lever_arm_compensation_gain": 1.0,
+  "maximum_camera_lever_arm_correction_m": 0.05,
+  "tracking_direction_blend_speed_mps": 0.05,
+  "tracking_direction_recovery_error_range_m": [
+    0.2,
+    0.4
+  ],
+  "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
+  "riser_thermal_force_contract": "leadshine_400w_first_order_monitor_v1",
+  "controller_overrides": {
+    "wz_kp": 1.05
+  },
+  "tracking_overrides": {},
+  "position_observation_link": "physical_cam_link_fk",
+  "target_attitude_contract": "semantic_dfr_to_physical_cam_v1",
+  "hardware_proxy_command_contract": "semantic_attitude_position_only",
+  "simulation_proxy_realization": "rate_audited_ideal_state_adapter",
+  "phase_governor_enabled": true,
+  "com_pitch_feedforward_enabled": true,
+  "maximum_duration_scale": 3.0,
+  "completion_horizon_contract": "bounded_execution_duration_scale_v1",
+  "trajectory_command_source": "deterministic_teacher",
+  "residual_policy": null,
+  "cases": [
+    2
+  ],
+  "passed_case_count": 1,
+  "dynamic_quality_passed": true,
+  "thermal_admission_passed": true,
+  "controller_evidence_passed": true,
+  "residual_label_envelope_passed": true,
+  "residual_label_admission_passed": true,
+  "results": [
+    {
+      "case": 2,
+      "planning_strategy": "smoothed_preview_0.05m_g2.75",
+      "source_duration_s": 9.439314,
+      "execution_duration_s": 18.241927671727208,
+      "maximum_duration_scale": 3.0,
+      "maximum_runtime_s": 54.72578301518162,
+      "completed_phase_time_s": 18.241927671727208,
+      "completed_steps": 9199,
+      "wall_duration_s": 45.995,
+      "progress_scale_min": 0.2735083636502713,
+      "progress_scale_mean": 0.39664938824929175,
+      "position_error_p95_m": 0.13982963387387617,
+      "position_error_max_m": 0.15351428534057934,
+      "attitude_error_p95_deg": 0.13723851290308633,
+      "attitude_error_max_deg": 0.17577708266020106,
+      "pitch_p95_deg": 6.104888820728159,
+      "pitch_max_deg": 6.632458181748643,
+      "riser_servo_error_p95_m": 0.01121182836090493,
+      "riser_servo_error_max_m": 0.012264779274909543,
+      "proxy_servo_error_p95_deg": 0.035296432787901816,
+      "proxy_servo_error_max_deg": 0.21461680882142428,
+      "proxy_axis_error_p95_deg": [
+        0.035671985448553094,
+        0.01471747916513036,
+        0.08641562129602669
+      ],
+      "proxy_axis_velocity_max_abs_deg_s": [
+        51.5073127746582,
+        20.75682258605957,
+        28.26405906677246
+      ],
+      "proxy_axis_target_velocity_max_abs_deg_s": [
+        36.424442478451155,
+        16.159982998112,
+        26.204991475965695
+      ],
+      "proxy_axis_effort_p95_nm": [
+        1.6741151213645935,
+        0.6444098830223088,
+        2.7398353099823027
+      ],
+      "proxy_axis_saturation_ratio": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "action_saturation_ratio": 0.0,
+      "riser_saturation_ratio": 0.0,
+      "riser_effort_max_n": 20.32168197631836,
+      "riser_thermal_load_final": 0.0009305138801911286,
+      "riser_thermal_load_max": 0.0009305138801911286,
+      "riser_thermal_sample_count": 9199,
+      "riser_peak_force_violation_count": 0,
+      "riser_continuous_force_n": 292.3970042486123,
+      "riser_peak_force_n": 877.1910127458367,
+      "riser_thermal_time_constant_s": 30.0,
+      "recovery_telemetry": {
+        "schema": "riser_recovery_direction_policy_rate_v1",
+        "policy_rate_sample_count": 9199,
+        "activation_step_count": 0,
+        "full_authority_step_count": 0,
+        "activation_segment_count": 0,
+        "motion_direction_sign_change_count": 0,
+        "feedback_direction_sign_change_count": 0,
+        "consecutive_active_motion_direction_chatter_count": 0,
+        "candidate_yaw_saturation_step_count": 0,
+        "legacy_yaw_saturation_step_count": 0,
+        "candidate_vs_legacy_delta_nonzero_step_count": 0,
+        "candidate_vs_legacy_yaw_delta_abs_max_rad_s": 0.0,
+        "recovery_blend_max": 0.0
+      },
+      "recovery_telemetry_observed": true,
+      "camera_lever_arm_compensation_enabled": true,
+      "camera_lever_arm_compensation_gain": 1.0,
+      "maximum_camera_lever_arm_correction_m": 0.05,
+      "camera_lever_arm_telemetry_sample_count": 9199,
+      "camera_lever_arm_telemetry_observed": true,
+      "camera_lever_arm_correction_max_m": 0.05000000000000002,
+      "camera_lever_arm_raw_correction_max_m": 0.1933566254321744,
+      "camera_lever_arm_correction_saturation_ratio": 0.9439069464072182,
+      "proxy_saturation_ratio": 0.0,
+      "residual_action_abs_max": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "raw_residual_command_abs_max": [
+        0.2459370708331451,
+        0.1453136995758454,
+        0.0122886211328197
+      ],
+      "normalized_residual_label_abs_max": [
+        0.8197902361104836,
+        0.3632842489396135,
+        0.12288621132819699
+      ],
+      "raw_residual_label_applied_to_commands": false,
+      "dynamic_quality_passed": true,
+      "thermal_admission_passed": true,
+      "controller_evidence_passed": true,
+      "residual_label_envelope_passed": true,
+      "residual_label_admission_passed": true,
+      "peak_base_xy_error_m": 0.20307078338365675,
+      "peak_base_yaw_error_deg": 5.2953126346490516,
+      "peak_com_pitch_bias_deg": 2.06283649104789,
+      "internal_attitude_ik_failures": 0,
+      "internal_attitude_ik_error_max_deg": 0.09995589021769545,
+      "internal_proxy_rate_max_deg_s": 36.424442478451155,
+      "termination": null,
+      "trace": [
+        {
+          "step": 1,
+          "elapsed_s": 0.0,
+          "phase_time_s": 0.0,
+          "progress_scale": 1.0,
+          "position_error_m": 0.002852221034915557,
+          "attitude_error_deg": 0.005593215997997271,
+          "pitch_deg": 0.0025715141123018996,
+          "riser_error_m": 6.969037372073217e-06,
+          "riser_thermal_load": 9.443130043063692e-08,
+          "proxy_error_deg": [
+            0.0035522749529720604,
+            0.004571213140185678,
+            0.0005402396484065235
+          ],
+          "proxy_signed_error_deg": [
+            -0.0035522749529720604,
+            -0.004571213140185678,
+            0.0005402396484065235
+          ],
+          "proxy_target_deg": [
+            18.381863847975435,
+            -4.611550456899888,
+            -165.75018751904392
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            18.381863847975435,
+            -4.611550456899888,
+            -165.75018751904392
+          ],
+          "proxy_actual_deg": [
+            18.38541603088379,
+            -4.606978893280029,
+            -165.75071716308594
+          ],
+          "proxy_velocity_deg_s": [
+            0.7621176838874817,
+            1.365260124206543,
+            -0.054725512862205505
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -0.10770703107118607,
+            -0.17646083235740662,
+            0.010503607802093029
+          ],
+          "base_xy_error_m": 2.423259237697839e-05,
+          "base_yaw_error_deg": 7.159684487770715e-05,
+          "actual_base_xy_yaw": [
+            -0.19426584243774414,
+            -0.04608732461929321,
+            3.075166475254793
+          ],
+          "target_base_xy_yaw": [
+            -0.19428998393025296,
+            -0.046085225364007276,
+            3.0751677248554703
+          ],
+          "commanded_base_xy_yaw": [
+            -0.19428983982652426,
+            -0.046085248701274395,
+            3.0751677248554703
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.19428998393025296,
+            0.046085225364007276
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.19428983982652426,
+            0.046085248701274395
+          ],
+          "camera_lever_arm_error_xy_m": [
+            -1.4410372869977373e-07,
+            2.33372671187837e-08
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            1.4410372869977373e-07,
+            -2.33372671187837e-08
+          ],
+          "camera_lever_arm_correction_saturated": false,
+          "camera_position_error_xyz_m": [
+            -3.641936928033829e-05,
+            -3.0444934964179993e-06,
+            0.002851986885070712
+          ],
+          "actual_camera_position_world_m": [
+            -3.641936928033829e-05,
+            -3.0444934964179993e-06,
+            1.3528519868850708
+          ],
+          "target_camera_position_world_m": [
+            0.0,
+            0.0,
+            1.35
+          ],
+          "actual_yaw_rate_rad_s": -0.0005123376031406224,
+          "phase_feedforward_v_mps": 0.13930298233518715,
+          "phase_feedforward_wz_rad_s": 0.1926281362447213,
+          "vx_reference_mps": 0.13930275217968965,
+          "wz_reference_rad_s": 0.19262815749290005,
+          "along_track_error_m": -1.4384718593394423e-07,
+          "cross_track_error_m": 1.5632169729419142e-08,
+          "base_yaw_error_rad": -1.8333965456918122e-09,
+          "raw_velocity_reference_mps": 0.13930275217968965,
+          "base_position_error_m": 1.446940829182869e-07,
+          "feedforward_direction": 1.0,
+          "feedback_motion_direction": 1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": 1.0
+        },
+        {
+          "step": 201,
+          "elapsed_s": 1.0,
+          "phase_time_s": 0.5732778013282851,
+          "progress_scale": 0.3111845841548895,
+          "position_error_m": 0.09139626110863003,
+          "attitude_error_deg": 0.08422915467169345,
+          "pitch_deg": 4.731197759760609,
+          "riser_error_m": 0.00982285467090005,
+          "riser_thermal_load": 4.349902633403208e-05,
+          "proxy_error_deg": [
+            0.03405422345047748,
+            0.012655758122515274,
+            0.007940435170230645
+          ],
+          "proxy_signed_error_deg": [
+            -0.03405422345047748,
+            -0.012655758122515274,
+            0.007940435170230645
+          ],
+          "proxy_target_deg": [
+            14.667306417787497,
+            -2.5711056695483645,
+            -165.94170975290956
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            14.667306417787497,
+            -2.5711056695483645,
+            -165.94170975290956
+          ],
+          "proxy_actual_deg": [
+            14.701359748840332,
+            -2.5584497451782227,
+            -165.94964599609375
+          ],
+          "proxy_velocity_deg_s": [
+            13.052129745483398,
+            4.184316158294678,
+            -3.4994843006134033
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6033985614776611,
+            -0.5684336423873901,
+            0.3912554085254669
+          ],
+          "base_xy_error_m": 0.20307009241002458,
+          "base_yaw_error_deg": 0.4605589271874279,
+          "actual_base_xy_yaw": [
+            -0.19349274039268494,
+            -0.04591832682490349,
+            3.0854099838344453
+          ],
+          "target_base_xy_yaw": [
+            0.00924585334441818,
+            -0.05751681987002719,
+            3.0934482535133188
+          ],
+          "commanded_base_xy_yaw": [
+            -0.04057967128456151,
+            -0.053343440490323205,
+            3.0934482535133188
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.19326664420158013,
+            0.04875011396700246
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.30593226104974747,
+            0.03931325674057007
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.11266561684816734,
+            -0.009436857226432394
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04982552462897969,
+            0.004173379379703992
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            -0.08952566468886636,
+            0.002200583728761734,
+            -0.018264428211861805
+          ],
+          "actual_camera_position_world_m": [
+            0.11298683285713196,
+            -0.0065661221742630005,
+            1.3354846239089966
+          ],
+          "target_camera_position_world_m": [
+            0.20251249754599832,
+            -0.008766705903024734,
+            1.3537490521208584
+          ],
+          "actual_yaw_rate_rad_s": 0.000847439921926707,
+          "phase_feedforward_v_mps": -0.12448414451437378,
+          "phase_feedforward_wz_rad_s": 0.00894902968676738,
+          "vx_reference_mps": -0.37041272393917796,
+          "wz_reference_rad_s": 0.02040940316009022,
+          "along_track_error_m": -0.1537053621405026,
+          "cross_track_error_m": -0.0011787001030240576,
+          "base_yaw_error_rad": 0.008076936098988963,
+          "raw_velocity_reference_mps": -0.37041272393917796,
+          "base_position_error_m": 0.15370988154531873,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 401,
+          "elapsed_s": 2.0,
+          "phase_time_s": 0.8868534071131519,
+          "progress_scale": 0.34883988604417593,
+          "position_error_m": 0.028147373616053243,
+          "attitude_error_deg": 0.053740269194673757,
+          "pitch_deg": 6.255800569779121,
+          "riser_error_m": 0.011127997950515667,
+          "riser_thermal_load": 0.00010255094466772986,
+          "proxy_error_deg": [
+            0.034560289275075116,
+            0.012745847129425648,
+            0.008147987009321577
+          ],
+          "proxy_signed_error_deg": [
+            -0.034560289275075116,
+            -0.012745847129425648,
+            0.008147987009321577
+          ],
+          "proxy_target_deg": [
+            13.167522602726326,
+            -1.8815060946124245,
+            -165.80786271977
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.167522602726326,
+            -1.8815060946124245,
+            -165.80786271977
+          ],
+          "proxy_actual_deg": [
+            13.202082633972168,
+            -1.868760108947754,
+            -165.8159942626953
+          ],
+          "proxy_velocity_deg_s": [
+            12.955106735229492,
+            4.623849391937256,
+            -3.1294994354248047
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6103885173797607,
+            -0.5740505456924438,
+            0.38797950744628906
+          ],
+          "base_xy_error_m": 0.16495594806938374,
+          "base_yaw_error_deg": 0.5365473401624629,
+          "actual_base_xy_yaw": [
+            -0.030187461525201797,
+            -0.054635778069496155,
+            3.0914900417687807
+          ],
+          "target_base_xy_yaw": [
+            0.13455342790455857,
+            -0.06305623847025202,
+            3.1008545594474337
+          ],
+          "commanded_base_xy_yaw": [
+            0.0846979733681604,
+            -0.05925707369768228,
+            3.1008545594474337
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.1929416922742648,
+            0.04962504961218676
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.342752106487751,
+            0.03820895776152611
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1498104142134862,
+            -0.01141609185066065
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049855454536398176,
+            0.003799164772569739
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            -0.014962814461355112,
+            -0.0029816057319310765,
+            -0.023653728081130643
+          ],
+          "actual_camera_position_world_m": [
+            0.31253230571746826,
+            -0.016412794589996338,
+            1.3322203159332275
+          ],
+          "target_camera_position_world_m": [
+            0.3274951201788234,
+            -0.013431188858065261,
+            1.3558740440143582
+          ],
+          "actual_yaw_rate_rad_s": 0.00818586628884077,
+          "phase_feedforward_v_mps": -0.1394247247870369,
+          "phase_feedforward_wz_rad_s": 0.006732811014634501,
+          "vx_reference_mps": -0.32466684437733273,
+          "wz_reference_rad_s": 0.019729770738593094,
+          "along_track_error_m": -0.1157763247439349,
+          "cross_track_error_m": -0.0011423953177105966,
+          "base_yaw_error_rad": 0.009402805622827248,
+          "raw_velocity_reference_mps": -0.32466684437733273,
+          "base_position_error_m": 0.11578196076364833,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 601,
+          "elapsed_s": 3.0,
+          "phase_time_s": 1.2497458468722291,
+          "progress_scale": 0.37224404149941237,
+          "position_error_m": 0.02383288753591205,
+          "attitude_error_deg": 0.0364566145459859,
+          "pitch_deg": 6.138779792502938,
+          "riser_error_m": 0.011172805923489348,
+          "riser_thermal_load": 0.00016416884863841214,
+          "proxy_error_deg": [
+            0.03486099427982016,
+            0.011657856394021978,
+            0.009080757312155678
+          ],
+          "proxy_signed_error_deg": [
+            -0.03486099427982016,
+            -0.011657856394021978,
+            0.009080757312155678
+          ],
+          "proxy_target_deg": [
+            13.419379675273758,
+            -1.7355490445291097,
+            -165.78107085326948
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.419379675273758,
+            -1.7355490445291097,
+            -165.78107085326948
+          ],
+          "proxy_actual_deg": [
+            13.454239845275879,
+            -1.7238911390304565,
+            -165.79014587402344
+          ],
+          "proxy_velocity_deg_s": [
+            12.99172306060791,
+            4.46134614944458,
+            -3.276491641998291
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6218065023422241,
+            -0.5306130647659302,
+            0.4256054162979126
+          ],
+          "base_xy_error_m": 0.14822903624027653,
+          "base_yaw_error_deg": 0.5436057092402313,
+          "actual_base_xy_yaw": [
+            0.13150887191295624,
+            -0.062298793345689774,
+            3.097376723736268
+          ],
+          "target_base_xy_yaw": [
+            0.27960751472876966,
+            -0.06851483556203063,
+            3.106864433195149
+          ],
+          "commanded_base_xy_yaw": [
+            0.22972912357534478,
+            -0.06502971060789386,
+            3.106864433195149
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.1926711976579244,
+            0.05030348017662345
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3399864137172699,
+            0.040010206401348114
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1473152160593455,
+            -0.010293273775275336
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049878391153424885,
+            0.003485124954136762
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            -0.0007925611682797484,
+            -0.0040613059429085545,
+            -0.023470921778491416
+          ],
+          "actual_camera_position_world_m": [
+            0.4714861512184143,
+            -0.022272661328315735,
+            1.3345961570739746
+          ],
+          "target_camera_position_world_m": [
+            0.47227871238669406,
+            -0.01821135538540718,
+            1.358067078852466
+          ],
+          "actual_yaw_rate_rad_s": 0.007091987412422895,
+          "phase_feedforward_v_mps": -0.14886957867322162,
+          "phase_feedforward_wz_rad_s": 0.005643557544631714,
+          "vx_reference_mps": -0.3073602953549409,
+          "wz_reference_rad_s": 0.01948696526676925,
+          "along_track_error_m": -0.09905669792607456,
+          "cross_track_error_m": -0.0016156483761423823,
+          "base_yaw_error_rad": 0.009516612631603303,
+          "raw_velocity_reference_mps": -0.3073602953549409,
+          "base_position_error_m": 0.09906987293669511,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 801,
+          "elapsed_s": 4.0,
+          "phase_time_s": 1.6273449291432072,
+          "progress_scale": 0.3822524884449613,
+          "position_error_m": 0.025413136453770132,
+          "attitude_error_deg": 0.07099600964606971,
+          "pitch_deg": 6.088737557775194,
+          "riser_error_m": 0.011170466038421534,
+          "riser_thermal_load": 0.0002236964448169566,
+          "proxy_error_deg": [
+            0.03460889432000136,
+            0.012583833741848537,
+            0.00828423206472753
+          ],
+          "proxy_signed_error_deg": [
+            -0.03460889432000136,
+            -0.012583833741848537,
+            0.00828423206472753
+          ],
+          "proxy_target_deg": [
+            13.538567566798301,
+            -1.5814929069674695,
+            -165.7334003561665
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.538567566798301,
+            -1.5814929069674695,
+            -165.7334003561665
+          ],
+          "proxy_actual_deg": [
+            13.573175430297852,
+            -1.568908929824829,
+            -165.74166870117188
+          ],
+          "proxy_velocity_deg_s": [
+            12.961764335632324,
+            4.7083330154418945,
+            -3.0748629570007324
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6124143600463867,
+            -0.5756230354309082,
+            0.38991063833236694
+          ],
+          "base_xy_error_m": 0.13737779585441434,
+          "base_yaw_error_deg": 0.5159578949337503,
+          "actual_base_xy_yaw": [
+            0.2932610809803009,
+            -0.0689854845404625,
+            3.1036665191426964
+          ],
+          "target_base_xy_yaw": [
+            0.4305702699376792,
+            -0.07332661592342249,
+            3.1126716832109493
+          ],
+          "commanded_base_xy_yaw": [
+            0.3806673493581748,
+            -0.07021237161128577,
+            3.1126716832109493
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.1924075805178651,
+            0.05096431050225614
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3388082981109619,
+            0.04182801954448223
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1464007175930968,
+            -0.009136290957773907
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049902920579504406,
+            0.0031142443121367166
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.009087922554709582,
+            -0.004788061034150193,
+            -0.02324460452644428
+          ],
+          "actual_camera_position_world_m": [
+            0.6320657730102539,
+            -0.027150366455316544,
+            1.3367353677749634
+          ],
+          "target_camera_position_world_m": [
+            0.6229778504555443,
+            -0.02236230542116635,
+            1.3599799723014077
+          ],
+          "actual_yaw_rate_rad_s": 0.00826109480112791,
+          "phase_feedforward_v_mps": -0.1528876765091028,
+          "phase_feedforward_wz_rad_s": 0.006242530467596825,
+          "vx_reference_mps": -0.29400690443444205,
+          "wz_reference_rad_s": 0.0202121433773174,
+          "along_track_error_m": -0.08819951745333704,
+          "cross_track_error_m": -0.002090071738589759,
+          "base_yaw_error_rad": 0.009028754418196616,
+          "raw_velocity_reference_mps": -0.29400690443444205,
+          "base_position_error_m": 0.0882242782848007,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 1001,
+          "elapsed_s": 5.0,
+          "phase_time_s": 2.010858407966511,
+          "progress_scale": 0.38498080750892294,
+          "position_error_m": 0.029671538883185834,
+          "attitude_error_deg": 0.04127527186334457,
+          "pitch_deg": 6.075095962455386,
+          "riser_error_m": 0.011081862521537866,
+          "riser_thermal_load": 0.00028076247762357106,
+          "proxy_error_deg": [
+            0.034793944281187934,
+            0.012759832427750247,
+            0.008395028346466188
+          ],
+          "proxy_signed_error_deg": [
+            -0.034793944281187934,
+            -0.012759832427750247,
+            0.008395028346466188
+          ],
+          "proxy_target_deg": [
+            13.672504380247716,
+            -1.3454648491767573,
+            -165.60721792818467
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.672504380247716,
+            -1.3454648491767573,
+            -165.60721792818467
+          ],
+          "proxy_actual_deg": [
+            13.707297325134277,
+            -1.3327049016952515,
+            -165.6156005859375
+          ],
+          "proxy_velocity_deg_s": [
+            13.268464088439941,
+            4.483400344848633,
+            -3.448756694793701
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6246198415756226,
+            -0.5530514717102051,
+            0.4171898663043976
+          ],
+          "base_xy_error_m": 0.12880599868327855,
+          "base_yaw_error_deg": 0.5046576256311731,
+          "actual_base_xy_yaw": [
+            0.45514634251594543,
+            -0.07460452616214752,
+            3.1107996445345165
+          ],
+          "target_base_xy_yaw": [
+            0.5839251619329656,
+            -0.07725046009088708,
+            3.1196075816970774
+          ],
+          "commanded_base_xy_yaw": [
+            0.5340025559019743,
+            -0.07446955968374608,
+            3.1196075816970774
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.192092390184032,
+            0.051754163076392565
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3384301960468292,
+            0.04360252805054188
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1463378058627972,
+            -0.008151635025850687
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04992260603099125,
+            0.0027809004071409973
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.01755052258621892,
+            -0.005494657474021336,
+            -0.023284933237830208
+          ],
+          "actual_camera_position_world_m": [
+            0.7935680747032166,
+            -0.030990954488515854,
+            1.3381437063217163
+          ],
+          "target_camera_position_world_m": [
+            0.7760175521169976,
+            -0.025496297014494518,
+            1.3614286395595465
+          ],
+          "actual_yaw_rate_rad_s": 0.005496487952768803,
+          "phase_feedforward_v_mps": -0.1539638752656754,
+          "phase_feedforward_wz_rad_s": 0.007891329206481008,
+          "vx_reference_mps": -0.2813719682111341,
+          "wz_reference_rad_s": 0.02235986309091822,
+          "along_track_error_m": -0.07963005809091168,
+          "cross_track_error_m": -0.0025657326616406392,
+          "base_yaw_error_rad": 0.008849945743313548,
+          "raw_velocity_reference_mps": -0.2813719682111341,
+          "base_position_error_m": 0.07967138216231082,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 1201,
+          "elapsed_s": 6.0,
+          "phase_time_s": 2.3974782060248043,
+          "progress_scale": 0.39287607930263446,
+          "position_error_m": 0.03410123512744514,
+          "attitude_error_deg": 0.03413523672475675,
+          "pitch_deg": 6.035619603486827,
+          "riser_error_m": 0.010687172831678082,
+          "riser_thermal_load": 0.00033296967921874756,
+          "proxy_error_deg": [
+            0.03437960078766515,
+            0.012625737785848122,
+            0.008125837559957215
+          ],
+          "proxy_signed_error_deg": [
+            -0.03437960078766515,
+            -0.012625737785848122,
+            0.008125837559957215
+          ],
+          "proxy_target_deg": [
+            13.79167095397202,
+            -1.1725016754892623,
+            -165.3993029530692
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.79167095397202,
+            -1.1725016754892623,
+            -165.3993029530692
+          ],
+          "proxy_actual_deg": [
+            13.8260498046875,
+            -1.1598758697509766,
+            -165.4074249267578
+          ],
+          "proxy_velocity_deg_s": [
+            12.916231155395508,
+            4.594362258911133,
+            -3.121770143508911
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6011104583740234,
+            -0.5565673112869263,
+            0.3938690423965454
+          ],
+          "base_xy_error_m": 0.1209516318973634,
+          "base_yaw_error_deg": 0.5339366871456931,
+          "actual_base_xy_yaw": [
+            0.6176010370254517,
+            -0.07897903025150299,
+            3.119638526013425
+          ],
+          "target_base_xy_yaw": [
+            0.7385486162247843,
+            -0.07996915370666124,
+            3.128957479201308
+          ],
+          "commanded_base_xy_yaw": [
+            0.688604483986725,
+            -0.07760617783136149,
+            3.128957479201308
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.1916662224972887,
+            0.05280918606986977
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.337316632270813,
+            0.045918118208646774
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.14565040977352428,
+            -0.006891067861222996
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049944132238059276,
+            0.0023629758752997557
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.02469502236572607,
+            -0.005876193577321765,
+            -0.02277104425834331
+          ],
+          "actual_camera_position_world_m": [
+            0.9549098610877991,
+            -0.033036161214113235,
+            1.3394283056259155
+          ],
+          "target_camera_position_world_m": [
+            0.930214838722073,
+            -0.02715996763679147,
+            1.3621993498842588
+          ],
+          "actual_yaw_rate_rad_s": 0.014021303504705429,
+          "phase_feedforward_v_mps": -0.15713373190853266,
+          "phase_feedforward_wz_rad_s": 0.011464907621534346,
+          "vx_reference_mps": -0.2719528585542006,
+          "wz_reference_rad_s": 0.027126024805817096,
+          "along_track_error_m": -0.07176195415354243,
+          "cross_track_error_m": -0.0029352844046025726,
+          "base_yaw_error_rad": 0.009381825481149075,
+          "raw_velocity_reference_mps": -0.2719528585542006,
+          "base_position_error_m": 0.0718219601408304,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 1401,
+          "elapsed_s": 7.0,
+          "phase_time_s": 2.788975054556167,
+          "progress_scale": 0.39471451009510805,
+          "position_error_m": 0.0381384445430879,
+          "attitude_error_deg": 0.05511746524385798,
+          "pitch_deg": 6.026427449524459,
+          "riser_error_m": 0.009771923024495144,
+          "riser_thermal_load": 0.0003759573839477061,
+          "proxy_error_deg": [
+            0.03400679531300641,
+            0.012357563765673285,
+            0.007936191815391264
+          ],
+          "proxy_signed_error_deg": [
+            -0.03400679531300641,
+            -0.012357563765673285,
+            0.007936191815391264
+          ],
+          "proxy_target_deg": [
+            13.787216523250772,
+            -1.1996679167657958,
+            -164.9266795837088
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.787216523250772,
+            -1.1996679167657958,
+            -164.9266795837088
+          ],
+          "proxy_actual_deg": [
+            13.821222305297852,
+            -1.1873103380203247,
+            -164.93460083007812
+          ],
+          "proxy_velocity_deg_s": [
+            12.914376258850098,
+            4.217900276184082,
+            -3.3096413612365723
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6091721057891846,
+            -0.5151256918907166,
+            0.4196447730064392
+          ],
+          "base_xy_error_m": 0.11490247381889702,
+          "base_yaw_error_deg": 0.5878217342043557,
+          "actual_base_xy_yaw": [
+            0.780242919921875,
+            -0.08173017203807831,
+            3.13110328151154
+          ],
+          "target_base_xy_yaw": [
+            0.8951430046198816,
+            -0.08098920908811219,
+            3.141362706188189
+          ],
+          "commanded_base_xy_yaw": [
+            0.8451759588914517,
+            -0.07917417708481343,
+            3.141362706188189
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.19110507663542964,
+            0.05429315744351186
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.33663320541381836,
+            0.049006909132003784
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.14552812877838872,
+            -0.005286248311508077
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04996704572842987,
+            0.001815032003298763
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.030631739568358185,
+            -0.006010954094611706,
+            -0.021911319313426603
+          ],
+          "actual_camera_position_world_m": [
+            1.1168798208236694,
+            -0.032707005739212036,
+            1.3395236730575562
+          ],
+          "target_camera_position_world_m": [
+            1.0862480812553112,
+            -0.02669605164460033,
+            1.3614349923709828
+          ],
+          "actual_yaw_rate_rad_s": 0.009461590088903904,
+          "phase_feedforward_v_mps": -0.1579065336621741,
+          "phase_feedforward_wz_rad_s": 0.012610438895850099,
+          "vx_reference_mps": -0.26303764323821766,
+          "wz_reference_rad_s": 0.029851404054390254,
+          "along_track_error_m": -0.0657069434850272,
+          "cross_track_error_m": -0.003240219844887738,
+          "base_yaw_error_rad": 0.010317196159340458,
+          "raw_velocity_reference_mps": -0.26303764323821766,
+          "base_position_error_m": 0.06578678778286536,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 1601,
+          "elapsed_s": 8.0,
+          "phase_time_s": 3.1817369860298492,
+          "progress_scale": 0.39357557605100846,
+          "position_error_m": 0.041560559712112616,
+          "attitude_error_deg": 0.03847443961343338,
+          "pitch_deg": 6.032122119744958,
+          "riser_error_m": 0.008453659977231465,
+          "riser_thermal_load": 0.0004047183927049927,
+          "proxy_error_deg": [
+            0.03399149792384703,
+            0.011671090185013345,
+            0.008585659682818056
+          ],
+          "proxy_signed_error_deg": [
+            -0.03399149792384703,
+            -0.011671090185013345,
+            0.008585659682818056
+          ],
+          "proxy_target_deg": [
+            13.698336054818569,
+            -1.328152486664536,
+            -164.34426192309635
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.698336054818569,
+            -1.328152486664536,
+            -164.34426192309635
+          ],
+          "proxy_actual_deg": [
+            13.73232650756836,
+            -1.316481351852417,
+            -164.35284423828125
+          ],
+          "proxy_velocity_deg_s": [
+            13.121123313903809,
+            4.113399982452393,
+            -3.563398838043213
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6152931451797485,
+            -0.5167657136917114,
+            0.43411433696746826
+          ],
+          "base_xy_error_m": 0.10992095545960803,
+          "base_yaw_error_deg": 0.5931244145536873,
+          "actual_base_xy_yaw": [
+            0.9423515200614929,
+            -0.08256787806749344,
+            -3.140376796677544
+          ],
+          "target_base_xy_yaw": [
+            1.0522441834609308,
+            -0.08007408975832025,
+            3.153160484409968
+          ],
+          "commanded_base_xy_yaw": [
+            1.002259821386611,
+            -0.07882367061927567,
+            3.153160484409968
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.19055841748762958,
+            0.055782034793359726
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.33606839179992676,
+            0.05214192718267441
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.14550997431229717,
+            -0.0036401076106853184
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049984362074319916,
+            0.0012504191390445864
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.03558852186943273,
+            -0.006109562323628949,
+            -0.020576940563326707
+          ],
+          "actual_camera_position_world_m": [
+            1.2783911228179932,
+            -0.030401617288589478,
+            1.3374873399734497
+          ],
+          "target_camera_position_world_m": [
+            1.2428026009485604,
+            -0.02429205496496053,
+            1.3580642805367764
+          ],
+          "actual_yaw_rate_rad_s": 0.008896949701011181,
+          "phase_feedforward_v_mps": -0.1573519564525144,
+          "phase_feedforward_wz_rad_s": 0.010802097512761176,
+          "vx_reference_mps": -0.2545252100322818,
+          "wz_reference_rad_s": 0.028808610682056705,
+          "along_track_error_m": -0.06073328348735459,
+          "cross_track_error_m": -0.0036743756148144794,
+          "base_yaw_error_rad": 0.010412458122561507,
+          "raw_velocity_reference_mps": -0.2545252100322818,
+          "base_position_error_m": 0.06084433218726393,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 1801,
+          "elapsed_s": 9.0,
+          "phase_time_s": 3.575262612907461,
+          "progress_scale": 0.39539428467225357,
+          "position_error_m": 0.04361913250513538,
+          "attitude_error_deg": 0.08348288585364734,
+          "pitch_deg": 6.023028576638732,
+          "riser_error_m": 0.006815227286044112,
+          "riser_thermal_load": 0.00041937518154401066,
+          "proxy_error_deg": [
+            0.03375114551841738,
+            0.011183620254283669,
+            0.008969560091296873
+          ],
+          "proxy_signed_error_deg": [
+            -0.03375114551841738,
+            -0.011183620254283669,
+            0.008969560091296873
+          ],
+          "proxy_target_deg": [
+            13.637213133946958,
+            -1.4389174858125011,
+            -163.85326553460587
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.637213133946958,
+            -1.4389174858125011,
+            -163.85326553460587
+          ],
+          "proxy_actual_deg": [
+            13.670963287353516,
+            -1.4277337789535522,
+            -163.8622283935547
+          ],
+          "proxy_velocity_deg_s": [
+            13.243767738342285,
+            4.299201965332031,
+            -3.5043857097625732
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6488747596740723,
+            -0.49700093269348145,
+            0.46321725845336914
+          ],
+          "base_xy_error_m": 0.10597517477523674,
+          "base_yaw_error_deg": 0.4884359250771036,
+          "actual_base_xy_yaw": [
+            1.1037344932556152,
+            -0.0815209448337555,
+            -3.129093871896696
+          ],
+          "target_base_xy_yaw": [
+            1.2096323685492925,
+            -0.07747401057103762,
+            3.1626162503605104
+          ],
+          "commanded_base_xy_yaw": [
+            1.1596360199992526,
+            -0.07686974931716935,
+            3.1626162503605104
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.19010714033053833,
+            0.05701503059129445
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3349043130874634,
+            0.055264996364712715
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.14479717275692505,
+            -0.001750034226581737
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04999634855003988,
+            0.0006042612538682696
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.038890952812979274,
+            -0.005782553478489716,
+            -0.018886095019023497
+          ],
+          "actual_camera_position_world_m": [
+            1.43863046169281,
+            -0.02624153345823288,
+            1.3339130878448486
+          ],
+          "target_camera_position_world_m": [
+            1.3997395088798308,
+            -0.020458979979743164,
+            1.3527991828638721
+          ],
+          "actual_yaw_rate_rad_s": 0.008806638419628143,
+          "phase_feedforward_v_mps": -0.15814603424542026,
+          "phase_feedforward_wz_rad_s": 0.008397014279892203,
+          "vx_reference_mps": -0.24895934656005891,
+          "wz_reference_rad_s": 0.024603361751730043,
+          "along_track_error_m": -0.056758320196649156,
+          "cross_track_error_m": -0.003954289207668744,
+          "base_yaw_error_rad": 0.008562428050278936,
+          "raw_velocity_reference_mps": -0.24895934656005891,
+          "base_position_error_m": 0.05689589892675251,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 2001,
+          "elapsed_s": 10.0,
+          "phase_time_s": 3.968347872302957,
+          "progress_scale": 0.39442209262126693,
+          "position_error_m": 0.04589112304605092,
+          "attitude_error_deg": 0.05960549847116299,
+          "pitch_deg": 6.027889536893666,
+          "riser_error_m": 0.005819746821879135,
+          "riser_thermal_load": 0.00042261351746250396,
+          "proxy_error_deg": [
+            0.03369332021111287,
+            0.011821940676601814,
+            0.008564476045420932
+          ],
+          "proxy_signed_error_deg": [
+            -0.03369332021111287,
+            -0.011821940676601814,
+            0.008564476045420932
+          ],
+          "proxy_target_deg": [
+            13.562242184995318,
+            -1.5464342862020615,
+            -163.3678256026104
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.562242184995318,
+            -1.5464342862020615,
+            -163.3678256026104
+          ],
+          "proxy_actual_deg": [
+            13.595934867858887,
+            -1.5346122980117798,
+            -163.3763885498047
+          ],
+          "proxy_velocity_deg_s": [
+            13.24189567565918,
+            4.360739231109619,
+            -3.480560779571533
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6363686323165894,
+            -0.5475124716758728,
+            0.42474907636642456
+          ],
+          "base_xy_error_m": 0.1024015074599921,
+          "base_yaw_error_deg": 0.37332012017866983,
+          "actual_base_xy_yaw": [
+            1.2645494937896729,
+            -0.07878292351961136,
+            -3.119441602089354
+          ],
+          "target_base_xy_yaw": [
+            1.366817029802812,
+            -0.07354653087962373,
+            3.1702593703512916
+          ],
+          "commanded_base_xy_yaw": [
+            1.316817077407007,
+            -0.07347753510267745,
+            3.1702593703512916
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18973418402970066,
+            0.058018088530787826
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3339630365371704,
+            0.05781906470656395
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.14422885250746975,
+            -0.0001990238242238762
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04999995239580498,
+            6.899577694629087e-05
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.04193580570636679,
+            -0.00542115419030384,
+            -0.01783239920567592
+          ],
+          "actual_camera_position_world_m": [
+            1.5984870195388794,
+            -0.020949596539139748,
+            1.3283389806747437
+          ],
+          "target_camera_position_world_m": [
+            1.5565512138325126,
+            -0.015528442348835908,
+            1.3461713798804196
+          ],
+          "actual_yaw_rate_rad_s": 0.008384901098906994,
+          "phase_feedforward_v_mps": -0.15770224270409858,
+          "phase_feedforward_wz_rad_s": 0.006768216587825801,
+          "vx_reference_mps": -0.24280212895499942,
+          "wz_reference_rad_s": 0.02086457592877139,
+          "along_track_error_m": -0.053187428906813015,
+          "cross_track_error_m": -0.004148536809236656,
+          "base_yaw_error_rad": 0.006561295105908837,
+          "raw_velocity_reference_mps": -0.24280212895499942,
+          "base_position_error_m": 0.053348973292603116,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 2201,
+          "elapsed_s": 11.0,
+          "phase_time_s": 4.362235507744308,
+          "progress_scale": 0.39381702323816836,
+          "position_error_m": 0.04752415031980681,
+          "attitude_error_deg": 0.05987530813952219,
+          "pitch_deg": 6.030914883809158,
+          "riser_error_m": 0.005850543551929599,
+          "riser_thermal_load": 0.00042476792983458703,
+          "proxy_error_deg": [
+            0.03327217197694294,
+            0.011511181877221765,
+            0.008450176967439259
+          ],
+          "proxy_signed_error_deg": [
+            -0.03327217197694294,
+            -0.011511181877221765,
+            0.008450176967439259
+          ],
+          "proxy_target_deg": [
+            13.499772658899303,
+            -1.6359151152223732,
+            -162.97744432646041
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.499772658899303,
+            -1.6359151152223732,
+            -162.97744432646041
+          ],
+          "proxy_actual_deg": [
+            13.53304386138916,
+            -1.6244038343429565,
+            -162.9858856201172
+          ],
+          "proxy_velocity_deg_s": [
+            13.155248641967773,
+            4.077430248260498,
+            -3.56060528755188
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6256999969482422,
+            -0.5053126811981201,
+            0.4402792453765869
+          ],
+          "base_xy_error_m": 0.09971647235141069,
+          "base_yaw_error_deg": 0.24642096564506483,
+          "actual_base_xy_yaw": [
+            1.424760103225708,
+            -0.07459594309329987,
+            -3.111127390535506
+          ],
+          "target_base_xy_yaw": [
+            1.524292012194959,
+            -0.06853178980150534,
+            3.176358773840531
+          ],
+          "commanded_base_xy_yaw": [
+            1.4742938091427726,
+            -0.06895569020530819,
+            3.176358773840531
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.1894317187475838,
+            0.05882894610484418
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.33277058601379395,
+            0.060044217854738235
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.14333886726621015,
+            0.0012152717498940535
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04999820305218635,
+            -0.0004239004038028438
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.043795156577293604,
+            -0.004836619748883083,
+            -0.01780831921868664
+          ],
+          "actual_camera_position_world_m": [
+            1.7575188875198364,
+            -0.014539463445544243,
+            1.320706844329834
+          ],
+          "target_camera_position_world_m": [
+            1.7137237309425428,
+            -0.00970284369666116,
+            1.3385151635485206
+          ],
+          "actual_yaw_rate_rad_s": 0.00551573745906353,
+          "phase_feedforward_v_mps": -0.15750744570897085,
+          "phase_feedforward_wz_rad_s": 0.005482124531115917,
+          "vx_reference_mps": -0.23828651532544473,
+          "wz_reference_rad_s": 0.01688475063705032,
+          "along_track_error_m": -0.05048691851029617,
+          "cross_track_error_m": -0.0041304579099718,
+          "base_yaw_error_rad": 0.00433911603414725,
+          "raw_velocity_reference_mps": -0.23828651532544473,
+          "base_position_error_m": 0.05065559814286408,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 2401,
+          "elapsed_s": 12.0,
+          "phase_time_s": 4.754556200032978,
+          "progress_scale": 0.39179468960229225,
+          "position_error_m": 0.04945054716516906,
+          "attitude_error_deg": 0.06790868891048023,
+          "pitch_deg": 6.041026551988539,
+          "riser_error_m": 0.005870580135216019,
+          "riser_thermal_load": 0.00042689556401589437,
+          "proxy_error_deg": [
+            0.032889885942485445,
+            0.01318649690112856,
+            0.0070145244015090485
+          ],
+          "proxy_signed_error_deg": [
+            -0.032889885942485445,
+            -0.01318649690112856,
+            0.0070145244015090485
+          ],
+          "proxy_target_deg": [
+            13.430609105031046,
+            -1.6998874117272027,
+            -162.68891112800262
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.430609105031046,
+            -1.6998874117272027,
+            -162.68891112800262
+          ],
+          "proxy_actual_deg": [
+            13.46349811553955,
+            -1.6867008209228516,
+            -162.6959228515625
+          ],
+          "proxy_velocity_deg_s": [
+            12.993110656738281,
+            4.796150207519531,
+            -2.99499773979187
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6025090217590332,
+            -0.601181149482727,
+            0.3631688058376312
+          ],
+          "base_xy_error_m": 0.09683302879200874,
+          "base_yaw_error_deg": 0.14598992938349137,
+          "actual_base_xy_yaw": [
+            1.5844982862472534,
+            -0.06920840591192245,
+            -3.1044576989456343
+          ],
+          "target_base_xy_yaw": [
+            1.6811109765324814,
+            -0.06267973522911091,
+            3.181275613176448
+          ],
+          "commanded_base_xy_yaw": [
+            1.6311177415656617,
+            -0.06350220562513893,
+            3.181275613176448
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18918456624954727,
+            0.05950483499868188
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3317662477493286,
+            0.06185053661465645
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.14258168149978134,
+            0.0023457016159745686
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04999323496681984,
+            -0.000822470396028016
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.0459487256353297,
+            -0.004179735980519201,
+            -0.0177932862214083
+          ],
+          "actual_camera_position_world_m": [
+            1.9162442684173584,
+            -0.007354636210948229,
+            1.3123431205749512
+          ],
+          "target_camera_position_world_m": [
+            1.8702955427820287,
+            -0.003174900230429028,
+            1.3301364067963595
+          ],
+          "actual_yaw_rate_rad_s": 0.0077460999600589275,
+          "phase_feedforward_v_mps": -0.1566631660256655,
+          "phase_feedforward_wz_rad_s": 0.0044141473116201925,
+          "vx_reference_mps": -0.2328366475092154,
+          "wz_reference_rad_s": 0.01346938896896693,
+          "along_track_error_m": -0.0476084259272187,
+          "cross_track_error_m": -0.003972825588896752,
+          "base_yaw_error_rad": 0.0025800027283346735,
+          "raw_velocity_reference_mps": -0.2328366475092154,
+          "base_position_error_m": 0.047773900431378455,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 2601,
+          "elapsed_s": 13.0,
+          "phase_time_s": 5.148625360985016,
+          "progress_scale": 0.3941113190140313,
+          "position_error_m": 0.049392680516559984,
+          "attitude_error_deg": 0.11290448590375302,
+          "pitch_deg": 6.029443404929844,
+          "riser_error_m": 0.005896427444700425,
+          "riser_thermal_load": 0.00042907490356903,
+          "proxy_error_deg": [
+            0.03406374591621514,
+            0.011232649316060711,
+            0.009078545239886052
+          ],
+          "proxy_signed_error_deg": [
+            -0.03406374591621514,
+            -0.011232649316060711,
+            0.009078545239886052
+          ],
+          "proxy_target_deg": [
+            13.403416493187798,
+            -1.7540307615690958,
+            -162.4974459614798
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.403416493187798,
+            -1.7540307615690958,
+            -162.4974459614798
+          ],
+          "proxy_actual_deg": [
+            13.437479972839355,
+            -1.7427979707717896,
+            -162.5065155029297
+          ],
+          "proxy_velocity_deg_s": [
+            13.41609001159668,
+            4.1941633224487305,
+            -3.6551742553710938
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6575478315353394,
+            -0.5099734663963318,
+            0.45724010467529297
+          ],
+          "base_xy_error_m": 0.0955193923393615,
+          "base_yaw_error_deg": 0.06849617306765811,
+          "actual_base_xy_yaw": [
+            1.743323802947998,
+            -0.06289283186197281,
+            -3.098990910510998
+          ],
+          "target_base_xy_yaw": [
+            1.8386008441046604,
+            -0.05609285088313606,
+            3.185389880413635
+          ],
+          "commanded_base_xy_yaw": [
+            1.7886142793097892,
+            -0.057251876339345704,
+            3.185389880413635
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18897534041565356,
+            0.06009087409466589
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.33019840717315674,
+            0.06336537655442953
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.14122306675750318,
+            0.0032745024597636424
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049986564794871215,
+            -0.0011590254562096466
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.04594757532160498,
+            -0.003513077958992101,
+            -0.017779637058456643
+          ],
+          "actual_camera_position_world_m": [
+            2.073523759841919,
+            0.00048494525253772736,
+            1.3033783435821533
+          ],
+          "target_camera_position_world_m": [
+            2.027576184520314,
+            0.003998023211529828,
+            1.32115798064061
+          ],
+          "actual_yaw_rate_rad_s": 0.0030273667071014643,
+          "phase_feedforward_v_mps": -0.15767864440051652,
+          "phase_feedforward_wz_rad_s": 0.003757307013294668,
+          "vx_reference_mps": -0.23172474163618012,
+          "wz_reference_rad_s": 0.010783690598349284,
+          "along_track_error_m": -0.04627881077228975,
+          "cross_track_error_m": -0.0037079369050612983,
+          "base_yaw_error_rad": 0.0012203985228855568,
+          "raw_velocity_reference_mps": -0.23172474163618012,
+          "base_position_error_m": 0.04642711624244303,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 2801,
+          "elapsed_s": 14.0,
+          "phase_time_s": 5.545108350490218,
+          "progress_scale": 0.3986492113212232,
+          "position_error_m": 0.047893678537820714,
+          "attitude_error_deg": 0.09743939258989183,
+          "pitch_deg": 6.006753943393885,
+          "riser_error_m": 0.005905664194385873,
+          "riser_thermal_load": 0.0004312568907925415,
+          "proxy_error_deg": [
+            0.03334462829094819,
+            0.012456562797017704,
+            0.007724986675192011
+          ],
+          "proxy_signed_error_deg": [
+            -0.03334462829094819,
+            -0.012456562797017704,
+            0.007724986675192011
+          ],
+          "proxy_target_deg": [
+            13.349426649334909,
+            -1.8031652504265188,
+            -162.30949399700842
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.349426649334909,
+            -1.8031652504265188,
+            -162.30949399700842
+          ],
+          "proxy_actual_deg": [
+            13.382770538330078,
+            -1.7907085418701172,
+            -162.3172149658203
+          ],
+          "proxy_velocity_deg_s": [
+            13.181538581848145,
+            4.438213348388672,
+            -3.313044786453247
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6235960721969604,
+            -0.5663694143295288,
+            0.3952796161174774
+          ],
+          "base_xy_error_m": 0.0954433015666418,
+          "base_yaw_error_deg": 0.010542867912704115,
+          "actual_base_xy_yaw": [
+            1.9018373489379883,
+            -0.055788304656744,
+            -3.0944556951243647
+          ],
+          "target_base_xy_yaw": [
+            1.9970290858831203,
+            -0.04886320311888122,
+            3.188913619812902
+          ],
+          "commanded_base_xy_yaw": [
+            1.9470489400676336,
+            -0.05027211200971894,
+            3.188913619812902
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18879431181759565,
+            0.06061085611672652
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.32844066619873047,
+            0.06454739905893803
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.13964635438113482,
+            0.0039365429422115045
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04998014581548676,
+            -0.001408908890837723
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.0444448422742596,
+            -0.0029777627043663397,
+            -0.01759526551026669
+          ],
+          "actual_camera_position_world_m": [
+            2.2302682399749756,
+            0.008769890293478966,
+            1.2941192388534546
+          ],
+          "target_camera_position_world_m": [
+            2.185823397700716,
+            0.011747652997845305,
+            1.3117145043637213
+          ],
+          "actual_yaw_rate_rad_s": 0.004629544913768768,
+          "phase_feedforward_v_mps": -0.15945165905621317,
+          "phase_feedforward_wz_rad_s": 0.003259218707857533,
+          "vx_reference_mps": -0.23339041998744142,
+          "wz_reference_rad_s": 0.0085810987301441,
+          "along_track_error_m": -0.046211725582017665,
+          "cross_track_error_m": -0.003380790752270712,
+          "base_yaw_error_rad": 0.00020891157823374958,
+          "raw_velocity_reference_mps": -0.23339041998744142,
+          "base_position_error_m": 0.046335227714756566,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 3001,
+          "elapsed_s": 15.0,
+          "phase_time_s": 5.941834212130791,
+          "progress_scale": 0.39750447161632907,
+          "position_error_m": 0.046422935456533886,
+          "attitude_error_deg": 0.07678310555387333,
+          "pitch_deg": 6.012477641918355,
+          "riser_error_m": 0.005924269679575267,
+          "riser_thermal_load": 0.00043345702101433084,
+          "proxy_error_deg": [
+            0.033416442734885005,
+            0.012444178686669445,
+            0.007856992242422523
+          ],
+          "proxy_signed_error_deg": [
+            -0.033416442734885005,
+            -0.012444178686669445,
+            0.007856992242422523
+          ],
+          "proxy_target_deg": [
+            13.289549698518341,
+            -1.852232257814355,
+            -162.1231573742883
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.289549698518341,
+            -1.852232257814355,
+            -162.1231573742883
+          ],
+          "proxy_actual_deg": [
+            13.322965621948242,
+            -1.8397879600524902,
+            -162.13101196289062
+          ],
+          "proxy_velocity_deg_s": [
+            13.19495964050293,
+            4.502939224243164,
+            -3.2851734161376953
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.627945899963379,
+            -0.5625881552696228,
+            0.4008690416812897
+          ],
+          "base_xy_error_m": 0.09599158369935992,
+          "base_yaw_error_deg": 0.05474395461057475,
+          "actual_base_xy_yaw": [
+            2.059786081314087,
+            -0.04800286144018173,
+            -3.0902682011694145
+          ],
+          "target_base_xy_yaw": [
+            2.1555298283146804,
+            -0.04110945506904977,
+            3.191961643756655
+          ],
+          "commanded_base_xy_yaw": [
+            2.105556959329133,
+            -0.0427563811005681,
+            3.191961643756655
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18863627741808564,
+            0.06107692920643443
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3273005485534668,
+            0.06564680486917496
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.13866427113538116,
+            0.00456987566274053
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049972868985547626,
+            -0.0016469260315183309
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.042914325251731,
+            -0.0023214408205339994,
+            -0.017551653400945222
+          ],
+          "actual_camera_position_world_m": [
+            2.387080430984497,
+            0.017646033316850662,
+            1.2844321727752686
+          ],
+          "target_camera_position_world_m": [
+            2.344166105732766,
+            0.01996747413738466,
+            1.3019838261762138
+          ],
+          "actual_yaw_rate_rad_s": 0.0031567371916025877,
+          "phase_feedforward_v_mps": -0.1589974514764097,
+          "phase_feedforward_wz_rad_s": 0.0028682502757232235,
+          "vx_reference_mps": -0.23382931498693105,
+          "wz_reference_rad_s": 0.006083430229927375,
+          "along_track_error_m": -0.04676991469407584,
+          "cross_track_error_m": -0.0028924055297609745,
+          "base_yaw_error_rad": -0.0009361902836977583,
+          "raw_velocity_reference_mps": -0.23382931498693105,
+          "base_position_error_m": 0.046859267282360735,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 3201,
+          "elapsed_s": 16.0,
+          "phase_time_s": 6.3383164272632895,
+          "progress_scale": 0.39635119417497233,
+          "position_error_m": 0.04483833660990177,
+          "attitude_error_deg": 0.10181062917049358,
+          "pitch_deg": 6.018244029125138,
+          "riser_error_m": 0.0058793594293158336,
+          "riser_thermal_load": 0.000435605421595483,
+          "proxy_error_deg": [
+            0.03287985397490867,
+            0.012474315938953507,
+            0.007454932105016985
+          ],
+          "proxy_signed_error_deg": [
+            -0.03287985397490867,
+            -0.012474315938953507,
+            0.007454932105016985
+          ],
+          "proxy_target_deg": [
+            13.256727643371974,
+            -1.8790550927464835,
+            -162.03098305041536
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.256727643371974,
+            -1.8790550927464835,
+            -162.03098305041536
+          ],
+          "proxy_actual_deg": [
+            13.289607048034668,
+            -1.8665807247161865,
+            -162.03842163085938
+          ],
+          "proxy_velocity_deg_s": [
+            13.008150100708008,
+            4.4901509284973145,
+            -3.166698455810547
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6040692329406738,
+            -0.5599266290664673,
+            0.386019766330719
+          ],
+          "base_xy_error_m": 0.09669485414372521,
+          "base_yaw_error_deg": 0.08239935252082771,
+          "actual_base_xy_yaw": [
+            2.2174501419067383,
+            -0.03963881731033325,
+            -3.0871189600813715
+          ],
+          "target_base_xy_yaw": [
+            2.31391048993515,
+            -0.03290858134760859,
+            3.1946282070952146
+          ],
+          "commanded_base_xy_yaw": [
+            2.2639435999938327,
+            -0.03472789704100656,
+            3.1946282070952146
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.1884968446480828,
+            0.06149963732436413
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.32620930671691895,
+            0.06651380658149719
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.13771246206883614,
+            0.005014169257133064
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.0499668899413177,
+            -0.0018193156933979718
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.041231133205463344,
+            -0.0017134385132860364,
+            -0.017536653414987224
+          ],
+          "actual_camera_position_world_m": [
+            2.5436384677886963,
+            0.026877617463469505,
+            1.2745532989501953
+          ],
+          "target_camera_position_world_m": [
+            2.502407334583233,
+            0.02859105597675554,
+            1.2920899523651825
+          ],
+          "actual_yaw_rate_rad_s": 0.0029012293089181185,
+          "phase_feedforward_v_mps": -0.15848416276028252,
+          "phase_feedforward_wz_rad_s": 0.0025010090675375925,
+          "vx_reference_mps": -0.23446901744572304,
+          "wz_reference_rad_s": 0.004351263509428856,
+          "along_track_error_m": -0.04749053417840032,
+          "cross_track_error_m": -0.002372804140021415,
+          "base_yaw_error_rad": -0.001424126473450716,
+          "raw_velocity_reference_mps": -0.23446901744572304,
+          "base_position_error_m": 0.047549774300586455,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 3401,
+          "elapsed_s": 17.0,
+          "phase_time_s": 6.734029377399482,
+          "progress_scale": 0.3964243625764562,
+          "position_error_m": 0.04317898890316198,
+          "attitude_error_deg": 0.09547398194554432,
+          "pitch_deg": 6.017878187117719,
+          "riser_error_m": 0.005883588433937992,
+          "riser_thermal_load": 0.0004377116464210279,
+          "proxy_error_deg": [
+            0.03332862134396033,
+            0.011353698035010294,
+            0.008441648741827575
+          ],
+          "proxy_signed_error_deg": [
+            -0.03332862134396033,
+            -0.011353698035010294,
+            0.008441648741827575
+          ],
+          "proxy_target_deg": [
+            13.208428278225107,
+            -1.9085706480343978,
+            -161.9469139127145
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.208428278225107,
+            -1.9085706480343978,
+            -161.9469139127145
+          ],
+          "proxy_actual_deg": [
+            13.241756439208984,
+            -1.897216796875,
+            -161.95535278320312
+          ],
+          "proxy_velocity_deg_s": [
+            13.102917671203613,
+            4.270514488220215,
+            -3.3490538597106934
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.620094895362854,
+            -0.522281289100647,
+            0.4187973737716675
+          ],
+          "base_xy_error_m": 0.09735800954652933,
+          "base_yaw_error_deg": 0.09422554340916355,
+          "actual_base_xy_yaw": [
+            2.3748233318328857,
+            -0.030846508219838142,
+            -3.084557480944283
+          ],
+          "target_base_xy_yaw": [
+            2.471962931596075,
+            -0.024328826062083822,
+            3.1969832802633324
+          ],
+          "commanded_base_xy_yaw": [
+            2.422000681471534,
+            -0.026271392017934388,
+            3.1969832802633324
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18837271465011174,
+            0.06188686100038426
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.32499170303344727,
+            0.06719869934022427
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.13661898838333553,
+            0.005311838339840003
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04996225012454073,
+            -0.001942565955850565
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.03946317615676742,
+            -0.0012018577572949635,
+            -0.017482515501224594
+          ],
+          "actual_camera_position_world_m": [
+            2.699798822402954,
+            0.03635617718100548,
+            1.264662742614746
+          ],
+          "target_camera_position_world_m": [
+            2.6603356462461867,
+            0.03755803493830044,
+            1.2821452581159707
+          ],
+          "actual_yaw_rate_rad_s": 0.0014977066311985254,
+          "phase_feedforward_v_mps": -0.15853364748081994,
+          "phase_feedforward_wz_rad_s": 0.0022069270369757393,
+          "vx_reference_mps": -0.23557665547978396,
+          "wz_reference_rad_s": 0.003059152537030346,
+          "along_track_error_m": -0.04815187999935251,
+          "cross_track_error_m": -0.001878736376279212,
+          "base_yaw_error_rad": -0.001638232553636843,
+          "raw_velocity_reference_mps": -0.23557665547978396,
+          "base_position_error_m": 0.04818851728206212,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 3601,
+          "elapsed_s": 18.0,
+          "phase_time_s": 7.128934052340805,
+          "progress_scale": 0.39388464211095153,
+          "position_error_m": 0.04169086399033053,
+          "attitude_error_deg": 0.07580668858795978,
+          "pitch_deg": 6.0305767894452424,
+          "riser_error_m": 0.005913807885461475,
+          "riser_thermal_load": 0.00043981169287824525,
+          "proxy_error_deg": [
+            0.03360626100954929,
+            0.011823013672203488,
+            0.008352344759351319
+          ],
+          "proxy_signed_error_deg": [
+            -0.03360626100954929,
+            -0.011823013672203488,
+            0.008352344759351319
+          ],
+          "proxy_target_deg": [
+            13.14587553502828,
+            -1.9351293653103356,
+            -161.87102419236976
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.14587553502828,
+            -1.9351293653103356,
+            -161.87102419236976
+          ],
+          "proxy_actual_deg": [
+            13.179481506347656,
+            -1.9233062267303467,
+            -161.87936401367188
+          ],
+          "proxy_velocity_deg_s": [
+            13.277774810791016,
+            4.218773365020752,
+            -3.4983508586883545
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6399585008621216,
+            -0.523621678352356,
+            0.43129363656044006
+          ],
+          "base_xy_error_m": 0.09819021177110122,
+          "base_yaw_error_deg": 0.09169479643306896,
+          "actual_base_xy_yaw": [
+            2.531684398651123,
+            -0.02170293591916561,
+            -3.0825057484002705
+          ],
+          "target_base_xy_yaw": [
+            2.6296730522785743,
+            -0.015414736818223274,
+            3.1990791826746126
+          ],
+          "commanded_base_xy_yaw": [
+            2.579713879456851,
+            -0.01743489794278221,
+            3.1990791826746126
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18826138707295303,
+            0.06224467818725408
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3240978717803955,
+            0.06773739494383335
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.13583648470744247,
+            0.005492716756579273
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04995917282172336,
+            -0.002020161124558936
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.037840201685459984,
+            -0.0007900918493011916,
+            -0.017482077437582122
+          ],
+          "actual_camera_position_world_m": [
+            2.8557746410369873,
+            0.046039849519729614,
+            1.254758358001709
+          ],
+          "target_camera_position_world_m": [
+            2.8179344393515273,
+            0.046829941369030806,
+            1.272240435439291
+          ],
+          "actual_yaw_rate_rad_s": 0.0005145777249708772,
+          "phase_feedforward_v_mps": -0.15755085156114554,
+          "phase_feedforward_wz_rad_s": 0.0019771536325435173,
+          "vx_reference_mps": -0.2359274477701512,
+          "wz_reference_rad_s": 0.002201412082207384,
+          "along_track_error_m": -0.04898537263062854,
+          "cross_track_error_m": -0.0014246570903700883,
+          "base_yaw_error_rad": -0.001593939321576055,
+          "raw_velocity_reference_mps": -0.2359274477701512,
+          "base_position_error_m": 0.049006085128141724,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 3801,
+          "elapsed_s": 19.0,
+          "phase_time_s": 7.522841330979319,
+          "progress_scale": 0.3945484511209121,
+          "position_error_m": 0.04015155347345986,
+          "attitude_error_deg": 0.04756996631255576,
+          "pitch_deg": 6.027257744395439,
+          "riser_error_m": 0.005934821522966982,
+          "riser_thermal_load": 0.0004418366811591831,
+          "proxy_error_deg": [
+            0.033578528331012304,
+            0.011900897250098437,
+            0.008254568990053536
+          ],
+          "proxy_signed_error_deg": [
+            -0.033578528331012304,
+            -0.011900897250098437,
+            0.008254568990053536
+          ],
+          "proxy_target_deg": [
+            13.077659432614634,
+            -1.966054944500947,
+            -161.8020960763869
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.077659432614634,
+            -1.966054944500947,
+            -161.8020960763869
+          ],
+          "proxy_actual_deg": [
+            13.111237525939941,
+            -1.9541538953781128,
+            -161.8103485107422
+          ],
+          "proxy_velocity_deg_s": [
+            13.25802230834961,
+            4.222892761230469,
+            -3.461620330810547
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6338610649108887,
+            -0.5417706370353699,
+            0.41509366035461426
+          ],
+          "base_xy_error_m": 0.09867649169289891,
+          "base_yaw_error_deg": 0.10814560427717211,
+          "actual_base_xy_yaw": [
+            2.688474178314209,
+            -0.01223047450184822,
+            -3.0803393958979965
+          ],
+          "target_base_xy_yaw": [
+            2.7869669524859497,
+            -0.006211882575722212,
+            3.2009584144153944
+          ],
+          "commanded_base_xy_yaw": [
+            2.7370122106187824,
+            -0.00833879700386939,
+            3.2009584144153944
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18816081180986322,
+            0.06257803374864636
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3228633403778076,
+            0.06831324007362127
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1347025285679444,
+            0.005735206324974915
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04995474186716752,
+            -0.0021269144281471776
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.03620474760604253,
+            -0.00027993877630244635,
+            -0.017357566978018157
+          ],
+          "actual_camera_position_world_m": [
+            3.0113325119018555,
+            0.056086212396621704,
+            1.2451058626174927
+          ],
+          "target_camera_position_world_m": [
+            2.975127764295813,
+            0.05636615117292415,
+            1.2624634295955108
+          ],
+          "actual_yaw_rate_rad_s": 0.00247979280538857,
+          "phase_feedforward_v_mps": -0.15782265893916522,
+          "phase_feedforward_wz_rad_s": 0.0017942019020721987,
+          "vx_reference_mps": -0.23696955718623414,
+          "wz_reference_rad_s": 0.0009129345708641374,
+          "along_track_error_m": -0.04946681140441807,
+          "cross_track_error_m": -0.0009139251781022789,
+          "base_yaw_error_rad": -0.0018767959153012331,
+          "raw_velocity_reference_mps": -0.23696955718623414,
+          "base_position_error_m": 0.04947525330659192,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 4001,
+          "elapsed_s": 20.0,
+          "phase_time_s": 7.916564303793282,
+          "progress_scale": 0.39293285525011024,
+          "position_error_m": 0.03878124778580507,
+          "attitude_error_deg": 0.10930404131009956,
+          "pitch_deg": 6.035335723749449,
+          "riser_error_m": 0.005939982510550723,
+          "riser_thermal_load": 0.0004438584897031404,
+          "proxy_error_deg": [
+            0.03429825951480239,
+            0.0113724113630687,
+            0.00903321055543499
+          ],
+          "proxy_signed_error_deg": [
+            -0.03429825951480239,
+            -0.0113724113630687,
+            0.00903321055543499
+          ],
+          "proxy_target_deg": [
+            13.077659432614634,
+            -1.966054944500947,
+            -161.8020960763869
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.077659432614634,
+            -1.966054944500947,
+            -161.8020960763869
+          ],
+          "proxy_actual_deg": [
+            13.111956596374512,
+            -1.954682469367981,
+            -161.81112670898438
+          ],
+          "proxy_velocity_deg_s": [
+            13.347524642944336,
+            4.634947299957275,
+            -3.2956175804138184
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.661775827407837,
+            -0.5325174331665039,
+            0.43867072463035583
+          ],
+          "base_xy_error_m": 0.09939018899636887,
+          "base_yaw_error_deg": 0.10628562654392909,
+          "actual_base_xy_yaw": [
+            2.8449463844299316,
+            -0.0024743659887462854,
+            -3.0786741462165352
+          ],
+          "target_base_xy_yaw": [
+            2.9441705778418474,
+            0.00326750744147219,
+            3.202656126832315
+          ],
+          "commanded_base_xy_yaw": [
+            2.8942192902856108,
+            0.0010609554991546331,
+            3.202656126832315
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18806925892288096,
+            0.06289137161513811
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3218848705291748,
+            0.06880255253054202
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.13381561160629385,
+            0.0059111809154039074
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049951287556236776,
+            -0.002206551942317557
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.03460119335612122,
+            0.0001704958527906364,
+            -0.017513238687361765
+          ],
+          "actual_camera_position_world_m": [
+            3.1668410301208496,
+            0.06632937490940094,
+            1.2353613376617432
+          ],
+          "target_camera_position_world_m": [
+            3.1322398367647284,
+            0.0661588790566103,
+            1.252874576349105
+          ],
+          "actual_yaw_rate_rad_s": -0.0004987750435248017,
+          "phase_feedforward_v_mps": -0.1572314377646092,
+          "phase_feedforward_wz_rad_s": 0.001604873697774376,
+          "vx_reference_mps": -0.2375057786306637,
+          "wz_reference_rad_s": 2.4171866174757485e-05,
+          "along_track_error_m": -0.05017146304128404,
+          "cross_track_error_m": -0.00043012194006140404,
+          "base_yaw_error_rad": -0.0018549039514097706,
+          "raw_velocity_reference_mps": -0.2375057786306637,
+          "base_position_error_m": 0.05017330673362333,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 4201,
+          "elapsed_s": 21.0,
+          "phase_time_s": 8.30954609350682,
+          "progress_scale": 0.3934716717982596,
+          "position_error_m": 0.03723305468153761,
+          "attitude_error_deg": 0.05572910651644047,
+          "pitch_deg": 6.032641641008702,
+          "riser_error_m": 0.005949406331534179,
+          "riser_thermal_load": 0.0004457919447574663,
+          "proxy_error_deg": [
+            0.03361823762000594,
+            0.012009232649347583,
+            0.008212802423772205
+          ],
+          "proxy_signed_error_deg": [
+            -0.03361823762000594,
+            -0.012009232649347583,
+            0.008212802423772205
+          ],
+          "proxy_target_deg": [
+            12.98921316980358,
+            -1.9955333067746623,
+            -161.7626866703072
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.98921316980358,
+            -1.9955333067746623,
+            -161.7626866703072
+          ],
+          "proxy_actual_deg": [
+            13.022830963134766,
+            -1.983523964881897,
+            -161.77088928222656
+          ],
+          "proxy_velocity_deg_s": [
+            13.308349609375,
+            4.175962924957275,
+            -3.5191004276275635
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6401150226593018,
+            -0.5345691442489624,
+            0.42237111926078796
+          ],
+          "base_xy_error_m": 0.09999035504071968,
+          "base_yaw_error_deg": 0.09760326617194012,
+          "actual_base_xy_yaw": [
+            3.001222848892212,
+            0.007499829865992069,
+            -3.0772872400046887
+          ],
+          "target_base_xy_yaw": [
+            3.1010627419061514,
+            0.012983155876206659,
+            3.2041945688194966
+          ],
+          "commanded_base_xy_yaw": [
+            3.051113469882599,
+            0.010731440015544134,
+            3.2041945688194966
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18798564862774558,
+            0.0631872775462625
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3207869529724121,
+            0.06917396746575832
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.13280130434466653,
+            0.00598668991949583
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04994927202355247,
+            -0.002251715860662525
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.032957358214882326,
+            0.0005017853175172671,
+            -0.017316498257714308
+          ],
+          "actual_camera_position_world_m": [
+            3.3220057487487793,
+            0.07667221873998642,
+            1.226251482963562
+          ],
+          "target_camera_position_world_m": [
+            3.289048390533897,
+            0.07617043342246915,
+            1.2435679812212763
+          ],
+          "actual_yaw_rate_rad_s": -0.001880413037724793,
+          "phase_feedforward_v_mps": -0.15739153739875766,
+          "phase_feedforward_wz_rad_s": 0.0014675229150667923,
+          "vx_reference_mps": -0.23863340472931874,
+          "wz_reference_rad_s": -0.0005453244719847664,
+          "along_track_error_m": -0.05077616708160067,
+          "cross_track_error_m": -1.891677519893272e-05,
+          "base_yaw_error_rad": -0.0017010187915416316,
+          "raw_velocity_reference_mps": -0.23863340472931874,
+          "base_position_error_m": 0.05077617060534411,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 4401,
+          "elapsed_s": 22.0,
+          "phase_time_s": 8.701886167737921,
+          "progress_scale": 0.3924772816324704,
+          "position_error_m": 0.03598479426457252,
+          "attitude_error_deg": 0.10800540696147277,
+          "pitch_deg": 6.037613591837649,
+          "riser_error_m": 0.005939480683526677,
+          "riser_thermal_load": 0.00044770933855447245,
+          "proxy_error_deg": [
+            0.03382058197416757,
+            0.011439979070709332,
+            0.008663594908993046
+          ],
+          "proxy_signed_error_deg": [
+            -0.03382058197416757,
+            -0.011439979070709332,
+            0.008663594908993046
+          ],
+          "proxy_target_deg": [
+            12.98921316980358,
+            -1.9955333067746623,
+            -161.7626866703072
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.98921316980358,
+            -1.9955333067746623,
+            -161.7626866703072
+          ],
+          "proxy_actual_deg": [
+            13.023033142089844,
+            -1.984093189239502,
+            -161.77134704589844
+          ],
+          "proxy_velocity_deg_s": [
+            13.326048851013184,
+            4.159898281097412,
+            -3.552973747253418
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6452580690383911,
+            -0.5197972059249878,
+            0.4349815249443054
+          ],
+          "base_xy_error_m": 0.1006023241979463,
+          "base_yaw_error_deg": 0.09359936222621279,
+          "actual_base_xy_yaw": [
+            3.1572182178497314,
+            0.017679130658507347,
+            -3.075957049152198
+          ],
+          "target_base_xy_yaw": [
+            3.257684330935164,
+            0.022912461866617436,
+            3.205594640978774
+          ],
+          "commanded_base_xy_yaw": [
+            3.2077372097775716,
+            0.020613529925741822,
+            3.205594640978774
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18790894563432525,
+            0.06346840280965392
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.31984758377075195,
+            0.06954118423163891
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1319386381364267,
+            0.006072781421984988
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04994712115759248,
+            -0.0022989319408756154
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.031466803005095745,
+            0.0008440807497158836,
+            -0.017436549388857525
+          ],
+          "actual_camera_position_world_m": [
+            3.477060079574585,
+            0.08722494542598724,
+            1.2171846628189087
+          ],
+          "target_camera_position_world_m": [
+            3.445593276569489,
+            0.08638086467627136,
+            1.2346212122077662
+          ],
+          "actual_yaw_rate_rad_s": 0.0004210662445984781,
+          "phase_feedforward_v_mps": -0.1569939179362247,
+          "phase_feedforward_wz_rad_s": 0.0013409810221728664,
+          "vx_reference_mps": -0.23920680292300944,
+          "wz_reference_rad_s": -0.0011864878482095895,
+          "along_track_error_m": -0.05138305311674046,
+          "cross_track_error_m": 0.0003846641479084362,
+          "base_yaw_error_rad": -0.0016253938737665014,
+          "raw_velocity_reference_mps": -0.23920680292300944,
+          "base_position_error_m": 0.05138449293419619,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 4601,
+          "elapsed_s": 23.0,
+          "phase_time_s": 9.09391105734025,
+          "progress_scale": 0.39157945326607224,
+          "position_error_m": 0.034615330625908367,
+          "attitude_error_deg": 0.06017561360102479,
+          "pitch_deg": 6.042102733669639,
+          "riser_error_m": 0.00594648998199887,
+          "riser_thermal_load": 0.00044958847721387113,
+          "proxy_error_deg": [
+            0.03333712366120296,
+            0.011726822425613192,
+            0.008158349182226918
+          ],
+          "proxy_signed_error_deg": [
+            -0.03333712366120296,
+            -0.011726822425613192,
+            0.008158349182226918
+          ],
+          "proxy_target_deg": [
+            12.894245588239263,
+            -2.0250653126082683,
+            -161.74720927337611
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.894245588239263,
+            -2.0250653126082683,
+            -161.74720927337611
+          ],
+          "proxy_actual_deg": [
+            12.927581787109375,
+            -2.013338327407837,
+            -161.75535583496094
+          ],
+          "proxy_velocity_deg_s": [
+            13.15791130065918,
+            4.243643760681152,
+            -3.3719589710235596
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.629345417022705,
+            -0.5127589702606201,
+            0.42639851570129395
+          ],
+          "base_xy_error_m": 0.10126511877580846,
+          "base_yaw_error_deg": 0.0997911941481015,
+          "actual_base_xy_yaw": [
+            3.313023328781128,
+            0.028078852221369743,
+            -3.07457053426376
+          ],
+          "target_base_xy_yaw": [
+            3.414166707073473,
+            0.033042853459301955,
+            3.2068730880134453
+          ],
+          "commanded_base_xy_yaw": [
+            3.3642230478605253,
+            0.030669900779421954,
+            3.2068730880134453
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18783831048736443,
+            0.06373702994674492
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3189656734466553,
+            0.0699672307819128
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.13112736295929084,
+            0.0062302008351678845
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04994365921294765,
+            -0.00237295267988
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.02997945471394292,
+            0.0012691761041841443,
+            -0.017258116971795134
+          ],
+          "actual_camera_position_world_m": [
+            3.6319844722747803,
+            0.09804905951023102,
+            1.2088536024093628
+          ],
+          "target_camera_position_world_m": [
+            3.6020050175608374,
+            0.09677988340604687,
+            1.226111719381158
+          ],
+          "actual_yaw_rate_rad_s": 0.0023106338921934366,
+          "phase_feedforward_v_mps": -0.15663400111790915,
+          "phase_feedforward_wz_rad_s": 0.001213442139700842,
+          "vx_reference_mps": -0.23989718493649032,
+          "wz_reference_rad_s": -0.0021308052373566334,
+          "along_track_error_m": -0.05203948988661322,
+          "cross_track_error_m": 0.0008426521743971748,
+          "base_yaw_error_rad": -0.0017335575962180944,
+          "raw_velocity_reference_mps": -0.23989718493649032,
+          "base_position_error_m": 0.05204631178427475,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 4801,
+          "elapsed_s": 24.0,
+          "phase_time_s": 9.485082464006252,
+          "progress_scale": 0.39089865416055125,
+          "position_error_m": 0.0335619807112597,
+          "attitude_error_deg": 0.10970671361734817,
+          "pitch_deg": 6.045506729197244,
+          "riser_error_m": 0.005945657284012529,
+          "riser_thermal_load": 0.00045142272651941005,
+          "proxy_error_deg": [
+            0.033513001032330784,
+            0.012535559512025014,
+            0.007748537832026151
+          ],
+          "proxy_signed_error_deg": [
+            -0.033513001032330784,
+            -0.012535559512025014,
+            0.007748537832026151
+          ],
+          "proxy_target_deg": [
+            12.894245588239263,
+            -2.0250653126082683,
+            -161.74720927337611
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.894245588239263,
+            -2.0250653126082683,
+            -161.74720927337611
+          ],
+          "proxy_actual_deg": [
+            12.92775821685791,
+            -2.0125296115875244,
+            -161.75494384765625
+          ],
+          "proxy_velocity_deg_s": [
+            13.254366874694824,
+            4.407104969024658,
+            -3.31953763961792
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6329748630523682,
+            -0.5626224875450134,
+            0.39779818058013916
+          ],
+          "base_xy_error_m": 0.101776163635395,
+          "base_yaw_error_deg": 0.09143651805555246,
+          "actual_base_xy_yaw": [
+            3.468627452850342,
+            0.038661178201436996,
+            -3.0735494923132882
+          ],
+          "target_base_xy_yaw": [
+            3.5702958876978665,
+            0.043342720681572654,
+            3.2080399465696696
+          ],
+          "commanded_base_xy_yaw": [
+            3.5203531495124993,
+            0.04095046180179629,
+            3.2080399465696696
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18777324857878241,
+            0.06399445383218527
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3181135654449463,
+            0.07023775950074196
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.13034031686616387,
+            0.006243305668556687
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04994273818536716,
+            -0.0023922588797763624
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.028667352065636198,
+            0.0015644304962747213,
+            -0.017382233229080724
+          ],
+          "actual_camera_position_world_m": [
+            3.786736488342285,
+            0.10890160501003265,
+            1.2007633447647095
+          ],
+          "target_camera_position_world_m": [
+            3.758069136276649,
+            0.10733717451375793,
+            1.2181455779937902
+          ],
+          "actual_yaw_rate_rad_s": 0.0036406933795660734,
+          "phase_feedforward_v_mps": -0.15636185223043125,
+          "phase_feedforward_wz_rad_s": 0.0011135085309410288,
+          "vx_reference_mps": -0.24042780452921686,
+          "wz_reference_rad_s": -0.002642112085940716,
+          "along_track_error_m": -0.05254122018674101,
+          "cross_track_error_m": 0.0012320214847547722,
+          "base_yaw_error_rad": -0.0015896569914579891,
+          "raw_velocity_reference_mps": -0.24042780452921686,
+          "base_position_error_m": 0.052555662831425674,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 5001,
+          "elapsed_s": 25.0,
+          "phase_time_s": 9.875706520229611,
+          "progress_scale": 0.39072388669516345,
+          "position_error_m": 0.03245956800077332,
+          "attitude_error_deg": 0.05926077339656729,
+          "pitch_deg": 6.046380566524182,
+          "riser_error_m": 0.005946414117674381,
+          "riser_thermal_load": 0.0004532067551895187,
+          "proxy_error_deg": [
+            0.033510860650390245,
+            0.012199047357321151,
+            0.007954136375671784
+          ],
+          "proxy_signed_error_deg": [
+            -0.033510860650390245,
+            -0.012199047357321151,
+            0.007954136375671784
+          ],
+          "proxy_target_deg": [
+            12.798648132129474,
+            -2.0478011794698676,
+            -161.76289069484193
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.798648132129474,
+            -2.0478011794698676,
+            -161.76289069484193
+          ],
+          "proxy_actual_deg": [
+            12.832158088684082,
+            -2.03560209274292,
+            -161.77084350585938
+          ],
+          "proxy_velocity_deg_s": [
+            13.234552383422852,
+            4.370987415313721,
+            -3.3406124114990234
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6346943378448486,
+            -0.5399889945983887,
+            0.41294580698013306
+          ],
+          "base_xy_error_m": 0.10221746809436158,
+          "base_yaw_error_deg": 0.08012111047868278,
+          "actual_base_xy_yaw": [
+            3.6240735054016113,
+            0.04937462881207466,
+            -3.0726803850879625
+          ],
+          "target_base_xy_yaw": [
+            3.7261950588627513,
+            0.053801716150874895,
+            3.209106544913417
+          ],
+          "commanded_base_xy_yaw": [
+            3.6762540897874993,
+            0.051372805319922665,
+            3.209106544913417
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18771318310642737,
+            0.06424240332341744
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3173098564147949,
+            0.07054542005062103
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.12959667330836755,
+            0.0063030167272035975
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04994096907525207,
+            -0.0024289108309522274
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.027471066731382887,
+            0.001875821354984708,
+            -0.017188523545695222
+          ],
+          "actual_camera_position_world_m": [
+            3.9413793087005615,
+            0.11991994082927704,
+            1.193624496459961
+          ],
+          "target_camera_position_world_m": [
+            3.9139082419691786,
+            0.11804411947429233,
+            1.2108130200056562
+          ],
+          "actual_yaw_rate_rad_s": -0.0008112507639452815,
+          "phase_feedforward_v_mps": -0.1562886667534716,
+          "phase_feedforward_wz_rad_s": 0.0010231547068208463,
+          "vx_reference_mps": -0.24104153468322245,
+          "wz_reference_rad_s": -0.003052655668287784,
+          "along_track_error_m": -0.05297054245609427,
+          "cross_track_error_m": 0.0015996558099612653,
+          "base_yaw_error_rad": -0.001396938883472277,
+          "raw_velocity_reference_mps": -0.24104153468322245,
+          "base_position_error_m": 0.05299469093034913,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 5201,
+          "elapsed_s": 26.0,
+          "phase_time_s": 10.26607158592493,
+          "progress_scale": 0.38983416917840474,
+          "position_error_m": 0.03152328539953077,
+          "attitude_error_deg": 0.1169124796060744,
+          "pitch_deg": 6.050829154107976,
+          "riser_error_m": 0.0059484024759902665,
+          "riser_thermal_load": 0.0004549998084317419,
+          "proxy_error_deg": [
+            0.033343521015724936,
+            0.012946099297791296,
+            0.007366740107050687
+          ],
+          "proxy_signed_error_deg": [
+            -0.033343521015724936,
+            -0.012946099297791296,
+            0.007366740107050687
+          ],
+          "proxy_target_deg": [
+            12.798648132129474,
+            -2.0478011794698676,
+            -161.76289069484193
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.798648132129474,
+            -2.0478011794698676,
+            -161.76289069484193
+          ],
+          "proxy_actual_deg": [
+            12.831991195678711,
+            -2.0348548889160156,
+            -161.77024841308594
+          ],
+          "proxy_velocity_deg_s": [
+            13.161470413208008,
+            4.659073352813721,
+            -3.10439133644104
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6240471601486206,
+            -0.5839322209358215,
+            0.377616286277771
+          ],
+          "base_xy_error_m": 0.10281351393675554,
+          "base_yaw_error_deg": 0.06297202841218112,
+          "actual_base_xy_yaw": [
+            3.7792534828186035,
+            0.06018705293536186,
+            -3.0720058974825264
+          ],
+          "target_base_xy_yaw": [
+            3.8819801206346263,
+            0.06441275181709845,
+            3.210080340464608
+          ],
+          "commanded_base_xy_yaw": [
+            3.8320384432087855,
+            0.0619984494554883,
+            3.210080340464608
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18765772868534292,
+            0.0644822432768218
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.31664419174194336,
+            0.07071776315569878
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.12898646305660044,
+            0.00623551987887698
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04994167742584068,
+            -0.002414302361610154
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.026257441054786668,
+            0.002006237267873273,
+            -0.01732741537736282
+          ],
+          "actual_camera_position_world_m": [
+            4.095895290374756,
+            0.13090123236179352,
+            1.1868975162506104
+          ],
+          "target_camera_position_world_m": [
+            4.069637849319969,
+            0.12889499509392024,
+            1.2042249316279732
+          ],
+          "actual_yaw_rate_rad_s": 0.0010316204279661179,
+          "phase_feedforward_v_mps": -0.1559346580487889,
+          "phase_feedforward_wz_rad_s": 0.0009256762645555682,
+          "vx_reference_mps": -0.24163207455874866,
+          "wz_reference_rad_s": -0.0031854610244933957,
+          "along_track_error_m": -0.05356088531872485,
+          "cross_track_error_m": 0.0018626823457194154,
+          "base_yaw_error_rad": -0.0010975948087248674,
+          "raw_velocity_reference_mps": -0.24163207455874866,
+          "base_position_error_m": 0.05359326470412723,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 5401,
+          "elapsed_s": 27.0,
+          "phase_time_s": 10.655439815819854,
+          "progress_scale": 0.3895802568960095,
+          "position_error_m": 0.03072813948405678,
+          "attitude_error_deg": 0.0763953922569133,
+          "pitch_deg": 6.052098715519953,
+          "riser_error_m": 0.005961753048175256,
+          "riser_thermal_load": 0.00045671851488286394,
+          "proxy_error_deg": [
+            0.03342955801256646,
+            0.01258983927584995,
+            0.007738367902048978
+          ],
+          "proxy_signed_error_deg": [
+            -0.03342955801256646,
+            -0.01258983927584995,
+            0.007738367902048978
+          ],
+          "proxy_target_deg": [
+            12.715477966521306,
+            -2.0614946185706424,
+            -161.81364986317365
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.715477966521306,
+            -2.0614946185706424,
+            -161.81364986317365
+          ],
+          "proxy_actual_deg": [
+            12.748907089233398,
+            -2.0489046573638916,
+            -161.82138061523438
+          ],
+          "proxy_velocity_deg_s": [
+            13.206954002380371,
+            4.491496562957764,
+            -3.237921714782715
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.634039282798767,
+            -0.5506148338317871,
+            0.4048745036125183
+          ],
+          "base_xy_error_m": 0.10313141607587925,
+          "base_yaw_error_deg": 0.0529304671763531,
+          "actual_base_xy_yaw": [
+            3.93430495262146,
+            0.07110792398452759,
+            -3.07129702328071
+          ],
+          "target_base_xy_yaw": [
+            4.037357486072909,
+            0.07514083001542844,
+            3.21096447297203
+          ],
+          "commanded_base_xy_yaw": [
+            3.9874176517732565,
+            0.07268869826463455,
+            3.21096447297203
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18760673277073714,
+            0.06471456763177326
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3160216808319092,
+            0.0710199624300003
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.12841494806117204,
+            0.006305394798227046
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.0499398342996525,
+            -0.0024521317507938995
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.025358599912457258,
+            0.002276065046012715,
+            -0.01720405459587626
+          ],
+          "actual_camera_position_world_m": [
+            4.2503228187561035,
+            0.14213146269321442,
+            1.1813186407089233
+          ],
+          "target_camera_position_world_m": [
+            4.224964218843646,
+            0.1398553976472017,
+            1.1985226953047996
+          ],
+          "actual_yaw_rate_rad_s": 0.002649578033015132,
+          "phase_feedforward_v_mps": -0.15583141973948547,
+          "phase_feedforward_wz_rad_s": 0.0008461922401354421,
+          "vx_reference_mps": -0.24202168754847472,
+          "wz_reference_rad_s": -0.0034865259925621825,
+          "along_track_error_m": -0.05386891738061828,
+          "cross_track_error_m": 0.002152686107330045,
+          "base_yaw_error_rad": -0.000919740893085464,
+          "raw_velocity_reference_mps": -0.24202168754847472,
+          "base_position_error_m": 0.053911912572608384,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 5601,
+          "elapsed_s": 28.0,
+          "phase_time_s": 11.044799864855698,
+          "progress_scale": 0.3890378544985459,
+          "position_error_m": 0.03008511910176443,
+          "attitude_error_deg": 0.04488829051787967,
+          "pitch_deg": 6.054810727507271,
+          "riser_error_m": 0.006209143423388408,
+          "riser_thermal_load": 0.00045909168267813094,
+          "proxy_error_deg": [
+            0.03316370781337246,
+            0.012380085980160759,
+            0.007645363976393335
+          ],
+          "proxy_signed_error_deg": [
+            -0.03316370781337246,
+            -0.012380085980160759,
+            0.007645363976393335
+          ],
+          "proxy_target_deg": [
+            12.638790636662904,
+            -2.07505602074558,
+            -161.87383487141707
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.638790636662904,
+            -2.07505602074558,
+            -161.87383487141707
+          ],
+          "proxy_actual_deg": [
+            12.671953201293945,
+            -2.062675714492798,
+            -161.8814697265625
+          ],
+          "proxy_velocity_deg_s": [
+            13.198174476623535,
+            4.408929347991943,
+            -3.2837626934051514
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6259536743164062,
+            -0.5549551248550415,
+            0.3973487913608551
+          ],
+          "base_xy_error_m": 0.10356855078146893,
+          "base_yaw_error_deg": 0.03972078731554761,
+          "actual_base_xy_yaw": [
+            4.089226722717285,
+            0.08211750537157059,
+            -3.070728808618718
+          ],
+          "target_base_xy_yaw": [
+            4.192722488402201,
+            0.08599966923553441,
+            3.2117632400407277
+          ],
+          "commanded_base_xy_yaw": [
+            4.1427842935306725,
+            0.08351437388624783,
+            3.2117632400407277
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18755995461239472,
+            0.06494080064012277
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.31551361083984375,
+            0.07130872458219528
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.12795365622744903,
+            0.006367923942072515
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.0499381948715291,
+            -0.0024852953492865808
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.02445455268242558,
+            0.002486520037329576,
+            -0.017346655659630228
+          ],
+          "actual_camera_position_world_m": [
+            4.4047369956970215,
+            0.15342698991298676,
+            1.1765038967132568
+          ],
+          "target_camera_position_world_m": [
+            4.380282443014596,
+            0.15094046987565718,
+            1.193850552372887
+          ],
+          "actual_yaw_rate_rad_s": -0.0003567788517102599,
+          "phase_feedforward_v_mps": -0.15561476613901631,
+          "phase_feedforward_wz_rad_s": 0.0007575381350218186,
+          "vx_reference_mps": -0.24249066609361897,
+          "wz_reference_rad_s": -0.003669972347127732,
+          "along_track_error_m": -0.054297437471626644,
+          "cross_track_error_m": 0.002398653620303168,
+          "base_yaw_error_rad": -0.0006912750430789989,
+          "raw_velocity_reference_mps": -0.24249066609361897,
+          "base_position_error_m": 0.05435039333045713,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 5801,
+          "elapsed_s": 29.0,
+          "phase_time_s": 11.433551159194502,
+          "progress_scale": 0.38847777898660485,
+          "position_error_m": 0.030069033562750914,
+          "attitude_error_deg": 0.10922937120709102,
+          "pitch_deg": 6.057611105066976,
+          "riser_error_m": 0.007133323003015168,
+          "riser_thermal_load": 0.0004657304233384735,
+          "proxy_error_deg": [
+            0.034227509776601946,
+            0.012529282924843224,
+            0.00802785456991405
+          ],
+          "proxy_signed_error_deg": [
+            -0.034227509776601946,
+            -0.012529282924843224,
+            0.00802785456991405
+          ],
+          "proxy_target_deg": [
+            12.638790636662904,
+            -2.07505602074558,
+            -161.87383487141707
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.638790636662904,
+            -2.07505602074558,
+            -161.87383487141707
+          ],
+          "proxy_actual_deg": [
+            12.673017501831055,
+            -2.0625267028808594,
+            -161.88185119628906
+          ],
+          "proxy_velocity_deg_s": [
+            13.258959770202637,
+            4.350757598876953,
+            -3.3420419692993164
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6555638313293457,
+            -0.5676173567771912,
+            0.40232226252555847
+          ],
+          "base_xy_error_m": 0.1039713027702521,
+          "base_yaw_error_deg": 0.026857275151848114,
+          "actual_base_xy_yaw": [
+            4.243933200836182,
+            0.09319479763507843,
+            -3.0702414406964085
+          ],
+          "target_base_xy_yaw": [
+            4.347836355793342,
+            0.0969585975356678,
+            3.212475118603664
+          ],
+          "commanded_base_xy_yaw": [
+            4.297896676241996,
+            0.09450331622615561,
+            3.212475118603664
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18751747384449846,
+            0.0651612809420494
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.31505870819091797,
+            0.07143183797597885
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1275412343464195,
+            0.0062705570339294525
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04993967955134635,
+            -0.0024552813095121877
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.02363474152915135,
+            0.0025087911418430475,
+            -0.018418787670600345
+          ],
+          "actual_camera_position_world_m": [
+            4.558988571166992,
+            0.16462866961956024,
+            1.1719839572906494
+          ],
+          "target_camera_position_world_m": [
+            4.535353829637841,
+            0.1621198784777172,
+            1.1904027449612498
+          ],
+          "actual_yaw_rate_rad_s": 0.002664018888026476,
+          "phase_feedforward_v_mps": -0.15539217027396057,
+          "phase_feedforward_wz_rad_s": 0.0006690386086107443,
+          "vx_reference_mps": -0.24290172624369372,
+          "wz_reference_rad_s": -0.003702027287148367,
+          "along_track_error_m": -0.0546934724810832,
+          "cross_track_error_m": 0.0025411695151254694,
+          "base_yaw_error_rad": -0.0004660930192257558,
+          "raw_velocity_reference_mps": -0.24290172624369372,
+          "base_position_error_m": 0.0547524745974427,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 6001,
+          "elapsed_s": 30.0,
+          "phase_time_s": 11.821672762598908,
+          "progress_scale": 0.38787066054675534,
+          "position_error_m": 0.030302958735601297,
+          "attitude_error_deg": 0.09287038007801517,
+          "pitch_deg": 6.060646697266224,
+          "riser_error_m": 0.008555814233078385,
+          "riser_thermal_load": 0.0004824451157124829,
+          "proxy_error_deg": [
+            0.03484538492084847,
+            0.01111716312319618,
+            0.009270486395879948
+          ],
+          "proxy_signed_error_deg": [
+            -0.03484538492084847,
+            -0.01111716312319618,
+            0.009270486395879948
+          ],
+          "proxy_target_deg": [
+            12.525577946824644,
+            -1.9964111100171906,
+            -162.44389658252766
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.525577946824644,
+            -1.9964111100171906,
+            -162.44389658252766
+          ],
+          "proxy_actual_deg": [
+            12.560422897338867,
+            -1.9852938652038574,
+            -162.45315551757812
+          ],
+          "proxy_velocity_deg_s": [
+            13.183152198791504,
+            4.296384334564209,
+            -3.3766045570373535
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6297234296798706,
+            -0.5227644443511963,
+            0.4234771132469177
+          ],
+          "base_xy_error_m": 0.1042777597166647,
+          "base_yaw_error_deg": 0.1755983213154617,
+          "actual_base_xy_yaw": [
+            4.398483753204346,
+            0.10428936034440994,
+            -3.0702310335819747
+          ],
+          "target_base_xy_yaw": [
+            4.502699050354123,
+            0.1078981013312377,
+            3.2098895047296816
+          ],
+          "commanded_base_xy_yaw": [
+            4.452774994141317,
+            0.10514335792022435,
+            3.2098895047296816
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.1876056690576986,
+            0.06529806004682112
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3146800994873047,
+            0.07230985909700394
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1270744304296061,
+            0.007011799050182815
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049924056212806656,
+            -0.002754743411013346
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.022856749094037454,
+            0.003403311383095353,
+            -0.019602443740857067
+          ],
+          "actual_camera_position_world_m": [
+            4.713161468505859,
+            0.17659947276115417,
+            1.1686574220657349
+          ],
+          "target_camera_position_world_m": [
+            4.690304719411822,
+            0.17319616137805882,
+            1.188259865806592
+          ],
+          "actual_yaw_rate_rad_s": -0.0027404737193137407,
+          "phase_feedforward_v_mps": -0.1551464542185743,
+          "phase_feedforward_wz_rad_s": -0.009538763858534763,
+          "vx_reference_mps": -0.24312859455401192,
+          "wz_reference_rad_s": -0.017755689608739755,
+          "along_track_error_m": -0.054988837709648526,
+          "cross_track_error_m": 0.0030198536497772397,
+          "base_yaw_error_rad": -0.003072621062949277,
+          "raw_velocity_reference_mps": -0.24312859455401192,
+          "base_position_error_m": 0.055071696802660226,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 6201,
+          "elapsed_s": 31.0,
+          "phase_time_s": 12.209168048328594,
+          "progress_scale": 0.3866929651791159,
+          "position_error_m": 0.03056469371072053,
+          "attitude_error_deg": 0.08966484119655642,
+          "pitch_deg": 6.066535174104421,
+          "riser_error_m": 0.009170338105165765,
+          "riser_thermal_load": 0.0005080708071913372,
+          "proxy_error_deg": [
+            0.035061104043598114,
+            0.010666335199831742,
+            0.009629990569692989
+          ],
+          "proxy_signed_error_deg": [
+            -0.035061104043598114,
+            -0.010666335199831742,
+            0.009629990569692989
+          ],
+          "proxy_target_deg": [
+            12.459363817299353,
+            -1.7360339114127001,
+            -163.8664020862509
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.459363817299353,
+            -1.7360339114127001,
+            -163.8664020862509
+          ],
+          "proxy_actual_deg": [
+            12.494423866271973,
+            -1.7253674268722534,
+            -163.8760223388672
+          ],
+          "proxy_velocity_deg_s": [
+            13.172683715820312,
+            4.054676055908203,
+            -3.537386894226074
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6403796672821045,
+            -0.49049970507621765,
+            0.4504096508026123
+          ],
+          "base_xy_error_m": 0.1042554045891138,
+          "base_yaw_error_deg": 0.5369887877767594,
+          "actual_base_xy_yaw": [
+            4.553162097930908,
+            0.11516397446393967,
+            -3.0732521081104567
+          ],
+          "target_base_xy_yaw": [
+            4.657386866775755,
+            0.11769121510900428,
+            3.2005609766761327
+          ],
+          "commanded_base_xy_yaw": [
+            4.607479110391773,
+            0.11465545281313122,
+            3.2005609766761327
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18790013532061334,
+            0.06572246622052615
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.31453514099121094,
+            0.07342535257339478
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1266350056705976,
+            0.007702886352868629
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04990775638398261,
+            -0.003035762295873064
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.02240880631427622,
+            0.005178618489462189,
+            -0.020130271029969116
+          ],
+          "actual_camera_position_world_m": [
+            4.8676958084106445,
+            0.18859229981899261,
+            1.1663447618484497
+          ],
+          "target_camera_position_world_m": [
+            4.845287002096368,
+            0.18341368132953043,
+            1.1864750328784188
+          ],
+          "actual_yaw_rate_rad_s": -0.005348966456949711,
+          "phase_feedforward_v_mps": -0.1546792009774535,
+          "phase_feedforward_wz_rad_s": -0.005879582298372171,
+          "vx_reference_mps": -0.2425675482934699,
+          "wz_reference_rad_s": -0.023467111061103975,
+          "along_track_error_m": -0.05493021707251026,
+          "cross_track_error_m": 0.00421698138539939,
+          "base_yaw_error_rad": -0.009385047237193933,
+          "raw_velocity_reference_mps": -0.2425675482934699,
+          "base_position_error_m": 0.05509184766948647,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 6401,
+          "elapsed_s": 32.0,
+          "phase_time_s": 12.597190439820224,
+          "progress_scale": 0.3884928907801435,
+          "position_error_m": 0.030814442280945754,
+          "attitude_error_deg": 0.04454486900432752,
+          "pitch_deg": 6.057535546099283,
+          "riser_error_m": 0.009278218508425584,
+          "riser_thermal_load": 0.0005349930833360571,
+          "proxy_error_deg": [
+            0.03468022164285767,
+            0.012046916082402851,
+            0.008539933837416937
+          ],
+          "proxy_signed_error_deg": [
+            -0.03468022164285767,
+            -0.012046916082402851,
+            0.008539933837416937
+          ],
+          "proxy_target_deg": [
+            12.399323138754868,
+            -1.4834595212177346,
+            -165.28056265961044
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.399323138754868,
+            -1.4834595212177346,
+            -165.28056265961044
+          ],
+          "proxy_actual_deg": [
+            12.434002876281738,
+            -1.4714125394821167,
+            -165.28909301757812
+          ],
+          "proxy_velocity_deg_s": [
+            13.029827117919922,
+            4.464995861053467,
+            -3.2077720165252686
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6168107986450195,
+            -0.5621759295463562,
+            0.3927951455116272
+          ],
+          "base_xy_error_m": 0.10402997669906633,
+          "base_yaw_error_deg": 0.4055179373986194,
+          "actual_base_xy_yaw": [
+            4.708309650421143,
+            0.1255989819765091,
+            -3.0752559367407795
+          ],
+          "target_base_xy_yaw": [
+            4.8123337256404914,
+            0.12670705542512628,
+            3.2008517472553053
+          ],
+          "commanded_base_xy_yaw": [
+            4.762417763976168,
+            0.12380933716315298,
+            3.2008517472553053
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18761526802561157,
+            0.06748862196288802
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.31401634216308594,
+            0.0748264491558075
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.12640107413747437,
+            0.007337827192919477
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04991596166432363,
+            -0.002897718261973297
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.022372707383701673,
+            0.006234700929818648,
+            -0.020251427646581277
+          ],
+          "actual_camera_position_world_m": [
+            5.022321701049805,
+            0.20043037831783295,
+            1.1646347045898438
+          ],
+          "target_camera_position_world_m": [
+            4.999948993666103,
+            0.1941956773880143,
+            1.184886132236425
+          ],
+          "actual_yaw_rate_rad_s": -0.0013570317532867193,
+          "phase_feedforward_v_mps": -0.1553960976327352,
+          "phase_feedforward_wz_rad_s": 0.006304565000996893,
+          "vx_reference_mps": -0.24283363724177143,
+          "wz_reference_rad_s": -0.010249872563447018,
+          "along_track_error_m": -0.05464846225564762,
+          "cross_track_error_m": 0.005372557163723893,
+          "base_yaw_error_rad": -0.007079668182381727,
+          "raw_velocity_reference_mps": -0.24283363724177143,
+          "base_position_error_m": 0.05491191853672956,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 6601,
+          "elapsed_s": 33.0,
+          "phase_time_s": 12.985915770475549,
+          "progress_scale": 0.3887924799526131,
+          "position_error_m": 0.03134934615796077,
+          "attitude_error_deg": 0.03873293598369841,
+          "pitch_deg": 6.056037600236935,
+          "riser_error_m": 0.009384259161418829,
+          "riser_thermal_load": 0.0005620061726083588,
+          "proxy_error_deg": [
+            0.03346270101394676,
+            0.014170317652337585,
+            0.006460347691109982
+          ],
+          "proxy_signed_error_deg": [
+            -0.03346270101394676,
+            -0.014170317652337585,
+            0.006460347691109982
+          ],
+          "proxy_target_deg": [
+            12.31882598370104,
+            -1.262928787685597,
+            -166.48586203032454
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.31882598370104,
+            -1.262928787685597,
+            -166.48586203032454
+          ],
+          "proxy_actual_deg": [
+            12.352288246154785,
+            -1.2487584352493286,
+            -166.4923095703125
+          ],
+          "proxy_velocity_deg_s": [
+            12.725166320800781,
+            4.916970729827881,
+            -2.7409772872924805
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.5765352249145508,
+            -0.6326379776000977,
+            0.32379597425460815
+          ],
+          "base_xy_error_m": 0.10376732011494574,
+          "base_yaw_error_deg": 0.259627574244055,
+          "actual_base_xy_yaw": [
+            4.863732814788818,
+            0.13600224256515503,
+            -3.073672202937714
+          ],
+          "target_base_xy_yaw": [
+            4.967497367475182,
+            0.136760087956086,
+            3.214044460241397
+          ],
+          "commanded_base_xy_yaw": [
+            4.917560141026755,
+            0.13425540940614827,
+            3.214044460241397
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18660062206648487,
+            0.07068454438070654
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.31340456008911133,
+            0.07704459130764008
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.12680393802262646,
+            0.006360046926933538
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04993722644842705,
+            -0.002504678549937705
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.023033663290364714,
+            0.005608474924865187,
+            -0.020512846437657384
+          ],
+          "actual_camera_position_world_m": [
+            5.177131652832031,
+            0.21305310726165771,
+            1.1630738973617554
+          ],
+          "target_camera_position_world_m": [
+            5.1540979895416665,
+            0.20744463233679253,
+            1.1835867437994128
+          ],
+          "actual_yaw_rate_rad_s": 0.00958362128585577,
+          "phase_feedforward_v_mps": -0.1555036389612151,
+          "phase_feedforward_wz_rad_s": 0.020105085075099012,
+          "vx_reference_mps": -0.24249122492152098,
+          "wz_reference_rad_s": 0.01749516623722917,
+          "along_track_error_m": -0.054367241225191154,
+          "cross_track_error_m": 0.0053940363050046704,
+          "base_yaw_error_rad": 0.004567613016364302,
+          "raw_velocity_reference_mps": -0.24249122492152098,
+          "base_position_error_m": 0.054634170132782586,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 6801,
+          "elapsed_s": 34.0,
+          "phase_time_s": 13.375561080227643,
+          "progress_scale": 0.3911080848359767,
+          "position_error_m": 0.0323456915143614,
+          "attitude_error_deg": 0.09210458762430096,
+          "pitch_deg": 6.044459575820117,
+          "riser_error_m": 0.009588984492163943,
+          "riser_thermal_load": 0.0005899004805104969,
+          "proxy_error_deg": [
+            0.03318046087546523,
+            0.012908921223003765,
+            0.007211383471630161
+          ],
+          "proxy_signed_error_deg": [
+            -0.03318046087546523,
+            -0.012908921223003765,
+            0.007211383471630161
+          ],
+          "proxy_target_deg": [
+            12.271791234590612,
+            -1.171950295187207,
+            -166.9765431053264
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.271791234590612,
+            -1.171950295187207,
+            -166.9765431053264
+          ],
+          "proxy_actual_deg": [
+            12.304970741271973,
+            -1.1590412855148315,
+            -166.98374938964844
+          ],
+          "proxy_velocity_deg_s": [
+            12.666176795959473,
+            4.3426194190979,
+            -3.116344690322876
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.5641818046569824,
+            -0.5544496774673462,
+            0.37312963604927063
+          ],
+          "base_xy_error_m": 0.10296529241571026,
+          "base_yaw_error_deg": 1.1654195183090865,
+          "actual_base_xy_yaw": [
+            5.019840717315674,
+            0.1474578082561493,
+            -3.0572104217698195
+          ],
+          "target_base_xy_yaw": [
+            5.122770074818881,
+            0.15017788292970302,
+            3.2463152931712673
+          ],
+          "commanded_base_xy_yaw": [
+            5.072847905884385,
+            0.14738914685835547,
+            3.2463152931712673
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.18447108802873657,
+            0.0757226926027535
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3115873336791992,
+            0.08282361924648285
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.12711624565046264,
+            0.007100926643729355
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04992216893449608,
+            -0.0027887360713475485
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.02415637056913056,
+            0.004430875168303372,
+            -0.021049486115152227
+          ],
+          "actual_camera_position_world_m": [
+            5.331397533416748,
+            0.2303314507007599,
+            1.1616930961608887
+          ],
+          "target_camera_position_world_m": [
+            5.3072411628476175,
+            0.22590057553245652,
+            1.182742582276041
+          ],
+          "actual_yaw_rate_rad_s": 0.031319551169872284,
+          "phase_feedforward_v_mps": -0.15637575166539378,
+          "phase_feedforward_wz_rad_s": 0.047233735035596164,
+          "vx_reference_mps": -0.24215741867880472,
+          "wz_reference_rad_s": 0.06504419742883966,
+          "along_track_error_m": -0.05361354188338184,
+          "cross_track_error_m": 0.004528584886190593,
+          "base_yaw_error_rad": 0.020502783102107826,
+          "raw_velocity_reference_mps": -0.24215741867880472,
+          "base_position_error_m": 0.05380446035741435,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 7001,
+          "elapsed_s": 35.0,
+          "phase_time_s": 13.768006851209254,
+          "progress_scale": 0.39398735108059557,
+          "position_error_m": 0.03543545370580239,
+          "attitude_error_deg": 0.018988389748303112,
+          "pitch_deg": 6.030063244597022,
+          "riser_error_m": 0.011212543713890799,
+          "riser_thermal_load": 0.000624816262473364,
+          "proxy_error_deg": [
+            0.033820754062604534,
+            0.013056923890301672,
+            0.007383280567219198
+          ],
+          "proxy_signed_error_deg": [
+            -0.033820754062604534,
+            -0.013056923890301672,
+            0.007383280567219198
+          ],
+          "proxy_target_deg": [
+            12.660608327877599,
+            -0.6427783806940863,
+            -167.71888107290292
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.660608327877599,
+            -0.6427783806940863,
+            -167.71888107290292
+          ],
+          "proxy_actual_deg": [
+            12.694428443908691,
+            -0.6297214031219482,
+            -167.72625732421875
+          ],
+          "proxy_velocity_deg_s": [
+            12.914847373962402,
+            4.463689804077148,
+            -3.152430772781372
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6034544706344604,
+            -0.5564103722572327,
+            0.388439804315567
+          ],
+          "base_xy_error_m": 0.1010125115606735,
+          "base_yaw_error_deg": 3.1430997022743705,
+          "actual_base_xy_yaw": [
+            5.177412509918213,
+            0.1640925407409668,
+            -2.9921829445904273
+          ],
+          "target_base_xy_yaw": [
+            5.278060569192316,
+            0.17266550149859028,
+            3.3458598011123004
+          ],
+          "commanded_base_xy_yaw": [
+            5.228488020740661,
+            0.166141511921015,
+            3.3458598011123004
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.1785985592493624,
+            0.08641123170233272
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.3050670623779297,
+            0.10305510461330414
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.12646850312856728,
+            0.016643872910971413
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04957254845165507,
+            -0.00652398957757528
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.025764653906954038,
+            0.008241873175724945,
+            -0.02288941927935717
+          ],
+          "actual_camera_position_world_m": [
+            5.482423782348633,
+            0.26731860637664795,
+            1.1602659225463867
+          ],
+          "target_camera_position_world_m": [
+            5.456659128441679,
+            0.259076733200923,
+            1.183155341825744
+          ],
+          "actual_yaw_rate_rad_s": 0.11006459593772888,
+          "phase_feedforward_v_mps": -0.15759023387028426,
+          "phase_feedforward_wz_rad_s": 0.15759176439427328,
+          "vx_reference_mps": -0.24018453033771214,
+          "wz_reference_rad_s": 0.21576086065815459,
+          "along_track_error_m": -0.051621435292142415,
+          "cross_track_error_m": 0.005553540817100177,
+          "base_yaw_error_rad": 0.055416172907942964,
+          "raw_velocity_reference_mps": -0.24018453033771214,
+          "base_position_error_m": 0.05191930659425301,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 7201,
+          "elapsed_s": 36.0,
+          "phase_time_s": 14.181396429528293,
+          "progress_scale": 0.45885331611874813,
+          "position_error_m": 0.04832670507889243,
+          "attitude_error_deg": 0.17577708266020106,
+          "pitch_deg": 5.705733419406259,
+          "riser_error_m": 0.007367553429803997,
+          "riser_thermal_load": 0.0006615521590367599,
+          "proxy_error_deg": [
+            0.06687010009692677,
+            0.04078600884984146,
+            0.10874734765798513
+          ],
+          "proxy_signed_error_deg": [
+            -0.06687010009692677,
+            -0.04078600884984146,
+            0.10874734765798513
+          ],
+          "proxy_target_deg": [
+            14.390229316043053,
+            0.6917457498576495,
+            -171.5820866491677
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            14.390229316043053,
+            0.6917457498576495,
+            -171.5820866491677
+          ],
+          "proxy_actual_deg": [
+            14.457098960876465,
+            0.732531726360321,
+            -171.69082641601562
+          ],
+          "proxy_velocity_deg_s": [
+            19.564247131347656,
+            9.792329788208008,
+            -22.93563461303711
+          ],
+          "proxy_target_velocity_deg_s": [
+            6.830552731822963,
+            5.907273646855084,
+            -20.811177839813734
+          ],
+          "proxy_applied_effort_nm": [
+            -2.718278169631958,
+            -1.4784311056137085,
+            3.746116876602173
+          ],
+          "base_xy_error_m": 0.09163633322895487,
+          "base_yaw_error_deg": 4.982244827607095,
+          "actual_base_xy_yaw": [
+            5.337599277496338,
+            0.19719001650810242,
+            -2.858926251121871
+          ],
+          "target_base_xy_yaw": [
+            5.427242320219025,
+            0.21619902645250816,
+            3.5112156324399164
+          ],
+          "commanded_base_xy_yaw": [
+            5.377242714022246,
+            0.21600058208504427,
+            3.5112156324399164
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.14910087110253034,
+            0.1436715216926731
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.2797389030456543,
+            0.1441900134086609
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.13063803194312396,
+            0.0005184917159877789
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049999606196779414,
+            -0.00019844436746389496
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.04069267446213587,
+            -0.01806473244846496,
+            -0.018794736243593846
+          ],
+          "actual_camera_position_world_m": [
+            5.617035865783691,
+            0.3418058156967163,
+            1.156272530555725
+          ],
+          "target_camera_position_world_m": [
+            5.5763431913215555,
+            0.35987054814518127,
+            1.175067266799319
+          ],
+          "actual_yaw_rate_rad_s": 0.16172605752944946,
+          "phase_feedforward_v_mps": -0.1572557255632157,
+          "phase_feedforward_wz_rad_s": 0.18348378210374472,
+          "vx_reference_mps": -0.22783293816115674,
+          "wz_reference_rad_s": 0.2993613019045918,
+          "along_track_error_m": -0.04411075787371315,
+          "cross_track_error_m": -0.007035078305397003,
+          "base_yaw_error_rad": 0.08777075195229299,
+          "raw_velocity_reference_mps": -0.22783293816115674,
+          "base_position_error_m": 0.044668235771702626,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 7401,
+          "elapsed_s": 37.0,
+          "phase_time_s": 14.616888108119385,
+          "progress_scale": 0.40895485687303224,
+          "position_error_m": 0.10619834753202619,
+          "attitude_error_deg": 0.14406929405117194,
+          "pitch_deg": 5.955225715634839,
+          "riser_error_m": 0.008758661691318226,
+          "riser_thermal_load": 0.0006749771315326179,
+          "proxy_error_deg": [
+            0.03332571843904554,
+            0.012861682575058897,
+            0.007154239011908817
+          ],
+          "proxy_signed_error_deg": [
+            -0.03332571843904554,
+            -0.012861682575058897,
+            0.007154239011908817
+          ],
+          "proxy_target_deg": [
+            13.837384028208767,
+            0.3888904179310613,
+            -170.057862508919
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.837384028208767,
+            0.3888904179310613,
+            -170.057862508919
+          ],
+          "proxy_actual_deg": [
+            13.870709419250488,
+            0.4017520844936371,
+            -170.06500244140625
+          ],
+          "proxy_velocity_deg_s": [
+            12.807653427124023,
+            4.487887382507324,
+            -3.060582160949707
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.5880688428878784,
+            -0.5535688996315002,
+            0.37943020462989807
+          ],
+          "base_xy_error_m": 0.08766583546941911,
+          "base_yaw_error_deg": 5.182779197645104,
+          "actual_base_xy_yaw": [
+            5.489346504211426,
+            0.253901869058609,
+            -2.688229564706011
+          ],
+          "target_base_xy_yaw": [
+            5.570525249713866,
+            0.28699733683293177,
+            3.6854123038763524
+          ],
+          "commanded_base_xy_yaw": [
+            5.521267237820121,
+            0.2955791935245597,
+            3.6854123038763524
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.0916577837984125,
+            0.21906193601087515
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.2568955421447754,
+            0.19027379155158997
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1652377583463629,
+            -0.02878814445928518
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04925801189374539,
+            0.008581856691627908
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.0839140543478285,
+            -0.06165526683947342,
+            -0.02086021506111635
+          ],
+          "actual_camera_position_world_m": [
+            5.746097087860107,
+            0.4444040060043335,
+            1.1539626121520996
+          ],
+          "target_camera_position_world_m": [
+            5.662183033512279,
+            0.5060592728438069,
+            1.174822827213216
+          ],
+          "actual_yaw_rate_rad_s": 0.17020706832408905,
+          "phase_feedforward_v_mps": -0.16133794088736417,
+          "phase_feedforward_wz_rad_s": 0.16366615898167666,
+          "vx_reference_mps": -0.2377366072567209,
+          "wz_reference_rad_s": 0.3085182693996824,
+          "along_track_error_m": -0.04774916648084797,
+          "cross_track_error_m": -0.02351708858707067,
+          "base_yaw_error_rad": 0.09131373128116646,
+          "raw_velocity_reference_mps": -0.2377366072567209,
+          "base_position_error_m": 0.053226275045581244,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 7601,
+          "elapsed_s": 38.0,
+          "phase_time_s": 15.01894272710982,
+          "progress_scale": 0.3999258590544632,
+          "position_error_m": 0.14104099778248305,
+          "attitude_error_deg": 0.16389378839204627,
+          "pitch_deg": 6.000370704727684,
+          "riser_error_m": 0.009210659738162708,
+          "riser_thermal_load": 0.0006953226238356553,
+          "proxy_error_deg": [
+            0.03386126220473498,
+            0.012582349707098282,
+            0.007688256788664592
+          ],
+          "proxy_signed_error_deg": [
+            -0.03386126220473498,
+            -0.012582349707098282,
+            0.007688256788664592
+          ],
+          "proxy_target_deg": [
+            13.374186837992047,
+            -0.1176120828949818,
+            -167.4266811323118
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            13.374186837992047,
+            -0.1176120828949818,
+            -167.4266811323118
+          ],
+          "proxy_actual_deg": [
+            13.408047676086426,
+            -0.10502972453832626,
+            -167.43435668945312
+          ],
+          "proxy_velocity_deg_s": [
+            12.873637199401855,
+            4.387872695922852,
+            -3.1910340785980225
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.5962626934051514,
+            -0.549345076084137,
+            0.3913884460926056
+          ],
+          "base_xy_error_m": 0.08349135194572012,
+          "base_yaw_error_deg": 4.553129788833324,
+          "actual_base_xy_yaw": [
+            5.6302170753479,
+            0.33611199259757996,
+            -2.5164182617928357
+          ],
+          "target_base_xy_yaw": [
+            5.700744269390072,
+            0.3807966739801515,
+            3.846234151472526
+          ],
+          "commanded_base_xy_yaw": [
+            5.651495803407268,
+            0.3894331430700408,
+            3.846234151472526
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.037268190640550536,
+            0.2621758196333568
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.22406530380249023,
+            0.2294180989265442
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1867971131619397,
+            -0.0327577207068126
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049248465982803837,
+            0.008636469089889317
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.11606821700184788,
+            -0.07725217386558347,
+            -0.02127988934491909
+          ],
+          "actual_camera_position_world_m": [
+            5.854080677032471,
+            0.5657203197479248,
+            1.153670310974121
+          ],
+          "target_camera_position_world_m": [
+            5.738012460030623,
+            0.6429724936135083,
+            1.1749502003190402
+          ],
+          "actual_yaw_rate_rad_s": 0.17045442759990692,
+          "phase_feedforward_v_mps": -0.15995242476006363,
+          "phase_feedforward_wz_rad_s": 0.15995337060170017,
+          "vx_reference_mps": -0.23875154611973487,
+          "wz_reference_rad_s": 0.30256857168676154,
+          "along_track_error_m": -0.04924945084979453,
+          "cross_track_error_m": -0.030816204007180326,
+          "base_yaw_error_rad": 0.08032574589524241,
+          "raw_velocity_reference_mps": -0.23875154611973487,
+          "base_position_error_m": 0.058096013963252965,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 7801,
+          "elapsed_s": 39.0,
+          "phase_time_s": 15.416907078351167,
+          "progress_scale": 0.3962893809629837,
+          "position_error_m": 0.15316678059251798,
+          "attitude_error_deg": 0.16385978994514147,
+          "pitch_deg": 6.018553095185081,
+          "riser_error_m": 0.009432133414197574,
+          "riser_thermal_load": 0.0007171981456349525,
+          "proxy_error_deg": [
+            0.03424549225650178,
+            0.013085856494567399,
+            0.007550093526888475
+          ],
+          "proxy_signed_error_deg": [
+            -0.03424549225650178,
+            -0.013085856494567399,
+            0.007550093526888475
+          ],
+          "proxy_target_deg": [
+            12.924339448286652,
+            -0.5686065927545665,
+            -164.65220520941764
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.924339448286652,
+            -0.5686065927545665,
+            -164.65220520941764
+          ],
+          "proxy_actual_deg": [
+            12.95858383178711,
+            -0.5555207133293152,
+            -164.6597442626953
+          ],
+          "proxy_velocity_deg_s": [
+            13.060608863830566,
+            4.443593978881836,
+            -3.22092604637146
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6142736673355103,
+            -0.5662379264831543,
+            0.38666146993637085
+          ],
+          "base_xy_error_m": 0.08025901305487668,
+          "base_yaw_error_deg": 3.9046427138499333,
+          "actual_base_xy_yaw": [
+            5.753316879272461,
+            0.43979960680007935,
+            -2.3459142866812095
+          ],
+          "target_base_xy_yaw": [
+            5.8133084786923925,
+            0.493114868926241,
+            4.005419891969066
+          ],
+          "commanded_base_xy_yaw": [
+            5.763757532481351,
+            0.499800953699145,
+            4.005419891969066
+          ],
+          "camera_lever_arm_target_xy_m": [
+            -0.0043792259984725135,
+            0.2875878104454659
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.1854410171508789,
+            0.2619746923446655
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.18982024314935142,
+            -0.02561311810080036
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.049550946211041634,
+            0.006686084772904011
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.12960405342790615,
+            -0.07877549431311315,
+            -0.021383954448550124
+          ],
+          "actual_camera_position_world_m": [
+            5.938533306121826,
+            0.7019271850585938,
+            1.1538918018341064
+          ],
+          "target_camera_position_world_m": [
+            5.80892925269392,
+            0.7807026793717069,
+            1.1752757562826566
+          ],
+          "actual_yaw_rate_rad_s": 0.16764602065086365,
+          "phase_feedforward_v_mps": -0.15849723137680288,
+          "phase_feedforward_wz_rad_s": 0.1584981987990312,
+          "vx_reference_mps": -0.24000507505730964,
+          "wz_reference_rad_s": 0.29313841658575257,
+          "along_track_error_m": -0.05094240230031672,
+          "cross_track_error_m": -0.034565088027030615,
+          "base_yaw_error_rad": 0.0689938214551462,
+          "raw_velocity_reference_mps": -0.24000507505730964,
+          "base_position_error_m": 0.06156194979403828,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 8001,
+          "elapsed_s": 40.0,
+          "phase_time_s": 15.812912069447021,
+          "progress_scale": 0.39528158655094836,
+          "position_error_m": 0.14490586550836018,
+          "attitude_error_deg": 0.09358617237640275,
+          "pitch_deg": 6.023592067245258,
+          "riser_error_m": 0.009756455898766059,
+          "riser_thermal_load": 0.0007413393041154819,
+          "proxy_error_deg": [
+            0.03467540395010286,
+            0.013266341842829753,
+            0.007431177891775874
+          ],
+          "proxy_signed_error_deg": [
+            -0.03467540395010286,
+            -0.013266341842829753,
+            0.007431177891775874
+          ],
+          "proxy_target_deg": [
+            12.4767182686121,
+            -0.9462109519198628,
+            -161.80194958062305
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.4767182686121,
+            -0.9462109519198628,
+            -161.80194958062305
+          ],
+          "proxy_actual_deg": [
+            12.511392593383789,
+            -0.9329445362091064,
+            -161.8093719482422
+          ],
+          "proxy_velocity_deg_s": [
+            13.21169662475586,
+            4.472588539123535,
+            -3.2095367908477783
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.637371301651001,
+            -0.5633223652839661,
+            0.3905686140060425
+          ],
+          "base_xy_error_m": 0.07783182672354602,
+          "base_yaw_error_deg": 3.3690583814220108,
+          "actual_base_xy_yaw": [
+            5.856204032897949,
+            0.5615674257278442,
+            -2.1781645802199057
+          ],
+          "target_base_xy_yaw": [
+            5.906245430281917,
+            0.6211799395062777,
+            4.163821888407406
+          ],
+          "commanded_base_xy_yaw": [
+            5.856359101596818,
+            0.62454954042067,
+            4.163821888407406
+          ],
+          "camera_lever_arm_target_xy_m": [
+            -0.03164990393774758,
+            0.29898708914955463
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.14293384552001953,
+            0.28719472885131836
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.1745837494577671,
+            -0.01179236029823627
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04988632868509896,
+            0.003369600914392288
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.12430584084333063,
+            -0.07128608201963238,
+            -0.021542105311453952
+          ],
+          "actual_camera_position_world_m": [
+            5.9989013671875,
+            0.8488809466362,
+            1.1543365716934204
+          ],
+          "target_camera_position_world_m": [
+            5.874595526344169,
+            0.9201670286558323,
+            1.1758786770048744
+          ],
+          "actual_yaw_rate_rad_s": 0.1640692800283432,
+          "phase_feedforward_v_mps": -0.15811908086478377,
+          "phase_feedforward_wz_rad_s": 0.1581200795265701,
+          "vx_reference_mps": -0.2422306495334421,
+          "wz_reference_rad_s": 0.2834541995308319,
+          "along_track_error_m": -0.05256973041791145,
+          "cross_track_error_m": -0.03585255066837012,
+          "base_yaw_error_rad": 0.05962941166808886,
+          "raw_velocity_reference_mps": -0.2422306495334421,
+          "base_position_error_m": 0.06363161121360932,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 8201,
+          "elapsed_s": 41.0,
+          "phase_time_s": 16.206852772896912,
+          "progress_scale": 0.39361749633703935,
+          "position_error_m": 0.11816245858505521,
+          "attitude_error_deg": 0.09217688499552042,
+          "pitch_deg": 6.031912518314803,
+          "riser_error_m": 0.009787787342689147,
+          "riser_thermal_load": 0.0007662195211287301,
+          "proxy_error_deg": [
+            0.035174000194364105,
+            0.01279340376929779,
+            0.0076529862560664385
+          ],
+          "proxy_signed_error_deg": [
+            -0.035174000194364105,
+            -0.01279340376929779,
+            0.0076529862560664385
+          ],
+          "proxy_target_deg": [
+            12.045735047096736,
+            -1.2272777711040217,
+            -159.04013202666084
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            12.045735047096736,
+            -1.2272777711040217,
+            -159.04013202666084
+          ],
+          "proxy_actual_deg": [
+            12.08090877532959,
+            -1.2144843339920044,
+            -159.0477752685547
+          ],
+          "proxy_velocity_deg_s": [
+            13.382274627685547,
+            4.374475479125977,
+            -3.215020179748535
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6600050926208496,
+            -0.5431207418441772,
+            0.3982604742050171
+          ],
+          "base_xy_error_m": 0.07626885383667646,
+          "base_yaw_error_deg": 2.9713000957304776,
+          "actual_base_xy_yaw": [
+            5.936629772186279,
+            0.6971497535705566,
+            -2.0136461071275447
+          ],
+          "target_base_xy_yaw": [
+            5.977518023625725,
+            0.761532118856285,
+            4.321398169787361
+          ],
+          "commanded_base_xy_yaw": [
+            5.9275539807804325,
+            0.7596362226160559,
+            4.321398169787361
+          ],
+          "camera_lever_arm_target_xy_m": [
+            -0.043184138637571756,
+            0.2998651855889988
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.09808492660522461,
+            0.305225670337677
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.14126906524279637,
+            0.005360484748678229
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04996404284529311,
+            -0.001895896240229116
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.10013047429529376,
+            -0.05894564619638243,
+            -0.021486403392734443
+          ],
+          "actual_camera_position_world_m": [
+            6.034464359283447,
+            1.0024516582489014,
+            1.155339002609253
+          ],
+          "target_camera_position_world_m": [
+            5.9343338849881535,
+            1.0613973044452838,
+            1.1768254060019874
+          ],
+          "actual_yaw_rate_rad_s": 0.16052711009979248,
+          "phase_feedforward_v_mps": -0.15743172493874408,
+          "phase_feedforward_wz_rad_s": 0.15743275759039185,
+          "vx_reference_mps": -0.24275504111714274,
+          "wz_reference_rad_s": 0.27315666330559996,
+          "along_track_error_m": -0.053327072611499174,
+          "cross_track_error_m": -0.03501183095707159,
+          "base_yaw_error_rad": 0.05267179939966724,
+          "raw_velocity_reference_mps": -0.24275504111714274,
+          "base_position_error_m": 0.06379345562264724,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 8401,
+          "elapsed_s": 42.0,
+          "phase_time_s": 16.601959338411692,
+          "progress_scale": 0.39871862311866346,
+          "position_error_m": 0.0774131076348732,
+          "attitude_error_deg": 0.09007928567228564,
+          "pitch_deg": 6.006406884406683,
+          "riser_error_m": 0.010025267756894385,
+          "riser_thermal_load": 0.0007917400377627221,
+          "proxy_error_deg": [
+            0.035573190333788,
+            0.012588588599151984,
+            0.007484592580541692
+          ],
+          "proxy_signed_error_deg": [
+            -0.035573190333788,
+            -0.012588588599151984,
+            0.007484592580541692
+          ],
+          "proxy_target_deg": [
+            11.670494221533367,
+            -1.4388642087695718,
+            -156.32609252720002
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            11.670494221533367,
+            -1.4388642087695718,
+            -156.32609252720002
+          ],
+          "proxy_actual_deg": [
+            11.706067085266113,
+            -1.4262754917144775,
+            -156.3335723876953
+          ],
+          "proxy_velocity_deg_s": [
+            13.537626266479492,
+            4.317352294921875,
+            -3.134814500808716
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.6772146224975586,
+            -0.5405603647232056,
+            0.3845168948173523
+          ],
+          "base_xy_error_m": 0.07676253655223383,
+          "base_yaw_error_deg": 2.766210279079672,
+          "actual_base_xy_yaw": [
+            5.99334192276001,
+            0.8423049449920654,
+            -1.8520239883587644
+          ],
+          "target_base_xy_yaw": [
+            6.0259571867896256,
+            0.9117940201781081,
+            4.479440795993273
+          ],
+          "commanded_base_xy_yaw": [
+            5.9773451211239,
+            0.9000950000605449,
+            4.479440795993273
+          ],
+          "camera_lever_arm_target_xy_m": [
+            -0.0379691395813051,
+            0.29373742969344585
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.05179309844970703,
+            0.31533968448638916
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.08976223803101213,
+            0.02160225479294331
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.04861206566572596,
+            -0.011699020117563156
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            0.05689425030754869,
+            -0.04785069997836544,
+            -0.021590368853053876
+          ],
+          "actual_camera_position_world_m": [
+            6.044882297515869,
+            1.1576807498931885,
+            1.1565932035446167
+          ],
+          "target_camera_position_world_m": [
+            5.9879880472083205,
+            1.205531449871554,
+            1.1781835723976706
+          ],
+          "actual_yaw_rate_rad_s": 0.15924082696437836,
+          "phase_feedforward_v_mps": -0.15946604162387662,
+          "phase_feedforward_wz_rad_s": 0.1594671294346846,
+          "vx_reference_mps": -0.24239569951201245,
+          "wz_reference_rad_s": 0.26552146031945173,
+          "along_track_error_m": -0.05183103618008488,
+          "cross_track_error_m": -0.03143906180154069,
+          "base_yaw_error_rad": 0.0490797818187134,
+          "raw_velocity_reference_mps": -0.24239569951201245,
+          "base_position_error_m": 0.06062071360898322,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 8601,
+          "elapsed_s": 43.0,
+          "phase_time_s": 17.011721410946485,
+          "progress_scale": 0.41898567268811304,
+          "position_error_m": 0.052736090868988804,
+          "attitude_error_deg": 0.0845982231019842,
+          "pitch_deg": 5.905071636559435,
+          "riser_error_m": 0.010525396074317683,
+          "riser_thermal_load": 0.0008204532594502259,
+          "proxy_error_deg": [
+            0.037283613554989534,
+            0.009933199958063703,
+            0.01050423683069922
+          ],
+          "proxy_signed_error_deg": [
+            -0.037283613554989534,
+            -0.009933199958063703,
+            0.01050423683069922
+          ],
+          "proxy_target_deg": [
+            11.449360556130921,
+            -1.4241514018092953,
+            -154.96345542676713
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            11.449360556130921,
+            -1.4241514018092953,
+            -154.96345542676713
+          ],
+          "proxy_actual_deg": [
+            11.48664379119873,
+            -1.4142180681228638,
+            -154.9739532470703
+          ],
+          "proxy_velocity_deg_s": [
+            13.92764663696289,
+            4.0795793533325195,
+            -3.562788963317871
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.7349505424499512,
+            -0.42141133546829224,
+            0.5014607906341553
+          ],
+          "base_xy_error_m": 0.08521939367876946,
+          "base_yaw_error_deg": 2.2989815626263446,
+          "actual_base_xy_yaw": [
+            6.025818824768066,
+            0.9922789931297302,
+            -1.715152243810561
+          ],
+          "target_base_xy_yaw": [
+            6.051386415303655,
+            1.073572556055595,
+            4.6081578610794995
+          ],
+          "commanded_base_xy_yaw": [
+            6.026233761091009,
+            1.04037670513849,
+            4.6081578610794995
+          ],
+          "camera_lever_arm_target_xy_m": [
+            -0.014945478004150026,
+            0.2839198731696564
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.010207176208496094,
+            0.3171157240867615
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.02515265421264612,
+            0.033195850917105085
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.02515265421264612,
+            -0.033195850917105085
+          ],
+          "camera_lever_arm_correction_saturated": false,
+          "camera_position_error_xyz_m": [
+            -0.0005017206857358403,
+            -0.04806492945413332,
+            -0.021693457840209263
+          ],
+          "actual_camera_position_world_m": [
+            6.0359392166137695,
+            1.3094274997711182,
+            1.158381462097168
+          ],
+          "target_camera_position_world_m": [
+            6.036440937299505,
+            1.3574924292252515,
+            1.1800749199373772
+          ],
+          "actual_yaw_rate_rad_s": 0.05044882744550705,
+          "phase_feedforward_v_mps": -0.16771106531005983,
+          "phase_feedforward_wz_rad_s": -0.0073106231548028125,
+          "vx_reference_mps": -0.24514934138776892,
+          "wz_reference_rad_s": 0.0509239987863173,
+          "along_track_error_m": -0.04839892254856818,
+          "cross_track_error_m": -0.006518592239969036,
+          "base_yaw_error_rad": 0.040380611317638794,
+          "raw_velocity_reference_mps": -0.24514934138776892,
+          "base_position_error_m": 0.04883592682291681,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 8801,
+          "elapsed_s": 44.0,
+          "phase_time_s": 17.43853143117085,
+          "progress_scale": 0.4403578468652707,
+          "position_error_m": 0.05859088768941027,
+          "attitude_error_deg": 0.1264569373998931,
+          "pitch_deg": 5.798210765673647,
+          "riser_error_m": 0.011166932658590811,
+          "riser_thermal_load": 0.0008566101842422024,
+          "proxy_error_deg": [
+            0.031106952832348992,
+            0.030290215694705417,
+            0.130312616947437
+          ],
+          "proxy_signed_error_deg": [
+            -0.031106952832348992,
+            -0.030290215694705417,
+            0.130312616947437
+          ],
+          "proxy_target_deg": [
+            11.394967953067534,
+            -0.28191243704684465,
+            -161.60782926852414
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            11.394967953067534,
+            -0.28191243704684465,
+            -161.60782926852414
+          ],
+          "proxy_actual_deg": [
+            11.426074028015137,
+            -0.25162220001220703,
+            -161.73812866210938
+          ],
+          "proxy_velocity_deg_s": [
+            12.544084548950195,
+            7.563465118408203,
+            -27.00290298461914
+          ],
+          "proxy_target_velocity_deg_s": [
+            -0.9461467120867613,
+            4.2579570514264535,
+            -24.867100129689955
+          ],
+          "proxy_applied_effort_nm": [
+            -1.5133392810821533,
+            -1.1552330255508423,
+            4.415711879730225
+          ],
+          "base_xy_error_m": 0.09239024347189256,
+          "base_yaw_error_deg": 0.9543421730218938,
+          "actual_base_xy_yaw": [
+            6.046967506408691,
+            1.1410216093063354,
+            -1.7226801181982547
+          ],
+          "target_base_xy_yaw": [
+            6.0718582290527525,
+            1.229995813517736,
+            4.543848775871462
+          ],
+          "commanded_base_xy_yaw": [
+            6.073072426096168,
+            1.1888380864572965,
+            4.543848775871462
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.003867795828815801,
+            0.27593349951731927
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.0026535987854003906,
+            0.3170912265777588
+          ],
+          "camera_lever_arm_error_xy_m": [
+            -0.0012141970434154103,
+            0.04115772706043952
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            0.0012141970434154103,
+            -0.04115772706043952
+          ],
+          "camera_lever_arm_correction_saturated": false,
+          "camera_position_error_xyz_m": [
+            -0.026406757608619102,
+            -0.0477487662744962,
+            -0.021345505196557424
+          ],
+          "actual_camera_position_world_m": [
+            6.049319267272949,
+            1.458180546760559,
+            1.161051630973816
+          ],
+          "target_camera_position_world_m": [
+            6.075726024881568,
+            1.5059293130350553,
+            1.1823971361703733
+          ],
+          "actual_yaw_rate_rad_s": -0.04045911878347397,
+          "phase_feedforward_v_mps": -0.15680655946889804,
+          "phase_feedforward_wz_rad_s": -0.08013880501347284,
+          "vx_reference_mps": -0.2399301893465401,
+          "wz_reference_rad_s": -0.1282298283619568,
+          "along_track_error_m": -0.051952268673526265,
+          "cross_track_error_m": 0.018579002945487477,
+          "base_yaw_error_rad": -0.01685209910854393,
+          "raw_velocity_reference_mps": -0.2399301893465401,
+          "base_position_error_m": 0.05517442859490881,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 9001,
+          "elapsed_s": 45.0,
+          "phase_time_s": 17.853714886531538,
+          "progress_scale": 0.3969798277107074,
+          "position_error_m": 0.059646963467545416,
+          "attitude_error_deg": 0.08607847524096193,
+          "pitch_deg": 6.015100861446463,
+          "riser_error_m": 0.011280771544762036,
+          "riser_thermal_load": 0.000894170915776513,
+          "proxy_error_deg": [
+            0.03410976616927391,
+            0.011415602226091216,
+            0.008284160901826642
+          ],
+          "proxy_signed_error_deg": [
+            -0.03410976616927391,
+            -0.011415602226091216,
+            0.008284160901826642
+          ],
+          "proxy_target_deg": [
+            10.90154218939806,
+            1.124445497077264,
+            -169.79006834145343
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            10.90154218939806,
+            1.124445497077264,
+            -169.79006834145343
+          ],
+          "proxy_actual_deg": [
+            10.935651779174805,
+            1.1358610391616821,
+            -169.79833984375
+          ],
+          "proxy_velocity_deg_s": [
+            12.85698127746582,
+            4.375552654266357,
+            -3.0903737545013428
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.5913481712341309,
+            -0.5295207500457764,
+            0.3867533206939697
+          ],
+          "base_xy_error_m": 0.10135997006128787,
+          "base_yaw_error_deg": 2.0571529403093374,
+          "actual_base_xy_yaw": [
+            6.07279634475708,
+            1.2913295030593872,
+            -1.760492352432167
+          ],
+          "target_base_xy_yaw": [
+            6.104167439958255,
+            1.3877125820551528,
+            4.486788862721939
+          ],
+          "commanded_base_xy_yaw": [
+            6.1047371164650475,
+            1.3377158274737042,
+            4.486788862721939
+          ],
+          "camera_lever_arm_target_xy_m": [
+            0.003905661529689297,
+            0.2715266685054585
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            0.0033245086669921875,
+            0.3225306272506714
+          ],
+          "camera_lever_arm_error_xy_m": [
+            -0.0005811528626971096,
+            0.05100395874521291
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            0.0005696765067927364,
+            -0.04999675458144867
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            -0.03189979597646975,
+            -0.0453589738806186,
+            -0.021971043581397343
+          ],
+          "actual_camera_position_world_m": [
+            6.076173305511475,
+            1.6138802766799927,
+            1.163326382637024
+          ],
+          "target_camera_position_world_m": [
+            6.108073101487944,
+            1.6592392505606113,
+            1.1852974262184213
+          ],
+          "actual_yaw_rate_rad_s": -0.03044767864048481,
+          "phase_feedforward_v_mps": -0.15886549222163826,
+          "phase_feedforward_wz_rad_s": -0.027308362659057416,
+          "vx_reference_mps": -0.24261986599741742,
+          "wz_reference_rad_s": -0.10451393560387091,
+          "along_track_error_m": -0.05234648360986196,
+          "cross_track_error_m": 0.022627720944092176,
+          "base_yaw_error_rad": -0.036053326273896034,
+          "raw_velocity_reference_mps": -0.24261986599741742,
+          "base_position_error_m": 0.05702778359222156,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        },
+        {
+          "step": 9199,
+          "elapsed_s": 45.99,
+          "phase_time_s": 18.241927671727208,
+          "progress_scale": 0.3892666658357413,
+          "position_error_m": 0.056457839137152195,
+          "attitude_error_deg": 0.07700117710596599,
+          "pitch_deg": 6.053666670821293,
+          "riser_error_m": 0.011297482081238597,
+          "riser_thermal_load": 0.0009305138801911286,
+          "proxy_error_deg": [
+            0.03379507753805807,
+            0.012093186812789522,
+            0.007432648917831935
+          ],
+          "proxy_signed_error_deg": [
+            -0.03379507753805807,
+            -0.012093186812789522,
+            0.007432648917831935
+          ],
+          "proxy_target_deg": [
+            10.443962703618915,
+            2.2152306477547223,
+            -176.50459965658808
+          ],
+          "proxy_unwrapped_semantic_target_deg": [
+            10.443962703618915,
+            2.2152306477547223,
+            -176.50459965658808
+          ],
+          "proxy_actual_deg": [
+            10.477757453918457,
+            2.2273237705230713,
+            -176.51202392578125
+          ],
+          "proxy_velocity_deg_s": [
+            12.5674409866333,
+            4.621100902557373,
+            -2.7399420738220215
+          ],
+          "proxy_target_velocity_deg_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "proxy_applied_effort_nm": [
+            -1.5688669681549072,
+            -0.5775406956672668,
+            0.33940422534942627
+          ],
+          "base_xy_error_m": 0.10286501179020059,
+          "base_yaw_error_deg": 1.5898945126522408,
+          "actual_base_xy_yaw": [
+            6.103200912475586,
+            1.4426941871643066,
+            -1.7774503377842272
+          ],
+          "target_base_xy_yaw": [
+            6.139620570300353,
+            1.538896157905685,
+            4.477986075390187
+          ],
+          "commanded_base_xy_yaw": [
+            6.133147911149177,
+            1.48931688115105,
+            4.477986075390187
+          ],
+          "camera_lever_arm_target_xy_m": [
+            -0.00788557030035264,
+            0.26958984209431525
+          ],
+          "camera_lever_arm_actual_xy_m": [
+            -0.0009088516235351562,
+            0.32303011417388916
+          ],
+          "camera_lever_arm_error_xy_m": [
+            0.006976718676817484,
+            0.053440272079573914
+          ],
+          "camera_lever_arm_correction_xy_m": [
+            -0.0064726591511755594,
+            -0.04957927675463513
+          ],
+          "camera_lever_arm_correction_saturated": true,
+          "camera_position_error_xyz_m": [
+            -0.02940097747802728,
+            -0.0427524003372195,
+            -0.022255390106201256
+          ],
+          "actual_camera_position_world_m": [
+            6.102334022521973,
+            1.7657335996627808,
+            1.1663556098937988
+          ],
+          "target_camera_position_world_m": [
+            6.131735,
+            1.8084860000000003,
+            1.188611
+          ],
+          "actual_yaw_rate_rad_s": -0.020776329562067986,
+          "phase_feedforward_v_mps": -0.15573439690232907,
+          "phase_feedforward_wz_rad_s": -0.022877838077129047,
+          "vx_reference_mps": -0.2398187274690527,
+          "wz_reference_rad_s": -0.08593320218564633,
+          "along_track_error_m": -0.052552706604202255,
+          "cross_track_error_m": 0.01974910189364596,
+          "base_yaw_error_rad": -0.027859759390040283,
+          "raw_velocity_reference_mps": -0.2398187274690527,
+          "base_position_error_m": 0.0561410188456976,
+          "feedforward_direction": -1.0,
+          "feedback_motion_direction": -1.0,
+          "direction_recovery_blend": 0.0,
+          "motion_direction": -1.0
+        }
+      ],
+      "checks": {
+        "completed_reference": true,
+        "no_termination": true,
+        "pitch_bounded": true,
+        "position_p95_bounded": true,
+        "position_max_bounded": true,
+        "attitude_p95_bounded": true,
+        "attitude_max_bounded": true,
+        "riser_servo_error_bounded": true,
+        "proxy_servo_error_bounded": true,
+        "action_saturation_bounded": true,
+        "riser_saturation_bounded": true,
+        "proxy_saturation_bounded": true,
+        "internal_attitude_ik_converged": true,
+        "internal_proxy_rate_bounded": true,
+        "residual_teacher_unclipped": true,
+        "riser_thermal_force_observed": true,
+        "riser_thermal_load_bounded": true,
+        "riser_peak_force_bounded": true,
+        "camera_lever_arm_telemetry_observed": true
+      },
+      "executed_residual_dataset": null,
+      "passed": true
+    }
+  ],
+  "passed": true
+}

@@ -116,6 +116,9 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["projection_aware_effective_label_loss_required"] is True
     assert corrective["requested_output_slew_regularization_required"] is True
     assert corrective["temporal_projection_valid_for_training"] is False
+    assert corrective["temporal_projection_authoritative_cpu_suite"] == (
+        "897_passed_12_skipped_2_warnings"
+    )
     assert corrective["case30_valid_for_training"] is False
     assert corrective["conversion_route"]["case30_default_preserved"] is True
     assert corrective["conversion_route"]["allowed_splits"] == [

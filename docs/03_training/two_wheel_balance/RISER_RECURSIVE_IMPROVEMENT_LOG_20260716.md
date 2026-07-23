@@ -7621,6 +7621,11 @@ and must state whether its candidate was accepted or rejected.
   It is valid only for BC contract review. Case-23 capture, corpus merge, BC,
   PPO, learned rollout, and training remain unauthorized, and no Isaac/GPU
   process was launched.
+- The first `.98` suite correctly found non-portable Windows path separators
+  in regenerated evidence: `896 passed, 1 failed, 12 skipped`. Commit
+  `d5b936678b50b0af82511e14fb2a79a3bdf818da` normalizes evidence paths to
+  POSIX form without changing numerical results. The final authoritative
+  `.98` suite passed `897 passed, 12 skipped, 2 warnings` in `81.60 s`.
 
 ## Next round after Round 194
 

@@ -258,6 +258,8 @@
         "projection_aware_effective_label_loss_required": true,
         "requested_output_slew_regularization_required": true,
         "temporal_projection_valid_for_training": false,
+        "temporal_projection_authoritative_cpu_commit": "d5b936678b50b0af82511e14fb2a79a3bdf818da",
+        "temporal_projection_authoritative_cpu_suite": "897_passed_12_skipped_2_warnings",
         "capture_authorized": false,
         "merge_authorized": false,
         "conversion_route": {

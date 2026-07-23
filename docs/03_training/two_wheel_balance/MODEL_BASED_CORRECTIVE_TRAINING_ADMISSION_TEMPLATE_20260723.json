@@ -1,0 +1,20 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_corrective_training_admission_v1",
+  "source_corpus_sha256": null,
+  "promotion_commit": null,
+  "loss_module_sha256": "f9fe3c59ba3188effc27104e15f58b1de15c78ac49a59ebc9fe569fd9e6ea8c9",
+  "loss_audit_summary_sha256": "80818a5d8f35b9a519ca916f9d05210c5b3a38fae72e54aa57a43911a625ee9f",
+  "promotion_module_sha256": "c741180528b026b88f9b6a1933ab47e20c3bb00bc652fc1638ed85e23a034aa4",
+  "promotion_script_sha256": "ea71b33e5420e9b17bf9cecca318630236e877f45eac4f4a1a54ad49999f6a0c",
+  "loss_contract": "model_based_projected_effective_action_bc_loss_v1",
+  "projection_contract": "model_based_residual_safety_projection_v1",
+  "requested_slew_regularization_contract": "requested_physical_residual_slew_hinge_v1",
+  "minimum_train_cases": 4,
+  "minimum_validation_cases": 2,
+  "reserved_holdout_cases": [3, 5, 13, 19, 24],
+  "training_schema_promotion_approved": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "learned_rollout_authorized": false,
+  "training_started": false
+}

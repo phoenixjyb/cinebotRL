@@ -67,6 +67,21 @@ PROJECTED_BC_LOSS_AUDIT = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260723_model_based_corrective_bc_loss_v1/summary.json"
 )
+PROJECTED_TRAINING_PROMOTION_MODULE = (
+    ROOT
+    / "src/rl_platform/tasks/two_wheel_balance/"
+    "riser_model_based_corrective_training_dataset.py"
+)
+PROJECTED_TRAINING_PROMOTION_SCRIPT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "promote_model_based_corrective_training_dataset.py"
+)
+PROJECTED_TRAINING_ADMISSION_TEMPLATE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "MODEL_BASED_CORRECTIVE_TRAINING_ADMISSION_TEMPLATE_20260723.json"
+)
 BENCH_RAW_LOG_REDUCER = (
     ROOT / "scripts/two_wheel_balance/reduce_riser_bench_log.py"
 )
@@ -346,6 +361,35 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corpus["reserved_holdout_cases_unopened"] == [3, 5, 13, 19, 24]
     assert corpus["effective_post_supervisor_labels_only"] is True
     assert corpus["bc_entrypoint_refuses_review_only_schema"] is True
+    assert corpus["projection_training_dataset_schema"] == (
+        "cinebotrl_two_wheel_riser_model_based_corrective_training_v1"
+    )
+    assert corpus["projection_training_admission_schema"] == (
+        "cinebotrl_two_wheel_riser_model_based_corrective_training_admission_v1"
+    )
+    assert corpus["projection_training_promotion_module_sha256"] == _sha256(
+        PROJECTED_TRAINING_PROMOTION_MODULE
+    )
+    assert corpus["projection_training_promotion_script_sha256"] == _sha256(
+        PROJECTED_TRAINING_PROMOTION_SCRIPT
+    )
+    assert corpus["projection_training_admission_template_sha256"] == _sha256(
+        PROJECTED_TRAINING_ADMISSION_TEMPLATE
+    )
+    assert corpus["projection_training_transition_contract"] == (
+        "same_case_previous_row_elapsed_delta_v1"
+    )
+    assert corpus["projection_training_case_balancing_contract"] == (
+        "unit_total_weight_per_case_v1"
+    )
+    assert corpus["projection_training_admission_template_approved"] is False
+    assert corpus["projection_training_real_corpus_available"] is False
+    assert corpus["projection_training_dataset_created"] is False
+    assert corpus["projection_training_bc_entrypoint_integrated"] is False
+    assert corpus["projection_training_bc_authorized"] is False
+    assert corpus["projection_training_focused_cpu_suite"] == (
+        "63_passed_5_warnings"
+    )
     assert corrective["multi_case_corpus_created"] is False
     assert stage["runtime_authorized"] is False
     assert stage["bc_authorized"] is False

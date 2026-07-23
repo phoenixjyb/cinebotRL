@@ -58,6 +58,20 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 > `0/0/0`，effective label 的 `30/49/8` 个违规仍全部来自 supervisor
 > clipping。该结果只证明损失合同正确，不代表多 case corpus 已满足、不授权 BC，
 > 也未生成 checkpoint 或启动训练。现有 review-only corpus 仍被 BC 入口拒绝。
+>
+> **2026-07-23 训练 schema 晋级合同：** 已实现
+> `cinebotrl_two_wheel_riser_model_based_corrective_training_v1` 的晋级器，但
+> 当前没有创建该数据集。晋级必须输入至少 `4` 个 train case 和 `2` 个 validation
+> case 的 review corpus，保留 holdout `[3,5,13,19,24]` 完全未打开，并由独立
+> admission 精确绑定 corpus、commit、loss module、loss audit、promotion module
+> 和 promotion CLI 的 SHA。晋级只派生同 case previous-row index、正
+> `delta_time_s`、transition mask 和每 case 总权重为 `1` 的 sample weight；
+> 不修改 effective label，也不把 requested audit action 变成 target。仓库中的
+> admission template 缺少 corpus SHA/commit，且
+> `training_schema_promotion_approved=false`，因此不能执行。即使未来晋级成功，
+> `bc_authorized=false`、`ppo_authorized=false`、`learned_rollout_authorized=false`
+> 和 `training_started=false` 仍保持不变；BC 入口在单独集成和授权前继续拒绝
+> 新 schema。
 
 ## 固定运行合同
 

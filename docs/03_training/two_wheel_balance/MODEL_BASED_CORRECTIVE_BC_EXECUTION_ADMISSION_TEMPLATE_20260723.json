@@ -1,0 +1,69 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_admission_v1",
+  "dataset": {
+    "path": null,
+    "sha256": null
+  },
+  "dataset_schema": "cinebotrl_two_wheel_riser_model_based_corrective_training_v1",
+  "dataset_promotion_commit": null,
+  "execution_commit": null,
+  "code": {
+    "trainer": {
+      "path": "scripts/two_wheel_balance/train_riser_residual_bc.py",
+      "sha256": "ea7d6cc881f54467296286fced2522c07739450961943fe84344cb02c35785a4"
+    },
+    "adapter": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_bc_adapter.py",
+      "sha256": "946e205daf98c36c7141536ec2ddd3073190b7d76f0e8224d066e3e309284a48"
+    },
+    "loss_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_bc_loss.py",
+      "sha256": "f9fe3c59ba3188effc27104e15f58b1de15c78ac49a59ebc9fe569fd9e6ea8c9"
+    },
+    "policy_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_residual_policy.py",
+      "sha256": "5ecbaefa054d80ca8d1e85fa3ed732d993ca0fb25a0ca4e3fea22206c54cc257"
+    },
+    "training_dataset_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_training_dataset.py",
+      "sha256": "c741180528b026b88f9b6a1933ab47e20c3bb00bc652fc1638ed85e23a034aa4"
+    },
+    "admission_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_bc_contract.py",
+      "sha256": "0c8787a091aaa8051368aeed176e31e2327c0e1c6afa26d70a5e3a88d32b6c49"
+    }
+  },
+  "optimizer_contract": "exact_case_balanced_projection_aware_gradient_accumulation_v1",
+  "validation_contract": "projected_effective_action_case_balanced_validation_v1",
+  "loss_contract": "model_based_projected_effective_action_bc_loss_v1",
+  "projection_contract": "model_based_residual_safety_projection_v1",
+  "training_config": {
+    "optimizer": "AdamW",
+    "epochs_max": 200,
+    "patience": 20,
+    "batch_size": 4096,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.00001,
+    "gradient_clip_norm": 5.0,
+    "state_hidden_sizes": [128, 128],
+    "lookahead_hidden_sizes": [64, 64],
+    "fusion_hidden_sizes": [256, 128],
+    "seed": 20260723,
+    "device": "cuda",
+    "minimum_improvement_fraction": 0.05,
+    "maximum_normalized_prediction_abs": 0.95,
+    "model_selection_split": "validation",
+    "optimizer_steps_per_epoch": 1
+  },
+  "split_cases": {
+    "train": [],
+    "validation": []
+  },
+  "reserved_holdout_cases": [3, 5, 13, 19, 24],
+  "holdout_opened": false,
+  "bc_execution_approved": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "learned_rollout_authorized": false,
+  "training_started": false
+}

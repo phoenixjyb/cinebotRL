@@ -94,6 +94,20 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 > batch 切分的一步参数更新一致，并能确定性学习一个可达的三通道 teacher；无效
 > 的跨 case/split predecessor 会被拒绝。该 kernel 目前没有 CLI 路由，不创建
 > policy，且不改变 `bc_authorized=false`。
+>
+> **2026-07-23 BC execution admission/report 合同：** 已定义严格的
+> `cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_admission_v1`
+> 和 execution report v1。admission 必须绑定 promoted dataset、promotion
+> commit、execution commit、trainer、adapter、loss、policy、training-dataset
+> module 和 admission module 的 SHA，并固定 optimizer、网络尺寸、seed、CUDA
+> device、case split 和 unopened holdout。仓库模板故意保留 dataset/commit
+> 为 `null`、split 为空、`bc_execution_approved=false`，不能通过验证。成功
+> report 必须绑定 admission 和 dataset，包含连续 epoch history、train/validation
+> projected metrics、zero-request improvement、requested-action margin、真实
+> checkpoint/TorchScript SHA，且 holdout、PPO、learned rollout 保持关闭。
+> 缺 artifact、伪造 code/dataset hash、stale commit、改超参数、打开 holdout
+> 或虚假 success 均 fail closed。当前仅实现 validator，没有把 admission 接到
+> trainer，也没有授权或启动 BC。
 
 ## 固定运行合同
 

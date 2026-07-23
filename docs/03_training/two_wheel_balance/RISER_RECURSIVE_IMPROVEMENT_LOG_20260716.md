@@ -8740,3 +8740,40 @@ and must state whether its candidate was accepted or rejected.
 - The independent case-6 runtime step is now reviewable as exactly one
   separately authorized v2 paired canary. Do not issue that authorization or
   launch Isaac implicitly.
+
+## Round 226: case-2 readiness exposes a structural profile constraint
+
+- Imported and hash-bound the selected case-2 exact-source smoothed plan and
+  its passing zero-residual dynamic gate from `.98`. Their SHA-256 values
+  exactly match the tranche-selection contract.
+- The plan contains `480` source states and `479` transitions, with separate
+  `9.439314 s` source and `18.241928 s` execution clocks. The source-anchor map
+  is exactly one-to-one, initialization is separate and empty, and camera
+  height remains within `1.174803-1.362249 m`.
+- The zero-residual gate passes at `0.139830/0.153514 m` position p95/max and
+  `6.632458 deg` peak pitch, but its p95 margin is only `0.010170 m`.
+  Base-linear, base-yaw, and proxy-rate commands reach their frozen limits,
+  while camera lever-arm correction saturation is `0.943907`.
+- No interval of at least `0.1 s` satisfies the existing conservative
+  low-motion envelope. Case 2 is therefore evidence-ready but not
+  profile-ready. Reusing either the case-23 or case-6 profile is explicitly
+  forbidden.
+- Implementation commits
+  `9a16e5ca18ab4da96d78269234b674eec88d103c` and
+  `b7d02c1a5b72e61394921f837d9845a850fc5e64` pass `15` focused
+  tests on macOS and `.98`.
+- The authoritative `.98` CPU suite passes:
+  `1149 passed, 12 skipped, 2 warnings in 124.40 s`. Both hosts regenerate
+  byte-identical evidence at SHA-256
+  `5e346af90c7d4888914baf6bcf8adaef65957bb20a97a11b8666590ca9067f5c`.
+- No token, runtime namespace, Isaac process, GPU workload, label capture,
+  conversion, merge, BC, PPO, or training was created. Goal completion
+  remains `6/10`.
+
+## Next round after Round 226
+
+- Design a CPU-only structural corrective profile for case 2 that excludes
+  saturated segments and proves command, clock, and supervisor invariants.
+- The nearest actual data-path action remains exactly one separately
+  authorized case-23 v4 CPU conversion. Case 6 remains separately reviewable
+  as one v2 paired canary.

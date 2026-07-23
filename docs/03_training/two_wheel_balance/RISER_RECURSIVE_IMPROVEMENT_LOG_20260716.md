@@ -7561,3 +7561,35 @@ and must state whether its candidate was accepted or rejected.
   or reuse current training evidence for the 750 W candidate.
 - Learning remains at the separately authorized case-23 capture boundary under
   the active 400 W plant identity.
+
+## Round 193: case-23 capture is bound to the active 400 W plant
+
+- Commit `eff05387a93fd8281ae32482121c67105d85819d` adds the active drive-profile
+  evidence as a required, hash-pinned case-23 capture identity. The validator
+  now requires `leadshine_400w_engineering_sample_v1`, `300 N / 1.0 m/s`, and
+  `leadshine_400w_first_order_monitor_v1`.
+- The same semantic gate requires the 750 W candidate to remain disabled for
+  simulation, runtime, and training. It rejects silent plant upgrades and
+  records that a plant switch invalidates existing dynamic, capture, and BC
+  evidence.
+- Current no-token capture contract SHA-256 and Git blob are
+  `18210efd27ba7d6001dc2d81f070f95df5dacd36f78ae417184771d2208f05d8`
+  and `01a7f0e957b49c21ccaf68a91c8e476bfaa894aa`. The prior
+  `1d290b6be77e86e69a5ecf025f616bf5cd3c53c336b2ca4d94185b76f5422756`
+  capture-contract hash is superseded.
+- Live `.98` focused tests passed `15/15` with two configuration warnings.
+  The no-token preflight passed every pinned identity and the new drive-profile
+  semantics at clean
+  `HEAD == upstream == eff05387a93fd8281ae32482121c67105d85819d`.
+- The pair namespace remains the single completed case-23 pair. The capture
+  namespace and token remain absent. Runtime, GPU, label capture, dataset
+  conversion, corpus merge, BC, PPO, and training remain unauthorized.
+
+## Next round after Round 193
+
+- Do not rerun the passed case-23 pair. The only prepared runtime action is one
+  separately authorized case-23 corrective-label capture in
+  `20260723_model_based_corrective_teacher_case23_capture_v1_exclusive`.
+- Authorization wording must name the corrective-label capture rather than the
+  already-completed paired canary. After a capture pass or reject, stop and
+  audit before any conversion or learning action.

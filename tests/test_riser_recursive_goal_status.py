@@ -1,4 +1,5 @@
 import json
+import hashlib
 from pathlib import Path
 
 
@@ -7,10 +8,22 @@ GOAL = (
     ROOT
     / "docs/03_training/two_wheel_balance/riser_recursive_improvement_goal_v1.json"
 )
+CASE23_CAPTURE_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/model_based_corrective_teacher_case23_capture_contract_v1.json"
+)
+DRIVE_PROFILE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
+)
 
 
 def _goal() -> dict:
     return json.loads(GOAL.read_text(encoding="utf-8"))
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_goal_preserves_robot_and_completion_contract() -> None:
@@ -70,6 +83,19 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["case23_position_p95_improvement_m"] > 0.003
     assert corrective["case23_position_p95_improvement_fraction"] > 0.02
     assert corrective["case23_capture_review_ready"] is True
+    assert corrective["case23_pair_contract_sha256"] == (
+        "e5b5b360efdb0334412fb156d77dba7e0a6eb605651c16bffc280a8076caa043"
+    )
+    assert corrective["case23_capture_contract_sha256"] == _sha256(
+        CASE23_CAPTURE_CONTRACT
+    )
+    assert corrective["case23_capture_drive_profile"] == (
+        "leadshine_400w_engineering_sample_v1"
+    )
+    assert corrective["case23_capture_drive_profile_sha256"] == _sha256(
+        DRIVE_PROFILE
+    )
+    assert corrective["case23_capture_cpu_preflight_passed"] is True
     assert corrective["case23_capture_authorized"] is False
     assert corrective["case23_conversion_authorized"] is False
     assert corrective["case30_valid_for_training"] is False

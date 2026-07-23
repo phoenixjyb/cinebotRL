@@ -13,22 +13,29 @@ fail-closed.
 
 ## Reviewed identities
 
-- CPU-ready contract commit:
+- Superseded pre-drive-profile contract commit:
   `b52024d175404803744304144f659c934ad68664`
+- Current CPU-ready contract commit:
+  `eff05387a93fd8281ae32482121c67105d85819d`
 - Passed case-23 pair final SHA-256:
   `67c8e99a0629a4b1cb4a2981abfe8360c5d9979c4757582dab6d4fb22cd00deb`
 - Case-23 plan SHA-256:
   `ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6`
 - No-token capture contract SHA-256:
-  `1d290b6be77e86e69a5ecf025f616bf5cd3c53c336b2ca4d94185b76f5422756`
+  `18210efd27ba7d6001dc2d81f070f95df5dacd36f78ae417184771d2208f05d8`
+- No-token capture contract Git blob:
+  `01a7f0e957b49c21ccaf68a91c8e476bfaa894aa`
+- Active 400 W drive-profile evidence SHA-256:
+  `39a700de3985175e4e8415f1f23beef4264b103daa7ce8847f4ac0fe69f879f7`
 - Fresh namespace, still absent:
   `20260723_model_based_corrective_teacher_case23_capture_v1_exclusive`
 
 ## Runtime contract audit
 
 The wrapper is pinned to case 23, the accepted case-23 smoothed plan, frozen
-LQR gains, the tracked case-23 corrective and wrench profiles, and residual
-scales `[0.05, 0.05, 0.02]`. It uses the model-based planner plus the bounded
+LQR gains, the tracked case-23 corrective and wrench profiles, the active
+`leadshine_400w_engineering_sample_v1` drive profile, and residual scales
+`[0.05, 0.05, 0.02]`. It uses the model-based planner plus the bounded
 corrective teacher, captures requested and effective post-supervisor commands,
 and consumes a one-use authorization before Isaac when and only when a later
 authorization commit provides one.
@@ -38,6 +45,12 @@ Python/Isaac in `--execute` mode. Its preflight verifies clean
 `HEAD == upstream`, the canonical committed contract blob, the reviewed-parent
 lineage, every pinned source/asset hash, an absent output namespace, the passed
 pair thresholds, closed holdouts, and closed learning paths.
+
+The drive-profile validator additionally requires the active actuator limit to
+remain `300 N / 1.0 m/s`, the first-order 400 W thermal contract to remain
+active, and the 750 W production candidate to remain disabled for simulation,
+runtime, and training. A silent plant upgrade or any attempt to reuse this
+capture contract after a plant switch revokes CPU readiness before Isaac.
 
 The finalizer independently reopens the archive and requires:
 

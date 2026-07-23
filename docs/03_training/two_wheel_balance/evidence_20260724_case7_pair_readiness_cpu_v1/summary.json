@@ -1,0 +1,172 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case7_pair_readiness_cpu_v1",
+  "case": 7,
+  "selection_checks": {
+    "schema": true,
+    "passed": true,
+    "selected_cases": true,
+    "validation_cases": true,
+    "holdout_cases": true,
+    "plan_hash": true,
+    "gate_hash": true,
+    "runtime_closed": true,
+    "learning_closed": true,
+    "case7_role": true,
+    "case7_checks": true
+  },
+  "plan_checks": {
+    "schema_case": true,
+    "integrity": true,
+    "kinematic_gate": true,
+    "all_plan_checks": true,
+    "all_kinematic_checks": true,
+    "training_closed": true,
+    "array_shapes": true,
+    "arrays_finite": true,
+    "clocks": true
+  },
+  "gate_checks": {
+    "schema_case": true,
+    "passed": true,
+    "result_passed": true,
+    "no_termination": true,
+    "zero_residual_action": true,
+    "raw_label_not_applied": true,
+    "label_margin": true,
+    "non_training_playback": true
+  },
+  "metric_checks": {
+    "base_linear": true,
+    "base_yaw": true,
+    "riser": true,
+    "proxy": true,
+    "camera_height": true
+  },
+  "inputs": {
+    "selection": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_model_based_pair_tranche_v1/selection.json",
+      "sha256": "93aa25e99409ad926d4c4cf0b15075e6ea3532dd1c01d5217a45daffc37db7c0",
+      "size_bytes": 14077
+    },
+    "plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case7_pair_readiness_cpu_v1/source/case_0007_smoothed_riser_plan_v1.npz",
+      "sha256": "a83934dab6e4293cd830397d3c2ffb41d4f4d78545dddec7fdfa630fa0d22f41",
+      "size_bytes": 165600
+    },
+    "dynamic_gate": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case7_pair_readiness_cpu_v1/source/case_0007_dynamic_gate.json",
+      "sha256": "28b1117eb1dede740e70348f48eb06aa35d87ce86ae3572a740737a83c75605f",
+      "size_bytes": 145685
+    }
+  },
+  "plan": {
+    "sample_count": 663,
+    "transition_count": 662,
+    "source_duration_s": 12.940941,
+    "execution_duration_s": 18.1173174,
+    "minimum_target_camera_height_m": 0.6,
+    "maximum_target_camera_height_m": 1.6054519999999999,
+    "maximums": {
+      "base_linear_velocity_mps": 0.2998704977273021,
+      "base_yaw_rate_radps": 0.29987049772734425,
+      "riser_rate_mps": 0.6859824231195146,
+      "proxy_rate_radps": 0.31402365089612344
+    },
+    "headroom": {
+      "base_linear_velocity_mps": 0.1001295022726979,
+      "base_yaw_rate_radps": 0.10012950227265577,
+      "riser_rate_mps": 0.31401757688048537,
+      "proxy_rate_radps": 0.10485536958251562
+    }
+  },
+  "zero_residual_dynamic_gate": {
+    "position_error_p95_m": 0.13090413286504898,
+    "position_error_max_m": 0.14294768032360575,
+    "pitch_max_deg": 6.169691948025947,
+    "camera_lever_arm_correction_saturation_ratio": 0.9194793400938399,
+    "normalized_residual_label_abs_max": [
+      0.7666128584580739,
+      0.4030883700031987,
+      0.12628383956008626
+    ],
+    "normalized_residual_label_headroom": [
+      0.18338714154192604,
+      0.5469116299968013,
+      0.8237161604399137
+    ],
+    "dynamic_margins": {
+      "position_error_p95_m": 0.01909586713495101,
+      "position_error_max_m": 0.10705231967639425,
+      "pitch_max_deg": 5.830308051974053,
+      "attitude_error_max_deg": 9.739704815715593,
+      "riser_servo_error_max_m": 0.018222607526539453,
+      "action_saturation_ratio": 0.2
+    }
+  },
+  "profile_window_contract": {
+    "limits": {
+      "base_linear_velocity_mps": 0.3,
+      "base_yaw_rate_radps": 0.3,
+      "riser_rate_mps": 0.25,
+      "proxy_rate_radps": 0.3
+    },
+    "minimum_duration_s": 0.1,
+    "windows": [
+      {
+        "start_index": 0,
+        "end_index": 12,
+        "start_time_s": 0.0,
+        "end_time_s": 0.5743449169080325,
+        "duration_s": 0.5743449169080325
+      },
+      {
+        "start_index": 27,
+        "end_index": 125,
+        "start_time_s": 1.190241994037773,
+        "end_time_s": 3.7250485968424965,
+        "duration_s": 2.534806602804723
+      },
+      {
+        "start_index": 137,
+        "end_index": 264,
+        "start_time_s": 4.067674419408511,
+        "end_time_s": 7.499668511286682,
+        "duration_s": 3.4319940918781713
+      },
+      {
+        "start_index": 503,
+        "end_index": 661,
+        "start_time_s": 15.501970029969046,
+        "end_time_s": 18.11064785426223,
+        "duration_s": 2.608677824293183
+      }
+    ],
+    "bounded_window_found": true
+  },
+  "case_specific_profile_required": true,
+  "case23_profile_reuse_authorized": false,
+  "pair_profile_cpu_ready": false,
+  "next_bounded_action": "design_case7_specific_corrective_profile_cpu_only",
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true,
+  "source_execution_clock_checks": {
+    "execution_clock_alias_exact": true,
+    "source_clock_shape": true,
+    "source_clock_strictly_increasing": true,
+    "source_duration_metadata": true,
+    "execution_duration_metadata": true,
+    "source_anchor_map_exact": true,
+    "initialization_separate_and_empty": true
+  },
+  "case6_profile_reuse_authorized": false,
+  "case2_profile_reuse_authorized": false,
+  "safe_window_absent_requires_structural_profile": false
+}

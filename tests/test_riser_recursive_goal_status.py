@@ -293,6 +293,16 @@ CASE8_VALIDATION_PAIR_ROUTE_EVIDENCE = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_case8_validation_pair_route_cpu_v1/summary.json"
 )
+CASE16_VALIDATION_PAIR_READINESS_SCRIPT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "audit_model_based_corrective_case16_validation_pair_readiness.py"
+)
+CASE16_VALIDATION_PAIR_READINESS_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case16_validation_pair_readiness_cpu_v1/summary.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -1327,6 +1337,68 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case8_route["dataset_creation_authorized"] is False
     assert case8_route["training_started"] is False
     assert case8_route["valid_for_training"] is False
+    assert corrective["case16_validation_pair_readiness_script_sha256"] == (
+        _sha256(CASE16_VALIDATION_PAIR_READINESS_SCRIPT)
+    )
+    assert corrective[
+        "case16_validation_pair_readiness_script_git_blob_sha1"
+    ] == "8c294399cd5e457801e4aee6d498dcae554cdca2"
+    assert corrective["case16_validation_pair_readiness_summary_sha256"] == (
+        _sha256(CASE16_VALIDATION_PAIR_READINESS_EVIDENCE)
+    )
+    assert corrective[
+        "case16_validation_pair_readiness_mac_windows_byte_parity"
+    ] is True
+    assert corrective["case16_validation_pair_readiness_split"] == "validation"
+    assert corrective["case16_validation_pair_readiness_source_states"] == 896
+    assert corrective["case16_validation_pair_readiness_transitions"] == 895
+    assert corrective[
+        "case16_validation_pair_readiness_low_motion_window_count"
+    ] == 0
+    assert corrective[
+        "case16_validation_pair_readiness_safe_window_absent_requires_structural_profile"
+    ] is True
+    assert corrective[
+        "case16_validation_pair_readiness_case_specific_profile_required"
+    ] is True
+    assert corrective[
+        "case16_validation_pair_readiness_external_wrench_profile_suitable"
+    ] is False
+    assert corrective[
+        "case16_validation_pair_readiness_pair_profile_cpu_ready"
+    ] is False
+    assert corrective[
+        "case16_validation_pair_readiness_runtime_authorized"
+    ] is False
+    assert corrective[
+        "case16_validation_pair_readiness_label_capture_authorized"
+    ] is False
+    assert corrective[
+        "case16_validation_pair_readiness_training_authorized"
+    ] is False
+    case16 = json.loads(
+        CASE16_VALIDATION_PAIR_READINESS_EVIDENCE.read_text()
+    )
+    assert case16["passed"] is True
+    assert case16["case"] == 16
+    assert case16["split"] == "validation"
+    assert all(case16["selection_checks"].values())
+    assert all(case16["plan_checks"].values())
+    assert all(case16["gate_checks"].values())
+    assert case16["profile_window_contract"]["windows"] == []
+    assert case16[
+        "safe_window_absent_requires_structural_profile"
+    ] is True
+    assert case16["pair_profile_cpu_ready"] is False
+    assert case16["runtime_authorized"] is False
+    assert case16["gpu_launch_authorized"] is False
+    assert case16["label_capture_authorized"] is False
+    assert case16["dataset_conversion_authorized"] is False
+    assert case16["dataset_merge_authorized"] is False
+    assert case16["bc_authorized"] is False
+    assert case16["ppo_authorized"] is False
+    assert case16["training_started"] is False
+    assert case16["valid_for_training"] is False
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

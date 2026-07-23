@@ -9057,3 +9057,32 @@ and must state whether its candidate was accepted or rejected.
 - Continue CPU-only preparation with case 16, the second selected validation
   case, unless a separate case-23 v4 CPU conversion or case-8 runtime
   authorization is explicitly issued.
+
+## Round 235: case-16 readiness requires a structural natural-error design
+
+- Bound the second selected validation case to the exact v12 explicit-preview
+  plan and exclusive zero-residual Gate C result. Their SHA-256 identities
+  match the validation selection.
+- Preserved `896` exact source anchors and `895` transitions with separate
+  `17.548706 s` source and `26.028630 s` execution clocks.
+- The zero-residual dynamic gate passes at `0.080600/0.081492 m` position
+  p95/max and `6.030922 deg` peak pitch.
+- Unlike case 8, case 16 reaches the frozen base-linear, yaw, and proxy-rate
+  limits. Lever-arm correction saturation is `0.958736`, and no low-motion
+  interval lasts `0.10 s`.
+- Marked `safe_window_absent_requires_structural_profile=true`. Reusing the
+  case-8 external-wrench pulse is not suitable; the next design must use
+  natural tracking error with deterministic safety projection.
+- Implementation commit
+  `7957e34871b2da9f84a555bcd46576048fbee658` passes `20` focused tests
+  on macOS and `.98`, with byte-identical evidence.
+- The authoritative `.98` CPU suite passes:
+  `1265 passed, 12 skipped, 2 warnings in 161.84 s`.
+- No token, runtime, capture, conversion, dataset, BC, PPO, or training was
+  created. Goal completion remains `6/10`.
+
+## Next round after Round 235
+
+- Design a CPU-only case-16 structural natural-error corrective profile with
+  no external wrench. Prove projection, command-limit, clock, and held-out
+  validation invariants before implementing any runtime route.

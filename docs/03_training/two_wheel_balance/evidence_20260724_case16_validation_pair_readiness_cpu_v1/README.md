@@ -21,3 +21,10 @@ The next bounded task is a CPU-only structural natural-error profile that
 uses the existing trajectory error without adding an external wrench. No
 validation runtime, authorization token, capture, conversion, merge, BC, PPO,
 or training is opened.
+
+The focused case-16/case-8/status suite passes `20 passed, 2 warnings` on
+macOS and `.98`; both hosts regenerate byte-identical evidence at SHA-256
+`965230c56437ee927a02559736f4512cbe7111ba462be1eb45de45b992307e43`.
+The authoritative `.98` CPU suite passes
+`1265 passed, 12 skipped, 2 warnings in 161.84 s` at implementation commit
+`7957e34871b2da9f84a555bcd46576048fbee658`.

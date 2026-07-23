@@ -7380,3 +7380,32 @@ and must state whether its candidate was accepted or rejected.
   single case-23 capture in the already pinned fresh namespace.
 - A successful capture may be reviewed for dataset conversion; it does not
   authorize conversion, corpus merge, BC, PPO, holdout access, or cases 6/2/7.
+
+## Round 188: independent case-23 capture-route review passes
+
+- Commit `86ceb7d31b97c3e8325fe1960042112f5c16fd95` adds the independent
+  CPU review and real, non-mocked case-23 archive tests. The audit decision is
+  **GO for exactly one separately authorized capture**, not for runtime under
+  the current no-token commit and not for conversion or training.
+- A synthetic archive now traverses the actual case-23 finalizer and conversion
+  implementation. It proves exact case/split preservation, effective
+  post-supervisor targets, previous-effective-action recurrence, and continued
+  `valid_for_training=false`. The implicit case-30 conversion route rejects the
+  archive, and the case-23 finalizer rejects a case-30-labeled archive.
+- The downstream corpus code was re-audited. It still requires at least four
+  train and two validation cases, keeps the splits case-disjoint, verifies all
+  source identities, and excludes holdouts `[3, 5, 13, 19, 24]`.
+- The authoritative `.98` suite passed with `872 passed, 12 skipped,
+  2 warnings` in `82.82 s`. The no-token preflight passed again at exact clean
+  `HEAD == upstream == 86ceb7d31b97c3e8325fe1960042112f5c16fd95`.
+- The output namespace remains absent and GPU ownership remains empty. Runtime,
+  GPU, capture, dataset, BC, PPO, and training authorization all remain false.
+
+## Next round after Round 188
+
+- Stop at the authorization boundary. Do not issue a token or launch Isaac
+  unless the user explicitly authorizes exactly one case-23 corrective-label
+  capture after this review.
+- If authorized, retain every pinned identity, threshold, command, namespace,
+  and capture-only gate; consume the one-use token before Isaac and stop after
+  case 23 regardless of pass or rejection.

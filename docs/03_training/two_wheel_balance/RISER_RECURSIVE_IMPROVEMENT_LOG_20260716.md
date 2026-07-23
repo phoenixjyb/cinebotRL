@@ -7551,7 +7551,9 @@ and must state whether its candidate was accepted or rejected.
   `39a700de3985175e4e8415f1f23beef4264b103daa7ce8847f4ac0fe69f879f7`;
   audit-script SHA-256 is
   `f8bcea857b84104fb5cdbf79aab7b3681fd569aac2ff4e0bf6b6a01e75443eff`.
-  No Isaac or GPU work was started.
+  The final authoritative suite at commit `c79107b` passed
+  `890 passed, 12 skipped, 2 warnings` in `96.08 s`. No Isaac or GPU work was
+  started.
 
 ## Next round after Round 192
 

@@ -349,6 +349,13 @@ def build_report(
         decision = "supplier_response_qualified_for_bench_input_only"
 
     supplier_merge = {
+        "required_candidate": {
+            "motor_model": MOTOR_MODEL,
+            "drive_model": DRIVE_MODEL,
+            "drive_profile": "leadshine_750w_production_candidate_v1",
+            "reduction_ratio": 3.0,
+            "linear_lead_m_per_rev": 0.07,
+        },
         "evidence": {"supplier_approval_package_sha256": response_sha256},
         "supplier_evidence": {
             "vertical_mobile_axis_duty_approved": bool(
@@ -417,7 +424,10 @@ def build_report(
         "decision": decision,
         "passed": passed,
         "supplier_response_complete": complete,
-        "valid_for_bench_supplier_evidence_merge": passed,
+        "valid_for_bench_supplier_evidence_merge": False,
+        "valid_for_current_400w_bench_supplier_evidence_merge": False,
+        "valid_for_750w_bench_supplier_evidence_merge": passed,
+        "candidate_identity_match_required_before_merge": True,
         "bench_measurement_merge_fragment": supplier_merge,
         "ready_for_production_design_review": False,
         "valid_for_production_procurement": False,

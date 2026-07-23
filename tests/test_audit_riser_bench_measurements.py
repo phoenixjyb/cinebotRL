@@ -25,6 +25,16 @@ def _sources():
     return procurement, vendor
 
 
+def _production_sources():
+    procurement = json.loads(
+        MODULE.PRODUCTION_CANDIDATE_AUDIT.read_text(encoding="utf-8")
+    )
+    vendor = json.loads(
+        MODULE.PRODUCTION_VENDOR_SNAPSHOT.read_text(encoding="utf-8")
+    )
+    return procurement, vendor
+
+
 def _healthy_measurements() -> dict:
     return {
         "schema": "cinebotrl_two_wheel_riser_bench_measurements_v1",
@@ -109,6 +119,36 @@ def _report(measurements: dict) -> dict:
     return MODULE.build_report(measurements, *_sources())
 
 
+def _production_report(measurements: dict) -> dict:
+    return MODULE.build_report(measurements, *_production_sources())
+
+
+def _healthy_production_measurements() -> dict:
+    measurements = _healthy_measurements()
+    measurements["candidate"].update(
+        {
+            "motor_model": "ELVM8075V48EH-M17-HD",
+            "drive_model": "ELD2-CAN7020B",
+            "drive_profile": "leadshine_750w_production_candidate_v1",
+        }
+    )
+    measurements["configuration"].update(
+        {
+            "complete_moving_mass_kg": 8.0,
+            "measured_friction_force_n": 20.0,
+            "counterbalance_force_n": 0.0,
+        }
+    )
+    measurements["continuous_duty"].update(
+        {
+            "phase_current_rms_a": 15.0,
+            "phase_current_peak_a": 45.0,
+        }
+    )
+    measurements["emergency_stop"]["phase_current_peak_a"] = 55.0
+    return measurements
+
+
 def test_complete_healthy_measurement_reaches_review_not_procurement() -> None:
     report = _report(_healthy_measurements())
     assert report["passed"] is True
@@ -119,6 +159,64 @@ def test_complete_healthy_measurement_reaches_review_not_procurement() -> None:
     assert report["valid_for_hardware_transfer"] is False
     assert report["valid_for_training"] is False
     assert report["thresholds"]["maximum_stopping_distance_m"] == 0.12
+
+
+def test_750w_candidate_has_a_separate_passing_bench_route() -> None:
+    report = _production_report(_healthy_production_measurements())
+    assert report["passed"] is True
+    assert report["candidate_profile"] == (
+        "leadshine_750w_production_candidate_v1"
+    )
+    assert report["decision"] == "750w_candidate_ready_for_production_design_review"
+    assert report["calculated"]["measured_force_margin_ratio"] > 1.9
+    assert report["ready_for_production_design_review"] is True
+    assert report["valid_for_production_procurement"] is False
+    assert report["valid_for_hardware_transfer"] is False
+    assert report["valid_for_training"] is False
+
+
+def test_400w_and_750w_evidence_cannot_cross_candidate_routes() -> None:
+    production_on_400w = _report(_healthy_production_measurements())
+    engineering_on_750w = _production_report(_healthy_measurements())
+    for report in (production_on_400w, engineering_on_750w):
+        assert report["checks"]["candidate_motor_matches"] is False
+        assert report["checks"]["candidate_drive_matches"] is False
+        assert report["checks"]["candidate_profile_matches_source_route"] is False
+        assert report["passed"] is False
+        assert report["ready_for_production_design_review"] is False
+
+
+def test_vendor_and_force_calculation_routes_cannot_be_crossed() -> None:
+    engineering_procurement, engineering_vendor = _sources()
+    production_procurement, production_vendor = _production_sources()
+    production_with_engineering_calculation = MODULE.build_report(
+        _healthy_production_measurements(),
+        engineering_procurement,
+        production_vendor,
+    )
+    engineering_with_production_calculation = MODULE.build_report(
+        _healthy_measurements(),
+        production_procurement,
+        engineering_vendor,
+    )
+    for report in (
+        production_with_engineering_calculation,
+        engineering_with_production_calculation,
+    ):
+        assert report["checks"][
+            "candidate_calculation_profile_matches_source_route"
+        ] is False
+        assert report["passed"] is False
+
+
+def test_legacy_400w_template_profile_omission_is_candidate_bound() -> None:
+    engineering = _report(_healthy_measurements())
+    production = _production_report(_healthy_measurements())
+    assert engineering["checks"]["candidate_profile_matches_source_route"] is True
+    assert production["checks"]["candidate_profile_matches_source_route"] is False
+    assert engineering["candidate_profile"] == (
+        "leadshine_400w_engineering_sample_v1"
+    )
 
 
 def test_unmeasured_template_fails_closed() -> None:
@@ -203,6 +301,28 @@ def test_cli_template_writes_lf_rejection_without_overwrite(tmp_path: Path) -> N
     assert report["passed"] is False
     second = subprocess.run(command, check=False, capture_output=True, text=True)
     assert second.returncode != 0
+
+
+def test_cli_750w_template_uses_the_production_route(tmp_path: Path) -> None:
+    output = tmp_path / "audit-750w.json"
+    command = [
+        sys.executable,
+        str(SCRIPT),
+        "--candidate-profile",
+        "leadshine_750w_production_candidate_v1",
+        "--output",
+        str(output),
+    ]
+    result = subprocess.run(command, check=False, capture_output=True, text=True)
+    assert result.returncode == 6
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["candidate_profile"] == (
+        "leadshine_750w_production_candidate_v1"
+    )
+    assert report["checks"]["candidate_motor_matches"] is True
+    assert report["checks"]["candidate_drive_matches"] is True
+    assert report["checks"]["candidate_profile_matches_source_route"] is True
+    assert report["passed"] is False
 
 
 def test_input_mutation_does_not_change_sources() -> None:

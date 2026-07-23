@@ -1,0 +1,79 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_bench_measurements_v1",
+  "test_id": "UNMEASURED_TEMPLATE_DO_NOT_TREAT_AS_EVIDENCE",
+  "candidate": {
+    "motor_model": "ELVM8075V48EH-M17-HD",
+    "drive_model": "ELD2-CAN7020B",
+    "drive_profile": "leadshine_750w_production_candidate_v1",
+    "reduction_ratio": 3.0,
+    "linear_lead_m_per_rev": 0.07,
+    "mechanism": "supplier_qualified_guided_belt_axis_or_synchronized_telescope"
+  },
+  "evidence": {
+    "raw_log_sha256": null,
+    "force_calibration_record_sha256": null,
+    "current_calibration_record_sha256": null,
+    "temperature_calibration_record_sha256": null,
+    "position_calibration_record_sha256": null,
+    "supplier_approval_package_sha256": null,
+    "safety_test_video_sha256": null
+  },
+  "configuration": {
+    "complete_moving_mass_kg": null,
+    "measured_friction_force_n": null,
+    "counterbalance_force_n": null,
+    "mechanical_stroke_m": null,
+    "software_camera_height_min_m": null,
+    "software_camera_height_max_m": null
+  },
+  "instrumentation": {
+    "force_calibration_valid": false,
+    "current_calibration_valid": false,
+    "temperature_calibration_valid": false,
+    "position_calibration_valid": false
+  },
+  "supplier_evidence": {
+    "vertical_mobile_axis_duty_approved": false,
+    "gearbox_continuous_speed_approved": false,
+    "gearbox_emergency_braking_torque_approved": false,
+    "belt_tooth_jump_margin_approved": false
+  },
+  "continuous_duty": {
+    "duration_s": null,
+    "duty_cycle_fraction": null,
+    "commanded_speed_mps": null,
+    "minimum_achieved_speed_mps": null,
+    "phase_current_rms_a": null,
+    "phase_current_peak_a": null,
+    "dc_input_current_rms_a": null,
+    "dc_bus_voltage_max_v": null,
+    "ambient_temperature_c": null,
+    "motor_housing_temperature_max_c": null,
+    "drive_temperature_max_c": null,
+    "final_thermal_slope_c_per_min": null,
+    "no_fault_or_tooth_jump": false
+  },
+  "emergency_stop": {
+    "repetitions": null,
+    "initial_speed_abs_min_mps": null,
+    "worst_stopping_distance_m": null,
+    "phase_current_peak_a": null,
+    "dc_bus_voltage_max_v": null,
+    "no_fault_or_position_loss": false
+  },
+  "power_loss_safety": {
+    "motor_brake_hold_duration_s": null,
+    "motor_brake_hold_displacement_m": null,
+    "independent_anti_fall_installed": false,
+    "independent_anti_fall_test_count": null,
+    "independent_anti_fall_worst_catch_distance_m": null,
+    "independent_anti_fall_no_damage": false
+  },
+  "limits": {
+    "lower_hard_limit_passed": false,
+    "upper_hard_limit_passed": false,
+    "lower_absorbing_end_stop_passed": false,
+    "upper_absorbing_end_stop_passed": false,
+    "safety_rated_power_removal_passed": false
+  }
+}

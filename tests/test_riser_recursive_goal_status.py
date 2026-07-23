@@ -37,6 +37,24 @@ SUPPLIER_RESPONSE_TEMPLATE = (
     / "docs/03_training/two_wheel_balance/"
     "RISER_750W_SUPPLIER_RESPONSE_TEMPLATE_20260723.json"
 )
+BENCH_CANDIDATE_ROUTE_AUDIT = (
+    ROOT / "scripts/two_wheel_balance/audit_riser_bench_measurements.py"
+)
+BENCH_400W_TEMPLATE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "RISER_BENCH_MEASUREMENT_TEMPLATE_20260723.json"
+)
+BENCH_750W_TEMPLATE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "RISER_750W_BENCH_MEASUREMENT_TEMPLATE_20260723.json"
+)
+BENCH_750W_TEMPLATE_AUDIT = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_riser_bench_750w_template_v1/summary.json"
+)
 
 
 def _goal() -> dict:
@@ -202,6 +220,27 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     assert hardware["supplier_response_missing_fields"] == 52
     assert hardware["supplier_response_collected"] is False
     assert hardware["supplier_response_valid_for_bench_evidence_merge"] is False
+    assert (
+        hardware["supplier_response_valid_for_current_400w_bench_evidence_merge"]
+        is False
+    )
+    assert (
+        hardware["supplier_response_valid_for_750w_bench_evidence_merge"] is False
+    )
+    assert hardware["bench_candidate_route_audit_sha256"] == _sha256(
+        BENCH_CANDIDATE_ROUTE_AUDIT
+    )
+    assert hardware["bench_400w_legacy_template_sha256"] == _sha256(
+        BENCH_400W_TEMPLATE
+    )
+    assert hardware["bench_750w_template_sha256"] == _sha256(
+        BENCH_750W_TEMPLATE
+    )
+    assert hardware["bench_750w_template_audit_summary_sha256"] == _sha256(
+        BENCH_750W_TEMPLATE_AUDIT
+    )
+    assert hardware["bench_750w_measurements_collected"] is False
+    assert hardware["bench_candidate_cross_merge_rejected"] is True
     assert hardware["supplier_response_authoritative_cpu_commit"] == (
         "a48a2914c41988ae6006d210809702e487da8823"
     )

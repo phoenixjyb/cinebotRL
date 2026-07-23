@@ -7709,3 +7709,37 @@ and must state whether its candidate was accepted or rejected.
 - The separately authorized case-23 capture remains the next software runtime
   action. Supplier preparation does not authorize capture, conversion, merge,
   BC, PPO, or any GPU work.
+
+## Round 197: 400 W and 750 W bench evidence become disjoint
+
+- Re-audit found that the existing bench template and auditor were pinned to
+  the 400 W engineering sample while the new supplier response is pinned to the
+  750 W production-design candidate. The Round-196 generic merge flag could
+  therefore have encouraged an invalid cross-candidate manual merge and is now
+  superseded.
+- Added explicit candidate routes to the bench auditor. The 400 W route binds
+  the legacy motor/drive and procurement-calculation schema; the 750 W route
+  binds `ELVM8075V48EH-M17-HD`, `ELD2-CAN7020B`, its production-candidate
+  calculation summary, and an explicit
+  `leadshine_750w_production_candidate_v1` profile.
+- The historical 400 W template remains byte-identical at SHA-256
+  `ec89f0787f081df24d1db60cd114432f3210783e274283f3611e3229e31dabe6`.
+  Its omitted profile is accepted only on the fully matching legacy route.
+- Added a separate blank 750 W template with SHA-256
+  `de3c9f08f35e5a03aea63fd02c5433c1800d74cbc36662dc7b72fd6748657b9e`.
+  The supplier merge fragment now carries exact required-candidate identity;
+  generic and 400 W merge eligibility are always false.
+- Its sealed blank-template audit has SHA-256
+  `1ffc8ccae050bd152c276025e0cce842e12accc318a3661e47b4f3c9bf075ad9`,
+  passes all candidate-route identity checks, reports `34` missing physical
+  fields, and remains rejected.
+- Crossed motor/drive/profile/vendor/calculation combinations fail closed.
+  Focused candidate-routing and supplier tests pass `44/44`. Neither template
+  contains physical measurements, and procurement, hardware transfer,
+  simulation switching, runtime, GPU, BC, PPO, and training remain false.
+
+## Next round after Round 197
+
+- Run the authoritative `.98` CPU suite and seal the final route/script hashes.
+- Do not build a merge utility until it verifies the supplier fragment's exact
+  required-candidate identity against the selected 750 W bench template.

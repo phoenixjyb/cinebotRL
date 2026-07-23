@@ -388,6 +388,10 @@ SHA-256 为
 `RISER_BENCH_MEASUREMENT_TEMPLATE_20260723.json`，并由
 `audit_riser_bench_measurements.py` 审核。禁止只填结论；输入必须绑定原始日志、
 四类仪器校准记录、厂家垂直轴/减速器批准资料和安全测试视频的 SHA-256。
+该历史模板只对应 400 W 工程样机。为保持已封存输入 SHA 不变，它未增加
+`drive_profile` 字段；审核器只在电机、驱动和 400 W 力学摘要同时匹配时，把该
+旧格式解释为 `leadshine_400w_engineering_sample_v1`。不得合并 750 W
+供应商回复或台架数据。
 
 首轮工程 gate 为：
 
@@ -540,3 +544,19 @@ python3 scripts/two_wheel_balance/audit_riser_supplier_response.py \
 完整通过只产生可合并到台架测量 JSON 的 `supplier_evidence` 片段，不会自动批准
 生产采购、硬件迁移、750 W 仿真 profile、runtime、训练、BC 或 PPO。供应商回复
 通过后，仍需完成校准后的 1 m/s 连续/急停/温升/再生/防坠/限位台架。
+
+750 W 台架使用独立模板
+`RISER_750W_BENCH_MEASUREMENT_TEMPLATE_20260723.json`，审核命令必须显式选择：
+
+```bash
+python3 scripts/two_wheel_balance/audit_riser_bench_measurements.py \
+  --candidate-profile leadshine_750w_production_candidate_v1 \
+  --measurements /path/to/750w_measurements.json \
+  --output /path/to/750w_bench_audit.json
+```
+
+审核器同时绑定电机、驱动、`drive_profile`、厂家快照和力学计算摘要。400 W 与
+750 W 任意一项交叉组合都会 fail-closed。供应商审核输出中的通用
+`valid_for_bench_supplier_evidence_merge` 固定为 false；只有
+`valid_for_750w_bench_supplier_evidence_merge=true` 且
+`required_candidate` 与 750 W 台架完全一致时，才允许后续专用合并器使用。

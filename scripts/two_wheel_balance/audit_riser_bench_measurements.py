@@ -28,6 +28,42 @@ DEFAULT_VENDOR_SNAPSHOT = (
     / "docs/03_training/two_wheel_balance/"
     "RISER_VENDOR_SPEC_SNAPSHOT_20260723.json"
 )
+PRODUCTION_MEASUREMENTS = (
+    PROJECT_ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "RISER_750W_BENCH_MEASUREMENT_TEMPLATE_20260723.json"
+)
+PRODUCTION_CANDIDATE_AUDIT = (
+    PROJECT_ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_hardware_production_candidate_v1/summary.json"
+)
+PRODUCTION_VENDOR_SNAPSHOT = (
+    PROJECT_ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "RISER_PRODUCTION_CANDIDATE_VENDOR_SNAPSHOT_20260723.json"
+)
+
+CANDIDATE_PROFILES = {
+    "leadshine_400w_engineering_sample_v1": (
+        DEFAULT_MEASUREMENTS,
+        DEFAULT_PROCUREMENT_AUDIT,
+        DEFAULT_VENDOR_SNAPSHOT,
+    ),
+    "leadshine_750w_production_candidate_v1": (
+        PRODUCTION_MEASUREMENTS,
+        PRODUCTION_CANDIDATE_AUDIT,
+        PRODUCTION_VENDOR_SNAPSHOT,
+    ),
+}
+PROCUREMENT_SCHEMAS = {
+    "leadshine_400w_engineering_sample_v1": (
+        "cinebotrl_two_wheel_riser_hardware_procurement_candidate_v1"
+    ),
+    "leadshine_750w_production_candidate_v1": (
+        "cinebotrl_two_wheel_riser_hardware_production_candidate_v1"
+    ),
+}
 
 MIN_PRODUCTION_FORCE_MARGIN = 1.15
 MIN_CONTINUOUS_TEST_DURATION_S = 1800.0
@@ -85,6 +121,25 @@ def _at_least(value: Any, limit: float) -> bool:
 
 def _number_or(value: Any, fallback: float) -> float:
     return float(value) if _finite_number(value) else fallback
+
+
+def _vendor_contract(
+    vendor: Mapping[str, Any],
+) -> tuple[str, Mapping[str, Any], Mapping[str, Any]]:
+    schema = vendor.get("schema")
+    if schema == "cinebotrl_two_wheel_riser_vendor_spec_snapshot_v1":
+        return (
+            "leadshine_400w_engineering_sample_v1",
+            vendor["leadshine_motor"],
+            vendor["leadshine_drive"],
+        )
+    if schema == "cinebotrl_two_wheel_riser_production_candidate_vendor_snapshot_v1":
+        return (
+            "leadshine_750w_production_candidate_v1",
+            vendor["motor"],
+            vendor["drive"],
+        )
+    raise ValueError(f"unsupported riser vendor snapshot schema: {schema!r}")
 
 
 NUMERIC_FIELDS = (
@@ -190,8 +245,7 @@ def build_report(
         emergency_design_force_n = None
         measured_force_margin = None
 
-    motor = vendor["leadshine_motor"]
-    drive = vendor["leadshine_drive"]
+    candidate_profile, motor, drive = _vendor_contract(vendor)
     motor_rise = None
     drive_rise = None
     ambient = _get(measurements, "continuous_duty.ambient_temperature_c")
@@ -220,6 +274,17 @@ def build_report(
         == motor["model"],
         "candidate_drive_matches": _get(measurements, "candidate.drive_model")
         == drive["model"],
+        "candidate_profile_matches_source_route": (
+            _get(measurements, "candidate.drive_profile") == candidate_profile
+            or (
+                candidate_profile == "leadshine_400w_engineering_sample_v1"
+                and _get(measurements, "candidate.drive_profile") is None
+            )
+        ),
+        "candidate_calculation_profile_matches_source_route": procurement.get(
+            "schema"
+        )
+        == PROCUREMENT_SCHEMAS[candidate_profile],
         "candidate_reduction_is_3_to_1": math.isclose(
             _number_or(_get(measurements, "candidate.reduction_ratio"), 0.0), 3.0
         ),
@@ -390,10 +455,16 @@ def build_report(
     elif not passed:
         decision = "repair_failed_bench_gate_and_repeat_without_threshold_relaxation"
     else:
-        decision = "400w_candidate_ready_for_production_design_review"
+        candidate_label = (
+            "400w_candidate"
+            if candidate_profile == "leadshine_400w_engineering_sample_v1"
+            else "750w_candidate"
+        )
+        decision = f"{candidate_label}_ready_for_production_design_review"
 
     return {
         "schema": "cinebotrl_two_wheel_riser_bench_acceptance_audit_v1",
+        "candidate_profile": candidate_profile,
         "threshold_provenance": (
             "project_engineering_gate_v1_not_vendor_product_rating_or_safety_certification"
         ),
@@ -449,21 +520,34 @@ def build_report(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--measurements", type=Path, default=DEFAULT_MEASUREMENTS)
     parser.add_argument(
-        "--procurement-audit", type=Path, default=DEFAULT_PROCUREMENT_AUDIT
+        "--candidate-profile",
+        choices=tuple(CANDIDATE_PROFILES),
+        default="leadshine_400w_engineering_sample_v1",
     )
-    parser.add_argument("--vendor-snapshot", type=Path, default=DEFAULT_VENDOR_SNAPSHOT)
+    parser.add_argument("--measurements", type=Path)
+    parser.add_argument(
+        "--procurement-audit", type=Path
+    )
+    parser.add_argument("--vendor-snapshot", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    measurements = json.loads(args.measurements.read_text(encoding="utf-8"))
-    procurement = json.loads(args.procurement_audit.read_text(encoding="utf-8"))
-    vendor = json.loads(args.vendor_snapshot.read_text(encoding="utf-8"))
+    defaults = CANDIDATE_PROFILES[args.candidate_profile]
+    measurements_path = args.measurements or defaults[0]
+    procurement_path = args.procurement_audit or defaults[1]
+    vendor_path = args.vendor_snapshot or defaults[2]
+    measurements = json.loads(measurements_path.read_text(encoding="utf-8"))
+    procurement = json.loads(procurement_path.read_text(encoding="utf-8"))
+    vendor = json.loads(vendor_path.read_text(encoding="utf-8"))
     report = build_report(measurements, procurement, vendor)
+    if report["candidate_profile"] != args.candidate_profile:
+        raise ValueError(
+            "selected candidate profile does not match the vendor snapshot"
+        )
     report["inputs"] = {
-        "measurements": _identity(args.measurements),
-        "procurement_audit": _identity(args.procurement_audit),
-        "vendor_snapshot": _identity(args.vendor_snapshot),
+        "measurements": _identity(measurements_path),
+        "procurement_audit": _identity(procurement_path),
+        "vendor_snapshot": _identity(vendor_path),
     }
     if args.output.exists():
         raise FileExistsError(f"refusing to overwrite bench audit: {args.output}")

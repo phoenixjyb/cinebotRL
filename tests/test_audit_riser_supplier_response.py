@@ -10,6 +10,11 @@ import pytest
 
 ROOT = Path(__file__).parents[1]
 SCRIPT = ROOT / "scripts/two_wheel_balance/audit_riser_supplier_response.py"
+BENCH_750W_TEMPLATE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "RISER_750W_BENCH_MEASUREMENT_TEMPLATE_20260723.json"
+)
 SPEC = importlib.util.spec_from_file_location("riser_supplier_audit", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
@@ -107,8 +112,18 @@ def _report(response: dict) -> dict:
 def test_complete_response_allows_only_supplier_evidence_merge() -> None:
     report = _report(_healthy_response())
     assert report["passed"] is True
-    assert report["valid_for_bench_supplier_evidence_merge"] is True
+    assert report["valid_for_bench_supplier_evidence_merge"] is False
+    assert report["valid_for_current_400w_bench_supplier_evidence_merge"] is False
+    assert report["valid_for_750w_bench_supplier_evidence_merge"] is True
+    assert report["candidate_identity_match_required_before_merge"] is True
     assert report["decision"] == "supplier_response_qualified_for_bench_input_only"
+    assert report["bench_measurement_merge_fragment"]["required_candidate"] == {
+        "motor_model": MODULE.MOTOR_MODEL,
+        "drive_model": MODULE.DRIVE_MODEL,
+        "drive_profile": "leadshine_750w_production_candidate_v1",
+        "reduction_ratio": 3.0,
+        "linear_lead_m_per_rev": 0.07,
+    }
     assert report["bench_measurement_merge_fragment"]["evidence"][
         "supplier_approval_package_sha256"
     ] == "a" * 64
@@ -123,6 +138,16 @@ def test_complete_response_allows_only_supplier_evidence_merge() -> None:
     assert report["runtime_authorized"] is False
     assert report["bc_authorized"] is False
     assert report["ppo_authorized"] is False
+
+
+def test_supplier_merge_identity_matches_only_the_750w_bench_template() -> None:
+    report = _report(_healthy_response())
+    template = json.loads(BENCH_750W_TEMPLATE.read_text(encoding="utf-8"))
+    required = report["bench_measurement_merge_fragment"]["required_candidate"]
+    assert all(template["candidate"][key] == value for key, value in required.items())
+    assert template["candidate"]["drive_profile"] == (
+        "leadshine_750w_production_candidate_v1"
+    )
 
 
 def test_unanswered_template_fails_closed() -> None:
@@ -174,7 +199,7 @@ def test_contract_regressions_fail_closed(
     report = _report(response)
     assert report["checks"][check] is False
     assert report["passed"] is False
-    assert report["valid_for_bench_supplier_evidence_merge"] is False
+    assert report["valid_for_750w_bench_supplier_evidence_merge"] is False
 
 
 def test_holding_brake_cannot_be_dynamic_stop() -> None:

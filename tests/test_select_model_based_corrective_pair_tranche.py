@@ -2,6 +2,8 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -210,6 +212,18 @@ def test_validation_selector_chooses_two_diverse_closed_cases(tmp_path) -> None:
     assert result["bc_authorized"] is False
     assert result["ppo_authorized"] is False
     assert result["valid_for_training"] is False
+
+
+def test_validation_selector_cli_imports_from_an_unrelated_cwd(tmp_path) -> None:
+    result = subprocess.run(
+        [sys.executable, str(VALIDATION_SCRIPT), "--help"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--dynamic-selection" in result.stdout
 
 
 def test_validation_selector_rejects_insufficient_dynamic_candidates(

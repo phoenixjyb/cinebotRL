@@ -6,9 +6,14 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 from typing import Any, Mapping
 
 import numpy as np
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.two_wheel_balance.select_model_based_corrective_pair_tranche import (
     FEATURE_NAMES,

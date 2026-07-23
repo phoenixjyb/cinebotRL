@@ -1,0 +1,58 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case6_pair_contract_cpu_evidence_v1",
+  "case": 6,
+  "implementation_commit": "10bb5db127efdcff5518f530c5bf3d54ab509be8",
+  "reviewed_parent_commit": "4078d8fa7c50ea2340b0be3e31a84b038a3fde11",
+  "namespace": "20260724_model_based_corrective_teacher_case6_pair_v1_exclusive",
+  "contract": {
+    "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case6_pair_contract_v1.json",
+    "sha256": "664be51b4b0504292e35a3dc0d227abcc6de99bf07a141d307d7ae9232eb1c70",
+    "git_blob_sha1": "73c170a88464f3077fae517b849a2bc447eb83fe"
+  },
+  "preflight": {
+    "macos_passed": true,
+    "macos_admission_sha256": "5ce9009d6fb0af6ee4e386eaa56e3234f21373cb58282d44b3305ce97838d1a1",
+    "host_98_passed": true,
+    "host_98_admission_sha256": "abcb04b65af868b1b5637a0e03167deaf546bbc430b9adaf4237e92ff9bf3c9b",
+    "identity_count": 17,
+    "failed_checks": []
+  },
+  "execute_probe": {
+    "exit_code": 4,
+    "reason": "runtime_authorization_not_issued",
+    "python_started": false,
+    "isaac_started": false,
+    "runtime_started": false,
+    "namespace_created": false
+  },
+  "tests": {
+    "macos_focused": {
+      "passed": 26,
+      "warnings": 2
+    },
+    "host_98_focused": {
+      "passed": 26,
+      "warnings": 2,
+      "duration_s": 9.54
+    },
+    "host_98_full": {
+      "passed": 1133,
+      "skipped": 12,
+      "warnings": 2,
+      "duration_s": 123.36
+    }
+  },
+  "cpu_contract_ready": true,
+  "runtime_route_contract_ready": true,
+  "execution_route_complete": false,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "authorization_token_issued": false,
+  "label_capture_authorized": false,
+  "dataset_creation_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

@@ -8663,3 +8663,41 @@ and must state whether its candidate was accepted or rejected.
   contract and CPU validator. Do not issue a token or launch Isaac.
 - The nearest actual data-path action remains the separately authorized
   case-23 v4 CPU conversion.
+
+## Round 224: case-6 paired-canary contract is fail-closed
+
+- Added a canonical, hash-bound case-6 paired-canary contract and CPU
+  validator. The contract pins `17` identities covering the selected plan,
+  readiness and profile evidence, profiles, provisional `28 kg` gains, robot
+  assets, playback, and corrective/perturbation runtime code.
+- The committed contract contains no usable authorization:
+  `runtime_authorization_token_sha256=""`, `authorization_token_issued=false`,
+  `runtime_authorized=false`, and `gpu_launch_authorized=false`.
+- The wrapper exposes CPU preflight only. Its `--execute` path rejects with
+  `runtime_authorization_not_issued` before Python or Isaac and cannot create
+  the reserved runtime namespace.
+- The evidence contract explicitly records
+  `runtime_route_contract_ready=true` separately from
+  `execution_route_complete=false`. CPU readiness therefore cannot be
+  presented as an executable canary.
+- Implementation commit
+  `10bb5db127efdcff5518f530c5bf3d54ab509be8` passes `26` focused tests on
+  macOS and `.98`. Both hosts validate all `17` identities with no failed
+  checks.
+- The authoritative `.98` CPU suite passes:
+  `1133 passed, 12 skipped, 2 warnings in 123.36 s`.
+- Evidence is preserved under
+  `evidence_20260724_case6_pair_contract_cpu_v1/`. The contract SHA-256 is
+  `664be51b4b0504292e35a3dc0d227abcc6de99bf07a141d307d7ae9232eb1c70`.
+- No token, runtime namespace, Isaac process, GPU workload, label capture,
+  dataset creation, BC, PPO, or training was created. Goal completion remains
+  `6/10`.
+
+## Next round after Round 224
+
+- The nearest actual data-path action remains exactly one separately
+  authorized case-23 v4 CPU conversion. The consumed capture authorization
+  cannot authorize that conversion.
+- Case 6 may advance only through a separate CPU-only implementation of the
+  paired-result finalizer and guarded execution route. That work must remain
+  tokenless and must not launch Isaac until separately reviewed and authorized.

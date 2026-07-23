@@ -7737,9 +7737,14 @@ and must state whether its candidate was accepted or rejected.
   Focused candidate-routing and supplier tests pass `44/44`. Neither template
   contains physical measurements, and procurement, hardware transfer,
   simulation switching, runtime, GPU, BC, PPO, and training remain false.
+- The authoritative `.98` Windows-Python suite at implementation commit
+  `681977133fc8c07e790f8c43832f3e06f0dbde42` passes
+  `921 passed, 12 skipped, 2 warnings` in `85.84 s`.
 
 ## Next round after Round 197
 
-- Run the authoritative `.98` CPU suite and seal the final route/script hashes.
 - Do not build a merge utility until it verifies the supplier fragment's exact
   required-candidate identity against the selected 750 W bench template.
+- Runtime progress still requires the separate case-23 corrective-label capture
+  authorization; hardware progress requires a signed 750 W supplier response
+  or real calibrated bench data.

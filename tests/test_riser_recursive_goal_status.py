@@ -242,10 +242,16 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     assert hardware["bench_750w_measurements_collected"] is False
     assert hardware["bench_candidate_cross_merge_rejected"] is True
     assert hardware["supplier_response_authoritative_cpu_commit"] == (
-        "a48a2914c41988ae6006d210809702e487da8823"
+        "681977133fc8c07e790f8c43832f3e06f0dbde42"
     )
     assert hardware["supplier_response_authoritative_cpu_suite"] == (
-        "915_passed_12_skipped_2_warnings_in_78.56s"
+        "921_passed_12_skipped_2_warnings_in_85.84s"
+    )
+    assert hardware["bench_candidate_route_authoritative_cpu_commit"] == (
+        "681977133fc8c07e790f8c43832f3e06f0dbde42"
+    )
+    assert hardware["bench_candidate_route_authoritative_cpu_suite"] == (
+        "921_passed_12_skipped_2_warnings_in_85.84s"
     )
     assert hardware["ready_for_production_design_review"] is False
     assert hardware["valid_for_production_procurement"] is False

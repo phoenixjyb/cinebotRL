@@ -1,0 +1,277 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case7_pair_profile_proposal_cpu_v1",
+  "case": 7,
+  "split": "train",
+  "input_checks": {
+    "readiness_schema": true,
+    "readiness_case": true,
+    "readiness_passed": true,
+    "readiness_requires_case_profile": true,
+    "readiness_has_low_motion_window": true,
+    "readiness_forbids_case23_reuse": true,
+    "readiness_forbids_case6_reuse": true,
+    "readiness_forbids_case2_reuse": true,
+    "readiness_not_profile_ready": true,
+    "readiness_closed": true,
+    "readiness_plan_hash": true,
+    "plan_schema_case": true,
+    "plan_integrity": true,
+    "plan_kinematic_gate": true,
+    "normalized_envelope": true
+  },
+  "shape_checks": {
+    "state_arrays": true,
+    "transition_arrays": true,
+    "finite": true,
+    "clocks": true,
+    "source_anchor_map": true
+  },
+  "formula_checks": {
+    "retained_raw_envelope": true,
+    "normalized_policy_margin": true,
+    "slew_horizon": true,
+    "pulse_source_samples": true,
+    "recovery_tail": true,
+    "base_residual_headroom": true,
+    "yaw_residual_headroom": true,
+    "riser_target_headroom": true,
+    "proxy_motion_headroom": true,
+    "full_plan_base_yaw_unclipped": true,
+    "full_plan_riser_clipping_bounded": true,
+    "pulse_window_projection_unclipped": true,
+    "projection_contractive": true,
+    "effective_normalized_margin": true,
+    "plant_mass": true,
+    "pulse_impulse_envelope": true,
+    "pulse_observable_lower_bound": true
+  },
+  "identities": {
+    "readiness": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case7_pair_readiness_cpu_v1/summary.json",
+      "sha256": "8652d92eaf8196d77bc3aab33e011029008b0ebdc3b31d035dda29417d2a3df1"
+    },
+    "plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case7_pair_readiness_cpu_v1/source/case_0007_smoothed_riser_plan_v1.npz",
+      "sha256": "a83934dab6e4293cd830397d3c2ffb41d4f4d78545dddec7fdfa630fa0d22f41"
+    },
+    "plant_prior": {
+      "path": "docs/03_training/two_wheel_balance/PLANT_PRIOR_PROVISIONAL_V1.json",
+      "sha256": "9c6268ab0f13d5487a41d31b011eb9ac735b0dcf01769752389972304e12762c"
+    },
+    "safety_projection_source": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_residual_dataset.py",
+      "sha256": "b0efa4b9199c6b48e48c98ebc507b07e404c71d21c378a770c9056b4d19008a0"
+    },
+    "corrective_profile": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_profile_v1.json",
+      "sha256": "adaacdf25fc8255cc3ff1bf61a9c5c76cc4c8460e83a70e9058daafa9fffc75f"
+    },
+    "wrench_profile": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_wrench_profile_v1.json",
+      "sha256": "0b00bb54bd8ef668417fa80a70bc7ccbe30aa5566278e52dec3b7ade45859e72"
+    }
+  },
+  "source_execution_clock_contract": {
+    "source_state_count": 663,
+    "transition_count": 662,
+    "source_duration_s": 12.940941,
+    "execution_duration_s": 18.1173174,
+    "source_anchor_map_exact": true
+  },
+  "profile_formula": {
+    "policy_residual_scales": [
+      0.05,
+      0.05,
+      0.02
+    ],
+    "observed_normalized_raw_envelope": [
+      0.7666128584580739,
+      0.4030883700031987,
+      0.12628383956008626
+    ],
+    "observed_raw_residual_envelope": [
+      0.038330642922903696,
+      0.020154418500159935,
+      0.0025256767912017254
+    ],
+    "retention_fraction": 0.5,
+    "maximum_residuals": [
+      0.019165321461451848,
+      0.010077209250079967,
+      0.0012628383956008627
+    ],
+    "slew_horizon_s": 0.35,
+    "maximum_slew_rates": [
+      0.05475806131843385,
+      0.028792026428799907,
+      0.0036081097017167506
+    ]
+  },
+  "pulse_window": {
+    "window_index": 1,
+    "window_start_index": 27,
+    "window_end_index": 125,
+    "pulse_start_index": 92,
+    "pulse_start_phase_time_s": 2.851306269086607,
+    "pulse_nominal_end_phase_time_s": 2.951306269086607,
+    "pulse_source_sample_count": 4,
+    "recovery_tail_s": 15.166011130913393,
+    "local_maximums": [
+      0.29987049772727103,
+      0.005598014687800821,
+      0.01386714206539824,
+      0.009330357069827119
+    ],
+    "local_headroom": [
+      0.10012950227272899,
+      0.3944019853121992,
+      0.9861328579346018,
+      0.40954866340881196
+    ],
+    "local_riser_target_range_m": [
+      0.070214265787641,
+      0.07132258139984841
+    ],
+    "local_riser_target_headroom_m": 0.070214265787641,
+    "selection_key": [
+      0.749676244,
+      0.7998130098302089,
+      2.851306269086607
+    ],
+    "pulse_duration_steps": 20,
+    "pulse_duration_s_at_policy_rate": 0.1
+  },
+  "projection_envelope": {
+    "full_plan": {
+      "command_lower_bounds": [
+        -0.4,
+        -0.4,
+        0.0
+      ],
+      "command_upper_bounds": [
+        0.4,
+        0.4,
+        1.2
+      ],
+      "directions": {
+        "negative": {
+          "requested_residual": [
+            -0.019165321461451848,
+            -0.010077209250079967,
+            -0.0012628383956008627
+          ],
+          "command_clipped_transition_count": [
+            0,
+            0,
+            4
+          ],
+          "effective_residual_abs_max": [
+            0.019165321461451862,
+            0.010077209250079988,
+            0.0012628383956008737
+          ],
+          "projection_is_contractive": true
+        },
+        "positive": {
+          "requested_residual": [
+            0.019165321461451848,
+            0.010077209250079967,
+            0.0012628383956008627
+          ],
+          "command_clipped_transition_count": [
+            0,
+            0,
+            0
+          ],
+          "effective_residual_abs_max": [
+            0.019165321461451862,
+            0.010077209250079988,
+            0.0012628383956008737
+          ],
+          "projection_is_contractive": true
+        }
+      },
+      "all_requested_commands_unclipped": false,
+      "all_projections_contractive": true
+    },
+    "pulse_window": {
+      "command_lower_bounds": [
+        -0.4,
+        -0.4,
+        0.0
+      ],
+      "command_upper_bounds": [
+        0.4,
+        0.4,
+        1.2
+      ],
+      "directions": {
+        "negative": {
+          "requested_residual": [
+            -0.019165321461451848,
+            -0.010077209250079967,
+            -0.0012628383956008627
+          ],
+          "command_clipped_transition_count": [
+            0,
+            0,
+            0
+          ],
+          "effective_residual_abs_max": [
+            0.019165321461451834,
+            0.010077209250079967,
+            0.0012628383956008599
+          ],
+          "projection_is_contractive": true
+        },
+        "positive": {
+          "requested_residual": [
+            0.019165321461451848,
+            0.010077209250079967,
+            0.0012628383956008627
+          ],
+          "command_clipped_transition_count": [
+            0,
+            0,
+            0
+          ],
+          "effective_residual_abs_max": [
+            0.019165321461451834,
+            0.010077209250079967,
+            0.0012628383956008599
+          ],
+          "projection_is_contractive": true
+        }
+      },
+      "all_requested_commands_unclipped": true,
+      "all_projections_contractive": true
+    },
+    "effective_normalized_action_abs_max": 0.38330642922903724,
+    "label_contract": "effective_post_supervisor_residual_only"
+  },
+  "pulse_lower_model": {
+    "total_mass_kg": 28.0,
+    "impulse_ns": 2.0,
+    "application_moment_impulse_nms": 1.0,
+    "ideal_free_body_delta_velocity_mps": 0.07142857142857142,
+    "ideal_free_body_displacement_during_pulse_m": 0.003571428571428572,
+    "limitation": "observability and envelope screen only; not a prediction of closed-loop Isaac response"
+  },
+  "case23_profile_reuse_authorized": false,
+  "case6_profile_reuse_authorized": false,
+  "case2_profile_reuse_authorized": false,
+  "pair_profile_cpu_ready": true,
+  "runtime_route_implemented": false,
+  "authorization_token_issued": false,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "next_bounded_action": "implement_case7_pair_runtime_contract_cpu_only_without_authorization",
+  "passed": true
+}

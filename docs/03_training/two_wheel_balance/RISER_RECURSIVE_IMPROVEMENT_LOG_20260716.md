@@ -7308,3 +7308,42 @@ and must state whether its candidate was accepted or rejected.
 - The next runtime measurement remains exactly one separately authorized
   case-23 paired canary. A pass opens a separate capture review only; it does
   not authorize corpus construction or BC.
+
+## Round 186: case-23 paired corrective target passed
+
+- User authorization was implemented as a one-use, mode-`0600`, SHA-256-bound
+  token at exact runtime commit
+  `d77a1d494be79e442798e34368d865de1cf7ce25`. The token was consumed before
+  Isaac and the fresh namespace was
+  `20260723_model_based_corrective_teacher_case23_pair_v1_exclusive`.
+- The authorization commit passed the authoritative `.98` CPU suite with
+  `862 passed, 12 skipped, 2 warnings` in `93.61 s`. The additional Windows
+  skip is the expected POSIX token-mode test; WSL token mode, hash, non-symlink,
+  canonical contract, clean HEAD/upstream, and exclusive GPU checks all passed
+  before launch.
+- Baseline ran first and passed all unchanged dynamic gates with `3,273` steps,
+  position p95/max `0.0593848022 / 0.0740444738 m`, and zero learned residual.
+  Only then did the wrapper launch the single candidate.
+- Candidate passed with the same `3,273` steps and position p95/max
+  `0.0534133640 / 0.0679118294 m`. P95 improved by `0.0059714383 m`
+  (`10.055499%`), exceeding both the `0.003 m` and `2%` admission thresholds.
+- Every no-regression check passed: position max, attitude max, pitch, riser
+  error, saturation, same plan/seed/clocks, deterministic perturbation, and
+  dynamic quality. GPU release also passed.
+- Final status SHA-256 is
+  `67c8e99a0629a4b1cb4a2981abfe8360c5d9979c4757582dab6d4fb22cd00deb`;
+  baseline/candidate SHA-256 identities are
+  `b2c4ef1f3bb39086e6bcaf015c10b8f9740c5497030f38321dfb4836b90ace72`
+  and
+  `130da066f623eb588790fe2467ba44ee1f6918a69841bdeb328b28635c708474`.
+- No labels, capture, normalized dataset, corpus, BC, PPO, policy rollout, or
+  training were authorized or created. The pass opens only a separate case-23
+  corrective-capture review.
+
+## Next round after Round 186
+
+- Build and review a case-23 capture-only contract bound to this exact passed
+  pair, the case-23 plan/profile, effective post-supervisor label semantics,
+  and a fresh namespace. Do not reuse the consumed pair token.
+- Do not launch capture until separately authorized. Conversion, corpus merge,
+  BC, PPO, holdouts, and cases 6/2/7 remain closed.

@@ -1,0 +1,151 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_case23_pair_final_v1",
+  "runtime_commit": "d77a1d494be79e442798e34368d865de1cf7ce25",
+  "namespace": "20260723_model_based_corrective_teacher_case23_pair_v1_exclusive",
+  "case": 23,
+  "split": "train",
+  "baseline_exit_code": 0,
+  "candidate_exit_code": 0,
+  "rollout_checks": {
+    "baseline_exit_zero": true,
+    "candidate_exit_zero": true,
+    "baseline_single_case": true,
+    "candidate_single_case": true,
+    "baseline_source": true,
+    "candidate_source": true,
+    "model_based_command_base": true,
+    "residual_scales": true,
+    "baseline_zero_action": true,
+    "candidate_profile_present": true,
+    "baseline_profile_absent": true,
+    "same_perturbation_profile": true,
+    "both_perturbations_exact": true,
+    "perturbation_passed": true,
+    "baseline_capture_closed": true,
+    "candidate_capture_closed": true,
+    "candidate_labels_not_captured": true,
+    "baseline_heartbeat": true,
+    "candidate_heartbeat": true,
+    "gpu_released": true
+  },
+  "contract_checks": {
+    "namespace": true,
+    "case_split": true,
+    "runtime_commit": true,
+    "admission_passed": true,
+    "runtime_authorized": true,
+    "label_capture_closed": true,
+    "dataset_closed": true,
+    "training_closed": true,
+    "contract_identity": true
+  },
+  "baseline_metrics": {
+    "case": 23,
+    "split": "train",
+    "plan_sha256": "ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6",
+    "physics_seed": 20260739,
+    "source_duration_s": 9.929694,
+    "execution_duration_s": 9.929693999999989,
+    "dynamic_quality_passed": true,
+    "position_error_p95_m": 0.05938480224396858,
+    "position_error_max_m": 0.07404447375945557,
+    "attitude_error_max_deg": 0.26164860068542717,
+    "pitch_max_deg": 5.642023122375673,
+    "riser_error_max_m": 0.010982123832260715,
+    "action_saturation_ratio": 0.0012221203788573174,
+    "normalized_residual_action_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "dataset_created": false,
+    "training_started": false,
+    "ppo_started": false
+  },
+  "candidate_metrics": {
+    "case": 23,
+    "split": "train",
+    "plan_sha256": "ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6",
+    "physics_seed": 20260739,
+    "source_duration_s": 9.929694,
+    "execution_duration_s": 9.929693999999989,
+    "dynamic_quality_passed": true,
+    "position_error_p95_m": 0.053413363967263365,
+    "position_error_max_m": 0.06791182937654126,
+    "attitude_error_max_deg": 0.25788286862915066,
+    "pitch_max_deg": 5.642537520997539,
+    "riser_error_max_m": 0.00983688018754636,
+    "action_saturation_ratio": 0.0012221203788573174,
+    "normalized_residual_action_abs_max": [
+      0.21678735971450805,
+      0.08447515457868575,
+      0.28423507064580916
+    ],
+    "dataset_created": false,
+    "training_started": false,
+    "ppo_started": false
+  },
+  "paired_admission": {
+    "schema": "cinebotrl_two_wheel_riser_corrective_target_pair_admission_v1",
+    "contract": "same_seed_paired_dynamic_improvement_before_label_capture_v1",
+    "case": 23,
+    "split": "train",
+    "position_p95_absolute_improvement_m": 0.005971438276705217,
+    "position_p95_relative_improvement": 0.10055499136248629,
+    "checks": {
+      "same_case_plan_seed_and_clocks": true,
+      "training_split_only": true,
+      "baseline_dynamic_quality": true,
+      "candidate_dynamic_quality": true,
+      "baseline_zero_residual": true,
+      "candidate_nonzero_bounded_residual": true,
+      "minimum_position_p95_improvement": true,
+      "position_max_not_regressed": true,
+      "attitude_max_not_regressed": true,
+      "pitch_not_regressed": true,
+      "riser_not_regressed": true,
+      "saturation_not_regressed": true,
+      "no_dataset_or_training": true
+    },
+    "corrective_target_admission_passed": true,
+    "label_capture_authorized": false,
+    "dataset_created": false,
+    "bc_authorized": false,
+    "ppo_authorized": false,
+    "training_started": false,
+    "valid_for_training": false
+  },
+  "baseline": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_teacher_case23_pair_v1_exclusive\\baseline\\case_0023.json",
+    "sha256": "b2c4ef1f3bb39086e6bcaf015c10b8f9740c5497030f38321dfb4836b90ace72"
+  },
+  "candidate": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_teacher_case23_pair_v1_exclusive\\candidate\\case_0023.json",
+    "sha256": "130da066f623eb588790fe2467ba44ee1f6918a69841bdeb328b28635c708474"
+  },
+  "baseline_heartbeat": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_teacher_case23_pair_v1_exclusive\\baseline\\runtime_heartbeat.json",
+    "sha256": "fd2086fe3ccb055b00101b3f03630aefa269be60762727d73a9c8dfea114020c"
+  },
+  "candidate_heartbeat": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_teacher_case23_pair_v1_exclusive\\candidate\\runtime_heartbeat.json",
+    "sha256": "a026578249f53424ddb6ec40c16fbea31e0111f6305d219ff98fba4b3a32ddec"
+  },
+  "admission": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_teacher_case23_pair_v1_exclusive\\admission.json",
+    "sha256": "2c159e802d829a134683060ad19edec1f68ce88018291b5fdf49f7230ea971d6"
+  },
+  "contract": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_teacher_case23_pair_v1_exclusive\\contract.json",
+    "sha256": "e5b5b360efdb0334412fb156d77dba7e0a6eb605651c16bffc280a8076caa043"
+  },
+  "dynamic_pair_completed": true,
+  "corrective_target_admission_passed": true,
+  "label_capture_authorized": false,
+  "dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

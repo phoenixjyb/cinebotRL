@@ -65,6 +65,11 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["next_case"] == 23
     assert corrective["case23_pair_cpu_ready"] is True
     assert corrective["case23_pair_runtime_authorized"] is False
+    assert corrective["case23_pair_executed"] is True
+    assert corrective["case23_pair_passed"] is True
+    assert corrective["case23_position_p95_improvement_m"] > 0.003
+    assert corrective["case23_position_p95_improvement_fraction"] > 0.02
+    assert corrective["case23_capture_review_ready"] is True
     assert corrective["case23_capture_authorized"] is False
     assert corrective["case23_conversion_authorized"] is False
     assert corrective["case30_valid_for_training"] is False
@@ -92,9 +97,7 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "exactly_one_baseline_first_same_seed_case23_pair" in goal[
-        "next_iteration"
-    ]["required_change"]
+    assert "case23_capture_only_contract" in goal["next_iteration"]["required_change"]
 
 
 def test_hardware_status_remains_measurement_blocked() -> None:

@@ -340,6 +340,18 @@
         "case23_capture_v4_evidence_commit": "8e3ea24482cb03eefcc0d55e3acfc0846148d196",
         "case23_capture_v4_normalized_mode_commit": "46370ecf03957b6921c9dd93bff86ae1cdf54df1",
         "case23_capture_v4_post_runtime_authoritative_cpu_suite": "1082_passed_12_skipped_2_warnings_in_114.24s",
+        "case23_capture_v4_conversion_review_schema": "cinebotrl_two_wheel_riser_case23_conversion_readiness_v1",
+        "case23_capture_v4_conversion_review_implementation_commit": "e1cda20a2c75bc9acfa6a6ad56d3006dff480f7e",
+        "case23_capture_v4_conversion_review_windows_git_fix_commit": "dfeb84b9e1def0ae41b2e1bfe7f32efa8dbd1a95",
+        "case23_capture_v4_conversion_review_contract_sha256": "58d358b546094c547a995c1fd336d9b750ce94bb734e481e28d8c65022d5f4a5",
+        "case23_capture_v4_conversion_reviewer_sha256": "ad15472f7e10429c7fe451447bb2125aee658ec2f1b1997578ddd6ab04df5989",
+        "case23_capture_v4_conversion_review_sha256": "d1d18672aa3c5922d04d55df49a903051e395328ca2828c39b538dc28581f270",
+        "case23_capture_v4_conversion_review_passed": true,
+        "case23_capture_v4_conversion_review_output_created": false,
+        "case23_capture_v4_conversion_review_sample_count": 3273,
+        "case23_capture_v4_conversion_review_observation_shape": [3273, 65],
+        "case23_capture_v4_conversion_review_clipped_rows": [0, 0, 0],
+        "case23_capture_v4_conversion_review_previous_rows_changed": 0,
         "case23_capture_v4_conversion_authorized": false,
         "temporal_projection_audit_sha256": "349e61367603d1945774edfc7839040a6eaef66261991425eeeb43bc4a561c47",
         "temporal_projection_contract": "model_based_residual_safety_projection_v1",
@@ -582,7 +594,7 @@
         "authoritative_windows_cpu_suite": "1082_passed_12_skipped_2_warnings_in_113.60s"
       },
       "completion_gap": [
-        "separately_review_and_convert_the_passed_case23_v4_capture",
+        "separately_authorize_and_convert_the_reviewed_case23_v4_capture",
         "dynamically_admit_and_convert_multiple_diverse_model_based_corrective_cases",
         "run_separately_authorized_pairs_and_captures_for_validation_cases_8_and_16",
         "populate_the_implemented_case_disjoint_corpus_with_at_least_4_train_and_2_validation_cases",
@@ -600,10 +612,10 @@
     "accepted_evidence": "docs/03_training/two_wheel_balance/RISER_RECURSIVE_IMPROVEMENT_LOG_20260716.md"
   },
   "next_iteration": {
-    "hypothesis": "the_passing_hash_bound_case23_v4_archive_can_be_converted_cpu_only_into_one_case23_train_split_dataset_without_changing_labels_clocks_or_identity_and_without_opening_training",
-    "required_change": "perform_a_separate_hash_bound_case23_v4_conversion_review_before_any_conversion_then_reopen_and_validate_the_result",
+    "hypothesis": "the_cpu_reviewed_case23_v4_archive_can_be_converted_once_into_one_case23_train_split_dataset_without_changing_labels_clocks_or_identity_and_without_opening_training",
+    "required_change": "require_a_new_separate_explicit_authorization_then_execute_exactly_one_case23_v4_cpu_conversion_and_reopen_the_output",
     "success_path": "case23_becomes_the_second_admitted_case_dataset_then_the_diverse_train_tranche_continues_with_case6_case2_and_case7",
     "rejection_path": "preserve_the_passing_raw_capture_without_modification_and_reject_conversion_if_any_schema_clock_identity_or_projection_check_fails",
-    "stop_rule": "the_consumed_v4_authorization_does_not_authorize_conversion_corpus_merge_bc_ppo_holdout_or_any_additional_runtime_case"
+    "stop_rule": "no_case23_v4_conversion_authorization_exists_and_the_consumed_capture_authorization_does_not_authorize_conversion_corpus_merge_bc_ppo_holdout_or_any_additional_runtime_case"
   }
 }

@@ -58,6 +58,21 @@ CASE23_CAPTURE_V4_ARCHIVE = (
     CASE23_CAPTURE_V4_EVIDENCE
     / "capture/case_0023_corrective_teacher_capture_v2.npz"
 )
+CASE23_CONVERSION_REVIEW = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_case23_corrective_conversion_review_v1/summary.json"
+)
+CASE23_CONVERSION_REVIEW_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_case23_conversion_review_contract_v1.json"
+)
+CASE23_CONVERSION_REVIEWER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "audit_model_based_corrective_case23_conversion_readiness.py"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -347,6 +362,31 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert final["ppo_authorized"] is False
     assert final["training_started"] is False
     assert final["valid_for_training"] is False
+    assert corrective["case23_capture_v4_conversion_review_passed"] is True
+    assert (
+        corrective["case23_capture_v4_conversion_review_sha256"]
+        == _sha256(CASE23_CONVERSION_REVIEW)
+    )
+    assert (
+        corrective["case23_capture_v4_conversion_review_contract_sha256"]
+        == _sha256(CASE23_CONVERSION_REVIEW_CONTRACT)
+    )
+    assert corrective["case23_capture_v4_conversion_reviewer_sha256"] == _sha256(
+        CASE23_CONVERSION_REVIEWER
+    )
+    review = json.loads(CASE23_CONVERSION_REVIEW.read_text())
+    assert review["case"] == 23
+    assert review["split"] == "train"
+    assert review["passed"] is True
+    assert review["prospective_case_dataset_valid_for_merge"] is True
+    assert review["prospective_dataset_metrics"]["sample_count"] == 3273
+    assert review["output_created"] is False
+    assert review["conversion_authorized"] is False
+    assert review["merged_dataset_created"] is False
+    assert review["bc_authorized"] is False
+    assert review["ppo_authorized"] is False
+    assert review["training_started"] is False
+    assert review["valid_for_training"] is False
     assert corrective["case23_capture_v4_conversion_authorized"] is False
     assert json.loads(CASE23_CAPTURE_V4_CPU_REVIEW.read_text())["passed"] is True
     assert corrective["temporal_projection_audit_sha256"] == _sha256(
@@ -559,7 +599,9 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "case23_v4_conversion_review" in goal["next_iteration"]["required_change"]
+    assert "exactly_one_case23_v4_cpu_conversion" in (
+        goal["next_iteration"]["required_change"]
+    )
 
 
 def test_hardware_status_remains_measurement_blocked() -> None:

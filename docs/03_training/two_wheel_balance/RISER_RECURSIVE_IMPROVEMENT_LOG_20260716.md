@@ -8455,3 +8455,34 @@ and must state whether its candidate was accepted or rejected.
 - A successful conversion would make case 23 the second admitted case dataset;
   it would not authorize cases 6/2/7, validation 8/16, corpus merge, BC, PPO,
   holdout, or learned-policy runtime.
+
+## Round 218: case-23 v4 conversion is reviewed without writing output
+
+- Added a hash-bound case-23 conversion review contract and reviewer. They pin
+  the passed capture/final status/gate/admission/capture contract, converter,
+  dataset/capture modules, reviewed parent, case/split, and the sole prospective
+  output path.
+- The first `.98` attempt correctly failed before source review because Windows
+  Python could not use Windows Git against the WSL-mounted repository. Commit
+  `dfeb84b9e1def0ae41b2e1bfe7f32efa8dbd1a95` delegates only repository
+  provenance queries to WSL Git while retaining Windows NumPy conversion
+  validation.
+- Canonical no-write preflight passes at clean synchronized `dfeb84b`: all
+  repository, contract, identity, source, effective-label, previous-action,
+  non-history observation, case-ID, and three-clock checks are true.
+- The prospective dataset is `3273 x 65`; action maxima are
+  `[0.216787, 0.084475, 0.284235]`, no rows are clipped, and the source already
+  has exact effective previous-action recurrence, so zero history rows would
+  change.
+- Review evidence is preserved under
+  `evidence_20260723_case23_corrective_conversion_review_v1/` at SHA-256
+  `d1d18672aa3c5922d04d55df49a903051e395328ca2828c39b538dc28581f270`.
+  No converted output, corpus merge, BC, PPO, or training was created.
+
+## Next round after Round 218
+
+- A new explicit authorization is required for exactly one CPU-only case-23 v4
+  conversion. Reopen and independently validate the produced archive before
+  admitting case 23 as the second case dataset.
+- The capture authorization is consumed and does not authorize conversion,
+  cases 6/2/7, validation 8/16, corpus merge, BC, PPO, holdout, or runtime.

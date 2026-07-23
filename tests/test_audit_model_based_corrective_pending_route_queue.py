@@ -24,10 +24,21 @@ EVIDENCE_V2 = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_pending_corrective_route_queue_cpu_v2"
 )
+EVIDENCE_V3 = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_pending_corrective_route_queue_cpu_v3"
+)
 CASE23_PREFLIGHT_V3 = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_case23_corrective_conversion_execution_cpu_v3/"
+    "summary.json"
+)
+CASE23_PREFLIGHT_V4 = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case23_corrective_conversion_execution_cpu_v4/"
     "summary.json"
 )
 
@@ -175,6 +186,50 @@ def test_committed_v2_queue_binds_current_closed_preflights() -> None:
     for field in MODULE.FALSE_FIELDS:
         if field in result:
             assert result[field] is False
+
+
+def test_committed_v3_queue_refreshes_head_without_route_identity_drift() -> None:
+    old = json.loads((EVIDENCE_V2 / "summary.json").read_text())
+    result = json.loads((EVIDENCE_V3 / "summary.json").read_text())
+    assert result["passed"] is True
+    assert result["git"]["head"] == "a8a7533642694dfb05c7a999803ebd95fed456fc"
+    assert result["git"]["upstream"] == result["git"]["head"]
+    assert result["ready_route_count"] == 6
+    assert result["execution_order"] == [
+        "case23_conversion",
+        "case6_pair",
+        "case2_pair",
+        "case7_pair",
+        "case8_validation_pair",
+        "case16_validation_pair",
+    ]
+    assert result["next_bounded_action"] == (
+        "authorize_exactly_one_case23_v4_cpu_conversion"
+    )
+    old_routes = {row["key"]: row for row in old["routes"]}
+    for route in result["routes"]:
+        path = EVIDENCE_V3 / "preflights" / f"{route['key']}.json"
+        payload = path.read_bytes()
+        preflight = json.loads(payload)
+        old_preflight = json.loads(
+            (
+                EVIDENCE_V2 / "preflights" / f"{route['key']}.json"
+            ).read_text()
+        )
+        assert hashlib.sha256(payload).hexdigest() == route["preflight"]["sha256"]
+        assert route["passed"] is True
+        assert preflight["passed"] is True
+        assert MODULE._closed(preflight) is True
+        assert set(preflight["identities"]) == set(old_preflight["identities"])
+        for name, identity in preflight["identities"].items():
+            old_identity = old_preflight["identities"][name]
+            assert identity["sha256"] == old_identity["sha256"]
+            assert identity["git_blob_sha1"] == old_identity["git_blob_sha1"]
+        assert route["identity_count"] == old_routes[route["key"]]["identity_count"]
+    assert CASE23_PREFLIGHT_V4.read_bytes() == (
+        EVIDENCE_V3 / "preflights/case23_conversion.json"
+    ).read_bytes()
+    assert MODULE._closed(result) is True
 
 
 @pytest.mark.parametrize(

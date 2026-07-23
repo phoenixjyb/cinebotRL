@@ -1,0 +1,181 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case8_validation_pair_readiness_cpu_v1",
+  "case": 8,
+  "split": "validation",
+  "selection_checks": {
+    "schema": true,
+    "passed": true,
+    "all_selection_checks": true,
+    "selected_cases": true,
+    "source_validation_cases": true,
+    "eligible_validation_cases": true,
+    "minimum_validation_corpus": true,
+    "train_profile_reuse_forbidden": true,
+    "case8_role": true,
+    "case8_checks": true,
+    "plan_hash": true,
+    "gate_hash": true,
+    "runtime_closed": true,
+    "learning_closed": true
+  },
+  "plan_checks": {
+    "schema_case": true,
+    "integrity": true,
+    "kinematic_gate": true,
+    "all_plan_checks": true,
+    "all_kinematic_checks": true,
+    "training_closed": true,
+    "array_shapes": true,
+    "arrays_finite": true,
+    "execution_clock": true,
+    "source_clock": true,
+    "source_anchor_map": true,
+    "source_execution_contract": true
+  },
+  "source_execution_clock_checks": {
+    "execution_clock_alias_exact": true,
+    "source_clock_strictly_increasing": true,
+    "source_duration_metadata": true,
+    "source_anchor_map_exact": true,
+    "initialization_separate_and_empty": true
+  },
+  "gate_checks": {
+    "schema_case": true,
+    "passed": true,
+    "result_passed": true,
+    "no_termination": true,
+    "zero_residual_action": true,
+    "raw_label_not_applied": true,
+    "label_margin": true,
+    "non_training_playback": true
+  },
+  "metric_checks": {
+    "base_linear": true,
+    "base_yaw": true,
+    "riser": true,
+    "proxy": true,
+    "camera_height": true
+  },
+  "inputs": {
+    "selection": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_model_based_corrective_validation_tranche_v1/selection.json",
+      "sha256": "5576c696e304eb9b9a173970e5fed06e887eccefe2d65a20678415148e22fa0b",
+      "size_bytes": 7258
+    },
+    "plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case8_validation_pair_readiness_cpu_v1/source/case_0008_smoothed_riser_plan_v1.npz",
+      "sha256": "f07ff020128dee70ea9c8c2d806dc75c8e0ef3964dccb4e0aabfd1b0048f3655",
+      "size_bytes": 165564
+    },
+    "dynamic_gate": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case8_validation_pair_readiness_cpu_v1/source/case_0008_dynamic_gate.json",
+      "sha256": "19506045f9b6ec04cee58efa1b5d2d5600824ce166b1534db05a4895596cf1e0",
+      "size_bytes": 145611
+    }
+  },
+  "plan": {
+    "sample_count": 663,
+    "transition_count": 662,
+    "source_duration_s": 12.940941,
+    "execution_duration_s": 18.1173174,
+    "minimum_target_camera_height_m": 0.6,
+    "maximum_target_camera_height_m": 1.6054519999999999,
+    "maximums": {
+      "base_linear_velocity_mps": 0.29987049776940694,
+      "base_yaw_rate_radps": 0.29987049776946223,
+      "riser_rate_mps": 0.6859824221163003,
+      "proxy_rate_radps": 0.3140236509402306
+    },
+    "headroom": {
+      "base_linear_velocity_mps": 0.10012950223059308,
+      "base_yaw_rate_radps": 0.10012950223053779,
+      "riser_rate_mps": 0.31401757788369966,
+      "proxy_rate_radps": 0.10485536953840846
+    }
+  },
+  "zero_residual_dynamic_gate": {
+    "position_error_p95_m": 0.13125407238082298,
+    "position_error_max_m": 0.14333129761196933,
+    "pitch_max_deg": 6.147057128003348,
+    "camera_lever_arm_correction_saturation_ratio": 0.9200605601816806,
+    "normalized_residual_label_abs_max": [
+      0.7683071716210526,
+      0.4073792973451225,
+      0.12531422692375283
+    ],
+    "normalized_residual_label_headroom": [
+      0.1816928283789474,
+      0.5426207026548775,
+      0.8246857730762471
+    ],
+    "dynamic_margins": {
+      "position_error_p95_m": 0.01874592761917701,
+      "position_error_max_m": 0.10666870238803067,
+      "pitch_max_deg": 5.852942871996652,
+      "attitude_error_max_deg": 9.776907158476424,
+      "riser_servo_error_max_m": 0.018321502679320284,
+      "action_saturation_ratio": 0.2
+    }
+  },
+  "profile_window_contract": {
+    "limits": {
+      "base_linear_velocity_mps": 0.3,
+      "base_yaw_rate_radps": 0.3,
+      "riser_rate_mps": 0.25,
+      "proxy_rate_radps": 0.3
+    },
+    "minimum_duration_s": 0.1,
+    "windows": [
+      {
+        "start_index": 0,
+        "end_index": 12,
+        "start_time_s": 0.0,
+        "end_time_s": 0.5743449168273737,
+        "duration_s": 0.5743449168273737
+      },
+      {
+        "start_index": 27,
+        "end_index": 125,
+        "start_time_s": 1.1902419938706201,
+        "end_time_s": 3.7250485965323663,
+        "duration_s": 2.534806602661746
+      },
+      {
+        "start_index": 137,
+        "end_index": 264,
+        "start_time_s": 4.067674419028258,
+        "end_time_s": 7.49966851005749,
+        "duration_s": 3.4319940910292326
+      },
+      {
+        "start_index": 503,
+        "end_index": 661,
+        "start_time_s": 15.501970028310998,
+        "end_time_s": 18.110647854263167,
+        "duration_s": 2.608677825952169
+      }
+    ],
+    "bounded_window_found": true
+  },
+  "case_specific_profile_required": true,
+  "case30_profile_reuse_authorized": false,
+  "case23_profile_reuse_authorized": false,
+  "case6_profile_reuse_authorized": false,
+  "case2_profile_reuse_authorized": false,
+  "case7_profile_reuse_authorized": false,
+  "pair_profile_cpu_ready": false,
+  "safe_window_absent_requires_structural_profile": false,
+  "next_bounded_action": "design_case8_validation_corrective_and_perturbation_profiles_cpu_only",
+  "validation_runtime_opened": false,
+  "holdout_opened": false,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

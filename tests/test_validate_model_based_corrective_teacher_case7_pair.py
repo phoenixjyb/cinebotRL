@@ -388,3 +388,14 @@ def test_committed_contract_is_cpu_only_and_tokenless() -> None:
         "valid_for_training",
     ):
         assert payload[field] is False
+
+
+def test_committed_contract_pins_current_identity_bytes() -> None:
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    for identity in payload["identities"].values():
+        path = ROOT / identity["path"]
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == identity["sha256"]
+        assert (
+            _run("git", "hash-object", str(path), cwd=ROOT).stdout.strip()
+            == identity["git_blob_sha1"]
+        )

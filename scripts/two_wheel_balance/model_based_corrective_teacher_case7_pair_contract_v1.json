@@ -70,8 +70,8 @@
     },
     "profile_proposal": {
       "path": "docs/03_training/two_wheel_balance/evidence_20260724_case7_pair_profile_cpu_v1/proposal.json",
-      "sha256": "c279d585600b7a1c2d80430dd1618785444335d12edf535c2903c268c38061cb",
-      "git_blob_sha1": "db265e837b9f685a52b88af00d779396502dc116"
+      "sha256": "3cc391ffd4ee4d4503e689e7740367bcf6b12d302b2abb688f2b4d25f387e261",
+      "git_blob_sha1": "bc31907ffaedf4103359e15a54b603db1f20469e"
     },
     "profile_builder": {
       "path": "scripts/two_wheel_balance/build_model_based_corrective_case7_pair_profiles.py",

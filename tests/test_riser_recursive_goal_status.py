@@ -361,6 +361,20 @@ CASE16_VALIDATION_NATURAL_ERROR_PAIR_EVIDENCE = (
     "evidence_20260724_case16_validation_natural_error_pair_route_cpu_v1/"
     "summary.json"
 )
+PENDING_CORRECTIVE_ROUTE_QUEUE_AUDITOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "audit_model_based_corrective_pending_route_queue.py"
+)
+PENDING_CORRECTIVE_ROUTE_QUEUE_TEST = (
+    ROOT
+    / "tests/test_audit_model_based_corrective_pending_route_queue.py"
+)
+PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_pending_corrective_route_queue_cpu_v1/summary.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -1607,6 +1621,79 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case16_route["ppo_authorized"] is False
     assert case16_route["training_started"] is False
     assert case16_route["valid_for_training"] is False
+    assert corrective[
+        "pending_corrective_route_queue_auditor_sha256"
+    ] == _sha256(PENDING_CORRECTIVE_ROUTE_QUEUE_AUDITOR)
+    assert corrective[
+        "pending_corrective_route_queue_auditor_git_blob_sha1"
+    ] == "231c98bd8374958a4877049085ff002abc6f4cea"
+    assert corrective[
+        "pending_corrective_route_queue_test_sha256"
+    ] == _sha256(PENDING_CORRECTIVE_ROUTE_QUEUE_TEST)
+    assert corrective[
+        "pending_corrective_route_queue_test_git_blob_sha1"
+    ] == "6d9c0adcdd3badfb56d9aaa790d6c3d7d6372485"
+    assert corrective[
+        "pending_corrective_route_queue_summary_sha256"
+    ] == _sha256(PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE)
+    assert corrective[
+        "pending_corrective_route_queue_ready_count"
+    ] == 6
+    assert corrective[
+        "pending_corrective_route_queue_identity_count"
+    ] == 107
+    assert corrective[
+        "pending_corrective_route_queue_execution_order"
+    ] == [
+        "case23_conversion",
+        "case6_pair",
+        "case2_pair",
+        "case7_pair",
+        "case8_validation_pair",
+        "case16_validation_pair",
+    ]
+    assert corrective[
+        "pending_corrective_route_queue_all_preflights_passed"
+    ] is True
+    assert corrective[
+        "pending_corrective_route_queue_all_namespaces_absent"
+    ] is True
+    assert corrective[
+        "pending_corrective_route_queue_next_bounded_action"
+    ] == "authorize_exactly_one_case23_v4_cpu_conversion"
+    for field in (
+        "runtime_authorized",
+        "gpu_launch_authorized",
+        "label_capture_authorized",
+        "dataset_conversion_authorized",
+        "dataset_merge_authorized",
+        "bc_authorized",
+        "ppo_authorized",
+        "training_started",
+    ):
+        assert corrective[f"pending_corrective_route_queue_{field}"] is False
+    route_queue = json.loads(
+        PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE.read_text()
+    )
+    assert route_queue["passed"] is True
+    assert route_queue["ready_route_count"] == 6
+    assert all(route_queue["checks"].values())
+    assert all(route["passed"] for route in route_queue["routes"])
+    assert sum(
+        route["identity_count"] for route in route_queue["routes"]
+    ) == 107
+    assert route_queue["next_bounded_action"] == (
+        "authorize_exactly_one_case23_v4_cpu_conversion"
+    )
+    assert route_queue["runtime_authorized"] is False
+    assert route_queue["gpu_launch_authorized"] is False
+    assert route_queue["label_capture_authorized"] is False
+    assert route_queue["dataset_conversion_authorized"] is False
+    assert route_queue["dataset_merge_authorized"] is False
+    assert route_queue["bc_authorized"] is False
+    assert route_queue["ppo_authorized"] is False
+    assert route_queue["training_started"] is False
+    assert route_queue["valid_for_training"] is False
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

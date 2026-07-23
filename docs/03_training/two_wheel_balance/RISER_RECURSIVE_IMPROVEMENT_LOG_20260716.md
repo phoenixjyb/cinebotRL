@@ -9154,3 +9154,32 @@ and must state whether its candidate was accepted or rejected.
   case-23 v4 CPU conversion:
   `Authorize exactly one case-23 v4 CPU conversion.`
 - Do not replay the consumed case-23 v4 corrective-label capture authorization.
+
+## Round 238: the six pending routes are fresh, ordered, and closed
+
+- Added a deterministic CPU audit for the complete pending corrective-data
+  queue at implementation commit
+  `3a8c6aa15b480f1e45354c2c95aa4beb7333e22f`.
+- Regenerated all six route preflights on `.98` at clean synchronized
+  `HEAD == upstream`. Every route passes all contract/check groups and all
+  `107` pinned identities.
+- Fixed the queue order to case-23 v4 CPU conversion, train paired canaries
+  `6/2/7`, then held-out validation pairs `8/16`. This prevents later runtime
+  work from bypassing the already accepted but unconverted case-23 capture.
+- Verified all six reserved namespaces are absent. Runtime, GPU, label
+  capture, dataset conversion/merge, BC, PPO, and training authorization
+  remain false for the aggregate and each route.
+- Focused macOS and `.98` suites pass `25` tests. Aggregate summary SHA-256 is
+  `b516f8e2f0fe8bc7f21a2837c9d0a56387990a2c1db59247f60a62d0dbe65488`.
+- The repeated case-23 v4 corrective-label capture was not replayed. No token,
+  runtime namespace, Isaac/GPU workload, capture, conversion, dataset, BC,
+  PPO, or training was created. Goal completion remains `6/10`.
+
+## Next round after Round 238
+
+- The queue is ready for review, not execution. The exact next action remains:
+  `Authorize exactly one case-23 v4 CPU conversion.`
+- After a passing conversion and independent reopen, case 23 can become the
+  second train dataset. Cases 6 and 2 remain the next minimum-tranche paired
+  canaries; case 7 is the additional train candidate; cases 8 and 16 remain
+  held-out validation only.

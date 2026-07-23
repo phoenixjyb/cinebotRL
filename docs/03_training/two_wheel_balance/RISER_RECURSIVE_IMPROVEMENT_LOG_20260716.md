@@ -8921,3 +8921,32 @@ and must state whether its candidate was accepted or rejected.
 - The nearest actual data-path action remains exactly one separately
   authorized case-23 v4 CPU conversion. The consumed v4 capture authorization
   cannot be reused.
+
+## Round 231: case-7 paired execution route is complete but unauthorized
+
+- Added a fresh case-7 paired contract, validator, wrapper, and finalizer at
+  implementation commit
+  `7f311139c93247b78e0e4e503525ebe002f825c0`.
+- Bound `18` plan, profile, robot, controller, runtime, and route identities.
+  The route fixes the case-7 reset seed at `20260723` and uses a fresh
+  `case7_pair_v1_exclusive` namespace.
+- Preserved baseline-first execution. The candidate cannot run unless the
+  exact-zero baseline passes its unchanged dynamic gate and releases the GPU.
+- Preserved the same plan, seed, physics, and deterministic perturbation for
+  both rollouts. No capture or dataset argument exists in the wrapper.
+- Mac and `.98` route regressions pass `50` tests. The `.98` preflight passes
+  every check with all `18` identities matching.
+- The authoritative `.98` CPU suite passes:
+  `1224 passed, 12 skipped, 2 warnings in 150.03 s`.
+- `.98 --execute` rejects before Python or Isaac with code `4` and
+  `runtime_authorization_not_issued`. The runtime namespace remains absent.
+- No token, Isaac/GPU run, label capture, dataset, BC, PPO, or training was
+  created. Goal completion remains `6/10`.
+
+## Next round after Round 231
+
+- The case-7 pair is separately reviewable for one future paired canary, but
+  no case-7 runtime authorization has been issued.
+- The nearest actual data-path action remains exactly one separately
+  authorized case-23 v4 CPU conversion. The consumed v4 capture authorization
+  cannot be reused.

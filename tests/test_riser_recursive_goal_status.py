@@ -208,6 +208,31 @@ CASE7_WRENCH_PROFILE = (
     / "scripts/two_wheel_balance/"
     "model_based_corrective_teacher_case7_wrench_profile_v1.json"
 )
+CASE7_PAIR_ROUTE_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case7_pair_contract_v1.json"
+)
+CASE7_PAIR_ROUTE_VALIDATOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "validate_model_based_corrective_teacher_case7_pair.py"
+)
+CASE7_PAIR_ROUTE_WRAPPER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "run_model_based_corrective_teacher_case7_pair.sh"
+)
+CASE7_PAIR_ROUTE_FINALIZER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "summarize_model_based_corrective_teacher_case7_pair.py"
+)
+CASE7_PAIR_ROUTE_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case7_pair_route_cpu_v1/summary.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -957,6 +982,55 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case7_profile["runtime_authorized"] is False
     assert case7_profile["label_capture_authorized"] is False
     assert case7_profile["training_started"] is False
+    assert corrective["case7_pair_route_schema"] == (
+        "cinebotrl_two_wheel_riser_corrective_teacher_case7_pair_contract_v1"
+    )
+    assert corrective["case7_pair_route_contract_sha256"] == _sha256(
+        CASE7_PAIR_ROUTE_CONTRACT
+    )
+    assert corrective["case7_pair_route_contract_git_blob_sha1"] == (
+        "f1a577b8950d90352fb7f8f260f95778ec5732ef"
+    )
+    assert corrective["case7_pair_route_validator_sha256"] == _sha256(
+        CASE7_PAIR_ROUTE_VALIDATOR
+    )
+    assert corrective["case7_pair_route_wrapper_sha256"] == _sha256(
+        CASE7_PAIR_ROUTE_WRAPPER
+    )
+    assert corrective["case7_pair_route_finalizer_sha256"] == _sha256(
+        CASE7_PAIR_ROUTE_FINALIZER
+    )
+    assert corrective["case7_pair_route_preflight_sha256"] == _sha256(
+        CASE7_PAIR_ROUTE_EVIDENCE
+    )
+    assert corrective["case7_pair_route_identity_count"] == 18
+    assert corrective["case7_pair_route_reset_seed"] == (
+        corrective["case7_pair_route_configuration_seed"] + 7
+    )
+    assert corrective[
+        "case7_pair_route_same_plan_seed_physics_and_perturbation"
+    ] is True
+    assert corrective["case7_pair_route_cpu_preflight_passed"] is True
+    assert corrective["case7_pair_route_runtime_route_contract_ready"] is True
+    assert corrective["case7_pair_route_execution_route_complete"] is True
+    assert corrective["case7_pair_route_authorization_token_issued"] is False
+    assert corrective["case7_pair_route_runtime_authorized"] is False
+    assert corrective["case7_pair_route_gpu_launch_authorized"] is False
+    assert corrective["case7_pair_route_label_capture_authorized"] is False
+    assert corrective["case7_pair_route_dataset_creation_authorized"] is False
+    assert corrective["case7_pair_route_training_authorized"] is False
+    case7_route = json.loads(CASE7_PAIR_ROUTE_EVIDENCE.read_text())
+    assert case7_route["passed"] is True
+    assert case7_route["cpu_contract_ready"] is True
+    assert case7_route["execution_route_complete"] is True
+    assert len(case7_route["identities"]) == 18
+    assert all(case7_route["checks"].values())
+    assert case7_route["authorization_token_issued"] is False
+    assert case7_route["runtime_authorized"] is False
+    assert case7_route["gpu_launch_authorized"] is False
+    assert case7_route["label_capture_authorized"] is False
+    assert case7_route["dataset_creation_authorized"] is False
+    assert case7_route["training_started"] is False
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

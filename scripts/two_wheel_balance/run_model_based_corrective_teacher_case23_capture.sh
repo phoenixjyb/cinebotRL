@@ -17,8 +17,7 @@ readonly CORRECTIVE_PROFILE="$WIN_ROOT\scripts\two_wheel_balance\model_based_cor
 readonly GAINS="$WIN_ROOT\docs\03_training\two_wheel_balance\evidence_20260714_28kg\lqr_gains.json"
 readonly PLAYBACK="$WIN_ROOT\scripts\two_wheel_balance\smoke_riser_reference_playback.py"
 readonly FINALIZER="$WIN_ROOT\scripts\two_wheel_balance\summarize_model_based_corrective_teacher_case23_capture.py"
-# Runtime authorization is intentionally absent from this CPU-only change.
-readonly AUTHORIZATION_SHA256=""
+readonly AUTHORIZATION_SHA256="REDACTED_CONSUMED_ONE_USE_AUTHORIZATION_HASH"
 
 reject() {
   printf '{"reason":"%s","runtime_started":false,"label_capture_started":false,"passed":false}\n' "$1" >&2

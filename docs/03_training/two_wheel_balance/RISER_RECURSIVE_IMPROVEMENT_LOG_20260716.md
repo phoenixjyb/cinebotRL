@@ -8436,6 +8436,9 @@ and must state whether its candidate was accepted or rejected.
   `f0ea5c59e1f2f0e5f6f91336788d0e0228d079f74a53a4a50d442751b8b23796`;
   final-status SHA-256 is
   `8f7589cdc31b5b6369fea8fda7fbd8b743b57afa78709cf03b2bd600a25833e3`.
+- Evidence commit `8e3ea24482cb03eefcc0d55e3acfc0846148d196` and mode-normalization
+  commit `46370ecf03957b6921c9dd93bff86ae1cdf54df1` pass the authoritative
+  `.98` CPU suite: `1082 passed, 12 skipped, 2 warnings in 114.24 s`.
 - The one-shot authorization is consumed and no retry is authorized. The
   archive is admitted only for a separately reviewed CPU conversion. No
   conversion, corpus merge, BC, PPO, holdout, or training was started.

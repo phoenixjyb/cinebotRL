@@ -327,6 +327,15 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["case23_capture_v4_capture_sha256"] == _sha256(
         CASE23_CAPTURE_V4_ARCHIVE
     )
+    assert corrective["case23_capture_v4_evidence_commit"] == (
+        "8e3ea24482cb03eefcc0d55e3acfc0846148d196"
+    )
+    assert corrective["case23_capture_v4_normalized_mode_commit"] == (
+        "46370ecf03957b6921c9dd93bff86ae1cdf54df1"
+    )
+    assert corrective["case23_capture_v4_post_runtime_authoritative_cpu_suite"] == (
+        "1082_passed_12_skipped_2_warnings_in_114.24s"
+    )
     final = json.loads(CASE23_CAPTURE_V4_FINAL.read_text())
     assert final["case"] == 23
     assert final["split"] == "train"

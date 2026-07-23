@@ -8331,6 +8331,10 @@ and must state whether its candidate was accepted or rejected.
 - No learned admission, runtime token, namespace, Isaac process, capture, BC,
   PPO, learned rollout, or GPU workload was created. Goal completion remains
   `6/10`.
+- Status commit `e6912d621b909298519e26ac478dee15f6a06326`
+  regenerates a byte-identical completion report on macOS and `.98` Windows
+  Python at SHA-256
+  `20e7b456e9fe481857a3cf3a0ddc1092b41b96fc01254d4c3338fa5f1ec294d0`.
 
 ## Next round after Round 214
 

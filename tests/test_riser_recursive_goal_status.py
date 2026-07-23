@@ -710,12 +710,12 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["focused_local_cpu_suite"] == "36_passed_2_warnings"
     assert audit["focused_windows_cpu_suite"] == "36_passed_2_warnings"
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
-        "3d78e8f9179f35fd9117842257877ec1e8deb5260b0ec7d03cd16d40e5f73317"
+        "20e7b456e9fe481857a3cf3a0ddc1092b41b96fc01254d4c3338fa5f1ec294d0"
     )
     report = json.loads(GOAL_COMPLETION_AUDIT.read_text())
-    assert report["git"]["head"] == "7dc88c0be03e7cf173766746a9e756be789484e3"
+    assert report["git"]["head"] == "e6912d621b909298519e26ac478dee15f6a06326"
     assert report["inputs"]["auditor"]["sha256"] == (
-        "de4f0f97546422824f4ccd9f84b607c963950854c4fff2d9382fde2d70127cce"
+        "b895c25183ba1a3451f76377a62a9abbe632babd57db24c1a509947fb97d0510"
     )
     assert report["required_gate_pass_count"] == audit["required_gate_pass_count"]
     assert report["required_gate_count"] == audit["required_gate_count"]

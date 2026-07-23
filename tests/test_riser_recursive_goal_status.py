@@ -8,6 +8,11 @@ GOAL = (
     ROOT
     / "docs/03_training/two_wheel_balance/riser_recursive_improvement_goal_v1.json"
 )
+GOAL_COMPLETION_AUDIT = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_riser_goal_completion_audit_v1/summary.json"
+)
 CASE23_CAPTURE_CONTRACT = (
     ROOT
     / "scripts/two_wheel_balance/model_based_corrective_teacher_case23_capture_contract_v1.json"
@@ -674,3 +679,15 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["runtime_started"] is False
     assert audit["bc_started_by_audit"] is False
     assert audit["ppo_started_by_audit"] is False
+    assert _sha256(GOAL_COMPLETION_AUDIT) == (
+        "3b00bad293b061a323d97ced6010bb0313423421b7deaa089202d29dfcdd8c6d"
+    )
+    report = json.loads(GOAL_COMPLETION_AUDIT.read_text())
+    assert report["git"]["head"] == "d83fa50f29761f967d204dfeadd7090631f535e4"
+    assert report["required_gate_pass_count"] == audit["required_gate_pass_count"]
+    assert report["required_gate_count"] == audit["required_gate_count"]
+    assert report["completion_blockers"] == audit["completion_blockers"]
+    assert report["goal_achieved"] is False
+    assert report["runtime_started"] is False
+    assert report["bc_started_by_audit"] is False
+    assert report["ppo_started_by_audit"] is False

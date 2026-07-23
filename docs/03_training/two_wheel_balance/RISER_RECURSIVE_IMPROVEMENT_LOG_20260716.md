@@ -8203,3 +8203,39 @@ and must state whether its candidate was accepted or rejected.
   the required `4` train plus `2` validation cases. Only then may a populated
   promotion admission and a separately approved BC execution admission be
   considered.
+
+## Round 211: end-goal evidence is machine-audited
+
+- Added `audit_riser_goal_completion.py`. It independently reads and hashes the
+  robot asset audit, 28 kg LQR gate, static/dynamic riser baseline,
+  exact-source all-79 portfolio, 750 W design recommendation, and physical
+  bench template.
+- Optional future learning evidence is fail-closed. A training dataset must
+  pass the projection-aware loader; dataset, BC admission, and BC report must
+  be supplied together; the existing BC validators must accept them; all-79
+  and learned-render reports must bind the resulting TorchScript SHA-256.
+- The implementation supports Windows Python running inside a WSL-created
+  worktree by falling back to WSL Git. It emits explicit LF bytes, so macOS and
+  `.98` Windows Python produce identical reports.
+- The clean-parent report at
+  `d83fa50f29761f967d204dfeadd7090631f535e4` has SHA-256
+  `3b00bad293b061a323d97ced6010bb0313423421b7deaa089202d29dfcdd8c6d`.
+  Mac and `.98` both pass `13` focused tests with two known pytest-config
+  warnings.
+- The audit passes `6/10` required gates: isolated worktree/branch, arm-free
+  asset, frozen LQR baseline, 0.60--1.80 m and 1 m/s riser baseline,
+  exact-source 79-case reference, and the 750 W motor/mechanism recommendation.
+- Four required gates remain false: real disjoint `4+2` corrective corpus,
+  authorized projection-aware BC, learned-policy all-79 dynamics, and
+  learned-policy rendered rollout audit.
+- Physical 750 W bench qualification remains false but is not substituted for
+  the requested engineering recommendation. No runtime, capture, BC, PPO,
+  learned rollout, or GPU work was started.
+
+## Next round after Round 211
+
+- The only prepared runtime operation remains exactly one separately
+  authorized case-23 v4 corrective-label capture.
+- A passing converted v4 case advances the first missing gate; it does not
+  authorize the remaining train/validation captures, BC execution, learned
+  rollout, all-79 evaluation, rendering, or PPO.

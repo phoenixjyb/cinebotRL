@@ -980,8 +980,10 @@
         "valid_for_hardware_transfer": false
       },
       "goal_completion_audit": {
-        "schema": "cinebotrl_two_wheel_riser_goal_completion_audit_v1",
-        "implementation_commit": "172d4efa8d43418b7eba656117b5004a7df7e708",
+        "schema": "cinebotrl_two_wheel_riser_goal_completion_audit_v2",
+        "implementation_commit": "a3185e211f300cb02c784973931f1b502b5f31cb",
+        "latest_report_sha256": "507e5a0f7161f89610a551ef7e3fa7493744f9d00f816c42663005e41fa85157",
+        "auditor_sha256": "52f814bec108bb445d15116ba103a9b68d7410d52660b922d77d5d78ea4d33dc",
         "host_independent_lf_evidence": true,
         "mac_and_windows_report_byte_parity_verified": true,
         "auditor_code_identity_bound": true,
@@ -1037,9 +1039,17 @@
         "runtime_started": false,
         "bc_started_by_audit": false,
         "ppo_started_by_audit": false,
-        "focused_local_cpu_suite": "75_passed_2_warnings",
-        "focused_windows_cpu_suite": "75_passed_2_warnings",
-        "authoritative_windows_cpu_suite": "1082_passed_12_skipped_2_warnings_in_113.60s"
+        "pre_training_architecture_contract_passed": true,
+        "pre_training_observation_dimension": 65,
+        "pre_training_action_dimension": 3,
+        "pre_training_corrective_case_datasets_available": 1,
+        "pre_training_required_train_cases": 4,
+        "pre_training_required_validation_cases": 2,
+        "pre_training_next_operation": "case23_v4_cpu_conversion",
+        "pre_training_next_operation_authorized": false,
+        "focused_local_cpu_suite": "13_passed_2_warnings_in_2.44s",
+        "focused_windows_cpu_suite": "21_passed_2_warnings_in_9.93s",
+        "authoritative_windows_cpu_suite": null
       },
       "completion_gap": [
         "separately_authorize_and_convert_the_reviewed_case23_v4_capture",

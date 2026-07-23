@@ -9222,3 +9222,34 @@ and must state whether its candidate was accepted or rejected.
 - The nearest real-data operation remains separately authorized case-23 v4 CPU
   conversion. The exact authorization phrase is:
   `Authorize exactly one case-23 v4 CPU conversion.`
+
+## Round 240: completion audit v2 binds the real pre-training state
+
+- Upgraded the goal completion auditor to schema
+  `cinebotrl_two_wheel_riser_goal_completion_audit_v2`.
+- The auditor now compares the active goal ledger with the executable BC
+  contract instead of accepting the ledger alone. It proves the admitted
+  architecture is exact-zero `65 -> 3` with a `26 + 3 * 13` observation
+  decomposition.
+- The report makes the data gap explicit: one converted corrective case
+  dataset exists, zero multi-case corpus cases exist, and the minimum corpus
+  remains four train plus two disjoint validation cases.
+- It records case 23 as the next operation and keeps conversion, runtime, BC,
+  PPO, and training authorization false. Architecture readiness therefore does
+  not imply readiness for BC execution.
+- The v2 report was generated independently on macOS and `.98` from clean
+  synchronized implementation commit
+  `a3185e211f300cb02c784973931f1b502b5f31cb`. The files are byte-identical with
+  SHA-256
+  `507e5a0f7161f89610a551ef7e3fa7493744f9d00f816c42663005e41fa85157`.
+- The focused `.98` CPU suite passes:
+  `21 passed, 2 warnings in 9.93 s`.
+- Completion remains honestly `6/10`. No token, runtime namespace, Isaac/GPU
+  work, capture, conversion, dataset merge, BC, PPO, checkpoint, or training
+  run was created.
+
+## Next round after Round 240
+
+- Run and seal the authoritative `.98` CPU suite for audit v2.
+- The nearest real-data operation is unchanged:
+  `Authorize exactly one case-23 v4 CPU conversion.`

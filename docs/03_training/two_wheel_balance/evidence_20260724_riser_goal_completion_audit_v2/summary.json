@@ -1,0 +1,173 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_goal_completion_audit_v2",
+  "objective": "Produce a balance-safe residual DNN policy for the arm-free two-wheel riser robot that completes all 79 corrected semantic camera trajectories.",
+  "required_completion_gates": [
+    "isolated_worktree_and_branch",
+    "arm_free_robot_asset",
+    "frozen_lqr_balance_baseline",
+    "riser_height_and_speed_baseline",
+    "exact_source_all79_reference",
+    "riser_motor_and_mechanism_recommendation",
+    "model_based_corrective_training_corpus",
+    "projection_aware_bc_policy",
+    "learned_policy_all79_dynamic_gate",
+    "learned_policy_render_audit"
+  ],
+  "gates": {
+    "isolated_worktree_and_branch": {
+      "required_for_goal": true,
+      "passed": true,
+      "evidence": [
+        "git:codex/two-wheel-riser-rl@a3185e211f300cb02c784973931f1b502b5f31cb"
+      ],
+      "detail": "dedicated riser branch is clean and synchronized"
+    },
+    "arm_free_robot_asset": {
+      "required_for_goal": true,
+      "passed": true,
+      "evidence": [
+        "docs/03_training/two_wheel_balance/evidence_20260715_riser/gate0_asset_audit.json"
+      ],
+      "detail": "two wheels, riser, physical gimbal, and no movable arm joints"
+    },
+    "frozen_lqr_balance_baseline": {
+      "required_for_goal": true,
+      "passed": true,
+      "evidence": [
+        "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_nominal_gate.json"
+      ],
+      "detail": "provisional 28 kg simulation LQR baseline passed its nominal gate"
+    },
+    "riser_height_and_speed_baseline": {
+      "required_for_goal": true,
+      "passed": true,
+      "evidence": [
+        "docs/03_training/two_wheel_balance/evidence_20260716_riser_gate0_gate3_online_comp/summary.json"
+      ],
+      "detail": "camera range is capped at 1.8 m and the simulated 1 m/s gate passed"
+    },
+    "exact_source_all79_reference": {
+      "required_for_goal": true,
+      "passed": true,
+      "evidence": [
+        "docs/03_training/two_wheel_balance/evidence_20260717_riser_exact_source_gate_a_b/summary.json"
+      ],
+      "detail": "79/79 immutable source references exist; planning is not training"
+    },
+    "riser_motor_and_mechanism_recommendation": {
+      "required_for_goal": true,
+      "passed": true,
+      "evidence": [
+        "docs/03_training/two_wheel_balance/evidence_20260723_hardware_production_candidate_v1/summary.json"
+      ],
+      "detail": "750 W servo plus guided belt/telescoping mechanism is design-review ready"
+    },
+    "model_based_corrective_training_corpus": {
+      "required_for_goal": true,
+      "passed": false,
+      "evidence": [],
+      "detail": "requires at least four train and two disjoint validation cases"
+    },
+    "projection_aware_bc_policy": {
+      "required_for_goal": true,
+      "passed": false,
+      "evidence": [],
+      "detail": "requires an authorized real BC run and passing offline report"
+    },
+    "learned_policy_all79_dynamic_gate": {
+      "required_for_goal": true,
+      "passed": false,
+      "evidence": [],
+      "detail": "requires one hash-bound learned-policy result for every case 1-79"
+    },
+    "learned_policy_render_audit": {
+      "required_for_goal": true,
+      "passed": false,
+      "evidence": [],
+      "detail": "requires at least three audited learned-policy rollout videos"
+    },
+    "physical_riser_bench_qualification": {
+      "required_for_goal": false,
+      "passed": false,
+      "evidence": [
+        "docs/03_training/two_wheel_balance/evidence_20260723_riser_bench_750w_template_v1/summary.json"
+      ],
+      "detail": "deployment qualification remains separate from the requested recommendation"
+    }
+  },
+  "required_gate_pass_count": 6,
+  "required_gate_count": 10,
+  "completion_blockers": [
+    "model_based_corrective_training_corpus",
+    "projection_aware_bc_policy",
+    "learned_policy_all79_dynamic_gate",
+    "learned_policy_render_audit"
+  ],
+  "pre_training_readiness": {
+    "architecture_contract_passed": true,
+    "policy_architecture": "model_based_shared_encoder_zero_initialized_residual_v1",
+    "observation_dimension": 65,
+    "base_observation_dimension": 26,
+    "lookahead_horizon_count": 3,
+    "lookahead_channel_count_per_horizon": 13,
+    "action_dimension": 3,
+    "zero_initialize_action_head": true,
+    "corrective_case_datasets_available": 1,
+    "corrective_training_corpus_cases_available": 0,
+    "minimum_train_cases": 4,
+    "minimum_validation_cases": 2,
+    "next_case": 23,
+    "next_operation": "case23_v4_cpu_conversion",
+    "next_operation_authorized": false,
+    "bc_authorized": false,
+    "training_authorized": false,
+    "ppo_authorized": false,
+    "runtime_authorized": false,
+    "ready_for_bc_execution": false
+  },
+  "goal_achieved": false,
+  "obstacle_avoidance_in_scope": false,
+  "runtime_started": false,
+  "bc_started_by_audit": false,
+  "ppo_started_by_audit": false,
+  "git": {
+    "branch": "codex/two-wheel-riser-rl",
+    "head": "a3185e211f300cb02c784973931f1b502b5f31cb",
+    "upstream": "a3185e211f300cb02c784973931f1b502b5f31cb",
+    "tracked_dirty": false
+  },
+  "inputs": {
+    "auditor": {
+      "path": "scripts/two_wheel_balance/audit_riser_goal_completion.py",
+      "sha256": "52f814bec108bb445d15116ba103a9b68d7410d52660b922d77d5d78ea4d33dc"
+    },
+    "goal": {
+      "path": "docs/03_training/two_wheel_balance/riser_recursive_improvement_goal_v1.json",
+      "sha256": "d570b3ed37ae14502d8deb30a1adbcc0c1a946788f2355d25d4aad0d2e98e77c"
+    },
+    "asset": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260715_riser/gate0_asset_audit.json",
+      "sha256": "5c5756fbb936bb28eeb0d972c2dc78cc6a837609a4a8320f2bdbbd3b221e907b"
+    },
+    "lqr": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_nominal_gate.json",
+      "sha256": "f995ba9580203becf7f4bc9338cd10b9f6af977de810a4c421eab905f3437f0f"
+    },
+    "baseline": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260716_riser_gate0_gate3_online_comp/summary.json",
+      "sha256": "feb69808af5fdd832cd386e357fa7e1b05197316b2ec0c8ff76ab647c15bc47e"
+    },
+    "exact_source": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260717_riser_exact_source_gate_a_b/summary.json",
+      "sha256": "6ce92b71c815c9aa63b1947905590ce755d4b3de19d6dd10996ddb93aaa8a28f"
+    },
+    "hardware": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_hardware_production_candidate_v1/summary.json",
+      "sha256": "bc4eaa8673cf389e11d639aec06414c5506fd2461e67bad6c5328d0363fd3bb7"
+    },
+    "bench": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_riser_bench_750w_template_v1/summary.json",
+      "sha256": "1ffc8ccae050bd152c276025e0cce842e12accc318a3661e47b4f3c9bf075ad9"
+    }
+  }
+}

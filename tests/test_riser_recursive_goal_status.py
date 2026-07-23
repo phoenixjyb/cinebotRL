@@ -11,7 +11,7 @@ GOAL = (
 GOAL_COMPLETION_AUDIT = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260723_riser_goal_completion_audit_v1/summary.json"
+    "evidence_20260724_riser_goal_completion_audit_v2/summary.json"
 )
 CASE23_CAPTURE_CONTRACT = (
     ROOT
@@ -2105,9 +2105,9 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     audit = _goal()["current_stage"]["status_refresh_20260723"][
         "goal_completion_audit"
     ]
-    assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v1"
+    assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v2"
     assert audit["implementation_commit"] == (
-        "172d4efa8d43418b7eba656117b5004a7df7e708"
+        "a3185e211f300cb02c784973931f1b502b5f31cb"
     )
     assert audit["host_independent_lf_evidence"] is True
     assert audit["mac_and_windows_report_byte_parity_verified"] is True
@@ -2228,18 +2228,24 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["runtime_started"] is False
     assert audit["bc_started_by_audit"] is False
     assert audit["ppo_started_by_audit"] is False
-    assert audit["focused_local_cpu_suite"] == "75_passed_2_warnings"
-    assert audit["focused_windows_cpu_suite"] == "75_passed_2_warnings"
-    assert audit["authoritative_windows_cpu_suite"] == (
-        "1082_passed_12_skipped_2_warnings_in_113.60s"
-    )
+    assert audit["pre_training_architecture_contract_passed"] is True
+    assert audit["pre_training_observation_dimension"] == 65
+    assert audit["pre_training_action_dimension"] == 3
+    assert audit["pre_training_corrective_case_datasets_available"] == 1
+    assert audit["pre_training_required_train_cases"] == 4
+    assert audit["pre_training_required_validation_cases"] == 2
+    assert audit["pre_training_next_operation"] == "case23_v4_cpu_conversion"
+    assert audit["pre_training_next_operation_authorized"] is False
+    assert audit["focused_local_cpu_suite"] == "13_passed_2_warnings_in_2.44s"
+    assert audit["focused_windows_cpu_suite"] == "21_passed_2_warnings_in_9.93s"
+    assert audit["authoritative_windows_cpu_suite"] is None
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
-        "b9804473371407657a1206ba18806b508e5745fc879a3d9071c0af6a8bb8c0ce"
+        "507e5a0f7161f89610a551ef7e3fa7493744f9d00f816c42663005e41fa85157"
     )
     report = json.loads(GOAL_COMPLETION_AUDIT.read_text())
-    assert report["git"]["head"] == "89d74defd0783cb492a03388592cd908d09d3050"
+    assert report["git"]["head"] == "a3185e211f300cb02c784973931f1b502b5f31cb"
     assert report["inputs"]["auditor"]["sha256"] == (
-        "1d2903d0f7f7c9e0a76bfdc220072b89180a5f44b64cb7840925a0cddb1c8d63"
+        "52f814bec108bb445d15116ba103a9b68d7410d52660b922d77d5d78ea4d33dc"
     )
     assert report["required_gate_pass_count"] == audit["required_gate_pass_count"]
     assert report["required_gate_count"] == audit["required_gate_count"]
@@ -2248,3 +2254,5 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert report["runtime_started"] is False
     assert report["bc_started_by_audit"] is False
     assert report["ppo_started_by_audit"] is False
+    assert report["pre_training_readiness"]["architecture_contract_passed"] is True
+    assert report["pre_training_readiness"]["ready_for_bc_execution"] is False

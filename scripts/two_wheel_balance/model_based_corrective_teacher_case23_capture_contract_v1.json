@@ -53,6 +53,11 @@
       "sha256": "808e2e295bb4639288efc84f5bdf7a1954a6e2aa96f6854d808b02306e9324e3",
       "git_blob_sha1": "4a8fabf5e801b7297c8b02d739d645b98f759fa6"
     },
+    "drive_profile_selection": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json",
+      "sha256": "39a700de3985175e4e8415f1f23beef4264b103daa7ce8847f4ac0fe69f879f7",
+      "git_blob_sha1": "88ce075736da04792acc257362c9fdb555bee9d8"
+    },
     "lqr_gains": {
       "path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
       "sha256": "2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6",
@@ -100,8 +105,8 @@
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case23_capture.py",
-      "sha256": "c9bb4d2588b955d83f62ecf7c5a547f9361742e83a9e22184b9e9d0be1ff8e0d",
-      "git_blob_sha1": "730c81b345b20eae67eee953a7f52c01fcc49b76"
+      "sha256": "13676a28524458ae677603fc64aed5fe4547654f4fc5932203deb71374464cdb",
+      "git_blob_sha1": "126fa3b62ed31117a6942058efd362e47b8e8a63"
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case23_capture.sh",

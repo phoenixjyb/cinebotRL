@@ -47,6 +47,7 @@ REQUIRED_IDENTITIES = {
     "case23_plan",
     "perturbation_profile",
     "corrective_profile",
+    "drive_profile_selection",
     "lqr_gains",
     "robot_build_audit",
     "robot_urdf",
@@ -61,6 +62,56 @@ REQUIRED_IDENTITIES = {
     "capture_finalizer",
 }
 TRACKED_IDENTITIES = REQUIRED_IDENTITIES - {"case23_plan"}
+
+
+def drive_profile_checks(result: dict[str, object]) -> dict[str, bool]:
+    rows = result.get("identities", {})
+    row = (
+        rows.get("drive_profile_selection", {})
+        if isinstance(rows, dict)
+        else {}
+    )
+    profile = {}
+    if isinstance(row, dict) and row.get("passed") is True:
+        profile = json.loads(
+            Path(str(row.get("path", ""))).read_text(encoding="utf-8")
+        )
+    active = profile.get("active_simulation_profile", {})
+    candidate = profile.get("production_design_candidate", {})
+    switch = profile.get("profile_switch_contract", {})
+    classification = profile.get("classification", {})
+    return {
+        "schema": profile.get("schema")
+        == "cinebotrl_two_wheel_riser_drive_profile_selection_v1",
+        "profile_audit_passed": profile.get("passed") is True,
+        "active_profile_is_400w": active.get("name")
+        == "leadshine_400w_engineering_sample_v1",
+        "active_force_and_speed": active.get("simulation_effort_limit_n")
+        == 300.0
+        and active.get("simulation_velocity_limit_mps") == 1.0,
+        "active_thermal_contract": active.get("thermal_contract")
+        == "leadshine_400w_first_order_monitor_v1",
+        "750w_candidate_not_simulation_enabled": candidate.get(
+            "simulation_enabled"
+        )
+        is False,
+        "750w_candidate_not_runtime_or_training_enabled": candidate.get(
+            "runtime_authorized"
+        )
+        is False
+        and candidate.get("valid_for_training") is False,
+        "plant_switch_invalidates_prior_evidence": switch.get(
+            "existing_dynamic_evidence_reusable_after_switch"
+        )
+        is False
+        and switch.get("existing_corrective_captures_reusable_after_switch")
+        is False
+        and switch.get("existing_bc_checkpoint_reusable_after_switch") is False,
+        "silent_upgrade_rejected": classification.get(
+            "silent_750w_simulation_upgrade_rejected"
+        )
+        is True,
+    }
 
 
 def validate(
@@ -85,6 +136,19 @@ def validate(
         tracked_identities=TRACKED_IDENTITIES,
         expected_execution=EXPECTED_EXECUTION,
     )
+    profile_checks = drive_profile_checks(result)
+    profile_passed = all(profile_checks.values())
+    result.setdefault("checks", {})["active_drive_profile"] = profile_passed
+    result["drive_profile_checks"] = profile_checks
+    result["cpu_contract_ready"] = bool(
+        result.get("cpu_contract_ready") and profile_passed
+    )
+    if not profile_passed:
+        result["authorization_consumed_before_isaac"] = False
+        result["runtime_authorized"] = False
+        result["gpu_launch_authorized"] = False
+        result["label_capture_authorized"] = False
+    result["passed"] = bool(result.get("passed") and profile_passed)
     result["schema"] = ADMISSION_SCHEMA
     return result
 

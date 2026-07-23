@@ -8481,6 +8481,11 @@ and must state whether its candidate was accepted or rejected.
 - Review evidence commit
   `34ca577f5c83ce3d3cf229d261ba467a85e9b5e8` passes the authoritative
   `.98` CPU suite: `1087 passed, 12 skipped, 2 warnings in 109.31 s`.
+- Status commit `cc1cd3f3cb055843f16a2e95a590169714f252d5` regenerates the
+  completion audit at SHA-256
+  `372b0a90e43dbabf5ba1701956eff8694b1b4ded459529c919f7f09c033d538e`.
+  The result remains `6/10`; conversion readiness is not a converted case
+  dataset and does not satisfy the multi-case corpus gate.
 
 ## Next round after Round 218
 

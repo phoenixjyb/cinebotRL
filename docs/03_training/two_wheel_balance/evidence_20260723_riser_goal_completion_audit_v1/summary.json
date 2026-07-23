@@ -18,7 +18,7 @@
       "required_for_goal": true,
       "passed": true,
       "evidence": [
-        "git:codex/two-wheel-riser-rl@302bf5ad2fe6ce5b1a760d80608f2934effebb9d"
+        "git:codex/two-wheel-riser-rl@cc1cd3f3cb055843f16a2e95a590169714f252d5"
       ],
       "detail": "dedicated riser branch is clean and synchronized"
     },
@@ -110,8 +110,8 @@
   "ppo_started_by_audit": false,
   "git": {
     "branch": "codex/two-wheel-riser-rl",
-    "head": "302bf5ad2fe6ce5b1a760d80608f2934effebb9d",
-    "upstream": "302bf5ad2fe6ce5b1a760d80608f2934effebb9d",
+    "head": "cc1cd3f3cb055843f16a2e95a590169714f252d5",
+    "upstream": "cc1cd3f3cb055843f16a2e95a590169714f252d5",
     "tracked_dirty": false
   },
   "inputs": {
@@ -121,7 +121,7 @@
     },
     "goal": {
       "path": "docs/03_training/two_wheel_balance/riser_recursive_improvement_goal_v1.json",
-      "sha256": "f3fae94f09bccfecb76081f0924a9f851fd7cb594b796aa112edd46871dbf5b1"
+      "sha256": "a91257f19e2f5dddb3d916a2c61ca7c4684099750bd05dd70e4d3e86820870d7"
     },
     "asset": {
       "path": "docs/03_training/two_wheel_balance/evidence_20260715_riser/gate0_asset_audit.json",

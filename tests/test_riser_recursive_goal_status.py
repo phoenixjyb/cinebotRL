@@ -470,6 +470,17 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corpus["projection_training_bc_execution_synthetic_end_to_end_passed"] is True
     assert corpus["projection_training_bc_execution_real_dataset_available"] is False
     assert corpus["projection_training_bc_execution_real_admission_authorized"] is False
+    assert corpus[
+        "projection_training_bc_execution_trainer_integration_commit"
+    ] == ("02dbff8bca1b8ed2fee3eb2598a3382c0adce0af")
+    assert corpus["projection_training_bc_execution_trainer_focused_cpu_suite"] == (
+        "84_passed_10_warnings_in_21.41s"
+    )
+    assert corpus[
+        "projection_training_bc_execution_trainer_authoritative_cpu_suite"
+    ] == ("1010_passed_12_skipped_2_warnings_in_93.62s")
+    assert corpus["projection_training_bc_execution_real_training_started"] is False
+    assert corpus["projection_training_bc_execution_real_checkpoint_created"] is False
     assert corpus["projection_training_bc_authorized"] is False
     assert corpus["projection_training_focused_cpu_suite"] == (
         "161_passed_3_warnings_in_17.59s"

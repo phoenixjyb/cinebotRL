@@ -8163,3 +8163,43 @@ and must state whether its candidate was accepted or rejected.
   into the trainer behind an explicit admission argument. The checked-in
   template and absent real `4+2` dataset must continue to make that path
   unusable by default.
+
+## Round 210: admission-gated projection BC trainer is integrated
+
+- `train_riser_residual_bc.py` now accepts `--bc-admission` only for the
+  projection-aware corrective training schema. Legacy datasets cannot use the
+  option.
+- Before optimizer creation, the route requires clean tracked state with
+  `HEAD == upstream`, exact source/execution commit equality, a fully authorized
+  admission, matching dataset/code/config hashes, the fixed CUDA training
+  configuration, and no legacy masking, scheduled sampling, or attenuated
+  previous-action variant.
+- The route builds same-case train/validation splits, normalizes observations
+  from train rows only, trains with the exact case-balanced projected kernel,
+  selects on projected validation loss, and gates all three channels against
+  zero-request improvement, normalized output margin, and zero requested-slew
+  violations.
+- Only a passing offline gate writes a checkpoint and TorchScript policy. The
+  resulting execution report is revalidated against admission, dataset,
+  history, split metrics, artifact hashes, closed holdouts, and closed
+  PPO/learned-rollout state before it is written.
+- A bounded synthetic end-to-end test exercises the real policy architecture,
+  optimizer, projected metrics, artifact writes, TorchScript export, and final
+  report validator on CPU. It is test-only and does not authorize the real
+  corpus or GPU training.
+- Integration commit
+  `02dbff8bca1b8ed2fee3eb2598a3382c0adce0af` passes `84 passed,
+  10 warnings` in `21.41 s`; the authoritative `.98` suite passes
+  `1010 passed, 12 skipped, 2 warnings` in `93.62 s`.
+- No real promoted `4+2` dataset or approved execution admission exists.
+  Real optimizer execution, checkpoint creation, dynamic canary, BC, PPO,
+  learned rollout, and training remain absent or unauthorized.
+
+## Next round after Round 210
+
+- The sole prepared runtime operation remains exactly one separately
+  authorized case-23 v4 corrective-label capture.
+- If v4 passes and converts, continue the disjoint corrective tranche toward
+  the required `4` train plus `2` validation cases. Only then may a populated
+  promotion admission and a separately approved BC execution admission be
+  considered.

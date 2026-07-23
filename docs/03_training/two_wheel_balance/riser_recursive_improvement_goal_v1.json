@@ -1035,7 +1035,8 @@
         "learned_policy_artifact_malformed_rejected_live_windows_cpu": true,
         "learned_preflight_windows_python_wsl_git_bridge_passed": true,
         "learned_policy_artifact_focused_windows_cpu_suite": "65_passed_2_warnings_in_7.74s",
-        "learned_policy_artifact_authoritative_windows_cpu_suite": null,
+        "learned_policy_artifact_authoritative_windows_cpu_commit": "e7476fbee8fa8963d85dbd880f9edf196eba8a8c",
+        "learned_policy_artifact_authoritative_windows_cpu_suite": "1309_passed_12_skipped_2_warnings_in_175.46s",
         "required_gate_count": 10,
         "required_gate_pass_count": 6,
         "completion_blockers": [

@@ -2231,7 +2231,12 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         is True
     )
     assert audit["learned_preflight_windows_python_wsl_git_bridge_passed"] is True
-    assert audit["learned_policy_artifact_authoritative_windows_cpu_suite"] is None
+    assert audit["learned_policy_artifact_authoritative_windows_cpu_commit"] == (
+        "e7476fbee8fa8963d85dbd880f9edf196eba8a8c"
+    )
+    assert audit["learned_policy_artifact_authoritative_windows_cpu_suite"] == (
+        "1309_passed_12_skipped_2_warnings_in_175.46s"
+    )
     assert audit["required_gate_pass_count"] == 6
     assert audit["required_gate_count"] == 10
     assert audit["completion_blockers"] == [

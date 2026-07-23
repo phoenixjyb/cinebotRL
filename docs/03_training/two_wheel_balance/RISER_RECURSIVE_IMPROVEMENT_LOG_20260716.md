@@ -9279,13 +9279,13 @@ and must state whether its candidate was accepted or rejected.
   TorchScript is rejected.
 - The focused `.98` suite passes:
   `65 passed, 2 warnings in 7.74 s`.
+- The authoritative `.98` suite passes:
+  `1309 passed, 12 skipped, 2 warnings in 175.46 s`.
 - No runtime namespace, Isaac/GPU work, capture, conversion, dataset merge, BC,
   PPO, checkpoint training, or learned rollout was started. Completion remains
   `6/10`.
 
 ## Next round after Round 241
 
-- Run and seal the authoritative `.98` CPU suite for the learned-policy
-  artifact and preflight repair.
 - The nearest real-data operation remains:
   `Authorize exactly one case-23 v4 CPU conversion.`

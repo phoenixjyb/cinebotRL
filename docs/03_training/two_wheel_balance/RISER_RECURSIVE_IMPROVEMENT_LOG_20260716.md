@@ -9107,7 +9107,7 @@ and must state whether its candidate was accepted or rejected.
   `77139d631ee05b3432d368ce478ff8f8af7bca93` passes the focused `19`-test
   suite on macOS and `.98`; Windows regenerates byte-identical artifacts.
 - The authoritative `.98` CPU suite passes:
-  `1278 passed, 12 skipped, 2 warnings in 162.65 s`.
+  `1278 passed, 12 skipped, 2 warnings in 155.25 s`.
 - No token, namespace, Isaac/GPU run, capture, conversion, dataset, BC, PPO,
   or training was created. Goal completion remains `6/10`.
 

@@ -28,4 +28,4 @@ contract is required before any runtime authorization can be reviewed.
 Implementation commit `77139d631ee05b3432d368ce478ff8f8af7bca93`
 passes the 19-test focused suite on macOS and `.98`. Windows regenerates the
 profile and proposal byte-for-byte. The authoritative `.98` CPU suite passes
-`1278 passed, 12 skipped, 2 warnings in 162.65 s`.
+`1278 passed, 12 skipped, 2 warnings in 155.25 s`.

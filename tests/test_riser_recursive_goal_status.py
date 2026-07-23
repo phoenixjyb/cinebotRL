@@ -556,6 +556,12 @@ def test_planner_imitation_failure_and_residual_layer_are_explicit() -> None:
     assert residual["zero_initialize_action_head"] is True
     assert residual["real_case30_observation_shape"] == [11411, 65]
     assert residual["real_case23_v4_observation_shape"] == [3273, 65]
+    assert residual["architecture_contract_authoritative_cpu_commit"] == (
+        "546fa7dfb54150832e6d81b0ad562b7ecdc0ef85"
+    )
+    assert residual["architecture_contract_authoritative_cpu_suite"] == (
+        "1300_passed_12_skipped_2_warnings_in_170.69s"
+    )
 
 
 def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
@@ -1909,7 +1915,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ] == ("69_passed_2_warnings_in_27.87s")
     assert corpus[
         "projection_training_bc_execution_contract_authoritative_cpu_suite"
-    ] is None
+    ] == ("1300_passed_12_skipped_2_warnings_in_170.69s")
     assert corpus["projection_training_bc_execution_admission_template_usable"] is False
     assert corpus["projection_training_bc_execution_trainer_integrated"] is True
     assert corpus["projection_training_bc_execution_synthetic_end_to_end_passed"] is True
@@ -1923,7 +1929,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     )
     assert corpus[
         "projection_training_bc_execution_trainer_authoritative_cpu_suite"
-    ] is None
+    ] == ("1300_passed_12_skipped_2_warnings_in_170.69s")
     assert corpus["projection_training_bc_execution_real_training_started"] is False
     assert corpus["projection_training_bc_execution_real_checkpoint_created"] is False
     assert corpus["projection_training_bc_authorized"] is False

@@ -8372,6 +8372,10 @@ and must state whether its candidate was accepted or rejected.
 - No real BC policy, split admission, runtime token, namespace, Isaac process,
   validation rollout, holdout access, capture, PPO, or GPU workload was
   created. The completion result remains `6/10`.
+- Status commit `e6ceab046f9bab5954697fca01fa774c0642d92f`
+  regenerates a byte-identical completion report on macOS and `.98` at
+  SHA-256
+  `387d15eb4a812bff8461bd5480be5b5864bae34e0b93205fbc4d1203eb20d51f`.
 
 ## Next round after Round 215
 

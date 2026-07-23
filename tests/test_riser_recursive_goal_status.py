@@ -745,10 +745,10 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "1068_passed_12_skipped_2_warnings_in_111.96s"
     )
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
-        "20e7b456e9fe481857a3cf3a0ddc1092b41b96fc01254d4c3338fa5f1ec294d0"
+        "387d15eb4a812bff8461bd5480be5b5864bae34e0b93205fbc4d1203eb20d51f"
     )
     report = json.loads(GOAL_COMPLETION_AUDIT.read_text())
-    assert report["git"]["head"] == "e6912d621b909298519e26ac478dee15f6a06326"
+    assert report["git"]["head"] == "e6ceab046f9bab5954697fca01fa774c0642d92f"
     assert report["inputs"]["auditor"]["sha256"] == (
         "b895c25183ba1a3451f76377a62a9abbe632babd57db24c1a509947fb97d0510"
     )

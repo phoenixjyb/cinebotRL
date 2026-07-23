@@ -92,6 +92,16 @@ PROJECTED_TRAINING_BC_TRAINER = (
     / "scripts/two_wheel_balance/"
     "train_riser_residual_bc.py"
 )
+PROJECTED_TRAINING_BC_EXECUTION_CONTRACT = (
+    ROOT
+    / "src/rl_platform/tasks/two_wheel_balance/"
+    "riser_model_based_corrective_bc_contract.py"
+)
+PROJECTED_TRAINING_BC_EXECUTION_ADMISSION_TEMPLATE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "MODEL_BASED_CORRECTIVE_BC_EXECUTION_ADMISSION_TEMPLATE_20260723.json"
+)
 BENCH_RAW_LOG_REDUCER = (
     ROOT / "scripts/two_wheel_balance/reduce_riser_bench_log.py"
 )
@@ -434,6 +444,29 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
         "projection_training_bc_optimizer_kernel_authoritative_cpu_suite"
     ] == ("993_passed_12_skipped_2_warnings_in_102.76s")
     assert corpus["projection_training_bc_optimizer_path_integrated"] is False
+    assert corpus["projection_training_bc_execution_admission_schema"] == (
+        "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_admission_v1"
+    )
+    assert corpus["projection_training_bc_execution_report_schema"] == (
+        "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_report_v1"
+    )
+    assert corpus[
+        "projection_training_bc_execution_contract_module_sha256"
+    ] == _sha256(PROJECTED_TRAINING_BC_EXECUTION_CONTRACT)
+    assert corpus[
+        "projection_training_bc_execution_admission_template_sha256"
+    ] == _sha256(PROJECTED_TRAINING_BC_EXECUTION_ADMISSION_TEMPLATE)
+    assert corpus[
+        "projection_training_bc_execution_contract_implementation_commit"
+    ] == ("ebb89fc6ae911329537b238427aa0c104fbe0f4d")
+    assert corpus[
+        "projection_training_bc_execution_contract_focused_cpu_suite"
+    ] == ("82_passed_5_warnings_in_21.55s")
+    assert corpus[
+        "projection_training_bc_execution_contract_authoritative_cpu_suite"
+    ] == ("1008_passed_12_skipped_2_warnings_in_96.17s")
+    assert corpus["projection_training_bc_execution_admission_template_usable"] is False
+    assert corpus["projection_training_bc_execution_trainer_integrated"] is False
     assert corpus["projection_training_bc_authorized"] is False
     assert corpus["projection_training_focused_cpu_suite"] == (
         "161_passed_3_warnings_in_17.59s"

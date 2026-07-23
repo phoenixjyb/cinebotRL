@@ -8122,3 +8122,44 @@ and must state whether its candidate was accepted or rejected.
   schema around the reviewed kernel. The checked-in template must remain
   unusable, and optimizer execution must stay closed until a real promoted
   `4+2` dataset receives explicit BC authorization.
+
+## Round 209: hash-bound BC execution admission and report contracts
+
+- Added
+  `cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_admission_v1`.
+  It binds the promoted dataset and promotion commit, exact execution commit,
+  trainer, adapter, loss, policy, training-dataset and admission modules, the
+  reviewed optimizer/validation contracts, immutable hyperparameters, disjoint
+  train/validation cases, and unopened holdouts.
+- The checked-in template has null dataset/promotion/execution identities,
+  empty splits, `bc_execution_approved=false`, and `bc_authorized=false`.
+  It cannot pass even CPU review until populated against a real promoted
+  dataset, and cannot pass execution admission without separate approval.
+- Added strict execution-report v1 validation. A success claim requires
+  contiguous nonnegative epoch history, one optimizer step per epoch, projected
+  train/validation metrics, three-channel improvement over zero request,
+  requested-action margin below `0.95`, closed holdouts, and matching
+  checkpoint/TorchScript files and SHA-256 identities.
+- Tests reject forged dataset/code hashes, stale execution commits, changed
+  learning rate, holdout leakage, PPO opening, mismatched approval, missing
+  artifacts, false success, holdout metrics, and prediction-margin equality.
+- Contract module and template SHA-256 values are
+  `0c8787a091aaa8051368aeed176e31e2327c0e1c6afa26d70a5e3a88d32b6c49`
+  and
+  `bdeba23dc8730cc8ee6ce5e36f4335d3450edd2a25c346b9026a181ca4657edf`.
+  Implementation commit
+  `ebb89fc6ae911329537b238427aa0c104fbe0f4d` passes `82` focused tests
+  and the authoritative `.98` suite with
+  `1008 passed, 12 skipped, 2 warnings` in `96.17 s`.
+- The contract is not connected to the trainer execution path. No real
+  promoted dataset, admission approval, optimizer run, artifact, BC, PPO,
+  rollout, or training was created or authorized.
+
+## Next round after Round 209
+
+- Exactly one separately authorized case-23 v4 corrective-label capture remains
+  the only prepared runtime action.
+- CPU work may integrate the admission validator and reviewed optimizer kernel
+  into the trainer behind an explicit admission argument. The checked-in
+  template and absent real `4+2` dataset must continue to make that path
+  unusable by default.

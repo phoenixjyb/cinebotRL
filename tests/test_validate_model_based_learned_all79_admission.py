@@ -112,6 +112,7 @@ def test_wrapper_rejects_before_namespace_or_isaac_without_admission() -> None:
     playback = source.index('"$ISAAC_PYTHON" -u -X utf8 "$PLAYBACK_WIN"')
     assert preflight < namespace < playback
     assert "to_windows_path" in source
+    assert 'RISER_GIT_ROOT_WSL="$ROOT"' in source
     assert 'mktemp -p "$ROOT"' in source
     assert 'python3 "$PREFLIGHT"' not in source
     assert "--require-authorized" in source

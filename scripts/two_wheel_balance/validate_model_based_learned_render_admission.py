@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -46,8 +47,14 @@ def _load(path: Path) -> dict:
 
 
 def _git(*args: str) -> str:
+    wsl_root = os.environ.get("RISER_GIT_ROOT_WSL")
+    command = (
+        ["wsl.exe", "git", "-C", wsl_root, *args]
+        if wsl_root
+        else ["git", "-C", str(ROOT), *args]
+    )
     return subprocess.run(
-        ["git", "-C", str(ROOT), *args],
+        command,
         check=True,
         capture_output=True,
         text=True,

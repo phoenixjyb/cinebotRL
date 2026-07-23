@@ -390,6 +390,7 @@ def test_wrapper_preflights_before_namespace_and_uses_d3d12() -> None:
     playback = source.index('"$ISAAC_PYTHON" -u -X utf8 "$playback_win"')
     assert preflight < namespace < playback
     assert "to_windows_path" in source
+    assert 'RISER_GIT_ROOT_WSL="$ROOT"' in source
     assert 'mktemp -p "$ROOT"' in source
     assert 'python3 "$PREFLIGHT"' not in source
     assert "--require-authorized" in source

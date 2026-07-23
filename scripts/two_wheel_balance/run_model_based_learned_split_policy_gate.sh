@@ -74,7 +74,8 @@ if [[ "$SPLIT_MODE" == holdout ]]; then
       "$RISER_MODEL_BASED_LEARNED_SPLIT_PRIOR_VALIDATION_REPORT")"
   )
 fi
-"$ISAAC_PYTHON" "$preflight_win" "${preflight_args[@]}"
+RISER_GIT_ROOT_WSL="$ROOT" \
+  "$ISAAC_PYTHON" "$preflight_win" "${preflight_args[@]}"
 
 if [[ "$RUN_MODE" == --preflight ]]; then
   cat "$receipt"

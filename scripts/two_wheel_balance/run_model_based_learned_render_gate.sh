@@ -47,7 +47,8 @@ to_windows_path() {
     wslpath -w "$1"
   fi
 }
-"$ISAAC_PYTHON" "$(to_windows_path "$PREFLIGHT")" \
+RISER_GIT_ROOT_WSL="$ROOT" \
+  "$ISAAC_PYTHON" "$(to_windows_path "$PREFLIGHT")" \
   --admission "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_ADMISSION")" \
   --all79-report \
   "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_ALL79_REPORT")" \

@@ -41,6 +41,13 @@ def _identity(repo: Path, relative: str) -> dict[str, str]:
     }
 
 
+def _git_blob_sha1(path: Path) -> str:
+    payload = path.read_bytes()
+    return hashlib.sha1(
+        f"blob {len(payload)}\0".encode() + payload
+    ).hexdigest()
+
+
 def _closed_payload() -> dict[str, bool]:
     return {
         "runtime_authorized": False,
@@ -395,7 +402,4 @@ def test_committed_contract_pins_current_identity_bytes() -> None:
     for identity in payload["identities"].values():
         path = ROOT / identity["path"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == identity["sha256"]
-        assert (
-            _run("git", "hash-object", str(path), cwd=ROOT).stdout.strip()
-            == identity["git_blob_sha1"]
-        )
+        assert _git_blob_sha1(path) == identity["git_blob_sha1"]

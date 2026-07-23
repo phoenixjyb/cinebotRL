@@ -376,6 +376,17 @@ PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_pending_corrective_route_queue_cpu_v1/summary.json"
 )
+PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE_V2 = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_pending_corrective_route_queue_cpu_v2/summary.json"
+)
+CASE23_CONVERSION_EXECUTION_EVIDENCE_V3 = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case23_corrective_conversion_execution_cpu_v3/"
+    "summary.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -1729,13 +1740,38 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ] == "231c98bd8374958a4877049085ff002abc6f4cea"
     assert corrective[
         "pending_corrective_route_queue_test_sha256"
-    ] == _sha256(PENDING_CORRECTIVE_ROUTE_QUEUE_TEST)
+    ] == "00c392594b94fb64d321f313fcb4b79672162f52d48f998a116484a6aa0c716b"
     assert corrective[
         "pending_corrective_route_queue_test_git_blob_sha1"
     ] == "6d9c0adcdd3badfb56d9aaa790d6c3d7d6372485"
     assert corrective[
+        "pending_corrective_route_queue_test_identity"
+    ] == "historical_cpu_queue_test"
+    assert corrective[
+        "pending_corrective_route_queue_active_test_sha256"
+    ] == _sha256(PENDING_CORRECTIVE_ROUTE_QUEUE_TEST)
+    assert corrective[
+        "pending_corrective_route_queue_active_test_git_blob_sha1"
+    ] == _git_blob_sha1(PENDING_CORRECTIVE_ROUTE_QUEUE_TEST)
+    assert corrective[
         "pending_corrective_route_queue_summary_sha256"
     ] == _sha256(PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE)
+    assert corrective[
+        "pending_corrective_route_queue_summary_identity"
+    ] == "historical_cpu_queue_evidence_v1"
+    assert corrective[
+        "pending_corrective_route_queue_v2_summary_sha256"
+    ] == _sha256(PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE_V2)
+    assert corrective[
+        "pending_corrective_route_queue_v2_case23_preflight_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_EVIDENCE_V3)
+    assert corrective["pending_corrective_route_queue_v2_ready_count"] == 6
+    assert corrective[
+        "pending_corrective_route_queue_v2_all_preflights_passed"
+    ] is True
+    assert corrective[
+        "pending_corrective_route_queue_v2_all_authorization_closed"
+    ] is True
     assert corrective[
         "pending_corrective_route_queue_ready_count"
     ] == 6
@@ -1794,6 +1830,22 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert route_queue["ppo_authorized"] is False
     assert route_queue["training_started"] is False
     assert route_queue["valid_for_training"] is False
+    route_queue_v2 = json.loads(
+        PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE_V2.read_text()
+    )
+    assert route_queue_v2["passed"] is True
+    assert route_queue_v2["git"]["head"] == (
+        corrective["pending_corrective_route_queue_v2_preflight_commit"]
+    )
+    assert route_queue_v2["ready_route_count"] == 6
+    assert all(route["passed"] for route in route_queue_v2["routes"])
+    assert route_queue_v2["next_bounded_action"] == (
+        "authorize_exactly_one_case23_v4_cpu_conversion"
+    )
+    assert route_queue_v2["dataset_conversion_authorized"] is False
+    assert route_queue_v2["bc_authorized"] is False
+    assert route_queue_v2["ppo_authorized"] is False
+    assert route_queue_v2["training_started"] is False
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

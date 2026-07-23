@@ -7856,3 +7856,32 @@ and must state whether its candidate was accepted or rejected.
 - Do not issue a token or launch v3. A future retry requires a new explicit
   authorization naming exactly one case-23 v3 corrective-label capture.
 - Conversion, corpus merge, BC, PPO, holdouts, and training remain closed.
+
+## Round 201: fresh case-23 v3 route passes CPU-only
+
+- V3 uses fresh namespace
+  `20260723_model_based_corrective_teacher_case23_capture_v3_exclusive` and
+  binds the consumed-v2 rejection manifest. V2 remains non-retryable.
+- Playback now requires capture directory, admission, and an independently
+  pinned `train` or `validation` split together. It forwards the corrective
+  profile's case and the expected split into `load_capture_admission` before
+  `AppLauncher`.
+- The v3 wrapper pins case 23 and split `train`, retains the exact plan,
+  corrective/wrench profiles, LQR, robot, active 400 W plant, safety gates, and
+  out-of-band authorization contract, and contains no token or token hash.
+- The no-token `.98` preflight passes at clean
+  `HEAD == upstream == 90d329cdb1ebaadefefd3696862873eb49f5fd37`.
+  The v3 namespace is absent and runtime/GPU/capture authorization remains
+  false.
+- Focused tests pass `37/37`; the authoritative `.98` suite passes
+  `949 passed, 12 skipped, 2 warnings` in `84.07 s`.
+- Contract SHA-256 and Git blob are
+  `990a20518288f2878fbd7c495dcdc17b8972ffab067f012db7e70a20cc9e3c7c`
+  and `6b25a90beb4b7f2c6f7ba769a60e246466c131dd`.
+
+## Next round after Round 201
+
+- Do not launch v3 without a new explicit instruction authorizing exactly one
+  case-23 v3 corrective-label capture.
+- A v3 pass opens only a conversion audit. A rejection stops for diagnosis.
+  Corpus merge, BC, PPO, holdouts, and training remain separately closed.

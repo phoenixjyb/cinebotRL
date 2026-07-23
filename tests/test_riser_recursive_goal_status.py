@@ -178,6 +178,12 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["case23_capture_v2_runtime_authorized"] is False
     assert corrective["case23_capture_v2_label_capture_authorized"] is False
     assert corrective["case23_capture_v2_conversion_authorized"] is False
+    assert corrective["case23_capture_v2_authorization_consumed"] is True
+    assert corrective["case23_capture_v2_retry_authorized"] is False
+    assert corrective["case23_capture_v3_cpu_ready"] is True
+    assert corrective["case23_capture_v3_runtime_authorized"] is False
+    assert corrective["case23_capture_v3_capture_case_propagated"] is True
+    assert corrective["case23_capture_v3_capture_split_propagated"] is True
     assert corrective["temporal_projection_audit_sha256"] == _sha256(
         TEMPORAL_PROJECTION_AUDIT
     )
@@ -219,7 +225,7 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "exactly_one_case23_v2_capture" in (
+    assert "exactly_one_case23_v3_capture" in (
         goal["next_iteration"]["required_change"]
     )
 

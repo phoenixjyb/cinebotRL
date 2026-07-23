@@ -9289,3 +9289,45 @@ and must state whether its candidate was accepted or rejected.
 
 - The nearest real-data operation remains:
   `Authorize exactly one case-23 v4 CPU conversion.`
+
+## Round 242: runtime action recurrence now matches corrective training data
+
+- Audited the complete offline-to-runtime `65 -> 3` residual-policy contract.
+  Corrective conversion rebuilds each observation's previous-action channels
+  from the prior effective post-supervisor label, while runtime previously
+  carried the requested pre-projection action.
+- Added a projection-aware helper that returns the unchanged safety-clamped
+  high-level command and the normalized residual actually realized after
+  supervisor limits. Runtime now carries that effective action into the next
+  observation under contract
+  `previous_effective_post_supervisor_action_v1`.
+- Kept requested network output separate from effective action and added
+  requested/effective/projection-delta telemetry. The model-based planner,
+  residual scales, safety limits, and final command path are unchanged.
+- Added fail-closed coverage for unprojected parity, per-axis safety
+  projection, invalid planner bases, recurrence ordering, and corrective
+  dataset contract reuse.
+- Implementation commit
+  `22203a348bddfa4d8550ca64b9bbd6f0edc65e07` is pushed and synchronized to
+  `.98`.
+- Resealed every active tokenless route that pins the shared playback or
+  residual modules at commit
+  `be5cd3ca12751db6b23308691d5e8040731e721c`. No archived case-23 capture
+  evidence was changed.
+- Split historical executed/preflight identities from current active contract
+  identities in the goal ledger at commit
+  `09580eedbd4cf1013cb2737bc494449f978606d2`, preventing a current reseal from
+  overwriting historical provenance.
+- Focused CPU contract coverage passes `103` tests. The authoritative `.98`
+  Windows-Isaac Python suite passes:
+  `1313 passed, 12 skipped, 2 warnings in 172.00 s`.
+- No token, runtime namespace, Isaac/GPU workload, capture, conversion, corpus
+  merge, BC, PPO, checkpoint, or training run was created. Goal completion
+  remains `6/10`.
+
+## Next round after Round 242
+
+- The case-23 v4 capture authorization is consumed and must not be replayed.
+- The nearest real-data operation remains separately authorized CPU-only
+  conversion:
+  `Authorize exactly one case-23 v4 CPU conversion.`

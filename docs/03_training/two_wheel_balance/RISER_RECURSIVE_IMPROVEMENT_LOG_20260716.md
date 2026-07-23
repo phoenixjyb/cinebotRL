@@ -8611,6 +8611,11 @@ and must state whether its candidate was accepted or rejected.
 - Status commit `993b81a5bb11e18d5a08d79b667beddb5d9a3b10` passes the
   authoritative `.98` CPU suite:
   `1114 passed, 12 skipped, 2 warnings in 114.32 s`.
+- Verification status commit `b269676a0f5d2afd8184851657cbf65597871e0e`
+  regenerates a byte-identical completion report on macOS and `.98` at
+  SHA-256
+  `ee548294277aa14eaf4e4e140c0b4ed26cdc89849a056e23d52291315cb6a6ab`.
+  The required-gate result remains `6/10`.
 - The requested case-23 v4 capture was not repeated: Round 217 already consumed
   the sole authorization and sealed the successful capture. No token, Isaac
   process, GPU workload, conversion, merge, BC, PPO, or training was created.

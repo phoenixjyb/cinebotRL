@@ -26,6 +26,17 @@ SPEC = importlib.util.spec_from_file_location("case23_capture_summary", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(MODULE)
+V4_SCRIPT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "summarize_model_based_corrective_teacher_case23_capture_v4.py"
+)
+V4_SPEC = importlib.util.spec_from_file_location(
+    "case23_capture_v4_summary", V4_SCRIPT
+)
+V4_MODULE = importlib.util.module_from_spec(V4_SPEC)
+assert V4_SPEC.loader is not None
+V4_SPEC.loader.exec_module(V4_MODULE)
 
 PLAN_SHA = "a" * 64
 PROFILE_SHA = "b" * 64
@@ -33,11 +44,13 @@ PAIR_SHA = "c" * 64
 COMMIT = "d" * 40
 
 
-def _real_case23_fixture(tmp_path: Path, *, capture_case: int = 23):
-    root = tmp_path / MODULE.NAMESPACE
+def _real_case23_fixture(
+    tmp_path: Path, *, capture_case: int = 23, module=MODULE
+):
+    root = tmp_path / module.NAMESPACE
     (root / "capture").mkdir(parents=True)
     contract = {
-        "namespace": MODULE.NAMESPACE,
+        "namespace": module.NAMESPACE,
         "reviewed_parent_commit": "e" * 40,
         "case": 23,
         "split": "train",
@@ -80,7 +93,7 @@ def _real_case23_fixture(tmp_path: Path, *, capture_case: int = 23):
     effective_residual = effective * MODEL_BASED_POLICY_RESIDUAL_SCALES
     delta = effective_residual - requested_residual
     model = np.tile([0.1, 0.0, 0.5], (count, 1))
-    capture_path = root / "capture" / MODULE.CAPTURE_NAME
+    capture_path = root / "capture" / module.CAPTURE_NAME
     save_corrective_capture(
         capture_path,
         {
@@ -212,6 +225,35 @@ def test_real_case23_archive_finalizes_and_converts_only_on_explicit_route(
         payload["observations"][1:, PREVIOUS_ACTION_INDICES],
         payload["actions"][:-1],
     )
+
+
+def test_v4_real_case23_archive_finalizes_without_v2_namespace_leak(
+    tmp_path,
+) -> None:
+    root, admission, capture = _real_case23_fixture(
+        tmp_path, module=V4_MODULE
+    )
+    result = V4_MODULE.summarize(
+        root,
+        admission,
+        runtime_commit=COMMIT,
+        playback_exit_code=0,
+        gpu_release_passed=True,
+    )
+    assert result["passed"] is True
+    assert result["namespace"] == V4_MODULE.NAMESPACE
+    assert result["case"] == 23
+    assert result["capture"]["path"] == str(capture.resolve())
+    assert result["archive_checks"]["loaded"] is True
+    assert all(result["archive_checks"].values())
+    assert all(result["gate_checks"].values())
+    assert all(result["contract_checks"].values())
+    assert result["capture_admitted_for_dataset_conversion"] is True
+    assert result["normalized_training_dataset_created"] is False
+    assert result["bc_authorized"] is False
+    assert result["ppo_authorized"] is False
+    assert result["training_started"] is False
+    assert result["valid_for_training"] is False
 
 
 def test_case23_finalizer_rejects_case30_labeled_capture(tmp_path) -> None:

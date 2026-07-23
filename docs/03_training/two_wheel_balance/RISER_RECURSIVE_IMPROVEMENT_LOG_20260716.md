@@ -7671,3 +7671,41 @@ and must state whether its candidate was accepted or rejected.
   measurement JSON, and run the existing bench audit without relaxing gates.
 - Until then, keep the active 400 W simulation profile and the separately
   unauthorized case-23 capture boundary unchanged.
+
+## Round 196: 750 W supplier responses become machine-auditable
+
+- Added `cinebotrl_two_wheel_riser_supplier_response_v1` and a fixed unanswered
+  response template for the pinned
+  `ELVM8075V48EH-M17-HD + ELD2-CAN7020B` production-design candidate.
+- The response gate binds the axis to a supported guided or synchronized
+  telescoping architecture, exact `0.60--1.80 m` camera range, `1.20 m`
+  software stroke, at least `1.50 m` mechanical stroke, `3:1`,
+  `70 mm/rev`, 8 kg, `1 m/s`, `2 m/s2`, `8 m/s3`, `5 m/s2`, and
+  `300 N` continuous-force requirements.
+- It also requires gearbox speed and emergency-torque margin, written vertical
+  duty/tooth-jump approvals, named regeneration and independent anti-fall
+  designs, at most `30 mm` declared catch distance, hard limits, absorbing end
+  stops, external safety power removal, and seven supporting SHA-256 records.
+  A motor holding brake declared for dynamic stopping is rejected.
+- Even a complete passing response produces only a fail-closed
+  `supplier_evidence` merge fragment for the later bench JSON. It does not
+  approve production procurement, hardware transfer, the 750 W simulation
+  profile, runtime, training, BC, or PPO.
+- The committed blank template has `52` missing fields and correctly returns
+  `collect_complete_signed_supplier_response`. Script/template SHA-256 values
+  are `ef3ffa688589533e4c12dcef8f41d7ce10f6484369a8601b606281b79acc8ce8`
+  and
+  `12bb571bfe58d5f224c7ef84b9f21afa9695a05cc5354dd0566b3a6232b5d47d`.
+  Focused hardware tests pass `38/38`.
+- The authoritative `.98` Windows-Python suite at implementation commit
+  `a48a2914c41988ae6006d210809702e487da8823` passes
+  `915 passed, 12 skipped, 2 warnings` in `78.56 s`.
+
+## Next round after Round 196
+
+- Send the fixed template to candidate axis/gearbox suppliers and require a
+  signed, hash-bound response. Do not infer positive approvals from a quote or
+  a catalog speed line.
+- The separately authorized case-23 capture remains the next software runtime
+  action. Supplier preparation does not authorize capture, conversion, merge,
+  BC, PPO, or any GPU work.

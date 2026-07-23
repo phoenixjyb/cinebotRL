@@ -29,6 +29,14 @@ BENCH_RAW_LOG_TEMPLATE = (
     / "docs/03_training/two_wheel_balance/"
     "RISER_BENCH_RAW_LOG_TEMPLATE_20260723.csv"
 )
+SUPPLIER_RESPONSE_AUDIT = (
+    ROOT / "scripts/two_wheel_balance/audit_riser_supplier_response.py"
+)
+SUPPLIER_RESPONSE_TEMPLATE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "RISER_750W_SUPPLIER_RESPONSE_TEMPLATE_20260723.json"
+)
 
 
 def _goal() -> dict:
@@ -181,6 +189,24 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     )
     assert hardware["bench_raw_log_authoritative_cpu_suite"] == (
         "903_passed_12_skipped_2_warnings_in_80.46s"
+    )
+    assert hardware["supplier_response_contract_schema"] == (
+        "cinebotrl_two_wheel_riser_supplier_response_v1"
+    )
+    assert hardware["supplier_response_audit_sha256"] == _sha256(
+        SUPPLIER_RESPONSE_AUDIT
+    )
+    assert hardware["supplier_response_template_sha256"] == _sha256(
+        SUPPLIER_RESPONSE_TEMPLATE
+    )
+    assert hardware["supplier_response_missing_fields"] == 52
+    assert hardware["supplier_response_collected"] is False
+    assert hardware["supplier_response_valid_for_bench_evidence_merge"] is False
+    assert hardware["supplier_response_authoritative_cpu_commit"] == (
+        "a48a2914c41988ae6006d210809702e487da8823"
+    )
+    assert hardware["supplier_response_authoritative_cpu_suite"] == (
+        "915_passed_12_skipped_2_warnings_in_78.56s"
     )
     assert hardware["ready_for_production_design_review"] is False
     assert hardware["valid_for_production_procurement"] is False

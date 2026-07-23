@@ -8585,3 +8585,37 @@ and must state whether its candidate was accepted or rejected.
   It remains `6/10`; the partial intake is not the required real corpus.
 - The intake audit passes, but `corpus_manifest_ready=false`. It authorizes no
   conversion, merge, capture, runtime, BC, PPO, or training.
+
+## Round 222: case-6 paired readiness is audited CPU-only
+
+- Preserved and hash-bound the selected case-6 smoothed exact-source plan and
+  its passing zero-residual dynamic evidence. The plan contains `807` source
+  states, `806` transitions, a `15.942736 s` source clock, and a
+  `17.737275 s` execution clock. Camera height remains within
+  `0.600000-1.528812 m`.
+- The zero-residual gate remains healthy at `0.118125/0.127080 m` position
+  p95/max and `6.393436 deg` peak pitch. No learned residual is applied and no
+  dataset is produced.
+- Case 6 is not paired-profile ready. Base-linear, base-yaw, and proxy-rate
+  commands reach their current limits, the camera lever-arm correction
+  saturation ratio is `0.958710`, and only one conservative `0.105 s`
+  low-motion window is available.
+- Reusing the case-23 perturbation profile is explicitly forbidden. The next
+  case-6 step is a CPU-only, case-specific corrective and perturbation profile
+  design; it is not a runtime authorization.
+- Implementation/evidence commit
+  `95666c94930eba4f9726a5d8ff3dbb7dcea83a40` passes `24` focused tests on
+  macOS and `.98`. Both platforms regenerate byte-identical evidence at
+  SHA-256
+  `0f74c92b93040b126f8e25ac2470603203f8e07df6e923c1462c3cd24891b5ec`.
+- The requested case-23 v4 capture was not repeated: Round 217 already consumed
+  the sole authorization and sealed the successful capture. No token, Isaac
+  process, GPU workload, conversion, merge, BC, PPO, or training was created.
+  Goal completion remains `6/10`.
+
+## Next round after Round 222
+
+- The nearest data-path action remains a separately authorized, exactly-once
+  case-23 v4 CPU conversion. The capture authorization cannot be reused for
+  conversion or another capture.
+- In parallel, continue CPU-only design of the case-6-specific paired profile.

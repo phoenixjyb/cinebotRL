@@ -19,6 +19,11 @@ be designed and CPU-reviewed. Reusing the case-23 profile is forbidden.
 The only conservative low-motion window found is 0.105 s near the end of the
 execution. This is a design constraint, not runtime admission.
 
+The focused audit suite passes `24` tests on macOS and on `.98` using
+`G:\isaaclab_venv\Scripts\python.exe`. Both platforms emit byte-identical
+`summary.json` evidence at SHA-256
+`0f74c92b93040b126f8e25ac2470603203f8e07df6e923c1462c3cd24891b5ec`.
+
 Runtime, GPU launch, label capture, dataset conversion/merge, BC, PPO, and
 training remain disabled. The already-consumed case-23 v4 capture remains the
 sole v4 capture and is not retryable.

@@ -11,7 +11,7 @@ GOAL = (
 GOAL_COMPLETION_AUDIT = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260724_riser_goal_completion_audit_v2/summary.json"
+    "evidence_20260724_riser_goal_completion_audit_v3/summary.json"
 )
 CASE23_CAPTURE_CONTRACT = (
     ROOT
@@ -2369,9 +2369,9 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     audit = _goal()["current_stage"]["status_refresh_20260723"][
         "goal_completion_audit"
     ]
-    assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v2"
+    assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v3"
     assert audit["implementation_commit"] == (
-        "a3185e211f300cb02c784973931f1b502b5f31cb"
+        "d845d029d12e33cc29543e4cad8627d5b2266f01"
     )
     assert audit["host_independent_lf_evidence"] is True
     assert audit["mac_and_windows_report_byte_parity_verified"] is True
@@ -2521,10 +2521,28 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["pre_training_corrective_case_datasets_available"] == 1
     assert audit["pre_training_required_train_cases"] == 4
     assert audit["pre_training_required_validation_cases"] == 2
-    assert audit["pre_training_next_operation"] == "case23_v4_cpu_conversion"
+    assert audit["pre_training_pending_route_queue_passed"] is True
+    assert audit["pre_training_pending_route_queue_bound_to_goal"] is True
+    assert audit["pre_training_pending_route_queue_ready_count"] == 6
+    assert audit["pre_training_pending_route_queue_identity_count"] == 107
+    assert audit["pre_training_pending_route_queue_execution_order"] == [
+        "case23_conversion",
+        "case6_pair",
+        "case2_pair",
+        "case7_pair",
+        "case8_validation_pair",
+        "case16_validation_pair",
+    ]
+    assert (
+        audit["pre_training_pending_route_queue_all_authorization_closed"]
+        is True
+    )
+    assert audit["pre_training_next_operation"] == (
+        "authorize_exactly_one_case23_v4_cpu_conversion"
+    )
     assert audit["pre_training_next_operation_authorized"] is False
-    assert audit["focused_local_cpu_suite"] == "13_passed_2_warnings_in_2.44s"
-    assert audit["focused_windows_cpu_suite"] == "21_passed_2_warnings_in_9.93s"
+    assert audit["focused_local_cpu_suite"] == "14_passed_2_warnings_in_2.89s"
+    assert audit["focused_windows_cpu_suite"] == "14_passed_2_warnings_in_9.76s"
     assert audit["authoritative_windows_cpu_commit"] == (
         "90f1aad2849e0a9e1029f2834c0db8301e98d0f3"
     )
@@ -2532,12 +2550,12 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "1301_passed_12_skipped_2_warnings_in_173.12s"
     )
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
-        "507e5a0f7161f89610a551ef7e3fa7493744f9d00f816c42663005e41fa85157"
+        "c27491ba9392396d76dc7797231186220dde75f6676c44c12df44ec6666651af"
     )
     report = json.loads(GOAL_COMPLETION_AUDIT.read_text())
-    assert report["git"]["head"] == "a3185e211f300cb02c784973931f1b502b5f31cb"
+    assert report["git"]["head"] == "d845d029d12e33cc29543e4cad8627d5b2266f01"
     assert report["inputs"]["auditor"]["sha256"] == (
-        "52f814bec108bb445d15116ba103a9b68d7410d52660b922d77d5d78ea4d33dc"
+        "90218bbab36d456cdd3f47f56e0ebd7499d951e64175b9c62df8eead93ba178f"
     )
     assert report["required_gate_pass_count"] == audit["required_gate_pass_count"]
     assert report["required_gate_count"] == audit["required_gate_count"]
@@ -2547,4 +2565,20 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert report["bc_started_by_audit"] is False
     assert report["ppo_started_by_audit"] is False
     assert report["pre_training_readiness"]["architecture_contract_passed"] is True
+    assert report["pre_training_readiness"]["pending_route_queue_passed"] is True
+    assert report["pre_training_readiness"][
+        "pending_route_queue_bound_to_goal"
+    ] is True
+    assert report["pre_training_readiness"][
+        "pending_route_queue_ready_count"
+    ] == 6
+    assert report["pre_training_readiness"][
+        "pending_route_queue_identity_count"
+    ] == 107
+    assert report["pre_training_readiness"][
+        "pending_route_queue_all_authorization_closed"
+    ] is True
+    assert report["inputs"]["pending_route_queue"]["sha256"] == (
+        "ef32652ac98d1103d431f7b3ae96d63c3311e3a7fba0b9a92061a1e1b16892cd"
+    )
     assert report["pre_training_readiness"]["ready_for_bc_execution"] is False

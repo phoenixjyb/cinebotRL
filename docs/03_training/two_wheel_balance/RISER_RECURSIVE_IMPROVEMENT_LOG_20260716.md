@@ -9171,6 +9171,8 @@ and must state whether its candidate was accepted or rejected.
   remain false for the aggregate and each route.
 - Focused macOS and `.98` suites pass `25` tests. Aggregate summary SHA-256 is
   `b516f8e2f0fe8bc7f21a2837c9d0a56387990a2c1db59247f60a62d0dbe65488`.
+- The authoritative `.98` CPU suite passes:
+  `1297 passed, 12 skipped, 2 warnings in 172.43 s`.
 - The repeated case-23 v4 corrective-label capture was not replayed. No token,
   runtime namespace, Isaac/GPU workload, capture, conversion, dataset, BC,
   PPO, or training was created. Goal completion remains `6/10`.

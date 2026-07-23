@@ -1,0 +1,17 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_learned_render_visual_review_v1",
+  "cases": [1, 15, 31, 50, 73, 79],
+  "videos": [],
+  "reviewer": "",
+  "reviewed_at_utc": "",
+  "visual_checks": {
+    "robot_asset_intact": false,
+    "riser_motion_visible": false,
+    "camera_and_gimbal_visible": false,
+    "wheel_ground_contact_plausible": false,
+    "no_detached_links": false,
+    "no_abnormal_oscillation": false
+  },
+  "notes": "",
+  "passed": false
+}

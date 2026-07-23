@@ -269,7 +269,36 @@ rollout JSON。
 
 ## Gate E：渲染与最终晋级
 
-Gate D 通过后，从简单、case 15、固定路径、联合自适应、低位、高位和长时长轨迹中选择代表 case 录制 RTX offscreen MP4。检查机器人结构、轮地接触、升降柱、云台姿态、目标轨迹和异常摆动。
+Gate D 通过后，固定录制代表 case `[1,15,31,50,73,79]`，覆盖简单、
+case-15 限偏航、固定路径、联合自适应、低位、高升降运动和长时长轨迹。
+当前入口为：
+
+```bash
+bash scripts/two_wheel_balance/run_model_based_learned_render_gate.sh \
+  --preflight
+```
+
+另行签发 hash-bound render admission 后才允许 `--execute`。入口必须绑定
+Gate-D all-79 报告、策略、exact-source、plan、LQR、USD、drive profile、
+代码 commit 和新的 namespace，并独占 GPU。录制使用 D3D12 offscreen RTX、
+完整 model-based planner、`[0.05,0.05,0.02]` 学习残差和与 Gate D
+完全相同的控制参数。
+
+运行结束只生成 rollout gate、MP4 与 `ffprobe` media manifest，不会自动
+宣称视觉通过。人工必须基于实际六个视频填写独立 visual-review JSON，
+逐项确认机器人结构完整、升降运动可见、camera/gimbal 可见、轮地接触可信、
+无脱落 link、无异常振荡。然后运行：
+
+```bash
+python3 scripts/two_wheel_balance/finalize_model_based_learned_render.py \
+  --media-manifest <media_manifest.json> \
+  --visual-review <completed_visual_review.json> \
+  --output <learned_render_audit.json>
+```
+
+finalizer 和最终 goal auditor 会重新验证 admission、preflight、每条 rollout、
+每个 MP4 哈希与媒体参数、reviewer 和 review 时间。模板中的 false 值不能
+作为通过证据。
 
 只有以下证据同时存在，DNN 才能成为新 baseline：
 

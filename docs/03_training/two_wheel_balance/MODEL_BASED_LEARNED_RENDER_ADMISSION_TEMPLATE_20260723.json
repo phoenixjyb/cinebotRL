@@ -1,0 +1,53 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_learned_render_admission_v1",
+  "all79_report": {"path": null, "sha256": null},
+  "all79_admission": {"path": null, "sha256": null},
+  "all79_preflight": {"path": null, "sha256": null},
+  "policy": {"path": null, "sha256": null},
+  "plan_manifest": {"path": null, "sha256": null},
+  "source_manifest": {"path": null, "sha256": null},
+  "lqr_gains": {"path": null, "sha256": null},
+  "robot_build_audit": {"path": null, "sha256": null},
+  "robot_usd": {"path": null, "sha256": null},
+  "drive_profile_selection": {"path": null, "sha256": null},
+  "execution_commit": null,
+  "code": {
+    "playback": {"path": null, "sha256": null},
+    "admission_contract": {"path": null, "sha256": null},
+    "preflight_validator": {"path": null, "sha256": null},
+    "execution_wrapper": {"path": null, "sha256": null},
+    "media_auditor": {"path": null, "sha256": null},
+    "report_finalizer": {"path": null, "sha256": null},
+    "completion_auditor": {"path": null, "sha256": null}
+  },
+  "cases": [1, 15, 31, 50, 73, 79],
+  "case_roles": {
+    "1": ["simple", "joint_adaptive"],
+    "15": ["case15_yaw_limited"],
+    "31": ["fixed_path", "low_height"],
+    "50": ["low_height_shift"],
+    "73": ["joint_adaptive", "high_riser_motion"],
+    "79": ["long_duration"]
+  },
+  "render_config": {
+    "tracking_profile": "riser_recovery_direction_v4_camera_lever_arm_v1",
+    "policy_command_contract": "model_based_planner_plus_bounded_policy_residual_v1",
+    "residual_action_scales": [0.05, 0.05, 0.02],
+    "controller_wz_kp": 1.05,
+    "maximum_duration_scale": 3.0,
+    "camera_lever_arm_compensation_gain": 1.0,
+    "maximum_camera_lever_arm_correction_m": 0.05,
+    "video_frame_stride": 8,
+    "video_fps": 25,
+    "minimum_width": 1280,
+    "minimum_height": 720,
+    "minimum_duration_s": 3.0
+  },
+  "all79_gate_passed": false,
+  "render_evaluation_approved": false,
+  "learned_render_authorized": false,
+  "residual_capture_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false
+}

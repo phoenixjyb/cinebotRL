@@ -123,7 +123,12 @@ LEARNED_RENDER_REPORT_FIELDS = {
     "schema",
     "policy",
     "source_all79_report",
+    "render_admission",
+    "render_preflight",
+    "media_manifest",
+    "visual_review",
     "cases",
+    "rollout_gates",
     "videos",
     "visual_checks",
     "passed",
@@ -144,8 +149,11 @@ LEARNED_RENDER_VISUAL_CHECKS = {
     "robot_asset_intact",
     "riser_motion_visible",
     "camera_and_gimbal_visible",
+    "wheel_ground_contact_plausible",
     "no_detached_links",
+    "no_abnormal_oscillation",
 }
+LEARNED_RENDER_ROLLOUT_FIELDS = {"case", "path", "sha256"}
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -374,13 +382,13 @@ def _validate_learned_render_report(
     if (
         set(report) != LEARNED_RENDER_REPORT_FIELDS
         or report.get("schema")
-        != "cinebotrl_two_wheel_riser_learned_render_audit_v1"
+        != "cinebotrl_two_wheel_riser_learned_render_audit_v2"
         or not isinstance(cases, list)
-        or len(cases) < 3
-        or cases != sorted(set(cases))
-        or any(not isinstance(case, int) or not 1 <= case <= 79 for case in cases)
+        or cases != [1, 15, 31, 50, 73, 79]
         or not isinstance(videos, list)
         or len(videos) != len(cases)
+        or not isinstance(report.get("rollout_gates"), list)
+        or len(report["rollout_gates"]) != len(cases)
         or not isinstance(visual_checks, Mapping)
         or set(visual_checks) != LEARNED_RENDER_VISUAL_CHECKS
         or not all(value is True for value in visual_checks.values())
@@ -401,6 +409,127 @@ def _validate_learned_render_report(
         directory=report_directory,
         expected_path=all79_report_path,
     )
+    admission_path = _resolve_identity(
+        report.get("render_admission"),
+        directory=report_directory,
+    )
+    preflight_path = _resolve_identity(
+        report.get("render_preflight"),
+        directory=report_directory,
+    )
+    media_path = _resolve_identity(
+        report.get("media_manifest"),
+        directory=report_directory,
+    )
+    review_path = _resolve_identity(
+        report.get("visual_review"),
+        directory=report_directory,
+    )
+    media = _load_json(media_path)
+    review = _load_json(review_path)
+    render_admission = _load_json(admission_path)
+    render_preflight = _load_json(preflight_path)
+    media_checks = media.get("media_checks")
+    if (
+        render_admission.get("schema")
+        != "cinebotrl_two_wheel_riser_model_based_learned_render_admission_v1"
+        or render_admission.get("cases") != cases
+        or render_admission.get("all79_gate_passed") is not True
+        or render_admission.get("render_evaluation_approved") is not True
+        or render_admission.get("learned_render_authorized") is not True
+        or render_admission.get("residual_capture_authorized") is not False
+        or render_admission.get("bc_authorized") is not False
+        or render_admission.get("ppo_authorized") is not False
+        or render_admission.get("training_started") is not False
+        or render_preflight.get("schema")
+        != "cinebotrl_two_wheel_riser_model_based_learned_render_preflight_v1"
+        or render_preflight.get("cases") != cases
+        or render_preflight.get("passed") is not True
+        or render_preflight.get("runtime_started") is not False
+        or render_preflight.get("recording_started") is not False
+        or _sha256(
+            _resolve_identity(
+                render_preflight.get("admission"),
+                directory=preflight_path.parent,
+            )
+        )
+        != _sha256(admission_path)
+        or media.get("schema")
+        != "cinebotrl_two_wheel_riser_learned_render_media_manifest_v1"
+        or media.get("passed") is not True
+        or media.get("manual_visual_review_required") is not True
+        or media.get("cases") != cases
+        or media.get("videos") != videos
+        or media.get("rollout_gates") != report["rollout_gates"]
+        or not isinstance(media_checks, Mapping)
+        or set(media_checks) != {str(case) for case in cases}
+        or any(
+            not isinstance(value, Mapping)
+            or not value
+            or not all(check is True for check in value.values())
+            for value in media_checks.values()
+        )
+        or media.get("policy") != report["policy"]
+        or media.get("source_all79_report") != report["source_all79_report"]
+        or _sha256(
+            _resolve_identity(media.get("admission"), directory=media_path.parent)
+        )
+        != _sha256(admission_path)
+        or _sha256(
+            _resolve_identity(media.get("preflight"), directory=media_path.parent)
+        )
+        != _sha256(preflight_path)
+        or media.get("runtime_started") is not True
+        or media.get("recording_started") is not True
+        or media.get("training_started") is not False
+        or media.get("ppo_authorized") is not False
+        or review.get("schema")
+        != "cinebotrl_two_wheel_riser_learned_render_visual_review_v1"
+        or review.get("cases") != cases
+        or review.get("videos") != videos
+        or review.get("visual_checks") != visual_checks
+        or not isinstance(review.get("reviewer"), str)
+        or not review["reviewer"].strip()
+        or not isinstance(review.get("reviewed_at_utc"), str)
+        or not review["reviewed_at_utc"].endswith("Z")
+        or review.get("passed") is not True
+    ):
+        raise ValueError("learned render provenance or visual review is invalid")
+    for expected_case, rollout in zip(
+        cases,
+        report["rollout_gates"],
+        strict=True,
+    ):
+        if (
+            not isinstance(rollout, Mapping)
+            or set(rollout) != LEARNED_RENDER_ROLLOUT_FIELDS
+            or rollout.get("case") != expected_case
+        ):
+            raise ValueError(f"learned render rollout {expected_case} is invalid")
+        _resolve_identity(
+            {"path": rollout["path"], "sha256": rollout["sha256"]},
+            directory=report_directory,
+        )
+        rollout_path = _resolve_identity(
+            {"path": rollout["path"], "sha256": rollout["sha256"]},
+            directory=report_directory,
+        )
+        rollout_payload = _load_json(rollout_path)
+        if (
+            rollout_payload.get("cases") != [expected_case]
+            or rollout_payload.get("passed") is not True
+            or rollout_payload.get("trajectory_command_source")
+            != "model_based_planner_plus_torchscript_residual"
+            or rollout_payload.get("tracking_profile")
+            != "riser_recovery_direction_v4_camera_lever_arm_v1"
+            or rollout_payload.get("policy_command_base")
+            != "model_based_planner"
+            or rollout_payload.get("residual_action_scales")
+            != [0.05, 0.05, 0.02]
+        ):
+            raise ValueError(
+                f"learned render rollout {expected_case} contract is invalid"
+            )
     for expected_case, video in zip(cases, videos, strict=True):
         if (
             not isinstance(video, Mapping)

@@ -413,7 +413,8 @@ def _valid_render_report(
     all79 = tmp_path / "all79.json"
     all79.write_bytes(b"all79\n")
     videos = []
-    for case in (1, 31, 73):
+    rollouts = []
+    for case in (1, 15, 31, 50, 73, 79):
         path = tmp_path / f"case_{case:04d}.mp4"
         path.write_bytes(f"video-{case}".encode())
         videos.append(
@@ -427,18 +428,116 @@ def _valid_render_report(
                 "duration_s": 10.0,
             }
         )
-    return {
-        "schema": "cinebotrl_two_wheel_riser_learned_render_audit_v1",
+        rollout = tmp_path / f"case_{case:04d}.json"
+        rollout.write_text(
+            json.dumps(
+                {
+                    "cases": [case],
+                    "passed": True,
+                    "trajectory_command_source": (
+                        "model_based_planner_plus_torchscript_residual"
+                    ),
+                    "tracking_profile": (
+                        "riser_recovery_direction_v4_camera_lever_arm_v1"
+                    ),
+                    "policy_command_base": "model_based_planner",
+                    "residual_action_scales": [0.05, 0.05, 0.02],
+                }
+            ),
+            encoding="utf-8",
+        )
+        rollouts.append({"case": case, **_identity(rollout)})
+    admission = tmp_path / "render_admission.json"
+    admission.write_text(
+        json.dumps(
+            {
+                "schema": (
+                    "cinebotrl_two_wheel_riser_"
+                    "model_based_learned_render_admission_v1"
+                ),
+                "cases": [1, 15, 31, 50, 73, 79],
+                "all79_gate_passed": True,
+                "render_evaluation_approved": True,
+                "learned_render_authorized": True,
+                "residual_capture_authorized": False,
+                "bc_authorized": False,
+                "ppo_authorized": False,
+                "training_started": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    preflight = tmp_path / "render_preflight.json"
+    preflight.write_text(
+        json.dumps(
+            {
+                "schema": (
+                    "cinebotrl_two_wheel_riser_"
+                    "model_based_learned_render_preflight_v1"
+                ),
+                "cases": [1, 15, 31, 50, 73, 79],
+                "admission": _identity(admission),
+                "passed": True,
+                "runtime_started": False,
+                "recording_started": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    visual_checks = {
+        "robot_asset_intact": True,
+        "riser_motion_visible": True,
+        "camera_and_gimbal_visible": True,
+        "wheel_ground_contact_plausible": True,
+        "no_detached_links": True,
+        "no_abnormal_oscillation": True,
+    }
+    media = {
+        "schema": "cinebotrl_two_wheel_riser_learned_render_media_manifest_v1",
         "policy": _identity(policy),
         "source_all79_report": _identity(all79),
-        "cases": [1, 31, 73],
+        "admission": _identity(admission),
+        "preflight": _identity(preflight),
+        "cases": [1, 15, 31, 50, 73, 79],
+        "rollout_gates": rollouts,
         "videos": videos,
-        "visual_checks": {
-            "robot_asset_intact": True,
-            "riser_motion_visible": True,
-            "camera_and_gimbal_visible": True,
-            "no_detached_links": True,
+        "media_checks": {
+            str(case): {"passed": True}
+            for case in (1, 15, 31, 50, 73, 79)
         },
+        "manual_visual_review_required": True,
+        "runtime_started": True,
+        "recording_started": True,
+        "training_started": False,
+        "ppo_authorized": False,
+        "passed": True,
+    }
+    media_path = tmp_path / "media.json"
+    media_path.write_text(json.dumps(media), encoding="utf-8")
+    review = {
+        "schema": "cinebotrl_two_wheel_riser_learned_render_visual_review_v1",
+        "cases": [1, 15, 31, 50, 73, 79],
+        "videos": videos,
+        "reviewer": "test-reviewer",
+        "reviewed_at_utc": "2026-07-23T12:00:00Z",
+        "visual_checks": visual_checks,
+        "notes": "",
+        "passed": True,
+    }
+    review_path = tmp_path / "review.json"
+    review_path.write_text(json.dumps(review), encoding="utf-8")
+    return {
+        "schema": "cinebotrl_two_wheel_riser_learned_render_audit_v2",
+        "policy": _identity(policy),
+        "source_all79_report": _identity(all79),
+        "render_admission": _identity(admission),
+        "render_preflight": _identity(preflight),
+        "media_manifest": _identity(media_path),
+        "visual_review": _identity(review_path),
+        "cases": [1, 15, 31, 50, 73, 79],
+        "rollout_gates": rollouts,
+        "videos": videos,
+        "visual_checks": visual_checks,
         "passed": True,
         "training_started": False,
         "ppo_authorized": False,
@@ -461,14 +560,20 @@ def test_render_validator_binds_policy_all79_videos_and_visual_review(
 def test_render_validator_rejects_forged_video_and_detached_robot(
     tmp_path: Path,
 ) -> None:
-    for mutation in ("video", "detached"):
+    for mutation in ("video", "detached", "reviewer"):
         directory = tmp_path / mutation
         directory.mkdir()
         report, policy, all79 = _valid_render_report(directory)
         if mutation == "video":
             report["videos"][0]["sha256"] = "0" * 64
-        else:
+        elif mutation == "detached":
             report["visual_checks"]["no_detached_links"] = False
+        else:
+            review_path = directory / report["visual_review"]["path"]
+            review = json.loads(review_path.read_text(encoding="utf-8"))
+            review["reviewer"] = ""
+            review_path.write_text(json.dumps(review), encoding="utf-8")
+            report["visual_review"] = _identity(review_path)
         try:
             MODULE._validate_learned_render_report(
                 report,

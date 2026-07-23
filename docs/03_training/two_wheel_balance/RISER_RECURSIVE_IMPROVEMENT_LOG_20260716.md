@@ -8304,3 +8304,39 @@ and must state whether its candidate was accepted or rejected.
   authorized case-23 v4 corrective-label capture.
 - A passing v4 capture still advances only the corrective corpus. Validation,
   holdout, learned all-79, rendering, and PPO remain separately gated.
+
+## Round 214: current model-based learned all-79 route is fail-closed
+
+- Replaced the historical phase-feedforward learned-rollout assumptions with a
+  future-only model-based route using residual scales `[0.05, 0.05, 0.02]`,
+  tracking profile `riser_recovery_direction_v4_camera_lever_arm_v1`, and the
+  current fixed controller and lever-arm settings.
+- The admission now binds the exact-source manifest, all-79 plan manifest and
+  every plan file, LQR gains, robot build audit, robot USD, drive profile,
+  validation and holdout reports, execution commit, evaluator and wrapper code,
+  and every raw teacher and learned rollout JSON.
+- Added a CPU-only preflight receipt and a guarded execute/resume wrapper.
+  Preflight requires clean `HEAD == upstream == BC execution commit`; resume
+  requires byte-identical admission and preflight evidence. A missing or
+  mismatched identity rejects before Isaac or a runtime namespace.
+- The rollout gate and completion auditor independently revalidate provenance,
+  raw rollout hashes, all 79 case rows, model-based command semantics, and the
+  fixed regression gates. The legacy all-79 wrapper remains historical and is
+  explicitly invalid for this route.
+- Implementation commit
+  `09df01ab7a0db3581ba36fa2a16d3b70852e97aa` passes `36` focused tests
+  with two known pytest-config warnings on macOS and `.98` Windows Python.
+  The real `.98` exact-source and v16 plan manifests pass the new CPU-only
+  source, timestamp, ordered-anchor, transition, and file-hash checks.
+- No learned admission, runtime token, namespace, Isaac process, capture, BC,
+  PPO, learned rollout, or GPU workload was created. Goal completion remains
+  `6/10`.
+
+## Next round after Round 214
+
+- The only prepared runtime operation remains exactly one separately
+  authorized case-23 v4 corrective-label capture. The consumed v3 instruction
+  cannot authorize a retry or v4.
+- After a real `4+2` corpus and separately admitted BC exist, populate the
+  model-based learned all-79 admission and run preflight before considering a
+  learned-policy rollout.

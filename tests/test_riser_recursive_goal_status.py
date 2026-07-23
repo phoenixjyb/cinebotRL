@@ -661,7 +661,7 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     ]
     assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v1"
     assert audit["implementation_commit"] == (
-        "abd9d616da4881b844f8506aeff1c9443dcf0b86"
+        "09df01ab7a0db3581ba36fa2a16d3b70852e97aa"
     )
     assert audit["host_independent_lf_evidence"] is True
     assert audit["mac_and_windows_report_byte_parity_verified"] is True
@@ -671,10 +671,23 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "cinebotrl_two_wheel_riser_model_based_learned_all79_admission_v1"
     )
     assert audit["learned_all79_admission_template_sha256"] == (
-        "cd3314b3df95881e54fbac0e26666af9ec5cbf0c8debdf343fdcb353c50859a3"
+        "955cbe3068aa0bb2f8b601dbeddd283b86aab6ebb23034315f0bf1ef4d1ed438"
     )
     assert audit["learned_all79_admission_implementation_commit"] == (
-        "abd9d616da4881b844f8506aeff1c9443dcf0b86"
+        "09df01ab7a0db3581ba36fa2a16d3b70852e97aa"
+    )
+    assert audit["learned_all79_exact_source_and_plan_identity_bound"] is True
+    assert audit["learned_all79_runtime_asset_identity_bound"] is True
+    assert audit["learned_all79_raw_rollout_hashes_required"] is True
+    assert audit["learned_all79_model_based_route_required"] is True
+    assert audit["learned_all79_preflight_and_resume_contract_required"] is True
+    assert audit["learned_all79_execution_wrapper_sha256"] == _sha256(
+        ROOT / "scripts/two_wheel_balance/run_model_based_learned_all79_policy_gate.sh"
+    )
+    assert audit["learned_all79_preflight_validator_sha256"] == _sha256(
+        ROOT
+        / "scripts/two_wheel_balance/"
+        "validate_model_based_learned_all79_admission.py"
     )
     assert audit["learned_all79_requires_validation_and_holdout"] is True
     assert audit["learned_all79_runtime_authorized"] is False
@@ -694,8 +707,8 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["runtime_started"] is False
     assert audit["bc_started_by_audit"] is False
     assert audit["ppo_started_by_audit"] is False
-    assert audit["focused_local_cpu_suite"] == "34_passed_2_warnings"
-    assert audit["focused_windows_cpu_suite"] == "34_passed_2_warnings"
+    assert audit["focused_local_cpu_suite"] == "36_passed_2_warnings"
+    assert audit["focused_windows_cpu_suite"] == "36_passed_2_warnings"
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
         "3d78e8f9179f35fd9117842257877ec1e8deb5260b0ec7d03cd16d40e5f73317"
     )

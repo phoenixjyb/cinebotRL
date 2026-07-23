@@ -31,9 +31,11 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_corpus imp
     load_corpus,
 )
 from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_bc_adapter import (  # noqa: E402
+    MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT,
     build_projection_aware_bc_preflight,
     build_projection_aware_split,
     evaluate_projection_aware_model,
+    evaluate_projection_aware_recursive_model,
     train_projection_aware_epoch,
 )
 from rl_platform.tasks.two_wheel_balance.riser_model_based_bc_loss import (  # noqa: E402
@@ -251,6 +253,7 @@ def _projection_training_config(args: argparse.Namespace) -> dict[str, object]:
         ),
         "model_selection_split": "validation",
         "optimizer_steps_per_epoch": 1,
+        "recursive_effective_action_validation_required": True,
     }
 
 
@@ -683,6 +686,27 @@ def _projection_report_metrics(
     }
 
 
+def _recursive_projection_report_metrics(
+    metrics: dict[str, object],
+    *,
+    minimum_improvement_fraction: float,
+) -> dict[str, object]:
+    common = _projection_report_metrics(
+        metrics,
+        minimum_improvement_fraction=minimum_improvement_fraction,
+    )
+    return {
+        "recurrence_contract": metrics["recurrence_contract"],
+        "row_count": metrics["row_count"],
+        "case_count": metrics["case_count"],
+        "case_reset_count": metrics["case_reset_count"],
+        **common,
+        "projected_action_abs_max": metrics["projected_action_abs_max"],
+        "projection_clipped_rows": metrics["projection_clipped_rows"],
+        "requested_rate_abs_max": metrics["requested_rate_abs_max"],
+    }
+
+
 def run_projection_aware_bc(
     args: argparse.Namespace,
     metadata: dict[str, object],
@@ -801,6 +825,12 @@ def run_projection_aware_bc(
         device=device,
         batch_size=args.batch_size,
     )
+    recursive_validation_evaluation = evaluate_projection_aware_recursive_model(
+        model,
+        validation_split,
+        loss,
+        device=device,
+    )
     split_metrics = {
         "train": _projection_report_metrics(
             train_evaluation,
@@ -811,12 +841,21 @@ def run_projection_aware_bc(
             minimum_improvement_fraction=args.minimum_improvement_fraction,
         ),
     }
+    recursive_validation_metrics = _recursive_projection_report_metrics(
+        recursive_validation_evaluation,
+        minimum_improvement_fraction=args.minimum_improvement_fraction,
+    )
     validation_metrics = split_metrics["validation"]
     offline_gate_passed = (
         all(validation_metrics["improves_over_zero_requested"])
         and max(validation_metrics["requested_action_abs_max"])
         < args.maximum_normalized_prediction_abs
         and validation_metrics["requested_slew_violation_count"] == [0, 0, 0]
+        and all(recursive_validation_metrics["improves_over_zero_requested"])
+        and max(recursive_validation_metrics["requested_action_abs_max"])
+        < args.maximum_normalized_prediction_abs
+        and recursive_validation_metrics["requested_slew_violation_count"]
+        == [0, 0, 0]
     )
     args.output_dir.mkdir(parents=True)
     checkpoint_identity = None
@@ -854,6 +893,9 @@ def run_projection_aware_bc(
                 "execution_commit": execution_commit,
                 "optimizer_contract": admission["optimizer_contract"],
                 "validation_contract": admission["validation_contract"],
+                "recursive_validation_contract": (
+                    MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT
+                ),
                 **action_semantics,
                 "best_epoch": best_epoch,
             },
@@ -880,6 +922,10 @@ def run_projection_aware_bc(
         "best_epoch": best_epoch,
         "history": history,
         "split_metrics": split_metrics,
+        "recursive_validation_contract": (
+            MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT
+        ),
+        "recursive_validation_metrics": recursive_validation_metrics,
         "offline_gate_passed": offline_gate_passed,
         "holdout_used_for_model_selection": False,
         "holdout_metrics_computed": False,

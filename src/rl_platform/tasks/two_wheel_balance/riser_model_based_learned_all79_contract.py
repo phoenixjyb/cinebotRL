@@ -21,9 +21,7 @@ from .riser_model_based_policy_artifact import (
 MODEL_BASED_LEARNED_ALL79_ADMISSION_SCHEMA = (
     "cinebotrl_two_wheel_riser_model_based_learned_all79_admission_v1"
 )
-BC_REPORT_SCHEMA = (
-    "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_report_v1"
-)
+BC_REPORT_SCHEMA = MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA
 VALIDATION_GATE_SCHEMA = (
     "cinebotrl_two_wheel_riser_residual_validation_canary_gate_v1"
 )

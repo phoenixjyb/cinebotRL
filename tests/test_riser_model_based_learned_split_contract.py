@@ -50,10 +50,7 @@ def _fixture(
     bc_admission = tmp_path / "bc_admission.json"
     bc_admission.write_text("{}\n", encoding="utf-8")
     bc_report = {
-        "schema": (
-            "cinebotrl_two_wheel_riser_"
-            "model_based_corrective_bc_execution_report_v1"
-        ),
+        "schema": all79_contract.BC_REPORT_SCHEMA,
         "admission": _identity(bc_admission),
         "execution_commit": EXECUTION_COMMIT,
         "split_cases": {

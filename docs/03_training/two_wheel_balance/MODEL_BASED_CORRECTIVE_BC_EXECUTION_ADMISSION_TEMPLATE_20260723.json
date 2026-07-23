@@ -10,11 +10,11 @@
   "code": {
     "trainer": {
       "path": "scripts/two_wheel_balance/train_riser_residual_bc.py",
-      "sha256": "19c83df9d796342eca13f15f6d693c191b1029d0695c8e1b38d5ed403b800ac9"
+      "sha256": "385853cec54143f583015c13426eb30db0bb1f6258db2beaf76458cc7eda816e"
     },
     "adapter": {
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_bc_adapter.py",
-      "sha256": "946e205daf98c36c7141536ec2ddd3073190b7d76f0e8224d066e3e309284a48"
+      "sha256": "32ed889eb9836091be3873416103c4290dee8b25702d17b546c71d269934c01e"
     },
     "loss_module": {
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_bc_loss.py",
@@ -30,11 +30,11 @@
     },
     "admission_module": {
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_bc_contract.py",
-      "sha256": "6ecb07eaa6fe9e5ef95115e91b8b3e8c164a2fb4e9bcea66bb892e30a0bfbe2f"
+      "sha256": "b36e8d05d95f2f278350be38e3ad2debe014304712efc52161e71a5513e3a32f"
     }
   },
   "optimizer_contract": "exact_case_balanced_projection_aware_gradient_accumulation_v1",
-  "validation_contract": "projected_effective_action_case_balanced_validation_v1",
+  "validation_contract": "projected_effective_action_case_balanced_recursive_validation_v2",
   "loss_contract": "model_based_projected_effective_action_bc_loss_v1",
   "projection_contract": "model_based_residual_safety_projection_v1",
   "training_config": {
@@ -60,7 +60,8 @@
     "minimum_improvement_fraction": 0.05,
     "maximum_normalized_prediction_abs": 0.95,
     "model_selection_split": "validation",
-    "optimizer_steps_per_epoch": 1
+    "optimizer_steps_per_epoch": 1,
+    "recursive_effective_action_validation_required": true
   },
   "split_cases": {
     "train": [],

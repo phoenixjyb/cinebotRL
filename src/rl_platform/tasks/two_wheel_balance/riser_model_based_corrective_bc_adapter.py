@@ -16,6 +16,7 @@ from .riser_model_based_corrective_training_dataset import (
     MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA,
     validate_training_dataset,
 )
+from .riser_residual_dataset import PREVIOUS_ACTION_INDICES
 
 MODEL_BASED_CORRECTIVE_BC_PREFLIGHT_SCHEMA = (
     "cinebotrl_two_wheel_riser_model_based_corrective_bc_preflight_v1"
@@ -27,7 +28,10 @@ MODEL_BASED_CORRECTIVE_BC_OPTIMIZER_CONTRACT = (
     "exact_case_balanced_projection_aware_gradient_accumulation_v1"
 )
 MODEL_BASED_CORRECTIVE_BC_VALIDATION_CONTRACT = (
-    "projected_effective_action_case_balanced_validation_v1"
+    "projected_effective_action_case_balanced_recursive_validation_v2"
+)
+MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT = (
+    "case_reset_recursive_effective_action_validation_v1"
 )
 
 
@@ -364,6 +368,128 @@ def evaluate_projection_aware_model(
         "loss_total": float(total_loss.item()),
         "loss_pointwise": float(pointwise_loss.item()),
         "loss_requested_slew": float(slew_loss.item()),
+        "case_balanced_mse_per_action": candidate_mse.tolist(),
+        "zero_requested_case_balanced_mse_per_action": zero_mse.tolist(),
+        "improves_over_zero_requested": (candidate_mse < zero_mse).tolist(),
+        "requested_action_abs_max": np.max(np.abs(requested), axis=0).tolist(),
+        "projected_action_abs_max": np.max(np.abs(projected), axis=0).tolist(),
+        "projection_clipped_rows": int(np.any(clipped, axis=1).sum()),
+        "requested_rate_abs_max": np.max(requested_rates, axis=0).tolist(),
+        "requested_slew_violation_count": np.sum(
+            requested_rates > maximum_rates[None, :] + 1e-7,
+            axis=0,
+        ).tolist(),
+    }
+
+
+def evaluate_projection_aware_recursive_model(
+    model: torch.nn.Module,
+    split: Mapping[str, np.ndarray],
+    loss: ModelBasedProjectedBCLoss,
+    *,
+    device: torch.device,
+) -> dict[str, object]:
+    """Evaluate the runtime recurrence using prior projected policy actions."""
+
+    observations = np.asarray(split["observations"], dtype=np.float32)
+    targets = np.asarray(split["effective_target_actions"], dtype=np.float32)
+    model_commands = np.asarray(split["model_based_commands"], dtype=np.float32)
+    case_ids = np.asarray(split["case_ids"], dtype=np.int64)
+    transition_valid = np.asarray(split["transition_valid"])
+    delta_time_s = np.asarray(split["delta_time_s"], dtype=np.float32)
+    source_rows = np.asarray(split["source_row_index"], dtype=np.int64)
+    row_count = len(observations)
+    if (
+        row_count <= 0
+        or observations.ndim != 2
+        or observations.shape[1] <= max(PREVIOUS_ACTION_INDICES)
+        or targets.shape != (row_count, 3)
+        or model_commands.shape != (row_count, 3)
+        or case_ids.shape != (row_count,)
+        or transition_valid.shape != (row_count,)
+        or transition_valid.dtype != np.bool_
+        or delta_time_s.shape != (row_count,)
+        or source_rows.shape != (row_count,)
+        or not np.isfinite(observations).all()
+        or not np.isfinite(targets).all()
+        or not np.isfinite(model_commands).all()
+        or not np.isfinite(delta_time_s).all()
+    ):
+        raise ValueError("recursive projection validation input mismatch")
+
+    requested = np.zeros((row_count, 3), dtype=np.float32)
+    projected = np.zeros((row_count, 3), dtype=np.float32)
+    clipped = np.zeros((row_count, 3), dtype=bool)
+    requested_rates = np.zeros((row_count, 3), dtype=np.float32)
+    model.eval()
+    with torch.inference_mode():
+        for case in np.unique(case_ids):
+            indices = np.flatnonzero(case_ids == case)
+            if (
+                not len(indices)
+                or transition_valid[indices[0]]
+                or np.any(~transition_valid[indices[1:]])
+                or np.any(np.diff(source_rows[indices]) <= 0)
+                or np.any(delta_time_s[indices[1:]] <= 0.0)
+            ):
+                raise ValueError(
+                    f"recursive projection case sequence is invalid: {int(case)}"
+                )
+            previous_effective = np.zeros(3, dtype=np.float32)
+            previous_requested = np.zeros(3, dtype=np.float32)
+            for offset, row in enumerate(indices):
+                recurrent_observation = observations[row].copy()
+                recurrent_observation[list(PREVIOUS_ACTION_INDICES)] = (
+                    previous_effective
+                )
+                request_tensor = model(
+                    torch.from_numpy(recurrent_observation[None, :]).to(
+                        device=device
+                    )
+                )
+                _, effective_tensor, clipped_tensor = loss.projection(
+                    torch.from_numpy(model_commands[row : row + 1]).to(
+                        device=device
+                    ),
+                    request_tensor,
+                )
+                row_requested = request_tensor.cpu().numpy()[0]
+                row_effective = effective_tensor.cpu().numpy()[0]
+                requested[row] = row_requested
+                projected[row] = row_effective
+                clipped[row] = clipped_tensor.cpu().numpy()[0]
+                if offset:
+                    requested_rates[row] = (
+                        np.abs(row_requested - previous_requested)
+                        * loss.action_scales.cpu().numpy()
+                        / delta_time_s[row]
+                    )
+                previous_requested = row_requested
+                previous_effective = row_effective
+
+        zero_requested = torch.zeros(
+            (row_count, 3), dtype=torch.float32, device=device
+        )
+        _, zero_projected, _ = loss.projection(
+            torch.from_numpy(model_commands).to(device=device),
+            zero_requested,
+        )
+
+    candidate_mse = _case_balanced_mse(targets, projected, case_ids)
+    zero_mse = _case_balanced_mse(
+        targets,
+        zero_projected.cpu().numpy(),
+        case_ids,
+    )
+    maximum_rates = loss.maximum_slew_rates.cpu().numpy()
+    return {
+        "recurrence_contract": (
+            MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT
+        ),
+        "row_count": row_count,
+        "case_count": int(len(np.unique(case_ids))),
+        "case_reset_count": int(len(np.unique(case_ids))),
+        "loss_total": float(np.mean(candidate_mse)),
         "case_balanced_mse_per_action": candidate_mse.tolist(),
         "zero_requested_case_balanced_mse_per_action": zero_mse.tolist(),
         "improves_over_zero_requested": (candidate_mse < zero_mse).tolist(),

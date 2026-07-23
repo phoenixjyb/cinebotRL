@@ -13,6 +13,10 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_bc_contrac
     validate_bc_execution_admission,
     validate_bc_execution_report,
 )
+from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_bc_adapter import (
+    MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT,
+    MODEL_BASED_CORRECTIVE_BC_VALIDATION_CONTRACT,
+)
 from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_training_dataset import (
     MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA,
 )
@@ -94,7 +98,7 @@ def _fixture(tmp_path: Path, *, authorized: bool) -> tuple[
             "exact_case_balanced_projection_aware_gradient_accumulation_v1"
         ),
         "validation_contract": (
-            "projected_effective_action_case_balanced_validation_v1"
+            MODEL_BASED_CORRECTIVE_BC_VALIDATION_CONTRACT
         ),
         "loss_contract": "model_based_projected_effective_action_bc_loss_v1",
         "projection_contract": "model_based_residual_safety_projection_v1",
@@ -227,6 +231,21 @@ def _metrics(improves: list[bool]) -> dict[str, object]:
     }
 
 
+def _recursive_metrics(improves: list[bool]) -> dict[str, object]:
+    return {
+        "recurrence_contract": (
+            MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT
+        ),
+        "row_count": 48,
+        "case_count": 2,
+        "case_reset_count": 2,
+        **_metrics(improves),
+        "projected_action_abs_max": [0.35, 0.45, 0.25],
+        "projection_clipped_rows": 3,
+        "requested_rate_abs_max": [0.02, 0.03, 0.01],
+    }
+
+
 def _report_fixture(
     tmp_path: Path,
 ) -> tuple[Path, dict[str, object], dict[str, object]]:
@@ -279,6 +298,12 @@ def _report_fixture(
             "train": _metrics([True, True, True]),
             "validation": _metrics([True, True, True]),
         },
+        "recursive_validation_contract": (
+            MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT
+        ),
+        "recursive_validation_metrics": _recursive_metrics(
+            [True, True, True]
+        ),
         "offline_gate_passed": True,
         "holdout_used_for_model_selection": False,
         "holdout_metrics_computed": False,
@@ -314,6 +339,7 @@ def test_success_report_requires_metrics_hashes_and_closed_holdout(
         "holdout",
         "prediction_margin",
         "slew_violation",
+        "recursive_regression",
     ],
 )
 def test_report_rejects_false_success_claims(
@@ -329,10 +355,14 @@ def test_report_rejects_false_success_claims(
         report["holdout_metrics_computed"] = True
     elif mutation == "prediction_margin":
         report["split_metrics"]["validation"]["requested_action_abs_max"][0] = 0.95
-    else:
+    elif mutation == "slew_violation":
         report["split_metrics"]["validation"][
             "requested_slew_violation_count"
         ][0] = 1
+    else:
+        report["recursive_validation_metrics"][
+            "improves_over_zero_requested"
+        ][0] = False
     with pytest.raises(ValueError, match="report failed"):
         validate_bc_execution_report(
             report,

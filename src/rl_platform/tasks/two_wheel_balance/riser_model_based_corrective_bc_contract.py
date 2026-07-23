@@ -12,6 +12,7 @@ import numpy as np
 from .riser_model_based_bc_loss import MODEL_BASED_PROJECTED_BC_LOSS
 from .riser_model_based_corrective_bc_adapter import (
     MODEL_BASED_CORRECTIVE_BC_OPTIMIZER_CONTRACT,
+    MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT,
     MODEL_BASED_CORRECTIVE_BC_VALIDATION_CONTRACT,
 )
 from .riser_model_based_corrective_corpus import (
@@ -38,7 +39,7 @@ MODEL_BASED_CORRECTIVE_BC_EXECUTION_ADMISSION_SCHEMA = (
     "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_admission_v1"
 )
 MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA = (
-    "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_report_v1"
+    "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_report_v2"
 )
 DEFAULT_BC_TRAINING_CONFIG = {
     "policy_architecture": (
@@ -66,6 +67,7 @@ DEFAULT_BC_TRAINING_CONFIG = {
     "maximum_normalized_prediction_abs": 0.95,
     "model_selection_split": "validation",
     "optimizer_steps_per_epoch": 1,
+    "recursive_effective_action_validation_required": True,
 }
 CODE_IDENTITY_KEYS = {
     "trainer",
@@ -113,6 +115,8 @@ REPORT_FIELDS = {
     "best_epoch",
     "history",
     "split_metrics",
+    "recursive_validation_contract",
+    "recursive_validation_metrics",
     "offline_gate_passed",
     "holdout_used_for_model_selection",
     "holdout_metrics_computed",
@@ -139,6 +143,15 @@ SPLIT_METRIC_FIELDS = {
     "improves_over_zero_requested",
     "requested_action_abs_max",
     "requested_slew_violation_count",
+}
+RECURSIVE_METRIC_FIELDS = SPLIT_METRIC_FIELDS | {
+    "recurrence_contract",
+    "row_count",
+    "case_count",
+    "case_reset_count",
+    "projected_action_abs_max",
+    "projection_clipped_rows",
+    "requested_rate_abs_max",
 }
 
 
@@ -326,13 +339,14 @@ def validate_bc_execution_report(
             ):
                 history_valid = False
                 break
-    metrics = report.get("split_metrics")
-    metrics_valid = isinstance(metrics, Mapping) and set(metrics) == {
-        "train",
-        "validation",
-    }
-    if metrics_valid:
-        for value in metrics.values():
+    def metrics_valid(values: object) -> bool:
+        valid = isinstance(values, Mapping) and set(values) == {
+            "train",
+            "validation",
+        }
+        if not valid:
+            return False
+        for value in values.values():
             if (
                 not isinstance(value, Mapping)
                 or set(value) != SPLIT_METRIC_FIELDS
@@ -349,8 +363,47 @@ def validate_bc_execution_report(
                 or not _finite_vector(value.get("requested_action_abs_max"), 3)
                 or not _finite_vector(value.get("requested_slew_violation_count"), 3)
             ):
-                metrics_valid = False
-                break
+                return False
+        return True
+
+    metrics = report.get("split_metrics")
+    recursive_metrics = report.get("recursive_validation_metrics")
+    teacher_metrics_valid = metrics_valid(metrics)
+    recursive_metrics_valid = (
+        isinstance(recursive_metrics, Mapping)
+        and set(recursive_metrics) == RECURSIVE_METRIC_FIELDS
+        and recursive_metrics.get("recurrence_contract")
+        == MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT
+        and isinstance(recursive_metrics.get("row_count"), int)
+        and recursive_metrics["row_count"] > 0
+        and isinstance(recursive_metrics.get("case_count"), int)
+        and recursive_metrics["case_count"] > 0
+        and recursive_metrics.get("case_reset_count")
+        == recursive_metrics["case_count"]
+        and isinstance(recursive_metrics.get("projection_clipped_rows"), int)
+        and 0
+        <= recursive_metrics["projection_clipped_rows"]
+        <= recursive_metrics["row_count"]
+        and isinstance(recursive_metrics.get("loss_total"), (int, float))
+        and np.isfinite(recursive_metrics["loss_total"])
+        and recursive_metrics["loss_total"] >= 0.0
+        and _finite_vector(
+            recursive_metrics.get("case_balanced_mse_per_action"), 3
+        )
+        and _finite_vector(
+            recursive_metrics.get("zero_requested_case_balanced_mse_per_action"),
+            3,
+        )
+        and _boolean_vector(
+            recursive_metrics.get("improves_over_zero_requested"), 3
+        )
+        and _finite_vector(recursive_metrics.get("requested_action_abs_max"), 3)
+        and _finite_vector(recursive_metrics.get("projected_action_abs_max"), 3)
+        and _finite_vector(recursive_metrics.get("requested_rate_abs_max"), 3)
+        and _finite_vector(
+            recursive_metrics.get("requested_slew_violation_count"), 3
+        )
+    )
     successful = report.get("offline_gate_passed") is True
     artifacts_valid = (
         _artifact_identity_valid(report.get("checkpoint"), report_directory)
@@ -360,6 +413,9 @@ def validate_bc_execution_report(
     )
     best_epoch = report.get("best_epoch")
     validation = metrics.get("validation", {}) if isinstance(metrics, Mapping) else {}
+    recursive_validation = (
+        recursive_metrics if isinstance(recursive_metrics, Mapping) else {}
+    )
     validation_improves = validation.get("improves_over_zero_requested") == [
         True,
         True,
@@ -375,6 +431,17 @@ def validate_bc_execution_report(
         0,
         0,
     ]
+    recursive_validation_improves = recursive_validation.get(
+        "improves_over_zero_requested"
+    ) == [True, True, True]
+    recursive_requested_margin = (
+        _finite_vector(recursive_validation.get("requested_action_abs_max"), 3)
+        and max(recursive_validation["requested_action_abs_max"])
+        < DEFAULT_BC_TRAINING_CONFIG["maximum_normalized_prediction_abs"]
+    )
+    recursive_validation_slew_safe = recursive_validation.get(
+        "requested_slew_violation_count"
+    ) == [0, 0, 0]
     checks = {
         "schema": report.get("schema")
         == MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA,
@@ -394,7 +461,9 @@ def validate_bc_execution_report(
         and report.get("optimizer_steps") == epochs_run
         and isinstance(best_epoch, int)
         and 1 <= best_epoch <= epochs_run,
-        "metrics": metrics_valid,
+        "metrics": teacher_metrics_valid and recursive_metrics_valid,
+        "recursive_contract": report.get("recursive_validation_contract")
+        == MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT,
         "holdout": report.get("holdout_used_for_model_selection") is False
         and report.get("holdout_metrics_computed") is False,
         "authorized": admission.get("bc_authorized") is True
@@ -405,7 +474,14 @@ def validate_bc_execution_report(
         "success_consistent": report.get("passed") is successful
         and report.get("valid_for_dynamic_canary") is successful,
         "success_gates": not successful
-        or (validation_improves and requested_margin and validation_slew_safe),
+        or (
+            validation_improves
+            and requested_margin
+            and validation_slew_safe
+            and recursive_validation_improves
+            and recursive_requested_margin
+            and recursive_validation_slew_safe
+        ),
         "artifacts": artifacts_valid,
     }
     if not all(checks.values()):

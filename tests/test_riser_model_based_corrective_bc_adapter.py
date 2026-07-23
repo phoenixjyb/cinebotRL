@@ -12,7 +12,12 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_bc_loss import (  # n
 from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_bc_adapter import (  # noqa: E402
     build_projection_aware_split,
     evaluate_projection_aware_model,
+    evaluate_projection_aware_recursive_model,
     train_projection_aware_epoch,
+)
+from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa: E402
+    OBSERVATION_NAMES,
+    PREVIOUS_ACTION_INDICES,
 )
 
 
@@ -164,3 +169,78 @@ def test_projection_split_rejects_cross_case_or_split_predecessor() -> None:
     payload["previous_row_index"][1] = 2
     with pytest.raises(ValueError, match="crosses a case or split"):
         build_projection_aware_split(payload, split_code=0)
+
+
+class _PreviousEffectiveEcho(torch.nn.Module):
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        return observations[:, list(PREVIOUS_ACTION_INDICES)]
+
+
+def _recursive_split() -> dict[str, np.ndarray]:
+    rows_per_case = 3
+    case_ids = np.repeat(np.array([8, 16], dtype=np.int64), rows_per_case)
+    observations = np.zeros(
+        (len(case_ids), len(OBSERVATION_NAMES)), dtype=np.float32
+    )
+    for case in np.unique(case_ids):
+        indices = np.flatnonzero(case_ids == case)
+        observations[
+            indices[1:, None], PREVIOUS_ACTION_INDICES
+        ] = np.array([0.8, -0.6, 0.4], dtype=np.float32)
+    transition_valid = np.ones(len(case_ids), dtype=bool)
+    transition_valid[::rows_per_case] = False
+    previous_observations = np.zeros_like(observations)
+    previous_observations[transition_valid] = observations[
+        np.flatnonzero(transition_valid) - 1
+    ]
+    return {
+        "observations": observations,
+        "previous_observations": previous_observations,
+        "effective_target_actions": np.zeros((len(case_ids), 3), dtype=np.float32),
+        "model_based_commands": np.zeros((len(case_ids), 3), dtype=np.float32),
+        "delta_time_s": np.ones(len(case_ids), dtype=np.float32),
+        "transition_valid": transition_valid,
+        "sample_weights": np.full(
+            len(case_ids), 1.0 / rows_per_case, dtype=np.float32
+        ),
+        "case_ids": case_ids,
+        "source_row_index": np.arange(len(case_ids), dtype=np.int64),
+    }
+
+
+def test_recursive_validation_uses_own_previous_effective_action() -> None:
+    split = _recursive_split()
+    model = _PreviousEffectiveEcho()
+    loss = ModelBasedProjectedBCLoss()
+
+    teacher_forced = evaluate_projection_aware_model(
+        model,
+        split,
+        loss,
+        device=torch.device("cpu"),
+        batch_size=4,
+    )
+    recursive = evaluate_projection_aware_recursive_model(
+        model,
+        split,
+        loss,
+        device=torch.device("cpu"),
+    )
+
+    assert max(teacher_forced["requested_action_abs_max"]) == pytest.approx(0.8)
+    assert recursive["requested_action_abs_max"] == [0.0, 0.0, 0.0]
+    assert recursive["projected_action_abs_max"] == [0.0, 0.0, 0.0]
+    assert recursive["case_reset_count"] == 2
+
+
+def test_recursive_validation_rejects_missing_case_reset() -> None:
+    split = _recursive_split()
+    split["transition_valid"][3] = True
+
+    with pytest.raises(ValueError, match="case sequence is invalid: 16"):
+        evaluate_projection_aware_recursive_model(
+            _PreviousEffectiveEcho(),
+            split,
+            ModelBasedProjectedBCLoss(),
+            device=torch.device("cpu"),
+        )

@@ -16,6 +16,10 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_bc_contrac
     DEFAULT_BC_TRAINING_CONFIG,
     sha256_file,
 )
+from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_bc_adapter import (  # noqa: E402
+    MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT,
+    MODEL_BASED_CORRECTIVE_BC_VALIDATION_CONTRACT,
+)
 from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_training_dataset import (  # noqa: E402
     MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA,
 )
@@ -24,6 +28,7 @@ from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (  # noqa
     MODEL_BASED_POLICY_RESIDUAL_CONTRACT,
     MODEL_BASED_POLICY_RESIDUAL_SCALES,
     OBSERVATION_NAMES,
+    PREVIOUS_ACTION_INDICES,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_policy import (  # noqa: E402
     MODEL_BASED_ZERO_INITIALIZED_RESIDUAL_POLICY_ARCHITECTURE,
@@ -51,6 +56,12 @@ def _synthetic_arrays() -> dict[str, np.ndarray]:
             0.10 * np.tanh(observations[:, 2]),
         )
     ).astype(np.float32)
+    observations[:, PREVIOUS_ACTION_INDICES] = 0.0
+    for case in cases:
+        indices = np.flatnonzero(case_ids == case)
+        observations[indices[1:, None], PREVIOUS_ACTION_INDICES] = actions[
+            indices[:-1]
+        ]
     split_labels = np.repeat(
         np.asarray([0] * len(TRAIN_CASES) + [1] * len(VALIDATION_CASES)),
         rows_per_case,
@@ -137,7 +148,7 @@ def test_guarded_projection_runner_learns_synthetic_data_and_seals_artifacts(
             "exact_case_balanced_projection_aware_gradient_accumulation_v1"
         ),
         "validation_contract": (
-            "projected_effective_action_case_balanced_validation_v1"
+            MODEL_BASED_CORRECTIVE_BC_VALIDATION_CONTRACT
         ),
         "loss_contract": "model_based_projected_effective_action_bc_loss_v1",
         "training_config": DEFAULT_BC_TRAINING_CONFIG,
@@ -177,6 +188,21 @@ def test_guarded_projection_runner_learns_synthetic_data_and_seals_artifacts(
     assert report["split_metrics"]["validation"][
         "requested_slew_violation_count"
     ] == [0, 0, 0]
+    assert report["recursive_validation_contract"] == (
+        MODEL_BASED_CORRECTIVE_BC_RECURSIVE_VALIDATION_CONTRACT
+    )
+    assert report["recursive_validation_metrics"][
+        "improves_over_zero_requested"
+    ] == [True, True, True]
+    assert report["recursive_validation_metrics"][
+        "requested_slew_violation_count"
+    ] == [0, 0, 0]
+    assert report["recursive_validation_metrics"]["case_count"] == len(
+        VALIDATION_CASES
+    )
+    assert report["recursive_validation_metrics"]["case_reset_count"] == len(
+        VALIDATION_CASES
+    )
     assert (tmp_path / "policy/residual_policy.pt").is_file()
     assert (tmp_path / "policy/residual_policy.torchscript.pt").is_file()
     checkpoint = torch.load(

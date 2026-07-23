@@ -205,19 +205,31 @@ checkpoint，不授权任何 Isaac rollout。训练器必须始终写入
 一次性、绑定策略 SHA-256、代码 commit、case 集和新 namespace 的运行授权；
 不得把 validation 指标通过直接解释为动态运行授权。
 
-## Gate C：case-disjoint 动态 holdout
+## Gate C：case-disjoint 动态 validation 与 holdout
 
-运行：
+当前 `model_based_planner + [0.05,0.05,0.02]` 策略必须先运行 validation：
 
 ```bash
-bash scripts/two_wheel_balance/run_riser_residual_holdout_gate.sh
+bash scripts/two_wheel_balance/run_model_based_learned_split_policy_gate.sh \
+  validation_canary --preflight
 ```
 
-只评估保留至此的 8 个 holdout case。每个 case 分别运行：
+另行签发一次性运行 admission 后才可把 `--preflight` 改为 `--execute`。
+validation 只允许 BC 报告中的完整 validation case，不能包含 train 或保留
+holdout case。只有 validation 动态 gate 通过、模型选择正式结束并把该报告
+逐字节绑定到新的 holdout admission 后，才能单独预检 holdout：
 
-- 零策略动作基线（不是完整确定性升降控制器）；
+```bash
+bash scripts/two_wheel_balance/run_model_based_learned_split_policy_gate.sh \
+  holdout --preflight
+```
+
+holdout 固定为 `[3,5,13,19,24]`，不得参与训练、早停、超参数选择或
+validation 阈值调整。每个 case 分别运行：
+
+- 完整 model-based planner 加零学习残差的基线；
 - 学习残差策略；
-- Gate A 已保存的确定性教师结果用于对照。
+- 同一个 model-based 零残差结果作为教师与 null-action 对照。
 
 晋级条件：
 
@@ -228,6 +240,12 @@ bash scripts/two_wheel_balance/run_riser_residual_holdout_gate.sh
 - 残差动作保持在 `[-1, 1]`。
 
 输出按策略 SHA-256 与 case 集合锁定并可恢复，禁止混用不同 checkpoint。
+admission、CPU preflight、exact-source、plan、LQR、USD、drive profile、
+代码 commit 与每条原始 rollout 都必须哈希绑定。validation 与 holdout 的
+summary 分别独立报告；validation 通过不自动授权 holdout。
+
+旧的 `run_riser_residual_holdout_gate.sh` 属于历史
+`phase_feedforward + [0.3,0.4,0.1]` 合同，不得用于当前策略。
 
 ## Gate D：学习策略全 79 条验证
 

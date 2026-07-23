@@ -195,3 +195,64 @@ def test_model_based_all79_contract_uses_planner_sources_and_scales(
     )
     assert summary["passed"]
     assert summary["residual_action_scales"] == scales
+
+
+def test_model_based_validation_requires_provenance_and_uses_baseline(
+    tmp_path: Path,
+) -> None:
+    baseline = tmp_path / "baseline"
+    learned = tmp_path / "learned"
+    policy = tmp_path / "policy.pt"
+    policy.write_bytes(b"policy")
+    scales = [0.05, 0.05, 0.02]
+    profile = "riser_recovery_direction_v4_camera_lever_arm_v1"
+    _write_rollout(
+        baseline,
+        8,
+        "model_based_planner_plus_zero_policy_residual",
+        0.15,
+        tracking_profile=profile,
+        policy_command_base="model_based_planner",
+        residual_action_scales=scales,
+    )
+    _write_rollout(
+        learned,
+        8,
+        "model_based_planner_plus_torchscript_residual",
+        0.10,
+        tracking_profile=profile,
+        policy_command_base="model_based_planner",
+        residual_action_scales=scales,
+    )
+    kwargs = {
+        "teacher_dir": baseline,
+        "zero_dir": baseline,
+        "learned_dir": learned,
+        "cases": [8],
+        "policy": policy,
+        "mode": "validation_canary",
+        "maximum_regression_fraction": 0.05,
+        "policy_command_contract": (
+            "model_based_planner_plus_bounded_policy_residual_v1"
+        ),
+        "expected_tracking_profile": profile,
+    }
+    with pytest.raises(ValueError, match="bound runtime provenance"):
+        gate_rollouts(**kwargs)
+    provenance = {}
+    for name in ("admission", "preflight", "plan_manifest"):
+        path = tmp_path / f"{name}.json"
+        path.write_text("{}\n", encoding="utf-8")
+        provenance[name] = path
+    summary = gate_rollouts(
+        **kwargs,
+        rollout_admission=provenance["admission"],
+        preflight_receipt=provenance["preflight"],
+        plan_manifest=provenance["plan_manifest"],
+        execution_commit="a" * 40,
+    )
+    assert summary["passed"] is True
+    assert summary["schema"].endswith("validation_canary_gate_v1")
+    assert summary["rows"][0]["teacher_rollout"] == (
+        summary["rows"][0]["zero_rollout"]
+    )

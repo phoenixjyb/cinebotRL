@@ -195,6 +195,82 @@ def _fixture(tmp_path: Path):
         "items": plan_items,
     }
     plan_manifest_path.write_text(json.dumps(plan_manifest), encoding="utf-8")
+    plan_identity = {
+        "path": plan_manifest_path.relative_to(tmp_path).as_posix(),
+        "sha256": hashlib.sha256(plan_manifest_path.read_bytes()).hexdigest(),
+    }
+
+    for mode, cases, report, report_path in (
+        (
+            "validation_canary",
+            VALIDATION_CASES,
+            validation,
+            validation_path,
+        ),
+        (
+            "holdout",
+            DEFAULT_RESERVED_HOLDOUT_CASES,
+            holdout,
+            holdout_path,
+        ),
+    ):
+        split_admission_path = tmp_path / f"{mode}_admission.json"
+        split_admission = {
+            "schema": (
+                "cinebotrl_two_wheel_riser_"
+                "model_based_learned_split_admission_v1"
+            ),
+            "mode": mode,
+            "policy": policy_identity,
+            "plan_manifest": plan_identity,
+            "execution_commit": EXECUTION_COMMIT,
+            "evaluation_config": DEFAULT_EVALUATION_CONFIG,
+            "cases": cases,
+            "prior_validation_gate_report": (
+                None if mode == "validation_canary" else _identity(validation_path)
+            ),
+            "model_selection_complete": mode == "holdout",
+            "prior_validation_gate_passed": mode == "holdout",
+            "split_evaluation_approved": True,
+            "learned_rollout_authorized": True,
+            "residual_capture_authorized": False,
+            "bc_authorized": False,
+            "ppo_authorized": False,
+            "training_started": False,
+        }
+        split_admission_path.write_text(
+            json.dumps(split_admission),
+            encoding="utf-8",
+        )
+        split_preflight_path = tmp_path / f"{mode}_preflight.json"
+        split_preflight = {
+            "schema": (
+                "cinebotrl_two_wheel_riser_"
+                "model_based_learned_split_preflight_v1"
+            ),
+            "mode": mode,
+            "cases": cases,
+            "execution_commit": EXECUTION_COMMIT,
+            "admission": _identity(split_admission_path),
+            "policy": policy_identity,
+            "plan_manifest": plan_identity,
+            "checks": {"contract": True, "clean": True},
+            "runtime_started": False,
+            "dataset_written": False,
+            "capture_started": False,
+            "bc_started": False,
+            "ppo_started": False,
+            "passed": True,
+        }
+        split_preflight_path.write_text(
+            json.dumps(split_preflight),
+            encoding="utf-8",
+        )
+        report["rollout_admission"] = _identity(split_admission_path)
+        report["preflight_receipt"] = _identity(split_preflight_path)
+        report["plan_manifest"] = plan_identity
+        report["execution_commit"] = EXECUTION_COMMIT
+        report_path.write_text(json.dumps(report), encoding="utf-8")
 
     runtime_assets = {}
     for name in (
@@ -218,10 +294,7 @@ def _fixture(tmp_path: Path):
         "schema": MODEL_BASED_LEARNED_ALL79_ADMISSION_SCHEMA,
         "bc_report": _identity(bc_report_path),
         "policy": policy_identity,
-        "plan_manifest": {
-            "path": plan_manifest_path.relative_to(tmp_path).as_posix(),
-            "sha256": hashlib.sha256(plan_manifest_path.read_bytes()).hexdigest(),
-        },
+        "plan_manifest": plan_identity,
         "source_manifest": _identity(source_manifest_path),
         **{
             name: _identity(path)
@@ -317,6 +390,9 @@ def test_admission_preserves_majority_zero_baseline_gate_semantics(
         "code_hash",
         "validation_failed",
         "holdout_failed",
+        "validation_provenance",
+        "validation_admission_unsafe_rehashed",
+        "holdout_preflight_unsafe_rehashed",
         "all79_cases",
         "config",
         "ppo",
@@ -352,6 +428,42 @@ def test_admission_rejects_forged_or_open_downstream_state(
         fixture["holdout_report"]["aggregate_checks"][
             "learned_beats_zero_on_majority_of_cases"
         ] = False
+    elif mutation == "validation_provenance":
+        fixture["validation_report"]["rollout_admission"]["sha256"] = "0" * 64
+    elif mutation == "validation_admission_unsafe_rehashed":
+        split_admission = Path(
+            fixture["validation_report"]["rollout_admission"]["path"]
+        )
+        split_admission = fixture["validation_report_path"].parent / split_admission
+        payload = json.loads(split_admission.read_text(encoding="utf-8"))
+        payload["ppo_authorized"] = True
+        split_admission.write_text(json.dumps(payload), encoding="utf-8")
+        fixture["validation_report"]["rollout_admission"] = _identity(
+            split_admission
+        )
+        fixture["validation_report_path"].write_text(
+            json.dumps(fixture["validation_report"]),
+            encoding="utf-8",
+        )
+        admission["validation_gate_report"] = _identity(
+            fixture["validation_report_path"]
+        )
+    elif mutation == "holdout_preflight_unsafe_rehashed":
+        preflight = Path(
+            fixture["holdout_report"]["preflight_receipt"]["path"]
+        )
+        preflight = fixture["holdout_report_path"].parent / preflight
+        payload = json.loads(preflight.read_text(encoding="utf-8"))
+        payload["checks"]["clean"] = False
+        preflight.write_text(json.dumps(payload), encoding="utf-8")
+        fixture["holdout_report"]["preflight_receipt"] = _identity(preflight)
+        fixture["holdout_report_path"].write_text(
+            json.dumps(fixture["holdout_report"]),
+            encoding="utf-8",
+        )
+        admission["holdout_gate_report"] = _identity(
+            fixture["holdout_report_path"]
+        )
     elif mutation == "all79_cases":
         admission["all79_cases"] = ALL79_CASES[:-1]
     elif mutation == "config":

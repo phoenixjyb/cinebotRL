@@ -1,0 +1,89 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_learned_split_admission_v1",
+  "mode": null,
+  "bc_report": {
+    "path": null,
+    "sha256": null
+  },
+  "policy": {
+    "path": null,
+    "sha256": null
+  },
+  "plan_manifest": {
+    "path": null,
+    "sha256": null
+  },
+  "source_manifest": {
+    "path": null,
+    "sha256": null
+  },
+  "lqr_gains": {
+    "path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+    "sha256": null
+  },
+  "robot_build_audit": {
+    "path": "assets_own/recomoProto2_two_wheel_riser/build_audit.json",
+    "sha256": null
+  },
+  "robot_usd": {
+    "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd",
+    "sha256": null
+  },
+  "drive_profile_selection": {
+    "path": "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json",
+    "sha256": null
+  },
+  "prior_validation_gate_report": null,
+  "execution_commit": null,
+  "code": {
+    "playback": {
+      "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+      "sha256": null
+    },
+    "rollout_gate": {
+      "path": "scripts/two_wheel_balance/gate_riser_residual_rollouts.py",
+      "sha256": null
+    },
+    "admission_contract": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_learned_split_contract.py",
+      "sha256": null
+    },
+    "preflight_validator": {
+      "path": "scripts/two_wheel_balance/validate_model_based_learned_split_admission.py",
+      "sha256": null
+    },
+    "execution_wrapper": {
+      "path": "scripts/two_wheel_balance/run_model_based_learned_split_policy_gate.sh",
+      "sha256": null
+    }
+  },
+  "evaluation_config": {
+    "tracking_profile": "riser_recovery_direction_v4_camera_lever_arm_v1",
+    "policy_command_contract": "model_based_planner_plus_bounded_policy_residual_v1",
+    "residual_action_scales": [
+      0.05,
+      0.05,
+      0.02
+    ],
+    "controller_wz_kp": 1.05,
+    "maximum_duration_scale": 3.0,
+    "camera_lever_arm_compensation_enabled": true,
+    "camera_lever_arm_compensation_gain": 1.0,
+    "maximum_camera_lever_arm_correction_m": 0.05,
+    "maximum_regression_fraction": 0.05,
+    "minimum_zero_improvement_fraction": 0.05,
+    "position_error_p95_m_max": 0.15,
+    "position_error_max_m_max": 0.25,
+    "attitude_error_p95_deg_max": 5.0,
+    "attitude_error_max_deg_max": 10.0
+  },
+  "cases": [],
+  "model_selection_complete": false,
+  "prior_validation_gate_passed": false,
+  "split_evaluation_approved": false,
+  "learned_rollout_authorized": false,
+  "residual_capture_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false
+}

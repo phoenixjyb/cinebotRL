@@ -168,6 +168,122 @@ def _artifact_identity_valid(identity: object, *, directory: Path) -> bool:
     return path.is_file() and identity["sha256"] == sha256_file(path)
 
 
+def _identity_path(identity: object, *, directory: Path) -> Path | None:
+    if (
+        not isinstance(identity, Mapping)
+        or set(identity) != {"path", "sha256"}
+        or not isinstance(identity.get("path"), str)
+        or not identity["path"]
+    ):
+        return None
+    path = Path(identity["path"])
+    path = path if path.is_absolute() else directory / path
+    return path.resolve()
+
+
+def _same_identity(left: object, right: object) -> bool:
+    return (
+        isinstance(left, Mapping)
+        and isinstance(right, Mapping)
+        and left.get("sha256") == right.get("sha256")
+        and Path(str(left.get("path"))).name == Path(str(right.get("path"))).name
+    )
+
+
+def _split_gate_provenance_valid(
+    report: Mapping[str, Any],
+    *,
+    mode: str,
+    cases: list[int],
+    policy_sha256: str,
+    report_directory: Path,
+) -> bool:
+    admission_path = _identity_path(
+        report.get("rollout_admission"),
+        directory=report_directory,
+    )
+    preflight_path = _identity_path(
+        report.get("preflight_receipt"),
+        directory=report_directory,
+    )
+    if (
+        admission_path is None
+        or preflight_path is None
+        or not _artifact_identity_valid(
+            report.get("rollout_admission"),
+            directory=report_directory,
+        )
+        or not _artifact_identity_valid(
+            report.get("preflight_receipt"),
+            directory=report_directory,
+        )
+        or not _artifact_identity_valid(
+            report.get("plan_manifest"),
+            directory=report_directory,
+        )
+    ):
+        return False
+    admission = _load_json_object(admission_path)
+    preflight = _load_json_object(preflight_path)
+    if admission is None or preflight is None:
+        return False
+    expected_stage = (
+        admission.get("model_selection_complete") is False
+        and admission.get("prior_validation_gate_passed") is False
+        and admission.get("prior_validation_gate_report") is None
+        if mode == "validation_canary"
+        else (
+            admission.get("model_selection_complete") is True
+            and admission.get("prior_validation_gate_passed") is True
+            and _artifact_identity_valid(
+                admission.get("prior_validation_gate_report"),
+                directory=admission_path.parent,
+            )
+        )
+    )
+    checks = preflight.get("checks")
+    return (
+        admission.get("schema")
+        == "cinebotrl_two_wheel_riser_model_based_learned_split_admission_v1"
+        and admission.get("mode") == mode
+        and admission.get("cases") == cases
+        and admission.get("execution_commit") == report.get("execution_commit")
+        and admission.get("evaluation_config") == DEFAULT_EVALUATION_CONFIG
+        and admission.get("policy", {}).get("sha256") == policy_sha256
+        and _same_identity(admission.get("plan_manifest"), report.get("plan_manifest"))
+        and admission.get("split_evaluation_approved") is True
+        and admission.get("learned_rollout_authorized") is True
+        and admission.get("residual_capture_authorized") is False
+        and admission.get("bc_authorized") is False
+        and admission.get("ppo_authorized") is False
+        and admission.get("training_started") is False
+        and expected_stage
+        and preflight.get("schema")
+        == "cinebotrl_two_wheel_riser_model_based_learned_split_preflight_v1"
+        and preflight.get("mode") == mode
+        and preflight.get("cases") == cases
+        and preflight.get("execution_commit") == report.get("execution_commit")
+        and _same_identity(
+            preflight.get("admission"),
+            report.get("rollout_admission"),
+        )
+        and preflight.get("policy", {}).get("sha256") == policy_sha256
+        and _same_identity(
+            preflight.get("plan_manifest"),
+            report.get("plan_manifest"),
+        )
+        and isinstance(checks, Mapping)
+        and bool(checks)
+        and all(value is True for value in checks.values())
+        and preflight.get("runtime_started") is False
+        and preflight.get("dataset_written") is False
+        and preflight.get("capture_started") is False
+        and preflight.get("bc_started") is False
+        and preflight.get("ppo_started") is False
+        and preflight.get("passed") is True
+    )
+
+
 def _gate_report_valid(
     report: Mapping[str, Any],
     *,
@@ -241,6 +357,17 @@ def _gate_report_valid(
             "learned_beats_zero_on_majority_of_cases",
         }
         and all(value is True for value in aggregates.values())
+        and _split_gate_provenance_valid(
+            report,
+            mode=(
+                "validation_canary"
+                if schema == VALIDATION_GATE_SCHEMA
+                else "holdout"
+            ),
+            cases=cases,
+            policy_sha256=policy_sha256,
+            report_directory=report_directory,
+        )
         and report.get("passed") is True
         and report.get("ppo_authorized") is False
     )

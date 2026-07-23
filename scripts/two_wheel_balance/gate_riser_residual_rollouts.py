@@ -133,14 +133,13 @@ def gate_rollouts(
         execution_commit,
     )
     if (
-        mode == "all79"
-        and policy_command_contract == MODEL_BASED_POLICY_COMMAND_CONTRACT
+        policy_command_contract == MODEL_BASED_POLICY_COMMAND_CONTRACT
         and (
             any(value is None for value in provenance)
             or re.fullmatch(r"[0-9a-f]{40}", str(execution_commit)) is None
         )
     ):
-        raise ValueError("model-based all79 mode requires bound runtime provenance")
+        raise ValueError("model-based rollout mode requires bound runtime provenance")
     command_contract = POLICY_COMMAND_CONTRACTS[policy_command_contract]
 
     rows = []

@@ -648,3 +648,29 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     assert hardware["ready_for_production_design_review"] is False
     assert hardware["valid_for_production_procurement"] is False
     assert hardware["valid_for_hardware_transfer"] is False
+
+
+def test_goal_completion_audit_preserves_the_real_end_state() -> None:
+    audit = _goal()["current_stage"]["status_refresh_20260723"][
+        "goal_completion_audit"
+    ]
+    assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v1"
+    assert audit["implementation_commit"] == (
+        "c79b56a470f23c6c731d5d347ed4b82f364aa8ae"
+    )
+    assert audit["host_independent_lf_evidence"] is True
+    assert audit["mac_and_windows_report_byte_parity_verified"] is True
+    assert audit["required_gate_pass_count"] == 6
+    assert audit["required_gate_count"] == 10
+    assert audit["completion_blockers"] == [
+        "model_based_corrective_training_corpus",
+        "projection_aware_bc_policy",
+        "learned_policy_all79_dynamic_gate",
+        "learned_policy_render_audit",
+    ]
+    assert audit["physical_riser_bench_qualification_required_for_goal"] is False
+    assert audit["physical_riser_bench_qualification_passed"] is False
+    assert audit["goal_achieved"] is False
+    assert audit["runtime_started"] is False
+    assert audit["bc_started_by_audit"] is False
+    assert audit["ppo_started_by_audit"] is False

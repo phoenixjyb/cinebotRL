@@ -497,13 +497,35 @@
         "valid_for_production_procurement": false,
         "valid_for_hardware_transfer": false
       },
+      "goal_completion_audit": {
+        "schema": "cinebotrl_two_wheel_riser_goal_completion_audit_v1",
+        "implementation_commit": "c79b56a470f23c6c731d5d347ed4b82f364aa8ae",
+        "host_independent_lf_evidence": true,
+        "mac_and_windows_report_byte_parity_verified": true,
+        "required_gate_count": 10,
+        "required_gate_pass_count": 6,
+        "completion_blockers": [
+          "model_based_corrective_training_corpus",
+          "projection_aware_bc_policy",
+          "learned_policy_all79_dynamic_gate",
+          "learned_policy_render_audit"
+        ],
+        "physical_riser_bench_qualification_required_for_goal": false,
+        "physical_riser_bench_qualification_passed": false,
+        "goal_achieved": false,
+        "runtime_started": false,
+        "bc_started_by_audit": false,
+        "ppo_started_by_audit": false,
+        "focused_local_cpu_suite": "12_passed_2_warnings",
+        "focused_windows_cpu_suite": "12_passed_2_warnings"
+      },
       "completion_gap": [
         "capture_and_convert_case23_under_a_separate_one_shot_authorization",
         "dynamically_admit_and_convert_multiple_diverse_model_based_corrective_cases",
         "run_separately_authorized_pairs_and_captures_for_validation_cases_8_and_16",
         "populate_the_implemented_case_disjoint_corpus_with_at_least_4_train_and_2_validation_cases",
         "populate_the_review_corpus_then_issue_a_separate_hash_bound_training_schema_admission",
-        "integrate_the_promoted_projection_training_schema_into_bc_only_under_a_separate_training_authorization",
+        "issue_a_separate_hash_bound_bc_execution_admission_and_run_the_integrated_trainer",
         "train_and_validate_a_nonzero_bounded_residual_dnn",
         "pass_case_disjoint_validation_and_full_79_dynamic_policy_gates",
         "record_and_audit_representative_rendered_rollouts",

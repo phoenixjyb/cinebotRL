@@ -315,9 +315,28 @@
         "case23_capture_v4_archive_finalizer_focused_suite": "33_passed_2_warnings",
         "case23_capture_v4_authoritative_cpu_suite": "960_passed_12_skipped_2_warnings_in_82.03s",
         "case23_capture_v4_no_token_preflight_passed": true,
-        "case23_capture_v4_cpu_ready": true,
+        "case23_capture_v4_pre_runtime_cpu_ready": true,
+        "case23_capture_v4_cpu_ready": false,
         "case23_capture_v4_runtime_authorized": false,
         "case23_capture_v4_label_capture_authorized": false,
+        "case23_capture_v4_attempted": true,
+        "case23_capture_v4_authorization_consumed": true,
+        "case23_capture_v4_runtime_commit": "31bb9afbf3e9ce6c17e0fc1d2f06b5990e130d1c",
+        "case23_capture_v4_completed_steps": 3273,
+        "case23_capture_v4_dynamic_quality_passed": true,
+        "case23_capture_v4_archive_checks_passed": true,
+        "case23_capture_v4_passed": true,
+        "case23_capture_v4_capture_files": 1,
+        "case23_capture_v4_retry_authorized": false,
+        "case23_capture_v4_capture_admitted_for_dataset_conversion": true,
+        "case23_capture_v4_final_status_sha256": "8f7589cdc31b5b6369fea8fda7fbd8b743b57afa78709cf03b2bd600a25833e3",
+        "case23_capture_v4_gate_sha256": "868471fc30872a4f53010e595e63dbf6b6429c1b832778d2d8447872b9c0d8b3",
+        "case23_capture_v4_capture_sha256": "f0ea5c59e1f2f0e5f6f91336788d0e0228d079f74a53a4a50d442751b8b23796",
+        "case23_capture_v4_sample_count": 3273,
+        "case23_capture_v4_perturbation_active_rows": 20,
+        "case23_capture_v4_position_p95_m": 0.053413363967263365,
+        "case23_capture_v4_position_max_m": 0.06791182937654126,
+        "case23_capture_v4_pitch_max_deg": 5.642537520997539,
         "case23_capture_v4_conversion_authorized": false,
         "temporal_projection_audit_sha256": "349e61367603d1945774edfc7839040a6eaef66261991425eeeb43bc4a561c47",
         "temporal_projection_contract": "model_based_residual_safety_projection_v1",
@@ -560,7 +579,7 @@
         "authoritative_windows_cpu_suite": "1082_passed_12_skipped_2_warnings_in_113.60s"
       },
       "completion_gap": [
-        "capture_and_convert_case23_under_a_separate_one_shot_authorization",
+        "separately_review_and_convert_the_passed_case23_v4_capture",
         "dynamically_admit_and_convert_multiple_diverse_model_based_corrective_cases",
         "run_separately_authorized_pairs_and_captures_for_validation_cases_8_and_16",
         "populate_the_implemented_case_disjoint_corpus_with_at_least_4_train_and_2_validation_cases",
@@ -573,15 +592,15 @@
       ]
     },
     "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
-    "current_root_cause": "the_v3_case23_capture_completed_the_full_dynamic_phase_but_wrote_no_archive_because_the_save_route_defaulted_to_case30_and_the_wrapper_reused_the_v2_finalizer_namespace;_v3_is_consumed_and_non_retryable_while_the_repaired_fresh_v4_route_is_cpu_ready_but_runtime_unauthorized",
-    "remote_isaac_validation": "42_dynamic_candidates_plus_exact_zero_case8_case78_preservation_plus_passed_case30_and_case23_corrective_pairs_plus_case30_capture",
+    "current_root_cause": "case23_v4_capture_passed_and_is_admitted_for_separate_cpu_conversion_but_the_real_case_disjoint_4_train_plus_2_validation_corrective_corpus_does_not_yet_exist",
+    "remote_isaac_validation": "42_dynamic_candidates_plus_exact_zero_case8_case78_preservation_plus_passed_case30_and_case23_corrective_pairs_plus_passed_case30_and_case23_corrective_captures",
     "accepted_evidence": "docs/03_training/two_wheel_balance/RISER_RECURSIVE_IMPROVEMENT_LOG_20260716.md"
   },
   "next_iteration": {
-    "hypothesis": "the_cpu_reviewed_fresh_namespace_case23_v4_capture_can_preserve_the_passed_pair_contract_and_produce_effective_post_supervisor_labels_with_explicit_case_and_split_propagation_and_a_v4_pinned_finalizer_without_changing_commands_or_dynamic_gates",
-    "required_change": "require_a_new_separate_explicit_authorization_then_execute_exactly_one_case23_v4_capture_with_the_cpu_reviewed_fresh_namespace_contract",
-    "success_path": "an_admitted_case23_capture_can_be_converted_to_a_train_split_case_dataset_then_the_diverse_tranche_continues",
-    "rejection_path": "preserve_the_pair_and_rejected_v3_attempt_evidence_without_relaxing_gates_reusing_any_consumed_namespace_or_substituting_synthetic_labels",
-    "stop_rule": "no_v4_authorization_exists_and_the_consumed_v3_authorization_does_not_authorize_v4_conversion_merge_bc_ppo_holdout_or_case6_case2_case7_runtime"
+    "hypothesis": "the_passing_hash_bound_case23_v4_archive_can_be_converted_cpu_only_into_one_case23_train_split_dataset_without_changing_labels_clocks_or_identity_and_without_opening_training",
+    "required_change": "perform_a_separate_hash_bound_case23_v4_conversion_review_before_any_conversion_then_reopen_and_validate_the_result",
+    "success_path": "case23_becomes_the_second_admitted_case_dataset_then_the_diverse_train_tranche_continues_with_case6_case2_and_case7",
+    "rejection_path": "preserve_the_passing_raw_capture_without_modification_and_reject_conversion_if_any_schema_clock_identity_or_projection_check_fails",
+    "stop_rule": "the_consumed_v4_authorization_does_not_authorize_conversion_corpus_merge_bc_ppo_holdout_or_any_additional_runtime_case"
   }
 }

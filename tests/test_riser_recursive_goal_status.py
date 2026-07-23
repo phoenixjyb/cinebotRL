@@ -48,6 +48,16 @@ CASE23_CAPTURE_V4_CPU_REVIEW = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260723_case23_corrective_capture_v4_cpu/summary.json"
 )
+CASE23_CAPTURE_V4_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_case23_corrective_capture_v4"
+)
+CASE23_CAPTURE_V4_FINAL = CASE23_CAPTURE_V4_EVIDENCE / "final_status.json"
+CASE23_CAPTURE_V4_ARCHIVE = (
+    CASE23_CAPTURE_V4_EVIDENCE
+    / "capture/case_0023_corrective_teacher_capture_v2.npz"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -218,7 +228,7 @@ def test_planner_imitation_failure_and_residual_layer_are_explicit() -> None:
     assert refresh["policy_action_scales"] == [0.05, 0.05, 0.02]
 
 
-def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> None:
+def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     goal = _goal()
     stage = goal["current_stage"]
     corrective = stage["status_refresh_20260723"]["model_based_corrective_teacher"]
@@ -294,10 +304,40 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["case23_capture_v4_authoritative_cpu_suite"] == (
         "960_passed_12_skipped_2_warnings_in_82.03s"
     )
-    assert corrective["case23_capture_v4_cpu_ready"] is True
+    assert corrective["case23_capture_v4_pre_runtime_cpu_ready"] is True
+    assert corrective["case23_capture_v4_cpu_ready"] is False
     assert corrective["case23_capture_v4_no_token_preflight_passed"] is True
     assert corrective["case23_capture_v4_runtime_authorized"] is False
     assert corrective["case23_capture_v4_label_capture_authorized"] is False
+    assert corrective["case23_capture_v4_attempted"] is True
+    assert corrective["case23_capture_v4_authorization_consumed"] is True
+    assert corrective["case23_capture_v4_completed_steps"] == 3273
+    assert corrective["case23_capture_v4_dynamic_quality_passed"] is True
+    assert corrective["case23_capture_v4_archive_checks_passed"] is True
+    assert corrective["case23_capture_v4_passed"] is True
+    assert corrective["case23_capture_v4_capture_files"] == 1
+    assert corrective["case23_capture_v4_retry_authorized"] is False
+    assert (
+        corrective["case23_capture_v4_capture_admitted_for_dataset_conversion"]
+        is True
+    )
+    assert corrective["case23_capture_v4_final_status_sha256"] == _sha256(
+        CASE23_CAPTURE_V4_FINAL
+    )
+    assert corrective["case23_capture_v4_capture_sha256"] == _sha256(
+        CASE23_CAPTURE_V4_ARCHIVE
+    )
+    final = json.loads(CASE23_CAPTURE_V4_FINAL.read_text())
+    assert final["case"] == 23
+    assert final["split"] == "train"
+    assert final["passed"] is True
+    assert final["dynamic_quality_passed"] is True
+    assert final["capture_admitted_for_dataset_conversion"] is True
+    assert final["normalized_training_dataset_created"] is False
+    assert final["bc_authorized"] is False
+    assert final["ppo_authorized"] is False
+    assert final["training_started"] is False
+    assert final["valid_for_training"] is False
     assert corrective["case23_capture_v4_conversion_authorized"] is False
     assert json.loads(CASE23_CAPTURE_V4_CPU_REVIEW.read_text())["passed"] is True
     assert corrective["temporal_projection_audit_sha256"] == _sha256(
@@ -510,9 +550,7 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "exactly_one_case23_v4_capture" in (
-        goal["next_iteration"]["required_change"]
-    )
+    assert "case23_v4_conversion_review" in goal["next_iteration"]["required_change"]
 
 
 def test_hardware_status_remains_measurement_blocked() -> None:

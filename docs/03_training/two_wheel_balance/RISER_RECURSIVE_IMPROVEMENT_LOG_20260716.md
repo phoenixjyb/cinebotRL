@@ -8415,3 +8415,35 @@ and must state whether its candidate was accepted or rejected.
 - The nearest data-path action remains exactly one separately authorized
   case-23 v4 corrective-label capture. Rendering remains downstream of a real
   admitted BC policy and passing all-79 learned rollout.
+
+## Round 217: case-23 v4 corrective capture passes
+
+- Consumed exactly one out-of-repository mode-`0600` authorization token and
+  ran only case 23 in
+  `20260723_model_based_corrective_teacher_case23_capture_v4_exclusive` at
+  clean synchronized runtime commit
+  `31bb9afbf3e9ce6c17e0fc1d2f06b5990e130d1c`.
+- The v4 finalizer passed every admission, dynamic, thermal, controller,
+  perturbation, heartbeat, GPU-release, archive, clock, and identity check.
+  The run completed 3,273 aligned samples and exactly 20 perturbation-active
+  rows.
+- Position p95/max was `0.053413/0.067912 m`, attitude p95/max was
+  `0.148905/0.257883 deg`, and peak pitch was `5.642538 deg`. No command or
+  amplitude clipping occurred; eight riser-label rows were slew-limited and
+  remain explicit.
+- Preserved evidence under
+  `evidence_20260723_case23_corrective_capture_v4/`. Capture SHA-256 is
+  `f0ea5c59e1f2f0e5f6f91336788d0e0228d079f74a53a4a50d442751b8b23796`;
+  final-status SHA-256 is
+  `8f7589cdc31b5b6369fea8fda7fbd8b743b57afa78709cf03b2bd600a25833e3`.
+- The one-shot authorization is consumed and no retry is authorized. The
+  archive is admitted only for a separately reviewed CPU conversion. No
+  conversion, corpus merge, BC, PPO, holdout, or training was started.
+
+## Next round after Round 217
+
+- Review and bind a CPU-only case-23 v4 conversion route, then convert only if
+  every archive, case/split, clock, projection, and provenance check passes.
+- A successful conversion would make case 23 the second admitted case dataset;
+  it would not authorize cases 6/2/7, validation 8/16, corpus merge, BC, PPO,
+  holdout, or learned-policy runtime.

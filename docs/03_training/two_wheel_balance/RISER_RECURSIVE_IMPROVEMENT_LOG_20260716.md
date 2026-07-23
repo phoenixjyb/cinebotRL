@@ -7935,3 +7935,36 @@ and must state whether its candidate was accepted or rejected.
 - A pass opens only a separate conversion audit. A rejection stops for
   diagnosis. Corpus merge, BC, PPO, holdouts, and training remain separately
   closed.
+
+## Round 204: 750 W external evidence collection is packaged fail-closed
+
+- The production design-review candidate remains Leadshine
+  `ELVM8075V48EH-M17-HD` plus `ELD2-CAN7020B`, with `3:1` reduction,
+  `0.07 m/rev` effective lead, `1.50 m` minimum mechanical stroke, and the
+  immutable `0.60-1.80 m` camera-height contract.
+- A machine-readable collection checklist now binds the supplier template,
+  production calculation, 750 W bench template, and vendor snapshot by path
+  and SHA-256. It preserves all `52` supplier and `34` bench missing fields,
+  grouped by section.
+- The checklist fixes the evidence order: signed supplier package, complete
+  instrumented axis, calibrated raw log and manual safety evidence, numeric
+  reduction, then hash-bound final assembly.
+- `external_collection_package_ready=true` means only that the empty
+  collection package is internally consistent. Real supplier evidence, real
+  bench evidence, hardware qualification, production design review,
+  procurement, hardware transfer, simulation profile switching, runtime,
+  capture, dataset creation, BC, PPO, and training all remain false.
+- Focused hardware/checklist tests pass `48/48`. The authoritative `.98` CPU
+  suite at `8c8f627f6e4a2d51eefee3a8ccccfaa496d51bd3` passes
+  `965 passed, 12 skipped, 2 warnings` in `81.77 s`.
+
+## Next round after Round 204
+
+- Hardware: send the pinned template to the supplier and collect the signed
+  response before building the physical 750 W axis and starting bench tests.
+  Do not treat the public vendor ratings or empty templates as vertical-axis
+  qualification.
+- Runtime: case-23 v4 remains the sole prepared capture action and still
+  requires a new explicit exactly-one authorization. No v4 namespace or token
+  exists. Conversion, corpus merge, BC, PPO, holdouts, and training remain
+  separately closed.

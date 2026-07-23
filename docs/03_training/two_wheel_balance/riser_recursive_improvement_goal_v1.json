@@ -413,6 +413,8 @@
         "external_evidence_checklist_summary_sha256": "e50d656c7d0e66ea051b4a478515ee582102c0e3fe5978ad426c131bda35cabe",
         "external_evidence_checklist_cn_sha256": "dd6c8b42ae3da8c40a0abff1ef03d8b6a3596cfadb4951528addf5f93ff925b7",
         "external_evidence_checklist_focused_cpu_suite": "42_passed_2_warnings",
+        "external_evidence_checklist_authoritative_cpu_commit": "8c8f627f6e4a2d51eefee3a8ccccfaa496d51bd3",
+        "external_evidence_checklist_authoritative_cpu_suite": "965_passed_12_skipped_2_warnings_in_81.77s",
         "external_evidence_collection_package_ready": true,
         "external_evidence_supplier_missing_fields_preserved": 52,
         "external_evidence_bench_missing_fields_preserved": 34,

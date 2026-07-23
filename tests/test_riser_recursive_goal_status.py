@@ -400,6 +400,12 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     assert hardware["external_evidence_checklist_cn_sha256"] == _sha256(
         EXTERNAL_EVIDENCE_CHECKLIST_CN
     )
+    assert hardware["external_evidence_checklist_authoritative_cpu_commit"] == (
+        "8c8f627f6e4a2d51eefee3a8ccccfaa496d51bd3"
+    )
+    assert hardware["external_evidence_checklist_authoritative_cpu_suite"] == (
+        "965_passed_12_skipped_2_warnings_in_81.77s"
+    )
     checklist = json.loads(EXTERNAL_EVIDENCE_CHECKLIST.read_text())
     assert checklist["external_collection_package_ready"] is True
     assert checklist["hardware_qualified"] is False

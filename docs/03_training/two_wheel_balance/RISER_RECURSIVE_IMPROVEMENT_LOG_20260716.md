@@ -8478,6 +8478,9 @@ and must state whether its candidate was accepted or rejected.
   `evidence_20260723_case23_corrective_conversion_review_v1/` at SHA-256
   `d1d18672aa3c5922d04d55df49a903051e395328ca2828c39b538dc28581f270`.
   No converted output, corpus merge, BC, PPO, or training was created.
+- Review evidence commit
+  `34ca577f5c83ce3d3cf229d261ba467a85e9b5e8` passes the authoritative
+  `.98` CPU suite: `1087 passed, 12 skipped, 2 warnings in 109.31 s`.
 
 ## Next round after Round 218
 

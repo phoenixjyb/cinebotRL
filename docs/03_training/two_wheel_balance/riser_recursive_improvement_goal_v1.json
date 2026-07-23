@@ -352,6 +352,8 @@
         "case23_capture_v4_conversion_review_observation_shape": [3273, 65],
         "case23_capture_v4_conversion_review_clipped_rows": [0, 0, 0],
         "case23_capture_v4_conversion_review_previous_rows_changed": 0,
+        "case23_capture_v4_conversion_review_authoritative_cpu_commit": "34ca577f5c83ce3d3cf229d261ba467a85e9b5e8",
+        "case23_capture_v4_conversion_review_authoritative_cpu_suite": "1087_passed_12_skipped_2_warnings_in_109.31s",
         "case23_capture_v4_conversion_authorized": false,
         "temporal_projection_audit_sha256": "349e61367603d1945774edfc7839040a6eaef66261991425eeeb43bc4a561c47",
         "temporal_projection_contract": "model_based_residual_safety_projection_v1",

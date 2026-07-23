@@ -387,6 +387,12 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert review["ppo_authorized"] is False
     assert review["training_started"] is False
     assert review["valid_for_training"] is False
+    assert corrective[
+        "case23_capture_v4_conversion_review_authoritative_cpu_commit"
+    ] == "34ca577f5c83ce3d3cf229d261ba467a85e9b5e8"
+    assert corrective[
+        "case23_capture_v4_conversion_review_authoritative_cpu_suite"
+    ] == "1087_passed_12_skipped_2_warnings_in_109.31s"
     assert corrective["case23_capture_v4_conversion_authorized"] is False
     assert json.loads(CASE23_CAPTURE_V4_CPU_REVIEW.read_text())["passed"] is True
     assert corrective["temporal_projection_audit_sha256"] == _sha256(

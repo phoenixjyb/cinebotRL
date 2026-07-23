@@ -220,6 +220,8 @@
         "multi_case_corpus_contract": {
           "schema": "cinebotrl_two_wheel_riser_model_based_corrective_merged_v1",
           "implemented": true,
+          "implementation_commit": "872d3e7a6430785ac6b06b45ad51c7b8e0a54523",
+          "authoritative_cpu_suite": "863_passed_11_skipped_2_warnings",
           "minimum_train_cases": 4,
           "minimum_validation_cases": 2,
           "reserved_holdout_cases_unopened": [3, 5, 13, 19, 24],

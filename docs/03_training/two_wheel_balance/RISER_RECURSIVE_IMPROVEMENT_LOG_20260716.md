@@ -7287,6 +7287,15 @@ and must state whether its candidate was accepted or rejected.
   CLI preflight and no-overwrite behavior, and rejection of holdout, duplicate,
   insufficient, hash-mismatched, source-leaking, recurrence-broken, and
   command-tampered inputs. Focused local coverage passes `42/42`.
+- Exact implementation commit
+  `872d3e7a6430785ac6b06b45ad51c7b8e0a54523` passes the complete
+  authoritative `.98` CPU suite with `863 passed, 11 skipped, 2 warnings` in
+  `80.91 s`. Corpus module SHA-256 is
+  `1365959dde90030c657dac24f53a3dfa22486dae69939cc1027a6d68b6c4bc9d`,
+  builder CLI SHA-256 is
+  `5730ed3040247e0cb8ab10e04a48614c82bfe2a5e668cb9449b55fb2be61efc1`,
+  and trainer SHA-256 is
+  `a3da3405915f8ccd913437d73f64d88d7660a6929dd9a03adba281cbe8a45a2a`.
 - This round created no real corpus because case 30 remains the only admitted
   converted source. It created no runtime namespace, Isaac process, capture,
   BC, PPO, policy artifact, holdout read, or training process.

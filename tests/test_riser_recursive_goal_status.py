@@ -76,6 +76,12 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["conversion_route"]["holdout_allowed"] is False
     corpus = corrective["multi_case_corpus_contract"]
     assert corpus["implemented"] is True
+    assert corpus["implementation_commit"] == (
+        "872d3e7a6430785ac6b06b45ad51c7b8e0a54523"
+    )
+    assert corpus["authoritative_cpu_suite"] == (
+        "863_passed_11_skipped_2_warnings"
+    )
     assert corpus["minimum_train_cases"] == 4
     assert corpus["minimum_validation_cases"] == 2
     assert corpus["reserved_holdout_cases_unopened"] == [3, 5, 13, 19, 24]

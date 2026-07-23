@@ -23,6 +23,9 @@ The focused audit suite passes `24` tests on macOS and on `.98` using
 `G:\isaaclab_venv\Scripts\python.exe`. Both platforms emit byte-identical
 `summary.json` evidence at SHA-256
 `0f74c92b93040b126f8e25ac2470603203f8e07df6e923c1462c3cd24891b5ec`.
+The authoritative `.98` CPU suite passes
+`1114 passed, 12 skipped, 2 warnings in 114.32 s` at status commit
+`993b81a5bb11e18d5a08d79b667beddb5d9a3b10`.
 
 Runtime, GPU launch, label capture, dataset conversion/merge, BC, PPO, and
 training remain disabled. The already-consumed case-23 v4 capture remains the

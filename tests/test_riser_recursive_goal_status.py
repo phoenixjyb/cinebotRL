@@ -536,6 +536,12 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["case6_pair_readiness_focused_cpu_suite"] == (
         "24_passed_2_warnings"
     )
+    assert corrective["case6_pair_readiness_authoritative_cpu_commit"] == (
+        "993b81a5bb11e18d5a08d79b667beddb5d9a3b10"
+    )
+    assert corrective["case6_pair_readiness_authoritative_cpu_suite"] == (
+        "1114_passed_12_skipped_2_warnings_in_114.32s"
+    )
     assert corrective["case6_pair_readiness_source_states"] == 807
     assert corrective["case6_pair_readiness_transitions"] == 806
     assert corrective["case6_pair_readiness_camera_height_range_m"] == [

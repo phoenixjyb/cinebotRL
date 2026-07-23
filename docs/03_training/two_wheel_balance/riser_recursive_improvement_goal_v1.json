@@ -395,6 +395,8 @@
         "case6_pair_readiness_summary_sha256": "0f74c92b93040b126f8e25ac2470603203f8e07df6e923c1462c3cd24891b5ec",
         "case6_pair_readiness_mac_windows_byte_parity": true,
         "case6_pair_readiness_focused_cpu_suite": "24_passed_2_warnings",
+        "case6_pair_readiness_authoritative_cpu_commit": "993b81a5bb11e18d5a08d79b667beddb5d9a3b10",
+        "case6_pair_readiness_authoritative_cpu_suite": "1114_passed_12_skipped_2_warnings_in_114.32s",
         "case6_pair_readiness_source_states": 807,
         "case6_pair_readiness_transitions": 806,
         "case6_pair_readiness_source_duration_s": 15.942736,

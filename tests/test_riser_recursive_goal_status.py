@@ -661,7 +661,7 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     ]
     assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v1"
     assert audit["implementation_commit"] == (
-        "15a58801ae0fab3fdc5686a1d0a7b0da8b42e6ef"
+        "172d4efa8d43418b7eba656117b5004a7df7e708"
     )
     assert audit["host_independent_lf_evidence"] is True
     assert audit["mac_and_windows_report_byte_parity_verified"] is True
@@ -725,6 +725,49 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["learned_all79_runtime_authorized"] is False
     assert audit["render_policy_all79_video_hashes_required"] is True
     assert audit["render_intact_robot_visual_checks_required"] is True
+    assert audit["learned_render_admission_schema"].endswith(
+        "model_based_learned_render_admission_v1"
+    )
+    assert audit["learned_render_admission_template_sha256"] == _sha256(
+        ROOT
+        / "docs/03_training/two_wheel_balance/"
+        "MODEL_BASED_LEARNED_RENDER_ADMISSION_TEMPLATE_20260723.json"
+    )
+    assert audit["learned_render_visual_review_template_sha256"] == _sha256(
+        ROOT
+        / "docs/03_training/two_wheel_balance/"
+        "MODEL_BASED_LEARNED_RENDER_VISUAL_REVIEW_TEMPLATE_20260723.json"
+    )
+    assert audit["learned_render_contract_module_sha256"] == _sha256(
+        ROOT
+        / "src/rl_platform/tasks/two_wheel_balance/"
+        "riser_model_based_learned_render_contract.py"
+    )
+    assert audit["learned_render_execution_wrapper_sha256"] == _sha256(
+        ROOT
+        / "scripts/two_wheel_balance/run_model_based_learned_render_gate.sh"
+    )
+    assert audit["learned_render_preflight_validator_sha256"] == _sha256(
+        ROOT
+        / "scripts/two_wheel_balance/"
+        "validate_model_based_learned_render_admission.py"
+    )
+    assert audit["learned_render_media_auditor_sha256"] == _sha256(
+        ROOT
+        / "scripts/two_wheel_balance/"
+        "audit_model_based_learned_render_media.py"
+    )
+    assert audit["learned_render_finalizer_sha256"] == _sha256(
+        ROOT
+        / "scripts/two_wheel_balance/finalize_model_based_learned_render.py"
+    )
+    assert audit["learned_render_representative_cases"] == [1, 15, 31, 50, 73, 79]
+    assert (
+        audit["learned_render_machine_media_and_manual_visual_review_required"]
+        is True
+    )
+    assert audit["learned_render_runtime_authorized"] is False
+    assert audit["learned_render_recording_started"] is False
     assert audit["required_gate_pass_count"] == 6
     assert audit["required_gate_count"] == 10
     assert audit["completion_blockers"] == [
@@ -739,10 +782,10 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["runtime_started"] is False
     assert audit["bc_started_by_audit"] is False
     assert audit["ppo_started_by_audit"] is False
-    assert audit["focused_local_cpu_suite"] == "61_passed_2_warnings"
-    assert audit["focused_windows_cpu_suite"] == "61_passed_2_warnings"
+    assert audit["focused_local_cpu_suite"] == "75_passed_2_warnings"
+    assert audit["focused_windows_cpu_suite"] == "75_passed_2_warnings"
     assert audit["authoritative_windows_cpu_suite"] == (
-        "1068_passed_12_skipped_2_warnings_in_111.96s"
+        "1082_passed_12_skipped_2_warnings_in_113.60s"
     )
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
         "387d15eb4a812bff8461bd5480be5b5864bae34e0b93205fbc4d1203eb20d51f"

@@ -8383,3 +8383,31 @@ and must state whether its candidate was accepted or rejected.
   case-23 v4 corrective-label capture. A passing conversion advances the
   training corpus; it does not authorize validation, holdout, BC, all-79, or
   PPO.
+
+## Round 216: learned-policy render evidence is fail-closed
+
+- Added a render admission and CPU preflight tied to a passing learned all-79
+  report, the exact TorchScript policy, source/plan/assets, clean execution
+  commit, rendering code, and representative cases `[1,15,31,50,73,79]`.
+- The guarded wrapper uses the current model-based residual contract and
+  D3D12 offscreen RTX rendering under exclusive GPU ownership. It supports
+  only a fresh namespace or byte-identical validated resume.
+- The machine media auditor hashes every rollout and MP4 and derives codec,
+  resolution, frame rate, and duration with `ffprobe`. It cannot set visual
+  checks.
+- A separate explicit review must confirm intact robot geometry, visible
+  riser and camera/gimbal, plausible wheel contact, no detached links, and no
+  abnormal oscillation. The v2 finalizer and completion auditor open and
+  revalidate admission, preflight, rollout, media, and review artifacts.
+- Implementation commit
+  `172d4efa8d43418b7eba656117b5004a7df7e708` passes `75` focused tests
+  on macOS and `.98`; the authoritative `.98` suite passes
+  `1082 passed, 12 skipped, 2 warnings` in `113.60 s`.
+- No render admission, namespace, Isaac process, recording, policy, capture,
+  BC, PPO, or GPU workload was created. Goal completion remains `6/10`.
+
+## Next round after Round 216
+
+- The nearest data-path action remains exactly one separately authorized
+  case-23 v4 corrective-label capture. Rendering remains downstream of a real
+  admitted BC policy and passing all-79 learned rollout.

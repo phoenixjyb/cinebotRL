@@ -8648,6 +8648,11 @@ and must state whether its candidate was accepted or rejected.
 - Status commit `3e3a4f070b1384a8a798d908e4bc174060921ba7` passes the
   authoritative `.98` CPU suite:
   `1124 passed, 12 skipped, 2 warnings in 113.57 s`.
+- Verification status commit
+  `89d74defd0783cb492a03388592cd908d09d3050` regenerates a
+  byte-identical completion report on macOS and `.98` at SHA-256
+  `b9804473371407657a1206ba18806b508e5745fc879a3d9071c0af6a8bb8c0ce`.
+  The required-gate result remains `6/10`.
 - `pair_profile_cpu_ready=true`, but no runtime route or authorization exists.
   No token, GPU launch, capture, conversion, merge, BC, PPO, or training was
   created. Goal completion remains `6/10`.

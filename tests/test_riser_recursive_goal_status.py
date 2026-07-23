@@ -216,10 +216,10 @@ def test_hardware_status_remains_measurement_blocked() -> None:
         BENCH_RAW_LOG_TEMPLATE
     )
     assert hardware["bench_raw_log_authoritative_cpu_commit"] == (
-        "96b8a4198c660bdce557cee04c0f71e6dba982ac"
+        "e189e0732e4a650c01f6dbd7edcf1b0b8f25e69f"
     )
     assert hardware["bench_raw_log_authoritative_cpu_suite"] == (
-        "903_passed_12_skipped_2_warnings_in_80.46s"
+        "932_passed_12_skipped_2_warnings_in_81.86s"
     )
     assert hardware["supplier_response_contract_schema"] == (
         "cinebotrl_two_wheel_riser_supplier_response_v1"
@@ -280,6 +280,12 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     assert hardware["bench_750w_assembly_valid_for_production_design_review"] is False
     assert hardware["bench_750w_assembly_valid_for_production_procurement"] is False
     assert hardware["bench_750w_assembly_valid_for_hardware_transfer"] is False
+    assert hardware["bench_750w_assembly_authoritative_cpu_commit"] == (
+        "e189e0732e4a650c01f6dbd7edcf1b0b8f25e69f"
+    )
+    assert hardware["bench_750w_assembly_authoritative_cpu_suite"] == (
+        "932_passed_12_skipped_2_warnings_in_81.86s"
+    )
     assert hardware["ready_for_production_design_review"] is False
     assert hardware["valid_for_production_procurement"] is False
     assert hardware["valid_for_hardware_transfer"] is False

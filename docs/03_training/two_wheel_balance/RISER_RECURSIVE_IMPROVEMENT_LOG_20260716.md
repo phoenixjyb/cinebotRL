@@ -7777,10 +7777,12 @@ and must state whether its candidate was accepted or rejected.
   Focused assembly/routing tests pass `47/47`.
 - Only synthetic healthy/rejection fixtures were used. No real supplier,
   calibration, safety, or telemetry evidence was assembled.
+- The authoritative `.98` Windows-Python suite at implementation commit
+  `e189e0732e4a650c01f6dbd7edcf1b0b8f25e69f` passes
+  `932 passed, 12 skipped, 2 warnings` in `81.86 s`.
 
 ## Next round after Round 198
 
-- Run the authoritative `.98` CPU suite and seal the implementation commit.
 - Real hardware progress then requires the signed 750 W supplier response and
   calibrated physical logs; software runtime still requires the separate
   case-23 corrective-label capture authorization.

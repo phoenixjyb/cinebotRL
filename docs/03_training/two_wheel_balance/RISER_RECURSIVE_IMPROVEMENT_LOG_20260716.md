@@ -8578,5 +8578,10 @@ and must state whether its candidate was accepted or rejected.
 - Evidence commit `fa4c834ae78ed65c74bd1e369c9e4868ea0c2d44`
   passes the authoritative `.98` suite:
   `1107 passed, 12 skipped, 2 warnings in 112.64 s`.
+- Status commit `0982661880c389ab6d5f56f8d2001d3674a29e23`
+  regenerates a byte-identical completion audit on macOS and `.98` at
+  SHA-256
+  `5dda6698bed9459329d25a3d6356891dd8a1cd91c6abe2a516fc3b07b336eefa`.
+  It remains `6/10`; the partial intake is not the required real corpus.
 - The intake audit passes, but `corpus_manifest_ready=false`. It authorizes no
   conversion, merge, capture, runtime, BC, PPO, or training.

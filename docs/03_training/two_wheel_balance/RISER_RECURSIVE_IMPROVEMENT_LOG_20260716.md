@@ -9372,3 +9372,51 @@ and must state whether its candidate was accepted or rejected.
 - A future authorized wrapper invocation must recompute admission against its
   then-current clean synchronized `HEAD`; the preserved v2 queue is evidence,
   not a reusable authorization.
+
+## Round 244: riser mass and drive recommendation is traceable end to end
+
+- Added a CPU-only cross-layer auditor that derives the moving assembly from
+  the current URDF `riser_joint` subtree instead of trusting a copied mass.
+  It distinguishes the `28.000 kg` whole-robot balance plant from the
+  `4.342 kg` modeled moving assembly, the conservative `8.000 kg` drive-sizing
+  mass, and the `14.803715 kg` calculated ceiling at the required `15%` force
+  margin.
+- Recomputed the selected 48 V/750 W, `3:1`, `70 mm/rev` candidate against the
+  existing conservative force model. The 8 kg emergency design force is
+  `276.96 N`, continuous equivalent linear force is `550.258929 N`, and the
+  resulting force margin is `1.986781`.
+- The sizing calculation explicitly receives no counterbalance credit. It also
+  records the `98.176 J` single-descent mechanical-energy bound for regeneration
+  review, the `0.12 m` full-speed stopping distance, and the `1.50 m`
+  recommended mechanical stroke while preserving the `0.60--1.80 m` camera
+  height contract.
+- Added fail-closed checks that reject treating all 28 kg as vertical payload,
+  extending the camera ceiling to 1.9 m, silently enabling the 750 W simulation
+  profile, or interpreting the empty bench template as physical qualification.
+- The active Isaac profile remains the 400 W engineering profile. The 750 W
+  unit remains only a supplier/bench design-review candidate; production
+  procurement, hardware transfer, runtime, capture, BC, PPO, and training stay
+  unauthorized.
+- Implementation commit
+  `71095494049c585df7afcede4718a030458ca261` is pushed and synchronized to
+  `.98`. The machine-readable summary SHA-256 is
+  `52ddff232c339d5cd3057cf680a98ce19939150943d9c45e21f14836d28c507a`.
+- Focused macOS and `.98` suites both pass `24` tests. The authoritative `.98`
+  Windows-Isaac Python suite passes:
+  `1321 passed, 12 skipped, 2 warnings in 173.36 s`.
+- Operational lesson: a long Windows pytest launched through an unlogged SSH
+  pipe can outlive the client stream. One diagnostic retry briefly created a
+  duplicate; the later duplicate was stopped, no unrelated process was
+  touched, and the authoritative suite was rerun alone with an explicit log
+  and exit-code file. Future long `.98` CPU suites should use that logged
+  pattern from the outset.
+- No Isaac/GPU workload, runtime namespace, label capture, CPU conversion,
+  corpus merge, BC, PPO, checkpoint, or training run was created. Goal
+  completion remains `6/10`.
+
+## Next round after Round 244
+
+- The physical riser recommendation is now calculation-traceable but still
+  awaits supplier and bench measurements before hardware transfer.
+- The exact next data-producing operation remains separately authorized:
+  `Authorize exactly one case-23 v4 CPU conversion.`

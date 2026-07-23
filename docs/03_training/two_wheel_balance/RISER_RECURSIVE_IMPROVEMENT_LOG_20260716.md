@@ -8549,6 +8549,11 @@ and must state whether its candidate was accepted or rejected.
 - Evidence commit `3040a6db2b70b1fced0fd306ea17e2a008009bd3`
   passes the authoritative `.98` suite:
   `1096 passed, 12 skipped, 2 warnings in 130.96 s`.
+- Status commit `5801a61aeffc4f9bb8caa85d0c32ac124b11ca29`
+  regenerates a byte-identical completion audit on macOS and `.98` at
+  SHA-256
+  `19151b0fabd21fc7c72d9e97e54445a2812c476454fd8370c9bfb2a4bb07c347`.
+  It remains `6/10` with the same four learning blockers.
 - No authorization token, conversion namespace, output, merge, BC, PPO,
   training, Isaac process, or GPU workload was created. The route is CPU-ready
   but conversion remains unauthorized.

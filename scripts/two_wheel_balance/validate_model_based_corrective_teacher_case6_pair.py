@@ -10,15 +10,15 @@ from pathlib import Path
 import subprocess
 
 
-SCHEMA = "cinebotrl_two_wheel_riser_corrective_teacher_case6_pair_contract_v1"
+SCHEMA = "cinebotrl_two_wheel_riser_corrective_teacher_case6_pair_contract_v2"
 ADMISSION_SCHEMA = (
-    "cinebotrl_two_wheel_riser_corrective_teacher_case6_pair_admission_v1"
+    "cinebotrl_two_wheel_riser_corrective_teacher_case6_pair_admission_v2"
 )
-REVIEWED_PARENT = "4078d8fa7c50ea2340b0be3e31a84b038a3fde11"
-NAMESPACE = "20260724_model_based_corrective_teacher_case6_pair_v1_exclusive"
+REVIEWED_PARENT = "f8cb3c456ab5268df600212445742c09ac133254"
+NAMESPACE = "20260724_model_based_corrective_teacher_case6_pair_v2_exclusive"
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/"
-    "model_based_corrective_teacher_case6_pair_contract_v1.json"
+    "model_based_corrective_teacher_case6_pair_contract_v2.json"
 )
 EXPECTED_HOLDOUT = [3, 5, 13, 19, 24]
 EXPECTED_VALIDATION = [8, 16, 22, 32, 78]
@@ -41,6 +41,7 @@ REQUIRED_IDENTITIES = {
     "perturbation_runtime",
     "preflight_wrapper",
     "contract_validator",
+    "paired_finalizer",
 }
 EXPECTED_RESIDUAL_SCALES = [0.05, 0.05, 0.02]
 EXPECTED_CONTROLLER_ARGUMENTS = {
@@ -332,7 +333,7 @@ def validate(
         "cpu_preflight_ready": contract.get("cpu_preflight_ready") is True,
         "runtime_route_contract_ready": contract.get("runtime_route_contract_ready")
         is True,
-        "execution_route_incomplete": contract.get("execution_route_complete") is False,
+        "execution_route_complete": contract.get("execution_route_complete") is True,
         "runtime_authorization_absent": contract.get("runtime_authorized") is False
         and contract.get("gpu_launch_authorized") is False
         and contract.get("authorization_token_issued") is False
@@ -376,7 +377,7 @@ def validate(
         "authorization_consumed_before_isaac": False,
         "cpu_contract_ready": cpu_passed,
         "runtime_route_contract_ready": cpu_passed,
-        "execution_route_complete": False,
+        "execution_route_complete": cpu_passed,
         "runtime_authorized": False,
         "gpu_launch_authorized": False,
         "label_capture_authorized": False,

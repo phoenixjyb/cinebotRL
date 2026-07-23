@@ -1,6 +1,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -77,6 +78,7 @@ def _fixture_repo(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
         "perturbation_runtime": "src/perturbation.py",
         "preflight_wrapper": "scripts/wrapper.sh",
         "contract_validator": "scripts/validator.py",
+        "paired_finalizer": "scripts/finalizer.py",
     }
     _write(repo / paths["case6_plan"], "fixture-case6-plan\n")
     plan_sha = hashlib.sha256((repo / paths["case6_plan"]).read_bytes()).hexdigest()
@@ -196,7 +198,7 @@ def _fixture_repo(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
         "holdout_opened": False,
         "cpu_preflight_ready": True,
         "runtime_route_contract_ready": True,
-        "execution_route_complete": False,
+        "execution_route_complete": True,
         "authorization_token_issued": False,
         "runtime_authorization_token_sha256": "",
         "dataset_creation_authorized": False,
@@ -217,7 +219,7 @@ def test_validator_accepts_clean_pushed_cpu_only_contract(tmp_path, monkeypatch)
     result = MODULE.validate(contract, repo, namespace=MODULE.NAMESPACE)
     assert result["passed"] is True
     assert result["cpu_contract_ready"] is True
-    assert result["execution_route_complete"] is False
+    assert result["execution_route_complete"] is True
     assert result["runtime_authorized"] is False
     assert result["gpu_launch_authorized"] is False
 
@@ -276,6 +278,23 @@ def test_wrapper_execute_fails_before_python_or_isaac() -> None:
     assert payload["runtime_started"] is False
 
 
+def test_wrapper_rejects_supplied_token_while_hash_is_empty(tmp_path) -> None:
+    token = tmp_path / "token"
+    token.write_text("not authorized\n", encoding="utf-8")
+    result = subprocess.run(
+        ["bash", str(WRAPPER), "--execute"],
+        env={
+            **os.environ,
+            "RISER_CORRECTIVE_CASE6_AUTHORIZATION_FILE": str(token),
+        },
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 4
+    assert json.loads(result.stderr)["reason"] == "runtime_authorization_not_issued"
+    assert token.exists()
+
+
 def test_wrapper_rejects_environment_override_before_python() -> None:
     result = subprocess.run(
         ["bash", str(WRAPPER), "--preflight"],
@@ -287,17 +306,22 @@ def test_wrapper_rejects_environment_override_before_python() -> None:
     assert "conflicting_environment_override:RISER_ROOT" in result.stderr
 
 
-def test_wrapper_has_no_runtime_or_learning_route() -> None:
+def test_wrapper_has_complete_but_unauthorized_runtime_route() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
+    empty_token = source.index('readonly AUTHORIZATION_SHA256=""')
     execute_reject = source.index('reject "runtime_authorization_not_issued" 4')
     python_start = source.index('python3 "$VALIDATOR"')
-    assert execute_reject < python_start
-    assert "AUTHORIZATION_SHA256" not in source
+    playback_start = source.index("timeout --signal=TERM --kill-after=30s 600")
+    assert empty_token < execute_reject < python_start < playback_start
     assert "ISAAC_PYTHON" in source
-    assert "smoke_riser_reference_playback.py" not in source
+    assert "smoke_riser_reference_playback.py" in source
+    assert "summarize_model_based_corrective_teacher_case6_pair.py" in source
+    assert "--corrective-teacher-profile" in source
     assert "--dataset-dir" not in source
     assert "--raw-teacher-dir" not in source
     assert "--policy-trace-dir" not in source
+    assert "--shadow-teacher-trace-dir" not in source
+    assert "--corrective-teacher-capture-dir" not in source
 
 
 def test_committed_contract_is_cpu_only_and_tokenless() -> None:
@@ -306,7 +330,7 @@ def test_committed_contract_is_cpu_only_and_tokenless() -> None:
     assert set(payload["identities"]) == MODULE.REQUIRED_IDENTITIES
     assert payload["cpu_preflight_ready"] is True
     assert payload["runtime_route_contract_ready"] is True
-    assert payload["execution_route_complete"] is False
+    assert payload["execution_route_complete"] is True
     assert payload["runtime_authorization_token_sha256"] == ""
     for field in (
         "runtime_authorized",

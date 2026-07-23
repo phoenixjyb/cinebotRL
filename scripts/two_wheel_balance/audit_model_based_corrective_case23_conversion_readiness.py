@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -97,9 +98,29 @@ def _git_blob(path: Path) -> str:
     return hashlib.sha1(prefix + payload).hexdigest()
 
 
+def _windows_path_to_wsl(value: str) -> str:
+    if len(value) < 3 or value[1:3] not in (":\\", ":/"):
+        raise ValueError(f"cannot map Windows repository path into WSL: {value}")
+    drive = value[0].lower()
+    suffix = value[3:].replace("\\", "/")
+    return f"/mnt/{drive}/{suffix}"
+
+
 def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    if os.name == "nt":
+        windows_root = os.environ.get("WINDIR", r"C:\Windows")
+        executable = str(Path(windows_root) / "System32/wsl.exe")
+        command = [
+            executable,
+            "git",
+            "-C",
+            _windows_path_to_wsl(str(repo)),
+            *args,
+        ]
+    else:
+        command = ["git", "-C", str(repo), *args]
     return subprocess.run(
-        ["git", "-C", str(repo), *args],
+        command,
         check=check,
         capture_output=True,
         text=True,

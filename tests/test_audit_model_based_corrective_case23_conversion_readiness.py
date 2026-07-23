@@ -40,6 +40,12 @@ def _review(contract: Path = CONTRACT):
     )
 
 
+def test_windows_repository_path_maps_to_wsl_git_path() -> None:
+    assert MODULE._windows_path_to_wsl(
+        r"G:\wSpace\cinebotRL-two-wheel-riser"
+    ) == "/mnt/g/wSpace/cinebotRL-two-wheel-riser"
+
+
 def test_real_case23_v4_source_is_ready_for_separate_conversion() -> None:
     result = _review()
     assert result["passed"] is True

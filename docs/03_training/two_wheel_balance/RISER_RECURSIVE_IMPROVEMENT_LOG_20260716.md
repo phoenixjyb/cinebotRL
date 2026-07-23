@@ -9138,7 +9138,7 @@ and must state whether its candidate was accepted or rejected.
   exceeding any regression allowance.
 - Mac and `.98` preflights pass every check. The `.98` focused route/profile
   suite passes `24` tests, and the authoritative `.98` CPU suite passes
-  `1289 passed, 12 skipped, 2 warnings in 172.47 s`.
+  `1289 passed, 12 skipped, 2 warnings in 171.93 s`.
 - An explicit `.98 --execute` attempt fails closed with exit code `4` before
   Python or Isaac. No runtime namespace was created.
 - The repeated case-23 v4 capture request was not replayed because that

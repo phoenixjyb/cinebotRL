@@ -52,6 +52,21 @@ TEMPORAL_PROJECTION_AUDIT = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260723_model_based_corrective_temporal_projection_v1/summary.json"
 )
+PROJECTED_BC_LOSS_MODULE = (
+    ROOT
+    / "src/rl_platform/tasks/two_wheel_balance/"
+    "riser_model_based_bc_loss.py"
+)
+PROJECTED_BC_LOSS_AUDIT_SCRIPT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "audit_model_based_corrective_bc_loss.py"
+)
+PROJECTED_BC_LOSS_AUDIT = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_model_based_corrective_bc_loss_v1/summary.json"
+)
 BENCH_RAW_LOG_REDUCER = (
     ROOT / "scripts/two_wheel_balance/reduce_riser_bench_log.py"
 )
@@ -261,6 +276,50 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corrective["temporal_projection_authoritative_cpu_suite"] == (
         "897_passed_12_skipped_2_warnings"
     )
+    assert corrective["projected_bc_loss_contract"] == (
+        "model_based_projected_effective_action_bc_loss_v1"
+    )
+    assert corrective["requested_output_slew_regularization_contract"] == (
+        "requested_physical_residual_slew_hinge_v1"
+    )
+    assert corrective["projected_bc_loss_module_sha256"] == _sha256(
+        PROJECTED_BC_LOSS_MODULE
+    )
+    assert corrective["projected_bc_loss_audit_script_sha256"] == _sha256(
+        PROJECTED_BC_LOSS_AUDIT_SCRIPT
+    )
+    assert corrective["projected_bc_loss_audit_summary_sha256"] == _sha256(
+        PROJECTED_BC_LOSS_AUDIT
+    )
+    projected_audit = json.loads(PROJECTED_BC_LOSS_AUDIT.read_text())
+    assert projected_audit["passed"] is True
+    assert projected_audit["sample_count"] == 11411
+    assert corrective["projected_bc_loss_case30_sample_count"] == 11411
+    assert corrective["projected_bc_loss_case30_pointwise_loss"] <= 1e-9
+    assert corrective["naive_requested_to_effective_case30_mse"] > 0.005
+    assert corrective["projected_bc_loss_requested_slew_violations"] == [
+        0,
+        0,
+        0,
+    ]
+    assert corrective["projected_bc_loss_effective_projection_violations"] == [
+        30,
+        49,
+        8,
+    ]
+    assert corrective["projected_bc_loss_effective_unclipped_violations"] == [
+        0,
+        0,
+        0,
+    ]
+    assert corrective["projected_bc_loss_differentiable"] is True
+    assert corrective["projected_bc_loss_torchscript_compatible"] is True
+    assert corrective["projected_bc_loss_focused_cpu_suite"] == (
+        "66_passed_13_warnings"
+    )
+    assert corrective["projected_bc_loss_contract_review_passed"] is True
+    assert corrective["projected_bc_loss_valid_for_training"] is False
+    assert corrective["review_only_corpus_still_rejected_by_bc_entrypoint"] is True
     assert corrective["case30_valid_for_training"] is False
     assert corrective["conversion_route"]["case30_default_preserved"] is True
     assert corrective["conversion_route"]["allowed_splits"] == [

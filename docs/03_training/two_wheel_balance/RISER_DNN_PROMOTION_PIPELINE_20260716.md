@@ -46,6 +46,18 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 > pointwise loss；requested output 的 slew regularization/gate 独立执行。
 > requested action 仍不得作为 pointwise training target，最终 runtime safety
 > supervisor 仍保持最高控制权限。
+>
+> **2026-07-23 CPU 实现状态：** 已实现
+> `model_based_projected_effective_action_bc_loss_v1`。网络输出仍表示
+> requested normalized residual；损失内部先经过不变的 safety projection，再与
+> effective target 比较。独立的
+> `requested_physical_residual_slew_hinge_v1` 只约束同一 case 内相邻 requested
+> 输出，不用 effective label 的投影跳变判定网络 chatter。case-30 的真实
+> `11,411` 行审计证明 projected pointwise loss 约为 `2.86e-13`，而错误的
+> requested-vs-effective 直接 MSE 为 `0.00538`；requested slew 违规为
+> `0/0/0`，effective label 的 `30/49/8` 个违规仍全部来自 supervisor
+> clipping。该结果只证明损失合同正确，不代表多 case corpus 已满足、不授权 BC，
+> 也未生成 checkpoint 或启动训练。现有 review-only corpus 仍被 BC 入口拒绝。
 
 ## 固定运行合同
 

@@ -1,0 +1,88 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_bc_loss_audit_v1",
+  "case": 30,
+  "loss_contract": "model_based_projected_effective_action_bc_loss_v1",
+  "projection_contract": "model_based_residual_safety_projection_v1",
+  "requested_slew_regularization_contract": "requested_physical_residual_slew_hinge_v1",
+  "implementation": {
+    "loss_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_bc_loss.py",
+      "sha256": "f9fe3c59ba3188effc27104e15f58b1de15c78ac49a59ebc9fe569fd9e6ea8c9"
+    },
+    "audit_script": {
+      "path": "scripts/two_wheel_balance/audit_model_based_corrective_bc_loss.py",
+      "sha256": "c5d0f5485c90f4c2bd78479424d73ff7e41ff2d8634102580466a1fc9d23a73d"
+    },
+    "torchscript_compatible": true,
+    "differentiable": true
+  },
+  "inputs": {
+    "dataset": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_case30_effective_label_conversion_v1/case_0030_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "191a44147bc44038a0645bf48a63609463bf280d97b37ddaf884200bd8b52447"
+    },
+    "corrective_profile": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case30_profile_v1.json",
+      "sha256": "26df020549f7db60f3e17d78bb3797e1f32630f615361a1e12d359977e7cf45b"
+    }
+  },
+  "sample_count": 11411,
+  "transition_count": 11410,
+  "action_scales": [
+    0.05,
+    0.05,
+    0.02
+  ],
+  "maximum_slew_rates": [
+    0.1,
+    0.1,
+    0.04
+  ],
+  "metrics": {
+    "total_loss": 2.871687534034689e-13,
+    "projected_pointwise_loss": 2.8596561425266176e-13,
+    "requested_slew_regularization_loss": 1.203127609983258e-15,
+    "naive_requested_to_effective_mse": 0.005383476207737214,
+    "projected_effective_action_max_error": 3.894791007041931e-06,
+    "requested_slew_violation_count_per_channel": [
+      0,
+      0,
+      0
+    ],
+    "effective_slew_violation_count_per_channel": [
+      30,
+      49,
+      8
+    ],
+    "effective_unclipped_slew_violation_count_per_channel": [
+      0,
+      0,
+      0
+    ],
+    "recorded_clipped_sample_count": 841,
+    "requested_gradient_abs_max": 1.1840829650111573e-08
+  },
+  "checks": {
+    "case_dataset_is_merge_only": true,
+    "training_remains_closed": true,
+    "projection_reconstructs_effective_targets": true,
+    "projected_pointwise_loss_is_numerically_zero": true,
+    "requested_slew_regularization_is_numerically_zero": true,
+    "naive_requested_target_loss_is_nonzero": true,
+    "requested_teacher_has_no_slew_violations": true,
+    "effective_target_has_projection_induced_slew_violations": true,
+    "projection_clipping_mask_is_exact": true,
+    "requested_action_gradient_is_finite": true
+  },
+  "passed": true,
+  "valid_for_bc_loss_contract_review": true,
+  "corpus_created": false,
+  "valid_for_training": false,
+  "runtime_authorized": false,
+  "capture_authorized": false,
+  "dataset_creation_authorized": false,
+  "learned_rollout_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false
+}

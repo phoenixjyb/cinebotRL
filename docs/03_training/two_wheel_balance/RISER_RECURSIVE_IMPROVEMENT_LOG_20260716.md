@@ -7827,3 +7827,32 @@ and must state whether its candidate was accepted or rejected.
   separate conversion audit; a rejection stops for diagnosis. Neither outcome
   automatically authorizes corpus merge, BC, PPO, holdout evaluation, or
   training.
+
+## Round 200: authorized case-23 v2 capture rejects on case-route propagation
+
+- The user authorized exactly one case-23 v2 corrective-label capture. The
+  wrapper consumed one out-of-repository mode-`0600` token at clean
+  `HEAD == upstream == 526952133a784ad653f4cfebd3e618a23fd4b291`.
+- Admission passed case `23`, split `train`, all pinned identities, fresh
+  namespace, active 400 W plant, authorization, and closed-training checks.
+- Playback rejected before Isaac initialization because it called the generic
+  capture loader without forwarding the expected case. The loader's
+  compatibility default is case 30, so its internal `case_split` check rejected
+  the otherwise valid case-23 admission.
+- Playback exited `2`; the finalizer exited `6`; no capture file, heartbeat,
+  labels, dataset, BC, PPO, or training was created. The token was deleted and
+  GPU ownership was empty after finalization.
+- The v2 namespace and evidence are preserved at
+  `evidence_20260723_case23_corrective_capture_v2_rejected_case_split`. V2 is
+  consumed and must not be retried.
+- CPU repair now requires playback to accept an independently pinned
+  train/validation split and call the admission loader with both the corrective
+  profile's case and that split. The first focused regression suite passes
+  `38/38`.
+
+## Next round after Round 200
+
+- Finish a fresh no-token v3 route around the repaired playback identity.
+- Do not issue a token or launch v3. A future retry requires a new explicit
+  authorization naming exactly one case-23 v3 corrective-label capture.
+- Conversion, corpus merge, BC, PPO, holdouts, and training remain closed.

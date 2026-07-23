@@ -199,7 +199,7 @@ parser.add_argument(
     "--corrective-teacher-capture-dir",
     type=Path,
     help=(
-        "Write one admitted case-30 corrective-label archive. Requires a "
+        "Write one admitted corrective-label archive. Requires a "
         "separate hash-bound runtime admission and never creates a normalized "
         "training dataset."
     ),
@@ -208,6 +208,14 @@ parser.add_argument(
     "--corrective-teacher-capture-admission",
     type=Path,
     help="Runtime admission paired with --corrective-teacher-capture-dir.",
+)
+parser.add_argument(
+    "--corrective-teacher-capture-split",
+    choices=("train", "validation"),
+    help=(
+        "Expected split pinned independently of the admission payload; required "
+        "with the corrective capture directory and admission."
+    ),
 )
 parser.add_argument(
     "--residual-policy",
@@ -293,17 +301,23 @@ corrective_capture_admission = None
 if (
     args.corrective_teacher_capture_dir is not None
     or args.corrective_teacher_capture_admission is not None
+    or args.corrective_teacher_capture_split is not None
 ):
     if (
         args.corrective_teacher_capture_dir is None
         or args.corrective_teacher_capture_admission is None
+        or args.corrective_teacher_capture_split is None
     ):
-        parser.error("corrective capture directory and admission are required together")
+        parser.error(
+            "corrective capture directory, admission, and split are required together"
+        )
     if corrective_teacher_config is None or corrective_teacher_profile_identity is None:
         parser.error("corrective capture requires the reviewed corrective profile")
     try:
         corrective_capture_admission = load_capture_admission(
-            args.corrective_teacher_capture_admission
+            args.corrective_teacher_capture_admission,
+            expected_case=corrective_teacher_case,
+            expected_split=args.corrective_teacher_capture_split,
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
@@ -3018,6 +3032,7 @@ def main() -> int:
             if corrective_capture_admission is None
             else str(args.corrective_teacher_capture_admission.resolve())
         ),
+        "corrective_teacher_capture_split": args.corrective_teacher_capture_split,
         "residual_policy": (
             None if args.residual_policy is None else str(args.residual_policy.resolve())
         ),

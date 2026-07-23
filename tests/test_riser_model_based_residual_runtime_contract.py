@@ -54,7 +54,19 @@ def test_corrective_teacher_capture_requires_separate_pre_app_admission() -> Non
     assert "corrective teacher requires model-based zero-policy mode" in pre_app
     assert "model_based_zero_measurement" in pre_app
     assert '"--corrective-teacher-capture-admission"' in pre_app
+    assert '"--corrective-teacher-capture-split"' in pre_app
     assert "load_capture_admission" in pre_app
+    assert (
+        "load_capture_admission(\n"
+        "            args.corrective_teacher_capture_admission,\n"
+        "            expected_case=corrective_teacher_case,\n"
+        "            expected_split=args.corrective_teacher_capture_split,\n"
+        "        )"
+    ) in pre_app
+    assert (
+        "corrective capture directory, admission, and split are required together"
+        in pre_app
+    )
     assert "corrective capture is exclusive with every legacy capture path" in pre_app
     assert '"corrective_teacher_label_capture_authorized": (' in source
     assert "corrective_capture_admission is not None" in source

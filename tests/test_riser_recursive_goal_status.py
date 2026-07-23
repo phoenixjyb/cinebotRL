@@ -76,7 +76,7 @@ CASE23_CONVERSION_REVIEWER = (
 CASE23_CONVERSION_EXECUTION_EVIDENCE = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260724_case23_corrective_conversion_execution_cpu/summary.json"
+    "evidence_20260724_case23_corrective_conversion_execution_cpu_v2/summary.json"
 )
 CASE23_CONVERSION_EXECUTION_CONTRACT = (
     ROOT
@@ -425,11 +425,14 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         "case23_capture_v4_conversion_execution_implementation_commit"
     ] == "02a090e02f03523c0274151202ab7af204585c32"
     assert corrective[
+        "case23_capture_v4_conversion_execution_wsl_ext4_fix_commit"
+    ] == "298805562202320c72319f7adb0f955fd9568116"
+    assert corrective[
         "case23_capture_v4_conversion_execution_contract_sha256"
     ] == _sha256(CASE23_CONVERSION_EXECUTION_CONTRACT)
     assert corrective[
         "case23_capture_v4_conversion_execution_contract_git_blob_sha1"
-    ] == "a343647b9e48d24170dec29fb5c5fcaa5123a51a"
+    ] == "6ccbbc5c3153b38d5c33cebac026cb5dfee3c1ea"
     assert corrective[
         "case23_capture_v4_conversion_execution_validator_sha256"
     ] == _sha256(CASE23_CONVERSION_EXECUTION_VALIDATOR)
@@ -444,6 +447,9 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ] == _sha256(CASE23_CONVERSION_EXECUTION_EVIDENCE)
     assert corrective[
         "case23_capture_v4_conversion_execution_cpu_contract_ready"
+    ] is True
+    assert corrective[
+        "case23_capture_v4_conversion_execution_token_requires_wsl_ext4"
     ] is True
     assert corrective[
         "case23_capture_v4_conversion_execution_token_present"

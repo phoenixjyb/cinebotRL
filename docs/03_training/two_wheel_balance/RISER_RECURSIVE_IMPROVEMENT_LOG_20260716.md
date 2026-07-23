@@ -8525,3 +8525,27 @@ and must state whether its candidate was accepted or rejected.
   check passes.
 - Do not infer conversion permission from the consumed capture authorization
   or this CPU-ready preflight.
+
+## Round 220: case-23 conversion token route is repaired for `.98`
+
+- The first authoritative full `.98` suite exposed one cross-platform failure:
+  `1094 passed, 1 failed, 12 skipped, 2 warnings`. The healthy authorization
+  test could not satisfy mode `0600` because `.98` mounts both `/mnt/c` and
+  `/mnt/g` as DrvFS without Linux metadata; files there report mode `0777`.
+- This was a real execution-contract defect, not relaxed as a test exception.
+  Commit `298805562202320c72319f7adb0f955fd9568116` requires authorization
+  tokens on WSL ext4 and supports the matching pinned-Ubuntu
+  `\\wsl.localhost` path for Windows Python.
+- The validator rejects alternate WSL distributions, and the shell wrapper
+  still independently verifies WSL mode `0600`, non-symlink status, and the
+  out-of-band SHA-256 before consuming the token.
+- The corrected real `.98` focused suite passes:
+  `9 passed, 2 warnings`.
+- Fresh no-token preflight evidence is preserved under
+  `evidence_20260724_case23_corrective_conversion_execution_cpu_v2/` at
+  SHA-256
+  `b1d76609bac8982d3bd4af818c15e18ad58dc88b24093617a8fe90018069f739`.
+  Every repository, contract, and identity check passes.
+- No authorization token, conversion namespace, output, merge, BC, PPO,
+  training, Isaac process, or GPU workload was created. The route is CPU-ready
+  but conversion remains unauthorized.

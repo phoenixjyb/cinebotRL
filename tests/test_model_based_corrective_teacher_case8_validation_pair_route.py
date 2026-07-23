@@ -49,11 +49,7 @@ def test_contract_is_hash_bound_validation_only_and_tokenless() -> None:
     for identity in contract["identities"].values():
         path = ROOT / identity["path"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == identity["sha256"]
-        command = ["git"]
-        if os.name == "nt":
-            command.extend(["-c", f"safe.directory={ROOT.resolve()}"])
-        command.extend(["-C", str(ROOT), "hash-object", str(path)])
-        blob = _run(*command).stdout.strip()
+        blob = MODULE._git(ROOT, "hash-object", str(path)).stdout.strip()
         assert blob == identity["git_blob_sha1"]
     assert contract["cpu_preflight_ready"] is True
     assert contract["runtime_route_contract_ready"] is True

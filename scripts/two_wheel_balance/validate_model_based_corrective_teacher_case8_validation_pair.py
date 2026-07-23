@@ -105,10 +105,25 @@ def _sha256(path: Path) -> str:
 def _git(
     repo: Path, *args: str, check: bool = True
 ) -> subprocess.CompletedProcess[str]:
-    command = ["git"]
     if os.name == "nt":
-        command.extend(["-c", f"safe.directory={repo.resolve()}"])
-    command.extend(["-C", str(repo), *args])
+        def wsl_path(value: str) -> str:
+            path = Path(value)
+            if not path.is_absolute() or not path.drive:
+                return value
+            drive = path.drive[0].lower()
+            relative = path.as_posix().split(":/", 1)[1]
+            return f"/mnt/{drive}/{relative}"
+
+        command = [
+            "wsl.exe",
+            "--exec",
+            "git",
+            "-C",
+            wsl_path(str(repo.resolve())),
+            *(wsl_path(value) for value in args),
+        ]
+    else:
+        command = ["git", "-C", str(repo), *args]
     return subprocess.run(
         command,
         capture_output=True,

@@ -103,14 +103,27 @@ def _identity(relative: str) -> dict[str, str]:
     path = PROJECT_ROOT / relative
     if not path.is_file():
         raise FileNotFoundError(path)
-    command = ["git"]
     if os.name == "nt":
-        command.extend(
-            ["-c", f"safe.directory={PROJECT_ROOT.resolve()}"]
-        )
-    command.extend(
-        ["-C", str(PROJECT_ROOT), "hash-object", str(path)]
-    )
+        drive = PROJECT_ROOT.drive[0].lower()
+        root_relative = PROJECT_ROOT.as_posix().split(":/", 1)[1]
+        path_relative = path.as_posix().split(":/", 1)[1]
+        command = [
+            "wsl.exe",
+            "--exec",
+            "git",
+            "-C",
+            f"/mnt/{drive}/{root_relative}",
+            "hash-object",
+            f"/mnt/{drive}/{path_relative}",
+        ]
+    else:
+        command = [
+            "git",
+            "-C",
+            str(PROJECT_ROOT),
+            "hash-object",
+            str(path),
+        ]
     blob = subprocess.run(
         command,
         check=True,

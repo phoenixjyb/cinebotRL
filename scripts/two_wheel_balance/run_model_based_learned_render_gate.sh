@@ -38,23 +38,37 @@ for name in "${required_environment[@]}"; do
   [[ -n "${!name:-}" ]] || reject "missing_environment:$name" 2
 done
 
-receipt="$(mktemp)"
+receipt="$(mktemp -p "$ROOT" .learned_render_preflight.XXXXXX.json)"
 trap 'rm -f "$receipt"' EXIT
-RISER_POLICY_INSPECTOR_PYTHON="$ISAAC_PYTHON" python3 "$PREFLIGHT" \
-  --admission "$RISER_MODEL_BASED_LEARNED_RENDER_ADMISSION" \
-  --all79-report "$RISER_MODEL_BASED_LEARNED_RENDER_ALL79_REPORT" \
-  --all79-admission "$RISER_MODEL_BASED_LEARNED_RENDER_ALL79_ADMISSION" \
-  --all79-preflight "$RISER_MODEL_BASED_LEARNED_RENDER_ALL79_PREFLIGHT" \
-  --policy "$RISER_MODEL_BASED_LEARNED_RENDER_POLICY" \
-  --plan-manifest "$RISER_MODEL_BASED_LEARNED_RENDER_PLAN_MANIFEST" \
-  --source-manifest "$RISER_MODEL_BASED_LEARNED_RENDER_SOURCE_MANIFEST" \
-  --lqr-gains "$RISER_MODEL_BASED_LEARNED_RENDER_LQR_GAINS" \
-  --robot-build-audit "$RISER_MODEL_BASED_LEARNED_RENDER_ROBOT_BUILD_AUDIT" \
-  --robot-usd "$RISER_MODEL_BASED_LEARNED_RENDER_ROBOT_USD" \
+to_windows_path() {
+  if [[ "$1" =~ ^[A-Za-z]:\\ ]]; then
+    printf '%s\n' "$1"
+  else
+    wslpath -w "$1"
+  fi
+}
+"$ISAAC_PYTHON" "$(to_windows_path "$PREFLIGHT")" \
+  --admission "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_ADMISSION")" \
+  --all79-report \
+  "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_ALL79_REPORT")" \
+  --all79-admission \
+  "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_ALL79_ADMISSION")" \
+  --all79-preflight \
+  "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_ALL79_PREFLIGHT")" \
+  --policy "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_POLICY")" \
+  --plan-manifest \
+  "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_PLAN_MANIFEST")" \
+  --source-manifest \
+  "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_SOURCE_MANIFEST")" \
+  --lqr-gains "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_LQR_GAINS")" \
+  --robot-build-audit \
+  "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_ROBOT_BUILD_AUDIT")" \
+  --robot-usd "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_RENDER_ROBOT_USD")" \
   --drive-profile-selection \
-  "$RISER_MODEL_BASED_LEARNED_RENDER_DRIVE_PROFILE_SELECTION" \
+  "$(to_windows_path \
+    "$RISER_MODEL_BASED_LEARNED_RENDER_DRIVE_PROFILE_SELECTION")" \
   --require-authorized \
-  --output "$receipt"
+  --output "$(to_windows_path "$receipt")"
 if [[ "$MODE" == --preflight ]]; then
   cat "$receipt"
   exit 0

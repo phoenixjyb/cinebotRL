@@ -38,31 +38,43 @@ if [[ "$SPLIT_MODE" == holdout ]]; then
     || reject missing_prior_validation_report 2
 fi
 
-receipt="$(mktemp)"
+receipt="$(mktemp -p "$ROOT" .learned_split_preflight.XXXXXX.json)"
 trap 'rm -f "$receipt"' EXIT
+to_windows_path() {
+  if [[ "$1" =~ ^[A-Za-z]:\\ ]]; then
+    printf '%s\n' "$1"
+  else
+    wslpath -w "$1"
+  fi
+}
+preflight_win="$(to_windows_path "$PREFLIGHT")"
 preflight_args=(
   --mode "$SPLIT_MODE"
-  --admission "$RISER_MODEL_BASED_LEARNED_SPLIT_ADMISSION"
-  --bc-report "$RISER_MODEL_BASED_LEARNED_SPLIT_BC_REPORT"
-  --policy "$RISER_MODEL_BASED_LEARNED_SPLIT_POLICY"
-  --plan-manifest "$RISER_MODEL_BASED_LEARNED_SPLIT_PLAN_MANIFEST"
-  --source-manifest "$RISER_MODEL_BASED_LEARNED_SPLIT_SOURCE_MANIFEST"
-  --lqr-gains "$RISER_MODEL_BASED_LEARNED_SPLIT_LQR_GAINS"
-  --robot-build-audit "$RISER_MODEL_BASED_LEARNED_SPLIT_ROBOT_BUILD_AUDIT"
-  --robot-usd "$RISER_MODEL_BASED_LEARNED_SPLIT_ROBOT_USD"
+  --admission "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_SPLIT_ADMISSION")"
+  --bc-report "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_SPLIT_BC_REPORT")"
+  --policy "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_SPLIT_POLICY")"
+  --plan-manifest \
+    "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_SPLIT_PLAN_MANIFEST")"
+  --source-manifest \
+    "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_SPLIT_SOURCE_MANIFEST")"
+  --lqr-gains "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_SPLIT_LQR_GAINS")"
+  --robot-build-audit \
+    "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_SPLIT_ROBOT_BUILD_AUDIT")"
+  --robot-usd "$(to_windows_path "$RISER_MODEL_BASED_LEARNED_SPLIT_ROBOT_USD")"
   --drive-profile-selection \
-    "$RISER_MODEL_BASED_LEARNED_SPLIT_DRIVE_PROFILE_SELECTION"
+    "$(to_windows_path \
+      "$RISER_MODEL_BASED_LEARNED_SPLIT_DRIVE_PROFILE_SELECTION")"
   --require-authorized
-  --output "$receipt"
+  --output "$(to_windows_path "$receipt")"
 )
 if [[ "$SPLIT_MODE" == holdout ]]; then
   preflight_args+=(
     --prior-validation-gate-report
-    "$RISER_MODEL_BASED_LEARNED_SPLIT_PRIOR_VALIDATION_REPORT"
+    "$(to_windows_path \
+      "$RISER_MODEL_BASED_LEARNED_SPLIT_PRIOR_VALIDATION_REPORT")"
   )
 fi
-RISER_POLICY_INSPECTOR_PYTHON="$ISAAC_PYTHON" \
-  python3 "$PREFLIGHT" "${preflight_args[@]}"
+"$ISAAC_PYTHON" "$preflight_win" "${preflight_args[@]}"
 
 if [[ "$RUN_MODE" == --preflight ]]; then
   cat "$receipt"

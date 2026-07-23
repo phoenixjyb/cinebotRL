@@ -107,10 +107,13 @@ def test_preflight_preserves_contract_rejection(
 
 def test_wrapper_rejects_before_namespace_or_isaac_without_admission() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
-    preflight = source.index('python3 "$PREFLIGHT"')
+    preflight = source.index('"$ISAAC_PYTHON" "$(to_windows_path "$PREFLIGHT")"')
     namespace = source.index('mkdir -p "$output/teacher"')
     playback = source.index('"$ISAAC_PYTHON" -u -X utf8 "$PLAYBACK_WIN"')
     assert preflight < namespace < playback
+    assert "to_windows_path" in source
+    assert 'mktemp -p "$ROOT"' in source
+    assert 'python3 "$PREFLIGHT"' not in source
     assert "--require-authorized" in source
     assert "--policy-command-base model_based_planner" in source
     assert "--residual-action-scales 0.05,0.05,0.02" in source

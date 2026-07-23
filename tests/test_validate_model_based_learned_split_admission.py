@@ -151,10 +151,13 @@ def test_holdout_preflight_forwards_prior_validation_report(
 
 def test_wrapper_rejects_before_namespace_and_uses_current_model_based_route() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
-    preflight = source.index('python3 "$PREFLIGHT"')
+    preflight = source.index('"$ISAAC_PYTHON" "$preflight_win"')
     namespace = source.index('mkdir -p "$output/baseline"')
     playback = source.index('"$ISAAC_PYTHON" -u -X utf8 "$playback_win"')
     assert preflight < namespace < playback
+    assert "to_windows_path" in source
+    assert 'mktemp -p "$ROOT"' in source
+    assert 'python3 "$PREFLIGHT"' not in source
     assert "--require-authorized" in source
     assert "missing_prior_validation_report" in source
     assert "--policy-command-base model_based_planner" in source

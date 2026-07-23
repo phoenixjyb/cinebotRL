@@ -1,0 +1,72 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_supplier_response_v1",
+  "request_id": "cinebotrl_two_wheel_riser_750w_axis_20260723",
+  "supplier": {
+    "company": null,
+    "engineer": null,
+    "response_date": null
+  },
+  "configuration": {
+    "axis_model": null,
+    "axis_architecture": null,
+    "motor_model": "ELVM8075V48EH-M17-HD",
+    "drive_model": "ELD2-CAN7020B",
+    "gearbox_model": null,
+    "reduction_ratio": null,
+    "linear_lead_m_per_rev": null,
+    "mechanical_stroke_m": null,
+    "software_working_stroke_m": null,
+    "software_camera_height_min_m": null,
+    "software_camera_height_max_m": null
+  },
+  "ratings": {
+    "rated_moving_mass_kg": null,
+    "maximum_linear_speed_mps": null,
+    "maximum_linear_acceleration_mps2": null,
+    "maximum_linear_jerk_mps3": null,
+    "minimum_emergency_deceleration_mps2": null,
+    "continuous_vertical_force_n": null,
+    "rated_eccentric_pitch_moment_nm": null,
+    "rated_eccentric_yaw_moment_nm": null,
+    "vertical_service_duty_cycle_fraction": null,
+    "vertical_service_continuous_duration_s": null,
+    "declared_cycle_life": null
+  },
+  "transmission": {
+    "gearbox_continuous_input_speed_rpm": null,
+    "gearbox_emergency_input_torque_nm": null,
+    "gearbox_efficiency_fraction": null,
+    "gearbox_backlash_deg": null,
+    "belt_tooth_jump_margin_ratio": null
+  },
+  "approvals": {
+    "vertical_mobile_axis_duty_approved": null,
+    "gearbox_continuous_speed_approved": null,
+    "gearbox_emergency_braking_torque_approved": null,
+    "belt_tooth_jump_margin_approved": null,
+    "regenerative_absorption_approved": null,
+    "independent_anti_fall_approved": null,
+    "independent_hard_limits_and_end_stops_approved": null,
+    "safety_power_removal_approved": null
+  },
+  "safety": {
+    "motor_holding_brake_is_static_only": null,
+    "motor_holding_brake_used_for_dynamic_stop": null,
+    "regenerative_absorption_model": null,
+    "regenerative_bus_voltage_limit_v": null,
+    "independent_anti_fall_model": null,
+    "independent_anti_fall_rated_holding_force_n": null,
+    "independent_anti_fall_maximum_catch_distance_m": null,
+    "safety_power_removal_architecture": null,
+    "safety_category_or_standard": null
+  },
+  "evidence": {
+    "axis_datasheet_sha256": null,
+    "gearbox_datasheet_sha256": null,
+    "selection_calculation_sha256": null,
+    "vertical_duty_approval_sha256": null,
+    "regeneration_calculation_sha256": null,
+    "safety_architecture_sha256": null,
+    "signed_supplier_response_sha256": null
+  }
+}

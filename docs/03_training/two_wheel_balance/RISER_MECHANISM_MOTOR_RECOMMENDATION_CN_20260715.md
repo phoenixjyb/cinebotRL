@@ -507,3 +507,36 @@ actuator、热模型和 USD，并重新执行 static/dynamic/exact-source/full-7
   https://www.leadshine.com/network-detail/c-servo-drives/CANopen/ELD2-CAN7020B.html
 - Leadshine 当前低压伺服产品目录和匹配表：
   https://m.leadshine.com/upfiles/downloads/4850bb0f1f150d6391f1ec74f11e83dc_1745548352730.pdf
+
+## 15. 750 W 供应商书面回复合同
+
+为了避免供应商只回复“速度可达 1 m/s”就被误判为完整选型批准，新增固定回复模板：
+
+`RISER_750W_SUPPLIER_RESPONSE_TEMPLATE_20260723.json`
+
+供应商或项目机械负责人必须逐项填写并绑定原始资料 SHA-256。核心边界包括：
+
+- 电机/驱动固定为 `ELVM8075V48EH-M17-HD + ELD2-CAN7020B`；
+- 机构只能是有导向同步带轴或两级机械同步伸缩桅杆；
+- `3:1` 减速、`70 mm/rev`、至少 `1.50 m` 机械行程；
+- 软件工作行程 `1.20 m`，相机光心严格为 `0.60--1.80 m`；
+- 至少 8 kg 运动质量、1 m/s、2 m/s2、8 m/s3、5 m/s2 急停减速度和
+  300 N 连续垂直力；
+- 减速器连续输入转速至少 `2571.43 rpm`，8 kg 急停输入扭矩必须包含
+  15% 项目裕量；
+- 厂家必须书面确认垂直占空比、跳齿裕量、再生吸收、独立防坠、硬限位、
+  吸能端挡和安全断能；
+- 电机抱闸只能用于静态保持，任何“用抱闸做动态急停”的回复直接拒绝；
+- 防坠额定保持力至少为 8 kg 静载的两倍，声明的最大捕获距离不得超过 30 mm。
+
+审核命令：
+
+```bash
+python3 scripts/two_wheel_balance/audit_riser_supplier_response.py \
+  --response /path/to/signed_supplier_response.json \
+  --output /path/to/supplier_response_audit.json
+```
+
+完整通过只产生可合并到台架测量 JSON 的 `supplier_evidence` 片段，不会自动批准
+生产采购、硬件迁移、750 W 仿真 profile、runtime、训练、BC 或 PPO。供应商回复
+通过后，仍需完成校准后的 1 m/s 连续/急停/温升/再生/防坠/限位台架。

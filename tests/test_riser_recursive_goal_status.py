@@ -163,6 +163,21 @@ CASE2_NATURAL_ERROR_CORRECTIVE_PROFILE = (
     / "scripts/two_wheel_balance/"
     "model_based_corrective_teacher_case2_natural_error_profile_v1.json"
 )
+CASE2_NATURAL_ERROR_PAIR_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case2_natural_error_pair_contract_v1.json"
+)
+CASE2_NATURAL_ERROR_PAIR_ADAPTER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "smoke_riser_case2_natural_error_pair.py"
+)
+CASE2_NATURAL_ERROR_PAIR_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case2_natural_error_pair_route_cpu_v1/summary.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -767,10 +782,45 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         "case2_natural_error_outward_yaw_projection_transitions"
     ] == 103
     assert corrective["case2_natural_error_pair_profile_cpu_ready"] is True
-    assert corrective["case2_natural_error_runtime_route_implemented"] is False
+    assert corrective["case2_natural_error_pair_contract_sha256"] == _sha256(
+        CASE2_NATURAL_ERROR_PAIR_CONTRACT
+    )
+    assert corrective["case2_natural_error_pair_adapter_sha256"] == _sha256(
+        CASE2_NATURAL_ERROR_PAIR_ADAPTER
+    )
+    assert corrective["case2_natural_error_pair_identity_count"] == 19
+    assert corrective["case2_natural_error_pair_reset_seed"] == (
+        corrective["case2_natural_error_pair_configuration_seed"] + 2
+    )
+    assert corrective["case2_natural_error_pair_external_wrench_used"] is False
+    assert (
+        corrective[
+            "case2_natural_error_pair_projection_observer_modifies_commands"
+        ]
+        is False
+    )
+    assert corrective[
+        "case2_natural_error_pair_historical_case23_v4_regression_passed"
+    ] is True
+    assert corrective["case2_natural_error_runtime_route_implemented"] is True
+    assert corrective["case2_natural_error_execution_route_complete"] is True
+    assert corrective["case2_natural_error_cpu_preflight_passed"] is True
+    assert (
+        corrective["case2_natural_error_authorization_token_issued"] is False
+    )
     assert corrective["case2_natural_error_runtime_authorized"] is False
     assert corrective["case2_natural_error_label_capture_authorized"] is False
     assert corrective["case2_natural_error_training_authorized"] is False
+    case2_route = json.loads(CASE2_NATURAL_ERROR_PAIR_EVIDENCE.read_text())
+    assert case2_route["passed"] is True
+    assert case2_route["execution_route_complete"] is True
+    assert case2_route["runtime_authorized"] is False
+    assert case2_route["gpu_launch_authorized"] is False
+    assert case2_route["authorization_token_issued"] is False
+    assert case2_route["label_capture_authorized"] is False
+    assert case2_route["dataset_creation_authorized"] is False
+    assert case2_route["training_started"] is False
+    assert case2_route["valid_for_training"] is False
     case2_profile = json.loads(
         CASE2_NATURAL_ERROR_PROFILE_PROPOSAL.read_text()
     )

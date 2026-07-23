@@ -8816,3 +8816,39 @@ and must state whether its candidate was accepted or rejected.
   the safety-projection source.
 - The nearest actual data-path action remains exactly one separately
   authorized case-23 v4 CPU conversion.
+
+## Round 228: case-2 paired route is complete but unauthorized
+
+- Added a tokenless case-2 natural-error paired-canary contract with a fresh
+  `20260724_model_based_corrective_teacher_case2_natural_error_pair_v1_exclusive`
+  namespace and `19` pinned identities.
+- Kept the shared playback and corrective-teacher runtime byte-stable. A
+  case-specific adapter observes requested versus effective post-supervisor
+  residuals while returning the original command object unchanged.
+- Corrected the case reset seed to `20260718`, which is the runtime invariant
+  `20260716 + case`. The draft had incorrectly copied case 6's `20260722`.
+- The paired route uses no external wrench. It runs the exact-zero baseline
+  before the natural-error candidate, requires the baseline dynamic gate to
+  pass, uses unchanged safety and quality thresholds, and forbids every
+  capture and training output.
+- Implementation commit
+  `39b63d8efbe7954c4f0fcc3aa762caee7695497e` passes `28` focused
+  route tests on macOS and `.98`, plus `320` macOS corrective/runtime
+  regressions including historical case-23 v4 identity validation.
+- The authoritative `.98` CPU suite passes:
+  `1183 passed, 12 skipped, 2 warnings in 137.70 s`.
+- macOS and `.98` preflights pass all `19` identity and contract checks at
+  clean pushed `HEAD`. Contract SHA-256 is
+  `1a5b9190bf656cd52b973193efd90bd60aa316dda2b67c41f93f21376626872c`.
+- `--execute` rejects before Python or Isaac with exit code `4`; the namespace
+  remains absent. No token, Isaac/GPU run, label capture, dataset, BC, PPO, or
+  training was created. Goal completion remains `6/10`.
+
+## Next round after Round 228
+
+- The nearest actual data-path action remains exactly one separately
+  authorized case-23 v4 CPU conversion. The consumed v4 capture authorization
+  cannot be reused.
+- Case 6 remains separately reviewable as one v2 paired canary.
+- Case 2 is now separately reviewable as one natural-error paired canary; no
+  case-2 runtime authorization has been issued.

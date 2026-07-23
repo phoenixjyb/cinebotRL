@@ -415,6 +415,15 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corpus["projection_training_bc_preflight_integrated"] is True
     assert corpus["projection_training_bc_preflight_cpu_only"] is True
     assert corpus["projection_training_bc_preflight_creates_output"] is False
+    assert corpus["projection_training_bc_optimizer_contract"] == (
+        "exact_case_balanced_projection_aware_gradient_accumulation_v1"
+    )
+    assert corpus["projection_training_bc_validation_contract"] == (
+        "projected_effective_action_case_balanced_validation_v1"
+    )
+    assert corpus["projection_training_bc_optimizer_kernel_implemented"] is True
+    assert corpus["projection_training_bc_optimizer_kernel_synthetic_only"] is True
+    assert corpus["projection_training_bc_optimizer_kernel_creates_artifacts"] is False
     assert corpus["projection_training_bc_optimizer_path_integrated"] is False
     assert corpus["projection_training_bc_authorized"] is False
     assert corpus["projection_training_focused_cpu_suite"] == (

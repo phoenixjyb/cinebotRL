@@ -82,6 +82,18 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 > 预检不创建 output directory、checkpoint 或 TorchScript。相同数据若不带
 > `--preflight-only`，入口会在 optimizer 创建前因缺少独立、hash-bound BC
 > 授权而拒绝；legacy 数据也不能借用这个预检开关。
+>
+> **2026-07-23 projection-aware optimizer kernel：** 已实现但尚未接入可执行
+> trainer。kernel 为每个当前 observation 显式取同 case、同 split 的前一
+> observation，分别计算当前和前一 requested action。minibatch 不各自重新
+> 归一化为不同目标；它先按全 split 的 case-balanced pointwise weight 和有效
+> transition weight 缩放每个 batch 的梯度，再在完整一轮后只做一次 optimizer
+> step，因此不同 batch 切分保持同一目标。validation 必须先通过 frozen safety
+> projection，再对 effective label 计算逐 case 平衡 MSE，并独立报告 zero-request
+> baseline、clipping、requested-action 范围和 slew。CPU synthetic test 证明不同
+> batch 切分的一步参数更新一致，并能确定性学习一个可达的三通道 teacher；无效
+> 的跨 case/split predecessor 会被拒绝。该 kernel 目前没有 CLI 路由，不创建
+> policy，且不改变 `bc_authorized=false`。
 
 ## 固定运行合同
 

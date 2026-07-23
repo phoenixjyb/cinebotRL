@@ -320,6 +320,47 @@ CASE16_VALIDATION_NATURAL_ERROR_PROPOSAL = (
     "evidence_20260724_case16_validation_natural_error_profile_cpu_v1/"
     "proposal.json"
 )
+CASE16_VALIDATION_NATURAL_ERROR_PAIR_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case16_validation_natural_error_"
+    "pair_contract_v1.json"
+)
+CASE16_VALIDATION_NATURAL_ERROR_PAIR_BUILDER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "build_model_based_corrective_teacher_case16_validation_natural_error_"
+    "pair_contract.py"
+)
+CASE16_VALIDATION_NATURAL_ERROR_PAIR_VALIDATOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "validate_model_based_corrective_teacher_case16_validation_natural_error_"
+    "pair.py"
+)
+CASE16_VALIDATION_NATURAL_ERROR_PAIR_WRAPPER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "run_model_based_corrective_teacher_case16_validation_natural_error_"
+    "pair.sh"
+)
+CASE16_VALIDATION_NATURAL_ERROR_PAIR_ADAPTER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "smoke_riser_case16_validation_natural_error_pair.py"
+)
+CASE16_VALIDATION_NATURAL_ERROR_PAIR_FINALIZER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "summarize_model_based_corrective_teacher_case16_validation_natural_error_"
+    "pair.py"
+)
+CASE16_VALIDATION_NATURAL_ERROR_PAIR_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case16_validation_natural_error_pair_route_cpu_v1/"
+    "summary.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -1476,6 +1517,96 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case16_profile["dataset_creation_authorized"] is False
     assert case16_profile["training_started"] is False
     assert case16_profile["valid_for_training"] is False
+    assert corrective[
+        "case16_validation_natural_error_pair_route_contract_sha256"
+    ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PAIR_CONTRACT)
+    assert corrective[
+        "case16_validation_natural_error_pair_route_contract_git_blob_sha1"
+    ] == "44ba07e6a9ef579e64c5da337e3dea08f82bd1de"
+    assert corrective[
+        "case16_validation_natural_error_pair_route_builder_sha256"
+    ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PAIR_BUILDER)
+    assert corrective[
+        "case16_validation_natural_error_pair_route_validator_sha256"
+    ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PAIR_VALIDATOR)
+    assert corrective[
+        "case16_validation_natural_error_pair_route_wrapper_sha256"
+    ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PAIR_WRAPPER)
+    assert corrective[
+        "case16_validation_natural_error_pair_route_adapter_sha256"
+    ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PAIR_ADAPTER)
+    assert corrective[
+        "case16_validation_natural_error_pair_route_finalizer_sha256"
+    ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PAIR_FINALIZER)
+    assert corrective[
+        "case16_validation_natural_error_pair_route_preflight_sha256"
+    ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PAIR_EVIDENCE)
+    assert corrective[
+        "case16_validation_natural_error_pair_route_identity_count"
+    ] == 24
+    assert corrective[
+        "case16_validation_natural_error_pair_route_reset_seed"
+    ] == (
+        corrective[
+            "case16_validation_natural_error_pair_route_configuration_seed"
+        ]
+        + 16
+    )
+    assert corrective[
+        "case16_validation_natural_error_pair_route_same_plan_seed_and_physics"
+    ] is True
+    assert corrective[
+        "case16_validation_natural_error_pair_route_external_wrench_forbidden"
+    ] is True
+    assert corrective[
+        "case16_validation_natural_error_pair_route_cpu_preflight_passed"
+    ] is True
+    assert corrective[
+        "case16_validation_natural_error_pair_route_contract_ready"
+    ] is True
+    assert corrective[
+        "case16_validation_natural_error_pair_route_execution_route_complete"
+    ] is True
+    assert corrective[
+        "case16_validation_natural_error_pair_route_authorization_token_issued"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_pair_route_runtime_authorized"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_pair_route_gpu_launch_authorized"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_pair_route_teacher_admission_authorized"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_pair_route_label_capture_authorized"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_pair_route_dataset_creation_authorized"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_pair_route_training_authorized"
+    ] is False
+    case16_route = json.loads(
+        CASE16_VALIDATION_NATURAL_ERROR_PAIR_EVIDENCE.read_text()
+    )
+    assert case16_route["passed"] is True
+    assert case16_route["case"] == 16
+    assert case16_route["split"] == "validation"
+    assert len(case16_route["identities"]) == 24
+    assert all(case16_route["document_checks"].values())
+    assert all(case16_route["checks"].values())
+    assert case16_route["authorization_token_issued"] is False
+    assert case16_route["runtime_authorized"] is False
+    assert case16_route["gpu_launch_authorized"] is False
+    assert case16_route["teacher_admission_authorized"] is False
+    assert case16_route["label_capture_authorized"] is False
+    assert case16_route["dataset_creation_authorized"] is False
+    assert case16_route["bc_authorized"] is False
+    assert case16_route["ppo_authorized"] is False
+    assert case16_route["training_started"] is False
+    assert case16_route["valid_for_training"] is False
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

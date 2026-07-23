@@ -9119,3 +9119,38 @@ and must state whether its candidate was accepted or rejected.
 - The nearest actual data-path action remains exactly one separately
   authorized case-23 v4 CPU conversion. The consumed case-23 capture
   authorization cannot be replayed.
+
+## Round 237: case-16 natural-error validation route is complete but unauthorized
+
+- Added a dedicated validation-only natural-error pair contract, builder,
+  validator, playback adapter, wrapper, and finalizer at implementation commit
+  `fcec29fdd2d72ea4defe129a11cf9e089a7c0a57`.
+- Bound the route to case `16`, validation split, the reviewed controller
+  parent `c92c428785be987ab13e558aa07abc2713a7a0c5`, and `24` exact source,
+  plan, controller, profile, robot, and route-code identities.
+- Preserved baseline-first execution, configuration seed `20260716`, reset
+  seed `20260732`, identical plan and physics, and the existing dynamic gates.
+  External wrench, capture, dataset, teacher admission, BC, PPO, and training
+  paths are forbidden.
+- The candidate is unreachable unless the baseline dynamically passes and
+  releases the GPU. The paired finalizer requires nonzero bounded effective
+  projection telemetry and at least `0.003 m` and `2%` p95 improvement without
+  exceeding any regression allowance.
+- Mac and `.98` preflights pass every check. The `.98` focused route/profile
+  suite passes `24` tests, and the authoritative `.98` CPU suite passes
+  `1289 passed, 12 skipped, 2 warnings in 172.47 s`.
+- An explicit `.98 --execute` attempt fails closed with exit code `4` before
+  Python or Isaac. No runtime namespace was created.
+- The repeated case-23 v4 capture request was not replayed because that
+  one-shot authorization was already consumed by the sealed successful
+  capture. No token, Isaac/GPU run, label, dataset, BC, PPO, or training was
+  created. Goal completion remains `6/10`.
+
+## Next round after Round 237
+
+- The case-16 validation natural-error pair is separately reviewable for one
+  future held-out paired canary. No runtime authorization has been issued.
+- The nearest real-data action remains exactly one separately authorized
+  case-23 v4 CPU conversion:
+  `Authorize exactly one case-23 v4 CPU conversion.`
+- Do not replay the consumed case-23 v4 corrective-label capture authorization.

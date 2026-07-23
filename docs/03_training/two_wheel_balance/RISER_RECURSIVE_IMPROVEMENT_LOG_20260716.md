@@ -7511,7 +7511,9 @@ and must state whether its candidate was accepted or rejected.
   `5576c696e304eb9b9a173970e5fed06e887eccefe2d65a20678415148e22fa0b`;
   selector SHA-256 is
   `8f95c022743cd633d2399953060a8836d7e901f26ae7265258ffb8b72e8dd460`.
-  Focused `.98` tests passed `10/10`.
+  Focused `.98` tests passed `10/10`; the final authoritative suite at
+  implementation/evidence commit `4091214` passed
+  `884 passed, 12 skipped, 2 warnings` in `83.23 s`.
 - The selection is proposal evidence only. Cases 8 and 16 each still require a
   separately reviewed same-seed pair before capture. Runtime, GPU, label
   capture, conversion, merge, BC, PPO, training, and holdout access remain

@@ -222,6 +222,7 @@
           "78": "not_dynamically_quality_qualified"
         },
         "validation_pair_selection_sha256": "5576c696e304eb9b9a173970e5fed06e887eccefe2d65a20678415148e22fa0b",
+        "validation_pair_authoritative_cpu_suite": "884_passed_12_skipped_2_warnings",
         "validation_pair_runtime_authorized": false,
         "validation_pair_capture_authorized": false,
         "next_case": 23,

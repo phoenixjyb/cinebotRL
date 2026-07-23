@@ -53,6 +53,7 @@ CASE23_CAPTURE_V4_EVIDENCE = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260723_case23_corrective_capture_v4"
 )
+CASE23_CAPTURE_V4_ARCHIVED_CONTRACT = CASE23_CAPTURE_V4_EVIDENCE / "contract.json"
 CASE23_CAPTURE_V4_FINAL = CASE23_CAPTURE_V4_EVIDENCE / "final_status.json"
 CASE23_CAPTURE_V4_ARCHIVE = (
     CASE23_CAPTURE_V4_EVIDENCE
@@ -501,6 +502,13 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _git_blob_sha1(path: Path) -> str:
+    payload = path.read_bytes()
+    return hashlib.sha1(
+        f"blob {len(payload)}\0".encode() + payload
+    ).hexdigest()
+
+
 def test_goal_preserves_robot_and_completion_contract() -> None:
     goal = _goal()
     robot = goal["robot_contract"]
@@ -627,7 +635,22 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     )
     assert corrective["case23_capture_v3_retry_authorized"] is False
     assert corrective["case23_capture_v4_contract_sha256"] == _sha256(
+        CASE23_CAPTURE_V4_ARCHIVED_CONTRACT
+    )
+    assert corrective["case23_capture_v4_contract_git_blob_sha1"] == (
+        _git_blob_sha1(CASE23_CAPTURE_V4_ARCHIVED_CONTRACT)
+    )
+    assert corrective["case23_capture_v4_contract_identity"] == (
+        "immutable_archived_executed_contract"
+    )
+    assert corrective["case23_capture_v4_active_contract_sha256"] == _sha256(
         CASE23_CAPTURE_V4_CONTRACT
+    )
+    assert corrective["case23_capture_v4_active_contract_git_blob_sha1"] == (
+        _git_blob_sha1(CASE23_CAPTURE_V4_CONTRACT)
+    )
+    assert corrective["case23_capture_v4_active_contract_identity"] == (
+        "current_resealed_tokenless_contract"
     )
     assert corrective["case23_capture_v4_save_case_propagated"] is True
     assert corrective["case23_capture_v4_save_split_propagated"] is True
@@ -688,10 +711,18 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         corrective["case23_capture_v4_conversion_review_sha256"]
         == _sha256(CASE23_CONVERSION_REVIEW)
     )
-    assert (
-        corrective["case23_capture_v4_conversion_review_contract_sha256"]
-        == _sha256(CASE23_CONVERSION_REVIEW_CONTRACT)
-    )
+    assert corrective[
+        "case23_capture_v4_conversion_review_contract_sha256"
+    ] == "58d358b546094c547a995c1fd336d9b750ce94bb734e481e28d8c65022d5f4a5"
+    assert corrective[
+        "case23_capture_v4_conversion_review_contract_identity"
+    ] == "historical_contract_used_for_review_evidence"
+    assert corrective[
+        "case23_capture_v4_conversion_review_active_contract_sha256"
+    ] == _sha256(CASE23_CONVERSION_REVIEW_CONTRACT)
+    assert corrective[
+        "case23_capture_v4_conversion_review_active_contract_git_blob_sha1"
+    ] == _git_blob_sha1(CASE23_CONVERSION_REVIEW_CONTRACT)
     assert corrective["case23_capture_v4_conversion_reviewer_sha256"] == _sha256(
         CASE23_CONVERSION_REVIEWER
     )
@@ -725,10 +756,19 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ] == "298805562202320c72319f7adb0f955fd9568116"
     assert corrective[
         "case23_capture_v4_conversion_execution_contract_sha256"
-    ] == _sha256(CASE23_CONVERSION_EXECUTION_CONTRACT)
+    ] == "02657099559b3ffa544adff02cbb7a727d4753b7df70fa5c5a5749056326fb9a"
     assert corrective[
         "case23_capture_v4_conversion_execution_contract_git_blob_sha1"
     ] == "6ccbbc5c3153b38d5c33cebac026cb5dfee3c1ea"
+    assert corrective[
+        "case23_capture_v4_conversion_execution_contract_identity"
+    ] == "historical_contract_used_for_cpu_preflight_evidence"
+    assert corrective[
+        "case23_capture_v4_conversion_execution_active_contract_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_CONTRACT)
+    assert corrective[
+        "case23_capture_v4_conversion_execution_active_contract_git_blob_sha1"
+    ] == _git_blob_sha1(CASE23_CONVERSION_EXECUTION_CONTRACT)
     assert corrective[
         "case23_capture_v4_conversion_execution_validator_sha256"
     ] == _sha256(CASE23_CONVERSION_EXECUTION_VALIDATOR)
@@ -998,9 +1038,20 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         "case2_natural_error_outward_yaw_projection_transitions"
     ] == 103
     assert corrective["case2_natural_error_pair_profile_cpu_ready"] is True
-    assert corrective["case2_natural_error_pair_contract_sha256"] == _sha256(
+    assert corrective[
+        "case2_natural_error_pair_contract_sha256"
+    ] == "1a5b9190bf656cd52b973193efd90bd60aa316dda2b67c41f93f21376626872c"
+    assert corrective[
+        "case2_natural_error_pair_contract_identity"
+    ] == "historical_cpu_route_contract"
+    assert corrective[
+        "case2_natural_error_pair_active_contract_sha256"
+    ] == _sha256(
         CASE2_NATURAL_ERROR_PAIR_CONTRACT
     )
+    assert corrective[
+        "case2_natural_error_pair_active_contract_git_blob_sha1"
+    ] == _git_blob_sha1(CASE2_NATURAL_ERROR_PAIR_CONTRACT)
     assert corrective["case2_natural_error_pair_adapter_sha256"] == _sha256(
         CASE2_NATURAL_ERROR_PAIR_ADAPTER
     )
@@ -1111,7 +1162,13 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["case7_pair_wrench_profile_sha256"] == _sha256(
         CASE7_WRENCH_PROFILE
     )
-    assert corrective["case7_pair_profile_proposal_sha256"] == _sha256(
+    assert corrective[
+        "case7_pair_profile_proposal_sha256"
+    ] == "c279d585600b7a1c2d80430dd1618785444335d12edf535c2903c268c38061cb"
+    assert corrective[
+        "case7_pair_profile_proposal_identity"
+    ] == "historical_cpu_profile_proposal"
+    assert corrective["case7_pair_profile_active_proposal_sha256"] == _sha256(
         CASE7_PAIR_PROFILE_PROPOSAL
     )
     assert corrective["case7_pair_profile_maximum_residuals"] == [
@@ -1146,12 +1203,18 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["case7_pair_route_schema"] == (
         "cinebotrl_two_wheel_riser_corrective_teacher_case7_pair_contract_v1"
     )
-    assert corrective["case7_pair_route_contract_sha256"] == _sha256(
+    assert corrective[
+        "case7_pair_route_contract_sha256"
+    ] == "406b38800ca58b7a5a0e579d8a9c7bb1031bed46e5ef4863b6facf69a046ef40"
+    assert corrective[
+        "case7_pair_route_contract_identity"
+    ] == "historical_cpu_route_contract"
+    assert corrective["case7_pair_route_active_contract_sha256"] == _sha256(
         CASE7_PAIR_ROUTE_CONTRACT
     )
-    assert corrective["case7_pair_route_contract_git_blob_sha1"] == (
-        "f1a577b8950d90352fb7f8f260f95778ec5732ef"
-    )
+    assert corrective[
+        "case7_pair_route_active_contract_git_blob_sha1"
+    ] == _git_blob_sha1(CASE7_PAIR_ROUTE_CONTRACT)
     assert corrective["case7_pair_route_validator_sha256"] == _sha256(
         CASE7_PAIR_ROUTE_VALIDATOR
     )
@@ -1287,6 +1350,12 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     )
     assert corrective[
         "case8_validation_pair_profile_proposal_sha256"
+    ] == "1a74b5d362e8c92c76b18e2c2ea0a9e7d67745504ea57fd27099cbc688dfb829"
+    assert corrective[
+        "case8_validation_pair_profile_proposal_identity"
+    ] == "historical_cpu_profile_proposal"
+    assert corrective[
+        "case8_validation_pair_profile_active_proposal_sha256"
     ] == _sha256(CASE8_VALIDATION_PAIR_PROFILE_PROPOSAL)
     assert corrective[
         "case8_validation_pair_profile_mac_windows_byte_parity"
@@ -1356,12 +1425,18 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case8_profile["ppo_authorized"] is False
     assert case8_profile["training_started"] is False
     assert case8_profile["valid_for_training"] is False
-    assert corrective["case8_validation_pair_route_contract_sha256"] == (
-        _sha256(CASE8_VALIDATION_PAIR_ROUTE_CONTRACT)
-    )
     assert corrective[
-        "case8_validation_pair_route_contract_git_blob_sha1"
-    ] == "2364199fb5c9d766fad3fbd592ab06ab6da27680"
+        "case8_validation_pair_route_contract_sha256"
+    ] == "ada5b6172fcee053daeb74326e4546246330fe4914c81d590ba3d59d3f750517"
+    assert corrective[
+        "case8_validation_pair_route_contract_identity"
+    ] == "historical_cpu_route_contract"
+    assert corrective[
+        "case8_validation_pair_route_active_contract_sha256"
+    ] == _sha256(CASE8_VALIDATION_PAIR_ROUTE_CONTRACT)
+    assert corrective[
+        "case8_validation_pair_route_active_contract_git_blob_sha1"
+    ] == _git_blob_sha1(CASE8_VALIDATION_PAIR_ROUTE_CONTRACT)
     assert corrective["case8_validation_pair_route_validator_sha256"] == (
         _sha256(CASE8_VALIDATION_PAIR_ROUTE_VALIDATOR)
     )
@@ -1552,10 +1627,16 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case16_profile["valid_for_training"] is False
     assert corrective[
         "case16_validation_natural_error_pair_route_contract_sha256"
+    ] == "c648865218132204f95a8346866aed1c1d30c795bdcc37c5767ecb7a44b4fb9c"
+    assert corrective[
+        "case16_validation_natural_error_pair_route_contract_identity"
+    ] == "historical_cpu_route_contract"
+    assert corrective[
+        "case16_validation_natural_error_pair_route_active_contract_sha256"
     ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PAIR_CONTRACT)
     assert corrective[
-        "case16_validation_natural_error_pair_route_contract_git_blob_sha1"
-    ] == "44ba07e6a9ef579e64c5da337e3dea08f82bd1de"
+        "case16_validation_natural_error_pair_route_active_contract_git_blob_sha1"
+    ] == _git_blob_sha1(CASE16_VALIDATION_NATURAL_ERROR_PAIR_CONTRACT)
     assert corrective[
         "case16_validation_natural_error_pair_route_builder_sha256"
     ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PAIR_BUILDER)

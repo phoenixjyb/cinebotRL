@@ -9185,3 +9185,40 @@ and must state whether its candidate was accepted or rejected.
   second train dataset. Cases 6 and 2 remain the next minimum-tranche paired
   canaries; case 7 is the additional train candidate; cases 8 and 16 remain
   held-out validation only.
+
+## Round 239: the final residual BC architecture is explicit and fail-closed
+
+- Audited the projection-aware BC runner against the real case-30 converted
+  dataset and the case-23 v4 capture. Their observation matrices are
+  `[11411,65]` and `[3273,65]`; both use the same ordered observation names.
+- Corrected the active goal ledger: `26` is only the physical/base-state block.
+  The admitted policy input is `65 = 26 + 3 * 13`, with three bounded residual
+  outputs for base linear velocity, base yaw rate, and riser target.
+- Pinned architecture
+  `model_based_shared_encoder_zero_initialized_residual_v1`: state encoder
+  `[128,128]`, shared lookahead encoder `[64,64]`, fusion `[256,128]`, and
+  `142019` parameters.
+- The projection-aware runner now initializes the residual action head to exact
+  zero before optimization. Eager and TorchScript paths both emit bit-exact
+  zero for nonzero synthetic observations before training.
+- The checked-in admission template binds architecture, dimensions, zero-head
+  initialization, and current trainer/contract hashes while remaining
+  unusable: dataset/commit identities are null and all learning authorization
+  flags remain false.
+- Implementation commit
+  `282c5998ec0c91982d2a1f610b18db7acc5f4e1b` and real-data contract test commit
+  `8063f785ca683ac41686b06ea53fc3afb69a431a` are pushed and synchronized to
+  `.98`.
+- The focused `.98` CPU suite passes:
+  `69 passed, 2 warnings in 27.87 s`.
+- No token, runtime namespace, Isaac/GPU workload, capture, conversion, dataset
+  merge, BC, PPO, checkpoint, or training run was created. Goal completion
+  remains `6/10`.
+
+## Next round after Round 239
+
+- Run the authoritative `.98` CPU suite and seal its exact result into the goal
+  ledger.
+- The nearest real-data operation remains separately authorized case-23 v4 CPU
+  conversion. The exact authorization phrase is:
+  `Authorize exactly one case-23 v4 CPU conversion.`

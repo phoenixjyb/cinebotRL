@@ -529,6 +529,7 @@ def test_current_status_distinguishes_candidates_from_training_corpus() -> None:
 def test_planner_imitation_failure_and_residual_layer_are_explicit() -> None:
     refresh = _goal()["current_stage"]["status_refresh_20260723"]
     imitation = refresh["planner_imitation_bc"]
+    residual = refresh["residual_dnn_admission_contract"]
     assert imitation["classification"] == (
         "encoder_initialization_only_not_final_residual_policy"
     )
@@ -543,6 +544,18 @@ def test_planner_imitation_failure_and_residual_layer_are_explicit() -> None:
         "delta_riser_target",
     ]
     assert refresh["policy_action_scales"] == [0.05, 0.05, 0.02]
+    assert residual["architecture"] == (
+        "model_based_shared_encoder_zero_initialized_residual_v1"
+    )
+    assert residual["observation_dimension"] == 65
+    assert residual["base_observation_dimension"] == 26
+    assert residual["lookahead_horizon_count"] == 3
+    assert residual["lookahead_channel_count_per_horizon"] == 13
+    assert residual["action_dimension"] == 3
+    assert residual["parameter_count"] == 142019
+    assert residual["zero_initialize_action_head"] is True
+    assert residual["real_case30_observation_shape"] == [11411, 65]
+    assert residual["real_case23_v4_observation_shape"] == [3273, 65]
 
 
 def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
@@ -1890,13 +1903,13 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ] == _sha256(PROJECTED_TRAINING_BC_EXECUTION_ADMISSION_TEMPLATE)
     assert corpus[
         "projection_training_bc_execution_contract_implementation_commit"
-    ] == ("ebb89fc6ae911329537b238427aa0c104fbe0f4d")
+    ] == ("282c5998ec0c91982d2a1f610b18db7acc5f4e1b")
     assert corpus[
         "projection_training_bc_execution_contract_focused_cpu_suite"
-    ] == ("82_passed_5_warnings_in_21.55s")
+    ] == ("69_passed_2_warnings_in_27.87s")
     assert corpus[
         "projection_training_bc_execution_contract_authoritative_cpu_suite"
-    ] == ("1008_passed_12_skipped_2_warnings_in_96.17s")
+    ] is None
     assert corpus["projection_training_bc_execution_admission_template_usable"] is False
     assert corpus["projection_training_bc_execution_trainer_integrated"] is True
     assert corpus["projection_training_bc_execution_synthetic_end_to_end_passed"] is True
@@ -1904,13 +1917,13 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corpus["projection_training_bc_execution_real_admission_authorized"] is False
     assert corpus[
         "projection_training_bc_execution_trainer_integration_commit"
-    ] == ("02dbff8bca1b8ed2fee3eb2598a3382c0adce0af")
+    ] == ("282c5998ec0c91982d2a1f610b18db7acc5f4e1b")
     assert corpus["projection_training_bc_execution_trainer_focused_cpu_suite"] == (
-        "84_passed_10_warnings_in_21.41s"
+        "69_passed_2_warnings_in_27.87s"
     )
     assert corpus[
         "projection_training_bc_execution_trainer_authoritative_cpu_suite"
-    ] == ("1010_passed_12_skipped_2_warnings_in_93.62s")
+    ] is None
     assert corpus["projection_training_bc_execution_real_training_started"] is False
     assert corpus["projection_training_bc_execution_real_checkpoint_created"] is False
     assert corpus["projection_training_bc_authorized"] is False

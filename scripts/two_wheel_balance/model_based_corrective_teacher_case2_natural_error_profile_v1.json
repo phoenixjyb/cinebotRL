@@ -1,0 +1,22 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_profile_v1",
+  "case": 2,
+  "longitudinal_gain_s_inv": 0.2,
+  "lateral_to_yaw_gain_rad_s_m": 0.3,
+  "vertical_gain": 0.3,
+  "deadbands_m": [
+    0.01,
+    0.01,
+    0.005
+  ],
+  "maximum_residuals": [
+    0.010247377951381045,
+    0.004541053111745168,
+    0.000614431056640985
+  ],
+  "maximum_slew_rates": [
+    0.025618444878452613,
+    0.011352632779362921,
+    0.0015360776416024624
+  ]
+}

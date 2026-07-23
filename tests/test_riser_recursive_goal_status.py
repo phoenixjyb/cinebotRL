@@ -82,6 +82,16 @@ PROJECTED_TRAINING_ADMISSION_TEMPLATE = (
     / "docs/03_training/two_wheel_balance/"
     "MODEL_BASED_CORRECTIVE_TRAINING_ADMISSION_TEMPLATE_20260723.json"
 )
+PROJECTED_TRAINING_BC_ADAPTER = (
+    ROOT
+    / "src/rl_platform/tasks/two_wheel_balance/"
+    "riser_model_based_corrective_bc_adapter.py"
+)
+PROJECTED_TRAINING_BC_TRAINER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "train_riser_residual_bc.py"
+)
 BENCH_RAW_LOG_REDUCER = (
     ROOT / "scripts/two_wheel_balance/reduce_riser_bench_log.py"
 )
@@ -390,6 +400,22 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corpus["projection_training_real_corpus_available"] is False
     assert corpus["projection_training_dataset_created"] is False
     assert corpus["projection_training_bc_entrypoint_integrated"] is False
+    assert corpus["projection_training_bc_preflight_schema"] == (
+        "cinebotrl_two_wheel_riser_model_based_corrective_bc_preflight_v1"
+    )
+    assert corpus["projection_training_bc_adapter_contract"] == (
+        "projection_aware_effective_label_bc_adapter_v1"
+    )
+    assert corpus["projection_training_bc_adapter_sha256"] == _sha256(
+        PROJECTED_TRAINING_BC_ADAPTER
+    )
+    assert corpus["projection_training_bc_trainer_sha256"] == _sha256(
+        PROJECTED_TRAINING_BC_TRAINER
+    )
+    assert corpus["projection_training_bc_preflight_integrated"] is True
+    assert corpus["projection_training_bc_preflight_cpu_only"] is True
+    assert corpus["projection_training_bc_preflight_creates_output"] is False
+    assert corpus["projection_training_bc_optimizer_path_integrated"] is False
     assert corpus["projection_training_bc_authorized"] is False
     assert corpus["projection_training_focused_cpu_suite"] == (
         "161_passed_3_warnings_in_17.59s"
@@ -399,6 +425,15 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     )
     assert corpus["projection_training_authoritative_cpu_suite"] == (
         "989_passed_12_skipped_2_warnings_in_95.37s"
+    )
+    assert corpus["projection_training_bc_preflight_focused_cpu_suite"] == (
+        "64_passed_5_warnings_in_20.97s"
+    )
+    assert corpus["projection_training_bc_preflight_authoritative_cpu_commit"] == (
+        "5f46832e706356a7587cd78d67822af0679ed51d"
+    )
+    assert corpus["projection_training_bc_preflight_authoritative_cpu_suite"] == (
+        "990_passed_12_skipped_2_warnings_in_100.07s"
     )
     assert corrective["multi_case_corpus_created"] is False
     assert stage["runtime_authorized"] is False

@@ -8042,3 +8042,42 @@ and must state whether its candidate was accepted or rejected.
   train and validation cases to populate the `4+2` review corpus. Only a fresh
   hash-bound promotion admission may create the training schema, and a further
   explicit BC authorization is still required before any learning run.
+
+## Round 207: projection-aware BC entry preflight is integrated CPU-only
+
+- The BC loader now recognizes
+  `cinebotrl_two_wheel_riser_model_based_corrective_training_v1` and validates
+  it through the production training-dataset loader instead of treating it as
+  an unknown archive.
+- Explicit `--preflight-only --device cpu` runs
+  `projection_aware_effective_label_bc_adapter_v1`. It evaluates the frozen
+  projection-aware loss, previous-row timing, case-balanced weights, clipping,
+  and requested-action slew diagnostics without creating an output directory,
+  optimizer, checkpoint, TorchScript artifact, rollout, or training run.
+- `requested_actions_audit` is used only to exercise the projection and slew
+  contract. Effective post-supervisor actions remain the future pointwise
+  targets. Audit-request reconstruction error is reported independently
+  because historical temporal supervisor limits need not be reproduced by the
+  pointwise projection.
+- A normal invocation with this schema still fails before optimizer creation
+  and requires a separate hash-bound BC authorization. Legacy datasets cannot
+  use the projection preflight switch.
+- Adapter and trainer SHA-256 values are
+  `3777aefc6f1fbc14a165f7eb9a897da6db46be4b8c56116e2ddaa69be7d52cb1`
+  and
+  `ea7d6cc881f54467296286fced2522c07739450961943fe84344cb02c35785a4`.
+  The implementation commit is
+  `5f46832e706356a7587cd78d67822af0679ed51d`.
+- Focused tests pass `64 passed, 5 warnings` in `20.97 s`; the authoritative
+  `.98` suite passes `990 passed, 12 skipped, 2 warnings` in `100.07 s`.
+- The optimizer path is not integrated, no real promoted dataset exists, and
+  BC, PPO, learned rollout, runtime capture, and training remain unauthorized.
+
+## Next round after Round 207
+
+- Runtime remains gated on exactly one separately authorized case-23 v4
+  corrective-label capture. V3 cannot be retried.
+- CPU-only development may next add the projection-aware optimizer and
+  validation-metric kernel behind a hash-bound BC admission contract, but it
+  must remain unusable until a real `4+2` promoted dataset and separate BC
+  authorization both exist.

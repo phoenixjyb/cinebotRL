@@ -384,10 +384,21 @@
           "projection_training_real_corpus_available": false,
           "projection_training_dataset_created": false,
           "projection_training_bc_entrypoint_integrated": false,
+          "projection_training_bc_preflight_schema": "cinebotrl_two_wheel_riser_model_based_corrective_bc_preflight_v1",
+          "projection_training_bc_adapter_contract": "projection_aware_effective_label_bc_adapter_v1",
+          "projection_training_bc_adapter_sha256": "3777aefc6f1fbc14a165f7eb9a897da6db46be4b8c56116e2ddaa69be7d52cb1",
+          "projection_training_bc_trainer_sha256": "ea7d6cc881f54467296286fced2522c07739450961943fe84344cb02c35785a4",
+          "projection_training_bc_preflight_integrated": true,
+          "projection_training_bc_preflight_cpu_only": true,
+          "projection_training_bc_preflight_creates_output": false,
+          "projection_training_bc_optimizer_path_integrated": false,
           "projection_training_bc_authorized": false,
           "projection_training_focused_cpu_suite": "161_passed_3_warnings_in_17.59s",
           "projection_training_authoritative_cpu_commit": "6dd9027568ab7afdca68615ad08a9934191ec874",
-          "projection_training_authoritative_cpu_suite": "989_passed_12_skipped_2_warnings_in_95.37s"
+          "projection_training_authoritative_cpu_suite": "989_passed_12_skipped_2_warnings_in_95.37s",
+          "projection_training_bc_preflight_focused_cpu_suite": "64_passed_5_warnings_in_20.97s",
+          "projection_training_bc_preflight_authoritative_cpu_commit": "5f46832e706356a7587cd78d67822af0679ed51d",
+          "projection_training_bc_preflight_authoritative_cpu_suite": "990_passed_12_skipped_2_warnings_in_100.07s"
         },
         "multi_case_corpus_created": false
       },

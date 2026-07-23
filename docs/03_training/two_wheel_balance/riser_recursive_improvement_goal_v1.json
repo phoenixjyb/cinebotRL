@@ -499,11 +499,16 @@
       },
       "goal_completion_audit": {
         "schema": "cinebotrl_two_wheel_riser_goal_completion_audit_v1",
-        "implementation_commit": "4b92a72750996439458e475c9d75be86332892bb",
+        "implementation_commit": "abd9d616da4881b844f8506aeff1c9443dcf0b86",
         "host_independent_lf_evidence": true,
         "mac_and_windows_report_byte_parity_verified": true,
         "auditor_code_identity_bound": true,
         "all79_full_row_revalidation_required": true,
+        "learned_all79_admission_schema": "cinebotrl_two_wheel_riser_model_based_learned_all79_admission_v1",
+        "learned_all79_admission_template_sha256": "cd3314b3df95881e54fbac0e26666af9ec5cbf0c8debdf343fdcb353c50859a3",
+        "learned_all79_admission_implementation_commit": "abd9d616da4881b844f8506aeff1c9443dcf0b86",
+        "learned_all79_requires_validation_and_holdout": true,
+        "learned_all79_runtime_authorized": false,
         "render_policy_all79_video_hashes_required": true,
         "render_intact_robot_visual_checks_required": true,
         "required_gate_count": 10,
@@ -520,8 +525,8 @@
         "runtime_started": false,
         "bc_started_by_audit": false,
         "ppo_started_by_audit": false,
-        "focused_local_cpu_suite": "17_passed_2_warnings",
-        "focused_windows_cpu_suite": "17_passed_2_warnings"
+        "focused_local_cpu_suite": "34_passed_2_warnings",
+        "focused_windows_cpu_suite": "34_passed_2_warnings"
       },
       "completion_gap": [
         "capture_and_convert_case23_under_a_separate_one_shot_authorization",

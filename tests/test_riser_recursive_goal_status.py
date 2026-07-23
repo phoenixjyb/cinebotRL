@@ -661,12 +661,23 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     ]
     assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v1"
     assert audit["implementation_commit"] == (
-        "4b92a72750996439458e475c9d75be86332892bb"
+        "abd9d616da4881b844f8506aeff1c9443dcf0b86"
     )
     assert audit["host_independent_lf_evidence"] is True
     assert audit["mac_and_windows_report_byte_parity_verified"] is True
     assert audit["auditor_code_identity_bound"] is True
     assert audit["all79_full_row_revalidation_required"] is True
+    assert audit["learned_all79_admission_schema"] == (
+        "cinebotrl_two_wheel_riser_model_based_learned_all79_admission_v1"
+    )
+    assert audit["learned_all79_admission_template_sha256"] == (
+        "cd3314b3df95881e54fbac0e26666af9ec5cbf0c8debdf343fdcb353c50859a3"
+    )
+    assert audit["learned_all79_admission_implementation_commit"] == (
+        "abd9d616da4881b844f8506aeff1c9443dcf0b86"
+    )
+    assert audit["learned_all79_requires_validation_and_holdout"] is True
+    assert audit["learned_all79_runtime_authorized"] is False
     assert audit["render_policy_all79_video_hashes_required"] is True
     assert audit["render_intact_robot_visual_checks_required"] is True
     assert audit["required_gate_pass_count"] == 6
@@ -683,6 +694,8 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["runtime_started"] is False
     assert audit["bc_started_by_audit"] is False
     assert audit["ppo_started_by_audit"] is False
+    assert audit["focused_local_cpu_suite"] == "34_passed_2_warnings"
+    assert audit["focused_windows_cpu_suite"] == "34_passed_2_warnings"
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
         "95e144e77d6ee94e08de2622ad005f3a7a6ac15b0ff9322eb3ee587c68d8558d"
     )

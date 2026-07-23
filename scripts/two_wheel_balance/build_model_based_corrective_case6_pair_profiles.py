@@ -40,6 +40,16 @@ PULSE_APPLICATION_HEIGHT_M = 0.5
 MINIMUM_RECOVERY_TAIL_S = 0.40
 MINIMUM_FREE_BODY_DISPLACEMENT_M = 0.003
 RISER_POSITION_BOUNDS_M = (0.0, 1.2)
+CANONICAL_CORRECTIVE_PROFILE = (
+    PROJECT_ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case6_profile_v1.json"
+)
+CANONICAL_WRENCH_PROFILE = (
+    PROJECT_ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case6_wrench_profile_v1.json"
+)
 MOTION_LIMITS = {
     "base_linear_velocity_mps": 0.4,
     "base_yaw_rate_radps": 0.4,
@@ -167,8 +177,6 @@ def build_profiles(
     plan_path: Path,
     plant: Mapping[str, object],
     plant_path: Path,
-    corrective_profile_path: Path,
-    wrench_profile_path: Path,
 ) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
     readiness_inputs = readiness.get("inputs", {})
     readiness_plan = readiness_inputs.get("plan", {})
@@ -428,11 +436,11 @@ def build_profiles(
                 "sha256": _sha256(plant_path),
             },
             "corrective_profile": {
-                "path": _display(corrective_profile_path),
+                "path": _display(CANONICAL_CORRECTIVE_PROFILE),
                 "sha256": _sha256_bytes(corrective_bytes),
             },
             "wrench_profile": {
-                "path": _display(wrench_profile_path),
+                "path": _display(CANONICAL_WRENCH_PROFILE),
                 "sha256": _sha256_bytes(wrench_bytes),
             },
         },
@@ -532,8 +540,6 @@ def main() -> int:
         plan_path=args.plan,
         plant=_load_object(args.plant_prior),
         plant_path=args.plant_prior,
-        corrective_profile_path=args.corrective_profile_output,
-        wrench_profile_path=args.wrench_profile_output,
     )
     serialized_outputs = (
         (args.corrective_profile_output, _json_bytes(corrective)),

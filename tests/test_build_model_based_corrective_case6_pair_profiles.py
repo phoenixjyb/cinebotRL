@@ -67,8 +67,6 @@ def _inputs(tmp_path: Path):
         "plan_path": PLAN,
         "plant": MODULE._load_object(PLANT),
         "plant_path": PLANT,
-        "corrective_profile_path": tmp_path / "case6_corrective.json",
-        "wrench_profile_path": tmp_path / "case6_wrench.json",
     }
 
 
@@ -177,15 +175,7 @@ def test_generated_profiles_load_only_with_case6_identity(
 def test_committed_profiles_match_the_formula_bound_proposal(
     tmp_path: Path,
 ) -> None:
-    corrective, wrench, proposal = MODULE.build_profiles(
-        **(
-            _inputs(tmp_path)
-            | {
-                "corrective_profile_path": COMMITTED_CORRECTIVE,
-                "wrench_profile_path": COMMITTED_WRENCH,
-            }
-        )
-    )
+    corrective, wrench, proposal = MODULE.build_profiles(**_inputs(tmp_path))
     assert json.loads(COMMITTED_CORRECTIVE.read_text()) == corrective
     assert json.loads(COMMITTED_WRENCH.read_text()) == wrench
     assert json.loads(COMMITTED_PROPOSAL.read_text()) == proposal

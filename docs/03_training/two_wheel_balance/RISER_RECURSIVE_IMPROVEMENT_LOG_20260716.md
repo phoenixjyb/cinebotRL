@@ -7654,7 +7654,10 @@ and must state whether its candidate was accepted or rejected.
   `04870ab00f2ca6a8f24e5a0f062b04d3c68aba92667cd9bc36497667f52fd01c`
   and
   `cf2196889bc3c973055d45c9c50d1f819e4a4c4287014cb5998110b77638acb3`.
-  Focused hardware tests pass `27/27`.
+  Focused contract tests pass `33/33`.
+- The authoritative `.98` Windows-Python suite at implementation commit
+  `96b8a4198c660bdce557cee04c0f71e6dba982ac` passes
+  `903 passed, 12 skipped, 2 warnings` in `80.46 s`.
 - Reducer output is only a numeric merge fragment. Calibration, supplier,
   brake, anti-fall, hard-limit, end-stop, and safety-power evidence remain
   manual and mandatory. No real measurements were collected, and production

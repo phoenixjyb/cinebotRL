@@ -176,6 +176,12 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     assert hardware["bench_raw_log_template_sha256"] == _sha256(
         BENCH_RAW_LOG_TEMPLATE
     )
+    assert hardware["bench_raw_log_authoritative_cpu_commit"] == (
+        "96b8a4198c660bdce557cee04c0f71e6dba982ac"
+    )
+    assert hardware["bench_raw_log_authoritative_cpu_suite"] == (
+        "903_passed_12_skipped_2_warnings_in_80.46s"
+    )
     assert hardware["ready_for_production_design_review"] is False
     assert hardware["valid_for_production_procurement"] is False
     assert hardware["valid_for_hardware_transfer"] is False

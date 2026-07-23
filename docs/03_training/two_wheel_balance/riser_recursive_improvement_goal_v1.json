@@ -303,6 +303,8 @@
         "bench_raw_log_reducer_sha256": "04870ab00f2ca6a8f24e5a0f062b04d3c68aba92667cd9bc36497667f52fd01c",
         "bench_raw_log_template_sha256": "cf2196889bc3c973055d45c9c50d1f819e4a4c4287014cb5998110b77638acb3",
         "bench_raw_log_numeric_reduction_ready": true,
+        "bench_raw_log_authoritative_cpu_commit": "96b8a4198c660bdce557cee04c0f71e6dba982ac",
+        "bench_raw_log_authoritative_cpu_suite": "903_passed_12_skipped_2_warnings_in_80.46s",
         "bench_raw_log_measurements_collected": false,
         "ready_for_production_design_review": false,
         "valid_for_production_procurement": false,

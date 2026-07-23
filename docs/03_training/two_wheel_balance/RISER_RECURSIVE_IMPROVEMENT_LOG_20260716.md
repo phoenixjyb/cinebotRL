@@ -7786,3 +7786,44 @@ and must state whether its candidate was accepted or rejected.
 - Real hardware progress then requires the signed 750 W supplier response and
   calibrated physical logs; software runtime still requires the separate
   case-23 corrective-label capture authorization.
+
+## Round 199: case-23 v1 rejection, v2 recovery, and secret-safe boundary
+
+- The exactly-one authorized case-23 v1 corrective-label capture was consumed
+  but rejected during Windows output-path argument validation before Isaac
+  initialization. No labels, dataset, conversion, BC, PPO, or training were
+  produced. The rejected namespace and machine-readable evidence remain
+  preserved.
+- V2 uses a fresh namespace and fixes the shell-to-Windows path construction.
+  The rejected v1 route remains permanently no-token and cannot be retried.
+- The security audit isolated a recently committed high-entropy one-use
+  authorization digest as the likely GitGuardian trigger. The nine affected
+  branch commits were rewritten, the consumed digest was redacted from
+  reachable history, and the branch was replaced using an exact
+  `--force-with-lease`.
+- V2 no longer commits token-derived authorization hashes. A future token must
+  be a non-symlink mode-`0600` file outside the repository, with its lowercase
+  SHA-256 provided only through the runtime environment and compared in
+  constant time.
+- Gitleaks scanned the final reachable branch history: `825 commits`,
+  approximately `48.39 MB`, and no leaks. The new GitHub secret-scan workflow
+  passed at final evidence commit
+  `4cd197ec7542aaed5430b77699856505afff0e06`.
+- The authoritative `.98` suite at implementation commit
+  `4a6e45643a2efd6b713054fa5862b0ae4a506e8d` passed
+  `941 passed, 12 skipped, 2 warnings` in `85.23 s`.
+- A new CPU-only no-token preflight at clean
+  `HEAD == upstream == 4cd197ec7542aaed5430b77699856505afff0e06`
+  passed every source, plan, contract, robot, drive-profile, and namespace
+  check. Runtime, GPU, label capture, conversion, merge, BC, PPO, and training
+  remain false.
+
+## Next round after Round 199
+
+- The sole prepared software runtime action is exactly one separately and
+  explicitly authorized case-23 v2 corrective-label capture in
+  `20260723_model_based_corrective_teacher_case23_capture_v2_exclusive`.
+- Authorization must name that exact one-shot v2 capture. A pass opens only a
+  separate conversion audit; a rejection stops for diagnosis. Neither outcome
+  automatically authorizes corpus merge, BC, PPO, holdout evaluation, or
+  training.

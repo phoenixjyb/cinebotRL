@@ -106,8 +106,11 @@ DNN 只输出 `delta-vx`、`delta-wz` 和升降目标增量。轮端力矩仍由
 > projected metrics、zero-request improvement、requested-action margin、真实
 > checkpoint/TorchScript SHA，且 holdout、PPO、learned rollout 保持关闭。
 > 缺 artifact、伪造 code/dataset hash、stale commit、改超参数、打开 holdout
-> 或虚假 success 均 fail closed。当前仅实现 validator，没有把 admission 接到
-> trainer，也没有授权或启动 BC。
+> 或虚假 success 均 fail closed。trainer 现已接入该 admission 和 reviewed
+> optimizer kernel：只有 clean `HEAD==upstream`、dataset/code/config/hash 全匹配
+> 且 admission 显式批准时才创建 optimizer。synthetic end-to-end test 可以生成并
+> 重新验证 checkpoint/TorchScript；仓库模板和当前真实数据状态仍无法进入该路径，
+> 因此没有授权或启动真实 BC。
 
 ## 固定运行合同
 

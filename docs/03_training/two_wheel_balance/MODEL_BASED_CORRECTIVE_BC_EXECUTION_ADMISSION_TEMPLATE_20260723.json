@@ -10,7 +10,7 @@
   "code": {
     "trainer": {
       "path": "scripts/two_wheel_balance/train_riser_residual_bc.py",
-      "sha256": "ea7d6cc881f54467296286fced2522c07739450961943fe84344cb02c35785a4"
+      "sha256": "1d74ace025f9c49d5cf2105049fbc7630e225b55638bfdb3bca5d93e906282a1"
     },
     "adapter": {
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_bc_adapter.py",
@@ -30,7 +30,7 @@
     },
     "admission_module": {
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_bc_contract.py",
-      "sha256": "0c8787a091aaa8051368aeed176e31e2327c0e1c6afa26d70a5e3a88d32b6c49"
+      "sha256": "c91f13b8647585f75d233a91c7d7979c92df8fa57320b219d23c4850a19c2077"
     }
   },
   "optimizer_contract": "exact_case_balanced_projection_aware_gradient_accumulation_v1",

@@ -409,7 +409,7 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corpus["projection_training_admission_template_approved"] is False
     assert corpus["projection_training_real_corpus_available"] is False
     assert corpus["projection_training_dataset_created"] is False
-    assert corpus["projection_training_bc_entrypoint_integrated"] is False
+    assert corpus["projection_training_bc_entrypoint_integrated"] is True
     assert corpus["projection_training_bc_preflight_schema"] == (
         "cinebotrl_two_wheel_riser_model_based_corrective_bc_preflight_v1"
     )
@@ -443,7 +443,7 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert corpus[
         "projection_training_bc_optimizer_kernel_authoritative_cpu_suite"
     ] == ("993_passed_12_skipped_2_warnings_in_102.76s")
-    assert corpus["projection_training_bc_optimizer_path_integrated"] is False
+    assert corpus["projection_training_bc_optimizer_path_integrated"] is True
     assert corpus["projection_training_bc_execution_admission_schema"] == (
         "cinebotrl_two_wheel_riser_model_based_corrective_bc_execution_admission_v1"
     )
@@ -466,7 +466,10 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
         "projection_training_bc_execution_contract_authoritative_cpu_suite"
     ] == ("1008_passed_12_skipped_2_warnings_in_96.17s")
     assert corpus["projection_training_bc_execution_admission_template_usable"] is False
-    assert corpus["projection_training_bc_execution_trainer_integrated"] is False
+    assert corpus["projection_training_bc_execution_trainer_integrated"] is True
+    assert corpus["projection_training_bc_execution_synthetic_end_to_end_passed"] is True
+    assert corpus["projection_training_bc_execution_real_dataset_available"] is False
+    assert corpus["projection_training_bc_execution_real_admission_authorized"] is False
     assert corpus["projection_training_bc_authorized"] is False
     assert corpus["projection_training_focused_cpu_suite"] == (
         "161_passed_3_warnings_in_17.59s"

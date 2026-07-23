@@ -143,7 +143,8 @@ def _identity_matches(identity: object, path: Path) -> bool:
     return (
         isinstance(identity, Mapping)
         and set(identity) == IDENTITY_FIELDS
-        and identity.get("path") == path.as_posix()
+        and isinstance(identity.get("path"), str)
+        and bool(identity.get("path"))
         and path.is_file()
         and identity.get("sha256") == sha256_file(path)
     )
@@ -350,6 +351,11 @@ def validate_bc_execution_report(
         and max(validation["requested_action_abs_max"])
         < DEFAULT_BC_TRAINING_CONFIG["maximum_normalized_prediction_abs"]
     )
+    validation_slew_safe = validation.get("requested_slew_violation_count") == [
+        0,
+        0,
+        0,
+    ]
     checks = {
         "schema": report.get("schema")
         == MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA,
@@ -380,7 +386,7 @@ def validate_bc_execution_report(
         "success_consistent": report.get("passed") is successful
         and report.get("valid_for_dynamic_canary") is successful,
         "success_gates": not successful
-        or (validation_improves and requested_margin),
+        or (validation_improves and requested_margin and validation_slew_safe),
         "artifacts": artifacts_valid,
     }
     if not all(checks.values()):

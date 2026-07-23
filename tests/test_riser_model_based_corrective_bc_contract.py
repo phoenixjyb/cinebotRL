@@ -297,7 +297,13 @@ def test_success_report_requires_metrics_hashes_and_closed_holdout(
 
 @pytest.mark.parametrize(
     "mutation",
-    ["missing_artifact", "false_success", "holdout", "prediction_margin"],
+    [
+        "missing_artifact",
+        "false_success",
+        "holdout",
+        "prediction_margin",
+        "slew_violation",
+    ],
 )
 def test_report_rejects_false_success_claims(
     tmp_path: Path,
@@ -310,8 +316,12 @@ def test_report_rejects_false_success_claims(
         report["offline_gate_passed"] = False
     elif mutation == "holdout":
         report["holdout_metrics_computed"] = True
-    else:
+    elif mutation == "prediction_margin":
         report["split_metrics"]["validation"]["requested_action_abs_max"][0] = 0.95
+    else:
+        report["split_metrics"]["validation"][
+            "requested_slew_violation_count"
+        ][0] = 1
     with pytest.raises(ValueError, match="report failed"):
         validate_bc_execution_report(
             report,

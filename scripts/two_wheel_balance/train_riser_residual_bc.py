@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import random
 import re
+import subprocess
 import sys
 
 import numpy as np
@@ -31,6 +32,19 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_corpus imp
 )
 from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_bc_adapter import (  # noqa: E402
     build_projection_aware_bc_preflight,
+    build_projection_aware_split,
+    evaluate_projection_aware_model,
+    train_projection_aware_epoch,
+)
+from rl_platform.tasks.two_wheel_balance.riser_model_based_bc_loss import (  # noqa: E402
+    ModelBasedProjectedBCLoss,
+)
+from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_bc_contract import (  # noqa: E402
+    CODE_IDENTITY_KEYS,
+    DEFAULT_BC_TRAINING_CONFIG,
+    MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA,
+    validate_bc_execution_admission,
+    validate_bc_execution_report,
 )
 from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_training_dataset import (  # noqa: E402
     MODEL_BASED_CORRECTIVE_TRAINING_DATASET_SCHEMA,
@@ -70,6 +84,7 @@ SPLIT_CODES = {"train": 0, "validation": 1, "holdout": 2}
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, required=True)
+    parser.add_argument("--bc-admission", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--epochs", type=int, default=100)
@@ -137,6 +152,94 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _identity(path: Path) -> dict[str, str]:
+    return {"path": path.as_posix(), "sha256": sha256(path)}
+
+
+def _projection_bc_code_paths() -> dict[str, Path]:
+    values = {
+        "trainer": Path(__file__).resolve(),
+        "adapter": (
+            PROJECT_ROOT
+            / "src/rl_platform/tasks/two_wheel_balance/"
+            "riser_model_based_corrective_bc_adapter.py"
+        ),
+        "loss_module": (
+            PROJECT_ROOT
+            / "src/rl_platform/tasks/two_wheel_balance/"
+            "riser_model_based_bc_loss.py"
+        ),
+        "policy_module": (
+            PROJECT_ROOT
+            / "src/rl_platform/tasks/two_wheel_balance/"
+            "riser_residual_policy.py"
+        ),
+        "training_dataset_module": (
+            PROJECT_ROOT
+            / "src/rl_platform/tasks/two_wheel_balance/"
+            "riser_model_based_corrective_training_dataset.py"
+        ),
+        "admission_module": (
+            PROJECT_ROOT
+            / "src/rl_platform/tasks/two_wheel_balance/"
+            "riser_model_based_corrective_bc_contract.py"
+        ),
+    }
+    if set(values) != CODE_IDENTITY_KEYS:
+        raise ValueError("projection-aware BC code identity set mismatch")
+    return values
+
+
+def _clean_execution_commit() -> str:
+    head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"],
+        cwd=PROJECT_ROOT,
+        text=True,
+    ).strip()
+    upstream = subprocess.check_output(
+        ["git", "rev-parse", "@{upstream}"],
+        cwd=PROJECT_ROOT,
+        text=True,
+    ).strip()
+    dirty = subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        cwd=PROJECT_ROOT,
+        text=True,
+    ).strip()
+    if head != upstream or dirty:
+        raise ValueError("projection-aware BC requires clean HEAD == upstream")
+    return head
+
+
+def _projection_training_config(args: argparse.Namespace) -> dict[str, object]:
+    return {
+        "optimizer": "AdamW",
+        "epochs_max": args.epochs,
+        "patience": args.patience,
+        "batch_size": args.batch_size,
+        "learning_rate": args.learning_rate,
+        "weight_decay": args.weight_decay,
+        "gradient_clip_norm": 5.0,
+        "state_hidden_sizes": [
+            int(item) for item in args.state_hidden_sizes.split(",") if item
+        ],
+        "lookahead_hidden_sizes": [
+            int(item) for item in args.lookahead_hidden_sizes.split(",") if item
+        ],
+        "fusion_hidden_sizes": [
+            int(item) for item in args.fusion_hidden_sizes.split(",") if item
+        ],
+        "seed": args.seed,
+        "device": args.device,
+        "minimum_improvement_fraction": args.minimum_improvement_fraction,
+        "maximum_normalized_prediction_abs": (
+            args.maximum_normalized_prediction_abs
+        ),
+        "model_selection_split": "validation",
+        "optimizer_steps_per_epoch": 1,
+    }
 
 
 def dataset_action_semantics(metadata: dict[str, object]) -> dict[str, object]:
@@ -523,6 +626,252 @@ def train_scheduled_sampling_epoch(
     return total_loss / total_rows, total_rows, sampled_rows
 
 
+def _projection_report_metrics(
+    metrics: dict[str, object],
+    *,
+    minimum_improvement_fraction: float,
+) -> dict[str, object]:
+    candidate = np.asarray(metrics["case_balanced_mse_per_action"], dtype=np.float64)
+    baseline = np.asarray(
+        metrics["zero_requested_case_balanced_mse_per_action"], dtype=np.float64
+    )
+    improves = (
+        (baseline > 1e-10)
+        & (candidate <= baseline * (1.0 - minimum_improvement_fraction))
+    )
+    return {
+        "loss_total": metrics["loss_total"],
+        "case_balanced_mse_per_action": candidate.tolist(),
+        "zero_requested_case_balanced_mse_per_action": baseline.tolist(),
+        "improves_over_zero_requested": improves.tolist(),
+        "requested_action_abs_max": metrics["requested_action_abs_max"],
+        "requested_slew_violation_count": metrics[
+            "requested_slew_violation_count"
+        ],
+    }
+
+
+def run_projection_aware_bc(
+    args: argparse.Namespace,
+    metadata: dict[str, object],
+    arrays: dict[str, np.ndarray],
+    action_semantics: dict[str, object],
+    *,
+    admission: dict[str, object],
+    admission_path: Path,
+    execution_commit: str,
+    device: torch.device,
+) -> int:
+    if args.output_dir.exists():
+        raise FileExistsError(
+            f"projection-aware BC output already exists: {args.output_dir}"
+        )
+    if (
+        args.mask_previous_action_observations
+        or args.scheduled_previous_action_max_probability != 0.0
+        or args.previous_action_observation_gain != 1.0
+        or args.previous_action_observation_gains is not None
+    ):
+        raise ValueError(
+            "projection-aware BC admission does not permit legacy previous-action variants"
+        )
+    if _projection_training_config(args) != DEFAULT_BC_TRAINING_CONFIG:
+        raise ValueError("projection-aware BC CLI configuration differs from admission")
+    train_split = build_projection_aware_split(
+        arrays,
+        split_code=MODEL_BASED_SPLIT_CODES["train"],
+    )
+    validation_split = build_projection_aware_split(
+        arrays,
+        split_code=MODEL_BASED_SPLIT_CODES["validation"],
+    )
+    train_observations = train_split["observations"]
+    observation_mean = train_observations.mean(
+        axis=0, dtype=np.float64
+    ).astype(np.float32)
+    observation_std = train_observations.std(
+        axis=0, dtype=np.float64
+    ).astype(np.float32)
+    observation_std = np.maximum(observation_std, 1e-4)
+    model = RiserResidualPolicy(
+        torch.from_numpy(observation_mean),
+        torch.from_numpy(observation_std),
+        tuple(DEFAULT_BC_TRAINING_CONFIG["state_hidden_sizes"]),
+        tuple(DEFAULT_BC_TRAINING_CONFIG["lookahead_hidden_sizes"]),
+        tuple(DEFAULT_BC_TRAINING_CONFIG["fusion_hidden_sizes"]),
+        (),
+        (1.0, 1.0, 1.0),
+    ).to(device)
+    loss = ModelBasedProjectedBCLoss(
+        action_scales=metadata["action_scales"],
+    ).to(device)
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=args.learning_rate,
+        weight_decay=args.weight_decay,
+    )
+    generator = torch.Generator().manual_seed(args.seed)
+    history = []
+    best_validation_loss = float("inf")
+    best_state = None
+    best_epoch = 0
+    epochs_without_improvement = 0
+    for epoch in range(1, args.epochs + 1):
+        train_metrics = train_projection_aware_epoch(
+            model,
+            optimizer,
+            train_split,
+            loss,
+            device=device,
+            batch_size=args.batch_size,
+            generator=generator,
+        )
+        validation_metrics = evaluate_projection_aware_model(
+            model,
+            validation_split,
+            loss,
+            device=device,
+            batch_size=args.batch_size,
+        )
+        validation_loss = float(validation_metrics["loss_total"])
+        history.append(
+            {
+                "epoch": epoch,
+                "train_loss_total": train_metrics["loss_total"],
+                "train_loss_pointwise": train_metrics["loss_pointwise"],
+                "train_loss_requested_slew": train_metrics[
+                    "loss_requested_slew"
+                ],
+                "validation_loss_total": validation_loss,
+            }
+        )
+        if validation_loss < best_validation_loss - 1e-7:
+            best_validation_loss = validation_loss
+            best_epoch = epoch
+            best_state = {
+                name: value.detach().cpu().clone()
+                for name, value in model.state_dict().items()
+            }
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= args.patience:
+                break
+    if best_state is None:
+        raise RuntimeError("projection-aware BC produced no candidate")
+    model.load_state_dict(best_state)
+    train_evaluation = evaluate_projection_aware_model(
+        model,
+        train_split,
+        loss,
+        device=device,
+        batch_size=args.batch_size,
+    )
+    validation_evaluation = evaluate_projection_aware_model(
+        model,
+        validation_split,
+        loss,
+        device=device,
+        batch_size=args.batch_size,
+    )
+    split_metrics = {
+        "train": _projection_report_metrics(
+            train_evaluation,
+            minimum_improvement_fraction=args.minimum_improvement_fraction,
+        ),
+        "validation": _projection_report_metrics(
+            validation_evaluation,
+            minimum_improvement_fraction=args.minimum_improvement_fraction,
+        ),
+    }
+    validation_metrics = split_metrics["validation"]
+    offline_gate_passed = (
+        all(validation_metrics["improves_over_zero_requested"])
+        and max(validation_metrics["requested_action_abs_max"])
+        < args.maximum_normalized_prediction_abs
+        and validation_metrics["requested_slew_violation_count"] == [0, 0, 0]
+    )
+    args.output_dir.mkdir(parents=True)
+    checkpoint_identity = None
+    torchscript_identity = None
+    model = model.cpu().eval()
+    if offline_gate_passed:
+        checkpoint = args.output_dir / "residual_policy.pt"
+        torch.save(
+            {
+                "schema": "cinebotrl_two_wheel_riser_model_based_residual_policy_v1",
+                "policy_architecture": POLICY_ARCHITECTURE,
+                "model_state_dict": model.state_dict(),
+                "state_hidden_sizes": DEFAULT_BC_TRAINING_CONFIG[
+                    "state_hidden_sizes"
+                ],
+                "lookahead_hidden_sizes": DEFAULT_BC_TRAINING_CONFIG[
+                    "lookahead_hidden_sizes"
+                ],
+                "fusion_hidden_sizes": DEFAULT_BC_TRAINING_CONFIG[
+                    "fusion_hidden_sizes"
+                ],
+                "observation_names": OBSERVATION_NAMES,
+                "action_names": ACTION_NAMES,
+                "dataset_schema": metadata["schema"],
+                "dataset_sha256": sha256(args.dataset),
+                "admission_sha256": sha256(admission_path),
+                "execution_commit": execution_commit,
+                "optimizer_contract": admission["optimizer_contract"],
+                "validation_contract": admission["validation_contract"],
+                **action_semantics,
+                "best_epoch": best_epoch,
+            },
+            checkpoint,
+        )
+        scripted = torch.jit.script(model)
+        torchscript = args.output_dir / "residual_policy.torchscript.pt"
+        scripted.save(str(torchscript))
+        checkpoint_identity = _identity(checkpoint)
+        torchscript_identity = _identity(torchscript)
+    report = {
+        "schema": MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA,
+        "admission": _identity(admission_path),
+        "dataset": admission["dataset"],
+        "execution_commit": execution_commit,
+        "optimizer_contract": admission["optimizer_contract"],
+        "validation_contract": admission["validation_contract"],
+        "loss_contract": admission["loss_contract"],
+        "training_config": admission["training_config"],
+        "split_cases": admission["split_cases"],
+        "reserved_holdout_cases": admission["reserved_holdout_cases"],
+        "epochs_run": len(history),
+        "optimizer_steps": len(history),
+        "best_epoch": best_epoch,
+        "history": history,
+        "split_metrics": split_metrics,
+        "offline_gate_passed": offline_gate_passed,
+        "holdout_used_for_model_selection": False,
+        "holdout_metrics_computed": False,
+        "checkpoint": checkpoint_identity,
+        "torchscript": torchscript_identity,
+        "bc_authorized": True,
+        "training_started": True,
+        "ppo_authorized": False,
+        "learned_rollout_authorized": False,
+        "passed": offline_gate_passed,
+        "valid_for_dynamic_canary": offline_gate_passed,
+    }
+    validate_bc_execution_report(
+        report,
+        admission_path=admission_path,
+        admission=admission,
+        report_directory=args.output_dir,
+    )
+    report_path = args.output_dir / "report.json"
+    report_path.write_text(
+        json.dumps(report, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    print(json.dumps(report, indent=2))
+    return 0 if offline_gate_passed else 2
+
+
 def main() -> int:
     args = parse_args()
     if re.fullmatch(r"[0-9a-f]{40}", args.source_commit) is None:
@@ -593,13 +942,45 @@ def main() -> int:
         if args.preflight_only:
             print(json.dumps(preflight, indent=2))
             return 0 if preflight["preflight_passed"] else 2
-        raise ValueError(
-            "projection-aware corrective training schema requires a separate "
-            "hash-bound BC authorization; use --preflight-only for CPU review"
+        if args.bc_admission is None:
+            raise ValueError(
+                "projection-aware corrective training schema requires a separate "
+                "hash-bound BC authorization; use --preflight-only for CPU review"
+            )
+        admission = json.loads(args.bc_admission.read_text(encoding="utf-8"))
+        if not isinstance(admission, dict):
+            raise ValueError("projection-aware BC admission must be a JSON object")
+        execution_commit = _clean_execution_commit()
+        if args.source_commit != execution_commit:
+            raise ValueError(
+                "projection-aware BC source commit does not match clean HEAD"
+            )
+        validate_bc_execution_admission(
+            admission,
+            dataset_path=args.dataset,
+            dataset_metadata=metadata,
+            code_paths=_projection_bc_code_paths(),
+            expected_execution_commit=execution_commit,
+            require_authorized=True,
+        )
+        return run_projection_aware_bc(
+            args,
+            metadata,
+            arrays,
+            action_semantics,
+            admission=admission,
+            admission_path=args.bc_admission,
+            execution_commit=execution_commit,
+            device=device,
         )
     if args.preflight_only:
         raise ValueError(
             "--preflight-only is reserved for the projection-aware corrective "
+            "training schema"
+        )
+    if args.bc_admission is not None:
+        raise ValueError(
+            "--bc-admission is reserved for the projection-aware corrective "
             "training schema"
         )
     observations = arrays["observations"].astype(np.float32)

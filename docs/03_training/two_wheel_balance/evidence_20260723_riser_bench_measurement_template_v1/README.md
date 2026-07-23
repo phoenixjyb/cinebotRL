@@ -14,3 +14,8 @@ This CPU-only evidence proves that the unmeasured bench template fails closed.
 The project thresholds are engineering review gates, not vendor ratings or a
 safety certification. A future measured pass permits production design review
 only; it does not grant automatic procurement or hardware-transfer approval.
+
+Measured continuous-duty and emergency-stop numbers should be reduced from the
+fixed raw CSV contract with `reduce_riser_bench_log.py`, not copied manually.
+That reducer records the raw-log SHA-256 but does not populate calibration,
+supplier approval, brake, anti-fall, limit, end-stop, or safety-power fields.

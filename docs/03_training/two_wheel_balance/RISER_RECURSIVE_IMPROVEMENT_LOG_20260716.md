@@ -7635,3 +7635,36 @@ and must state whether its candidate was accepted or rejected.
   implement the projection-aware loss and requested-output slew gate in a new
   explicitly authorized model-based training schema. Do not retrofit the
   legacy phase-feedforward BC corpus.
+
+## Round 195: calibrated bench logs gain deterministic numeric reduction
+
+- The existing hardware gate required manually entered RMS current, thermal
+  slope, and stopping-distance values. Added
+  `cinebotrl_two_wheel_riser_bench_log_reduction_v1` to derive those values
+  directly from a calibrated raw CSV.
+- The reducer validates exact columns, finite numeric values, strict time
+  ordering, boolean flags, one contiguous continuous-duty block, and exactly
+  one stop trigger per positive emergency-stop trial. Each trial must continue
+  until measured speed is at most `0.02 m/s`.
+- It derives time-weighted duty cycle, steady-state minimum speed, RMS/peak
+  currents, bus-voltage maximum, temperature maxima, final 300 s motor/drive
+  slopes, per-trial trigger speed, and stopping distance. The raw-log SHA-256
+  is sealed into the output.
+- Script and empty CSV-template SHA-256 values are
+  `04870ab00f2ca6a8f24e5a0f062b04d3c68aba92667cd9bc36497667f52fd01c`
+  and
+  `cf2196889bc3c973055d45c9c50d1f819e4a4c4287014cb5998110b77638acb3`.
+  Focused hardware tests pass `27/27`.
+- Reducer output is only a numeric merge fragment. Calibration, supplier,
+  brake, anti-fall, hard-limit, end-stop, and safety-power evidence remain
+  manual and mandatory. No real measurements were collected, and production
+  design review, procurement, hardware transfer, simulation profile switch,
+  runtime, GPU, BC, PPO, and training remain false.
+
+## Next round after Round 195
+
+- When physical hardware exists, acquire one calibrated raw log using the
+  fixed CSV contract, reduce it, merge only the numeric sections into a fresh
+  measurement JSON, and run the existing bench audit without relaxing gates.
+- Until then, keep the active 400 W simulation profile and the separately
+  unauthorized case-23 capture boundary unchanged.

@@ -21,6 +21,14 @@ TEMPORAL_PROJECTION_AUDIT = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260723_model_based_corrective_temporal_projection_v1/summary.json"
 )
+BENCH_RAW_LOG_REDUCER = (
+    ROOT / "scripts/two_wheel_balance/reduce_riser_bench_log.py"
+)
+BENCH_RAW_LOG_TEMPLATE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "RISER_BENCH_RAW_LOG_TEMPLATE_20260723.csv"
+)
 
 
 def _goal() -> dict:
@@ -157,6 +165,17 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     assert hardware["production_candidate_emergency_8kg_margin_ratio"] > 1.15
     assert hardware["production_candidate_ready_for_supplier_and_bench_review"]
     assert hardware["bench_measurement_missing_fields"] == 34
+    assert hardware["bench_raw_log_reducer_schema"] == (
+        "cinebotrl_two_wheel_riser_bench_log_reduction_v1"
+    )
+    assert hardware["bench_raw_log_numeric_reduction_ready"] is True
+    assert hardware["bench_raw_log_measurements_collected"] is False
+    assert hardware["bench_raw_log_reducer_sha256"] == _sha256(
+        BENCH_RAW_LOG_REDUCER
+    )
+    assert hardware["bench_raw_log_template_sha256"] == _sha256(
+        BENCH_RAW_LOG_TEMPLATE
+    )
     assert hardware["ready_for_production_design_review"] is False
     assert hardware["valid_for_production_procurement"] is False
     assert hardware["valid_for_hardware_transfer"] is False

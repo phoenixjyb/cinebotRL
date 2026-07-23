@@ -8239,3 +8239,36 @@ and must state whether its candidate was accepted or rejected.
 - A passing converted v4 case advances the first missing gate; it does not
   authorize the remaining train/validation captures, BC execution, learned
   rollout, all-79 evaluation, rendering, or PPO.
+
+## Round 212: future learned evidence is fail-closed
+
+- The completion auditor now hashes its own source file, so a report cannot
+  silently survive validator-code drift.
+- A learned all-79 report must contain exactly cases `1--79` in order, one row
+  per case, all true per-case checks, complete finite teacher/learned metrics,
+  three bounded residual channels, and no metric beyond the fixed regression
+  budget. The auditor independently recomputes the position-error means and
+  aggregate budget.
+- A learned-render report must bind the validated BC TorchScript file and
+  all-79 report by path and SHA-256. It requires at least three unique case
+  videos with verified file hashes, codec, resolution, frame rate, and
+  duration, plus true checks for an intact robot, visible riser motion, visible
+  camera/gimbal, and no detached links.
+- Healthy synthetic reports pass. Tests reject a wrong policy hash,
+  duplicate/misaligned case, false row check, metric regression, forged mean,
+  modified video hash, and detached-robot review.
+- Implementation commit
+  `4b92a72750996439458e475c9d75be86332892bb` and status commit
+  `83c9b3f9e2d02378694482d12d0cf8907d9e0989` pass `17` focused tests
+  on macOS and `.98`.
+- The regenerated current report is byte-identical across hosts at SHA-256
+  `95e144e77d6ee94e08de2622ad005f3a7a6ac15b0ff9322eb3ee587c68d8558d`.
+  The result remains honestly `6/10`; no missing learned-policy gate changed
+  state, and no runtime, capture, BC, PPO, rollout, or GPU work started.
+
+## Next round after Round 212
+
+- The only prepared runtime operation remains exactly one separately
+  authorized case-23 v4 corrective-label capture.
+- Do not construct all-79 or render evidence until a real `4+2` corpus,
+  authorized BC report, and separately admitted learned rollout exist.

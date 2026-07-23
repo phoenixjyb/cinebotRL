@@ -13,6 +13,10 @@ GOAL_COMPLETION_AUDIT = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260723_riser_goal_completion_audit_v1/summary.json"
 )
+GOAL_COMPLETION_AUDITOR = (
+    ROOT
+    / "scripts/two_wheel_balance/audit_riser_goal_completion.py"
+)
 CASE23_CAPTURE_CONTRACT = (
     ROOT
     / "scripts/two_wheel_balance/model_based_corrective_teacher_case23_capture_contract_v1.json"
@@ -684,10 +688,13 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["bc_started_by_audit"] is False
     assert audit["ppo_started_by_audit"] is False
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
-        "3b00bad293b061a323d97ced6010bb0313423421b7deaa089202d29dfcdd8c6d"
+        "95e144e77d6ee94e08de2622ad005f3a7a6ac15b0ff9322eb3ee587c68d8558d"
     )
     report = json.loads(GOAL_COMPLETION_AUDIT.read_text())
-    assert report["git"]["head"] == "d83fa50f29761f967d204dfeadd7090631f535e4"
+    assert report["git"]["head"] == "83c9b3f9e2d02378694482d12d0cf8907d9e0989"
+    assert report["inputs"]["auditor"]["sha256"] == _sha256(
+        GOAL_COMPLETION_AUDITOR
+    )
     assert report["required_gate_pass_count"] == audit["required_gate_pass_count"]
     assert report["required_gate_count"] == audit["required_gate_count"]
     assert report["completion_blockers"] == audit["completion_blockers"]

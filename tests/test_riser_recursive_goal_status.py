@@ -661,10 +661,14 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     ]
     assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v1"
     assert audit["implementation_commit"] == (
-        "c79b56a470f23c6c731d5d347ed4b82f364aa8ae"
+        "4b92a72750996439458e475c9d75be86332892bb"
     )
     assert audit["host_independent_lf_evidence"] is True
     assert audit["mac_and_windows_report_byte_parity_verified"] is True
+    assert audit["auditor_code_identity_bound"] is True
+    assert audit["all79_full_row_revalidation_required"] is True
+    assert audit["render_policy_all79_video_hashes_required"] is True
+    assert audit["render_intact_robot_visual_checks_required"] is True
     assert audit["required_gate_pass_count"] == 6
     assert audit["required_gate_count"] == 10
     assert audit["completion_blockers"] == [

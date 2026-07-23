@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -18,6 +19,17 @@ assert SPEC.loader is not None
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
+EVIDENCE_V2 = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_pending_corrective_route_queue_cpu_v2"
+)
+CASE23_PREFLIGHT_V3 = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case23_corrective_conversion_execution_cpu_v3/"
+    "summary.json"
+)
 
 HEAD = "1" * 40
 
@@ -122,6 +134,47 @@ def test_healthy_queue_is_ordered_and_closed(tmp_path: Path) -> None:
     assert result["runtime_authorized"] is False
     assert result["dataset_conversion_authorized"] is False
     assert result["training_started"] is False
+
+
+def test_committed_v2_queue_binds_current_closed_preflights() -> None:
+    result = json.loads((EVIDENCE_V2 / "summary.json").read_text())
+    assert result["passed"] is True
+    assert result["git"]["head"] == "cec3cdb20904bbe37d5214e859759ff13a7de84a"
+    assert result["git"]["upstream"] == result["git"]["head"]
+    assert result["ready_route_count"] == 6
+    assert result["execution_order"] == [
+        "case23_conversion",
+        "case6_pair",
+        "case2_pair",
+        "case7_pair",
+        "case8_validation_pair",
+        "case16_validation_pair",
+    ]
+    assert result["next_bounded_action"] == (
+        "authorize_exactly_one_case23_v4_cpu_conversion"
+    )
+    for route in result["routes"]:
+        path = EVIDENCE_V2 / "preflights" / f"{route['key']}.json"
+        payload = path.read_bytes()
+        assert hashlib.sha256(payload).hexdigest() == route["preflight"]["sha256"]
+        preflight = json.loads(payload)
+        assert route["passed"] is True
+        assert preflight["passed"] is True
+        assert (
+            preflight.get("runtime_commit")
+            or preflight["git"]["head"]
+        ) == result["git"]["head"]
+        assert MODULE._closed(preflight) is True
+        for field in MODULE.FALSE_FIELDS:
+            if field in preflight:
+                assert preflight[field] is False
+    assert CASE23_PREFLIGHT_V3.read_bytes() == (
+        EVIDENCE_V2 / "preflights/case23_conversion.json"
+    ).read_bytes()
+    assert MODULE._closed(result) is True
+    for field in MODULE.FALSE_FIELDS:
+        if field in result:
+            assert result[field] is False
 
 
 @pytest.mark.parametrize(

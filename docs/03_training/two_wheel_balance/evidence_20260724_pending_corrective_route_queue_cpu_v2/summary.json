@@ -1,0 +1,240 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_corrective_pending_route_queue_v1",
+  "git": {
+    "head": "cec3cdb20904bbe37d5214e859759ff13a7de84a",
+    "upstream": "cec3cdb20904bbe37d5214e859759ff13a7de84a",
+    "tracked_worktree_clean": true
+  },
+  "corpus_intake": {
+    "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/docs/03_training/two_wheel_balance/evidence_20260724_model_based_corrective_corpus_intake_v1/summary.json",
+    "sha256": "3d8f3da9c23ddb9d63a26afb3bec15324d8ce61a3e0b900c7cdf67f91c9e20bf",
+    "checks": {
+      "schema_and_passed": true,
+      "converted_state": true,
+      "case23_is_next": true,
+      "learning_closed": true
+    }
+  },
+  "checks": {
+    "exact_route_set_and_order": true,
+    "head_matches_upstream": true,
+    "tracked_worktree_clean": true,
+    "corpus_state": true,
+    "all_six_preflights_pass": true,
+    "namespaces_unique": true,
+    "train_before_validation": true
+  },
+  "routes": [
+    {
+      "key": "case23_conversion",
+      "priority": 1,
+      "case": 23,
+      "split": "train",
+      "kind": "cpu_conversion",
+      "namespace": "20260723_model_based_corrective_case23_conversion_v1_cpu",
+      "preflight": {
+        "path": "/tmp/riser_case23_conversion_preflight_cec3cdb.json",
+        "sha256": "0a7719f26849f2d08ffa8471b670c9b63068015c709541ca15ad22554e8a094a",
+        "size_bytes": 6710
+      },
+      "identity_count": 9,
+      "check_groups": {
+        "repository_checks": true,
+        "contract_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    },
+    {
+      "key": "case6_pair",
+      "priority": 2,
+      "case": 6,
+      "split": "train",
+      "kind": "train_paired_canary",
+      "namespace": "20260724_model_based_corrective_teacher_case6_pair_v2_exclusive",
+      "preflight": {
+        "path": "/tmp/riser_case6_pair_preflight_cec3cdb.json",
+        "sha256": "37efcb81d84f1fb83717e0333a8efdf6ebc9f7c5c1b9cdcb423d125374fa9b0d",
+        "size_bytes": 11444
+      },
+      "identity_count": 18,
+      "check_groups": {
+        "checks": true,
+        "selection_checks": true,
+        "readiness_checks": true,
+        "profile_proposal_checks": true,
+        "corrective_profile_checks": true,
+        "perturbation_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    },
+    {
+      "key": "case2_pair",
+      "priority": 3,
+      "case": 2,
+      "split": "train",
+      "kind": "train_paired_canary",
+      "namespace": "20260724_model_based_corrective_teacher_case2_natural_error_pair_v1_exclusive",
+      "preflight": {
+        "path": "/tmp/riser_case2_pair_preflight_cec3cdb.json",
+        "sha256": "e47faba122dc8af043238d0bb8f99e4a8bf5737466e635718de0844765bdb10a",
+        "size_bytes": 12135
+      },
+      "identity_count": 19,
+      "check_groups": {
+        "checks": true,
+        "selection_checks": true,
+        "readiness_checks": true,
+        "profile_proposal_checks": true,
+        "corrective_profile_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    },
+    {
+      "key": "case7_pair",
+      "priority": 4,
+      "case": 7,
+      "split": "train",
+      "kind": "train_paired_canary",
+      "namespace": "20260724_model_based_corrective_teacher_case7_pair_v1_exclusive",
+      "preflight": {
+        "path": "/tmp/riser_case7_pair_preflight_cec3cdb.json",
+        "sha256": "9bacdba7e481f6ba24aaea20701bfbbac31d0c71f6f85f2056b093c53ebb4be4",
+        "size_bytes": 11484
+      },
+      "identity_count": 18,
+      "check_groups": {
+        "checks": true,
+        "selection_checks": true,
+        "readiness_checks": true,
+        "profile_proposal_checks": true,
+        "corrective_profile_checks": true,
+        "perturbation_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    },
+    {
+      "key": "case8_validation_pair",
+      "priority": 5,
+      "case": 8,
+      "split": "validation",
+      "kind": "validation_paired_canary",
+      "namespace": "20260724_model_based_corrective_teacher_case8_validation_pair_v1_exclusive",
+      "preflight": {
+        "path": "/tmp/riser_case8_validation_pair_preflight_cec3cdb.json",
+        "sha256": "2a06a75d21cb830f5c3297c01383c8f870fc96a9844bedc1a3ef5b68c8c11796",
+        "size_bytes": 10930
+      },
+      "identity_count": 19,
+      "check_groups": {
+        "checks": true,
+        "document_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    },
+    {
+      "key": "case16_validation_pair",
+      "priority": 6,
+      "case": 16,
+      "split": "validation",
+      "kind": "validation_paired_canary",
+      "namespace": "20260724_model_based_corrective_teacher_case16_validation_natural_error_pair_v1_exclusive",
+      "preflight": {
+        "path": "/tmp/riser_case16_validation_pair_preflight_cec3cdb.json",
+        "sha256": "1c5528334666bd013355e6a1e097d1543c17cb36637b2f9fba635bfbc9456dd9",
+        "size_bytes": 13478
+      },
+      "identity_count": 24,
+      "check_groups": {
+        "checks": true,
+        "document_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    }
+  ],
+  "ready_route_count": 6,
+  "execution_order": [
+    "case23_conversion",
+    "case6_pair",
+    "case2_pair",
+    "case7_pair",
+    "case8_validation_pair",
+    "case16_validation_pair"
+  ],
+  "next_bounded_action": "authorize_exactly_one_case23_v4_cpu_conversion",
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

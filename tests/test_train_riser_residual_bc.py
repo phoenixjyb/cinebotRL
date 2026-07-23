@@ -331,6 +331,13 @@ def test_failed_offline_gate_does_not_emit_policy_artifacts(tmp_path: Path) -> N
     assert result.returncode == 2
     report = json.loads((output / "report.json").read_text(encoding="utf-8"))
     assert not report["offline_gate_passed"]
+    assert not report["offline_policy_candidate_ready"]
+    assert report["maximum_normalized_prediction_abs"] == 0.95
+    assert report["prediction_margin_checks"]["validation"] == [True, True, True]
+    assert report["recursive_prediction_margin_checks"] == {}
+    assert report["separate_dynamic_authorization_required"]
+    assert not report["dynamic_holdout_authorized"]
+    assert not report["learned_rollout_authorized"]
     assert report["checkpoint"] is None
     assert report["torchscript"] is None
     assert not (output / "residual_policy.pt").exists()
@@ -613,6 +620,17 @@ def test_admitted_bc_is_reproducible_for_the_same_seed(tmp_path: Path) -> None:
         assert result.returncode == 0, result.stderr
         report = json.loads((output / "report.json").read_text(encoding="utf-8"))
         assert report["offline_gate_passed"]
+        assert report["offline_policy_candidate_ready"]
+        assert report["maximum_normalized_prediction_abs"] == 0.95
+        assert report["prediction_margin_checks"]["validation"] == [
+            True,
+            True,
+            True,
+        ]
+        assert report["recursive_prediction_margin_checks"] == {}
+        assert report["separate_dynamic_authorization_required"]
+        assert not report["dynamic_holdout_authorized"]
+        assert not report["learned_rollout_authorized"]
         assert report["source_commit"] == "a" * 40
         assert report["offline_gate_splits"] == ["validation"]
         assert not report["holdout_used_for_model_selection"]

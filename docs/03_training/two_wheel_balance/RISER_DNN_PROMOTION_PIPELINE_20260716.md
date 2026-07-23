@@ -110,7 +110,18 @@ BC 指行为克隆。训练数据仅来自 Gate A 通过后的 Isaac 执行状�
 
 训练入口要求 tracked worktree 无改动，并把完整 Git SHA-1 同时写入 checkpoint 和报告。Gate C、Gate D 必须在同一 commit 上评估该策略；策略 SHA-256、代码 commit 或 case 集任一变化都禁止恢复旧 rollout。
 
-每个动作通道在 validation 上必须比零动作 MSE 至少改善 `5%`。如果某个通道的零动作信号为零，则不能把“同样为零”误报为改善。Gate B 不计算 holdout 指标。离线 gate 失败时只写审计报告，不生成 checkpoint 或 TorchScript。
+每个动作通道在 validation 上必须比零动作 MSE 至少改善 `5%`，且
+teacher-forced 与启用时的递归 validation 预测在每个通道上都必须严格小于
+归一化动作幅值 `0.95`，保留执行安全余量。如果某个通道的零动作信号为零，
+则不能把“同样为零”误报为改善。Gate B 不计算 holdout 指标。离线 gate
+失败时只写审计报告，不生成 checkpoint 或 TorchScript。
+
+Gate B 通过只产生 `offline_policy_candidate_ready=true` 的候选
+checkpoint，不授权任何 Isaac rollout。训练器必须始终写入
+`learned_rollout_authorized=false`、`dynamic_holdout_authorized=false` 和
+`separate_dynamic_authorization_required=true`。Gate C 需要另行评审并签发
+一次性、绑定策略 SHA-256、代码 commit、case 集和新 namespace 的运行授权；
+不得把 validation 指标通过直接解释为动态运行授权。
 
 ## Gate C：case-disjoint 动态 holdout
 

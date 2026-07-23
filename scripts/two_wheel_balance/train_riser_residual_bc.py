@@ -76,6 +76,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--minimum-improvement-fraction", type=float, default=0.05)
     parser.add_argument(
+        "--maximum-normalized-prediction-abs",
+        type=float,
+        default=0.95,
+        help="Strict validation output margin below the normalized action bound.",
+    )
+    parser.add_argument(
         "--mask-previous-action-observations",
         action="store_true",
         help="Mask teacher-forced previous-action channels inside the policy.",
@@ -495,6 +501,8 @@ def main() -> int:
         raise ValueError("training counts must be positive")
     if not 0.0 < args.minimum_improvement_fraction < 1.0:
         raise ValueError("minimum improvement fraction must be in (0, 1)")
+    if not 0.0 < args.maximum_normalized_prediction_abs < 1.0:
+        raise ValueError("maximum normalized prediction magnitude must be in (0, 1)")
     scheduled_sampling_enabled = args.scheduled_previous_action_max_probability > 0.0
     previous_action_gains = previous_action_observation_gains(args)
     attenuated_previous_action = any(gain < 1.0 for gain in previous_action_gains)
@@ -723,6 +731,8 @@ def main() -> int:
     recursive_split_results = {}
     improvement_checks = {}
     recursive_improvement_checks = {}
+    prediction_margin_checks = {}
+    recursive_prediction_margin_checks = {}
     baseline_signal_checks = {}
     for name in ("train", "validation"):
         mask = masks[name]
@@ -754,6 +764,10 @@ def main() -> int:
             baseline_signal = baseline_mse > 1e-10
             baseline_signal_checks[name] = baseline_signal.tolist()
             if name == "validation":
+                prediction_margin_checks[name] = (
+                    np.asarray(candidate["prediction_abs_max_per_action"])
+                    < args.maximum_normalized_prediction_abs
+                ).tolist()
                 improvement_checks[name] = (
                     baseline_signal
                     & (
@@ -774,11 +788,27 @@ def main() -> int:
                             <= baseline_mse * (1.0 - args.minimum_improvement_fraction)
                         )
                     ).tolist()
+                    recursive_prediction_margin_checks[name] = (
+                        np.asarray(
+                            recursive_split_results[name]["candidate"][
+                                "prediction_abs_max_per_action"
+                            ]
+                        )
+                        < args.maximum_normalized_prediction_abs
+                    ).tolist()
     offline_gate_passed = all(
         all(checks) for checks in improvement_checks.values()
+    ) and all(
+        all(checks) for checks in prediction_margin_checks.values()
     ) and (
         not scheduled_sampling_enabled
-        or all(all(checks) for checks in recursive_improvement_checks.values())
+        or (
+            all(all(checks) for checks in recursive_improvement_checks.values())
+            and all(
+                all(checks)
+                for checks in recursive_prediction_margin_checks.values()
+            )
+        )
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     checkpoint = None
@@ -883,11 +913,21 @@ def main() -> int:
         "split_results": split_results,
         "recursive_previous_action_split_results": recursive_split_results,
         "minimum_improvement_fraction": args.minimum_improvement_fraction,
+        "maximum_normalized_prediction_abs": (
+            args.maximum_normalized_prediction_abs
+        ),
         "baseline_signal_checks": baseline_signal_checks,
         "improvement_checks": improvement_checks,
         "recursive_improvement_checks": recursive_improvement_checks,
+        "prediction_margin_checks": prediction_margin_checks,
+        "recursive_prediction_margin_checks": (
+            recursive_prediction_margin_checks
+        ),
         "offline_gate_passed": offline_gate_passed,
-        "learned_rollout_authorized": offline_gate_passed,
+        "offline_policy_candidate_ready": offline_gate_passed,
+        "separate_dynamic_authorization_required": True,
+        "dynamic_holdout_authorized": False,
+        "learned_rollout_authorized": False,
         "checkpoint": None if checkpoint is None else checkpoint.name,
         "checkpoint_sha256": None if checkpoint is None else sha256(checkpoint),
         "torchscript": None if torchscript is None else torchscript.name,

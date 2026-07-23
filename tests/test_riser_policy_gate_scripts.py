@@ -36,6 +36,13 @@ def test_bc_gate_requires_complete_quality_qualified_exact_source_dataset() -> N
     assert 'report.get("holdout_metrics_computed") is False' in source
     assert 'report.get("case_balanced_training_loss") is True' in source
     assert 'report.get("case_balanced_validation_gate") is True' in source
+    assert '"offline_policy_candidate_ready"' in source
+    assert 'report.get("maximum_normalized_prediction_abs") == 0.95' in source
+    assert '"prediction_margin_checks"' in source
+    assert '"recursive_prediction_margin_checks"' in source
+    assert '"separate_dynamic_authorization_required"' in source
+    assert 'report.get("dynamic_holdout_authorized") is False' in source
+    assert 'report.get("learned_rollout_authorized") is False' in source
     assert '"cinebotrl_two_wheel_riser_residual_merged_v2"' in source
     assert '"executed_state_with_execution_time_lookahead_v2"' in source
     assert '== [0.25, 0.5, 1.0]' in source

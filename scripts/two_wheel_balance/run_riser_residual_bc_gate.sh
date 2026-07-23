@@ -153,7 +153,23 @@ checks = {
     == [0.3, 0.4, 0.1],
     "source_commit": report.get("source_commit") == sys.argv[2],
     "offline_gate": report.get("offline_gate_passed") is True,
-    "rollout_authorized": report.get("learned_rollout_authorized") is True,
+    "prediction_margin": report.get("maximum_normalized_prediction_abs") == 0.95
+    and report.get("prediction_margin_checks", {}).get("validation")
+    == [True, True, True],
+    "recursive_prediction_margin": report.get(
+        "recursive_prediction_margin_checks"
+    )
+    == {},
+    "offline_policy_candidate_ready": report.get(
+        "offline_policy_candidate_ready"
+    )
+    is True,
+    "separate_dynamic_authorization_required": report.get(
+        "separate_dynamic_authorization_required"
+    )
+    is True,
+    "dynamic_holdout_closed": report.get("dynamic_holdout_authorized") is False,
+    "learned_rollout_closed": report.get("learned_rollout_authorized") is False,
     "ppo_not_started": report.get("ppo_started") is False,
     "rollout_not_started": report.get("learned_rollout_started") is False,
     "no_leakage": report.get("source_group_leakage") is False,
@@ -171,4 +187,5 @@ if not all(checks.values()):
 print(json.dumps(checks, sort_keys=True))
 PY
 
-printf 'offline BC gate passed: %s\n' "$POLICY_ROOT"
+printf 'offline BC candidate gate passed; dynamic rollout remains closed: %s\n' \
+  "$POLICY_ROOT"

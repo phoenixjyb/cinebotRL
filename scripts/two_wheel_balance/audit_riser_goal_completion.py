@@ -57,6 +57,10 @@ DEFAULT_HARDWARE = (
 DEFAULT_BENCH = (
     DOC_ROOT / "evidence_20260723_riser_bench_750w_template_v1/summary.json"
 )
+DEFAULT_PENDING_ROUTE_QUEUE = (
+    DOC_ROOT
+    / "evidence_20260724_pending_corrective_route_queue_cpu_v3/summary.json"
+)
 EXPECTED_BRANCH = "codex/two-wheel-riser-rl"
 EXPECTED_MOVABLE_JOINTS = {
     "joint1_gimbal_pitch",
@@ -66,6 +70,25 @@ EXPECTED_MOVABLE_JOINTS = {
     "right_wheel_joint",
     "riser_joint",
 }
+EXPECTED_PENDING_ROUTE_ORDER = (
+    "case23_conversion",
+    "case6_pair",
+    "case2_pair",
+    "case7_pair",
+    "case8_validation_pair",
+    "case16_validation_pair",
+)
+PENDING_ROUTE_AUTHORIZATION_FIELDS = (
+    "runtime_authorized",
+    "gpu_launch_authorized",
+    "label_capture_authorized",
+    "dataset_conversion_authorized",
+    "dataset_merge_authorized",
+    "bc_authorized",
+    "ppo_authorized",
+    "training_started",
+    "valid_for_training",
+)
 REQUIRED_COMPLETION_GATES = (
     "isolated_worktree_and_branch",
     "arm_free_robot_asset",
@@ -79,7 +102,7 @@ REQUIRED_COMPLETION_GATES = (
     "learned_policy_render_audit",
 )
 GOAL_COMPLETION_AUDIT_SCHEMA = (
-    "cinebotrl_two_wheel_riser_goal_completion_audit_v2"
+    "cinebotrl_two_wheel_riser_goal_completion_audit_v3"
 )
 ROLLOUT_METRICS = (
     "position_error_p95_m",
@@ -847,6 +870,7 @@ def build_report(
     exact_source: Mapping[str, Any],
     hardware: Mapping[str, Any],
     bench: Mapping[str, Any],
+    pending_route_queue: Mapping[str, Any],
     git_state: Mapping[str, Any],
     learning: Mapping[str, Any],
     inputs: Mapping[str, Any],
@@ -918,6 +942,52 @@ def build_report(
         "model_based_corrective_training_corpus_cases_available"
     )
     next_case = corrective.get("next_case")
+    pending_routes = pending_route_queue.get("routes", [])
+    pending_route_keys = (
+        [route.get("key") for route in pending_routes]
+        if isinstance(pending_routes, list)
+        and all(isinstance(route, Mapping) for route in pending_routes)
+        else []
+    )
+    pending_identity_count = (
+        sum(
+            int(route.get("identity_count", -1))
+            for route in pending_routes
+        )
+        if pending_route_keys
+        else -1
+    )
+    pending_checks = pending_route_queue.get("checks", {})
+    pending_route_queue_bound = (
+        inputs.get("pending_route_queue", {}).get("sha256")
+        == corrective.get("pending_corrective_route_queue_v3_summary_sha256")
+    )
+    pending_authorization_closed = all(
+        pending_route_queue.get(field) is False
+        for field in PENDING_ROUTE_AUTHORIZATION_FIELDS
+    )
+    pending_route_queue_ready = (
+        pending_route_queue.get("schema")
+        == (
+            "cinebotrl_two_wheel_riser_model_based_corrective_"
+            "pending_route_queue_v1"
+        )
+        and pending_route_queue.get("passed") is True
+        and pending_route_queue_bound
+        and pending_route_queue.get("execution_order")
+        == list(EXPECTED_PENDING_ROUTE_ORDER)
+        and pending_route_keys == list(EXPECTED_PENDING_ROUTE_ORDER)
+        and pending_route_queue.get("ready_route_count")
+        == len(EXPECTED_PENDING_ROUTE_ORDER)
+        and pending_identity_count == 107
+        and all(route.get("passed") is True for route in pending_routes)
+        and isinstance(pending_checks, Mapping)
+        and bool(pending_checks)
+        and all(value is True for value in pending_checks.values())
+        and pending_route_queue.get("next_bounded_action")
+        == "authorize_exactly_one_case23_v4_cpu_conversion"
+        and pending_authorization_closed
+    )
     pre_training_readiness = {
         "architecture_contract_passed": architecture_contract_ready,
         "policy_architecture": admitted_architecture["policy_architecture"],
@@ -940,8 +1010,20 @@ def build_report(
         "minimum_train_cases": 4,
         "minimum_validation_cases": 2,
         "next_case": next_case,
-        "next_operation": "case23_v4_cpu_conversion",
-        "next_operation_authorized": False,
+        "pending_route_queue_passed": pending_route_queue_ready,
+        "pending_route_queue_bound_to_goal": pending_route_queue_bound,
+        "pending_route_queue_ready_count": (
+            pending_route_queue.get("ready_route_count")
+        ),
+        "pending_route_queue_identity_count": pending_identity_count,
+        "pending_route_queue_execution_order": pending_route_keys,
+        "pending_route_queue_all_authorization_closed": (
+            pending_authorization_closed
+        ),
+        "next_operation": pending_route_queue.get("next_bounded_action"),
+        "next_operation_authorized": (
+            pending_route_queue.get("dataset_conversion_authorized") is True
+        ),
         "bc_authorized": current_stage.get("bc_authorized") is True,
         "training_authorized": current_stage.get("training_authorized") is True,
         "ppo_authorized": current_stage.get("ppo_authorized") is True,
@@ -1105,6 +1187,11 @@ def main() -> int:
     parser.add_argument("--exact-source", type=Path, default=DEFAULT_EXACT_SOURCE)
     parser.add_argument("--hardware", type=Path, default=DEFAULT_HARDWARE)
     parser.add_argument("--bench", type=Path, default=DEFAULT_BENCH)
+    parser.add_argument(
+        "--pending-route-queue",
+        type=Path,
+        default=DEFAULT_PENDING_ROUTE_QUEUE,
+    )
     parser.add_argument("--training-dataset", type=Path)
     parser.add_argument("--bc-admission", type=Path)
     parser.add_argument("--bc-report", type=Path)
@@ -1133,6 +1220,7 @@ def main() -> int:
         "exact_source": args.exact_source,
         "hardware": args.hardware,
         "bench": args.bench,
+        "pending_route_queue": args.pending_route_queue,
     }
     inputs = {name: _identity(path) for name, path in fixed_paths.items()}
     learning, optional_identities = _optional_learning_evidence(
@@ -1161,6 +1249,7 @@ def main() -> int:
         exact_source=_load_json(args.exact_source),
         hardware=_load_json(args.hardware),
         bench=_load_json(args.bench),
+        pending_route_queue=_load_json(args.pending_route_queue),
         git_state=_git_state(),
         learning=learning,
         inputs=inputs,

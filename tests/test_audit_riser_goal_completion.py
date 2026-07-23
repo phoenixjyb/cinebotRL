@@ -49,6 +49,7 @@ def _current_inputs():
         "exact_source": MODULE.DEFAULT_EXACT_SOURCE,
         "hardware": MODULE.DEFAULT_HARDWARE,
         "bench": MODULE.DEFAULT_BENCH,
+        "pending_route_queue": MODULE.DEFAULT_PENDING_ROUTE_QUEUE,
     }
     payloads = {name: MODULE._load_json(path) for name, path in paths.items()}
     identities = {name: MODULE._identity(path) for name, path in paths.items()}
@@ -123,7 +124,20 @@ def test_current_goal_audit_passes_foundations_but_not_learning() -> None:
         "minimum_train_cases": 4,
         "minimum_validation_cases": 2,
         "next_case": 23,
-        "next_operation": "case23_v4_cpu_conversion",
+        "pending_route_queue_passed": True,
+        "pending_route_queue_bound_to_goal": True,
+        "pending_route_queue_ready_count": 6,
+        "pending_route_queue_identity_count": 107,
+        "pending_route_queue_execution_order": [
+            "case23_conversion",
+            "case6_pair",
+            "case2_pair",
+            "case7_pair",
+            "case8_validation_pair",
+            "case16_validation_pair",
+        ],
+        "pending_route_queue_all_authorization_closed": True,
+        "next_operation": "authorize_exactly_one_case23_v4_cpu_conversion",
         "next_operation_authorized": False,
         "bc_authorized": False,
         "training_authorized": False,
@@ -166,6 +180,20 @@ def test_goal_audit_rejects_residual_architecture_drift() -> None:
     report = _build_current(goal=goal)
     readiness = report["pre_training_readiness"]
     assert readiness["architecture_contract_passed"] is False
+    assert readiness["ready_for_bc_execution"] is False
+
+
+def test_goal_audit_rejects_pending_route_queue_drift() -> None:
+    payloads, _ = _current_inputs()
+    queue = json.loads(json.dumps(payloads["pending_route_queue"]))
+    queue["execution_order"] = list(reversed(queue["execution_order"]))
+    queue["dataset_conversion_authorized"] = True
+    report = _build_current(pending_route_queue=queue)
+    readiness = report["pre_training_readiness"]
+    assert readiness["pending_route_queue_passed"] is False
+    assert readiness["pending_route_queue_bound_to_goal"] is True
+    assert readiness["pending_route_queue_all_authorization_closed"] is False
+    assert readiness["next_operation_authorized"] is True
     assert readiness["ready_for_bc_execution"] is False
 
 

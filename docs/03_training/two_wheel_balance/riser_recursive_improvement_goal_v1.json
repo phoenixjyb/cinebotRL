@@ -408,6 +408,17 @@
         "bench_750w_assembly_valid_for_hardware_transfer": false,
         "bench_750w_assembly_authoritative_cpu_commit": "e189e0732e4a650c01f6dbd7edcf1b0b8f25e69f",
         "bench_750w_assembly_authoritative_cpu_suite": "932_passed_12_skipped_2_warnings_in_81.86s",
+        "external_evidence_checklist_schema": "cinebotrl_two_wheel_riser_750w_external_evidence_checklist_v1",
+        "external_evidence_checklist_builder_sha256": "af20e6f2735130037e354d6385ff8dcb1d593f6f335cf4e42f16b7893af77d49",
+        "external_evidence_checklist_summary_sha256": "e50d656c7d0e66ea051b4a478515ee582102c0e3fe5978ad426c131bda35cabe",
+        "external_evidence_checklist_cn_sha256": "dd6c8b42ae3da8c40a0abff1ef03d8b6a3596cfadb4951528addf5f93ff925b7",
+        "external_evidence_checklist_focused_cpu_suite": "42_passed_2_warnings",
+        "external_evidence_collection_package_ready": true,
+        "external_evidence_supplier_missing_fields_preserved": 52,
+        "external_evidence_bench_missing_fields_preserved": 34,
+        "external_evidence_manual_or_supplier_approval_synthesized": false,
+        "external_evidence_real_supplier_response_collected": false,
+        "external_evidence_real_bench_measurements_collected": false,
         "ready_for_production_design_review": false,
         "valid_for_production_procurement": false,
         "valid_for_hardware_transfer": false
@@ -425,15 +436,15 @@
       ]
     },
     "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
-    "current_root_cause": "the_v2_case23_capture_was_consumed_and_rejected_before_isaac_because_playback_did_not_forward_the_explicit_case_and_split_but_fresh_v3_is_now_cpu_ready_and_waits_for_a_new_exactly_one_runtime_authorization",
+    "current_root_cause": "the_v3_case23_capture_completed_the_full_dynamic_phase_but_wrote_no_archive_because_the_save_route_defaulted_to_case30_and_the_wrapper_reused_the_v2_finalizer_namespace;_v3_is_consumed_and_non_retryable_while_the_repaired_fresh_v4_route_is_cpu_ready_but_runtime_unauthorized",
     "remote_isaac_validation": "42_dynamic_candidates_plus_exact_zero_case8_case78_preservation_plus_passed_case30_and_case23_corrective_pairs_plus_case30_capture",
     "accepted_evidence": "docs/03_training/two_wheel_balance/RISER_RECURSIVE_IMPROVEMENT_LOG_20260716.md"
   },
   "next_iteration": {
-    "hypothesis": "the_cpu_reviewed_fresh_namespace_case23_v3_capture_can_preserve_the_passed_pair_contract_and_produce_effective_post_supervisor_labels_after_explicit_case_and_split_propagation_without_changing_commands_or_dynamic_gates",
-    "required_change": "require_a_new_separate_explicit_authorization_then_execute_exactly_one_case23_v3_capture_with_the_cpu_reviewed_fresh_namespace_contract",
+    "hypothesis": "the_cpu_reviewed_fresh_namespace_case23_v4_capture_can_preserve_the_passed_pair_contract_and_produce_effective_post_supervisor_labels_with_explicit_case_and_split_propagation_and_a_v4_pinned_finalizer_without_changing_commands_or_dynamic_gates",
+    "required_change": "require_a_new_separate_explicit_authorization_then_execute_exactly_one_case23_v4_capture_with_the_cpu_reviewed_fresh_namespace_contract",
     "success_path": "an_admitted_case23_capture_can_be_converted_to_a_train_split_case_dataset_then_the_diverse_tranche_continues",
-    "rejection_path": "preserve_the_pair_and_rejected_attempt_evidence_without_relaxing_gates_reusing_the_consumed_namespace_or_substituting_synthetic_labels",
-    "stop_rule": "the_consumed_authorization_does_not_authorize_a_retry_conversion_merge_bc_ppo_holdout_or_case6_case2_case7_runtime"
+    "rejection_path": "preserve_the_pair_and_rejected_v3_attempt_evidence_without_relaxing_gates_reusing_any_consumed_namespace_or_substituting_synthetic_labels",
+    "stop_rule": "no_v4_authorization_exists_and_the_consumed_v3_authorization_does_not_authorize_v4_conversion_merge_bc_ppo_holdout_or_case6_case2_case7_runtime"
   }
 }

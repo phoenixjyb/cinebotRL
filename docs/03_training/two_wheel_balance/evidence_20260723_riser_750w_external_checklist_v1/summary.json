@@ -1,0 +1,343 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_750w_external_evidence_checklist_v1",
+  "candidate_profile": "leadshine_750w_production_candidate_v1",
+  "inputs": {
+    "supplier_response": {
+      "path": "docs/03_training/two_wheel_balance/RISER_750W_SUPPLIER_RESPONSE_TEMPLATE_20260723.json",
+      "sha256": "12bb571bfe58d5f224c7ef84b9f21afa9695a05cc5354dd0566b3a6232b5d47d"
+    },
+    "production_candidate": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_hardware_production_candidate_v1/summary.json",
+      "sha256": "bc4eaa8673cf389e11d639aec06414c5506fd2461e67bad6c5328d0363fd3bb7"
+    },
+    "bench_measurements": {
+      "path": "docs/03_training/two_wheel_balance/RISER_750W_BENCH_MEASUREMENT_TEMPLATE_20260723.json",
+      "sha256": "de3c9f08f35e5a03aea63fd02c5433c1800d74cbc36662dc7b72fd6748657b9e"
+    },
+    "vendor_snapshot": {
+      "path": "docs/03_training/two_wheel_balance/RISER_PRODUCTION_CANDIDATE_VENDOR_SNAPSHOT_20260723.json",
+      "sha256": "11b08b6a179b395eceb5e797b28d224d8dfcf35c1921a4d6123d6f5a0e363512"
+    }
+  },
+  "immutable_contract": {
+    "motor_model": "ELVM8075V48EH-M17-HD",
+    "drive_model": "ELD2-CAN7020B",
+    "reduction_ratio": 3.0,
+    "linear_lead_m_per_rev": 0.07,
+    "mechanical_stroke_m_min": 1.5,
+    "software_camera_height_range_m": [
+      0.6,
+      1.8
+    ],
+    "software_working_stroke_m": 1.2,
+    "design_moving_mass_kg": 8.0,
+    "maximum_linear_speed_mps": 1.0,
+    "minimum_linear_acceleration_mps2": 2.0,
+    "minimum_linear_jerk_mps3": 8.0,
+    "minimum_emergency_deceleration_mps2": 5.0,
+    "minimum_continuous_vertical_force_n": 300.0,
+    "minimum_vertical_duty_cycle_fraction": 0.6,
+    "minimum_continuous_test_duration_s": 1800.0,
+    "motor_holding_brake_is_static_only": true,
+    "independent_anti_fall_required": true,
+    "safety_rated_power_removal_required": true
+  },
+  "supplier_collection": {
+    "template_complete": false,
+    "audit_passed": false,
+    "missing_or_invalid_field_count": 52,
+    "missing_or_invalid_fields": [
+      "approvals.belt_tooth_jump_margin_approved",
+      "approvals.gearbox_continuous_speed_approved",
+      "approvals.gearbox_emergency_braking_torque_approved",
+      "approvals.independent_anti_fall_approved",
+      "approvals.independent_hard_limits_and_end_stops_approved",
+      "approvals.regenerative_absorption_approved",
+      "approvals.safety_power_removal_approved",
+      "approvals.vertical_mobile_axis_duty_approved",
+      "configuration.axis_architecture",
+      "configuration.axis_model",
+      "configuration.gearbox_model",
+      "configuration.linear_lead_m_per_rev",
+      "configuration.mechanical_stroke_m",
+      "configuration.reduction_ratio",
+      "configuration.software_camera_height_max_m",
+      "configuration.software_camera_height_min_m",
+      "configuration.software_working_stroke_m",
+      "evidence.axis_datasheet_sha256",
+      "evidence.gearbox_datasheet_sha256",
+      "evidence.regeneration_calculation_sha256",
+      "evidence.safety_architecture_sha256",
+      "evidence.selection_calculation_sha256",
+      "evidence.signed_supplier_response_sha256",
+      "evidence.vertical_duty_approval_sha256",
+      "ratings.continuous_vertical_force_n",
+      "ratings.declared_cycle_life",
+      "ratings.maximum_linear_acceleration_mps2",
+      "ratings.maximum_linear_jerk_mps3",
+      "ratings.maximum_linear_speed_mps",
+      "ratings.minimum_emergency_deceleration_mps2",
+      "ratings.rated_eccentric_pitch_moment_nm",
+      "ratings.rated_eccentric_yaw_moment_nm",
+      "ratings.rated_moving_mass_kg",
+      "ratings.vertical_service_continuous_duration_s",
+      "ratings.vertical_service_duty_cycle_fraction",
+      "safety.independent_anti_fall_maximum_catch_distance_m",
+      "safety.independent_anti_fall_model",
+      "safety.independent_anti_fall_rated_holding_force_n",
+      "safety.motor_holding_brake_is_static_only",
+      "safety.motor_holding_brake_used_for_dynamic_stop",
+      "safety.regenerative_absorption_model",
+      "safety.regenerative_bus_voltage_limit_v",
+      "safety.safety_category_or_standard",
+      "safety.safety_power_removal_architecture",
+      "supplier.company",
+      "supplier.engineer",
+      "supplier.response_date",
+      "transmission.belt_tooth_jump_margin_ratio",
+      "transmission.gearbox_backlash_deg",
+      "transmission.gearbox_continuous_input_speed_rpm",
+      "transmission.gearbox_efficiency_fraction",
+      "transmission.gearbox_emergency_input_torque_nm"
+    ],
+    "missing_or_invalid_fields_by_section": {
+      "approvals": [
+        "approvals.belt_tooth_jump_margin_approved",
+        "approvals.gearbox_continuous_speed_approved",
+        "approvals.gearbox_emergency_braking_torque_approved",
+        "approvals.independent_anti_fall_approved",
+        "approvals.independent_hard_limits_and_end_stops_approved",
+        "approvals.regenerative_absorption_approved",
+        "approvals.safety_power_removal_approved",
+        "approvals.vertical_mobile_axis_duty_approved"
+      ],
+      "configuration": [
+        "configuration.axis_architecture",
+        "configuration.axis_model",
+        "configuration.gearbox_model",
+        "configuration.linear_lead_m_per_rev",
+        "configuration.mechanical_stroke_m",
+        "configuration.reduction_ratio",
+        "configuration.software_camera_height_max_m",
+        "configuration.software_camera_height_min_m",
+        "configuration.software_working_stroke_m"
+      ],
+      "evidence": [
+        "evidence.axis_datasheet_sha256",
+        "evidence.gearbox_datasheet_sha256",
+        "evidence.regeneration_calculation_sha256",
+        "evidence.safety_architecture_sha256",
+        "evidence.selection_calculation_sha256",
+        "evidence.signed_supplier_response_sha256",
+        "evidence.vertical_duty_approval_sha256"
+      ],
+      "ratings": [
+        "ratings.continuous_vertical_force_n",
+        "ratings.declared_cycle_life",
+        "ratings.maximum_linear_acceleration_mps2",
+        "ratings.maximum_linear_jerk_mps3",
+        "ratings.maximum_linear_speed_mps",
+        "ratings.minimum_emergency_deceleration_mps2",
+        "ratings.rated_eccentric_pitch_moment_nm",
+        "ratings.rated_eccentric_yaw_moment_nm",
+        "ratings.rated_moving_mass_kg",
+        "ratings.vertical_service_continuous_duration_s",
+        "ratings.vertical_service_duty_cycle_fraction"
+      ],
+      "safety": [
+        "safety.independent_anti_fall_maximum_catch_distance_m",
+        "safety.independent_anti_fall_model",
+        "safety.independent_anti_fall_rated_holding_force_n",
+        "safety.motor_holding_brake_is_static_only",
+        "safety.motor_holding_brake_used_for_dynamic_stop",
+        "safety.regenerative_absorption_model",
+        "safety.regenerative_bus_voltage_limit_v",
+        "safety.safety_category_or_standard",
+        "safety.safety_power_removal_architecture"
+      ],
+      "supplier": [
+        "supplier.company",
+        "supplier.engineer",
+        "supplier.response_date"
+      ],
+      "transmission": [
+        "transmission.belt_tooth_jump_margin_ratio",
+        "transmission.gearbox_backlash_deg",
+        "transmission.gearbox_continuous_input_speed_rpm",
+        "transmission.gearbox_efficiency_fraction",
+        "transmission.gearbox_emergency_input_torque_nm"
+      ]
+    }
+  },
+  "bench_collection": {
+    "template_complete": false,
+    "audit_passed": false,
+    "missing_or_invalid_field_count": 34,
+    "missing_or_invalid_fields": [
+      "configuration.complete_moving_mass_kg",
+      "configuration.counterbalance_force_n",
+      "configuration.measured_friction_force_n",
+      "configuration.mechanical_stroke_m",
+      "configuration.software_camera_height_max_m",
+      "configuration.software_camera_height_min_m",
+      "continuous_duty.ambient_temperature_c",
+      "continuous_duty.commanded_speed_mps",
+      "continuous_duty.dc_bus_voltage_max_v",
+      "continuous_duty.dc_input_current_rms_a",
+      "continuous_duty.drive_temperature_max_c",
+      "continuous_duty.duration_s",
+      "continuous_duty.duty_cycle_fraction",
+      "continuous_duty.final_thermal_slope_c_per_min",
+      "continuous_duty.minimum_achieved_speed_mps",
+      "continuous_duty.motor_housing_temperature_max_c",
+      "continuous_duty.phase_current_peak_a",
+      "continuous_duty.phase_current_rms_a",
+      "emergency_stop.dc_bus_voltage_max_v",
+      "emergency_stop.initial_speed_abs_min_mps",
+      "emergency_stop.phase_current_peak_a",
+      "emergency_stop.repetitions",
+      "emergency_stop.worst_stopping_distance_m",
+      "evidence.current_calibration_record_sha256",
+      "evidence.force_calibration_record_sha256",
+      "evidence.position_calibration_record_sha256",
+      "evidence.raw_log_sha256",
+      "evidence.safety_test_video_sha256",
+      "evidence.supplier_approval_package_sha256",
+      "evidence.temperature_calibration_record_sha256",
+      "power_loss_safety.independent_anti_fall_test_count",
+      "power_loss_safety.independent_anti_fall_worst_catch_distance_m",
+      "power_loss_safety.motor_brake_hold_displacement_m",
+      "power_loss_safety.motor_brake_hold_duration_s"
+    ],
+    "missing_or_invalid_fields_by_section": {
+      "configuration": [
+        "configuration.complete_moving_mass_kg",
+        "configuration.counterbalance_force_n",
+        "configuration.measured_friction_force_n",
+        "configuration.mechanical_stroke_m",
+        "configuration.software_camera_height_max_m",
+        "configuration.software_camera_height_min_m"
+      ],
+      "continuous_duty": [
+        "continuous_duty.ambient_temperature_c",
+        "continuous_duty.commanded_speed_mps",
+        "continuous_duty.dc_bus_voltage_max_v",
+        "continuous_duty.dc_input_current_rms_a",
+        "continuous_duty.drive_temperature_max_c",
+        "continuous_duty.duration_s",
+        "continuous_duty.duty_cycle_fraction",
+        "continuous_duty.final_thermal_slope_c_per_min",
+        "continuous_duty.minimum_achieved_speed_mps",
+        "continuous_duty.motor_housing_temperature_max_c",
+        "continuous_duty.phase_current_peak_a",
+        "continuous_duty.phase_current_rms_a"
+      ],
+      "emergency_stop": [
+        "emergency_stop.dc_bus_voltage_max_v",
+        "emergency_stop.initial_speed_abs_min_mps",
+        "emergency_stop.phase_current_peak_a",
+        "emergency_stop.repetitions",
+        "emergency_stop.worst_stopping_distance_m"
+      ],
+      "evidence": [
+        "evidence.current_calibration_record_sha256",
+        "evidence.force_calibration_record_sha256",
+        "evidence.position_calibration_record_sha256",
+        "evidence.raw_log_sha256",
+        "evidence.safety_test_video_sha256",
+        "evidence.supplier_approval_package_sha256",
+        "evidence.temperature_calibration_record_sha256"
+      ],
+      "power_loss_safety": [
+        "power_loss_safety.independent_anti_fall_test_count",
+        "power_loss_safety.independent_anti_fall_worst_catch_distance_m",
+        "power_loss_safety.motor_brake_hold_displacement_m",
+        "power_loss_safety.motor_brake_hold_duration_s"
+      ]
+    }
+  },
+  "collection_sequence": [
+    {
+      "order": 1,
+      "action": "collect_signed_supplier_response_and_datasheets",
+      "output": "<supplier_response.json>"
+    },
+    {
+      "order": 2,
+      "action": "assemble_complete_instrumented_vertical_axis",
+      "output": "<physical_750w_riser_axis>"
+    },
+    {
+      "order": 3,
+      "action": "collect_calibrated_raw_bench_log_and_manual_safety_evidence",
+      "output": "<raw_bench_log.csv>"
+    },
+    {
+      "order": 4,
+      "action": "reduce_candidate_bound_raw_bench_log",
+      "output": "<numeric_reduction.json>"
+    },
+    {
+      "order": 5,
+      "action": "assemble_hash_bound_supplier_and_bench_evidence",
+      "output": "<assembled_measurements.json> and <final_audit.json>"
+    }
+  ],
+  "commands": {
+    "audit_supplier_response": [
+      "python3",
+      "scripts/two_wheel_balance/audit_riser_supplier_response.py",
+      "--response",
+      "<supplier_response.json>",
+      "--output",
+      "<supplier_audit.json>"
+    ],
+    "reduce_raw_bench_log": [
+      "python3",
+      "scripts/two_wheel_balance/reduce_riser_bench_log.py",
+      "--candidate-profile",
+      "leadshine_750w_production_candidate_v1",
+      "--input",
+      "<raw_bench_log.csv>",
+      "--output",
+      "<numeric_reduction.json>"
+    ],
+    "assemble_final_evidence": [
+      "python3",
+      "scripts/two_wheel_balance/assemble_riser_750w_bench_evidence.py",
+      "--manual-measurements",
+      "<completed_manual_measurements.json>",
+      "--numeric-reduction",
+      "<numeric_reduction.json>",
+      "--supplier-audit",
+      "<supplier_audit.json>",
+      "--output-measurements",
+      "<assembled_measurements.json>",
+      "--output-audit",
+      "<final_audit.json>"
+    ]
+  },
+  "checks": {
+    "input_paths_and_hashes_present": true,
+    "template_state_is_fail_closed": true,
+    "expected_missing_fields_are_preserved": true,
+    "manual_values_remain_unmeasured": true,
+    "supplier_or_bench_approval_not_synthesized": true
+  },
+  "external_collection_package_ready": true,
+  "real_supplier_evidence_collected": false,
+  "real_bench_evidence_collected": false,
+  "hardware_qualified": false,
+  "ready_for_production_design_review": false,
+  "valid_for_production_procurement": false,
+  "valid_for_hardware_transfer": false,
+  "simulation_motor_model_updated": false,
+  "runtime_authorized": false,
+  "gpu_work_started": false,
+  "capture_authorized": false,
+  "dataset_creation_authorized": false,
+  "valid_for_training": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false
+}

@@ -94,6 +94,21 @@ BENCH_750W_ASSEMBLY_CONTRACT = (
     / "docs/03_training/two_wheel_balance/"
     "RISER_750W_BENCH_ASSEMBLY_CONTRACT_CN_20260723.md"
 )
+EXTERNAL_EVIDENCE_CHECKLIST_BUILDER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "build_riser_750w_external_evidence_checklist.py"
+)
+EXTERNAL_EVIDENCE_CHECKLIST = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260723_riser_750w_external_checklist_v1/summary.json"
+)
+EXTERNAL_EVIDENCE_CHECKLIST_CN = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "RISER_750W_EXTERNAL_EVIDENCE_CHECKLIST_CN_20260723.md"
+)
 
 
 def _goal() -> dict:
@@ -271,7 +286,7 @@ def test_case23_is_the_only_next_runtime_gate_and_learning_stays_closed() -> Non
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "exactly_one_case23_v3_capture" in (
+    assert "exactly_one_case23_v4_capture" in (
         goal["next_iteration"]["required_change"]
     )
 
@@ -373,6 +388,38 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     assert hardware["bench_750w_assembly_authoritative_cpu_suite"] == (
         "932_passed_12_skipped_2_warnings_in_81.86s"
     )
+    assert hardware["external_evidence_checklist_schema"] == (
+        "cinebotrl_two_wheel_riser_750w_external_evidence_checklist_v1"
+    )
+    assert hardware["external_evidence_checklist_builder_sha256"] == _sha256(
+        EXTERNAL_EVIDENCE_CHECKLIST_BUILDER
+    )
+    assert hardware["external_evidence_checklist_summary_sha256"] == _sha256(
+        EXTERNAL_EVIDENCE_CHECKLIST
+    )
+    assert hardware["external_evidence_checklist_cn_sha256"] == _sha256(
+        EXTERNAL_EVIDENCE_CHECKLIST_CN
+    )
+    checklist = json.loads(EXTERNAL_EVIDENCE_CHECKLIST.read_text())
+    assert checklist["external_collection_package_ready"] is True
+    assert checklist["hardware_qualified"] is False
+    assert (
+        hardware["external_evidence_supplier_missing_fields_preserved"]
+        == checklist["supplier_collection"]["missing_or_invalid_field_count"]
+        == 52
+    )
+    assert (
+        hardware["external_evidence_bench_missing_fields_preserved"]
+        == checklist["bench_collection"]["missing_or_invalid_field_count"]
+        == 34
+    )
+    assert hardware["external_evidence_collection_package_ready"] is True
+    assert (
+        hardware["external_evidence_manual_or_supplier_approval_synthesized"]
+        is False
+    )
+    assert hardware["external_evidence_real_supplier_response_collected"] is False
+    assert hardware["external_evidence_real_bench_measurements_collected"] is False
     assert hardware["ready_for_production_design_review"] is False
     assert hardware["valid_for_production_procurement"] is False
     assert hardware["valid_for_hardware_transfer"] is False

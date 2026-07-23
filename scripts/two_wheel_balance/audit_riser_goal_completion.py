@@ -337,7 +337,9 @@ def build_report(
             passed=git_state.get("branch") == EXPECTED_BRANCH
             and git_state.get("head") == git_state.get("upstream")
             and git_state.get("tracked_dirty") is False,
-            evidence=[str(git_state.get("root", ""))],
+            evidence=[
+                f"git:{git_state.get('branch', '')}@{git_state.get('head', '')}"
+            ],
             detail="dedicated riser branch is clean and synchronized",
         ),
         "arm_free_robot_asset": _gate(
@@ -465,6 +467,12 @@ def build_report(
         "runtime_started": False,
         "bc_started_by_audit": False,
         "ppo_started_by_audit": False,
+        "git": {
+            "branch": git_state.get("branch"),
+            "head": git_state.get("head"),
+            "upstream": git_state.get("upstream"),
+            "tracked_dirty": git_state.get("tracked_dirty"),
+        },
         "inputs": dict(inputs),
     }
 

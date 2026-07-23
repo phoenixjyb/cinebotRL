@@ -78,6 +78,15 @@ def test_current_goal_audit_passes_foundations_but_not_learning() -> None:
     assert report["runtime_started"] is False
     assert report["bc_started_by_audit"] is False
     assert report["ppo_started_by_audit"] is False
+    assert report["git"] == {
+        "branch": MODULE.EXPECTED_BRANCH,
+        "head": "a" * 40,
+        "upstream": "a" * 40,
+        "tracked_dirty": False,
+    }
+    assert report["gates"]["isolated_worktree_and_branch"]["evidence"] == [
+        f"git:{MODULE.EXPECTED_BRANCH}@{'a' * 40}"
+    ]
 
 
 def test_goal_audit_rejects_arm_or_1p9m_contract_drift() -> None:

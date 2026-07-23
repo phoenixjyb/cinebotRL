@@ -1801,6 +1801,18 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         "pending_corrective_route_queue_v3_route_identities_unchanged_from_v2"
     ] is True
     assert corrective[
+        "pending_corrective_route_queue_v3_goal_binding_commit"
+    ] == "c6dd84b9cab94fefb2a215d2256c343b40ff72fa"
+    assert corrective[
+        "pending_corrective_route_queue_v3_focused_mac_cpu_suite"
+    ] == "30_passed_2_warnings_in_0.62s"
+    assert corrective[
+        "pending_corrective_route_queue_v3_focused_windows_cpu_suite"
+    ] == "30_passed_2_warnings_in_2.56s"
+    assert corrective[
+        "pending_corrective_route_queue_v3_authoritative_windows_cpu_suite"
+    ] == "1331_passed_12_skipped_2_warnings_in_177.86s"
+    assert corrective[
         "pending_corrective_route_queue_v3_runtime_started"
     ] is False
     assert corrective[

@@ -9514,3 +9514,43 @@ and must state whether its candidate was accepted or rejected.
 - After the real case-disjoint corpus exists, every learned policy must pass
   recursive offline validation followed by the new balance-first dynamic
   validation, holdout, all-79, and render chain.
+
+## Round 247: the pending corrective queue is refreshed without conversion
+
+- Re-ran the case-23 conversion no-token preflight and all five pending paired
+  route preflights on `.98` from clean synchronized commit
+  `a8a7533642694dfb05c7a999803ebd95fed456fc`.
+- All six routes pass in the required order: case-23 conversion; train cases
+  6, 2, and 7; validation cases 8 and 16. Their complete set of `107`
+  SHA/blob identities is unchanged from the admitted v2 queue; only clean
+  commit context advanced.
+- Preserved the refreshed queue under
+  `evidence_20260724_pending_corrective_route_queue_cpu_v3`. Its summary
+  SHA-256 is
+  `ef32652ac98d1103d431f7b3ae96d63c3311e3a7fba0b9a92061a1e1b16892cd`.
+- Preserved the independent case-23 no-token preflight under
+  `evidence_20260724_case23_corrective_conversion_execution_cpu_v4`. Its
+  summary SHA-256 is
+  `b9ca26d3aed077c216c785cc611d4e63d6708bd66050bdd07d6a57a40dd565c3`.
+  CPU contract readiness is true while all authorization checks remain false,
+  as required when no one-time token exists.
+- Evidence/test commit
+  `c094d0d9c63cba589bb04f5ede078ba2693fb219` and goal-binding commit
+  `c6dd84b9cab94fefb2a215d2256c343b40ff72fa` are pushed and synchronized.
+- Focused macOS coverage passes
+  `30 passed, 2 warnings in 0.62 s`; focused `.98` Windows coverage passes
+  `30 passed, 2 warnings in 2.56 s`. The authoritative `.98` Windows-Isaac
+  Python CPU suite passes:
+  `1331 passed, 12 skipped, 2 warnings in 177.86 s`.
+- No authorization token, CPU conversion output, runtime namespace,
+  Isaac/GPU workload, capture, corpus merge, BC, checkpoint, PPO, or training
+  run was created. Goal completion remains `6/10`.
+
+## Next round after Round 247
+
+- The exact next data-producing operation remains separately authorized:
+  `Authorize exactly one case-23 v4 CPU conversion.`
+- The preserved queue is readiness evidence only. Any authorized conversion
+  must reopen the fail-closed wrapper against its then-current clean,
+  synchronized `HEAD`; conversion does not itself authorize merge or
+  training.

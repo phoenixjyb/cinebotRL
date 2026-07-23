@@ -7409,3 +7409,50 @@ and must state whether its candidate was accepted or rejected.
 - If authorized, retain every pinned identity, threshold, command, namespace,
   and capture-only gate; consume the one-use token before Isaac and stop after
   case 23 regardless of pass or rejection.
+
+## Round 189: 750 W riser production-design candidate pinned CPU-only
+
+- The previously vague `750 W class` fallback is now a pinned candidate:
+  Leadshine `ELVM8075V48EH-M17-HD` plus `ELD2-CAN7020B`. Current official
+  sources support 48 V, 750 W, 2.39/7.17 N m rated/peak torque, brake,
+  multi-turn absolute encoder, and a matched 20 Arms/80 Apeak CANopen drive.
+- With the unchanged `3:1`, 70 mm/rev, 90% transmission, and 95% reduction
+  assumptions, the candidate computes to `550.258929 N` continuous equivalent
+  linear force and `1650.776788 N` peak equivalent force. At `1 m/s`, motor
+  speed is `2571.428571 rpm`, below the 3000 rpm rating.
+- Against the unchanged conservative 8 kg emergency design force
+  `276.960000 N`, rated-force margin is `1.986781`, above the project minimum
+  `1.15`. The same formula gives a maximum moving mass of `14.803715 kg` at
+  that minimum margin. These are calculated screening values, not measured
+  carriage capability.
+- The mechanism remains a supplier-qualified guided belt axis with `1.50 m`
+  mechanical stroke, or a supplier-qualified synchronized two-stage
+  telescoping mast if collapsed height requires it. Software camera height
+  remains exactly `0.60--1.80 m`; `1.9 m` is explicitly rejected.
+- The motor must remain base-mounted rather than moving with the carriage.
+  External regeneration, independent anti-fall, hard limits, absorbing end
+  stops, safety-rated power removal, gearbox verification, vertical-duty
+  approval, and the calibrated bench campaign remain mandatory.
+- Evidence SHA-256 is
+  `bc4eaa8673cf389e11d639aec06414c5506fd2461e67bad6c5328d0363fd3bb7`.
+  Classification is only
+  `candidate_ready_for_supplier_and_bench_review=true`; production
+  procurement, hardware transfer, simulation motor replacement, runtime, GPU,
+  and training remain false.
+- The first `.98` full suite correctly rejected CRLF output from the new
+  evidence writer: `879 passed, 1 failed, 12 skipped`. Commit
+  `50eb597eda7578e3e4f850aa47b3158ac5e203e7` forces LF output and updates the
+  sealed script hash. Focused `.98` tests then passed `8/8`, every SHA-256
+  verified, and the final authoritative suite passed
+  `880 passed, 12 skipped, 2 warnings` in `84.72 s`.
+- No robot asset, controller, trajectory, gate, authorization, Isaac process,
+  capture, dataset, BC, PPO, or learned policy changed in this round.
+
+## Next round after Round 189
+
+- Hardware: send the pinned 750 W candidate and mechanism contract for supplier
+  vertical-axis/gearbox review, but do not place production orders. Populate
+  the calibrated bench template when hardware and instruments exist.
+- Learning: remain at the separately reviewed case-23 capture boundary. Do not
+  infer runtime authorization from the hardware candidate or its passing CPU
+  audit.

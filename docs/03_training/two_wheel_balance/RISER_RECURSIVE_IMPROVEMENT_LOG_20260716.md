@@ -7581,6 +7581,9 @@ and must state whether its candidate was accepted or rejected.
   The no-token preflight passed every pinned identity and the new drive-profile
   semantics at clean
   `HEAD == upstream == eff05387a93fd8281ae32482121c67105d85819d`.
+- The authoritative `.98` suite at evidence commit
+  `b801ae02c6beb03cc05cfa70017683541057d23e` passed
+  `892 passed, 12 skipped, 2 warnings` in `81.10 s`.
 - The pair namespace remains the single completed case-23 pair. The capture
   namespace and token remain absent. Runtime, GPU, label capture, dataset
   conversion, corpus merge, BC, PPO, and training remain unauthorized.

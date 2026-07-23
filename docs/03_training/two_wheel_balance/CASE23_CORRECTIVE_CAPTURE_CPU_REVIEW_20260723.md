@@ -27,6 +27,9 @@ fail-closed.
   `01a7f0e957b49c21ccaf68a91c8e476bfaa894aa`
 - Active 400 W drive-profile evidence SHA-256:
   `39a700de3985175e4e8415f1f23beef4264b103daa7ce8847f4ac0fe69f879f7`
+- Authoritative `.98` CPU suite at commit
+  `b801ae02c6beb03cc05cfa70017683541057d23e`:
+  `892 passed, 12 skipped, 2 warnings` in `81.10 s`
 - Fresh namespace, still absent:
   `20260723_model_based_corrective_teacher_case23_capture_v1_exclusive`
 

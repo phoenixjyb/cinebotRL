@@ -245,6 +245,8 @@
         "case23_capture_drive_profile_sha256": "39a700de3985175e4e8415f1f23beef4264b103daa7ce8847f4ac0fe69f879f7",
         "case23_capture_cpu_preflight_passed": true,
         "case23_capture_focused_cpu_suite": "15_passed_2_warnings",
+        "case23_capture_authoritative_cpu_commit": "b801ae02c6beb03cc05cfa70017683541057d23e",
+        "case23_capture_authoritative_cpu_suite": "892_passed_12_skipped_2_warnings",
         "case23_capture_authorized": false,
         "case23_conversion_authorized": false,
         "capture_authorized": false,

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -102,8 +103,16 @@ def _identity(relative: str) -> dict[str, str]:
     path = PROJECT_ROOT / relative
     if not path.is_file():
         raise FileNotFoundError(path)
+    command = ["git"]
+    if os.name == "nt":
+        command.extend(
+            ["-c", f"safe.directory={PROJECT_ROOT.resolve()}"]
+        )
+    command.extend(
+        ["-C", str(PROJECT_ROOT), "hash-object", str(path)]
+    )
     blob = subprocess.run(
-        ["git", "-C", str(PROJECT_ROOT), "hash-object", str(path)],
+        command,
         check=True,
         capture_output=True,
         text=True,

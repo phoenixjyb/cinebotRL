@@ -141,8 +141,8 @@
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case8_validation_pair.py",
-      "sha256": "f2e36fdbd2f9459f44021b0f920c3aab62ffdf303a859d905ce15eb6d367b286",
-      "git_blob_sha1": "babfb16ffa9edfffb55077a926483cc305cb89b8"
+      "sha256": "70664a65b1b91f29f26f6f05a431410fd0877bda4727ed89bae8a8a04154a7d3",
+      "git_blob_sha1": "3171d022d6a07ee0ea9dd675aa3e28d7fbfedfb2"
     },
     "paired_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case8_validation_pair.py",

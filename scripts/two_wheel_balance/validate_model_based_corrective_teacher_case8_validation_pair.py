@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 from typing import Mapping
@@ -104,8 +105,12 @@ def _sha256(path: Path) -> str:
 def _git(
     repo: Path, *args: str, check: bool = True
 ) -> subprocess.CompletedProcess[str]:
+    command = ["git"]
+    if os.name == "nt":
+        command.extend(["-c", f"safe.directory={repo.resolve()}"])
+    command.extend(["-C", str(repo), *args])
     return subprocess.run(
-        ["git", "-C", str(repo), *args],
+        command,
         capture_output=True,
         text=True,
         check=check,

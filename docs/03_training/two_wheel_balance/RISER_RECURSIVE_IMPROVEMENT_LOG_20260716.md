@@ -8575,5 +8575,8 @@ and must state whether its candidate was accepted or rejected.
   macOS and `.98`. Evidence is preserved under
   `evidence_20260724_model_based_corrective_corpus_intake_v1/` at SHA-256
   `3d8f3da9c23ddb9d63a26afb3bec15324d8ce61a3e0b900c7cdf67f91c9e20bf`.
+- Evidence commit `fa4c834ae78ed65c74bd1e369c9e4868ea0c2d44`
+  passes the authoritative `.98` suite:
+  `1107 passed, 12 skipped, 2 warnings in 112.64 s`.
 - The intake audit passes, but `corpus_manifest_ready=false`. It authorizes no
   conversion, merge, capture, runtime, BC, PPO, or training.

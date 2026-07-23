@@ -501,6 +501,12 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ]
     assert corrective["corrective_corpus_intake_manifest_ready"] is False
     assert corrective["corrective_corpus_intake_merge_authorized"] is False
+    assert corrective["corrective_corpus_intake_authoritative_cpu_commit"] == (
+        "fa4c834ae78ed65c74bd1e369c9e4868ea0c2d44"
+    )
+    assert corrective["corrective_corpus_intake_authoritative_cpu_suite"] == (
+        "1107_passed_12_skipped_2_warnings_in_112.64s"
+    )
     intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
     assert intake["passed"] is True
     assert intake["corpus_manifest_ready"] is False

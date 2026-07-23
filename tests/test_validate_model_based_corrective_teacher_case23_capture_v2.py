@@ -45,13 +45,9 @@ def _sha256(path: Path) -> str:
 
 
 def _git_blob(path: Path) -> str:
-    return subprocess.run(
-        ["git", "hash-object", path.relative_to(ROOT).as_posix()],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    payload = path.read_bytes()
+    header = f"blob {len(payload)}\0".encode()
+    return hashlib.sha1(header + payload).hexdigest()
 
 
 def test_v2_contract_is_fresh_route_and_keeps_runtime_closed() -> None:

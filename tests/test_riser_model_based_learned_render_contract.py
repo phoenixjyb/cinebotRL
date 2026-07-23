@@ -38,6 +38,29 @@ FINALIZER = (
 )
 
 
+def _balance_safety_snapshot() -> dict:
+    return {
+        "payload_dynamic_quality_passed": True,
+        "payload_thermal_admission_passed": True,
+        "result_dynamic_quality_passed": True,
+        "result_thermal_admission_passed": True,
+        "controller_evidence_passed": True,
+        "completed_reference": True,
+        "termination_absent": True,
+        "no_termination_check": True,
+        "pitch_bounded_check": True,
+        "saturation_checks_passed": True,
+        "thermal_checks_passed": True,
+        "pitch_max_deg": 4.0,
+        "action_saturation_ratio": 0.0,
+        "riser_saturation_ratio": 0.0,
+        "proxy_saturation_ratio": 0.0,
+        "riser_thermal_load_max": 0.5,
+        "riser_peak_force_violation_count": 0,
+        "passed": True,
+    }
+
+
 def _module(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -73,13 +96,18 @@ def _fixture(tmp_path: Path, *, authorized: bool):
         paths[name] = path
     policy_sha = contract.sha256_file(paths["policy"])
     all79 = {
-        "schema": "cinebotrl_two_wheel_riser_residual_all79_gate_v1",
+        "schema": contract.ALL79_GATE_SCHEMA,
         "policy_sha256": policy_sha,
         "execution_commit": EXECUTION_COMMIT,
         "cases": list(range(1, 80)),
         "passed": True,
         "rows": [
-            {"case": case, "checks": {"passed": True}}
+            {
+                "case": case,
+                "checks": {"passed": True},
+                "teacher_safety": _balance_safety_snapshot(),
+                "learned_safety": _balance_safety_snapshot(),
+            }
             for case in range(1, 80)
         ],
     }
@@ -191,7 +219,7 @@ def test_render_admission_rejects_invalid_policy_artifact(
 
 @pytest.mark.parametrize(
     "mutation",
-    ("policy", "all79", "case", "config", "code", "ppo", "row"),
+    ("policy", "all79", "case", "config", "code", "ppo", "row", "safety"),
 )
 def test_render_admission_rejects_forged_or_unsafe_state(
     tmp_path: Path,
@@ -210,6 +238,8 @@ def test_render_admission_rejects_forged_or_unsafe_state(
         admission["code"]["playback"]["sha256"] = "0" * 64
     elif mutation == "ppo":
         admission["ppo_authorized"] = True
+    elif mutation == "safety":
+        all79["rows"][1]["learned_safety"]["termination_absent"] = False
     else:
         all79["rows"][72]["checks"]["passed"] = False
     with pytest.raises(ValueError, match="admission failed"):

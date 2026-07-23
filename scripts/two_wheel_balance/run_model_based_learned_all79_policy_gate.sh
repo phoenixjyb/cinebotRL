@@ -151,6 +151,8 @@ for case_number in $(seq 1 79); do
     --cases "$case_number" \
     --controller-wz-kp 1.05 \
     --maximum-duration-scale 3.0 \
+    --maximum-pitch-deg 12.0 \
+    --maximum-saturation-ratio 0.20 \
     --enable-camera-lever-arm-compensation \
     --camera-lever-arm-compensation-gain 1.0 \
     --maximum-camera-lever-arm-correction-m 0.05 \
@@ -176,6 +178,8 @@ for case_number in $(seq 1 79); do
     --cases "$case_number" \
     --controller-wz-kp 1.05 \
     --maximum-duration-scale 3.0 \
+    --maximum-pitch-deg 12.0 \
+    --maximum-saturation-ratio 0.20 \
     --enable-camera-lever-arm-compensation \
     --camera-lever-arm-compensation-gain 1.0 \
     --maximum-camera-lever-arm-correction-m 0.05 \
@@ -201,6 +205,8 @@ python3 "$GATE" \
   riser_recovery_direction_v4_camera_lever_arm_v1 \
   --policy-command-contract \
   model_based_planner_plus_bounded_policy_residual_v1 \
+  --maximum-pitch-deg 12.0 \
+  --maximum-saturation-ratio 0.20 \
   --rollout-admission "$output/admission.json" \
   --preflight-receipt "$output/preflight.json" \
   --plan-manifest "$RISER_MODEL_BASED_LEARNED_ALL79_PLAN_MANIFEST" \

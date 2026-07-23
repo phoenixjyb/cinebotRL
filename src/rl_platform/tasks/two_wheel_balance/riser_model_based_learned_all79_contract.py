@@ -23,9 +23,31 @@ MODEL_BASED_LEARNED_ALL79_ADMISSION_SCHEMA = (
 )
 BC_REPORT_SCHEMA = MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA
 VALIDATION_GATE_SCHEMA = (
-    "cinebotrl_two_wheel_riser_residual_validation_canary_gate_v1"
+    "cinebotrl_two_wheel_riser_residual_validation_canary_gate_v2"
 )
-HOLDOUT_GATE_SCHEMA = "cinebotrl_two_wheel_riser_residual_holdout_gate_v1"
+HOLDOUT_GATE_SCHEMA = "cinebotrl_two_wheel_riser_residual_holdout_gate_v2"
+ALL79_GATE_SCHEMA = "cinebotrl_two_wheel_riser_residual_all79_gate_v2"
+BALANCE_SAFETY_CONTRACT = "balance_first_rollout_safety_v1"
+BALANCE_SAFETY_SNAPSHOT_FIELDS = {
+    "payload_dynamic_quality_passed",
+    "payload_thermal_admission_passed",
+    "result_dynamic_quality_passed",
+    "result_thermal_admission_passed",
+    "controller_evidence_passed",
+    "completed_reference",
+    "termination_absent",
+    "no_termination_check",
+    "pitch_bounded_check",
+    "saturation_checks_passed",
+    "thermal_checks_passed",
+    "pitch_max_deg",
+    "action_saturation_ratio",
+    "riser_saturation_ratio",
+    "proxy_saturation_ratio",
+    "riser_thermal_load_max",
+    "riser_peak_force_violation_count",
+    "passed",
+}
 CODE_IDENTITY_KEYS = {
     "playback",
     "rollout_gate",
@@ -51,6 +73,10 @@ DEFAULT_EVALUATION_CONFIG = {
     "position_error_max_m_max": 0.25,
     "attitude_error_p95_deg_max": 5.0,
     "attitude_error_max_deg_max": 10.0,
+    "maximum_pitch_deg": 12.0,
+    "maximum_saturation_ratio": 0.20,
+    "maximum_riser_thermal_load": 1.0,
+    "maximum_riser_peak_force_violations": 0,
 }
 ADMISSION_FIELDS = {
     "schema",
@@ -108,6 +134,11 @@ GATE_REPORT_FIELDS = {
     "expected_tracking_profile",
     "policy_command_contract",
     "residual_action_scales",
+    "balance_safety_contract",
+    "maximum_pitch_deg",
+    "maximum_saturation_ratio",
+    "maximum_riser_thermal_load",
+    "maximum_riser_peak_force_violations",
     "rollout_admission",
     "preflight_receipt",
     "plan_manifest",
@@ -118,6 +149,56 @@ GATE_REPORT_FIELDS = {
     "passed",
     "ppo_authorized",
 }
+
+
+def balance_safety_snapshot_valid(snapshot: object) -> bool:
+    if not isinstance(snapshot, Mapping) or set(snapshot) != (
+        BALANCE_SAFETY_SNAPSHOT_FIELDS
+    ):
+        return False
+    boolean_fields = BALANCE_SAFETY_SNAPSHOT_FIELDS - {
+        "pitch_max_deg",
+        "action_saturation_ratio",
+        "riser_saturation_ratio",
+        "proxy_saturation_ratio",
+        "riser_thermal_load_max",
+        "riser_peak_force_violation_count",
+    }
+    numeric_fields = {
+        "pitch_max_deg",
+        "action_saturation_ratio",
+        "riser_saturation_ratio",
+        "proxy_saturation_ratio",
+        "riser_thermal_load_max",
+    }
+    return (
+        all(snapshot.get(name) is True for name in boolean_fields)
+        and all(
+            isinstance(snapshot.get(name), (int, float))
+            and not isinstance(snapshot.get(name), bool)
+            and math.isfinite(float(snapshot[name]))
+            and float(snapshot[name]) >= 0.0
+            for name in numeric_fields
+        )
+        and isinstance(snapshot.get("riser_peak_force_violation_count"), int)
+        and not isinstance(snapshot.get("riser_peak_force_violation_count"), bool)
+        and snapshot["riser_peak_force_violation_count"] >= 0
+        and float(snapshot["pitch_max_deg"])
+        <= DEFAULT_EVALUATION_CONFIG["maximum_pitch_deg"]
+        and max(
+            float(snapshot[name])
+            for name in (
+                "action_saturation_ratio",
+                "riser_saturation_ratio",
+                "proxy_saturation_ratio",
+            )
+        )
+        <= DEFAULT_EVALUATION_CONFIG["maximum_saturation_ratio"]
+        and float(snapshot["riser_thermal_load_max"])
+        <= DEFAULT_EVALUATION_CONFIG["maximum_riser_thermal_load"]
+        and snapshot["riser_peak_force_violation_count"]
+        <= DEFAULT_EVALUATION_CONFIG["maximum_riser_peak_force_violations"]
+    )
 
 
 def sha256_file(path: Path) -> str:
@@ -351,6 +432,15 @@ def _gate_report_valid(
         == DEFAULT_EVALUATION_CONFIG["policy_command_contract"]
         and report.get("residual_action_scales")
         == DEFAULT_EVALUATION_CONFIG["residual_action_scales"]
+        and report.get("balance_safety_contract") == BALANCE_SAFETY_CONTRACT
+        and report.get("maximum_pitch_deg")
+        == DEFAULT_EVALUATION_CONFIG["maximum_pitch_deg"]
+        and report.get("maximum_saturation_ratio")
+        == DEFAULT_EVALUATION_CONFIG["maximum_saturation_ratio"]
+        and report.get("maximum_riser_thermal_load")
+        == DEFAULT_EVALUATION_CONFIG["maximum_riser_thermal_load"]
+        and report.get("maximum_riser_peak_force_violations")
+        == DEFAULT_EVALUATION_CONFIG["maximum_riser_peak_force_violations"]
         and isinstance(rows, list)
         and len(rows) == len(cases)
         and all(
@@ -359,6 +449,9 @@ def _gate_report_valid(
             and isinstance(row.get("checks"), Mapping)
             and bool(row["checks"])
             and all(value is True for value in row["checks"].values())
+            and balance_safety_snapshot_valid(row.get("teacher_safety"))
+            and balance_safety_snapshot_valid(row.get("learned_safety"))
+            and balance_safety_snapshot_valid(row.get("zero_safety"))
             and isinstance(row.get("learned_beats_zero_position_p95"), bool)
             and _artifact_identity_valid(
                 row.get("teacher_rollout"),

@@ -17,6 +17,29 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
+def _balance_safety_snapshot() -> dict:
+    return {
+        "payload_dynamic_quality_passed": True,
+        "payload_thermal_admission_passed": True,
+        "result_dynamic_quality_passed": True,
+        "result_thermal_admission_passed": True,
+        "controller_evidence_passed": True,
+        "completed_reference": True,
+        "termination_absent": True,
+        "no_termination_check": True,
+        "pitch_bounded_check": True,
+        "saturation_checks_passed": True,
+        "thermal_checks_passed": True,
+        "pitch_max_deg": 4.0,
+        "action_saturation_ratio": 0.0,
+        "riser_saturation_ratio": 0.0,
+        "proxy_saturation_ratio": 0.0,
+        "riser_thermal_load_max": 0.5,
+        "riser_peak_force_violation_count": 0,
+        "passed": True,
+    }
+
+
 def _current_inputs():
     paths = {
         "goal": MODULE.DEFAULT_GOAL,
@@ -321,6 +344,8 @@ def _valid_all79_report(
             },
             "teacher": _rollout_metrics(1.0),
             "learned": _rollout_metrics(0.9),
+            "teacher_safety": _balance_safety_snapshot(),
+            "learned_safety": _balance_safety_snapshot(),
             "learned_residual_action_abs_max": [0.5, 0.4, 0.3],
             "teacher_rollout": artifact(
                 _write_rollout_identity(tmp_path, case, "teacher")
@@ -332,7 +357,7 @@ def _valid_all79_report(
         for case in range(1, 80)
     ]
     report = {
-        "schema": "cinebotrl_two_wheel_riser_residual_all79_gate_v1",
+        "schema": MODULE.learned_all79_contract.ALL79_GATE_SCHEMA,
         "policy_sha256": policy_sha256,
         "cases": list(range(1, 80)),
         "case_count": 79,
@@ -345,6 +370,13 @@ def _valid_all79_report(
             "model_based_planner_plus_bounded_policy_residual_v1"
         ),
         "residual_action_scales": [0.05, 0.05, 0.02],
+        "balance_safety_contract": (
+            MODULE.learned_all79_contract.BALANCE_SAFETY_CONTRACT
+        ),
+        "maximum_pitch_deg": 12.0,
+        "maximum_saturation_ratio": 0.2,
+        "maximum_riser_thermal_load": 1.0,
+        "maximum_riser_peak_force_violations": 0,
         "rollout_admission": artifact(admission),
         "preflight_receipt": artifact(preflight),
         "plan_manifest": artifact(plan_manifest),
@@ -403,6 +435,7 @@ def test_all79_validator_rejects_forged_or_regressed_rows(
         "mean",
         "rollout_hash",
         "preflight_hash",
+        "safety",
     ):
         mutation_root = tmp_path / mutation
         mutation_root.mkdir()
@@ -419,6 +452,8 @@ def test_all79_validator_rejects_forged_or_regressed_rows(
             report["rows"][10]["teacher_rollout"]["sha256"] = "0" * 64
         elif mutation == "preflight_hash":
             report["preflight_receipt"]["sha256"] = "0" * 64
+        elif mutation == "safety":
+            report["rows"][10]["learned_safety"]["termination_absent"] = False
         else:
             report["means"]["learned_position_p95_m"] = 0.8
         try:

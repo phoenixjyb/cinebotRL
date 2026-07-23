@@ -19,6 +19,9 @@ def _write_rollout(
     tracking_profile: str = "riser_phase_consistent_v2",
     policy_command_base: str = "phase_feedforward",
     residual_action_scales: list[float] | None = None,
+    termination: dict | None = None,
+    thermal_admission_passed: bool = True,
+    action_saturation_ratio: float = 0.0,
 ) -> None:
     metrics = {name: 1.0 for name in REGRESSION_METRICS}
     metrics.update(
@@ -31,13 +34,41 @@ def _write_rollout(
     )
     result = {
         "case": case,
-        "passed": True,
+        "passed": termination is None and thermal_admission_passed,
+        "dynamic_quality_passed": termination is None,
+        "thermal_admission_passed": thermal_admission_passed,
+        "controller_evidence_passed": True,
+        "termination": termination,
+        "action_saturation_ratio": action_saturation_ratio,
+        "riser_saturation_ratio": 0.0,
+        "proxy_saturation_ratio": 0.0,
+        "riser_thermal_load_max": 0.5,
+        "riser_peak_force_violation_count": 0,
+        "checks": {
+            "completed_reference": termination is None,
+            "no_termination": termination is None,
+            "pitch_bounded": pitch_max_deg <= 12.0,
+            "initialization_action_saturation_bounded": True,
+            "action_saturation_bounded": action_saturation_ratio <= 0.20,
+            "riser_saturation_bounded": True,
+            "proxy_saturation_bounded": True,
+            "initialization_riser_thermal_force_observed": True,
+            "initialization_riser_thermal_load_bounded": (
+                thermal_admission_passed
+            ),
+            "initialization_riser_peak_force_bounded": True,
+            "riser_thermal_force_observed": True,
+            "riser_thermal_load_bounded": thermal_admission_passed,
+            "riser_peak_force_bounded": True,
+        },
         "residual_action_abs_max": [0.2, 0.3, 0.1],
         **metrics,
     }
     payload = {
         "cases": [case],
-        "passed": True,
+        "dynamic_quality_passed": termination is None,
+        "thermal_admission_passed": thermal_admission_passed,
+        "passed": result["passed"],
         "trajectory_command_source": source,
         "tracking_profile": tracking_profile,
         "phase_feedforward_contract": "derivatives_scaled_by_progress_v1",
@@ -96,6 +127,75 @@ def test_holdout_gate_rejects_balance_regression(tmp_path: Path) -> None:
     )
     assert not summary["passed"]
     assert not summary["rows"][0]["checks"]["regression_pitch_max_deg"]
+
+
+@pytest.mark.parametrize(
+    ("mutation", "check"),
+    (
+        ({"pitch_max_deg": 12.1}, "learned_balance_safety"),
+        ({"action_saturation_ratio": 0.21}, "learned_balance_safety"),
+        ({"thermal_admission_passed": False}, "learned_balance_safety"),
+        (
+            {"termination": {"reset_reason_counts": {"forbidden_body_contact": 1}}},
+            "learned_balance_safety",
+        ),
+    ),
+)
+def test_model_based_gate_rejects_good_tracking_with_unsafe_balance(
+    tmp_path: Path,
+    mutation: dict,
+    check: str,
+) -> None:
+    baseline = tmp_path / "baseline"
+    learned = tmp_path / "learned"
+    policy = tmp_path / "policy.pt"
+    policy.write_bytes(b"policy")
+    profile = "riser_recovery_direction_v4_camera_lever_arm_v1"
+    scales = [0.05, 0.05, 0.02]
+    common = {
+        "tracking_profile": profile,
+        "policy_command_base": "model_based_planner",
+        "residual_action_scales": scales,
+    }
+    _write_rollout(
+        baseline,
+        8,
+        "model_based_planner_plus_zero_policy_residual",
+        0.10,
+        **common,
+    )
+    _write_rollout(
+        learned,
+        8,
+        "model_based_planner_plus_torchscript_residual",
+        0.08,
+        **common,
+        **mutation,
+    )
+    provenance = {}
+    for name in ("admission", "preflight", "plan_manifest"):
+        path = tmp_path / f"{name}.json"
+        path.write_text("{}\n", encoding="utf-8")
+        provenance[name] = path
+    summary = gate_rollouts(
+        teacher_dir=baseline,
+        zero_dir=baseline,
+        learned_dir=learned,
+        cases=[8],
+        policy=policy,
+        mode="validation_canary",
+        maximum_regression_fraction=0.05,
+        expected_tracking_profile=profile,
+        policy_command_contract=(
+            "model_based_planner_plus_bounded_policy_residual_v1"
+        ),
+        rollout_admission=provenance["admission"],
+        preflight_receipt=provenance["preflight"],
+        plan_manifest=provenance["plan_manifest"],
+        execution_commit="a" * 40,
+    )
+    assert not summary["passed"]
+    assert not summary["rows"][0]["checks"][check]
 
 
 def test_all79_mode_requires_the_complete_case_set(tmp_path: Path) -> None:
@@ -252,7 +352,7 @@ def test_model_based_validation_requires_provenance_and_uses_baseline(
         execution_commit="a" * 40,
     )
     assert summary["passed"] is True
-    assert summary["schema"].endswith("validation_canary_gate_v1")
+    assert summary["schema"].endswith("validation_canary_gate_v2")
     assert summary["rows"][0]["teacher_rollout"] == (
         summary["rows"][0]["zero_rollout"]
     )

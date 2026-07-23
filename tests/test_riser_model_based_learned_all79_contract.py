@@ -34,6 +34,29 @@ EXECUTION_COMMIT = "a" * 40
 VALIDATION_CASES = [8, 16]
 
 
+def _safety_snapshot() -> dict:
+    return {
+        "payload_dynamic_quality_passed": True,
+        "payload_thermal_admission_passed": True,
+        "result_dynamic_quality_passed": True,
+        "result_thermal_admission_passed": True,
+        "controller_evidence_passed": True,
+        "completed_reference": True,
+        "termination_absent": True,
+        "no_termination_check": True,
+        "pitch_bounded_check": True,
+        "saturation_checks_passed": True,
+        "thermal_checks_passed": True,
+        "pitch_max_deg": 4.0,
+        "action_saturation_ratio": 0.0,
+        "riser_saturation_ratio": 0.0,
+        "proxy_saturation_ratio": 0.0,
+        "riser_thermal_load_max": 0.5,
+        "riser_peak_force_violation_count": 0,
+        "passed": True,
+    }
+
+
 def _identity(path: Path) -> dict[str, str]:
     return {
         "path": path.name,
@@ -65,6 +88,9 @@ def _gate_report(
             "teacher": {},
             "learned": {},
             "zero": {},
+            "teacher_safety": _safety_snapshot(),
+            "learned_safety": _safety_snapshot(),
+            "zero_safety": _safety_snapshot(),
             "learned_residual_action_abs_max": [0.5, 0.4, 0.3],
             "learned_beats_zero_position_p95": True,
             **identities,
@@ -84,6 +110,17 @@ def _gate_report(
             "model_based_planner_plus_bounded_policy_residual_v1"
         ),
         "residual_action_scales": [0.05, 0.05, 0.02],
+        "balance_safety_contract": contract.BALANCE_SAFETY_CONTRACT,
+        "maximum_pitch_deg": DEFAULT_EVALUATION_CONFIG["maximum_pitch_deg"],
+        "maximum_saturation_ratio": DEFAULT_EVALUATION_CONFIG[
+            "maximum_saturation_ratio"
+        ],
+        "maximum_riser_thermal_load": DEFAULT_EVALUATION_CONFIG[
+            "maximum_riser_thermal_load"
+        ],
+        "maximum_riser_peak_force_violations": DEFAULT_EVALUATION_CONFIG[
+            "maximum_riser_peak_force_violations"
+        ],
         "rollout_admission": None,
         "preflight_receipt": None,
         "plan_manifest": None,
@@ -411,6 +448,24 @@ def test_admission_preserves_majority_zero_baseline_gate_semantics(
         fixture["holdout_report_path"]
     )
     _validate(fixture)
+
+
+def test_admission_rejects_gate_report_with_unsafe_balance_snapshot(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    validation = fixture["validation_report"]
+    validation["rows"][0]["learned_safety"]["termination_absent"] = False
+    validation["rows"][0]["learned_safety"]["passed"] = False
+    fixture["validation_report_path"].write_text(
+        json.dumps(validation),
+        encoding="utf-8",
+    )
+    fixture["admission"]["validation_gate_report"] = _identity(
+        fixture["validation_report_path"]
+    )
+    with pytest.raises(ValueError, match="admission failed"):
+        _validate(fixture)
 
 
 @pytest.mark.parametrize(

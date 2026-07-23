@@ -89,7 +89,11 @@
     "position_error_p95_m_max": 0.15,
     "position_error_max_m_max": 0.25,
     "attitude_error_p95_deg_max": 5.0,
-    "attitude_error_max_deg_max": 10.0
+    "attitude_error_max_deg_max": 10.0,
+    "maximum_pitch_deg": 12.0,
+    "maximum_saturation_ratio": 0.2,
+    "maximum_riser_thermal_load": 1.0,
+    "maximum_riser_peak_force_violations": 0
   },
   "validation_cases": [],
   "holdout_cases": [

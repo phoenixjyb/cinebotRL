@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import statistics
@@ -18,6 +19,20 @@ ZERO_SOURCE = "zero_policy_action_baseline"
 LEGACY_POLICY_COMMAND_CONTRACT = "legacy_phase_feedforward_residual_v1"
 MODEL_BASED_POLICY_COMMAND_CONTRACT = (
     "model_based_planner_plus_bounded_policy_residual_v1"
+)
+MODEL_BASED_GATE_SCHEMA_VERSION = "v2"
+BALANCE_SAFETY_CONTRACT = "balance_first_rollout_safety_v1"
+DEFAULT_MAXIMUM_PITCH_DEG = 12.0
+DEFAULT_MAXIMUM_SATURATION_RATIO = 0.20
+DEFAULT_MAXIMUM_RISER_THERMAL_LOAD = 1.0
+DEFAULT_MAXIMUM_RISER_PEAK_FORCE_VIOLATIONS = 0
+THERMAL_CHECKS = (
+    "initialization_riser_thermal_force_observed",
+    "initialization_riser_thermal_load_bounded",
+    "initialization_riser_peak_force_bounded",
+    "riser_thermal_force_observed",
+    "riser_thermal_load_bounded",
+    "riser_peak_force_bounded",
 )
 POLICY_COMMAND_CONTRACTS = {
     LEGACY_POLICY_COMMAND_CONTRACT: {
@@ -97,6 +112,110 @@ def regression_checks(
     }
 
 
+def balance_safety_snapshot(
+    payload: dict,
+    result: dict,
+    *,
+    maximum_pitch_deg: float,
+    maximum_saturation_ratio: float,
+) -> dict:
+    checks = result.get("checks")
+    if not isinstance(checks, dict):
+        raise ValueError("rollout is missing dynamic safety checks")
+    numeric_fields = (
+        "pitch_max_deg",
+        "action_saturation_ratio",
+        "riser_saturation_ratio",
+        "proxy_saturation_ratio",
+        "riser_thermal_load_max",
+    )
+    if any(
+        not isinstance(result.get(name), (int, float))
+        or isinstance(result.get(name), bool)
+        or not math.isfinite(float(result[name]))
+        or float(result[name]) < 0.0
+        for name in numeric_fields
+    ):
+        raise ValueError("rollout is missing numeric balance safety evidence")
+    if (
+        not isinstance(result.get("riser_peak_force_violation_count"), int)
+        or isinstance(result.get("riser_peak_force_violation_count"), bool)
+        or result["riser_peak_force_violation_count"] < 0
+    ):
+        raise ValueError("rollout has invalid peak-force violation evidence")
+    saturation_values = [
+        float(result["action_saturation_ratio"]),
+        float(result["riser_saturation_ratio"]),
+        float(result["proxy_saturation_ratio"]),
+    ]
+    snapshot = {
+        "payload_dynamic_quality_passed": (
+            payload.get("dynamic_quality_passed") is True
+        ),
+        "payload_thermal_admission_passed": (
+            payload.get("thermal_admission_passed") is True
+        ),
+        "result_dynamic_quality_passed": (
+            result.get("dynamic_quality_passed") is True
+        ),
+        "result_thermal_admission_passed": (
+            result.get("thermal_admission_passed") is True
+        ),
+        "controller_evidence_passed": (
+            result.get("controller_evidence_passed") is True
+        ),
+        "completed_reference": checks.get("completed_reference") is True,
+        "termination_absent": result.get("termination") is None,
+        "no_termination_check": checks.get("no_termination") is True,
+        "pitch_bounded_check": checks.get("pitch_bounded") is True,
+        "saturation_checks_passed": all(
+            checks.get(name) is True
+            for name in (
+                "initialization_action_saturation_bounded",
+                "action_saturation_bounded",
+                "riser_saturation_bounded",
+                "proxy_saturation_bounded",
+            )
+        ),
+        "thermal_checks_passed": all(
+            checks.get(name) is True for name in THERMAL_CHECKS
+        ),
+        "pitch_max_deg": float(result["pitch_max_deg"]),
+        "action_saturation_ratio": saturation_values[0],
+        "riser_saturation_ratio": saturation_values[1],
+        "proxy_saturation_ratio": saturation_values[2],
+        "riser_thermal_load_max": float(result["riser_thermal_load_max"]),
+        "riser_peak_force_violation_count": int(
+            result["riser_peak_force_violation_count"]
+        ),
+    }
+    snapshot["passed"] = (
+        all(
+            snapshot[name] is True
+            for name in (
+                "payload_dynamic_quality_passed",
+                "payload_thermal_admission_passed",
+                "result_dynamic_quality_passed",
+                "result_thermal_admission_passed",
+                "controller_evidence_passed",
+                "completed_reference",
+                "termination_absent",
+                "no_termination_check",
+                "pitch_bounded_check",
+                "saturation_checks_passed",
+                "thermal_checks_passed",
+            )
+        )
+        and snapshot["pitch_max_deg"] <= maximum_pitch_deg
+        and max(saturation_values) <= maximum_saturation_ratio
+        and snapshot["riser_thermal_load_max"]
+        <= DEFAULT_MAXIMUM_RISER_THERMAL_LOAD
+        and snapshot["riser_peak_force_violation_count"]
+        <= DEFAULT_MAXIMUM_RISER_PEAK_FORCE_VIOLATIONS
+    )
+    return snapshot
+
+
 def gate_rollouts(
     *,
     teacher_dir: Path,
@@ -113,6 +232,8 @@ def gate_rollouts(
     preflight_receipt: Path | None = None,
     plan_manifest: Path | None = None,
     execution_commit: str | None = None,
+    maximum_pitch_deg: float = DEFAULT_MAXIMUM_PITCH_DEG,
+    maximum_saturation_ratio: float = DEFAULT_MAXIMUM_SATURATION_RATIO,
 ) -> dict:
     if mode not in {"validation_canary", "holdout", "all79"}:
         raise ValueError("unknown rollout gate mode")
@@ -124,8 +245,18 @@ def gate_rollouts(
         raise ValueError("invalid regression fraction")
     if not 0.0 < minimum_zero_improvement_fraction < 1.0:
         raise ValueError("invalid null-action improvement fraction")
+    if not math.isfinite(maximum_pitch_deg) or maximum_pitch_deg <= 0.0:
+        raise ValueError("maximum pitch must be positive")
+    if (
+        not math.isfinite(maximum_saturation_ratio)
+        or not 0.0 <= maximum_saturation_ratio <= 1.0
+    ):
+        raise ValueError("invalid maximum saturation ratio")
     if policy_command_contract not in POLICY_COMMAND_CONTRACTS:
         raise ValueError("unknown policy command contract")
+    model_based_gate = (
+        policy_command_contract == MODEL_BASED_POLICY_COMMAND_CONTRACT
+    )
     provenance = (
         rollout_admission,
         preflight_receipt,
@@ -133,7 +264,7 @@ def gate_rollouts(
         execution_commit,
     )
     if (
-        policy_command_contract == MODEL_BASED_POLICY_COMMAND_CONTRACT
+        model_based_gate
         and (
             any(value is None for value in provenance)
             or re.fullmatch(r"[0-9a-f]{40}", str(execution_commit)) is None
@@ -180,6 +311,29 @@ def gate_rollouts(
             profile_checks["zero_tracking_profile"] = (
                 zero_payload.get("tracking_profile") == expected_tracking_profile
             )
+        teacher_safety = None
+        learned_safety = None
+        zero_safety = None
+        if model_based_gate:
+            teacher_safety = balance_safety_snapshot(
+                teacher_payload,
+                teacher,
+                maximum_pitch_deg=maximum_pitch_deg,
+                maximum_saturation_ratio=maximum_saturation_ratio,
+            )
+            learned_safety = balance_safety_snapshot(
+                learned_payload,
+                learned,
+                maximum_pitch_deg=maximum_pitch_deg,
+                maximum_saturation_ratio=maximum_saturation_ratio,
+            )
+            if zero is not None:
+                zero_safety = balance_safety_snapshot(
+                    zero_payload,
+                    zero,
+                    maximum_pitch_deg=maximum_pitch_deg,
+                    maximum_saturation_ratio=maximum_saturation_ratio,
+                )
         checks = {
             "learned_hard_gate": learned_payload.get("passed") is True
             and learned.get("passed") is True,
@@ -188,6 +342,11 @@ def gate_rollouts(
             "bounded_residual": max(learned["residual_action_abs_max"])
             <= 1.0 + 1e-6,
         }
+        if model_based_gate:
+            checks["learned_balance_safety"] = learned_safety["passed"] is True
+            checks["teacher_balance_safety"] = teacher_safety["passed"] is True
+            if zero_safety is not None:
+                checks["zero_balance_safety"] = zero_safety["passed"] is True
         checks.update(profile_checks)
         checks.update(
             {
@@ -208,8 +367,13 @@ def gate_rollouts(
             "teacher_rollout": artifact_identity(teacher_path),
             "learned_rollout": artifact_identity(learned_path),
         }
+        if model_based_gate:
+            row["teacher_safety"] = teacher_safety
+            row["learned_safety"] = learned_safety
         if zero is not None:
             row["zero"] = {metric: zero[metric] for metric in REGRESSION_METRICS}
+            if model_based_gate:
+                row["zero_safety"] = zero_safety
             row["learned_beats_zero_position_p95"] = (
                 learned["position_error_p95_m"] < zero["position_error_p95_m"]
             )
@@ -246,7 +410,12 @@ def gate_rollouts(
             }
         )
     return {
-        "schema": f"cinebotrl_two_wheel_riser_residual_{mode}_gate_v1",
+        "schema": (
+            f"cinebotrl_two_wheel_riser_residual_{mode}_gate_"
+            f"{MODEL_BASED_GATE_SCHEMA_VERSION}"
+            if model_based_gate
+            else f"cinebotrl_two_wheel_riser_residual_{mode}_gate_v1"
+        ),
         "policy_sha256": hashlib.sha256(policy.read_bytes()).hexdigest(),
         "cases": cases,
         "case_count": len(cases),
@@ -257,6 +426,21 @@ def gate_rollouts(
         "expected_tracking_profile": expected_tracking_profile,
         "policy_command_contract": policy_command_contract,
         "residual_action_scales": command_contract["residual_action_scales"],
+        **(
+            {
+                "balance_safety_contract": BALANCE_SAFETY_CONTRACT,
+                "maximum_pitch_deg": maximum_pitch_deg,
+                "maximum_saturation_ratio": maximum_saturation_ratio,
+                "maximum_riser_thermal_load": (
+                    DEFAULT_MAXIMUM_RISER_THERMAL_LOAD
+                ),
+                "maximum_riser_peak_force_violations": (
+                    DEFAULT_MAXIMUM_RISER_PEAK_FORCE_VIOLATIONS
+                ),
+            }
+            if model_based_gate
+            else {}
+        ),
         "rollout_admission": (
             artifact_identity(rollout_admission)
             if rollout_admission is not None
@@ -298,6 +482,14 @@ def main() -> int:
     parser.add_argument(
         "--minimum-zero-improvement-fraction", type=float, default=0.05
     )
+    parser.add_argument(
+        "--maximum-pitch-deg", type=float, default=DEFAULT_MAXIMUM_PITCH_DEG
+    )
+    parser.add_argument(
+        "--maximum-saturation-ratio",
+        type=float,
+        default=DEFAULT_MAXIMUM_SATURATION_RATIO,
+    )
     parser.add_argument("--expected-tracking-profile", default=TRACKING_PROFILE)
     parser.add_argument(
         "--policy-command-contract",
@@ -320,6 +512,8 @@ def main() -> int:
         preflight_receipt=args.preflight_receipt,
         plan_manifest=args.plan_manifest,
         execution_commit=args.execution_commit,
+        maximum_pitch_deg=args.maximum_pitch_deg,
+        maximum_saturation_ratio=args.maximum_saturation_ratio,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

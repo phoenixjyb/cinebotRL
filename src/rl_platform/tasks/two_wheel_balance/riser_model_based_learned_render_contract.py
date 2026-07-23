@@ -7,12 +7,14 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .riser_model_based_learned_all79_contract import (
+    ALL79_GATE_SCHEMA,
     DEFAULT_EVALUATION_CONFIG,
     _exact_digest,
     _exact_source_manifest_valid,
     _mapping_matches_json_file,
     _plan_manifest_valid,
     _resolve_identity,
+    balance_safety_snapshot_valid,
     sha256_file,
 )
 from .riser_model_based_policy_artifact import (
@@ -124,6 +126,16 @@ def validate_render_admission(
     )
     policy_sha = sha256_file(policy_path) if policy_path.is_file() else None
     all79_rows = all79_report.get("rows")
+    all_rows_balance_safety_valid = (
+        isinstance(all79_rows, list)
+        and len(all79_rows) == 79
+        and all(
+            isinstance(row, Mapping)
+            and balance_safety_snapshot_valid(row.get("teacher_safety"))
+            and balance_safety_snapshot_valid(row.get("learned_safety"))
+            for row in all79_rows
+        )
+    )
     selected_rows_valid = (
         isinstance(all79_rows, list)
         and len(all79_rows) == 79
@@ -134,6 +146,12 @@ def validate_render_admission(
             and all(
                 value is True
                 for value in all79_rows[case - 1]["checks"].values()
+            )
+            and balance_safety_snapshot_valid(
+                all79_rows[case - 1].get("teacher_safety")
+            )
+            and balance_safety_snapshot_valid(
+                all79_rows[case - 1].get("learned_safety")
             )
             for case in REPRESENTATIVE_CASES
         )
@@ -148,11 +166,12 @@ def validate_render_admission(
         )
         and _mapping_matches_json_file(all79_report_path, all79_report)
         and all79_report.get("schema")
-        == "cinebotrl_two_wheel_riser_residual_all79_gate_v1"
+        == ALL79_GATE_SCHEMA
         and all79_report.get("passed") is True
         and all79_report.get("cases") == list(range(1, 80))
         and all79_report.get("policy_sha256") == policy_sha
         and all79_report.get("execution_commit") == expected_execution_commit
+        and all_rows_balance_safety_valid
         and selected_rows_valid,
         "all79_provenance": _resolve_identity(
             admission.get("all79_admission"),

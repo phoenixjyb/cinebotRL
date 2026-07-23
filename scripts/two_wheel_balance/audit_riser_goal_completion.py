@@ -103,6 +103,11 @@ ALL79_REPORT_FIELDS = {
     "expected_tracking_profile",
     "policy_command_contract",
     "residual_action_scales",
+    "balance_safety_contract",
+    "maximum_pitch_deg",
+    "maximum_saturation_ratio",
+    "maximum_riser_thermal_load",
+    "maximum_riser_peak_force_violations",
     "rollout_admission",
     "preflight_receipt",
     "plan_manifest",
@@ -118,6 +123,8 @@ ALL79_ROW_FIELDS = {
     "checks",
     "teacher",
     "learned",
+    "teacher_safety",
+    "learned_safety",
     "learned_residual_action_abs_max",
     "teacher_rollout",
     "learned_rollout",
@@ -245,7 +252,7 @@ def _validate_all79_report(
     if (
         set(report) != ALL79_REPORT_FIELDS
         or report.get("schema")
-        != "cinebotrl_two_wheel_riser_residual_all79_gate_v1"
+        != learned_all79_contract.ALL79_GATE_SCHEMA
         or report.get("policy_sha256") != policy_sha256
         or report.get("cases") != cases
         or report.get("case_count") != len(cases)
@@ -258,6 +265,22 @@ def _validate_all79_report(
         or report.get("policy_command_contract")
         != "model_based_planner_plus_bounded_policy_residual_v1"
         or report.get("residual_action_scales") != [0.05, 0.05, 0.02]
+        or report.get("balance_safety_contract")
+        != learned_all79_contract.BALANCE_SAFETY_CONTRACT
+        or report.get("maximum_pitch_deg")
+        != learned_all79_contract.DEFAULT_EVALUATION_CONFIG["maximum_pitch_deg"]
+        or report.get("maximum_saturation_ratio")
+        != learned_all79_contract.DEFAULT_EVALUATION_CONFIG[
+            "maximum_saturation_ratio"
+        ]
+        or report.get("maximum_riser_thermal_load")
+        != learned_all79_contract.DEFAULT_EVALUATION_CONFIG[
+            "maximum_riser_thermal_load"
+        ]
+        or report.get("maximum_riser_peak_force_violations")
+        != learned_all79_contract.DEFAULT_EVALUATION_CONFIG[
+            "maximum_riser_peak_force_violations"
+        ]
         or report.get("execution_commit") != execution_commit
         or not isinstance(rows, list)
         or len(rows) != len(cases)
@@ -309,6 +332,12 @@ def _validate_all79_report(
             or not all(value is True for value in row["checks"].values())
             or not _finite_nonnegative_metrics(row.get("teacher"))
             or not _finite_nonnegative_metrics(row.get("learned"))
+            or not learned_all79_contract.balance_safety_snapshot_valid(
+                row.get("teacher_safety")
+            )
+            or not learned_all79_contract.balance_safety_snapshot_valid(
+                row.get("learned_safety")
+            )
         ):
             raise ValueError(f"learned all-79 row {expected_case} is invalid")
         _resolve_identity(

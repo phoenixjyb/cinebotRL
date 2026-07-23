@@ -1,0 +1,156 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v1",
+  "checks": {
+    "train_selection": true,
+    "validation_selection": true,
+    "case30_conversion": true,
+    "case23_capture": true,
+    "case23_conversion_preflight": true,
+    "tranches_disjoint": true
+  },
+  "inputs": {
+    "train_selection": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_model_based_pair_tranche_v1/selection.json",
+      "sha256": "93aa25e99409ad926d4c4cf0b15075e6ea3532dd1c01d5217a45daffc37db7c0",
+      "size_bytes": 14077
+    },
+    "validation_selection": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_model_based_corrective_validation_tranche_v1/selection.json",
+      "sha256": "5576c696e304eb9b9a173970e5fed06e887eccefe2d65a20678415148e22fa0b",
+      "size_bytes": 7258
+    },
+    "case30_dataset": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_case30_effective_label_conversion_v1/case_0030_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "191a44147bc44038a0645bf48a63609463bf280d97b37ddaf884200bd8b52447",
+      "size_bytes": 3557893
+    },
+    "case30_audit": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_case30_effective_label_conversion_v1/independent_audit.json",
+      "sha256": "765d3eea2d72fc9660020508e80016d74c3c291b3c7d7e3cb2ed591bd72f69b5",
+      "size_bytes": 1560
+    },
+    "case23_final_status": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_case23_corrective_capture_v4/final_status.json",
+      "sha256": "8f7589cdc31b5b6369fea8fda7fbd8b743b57afa78709cf03b2bd600a25833e3",
+      "size_bytes": 4335
+    },
+    "case23_conversion_preflight": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case23_corrective_conversion_execution_cpu_v2/summary.json",
+      "sha256": "b1d76609bac8982d3bd4af818c15e18ad58dc88b24093617a8fe90018069f739",
+      "size_bytes": 6710
+    }
+  },
+  "required": {
+    "minimum_train_cases": 4,
+    "minimum_validation_cases": 2,
+    "minimum_train_tranche": [
+      30,
+      23,
+      6,
+      2
+    ],
+    "additional_train_candidate": [
+      7
+    ],
+    "validation_tranche": [
+      8,
+      16
+    ],
+    "reserved_holdout_cases": [
+      3,
+      5,
+      13,
+      19,
+      24
+    ]
+  },
+  "cases": [
+    {
+      "case": 30,
+      "split": "train",
+      "state": "converted_admitted_for_case_merge",
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_case30_effective_label_conversion_v1/case_0030_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "191a44147bc44038a0645bf48a63609463bf280d97b37ddaf884200bd8b52447",
+      "sample_count": 11411,
+      "valid_for_case_merge": true,
+      "valid_for_training": false
+    },
+    {
+      "case": 23,
+      "split": "train",
+      "state": "capture_passed_conversion_authorization_required",
+      "source_capture_sha256": "f0ea5c59e1f2f0e5f6f91336788d0e0228d079f74a53a4a50d442751b8b23796",
+      "source_final_status_sha256": "8f7589cdc31b5b6369fea8fda7fbd8b743b57afa78709cf03b2bd600a25833e3",
+      "expected_output_relative_path": "artifacts/two_wheel_riser/20260723_model_based_corrective_case23_conversion_v1_cpu/case_0023_model_based_corrective_case_dataset_v1.npz",
+      "valid_for_case_merge": false,
+      "valid_for_training": false
+    },
+    {
+      "case": 6,
+      "split": "train",
+      "state": "paired_canary_and_capture_required",
+      "valid_for_case_merge": false,
+      "valid_for_training": false
+    },
+    {
+      "case": 2,
+      "split": "train",
+      "state": "paired_canary_and_capture_required",
+      "valid_for_case_merge": false,
+      "valid_for_training": false
+    },
+    {
+      "case": 7,
+      "split": "train",
+      "state": "paired_canary_and_capture_required",
+      "valid_for_case_merge": false,
+      "valid_for_training": false
+    },
+    {
+      "case": 8,
+      "split": "validation",
+      "state": "paired_canary_and_capture_required",
+      "valid_for_case_merge": false,
+      "valid_for_training": false
+    },
+    {
+      "case": 16,
+      "split": "validation",
+      "state": "paired_canary_and_capture_required",
+      "valid_for_case_merge": false,
+      "valid_for_training": false
+    }
+  ],
+  "converted_train_cases": [
+    30
+  ],
+  "converted_validation_cases": [],
+  "converted_train_case_count": 1,
+  "converted_validation_case_count": 0,
+  "missing_train_case_count": 3,
+  "missing_validation_case_count": 2,
+  "pending_minimum_train_cases": [
+    23,
+    6,
+    2
+  ],
+  "pending_validation_cases": [
+    8,
+    16
+  ],
+  "next_bounded_action": "authorize_exactly_one_case23_v4_cpu_conversion",
+  "case23_conversion_authorized": false,
+  "case23_conversion_output_created": false,
+  "corpus_manifest_ready": false,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "valid_for_bc_admission_review": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

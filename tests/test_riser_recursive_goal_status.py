@@ -98,6 +98,16 @@ CASE23_CONVERSION_EXECUTION_FINALIZER = (
     / "scripts/two_wheel_balance/"
     "finalize_model_based_corrective_case23_conversion.py"
 )
+CORRECTIVE_CORPUS_INTAKE_SCRIPT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "audit_model_based_corrective_corpus_intake.py"
+)
+CORRECTIVE_CORPUS_INTAKE_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_model_based_corrective_corpus_intake_v1/summary.json"
+)
 DRIVE_PROFILE = (
     ROOT
     / "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json"
@@ -463,6 +473,43 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective[
         "case23_capture_v4_conversion_execution_authoritative_cpu_suite"
     ] == "1096_passed_12_skipped_2_warnings_in_130.96s"
+    assert corrective["corrective_corpus_intake_schema"] == (
+        "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v1"
+    )
+    assert corrective["corrective_corpus_intake_implementation_commit"] == (
+        "e6a3688de943864f043691f407de90eb0e51f75d"
+    )
+    assert corrective["corrective_corpus_intake_script_sha256"] == _sha256(
+        CORRECTIVE_CORPUS_INTAKE_SCRIPT
+    )
+    assert corrective["corrective_corpus_intake_summary_sha256"] == _sha256(
+        CORRECTIVE_CORPUS_INTAKE_EVIDENCE
+    )
+    assert corrective["corrective_corpus_intake_mac_windows_byte_parity"] is True
+    assert corrective["corrective_corpus_intake_converted_train_cases"] == [30]
+    assert corrective["corrective_corpus_intake_converted_validation_cases"] == []
+    assert corrective["corrective_corpus_intake_missing_train_case_count"] == 3
+    assert corrective["corrective_corpus_intake_missing_validation_case_count"] == 2
+    assert corrective["corrective_corpus_intake_pending_minimum_train_cases"] == [
+        23,
+        6,
+        2,
+    ]
+    assert corrective["corrective_corpus_intake_pending_validation_cases"] == [
+        8,
+        16,
+    ]
+    assert corrective["corrective_corpus_intake_manifest_ready"] is False
+    assert corrective["corrective_corpus_intake_merge_authorized"] is False
+    intake = json.loads(CORRECTIVE_CORPUS_INTAKE_EVIDENCE.read_text())
+    assert intake["passed"] is True
+    assert intake["corpus_manifest_ready"] is False
+    assert intake["dataset_conversion_authorized"] is False
+    assert intake["dataset_merge_authorized"] is False
+    assert intake["bc_authorized"] is False
+    assert intake["ppo_authorized"] is False
+    assert intake["training_started"] is False
+    assert intake["valid_for_training"] is False
     execution_preflight = json.loads(
         CASE23_CONVERSION_EXECUTION_EVIDENCE.read_text()
     )

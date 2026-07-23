@@ -8557,3 +8557,23 @@ and must state whether its candidate was accepted or rejected.
 - No authorization token, conversion namespace, output, merge, BC, PPO,
   training, Isaac process, or GPU workload was created. The route is CPU-ready
   but conversion remains unauthorized.
+
+## Round 221: real corrective corpus intake is machine-readable
+
+- Added a fail-closed intake auditor for the real model-based corrective
+  corpus. It reopens case datasets, binds the selected train and validation
+  tranches, verifies case-23 capture/conversion state, and refuses to treat
+  captures or preflights as converted data.
+- The auditor supports a future case-23 dataset only when a separate passing
+  conversion final status binds the exact dataset SHA-256 and keeps merge, BC,
+  PPO, and training closed.
+- Current evidence proves `1/4` converted train cases (`[30]`) and `0/2`
+  validation cases. The pending minimum train path is `[23, 6, 2]`; validation
+  remains `[8, 16]`; case 7 remains an additional diverse train candidate.
+- Implementation commit
+  `e6a3688de943864f043691f407de90eb0e51f75d` emits byte-identical reports on
+  macOS and `.98`. Evidence is preserved under
+  `evidence_20260724_model_based_corrective_corpus_intake_v1/` at SHA-256
+  `3d8f3da9c23ddb9d63a26afb3bec15324d8ce61a3e0b900c7cdf67f91c9e20bf`.
+- The intake audit passes, but `corpus_manifest_ready=false`. It authorizes no
+  conversion, merge, capture, runtime, BC, PPO, or training.

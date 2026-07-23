@@ -168,3 +168,10 @@ def test_partial_learning_arguments_are_rejected(tmp_path: Path) -> None:
         assert "must be supplied together" in str(error)
     else:
         raise AssertionError("partial learning evidence was accepted")
+
+
+def test_translates_windows_worktree_path_for_wsl_git() -> None:
+    assert (
+        MODULE._windows_to_wsl_path(r"G:\wSpace\cinebotRL-two-wheel-riser")
+        == "/mnt/g/wSpace/cinebotRL-two-wheel-riser"
+    )

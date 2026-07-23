@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 from typing import Any, Mapping
@@ -94,22 +96,43 @@ def _identity(path: Path) -> dict[str, str]:
     return {"path": display, "sha256": _sha256(resolved)}
 
 
-def _git_state() -> dict[str, Any]:
-    def run(*args: str) -> str:
+def _windows_to_wsl_path(value: str) -> str:
+    match = re.match(r"^([A-Za-z]):[\\/](.*)$", value)
+    if match is None:
+        raise ValueError(f"cannot translate Windows path to WSL: {value}")
+    drive, suffix = match.groups()
+    return f"/mnt/{drive.lower()}/{suffix.replace(chr(92), '/')}"
+
+
+def _git_value(*args: str) -> str:
+    command = ["git", "-C", str(PROJECT_ROOT), *args]
+    try:
         return subprocess.run(
-            ["git", "-C", str(PROJECT_ROOT), *args],
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        if os.name != "nt":
+            raise
+        wsl_root = _windows_to_wsl_path(str(PROJECT_ROOT))
+        return subprocess.run(
+            ["wsl.exe", "--exec", "git", "-C", wsl_root, *args],
             check=True,
             capture_output=True,
             text=True,
         ).stdout.strip()
 
-    root = Path(run("rev-parse", "--show-toplevel")).resolve()
-    branch = run("branch", "--show-current")
-    head = run("rev-parse", "HEAD")
-    upstream = run("rev-parse", "@{upstream}")
-    tracked_dirty = bool(run("status", "--porcelain", "--untracked-files=no"))
+
+def _git_state() -> dict[str, Any]:
+    root = _git_value("rev-parse", "--show-toplevel")
+    branch = _git_value("branch", "--show-current")
+    head = _git_value("rev-parse", "HEAD")
+    upstream = _git_value("rev-parse", "@{upstream}")
+    tracked_dirty = bool(_git_value("status", "--porcelain", "--untracked-files=no"))
     return {
-        "root": str(root),
+        "root": root,
         "branch": branch,
         "head": head,
         "upstream": upstream,

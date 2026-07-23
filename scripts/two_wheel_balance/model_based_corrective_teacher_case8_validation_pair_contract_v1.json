@@ -1,0 +1,180 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_case8_validation_pair_contract_v1",
+  "reviewed_parent_commit": "2e83ff1d2c8694ea177404371f48fd0e66f6f23c",
+  "case": 8,
+  "split": "validation",
+  "namespace": "20260724_model_based_corrective_teacher_case8_validation_pair_v1_exclusive",
+  "residual_action_scales": [
+    0.05,
+    0.05,
+    0.02
+  ],
+  "controller_arguments": {
+    "case": 8,
+    "configuration_seed": 20260716,
+    "reset_seed": 20260724,
+    "controller_wz_kp": 1.05,
+    "maximum_duration_scale": 3.0,
+    "camera_lever_arm_compensation_enabled": true,
+    "camera_lever_arm_compensation_gain": 1.0,
+    "maximum_camera_lever_arm_correction_m": 0.05,
+    "policy_command_base": "model_based_planner",
+    "zero_policy_action": true
+  },
+  "unchanged_dynamic_gate_thresholds": {
+    "maximum_pitch_deg": 12.0,
+    "maximum_position_p95_m": 0.15,
+    "maximum_position_error_m": 0.25,
+    "maximum_attitude_p95_deg": 5.0,
+    "maximum_attitude_error_deg": 10.0,
+    "maximum_riser_servo_error_m": 0.03,
+    "maximum_proxy_servo_error_deg": 5.0,
+    "maximum_internal_proxy_rate_deg_s": 360.0,
+    "maximum_saturation_ratio": 0.2
+  },
+  "paired_experiment_contract": {
+    "baseline": "complete_model_based_planner_plus_exact_zero_residual",
+    "candidate": "complete_model_based_planner_plus_case8_validation_corrective",
+    "rollout_order": [
+      "baseline",
+      "candidate"
+    ],
+    "same_plan_seed_physics_and_perturbation_required": true,
+    "candidate_requires_baseline_dynamic_pass": true,
+    "teacher_admission_during_pair": false,
+    "label_capture_during_pair": false,
+    "dataset_creation_during_pair": false,
+    "minimum_position_p95_improvement_m": 0.003,
+    "minimum_position_p95_relative_improvement": 0.02,
+    "maximum_position_error_regression_m": 0.005,
+    "maximum_attitude_error_regression_deg": 0.1,
+    "maximum_pitch_regression_deg": 0.5,
+    "maximum_riser_error_regression_m": 0.002,
+    "saturation_regression_allowed": false,
+    "maximum_runtime_seconds_per_rollout": 600
+  },
+  "identities": {
+    "selection": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_model_based_corrective_validation_tranche_v1/selection.json",
+      "sha256": "5576c696e304eb9b9a173970e5fed06e887eccefe2d65a20678415148e22fa0b",
+      "git_blob_sha1": "fdc01b4cef789c95820e54e0b193887ecd933bc5"
+    },
+    "readiness_audit": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case8_validation_pair_readiness_cpu_v1/summary.json",
+      "sha256": "8ba7d6613b53cca7f266cb0052680b2d0cc4a71e363e10abbadcb8c789526983",
+      "git_blob_sha1": "ad40e0f2c1d4c5781fce2da007145157ea95cf89"
+    },
+    "readiness_auditor": {
+      "path": "scripts/two_wheel_balance/audit_model_based_corrective_case8_validation_pair_readiness.py",
+      "sha256": "35a2840642512056d8d3ae7ea7160070cbd875fb387b0a32eed64c0ac888e258",
+      "git_blob_sha1": "cf44aa738f042a7f15256f999f70f7669c4f4d04"
+    },
+    "profile_proposal": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case8_validation_pair_profile_cpu_v1/proposal.json",
+      "sha256": "1a74b5d362e8c92c76b18e2c2ea0a9e7d67745504ea57fd27099cbc688dfb829",
+      "git_blob_sha1": "aac03d3852d9dea30ecff1caf5b017d147c436b1"
+    },
+    "profile_builder": {
+      "path": "scripts/two_wheel_balance/build_model_based_corrective_case8_validation_pair_profiles.py",
+      "sha256": "d3544aa85735c45eb89c66f2214f100d0989dfc0c3b43cbf5db997d89ba85f0a",
+      "git_blob_sha1": "6cb1b96cc1b209b27276c3d8d2b3d892baa3d5e9"
+    },
+    "case8_plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case8_validation_pair_readiness_cpu_v1/source/case_0008_smoothed_riser_plan_v1.npz",
+      "sha256": "f07ff020128dee70ea9c8c2d806dc75c8e0ef3964dccb4e0aabfd1b0048f3655",
+      "git_blob_sha1": "a8450006c367ed4b0f8b172c106c471aa07b45c8"
+    },
+    "perturbation_profile": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case8_validation_wrench_profile_v1.json",
+      "sha256": "7fecccc20e485bd3148434a8aa3c7571d6b83ff33530b7e0ee848d5c9d070ac5",
+      "git_blob_sha1": "808ff686092e65376df3c25bbd296ee762f873a6"
+    },
+    "corrective_profile": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case8_validation_profile_v1.json",
+      "sha256": "26e5fc5caf9cf041294bbd856862d8ec19e2c6cf2daa5aa2c0138523db3f5ce0",
+      "git_blob_sha1": "a39470082cce83ea8fd9d1c3086692417cb94570"
+    },
+    "lqr_gains": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+      "sha256": "2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6",
+      "git_blob_sha1": "70ecdd8ae6b7ce09574a97a8581229cb90add623"
+    },
+    "robot_build_audit": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/build_audit.json",
+      "sha256": "8be2b59a03a6c22838795ad361a86bf0f60a7534aeacd62893013f0ee27b40d9",
+      "git_blob_sha1": "83f8715d05be714dd8dcb2b0a9f47ef3f4bec8e9"
+    },
+    "robot_urdf": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.urdf",
+      "sha256": "603cecfc5b54e659f5d030023a69a3b42d6567f66d2771fbb7127d186f1a9afa",
+      "git_blob_sha1": "c70bf24a3189ccd24553287590dcfd191737ab33"
+    },
+    "robot_usd": {
+      "path": "assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd",
+      "sha256": "89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0",
+      "git_blob_sha1": "b25242c27c781b5aad4fadefb0cbf54398a9a75a"
+    },
+    "playback": {
+      "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+      "sha256": "f5ccbfb0b5ba15a9f94ee958ffff2f0bb6556a3f1e600555bf73764b21dc22c5",
+      "git_blob_sha1": "6939c38c47c9eff55277d04c153a3e77a92c47d0"
+    },
+    "corrective_teacher_runtime": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_corrective_teacher.py",
+      "sha256": "921112be40d49ae19ad06a377450c09455ac8afb5c1c8b9240591043ac47afd0",
+      "git_blob_sha1": "932ef1d6aed6f060acae7aaecc14f67dc481cb17"
+    },
+    "perturbation_runtime": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_perturbation.py",
+      "sha256": "789bc8b17d7f44b1063bdb3434ef16792449bd4ef3260cbf5f7bdf1ed2ed8779",
+      "git_blob_sha1": "6c5a8a592873d4c06a5fc8de10662890e6602395"
+    },
+    "validation_assessment": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_corrective_validation.py",
+      "sha256": "8f0eab36a4b034850f2a637035d179f5283c61b369dc4453919778b7f4cb4778",
+      "git_blob_sha1": "d0f979d27416094e07f88eabe21576cdd3e368fe"
+    },
+    "preflight_wrapper": {
+      "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case8_validation_pair.sh",
+      "sha256": "1d470c08811153c6c69ce1aea0b779395b3da98aca0db608b18112479be10541",
+      "git_blob_sha1": "bf5bc54cd8252dbc88ac009419bb305ca56837db"
+    },
+    "contract_validator": {
+      "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case8_validation_pair.py",
+      "sha256": "6483b5d380e805a91541d6a9bc1dc37e130ff584802b893050bd13bf45dbcde2",
+      "git_blob_sha1": "0ed16ad85b1dbbd56d4c936d0061b275911a4391"
+    },
+    "paired_finalizer": {
+      "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case8_validation_pair.py",
+      "sha256": "3430c7bffdd457aee65d158a44ecbc804c4d3ee41c1241e2d66094226fc5b95e",
+      "git_blob_sha1": "a508eedfdd0c75d2e09592b927ede2133ea789be"
+    }
+  },
+  "source_validation_cases": [
+    8,
+    16,
+    22,
+    32,
+    78
+  ],
+  "selected_validation_cases": [
+    8,
+    16
+  ],
+  "validation_runtime_opened": false,
+  "holdout_opened": false,
+  "cpu_preflight_ready": true,
+  "runtime_route_contract_ready": true,
+  "execution_route_complete": true,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "authorization_token_issued": false,
+  "runtime_authorization_token_sha256": "",
+  "teacher_admission_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_creation_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false
+}

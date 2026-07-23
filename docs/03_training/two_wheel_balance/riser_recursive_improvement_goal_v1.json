@@ -422,6 +422,8 @@
         "case6_wrench_profile_sha256": "e012cbd1eca35bcd1ead49abc5888c5bcc97f940211a743a06b396736d7a812c",
         "case6_pair_profile_mac_windows_byte_parity": true,
         "case6_pair_profile_focused_cpu_suite": "50_passed_2_warnings",
+        "case6_pair_profile_authoritative_cpu_commit": "3e3a4f070b1384a8a798d908e4bc174060921ba7",
+        "case6_pair_profile_authoritative_cpu_suite": "1124_passed_12_skipped_2_warnings_in_113.57s",
         "case6_pair_profile_envelope_retention_fraction": 0.75,
         "case6_pair_profile_maximum_residuals": [0.028767878925779956, 0.007952802338471211, 0.0017865156836203155],
         "case6_pair_profile_slew_horizon_s": 0.3,

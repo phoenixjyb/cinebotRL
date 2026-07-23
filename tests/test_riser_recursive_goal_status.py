@@ -614,6 +614,12 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["case6_pair_profile_focused_cpu_suite"] == (
         "50_passed_2_warnings"
     )
+    assert corrective["case6_pair_profile_authoritative_cpu_commit"] == (
+        "3e3a4f070b1384a8a798d908e4bc174060921ba7"
+    )
+    assert corrective["case6_pair_profile_authoritative_cpu_suite"] == (
+        "1124_passed_12_skipped_2_warnings_in_113.57s"
+    )
     assert corrective[
         "case6_pair_profile_envelope_retention_fraction"
     ] == 0.75

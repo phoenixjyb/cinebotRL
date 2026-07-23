@@ -32,3 +32,7 @@ BC, PPO, or training is enabled.
 The focused suite passes `50` tests on macOS and `.98`. Both platforms
 regenerate byte-identical corrective, wrench, and proposal files at the hashes
 recorded in `SHA256SUMS`.
+
+The authoritative `.98` CPU suite passes
+`1124 passed, 12 skipped, 2 warnings in 113.57 s` at status commit
+`3e3a4f070b1384a8a798d908e4bc174060921ba7`.

@@ -8645,6 +8645,9 @@ and must state whether its candidate was accepted or rejected.
   tests on macOS and `.98`. Both platforms regenerate byte-identical profile
   and proposal artifacts. Proposal SHA-256 is
   `649aeaa56333b9172e4a25d0f34a716d09a51da7cfa1f269ca14ab32da384b64`.
+- Status commit `3e3a4f070b1384a8a798d908e4bc174060921ba7` passes the
+  authoritative `.98` CPU suite:
+  `1124 passed, 12 skipped, 2 warnings in 113.57 s`.
 - `pair_profile_cpu_ready=true`, but no runtime route or authorization exists.
   No token, GPU launch, capture, conversion, merge, BC, PPO, or training was
   created. Goal completion remains `6/10`.

@@ -249,7 +249,7 @@
         "case23_capture_authoritative_cpu_suite": "892_passed_12_skipped_2_warnings",
         "case23_capture_authorized": false,
         "case23_conversion_authorized": false,
-        "temporal_projection_audit_sha256": "e4513b0d7878d6a5c436d9b32d03c4a4ee27c38563a982ad86ccf73cbd5575d7",
+        "temporal_projection_audit_sha256": "349e61367603d1945774edfc7839040a6eaef66261991425eeeb43bc4a561c47",
         "temporal_projection_contract": "model_based_residual_safety_projection_v1",
         "requested_teacher_slew_violation_count": [0, 0, 0],
         "effective_label_slew_violation_count": [30, 49, 8],

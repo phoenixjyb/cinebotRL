@@ -3,7 +3,7 @@
   "case": 30,
   "audit_script": {
     "path": "scripts/two_wheel_balance/audit_model_based_corrective_temporal_projection.py",
-    "sha256": "e3a02a110f95d9386969cf5c73101cd151dc326b2898cd0c7a8b507cbfd24b20"
+    "sha256": "bfce69e53f8661b1ac976f75688336a74ae27ec2b94f71901ba7344f530fe1b6"
   },
   "dataset": {
     "path": "docs/03_training/two_wheel_balance/evidence_20260723_case30_effective_label_conversion_v1/case_0030_model_based_corrective_case_dataset_v1.npz",

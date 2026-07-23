@@ -46,9 +46,9 @@ def sha256(path: Path) -> str:
 def portable_path(path: Path) -> str:
     resolved = path.resolve()
     try:
-        return str(resolved.relative_to(PROJECT_ROOT.resolve()))
+        return resolved.relative_to(PROJECT_ROOT.resolve()).as_posix()
     except ValueError:
-        return str(resolved)
+        return resolved.as_posix()
 
 
 def _rate_summary(

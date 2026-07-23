@@ -7617,7 +7617,7 @@ and must state whether its candidate was accepted or rejected.
   output slew must be regularized/gated independently; clipped effective-label
   transitions must not be naively classified as teacher chatter.
 - Audit summary SHA-256 is
-  `e4513b0d7878d6a5c436d9b32d03c4a4ee27c38563a982ad86ccf73cbd5575d7`.
+  `349e61367603d1945774edfc7839040a6eaef66261991425eeeb43bc4a561c47`.
   It is valid only for BC contract review. Case-23 capture, corpus merge, BC,
   PPO, learned rollout, and training remain unauthorized, and no Isaac/GPU
   process was launched.

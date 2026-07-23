@@ -76,8 +76,9 @@ def test_wrapper_is_capture_only_and_closes_consumed_authorization() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
     assert 'readonly AUTHORIZATION_SHA256=""' in source
     output_line = (
-        'readonly OUTPUT_WIN="${WIN_ROOT}\\\\artifacts\\\\two_wheel_riser'
-        '\\\\${NAMESPACE}"'
+        "readonly OUTPUT_WIN=\"${WIN_ROOT}\""
+        "'\\artifacts\\two_wheel_riser\\'"
+        '"${NAMESPACE}"'
     )
     assert output_line in source
     expanded = subprocess.run(

@@ -35,10 +35,10 @@ The finalizer exited fail-closed with code `6`.
 - No playback, Isaac, Kit, or compute process remains on the GPU.
 - The rejected namespace is preserved as immutable attempt evidence.
 
-The wrapper path is repaired with explicit braced expansion,
-`${WIN_ROOT}\\...\\${NAMESPACE}`, and the canonical contract is returned to a
-no-token state. That repair is CPU-only and does not authorize a second
-runtime.
+The wrapper path is repaired by concatenating the expanded root, a literal
+Windows path separator, and the expanded namespace as separate shell segments.
+The canonical contract is returned to a no-token state. That repair is
+CPU-only and does not authorize a second runtime.
 
 ## Evidence
 

@@ -110,8 +110,8 @@
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case23_capture_v2.sh",
-      "sha256": "0f02b7e523cd5680b465f2eb2263c9524d0be4241ae6b7f04a670ea970e95eef",
-      "git_blob_sha1": "8b639ecbf9bcb15ab8efd977c537577cd6fd5e43"
+      "sha256": "609bc3eeabf728edde0de4fc1277246339bb38e94db1a6c6c12e35976a17d9c5",
+      "git_blob_sha1": "d507298cfa9c43ebe40a0c55b92467b72d7b3183"
     },
     "capture_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case23_capture_v2.py",

@@ -46,7 +46,7 @@ def _sha256(path: Path) -> str:
 
 def _git_blob(path: Path) -> str:
     return subprocess.run(
-        ["git", "hash-object", str(path)],
+        ["git", "hash-object", path.relative_to(ROOT).as_posix()],
         cwd=ROOT,
         check=True,
         capture_output=True,
@@ -123,8 +123,9 @@ def test_v2_wrapper_expands_namespace_and_cannot_execute_without_token() -> None
         line for line in source.splitlines() if line.startswith("readonly OUTPUT_WIN=")
     )
     assert output_line == (
-        'readonly OUTPUT_WIN="${WIN_ROOT}\\\\artifacts\\\\two_wheel_riser'
-        '\\\\${NAMESPACE}"'
+        "readonly OUTPUT_WIN=\"${WIN_ROOT}\""
+        "'\\artifacts\\two_wheel_riser\\'"
+        '"${NAMESPACE}"'
     )
     shell = "\n".join(
         [

@@ -19,7 +19,7 @@ assert SPEC.loader is not None
 SPEC.loader.exec_module(MODULE)
 
 
-def test_committed_contract_pins_passed_pair_and_one_use_capture_authorization() -> None:
+def test_committed_contract_pins_passed_pair_and_closes_consumed_authorization() -> None:
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
     assert contract["case"] == 23
     assert contract["split"] == "train"
@@ -37,13 +37,11 @@ def test_committed_contract_pins_passed_pair_and_one_use_capture_authorization()
     assert "drive_profile_selection" in MODULE.REQUIRED_IDENTITIES
     assert "drive_profile_selection" in MODULE.TRACKED_IDENTITIES
     assert contract["execution_contract"] == MODULE.EXPECTED_EXECUTION
-    assert contract["runtime_authorized"] is True
-    assert contract["gpu_launch_authorized"] is True
-    assert contract["authorization_token_issued"] is True
-    assert contract["runtime_authorization_token_sha256"] == (
-        "REDACTED_CONSUMED_ONE_USE_AUTHORIZATION_HASH"
-    )
-    assert contract["label_capture_authorized"] is True
+    assert contract["runtime_authorized"] is False
+    assert contract["gpu_launch_authorized"] is False
+    assert contract["authorization_token_issued"] is False
+    assert contract["runtime_authorization_token_sha256"] == ""
+    assert contract["label_capture_authorized"] is False
     assert contract["dataset_creation_authorized"] is False
     assert contract["bc_authorized"] is False
     assert contract["ppo_authorized"] is False
@@ -74,12 +72,10 @@ def test_case23_adapter_passes_exact_configuration_to_generic_validator(monkeypa
     assert observed["expected_execution"] == MODULE.EXPECTED_EXECUTION
 
 
-def test_wrapper_is_capture_only_and_requires_exact_one_use_token() -> None:
+def test_wrapper_is_capture_only_and_closes_consumed_authorization() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
-    assert (
-        'readonly AUTHORIZATION_SHA256="'
-        'REDACTED_CONSUMED_ONE_USE_AUTHORIZATION_HASH"'
-    ) in source
+    assert 'readonly AUTHORIZATION_SHA256=""' in source
+    assert 'readonly OUTPUT_WIN="$WIN_ROOT\\artifacts\\two_wheel_riser\\\\$NAMESPACE"' in source
     assert "--cases 23" in source
     assert "--policy-command-base model_based_planner" in source
     assert "--corrective-teacher-capture-dir" in source
@@ -93,7 +89,7 @@ def test_wrapper_is_capture_only_and_requires_exact_one_use_token() -> None:
         check=False,
     )
     assert result.returncode == 4
-    assert "authorization_file_missing" in result.stderr
+    assert "runtime_authorization_not_issued" in result.stderr
 
 
 def test_case23_adapter_rejects_wrong_namespace_before_runtime(monkeypatch) -> None:

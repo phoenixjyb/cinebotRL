@@ -10,14 +10,15 @@ readonly POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.e
 readonly PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 readonly WIN_ROOT="G:\wSpace\cinebotRL-two-wheel-riser"
 readonly OUTPUT="$ROOT/artifacts/two_wheel_riser/$NAMESPACE"
-readonly OUTPUT_WIN="$WIN_ROOT\artifacts\two_wheel_riser\$NAMESPACE"
+readonly OUTPUT_WIN="$WIN_ROOT\artifacts\two_wheel_riser\\$NAMESPACE"
 readonly PLAN_DIR="$WIN_ROOT\artifacts\two_wheel_riser\20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu"
 readonly WRENCH_PROFILE="$WIN_ROOT\scripts\two_wheel_balance\model_based_corrective_teacher_case23_wrench_profile_v1.json"
 readonly CORRECTIVE_PROFILE="$WIN_ROOT\scripts\two_wheel_balance\model_based_corrective_teacher_case23_profile_v1.json"
 readonly GAINS="$WIN_ROOT\docs\03_training\two_wheel_balance\evidence_20260714_28kg\lqr_gains.json"
 readonly PLAYBACK="$WIN_ROOT\scripts\two_wheel_balance\smoke_riser_reference_playback.py"
 readonly FINALIZER="$WIN_ROOT\scripts\two_wheel_balance\summarize_model_based_corrective_teacher_case23_capture.py"
-readonly AUTHORIZATION_SHA256="REDACTED_CONSUMED_ONE_USE_AUTHORIZATION_HASH"
+# The one-use authorization was consumed by the rejected v1 attempt.
+readonly AUTHORIZATION_SHA256=""
 
 reject() {
   printf '{"reason":"%s","runtime_started":false,"label_capture_started":false,"passed":false}\n' "$1" >&2

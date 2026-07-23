@@ -8405,6 +8405,10 @@ and must state whether its candidate was accepted or rejected.
   `1082 passed, 12 skipped, 2 warnings` in `113.60 s`.
 - No render admission, namespace, Isaac process, recording, policy, capture,
   BC, PPO, or GPU workload was created. Goal completion remains `6/10`.
+- Status commit `1f34408063025397e6376666713b7a4e91765133`
+  regenerates a byte-identical completion report on macOS and `.98` at
+  SHA-256
+  `7de87987498744eba5a48d787559d5c80aa55c20b660d0c752f7f8c0f65053df`.
 
 ## Next round after Round 216
 

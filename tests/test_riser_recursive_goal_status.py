@@ -788,12 +788,12 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "1082_passed_12_skipped_2_warnings_in_113.60s"
     )
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
-        "387d15eb4a812bff8461bd5480be5b5864bae34e0b93205fbc4d1203eb20d51f"
+        "7de87987498744eba5a48d787559d5c80aa55c20b660d0c752f7f8c0f65053df"
     )
     report = json.loads(GOAL_COMPLETION_AUDIT.read_text())
-    assert report["git"]["head"] == "e6ceab046f9bab5954697fca01fa774c0642d92f"
+    assert report["git"]["head"] == "1f34408063025397e6376666713b7a4e91765133"
     assert report["inputs"]["auditor"]["sha256"] == (
-        "b895c25183ba1a3451f76377a62a9abbe632babd57db24c1a509947fb97d0510"
+        "1d2903d0f7f7c9e0a76bfdc220072b89180a5f44b64cb7840925a0cddb1c8d63"
     )
     assert report["required_gate_pass_count"] == audit["required_gate_pass_count"]
     assert report["required_gate_count"] == audit["required_gate_count"]

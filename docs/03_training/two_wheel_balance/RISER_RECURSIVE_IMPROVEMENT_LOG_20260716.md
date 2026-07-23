@@ -7456,3 +7456,39 @@ and must state whether its candidate was accepted or rejected.
 - Learning: remain at the separately reviewed case-23 capture boundary. Do not
   infer runtime authorization from the hardware candidate or its passing CPU
   audit.
+
+## Round 190: residual DNN offline promotion is separated from runtime
+
+- Commit `10174a2ca9fc3932317651cc1f6865a477b157e1` repairs the generic
+  residual-BC admission semantics. A validation pass and emitted checkpoint now
+  set `offline_policy_candidate_ready=true` while always retaining
+  `learned_rollout_authorized=false`, `dynamic_holdout_authorized=false`, and
+  `separate_dynamic_authorization_required=true`.
+- Gate B verifies that separation instead of treating offline MSE as permission
+  to launch a learned policy. Gate C therefore remains closed until a separate
+  one-shot contract binds the policy SHA-256, source commit, case set, and fresh
+  runtime namespace.
+- Offline admission also requires every teacher-forced validation prediction,
+  and every recursive validation prediction when scheduled sampling is
+  enabled, to stay strictly below normalized magnitude `0.95`. This reserves
+  action margin in addition to the existing `tanh` bound and dynamic safety
+  supervisor.
+- No policy architecture, observation, action scale, controller, plan, source
+  trajectory, dataset, runtime command, or dynamic threshold changed. No
+  checkpoint was trained and no Isaac, capture, holdout, BC campaign, or PPO
+  process was launched.
+- Focused Mac tests passed `60/60`. The Mac full suite could not collect six
+  unrelated mobile-manipulator modules because local `gymnasium` is absent.
+  The authoritative `.98` Isaac Python suite passed
+  `880 passed, 12 skipped, 2 warnings` in `81.22 s`.
+
+## Next round after Round 190
+
+- Learning data remains the blocking gap: only case 30 has a converted
+  model-based corrective case dataset and there are zero admitted multi-case
+  training-corpus cases.
+- Keep runtime and training closed. The next bounded runtime action remains
+  exactly one separately authorized case-23 corrective-label capture using the
+  already reviewed capture-only contract. A successful capture still requires
+  separate conversion review and does not authorize BC, holdout evaluation, or
+  PPO.

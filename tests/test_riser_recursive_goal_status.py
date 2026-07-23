@@ -661,7 +661,7 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     ]
     assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v1"
     assert audit["implementation_commit"] == (
-        "09df01ab7a0db3581ba36fa2a16d3b70852e97aa"
+        "15a58801ae0fab3fdc5686a1d0a7b0da8b42e6ef"
     )
     assert audit["host_independent_lf_evidence"] is True
     assert audit["mac_and_windows_report_byte_parity_verified"] is True
@@ -674,7 +674,7 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "955cbe3068aa0bb2f8b601dbeddd283b86aab6ebb23034315f0bf1ef4d1ed438"
     )
     assert audit["learned_all79_admission_implementation_commit"] == (
-        "09df01ab7a0db3581ba36fa2a16d3b70852e97aa"
+        "15a58801ae0fab3fdc5686a1d0a7b0da8b42e6ef"
     )
     assert audit["learned_all79_exact_source_and_plan_identity_bound"] is True
     assert audit["learned_all79_runtime_asset_identity_bound"] is True
@@ -690,6 +690,38 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "validate_model_based_learned_all79_admission.py"
     )
     assert audit["learned_all79_requires_validation_and_holdout"] is True
+    assert audit["learned_split_admission_schema"] == (
+        "cinebotrl_two_wheel_riser_model_based_learned_split_admission_v1"
+    )
+    assert audit["learned_split_admission_template_sha256"] == _sha256(
+        ROOT
+        / "docs/03_training/two_wheel_balance/"
+        "MODEL_BASED_LEARNED_SPLIT_ADMISSION_TEMPLATE_20260723.json"
+    )
+    assert audit["learned_split_admission_module_sha256"] == _sha256(
+        ROOT
+        / "src/rl_platform/tasks/two_wheel_balance/"
+        "riser_model_based_learned_split_contract.py"
+    )
+    assert audit["learned_split_execution_wrapper_sha256"] == _sha256(
+        ROOT
+        / "scripts/two_wheel_balance/"
+        "run_model_based_learned_split_policy_gate.sh"
+    )
+    assert audit["learned_split_preflight_validator_sha256"] == _sha256(
+        ROOT
+        / "scripts/two_wheel_balance/"
+        "validate_model_based_learned_split_admission.py"
+    )
+    assert audit["learned_split_model_based_route_required"] is True
+    assert audit["learned_split_validation_before_holdout_required"] is True
+    assert audit["learned_split_holdout_cases"] == [3, 5, 13, 19, 24]
+    assert (
+        audit["learned_split_admission_and_preflight_contents_revalidated_by_all79"]
+        is True
+    )
+    assert audit["learned_split_runtime_authorized"] is False
+    assert audit["learned_split_holdout_opened"] is False
     assert audit["learned_all79_runtime_authorized"] is False
     assert audit["render_policy_all79_video_hashes_required"] is True
     assert audit["render_intact_robot_visual_checks_required"] is True
@@ -707,8 +739,11 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["runtime_started"] is False
     assert audit["bc_started_by_audit"] is False
     assert audit["ppo_started_by_audit"] is False
-    assert audit["focused_local_cpu_suite"] == "36_passed_2_warnings"
-    assert audit["focused_windows_cpu_suite"] == "36_passed_2_warnings"
+    assert audit["focused_local_cpu_suite"] == "61_passed_2_warnings"
+    assert audit["focused_windows_cpu_suite"] == "61_passed_2_warnings"
+    assert audit["authoritative_windows_cpu_suite"] == (
+        "1068_passed_12_skipped_2_warnings_in_111.96s"
+    )
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
         "20e7b456e9fe481857a3cf3a0ddc1092b41b96fc01254d4c3338fa5f1ec294d0"
     )

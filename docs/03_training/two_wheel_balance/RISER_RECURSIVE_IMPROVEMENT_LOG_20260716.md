@@ -8344,3 +8344,38 @@ and must state whether its candidate was accepted or rejected.
 - After a real `4+2` corpus and separately admitted BC exist, populate the
   model-based learned all-79 admission and run preflight before considering a
   learned-policy rollout.
+
+## Round 215: learned validation and holdout use the current model-based route
+
+- Added one fail-closed split-evaluation admission for `validation_canary` and
+  `holdout`. Validation cases must come exactly from the passing BC report.
+  Holdout remains fixed at `[3,5,13,19,24]` and requires a separately
+  hash-bound passing validation report plus explicit model-selection
+  completion.
+- Both modes use the current
+  `model_based_planner + [0.05,0.05,0.02]` residual contract, frozen controller
+  settings, source/plan/runtime-asset identities, clean synchronized execution
+  commit, CPU preflight, fresh namespace, GPU ownership guard, bounded timeout,
+  and validated resume semantics.
+- Every split evaluates the complete model-based zero-residual baseline and
+  learned TorchScript policy. The baseline is the teacher and null-action
+  reference; the historical phase-feedforward holdout wrapper is explicitly
+  invalid for this policy.
+- The final all-79 admission now opens and validates the contents of each
+  split admission and preflight receipt rather than trusting their hashes
+  alone. Tests reject rehashed admissions that enable PPO and rehashed
+  preflights whose clean-state check is false.
+- Implementation commit
+  `15a58801ae0fab3fdc5686a1d0a7b0da8b42e6ef` passes `61` focused tests
+  on macOS and `.98`; the authoritative `.98` suite passes
+  `1068 passed, 12 skipped, 2 warnings` in `111.96 s`.
+- No real BC policy, split admission, runtime token, namespace, Isaac process,
+  validation rollout, holdout access, capture, PPO, or GPU workload was
+  created. The completion result remains `6/10`.
+
+## Next round after Round 215
+
+- The nearest data-path action remains exactly one separately authorized
+  case-23 v4 corrective-label capture. A passing conversion advances the
+  training corpus; it does not authorize validation, holdout, BC, all-79, or
+  PPO.

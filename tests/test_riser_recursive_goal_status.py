@@ -13,6 +13,22 @@ GOAL_COMPLETION_AUDIT = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_riser_goal_completion_audit_v5/summary.json"
 )
+CORRECTIVE_ROUTE_CATALOG = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_route_catalog_v1.json"
+)
+CORRECTIVE_ROUTE_PREPARER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "prepare_model_based_corrective_routes.py"
+)
+CORRECTIVE_ROUTE_PREFLIGHT = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_model_based_corrective_route_catalog_cpu_v1/"
+    "summary.json"
+)
 CASE23_CAPTURE_CONTRACT = (
     ROOT
     / "scripts/two_wheel_balance/model_based_corrective_teacher_case23_capture_contract_v1.json"
@@ -2753,6 +2769,42 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert (
         audit["pre_training_pending_route_queue_all_authorization_closed"]
         is True
+    )
+    assert audit["pre_training_corrective_route_catalog_consolidated"] is True
+    assert audit["pre_training_corrective_route_catalog_schema"] == (
+        "cinebotrl_two_wheel_riser_model_based_corrective_route_catalog_v1"
+    )
+    assert audit["pre_training_corrective_route_catalog_sha256"] == _sha256(
+        CORRECTIVE_ROUTE_CATALOG
+    )
+    assert audit["pre_training_corrective_route_preparer_sha256"] == _sha256(
+        CORRECTIVE_ROUTE_PREPARER
+    )
+    assert audit[
+        "pre_training_corrective_route_preflight_report_sha256"
+    ] == _sha256(CORRECTIVE_ROUTE_PREFLIGHT)
+    assert audit["pre_training_corrective_route_catalog_routes"] == [
+        "case7_pair",
+        "case8_validation_pair",
+        "case16_validation_pair",
+    ]
+    assert audit["pre_training_corrective_route_catalog_identity_count"] == 61
+    assert (
+        audit["pre_training_corrective_route_catalog_observation_dimension"]
+        == 65
+    )
+    assert audit["pre_training_corrective_route_catalog_action_dimension"] == 3
+    assert (
+        audit["pre_training_corrective_route_catalog_mac_windows_byte_parity"]
+        is True
+    )
+    assert (
+        audit["pre_training_corrective_route_catalog_runtime_authorized"]
+        is False
+    )
+    assert (
+        audit["pre_training_corrective_route_catalog_training_authorized"]
+        is False
     )
     assert audit["pre_training_next_operation"] == (
         "authorize_exactly_one_case7_paired_canary"

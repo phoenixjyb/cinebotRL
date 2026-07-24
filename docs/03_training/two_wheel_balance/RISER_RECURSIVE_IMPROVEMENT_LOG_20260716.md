@@ -9939,3 +9939,35 @@ and must state whether its candidate was accepted or rejected.
   canaries fail for the correct reason.
 - The next data-producing operation requires a new separate authorization:
   `Authorize exactly one case-7 paired canary.`
+
+## Round 257: pending corrective routes use one CPU preflight
+
+- Replaced repeated operator-side CPU preparation for pending cases 7, 8, and
+  16 with one committed route catalog and one fail-closed preflight command.
+  The existing case-specific wrappers remain the runtime backends.
+- The catalog binds 61 identities across the three routes and verifies the
+  canonical 65-observation, three-action residual contract with scales
+  `[0.05, 0.05, 0.02]`.
+- The first Windows run exposed two portability defects rather than route
+  defects: native Windows Python passed `G:\...` paths to WSL Git and launched
+  wrapper checks through Git Bash without WSL `python3`. Both boundaries now
+  use explicit WSL translation and have regression coverage.
+- The final focused compatibility suite passes `46 passed, 2 warnings in
+  6.96s` locally and `46 passed, 2 warnings in 66.63s` on `.98`. Both hosts
+  produced byte-identical all-route reports at SHA-256
+  `74aafa819003e41fbf8040ad4ba563915a149ae21e4fb55b98d20c5567ddbd52`.
+- Evidence is preserved under
+  `evidence_20260724_model_based_corrective_route_catalog_cpu_v1`.
+  Implementation commit
+  `b5292df1ebf704f13e7e67552502b70635c34197` is pushed and synchronized.
+- No plan, controller command, dynamic gate, profile, or safety ownership
+  changed. No authorization token, runtime namespace, Isaac/GPU workload,
+  capture, conversion, merge, BC, PPO, checkpoint, or training run was
+  created. Goal completion remains `6/10`.
+
+## Next round after Round 257
+
+- Repair the shared projection-observer evidence contract CPU-only so later
+  canaries fail for the correct reason.
+- The next data-producing operation remains separately authorized:
+  `Authorize exactly one case-7 paired canary.`

@@ -2356,7 +2356,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "exactly_one_case23_v4_cpu_conversion" in (
+    assert "exactly_one_case6_corrective_label_capture" in (
         goal["next_iteration"]["required_change"]
     )
 

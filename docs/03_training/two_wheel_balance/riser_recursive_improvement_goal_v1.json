@@ -475,6 +475,24 @@
         "case6_pair_profile_runtime_authorized": false,
         "case6_pair_profile_label_capture_authorized": false,
         "case6_pair_profile_training_authorized": false,
+        "case6_pair_execution_schema": "cinebotrl_two_wheel_riser_corrective_teacher_case6_pair_final_v2",
+        "case6_pair_execution_runtime_commit": "1a331133832bdf45cf4d8035f7b411e08c664522",
+        "case6_pair_execution_namespace": "20260724_model_based_corrective_teacher_case6_pair_v2_exclusive",
+        "case6_pair_execution_final_status_sha256": "c723407d40072b0e0753036b65f66e64963268d5f2d01934a2b4a13d1aa96458",
+        "case6_pair_execution_baseline_sha256": "318817eeba07cebaed864853278faedfb03243b0d5c57ac92ab21216ea8985c9",
+        "case6_pair_execution_candidate_sha256": "32200fa20f15a249f02e2e7e90d1f1f8e95db90371305b0d869f20c65970b92a",
+        "case6_pair_execution_baseline_position_p95_m": 0.11812328134807577,
+        "case6_pair_execution_candidate_position_p95_m": 0.11055969082871452,
+        "case6_pair_execution_position_p95_improvement_m": 0.007563590519361257,
+        "case6_pair_execution_position_p95_improvement_fraction": 0.0640313275506926,
+        "case6_pair_execution_dynamic_pair_completed": true,
+        "case6_pair_execution_corrective_target_admission_passed": true,
+        "case6_pair_execution_label_capture_authorized": false,
+        "case6_pair_execution_dataset_created": false,
+        "case6_pair_execution_bc_authorized": false,
+        "case6_pair_execution_ppo_authorized": false,
+        "case6_pair_execution_training_started": false,
+        "case6_pair_execution_valid_for_training": false,
         "case2_pair_readiness_schema": "cinebotrl_two_wheel_riser_case2_pair_readiness_cpu_v1",
         "case2_pair_readiness_implementation_commit": "9a16e5ca18ab4da96d78269234b674eec88d103c",
         "case2_pair_readiness_script_sha256": "ebd4a82b395058559685f98672f024e82061c53041c0763552426f92943c55b9",
@@ -1239,15 +1257,15 @@
       ]
     },
     "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
-    "current_root_cause": "case23_v4_capture_passed_and_is_admitted_for_separate_cpu_conversion_but_the_real_case_disjoint_4_train_plus_2_validation_corrective_corpus_does_not_yet_exist",
-    "remote_isaac_validation": "42_dynamic_candidates_plus_exact_zero_case8_case78_preservation_plus_passed_case30_and_case23_corrective_pairs_plus_passed_case30_and_case23_corrective_captures",
+    "current_root_cause": "case6_corrective_pair_passed_but_requires_separately_authorized_label_capture_and_conversion_before_the_real_case_disjoint_4_train_plus_2_validation_corrective_corpus_can_exist",
+    "remote_isaac_validation": "42_dynamic_candidates_plus_exact_zero_case8_case78_preservation_plus_passed_case30_case23_case6_corrective_pairs_plus_passed_case30_and_case23_corrective_captures",
     "accepted_evidence": "docs/03_training/two_wheel_balance/RISER_RECURSIVE_IMPROVEMENT_LOG_20260716.md"
   },
   "next_iteration": {
-    "hypothesis": "the_cpu_reviewed_case23_v4_archive_can_be_converted_once_into_one_case23_train_split_dataset_without_changing_labels_clocks_or_identity_and_without_opening_training",
-    "required_change": "require_a_new_separate_explicit_authorization_then_execute_exactly_one_case23_v4_cpu_conversion_and_reopen_the_output",
-    "success_path": "case23_becomes_the_second_admitted_case_dataset_then_the_diverse_train_tranche_continues_with_case6_case2_and_case7",
-    "rejection_path": "preserve_the_passing_raw_capture_without_modification_and_reject_conversion_if_any_schema_clock_identity_or_projection_check_fails",
-    "stop_rule": "no_case23_v4_conversion_authorization_exists_and_the_consumed_capture_authorization_does_not_authorize_conversion_corpus_merge_bc_ppo_holdout_or_any_additional_runtime_case"
+    "hypothesis": "the_dynamically_admitted_case6_corrective_target_can_be_captured_once_with_identical_plan_seed_physics_wrench_and_supervisor_contract_without_regressing_the_paired_gate",
+    "required_change": "require_a_new_separate_explicit_authorization_then_execute_exactly_one_case6_corrective_label_capture_and_reopen_the_output",
+    "success_path": "case6_capture_passes_then_requires_separate_cpu_conversion_before_the_diverse_train_tranche_continues_with_case2_and_case7",
+    "rejection_path": "preserve_the_passing_case6_pair_without_modification_and_reject_capture_if_any_dynamic_identity_clock_projection_or_data_contract_check_fails",
+    "stop_rule": "no_case6_capture_authorization_exists_and_the_consumed_pair_authorization_does_not_authorize_capture_conversion_corpus_merge_bc_ppo_holdout_or_any_additional_runtime_case"
   }
 }

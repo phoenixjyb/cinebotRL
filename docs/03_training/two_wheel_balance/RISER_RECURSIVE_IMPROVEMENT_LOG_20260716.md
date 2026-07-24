@@ -9727,3 +9727,36 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-6 paired canary.`
 - If case 6 passes its paired dynamic gate, review and authorize its corrective
   capture separately. Do not skip directly to conversion, merge, or BC.
+
+## Round 252: case-6 paired corrective target passes
+
+- Consumed exactly one external mode-`0600` authorization and executed the
+  pinned case-6 paired wrapper once at clean synchronized runtime commit
+  `1a331133832bdf45cf4d8035f7b411e08c664522`. The token was removed before
+  Isaac started and was not recreated.
+- Baseline and candidate used the same case-6 plan, source/execution clocks,
+  reset seed, physics, controller settings, and deterministic 20-step `20 N`
+  body-x wrench. Both dynamic-quality gates passed without termination.
+- The candidate reduced camera-position p95 error from `0.118123281 m` to
+  `0.110559691 m`: `0.007563591 m` absolute and `6.4031%` relative
+  improvement. Position max also improved from `0.127080200 m` to
+  `0.126411242 m`; attitude max, pitch max, riser error, and saturation did
+  not regress.
+- The paired admission passed every check. Candidate normalized residual
+  maxima were `[0.462029300, 0.159056047, 0.089325784]`, within the frozen
+  action envelope.
+- Preserved admission, contract, both raw rollout JSONs, heartbeats, logs,
+  exit codes, finalizer output, and checksums under
+  `evidence_20260724_case6_corrective_pair_execution_v2`. The final-status
+  SHA-256 is
+  `c723407d40072b0e0753036b65f66e64963268d5f2d01934a2b4a13d1aa96458`.
+- No label capture, dataset, conversion, merge, BC, PPO, checkpoint, or
+  training output was created. GPU ownership was released and the case-6
+  corrective target is admitted only for a separately authorized capture.
+
+## Next round after Round 252
+
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-6 corrective-label capture.`
+- Do not reuse the consumed paired-canary authorization and do not proceed
+  directly to conversion, corpus merge, BC, PPO, or case 2.

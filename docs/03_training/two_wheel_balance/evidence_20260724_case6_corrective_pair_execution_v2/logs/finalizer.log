@@ -1,0 +1,153 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_case6_pair_final_v2",
+  "runtime_commit": "1a331133832bdf45cf4d8035f7b411e08c664522",
+  "namespace": "20260724_model_based_corrective_teacher_case6_pair_v2_exclusive",
+  "case": 6,
+  "split": "train",
+  "baseline_exit_code": 0,
+  "candidate_exit_code": 0,
+  "rollout_checks": {
+    "baseline_exit_zero": true,
+    "candidate_exit_zero": true,
+    "baseline_single_case": true,
+    "candidate_single_case": true,
+    "baseline_source": true,
+    "candidate_source": true,
+    "model_based_command_base": true,
+    "residual_scales": true,
+    "baseline_zero_action": true,
+    "candidate_profile_bound": true,
+    "baseline_profile_absent": true,
+    "perturbation_profile_bound": true,
+    "same_perturbation_profile": true,
+    "both_perturbations_exact": true,
+    "perturbation_passed": true,
+    "baseline_capture_closed": true,
+    "candidate_capture_closed": true,
+    "candidate_labels_not_captured": true,
+    "baseline_heartbeat": true,
+    "candidate_heartbeat": true,
+    "gpu_released": true
+  },
+  "contract_checks": {
+    "namespace": true,
+    "case_split": true,
+    "runtime_commit": true,
+    "admission_passed": true,
+    "runtime_authorized": true,
+    "gpu_launch_authorized": true,
+    "label_capture_closed": true,
+    "dataset_closed": true,
+    "training_closed": true,
+    "contract_identity": true
+  },
+  "baseline_metrics": {
+    "case": 6,
+    "split": "train",
+    "plan_sha256": "b8ac6a9bb226de47a2722f076efb6dcf9586fd3b85740cf6efb5926cd86568aa",
+    "physics_seed": 20260722,
+    "source_duration_s": 15.942736,
+    "execution_duration_s": 17.737274605869224,
+    "dynamic_quality_passed": true,
+    "position_error_p95_m": 0.11812328134807577,
+    "position_error_max_m": 0.12708020044068666,
+    "attitude_error_max_deg": 0.45753337220838575,
+    "pitch_max_deg": 6.393435711744048,
+    "riser_error_max_m": 0.011877704680684165,
+    "action_saturation_ratio": 0.003763171098845961,
+    "normalized_residual_action_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "dataset_created": false,
+    "training_started": false,
+    "ppo_started": false
+  },
+  "candidate_metrics": {
+    "case": 6,
+    "split": "train",
+    "plan_sha256": "b8ac6a9bb226de47a2722f076efb6dcf9586fd3b85740cf6efb5926cd86568aa",
+    "physics_seed": 20260722,
+    "source_duration_s": 15.942736,
+    "execution_duration_s": 17.737274605869224,
+    "dynamic_quality_passed": true,
+    "position_error_p95_m": 0.11055969082871452,
+    "position_error_max_m": 0.12641124164527276,
+    "attitude_error_max_deg": 0.453032403177592,
+    "pitch_max_deg": 6.3830166850520165,
+    "riser_error_max_m": 0.01007954323349236,
+    "action_saturation_ratio": 0.0032774486322954747,
+    "normalized_residual_action_abs_max": [
+      0.46202929973602297,
+      0.15905604676942423,
+      0.08932578418101578
+    ],
+    "dataset_created": false,
+    "training_started": false,
+    "ppo_started": false
+  },
+  "paired_admission": {
+    "schema": "cinebotrl_two_wheel_riser_corrective_target_pair_admission_v1",
+    "contract": "same_seed_paired_dynamic_improvement_before_label_capture_v1",
+    "case": 6,
+    "split": "train",
+    "position_p95_absolute_improvement_m": 0.007563590519361257,
+    "position_p95_relative_improvement": 0.0640313275506926,
+    "checks": {
+      "same_case_plan_seed_and_clocks": true,
+      "training_split_only": true,
+      "baseline_dynamic_quality": true,
+      "candidate_dynamic_quality": true,
+      "baseline_zero_residual": true,
+      "candidate_nonzero_bounded_residual": true,
+      "minimum_position_p95_improvement": true,
+      "position_max_not_regressed": true,
+      "attitude_max_not_regressed": true,
+      "pitch_not_regressed": true,
+      "riser_not_regressed": true,
+      "saturation_not_regressed": true,
+      "no_dataset_or_training": true
+    },
+    "corrective_target_admission_passed": true,
+    "label_capture_authorized": false,
+    "dataset_created": false,
+    "bc_authorized": false,
+    "ppo_authorized": false,
+    "training_started": false,
+    "valid_for_training": false
+  },
+  "baseline": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case6_pair_v2_exclusive\\baseline\\case_0006.json",
+    "sha256": "318817eeba07cebaed864853278faedfb03243b0d5c57ac92ab21216ea8985c9"
+  },
+  "candidate": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case6_pair_v2_exclusive\\candidate\\case_0006.json",
+    "sha256": "32200fa20f15a249f02e2e7e90d1f1f8e95db90371305b0d869f20c65970b92a"
+  },
+  "baseline_heartbeat": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case6_pair_v2_exclusive\\baseline\\runtime_heartbeat.json",
+    "sha256": "d3640825cbc6053591872c6573d7cd723d34292fa00a07342cf5b3796f2a733b"
+  },
+  "candidate_heartbeat": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case6_pair_v2_exclusive\\candidate\\runtime_heartbeat.json",
+    "sha256": "654aef381d8b2e10f0b9151567268ad4ef3b899e6c66b00375fc1afae9254a0b"
+  },
+  "admission": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case6_pair_v2_exclusive\\admission.json",
+    "sha256": "152430ec848194692a5353dd1fd90bdbcfa3c88c27bd70b83257db32a536fd36"
+  },
+  "contract": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case6_pair_v2_exclusive\\contract.json",
+    "sha256": "dde65968b749fdaa4f70a73b38eedba0a71c4b6e70812412bef00cdfc259c24a"
+  },
+  "dynamic_pair_completed": true,
+  "corrective_target_admission_passed": true,
+  "label_capture_authorized": false,
+  "dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

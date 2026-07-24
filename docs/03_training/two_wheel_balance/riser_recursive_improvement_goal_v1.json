@@ -1330,12 +1330,12 @@
         "valid_for_hardware_transfer": false
       },
       "goal_completion_audit": {
-        "schema": "cinebotrl_two_wheel_riser_goal_completion_audit_v6",
-        "implementation_commit": "32fc83eef26e2ec6048e1f2469fe0e15c006237c",
-        "latest_report_sha256": "f58f95f2e06ec3583b798be762ed0fb7edbed23b010a8ef7ad9cc5e625c3ca2a",
-        "auditor_sha256": "9d5464e767c9d794eb620b29f31cb90e9785023888feb5657d34ffa3791dc70f",
-        "auditor_git_blob_sha1": "dc2d02ca6c1b9b1cf2b77cb33051f6fc859f1c51",
-        "case7_capture_route_summary_sha256": "29723b7e771a399471fa3bba40111a5169d9977423bf30ceca6f54f5b9249e9a",
+        "schema": "cinebotrl_two_wheel_riser_goal_completion_audit_v7",
+        "implementation_commit": "29ac155bcd9d7f34cdde58301273851330170630",
+        "latest_report_sha256": "e87a1aab9b89aab46114a65ae2a53929632c8b48a41a3d2eb85190c75dd6871e",
+        "auditor_sha256": "f7d84fb73109fe0ff8438cc6fa5cf8dd6b308556166926469ae9d5ed44d0182e",
+        "auditor_git_blob_sha1": "3746e6ea4162329b71798d45fedcf0cbed5ac8b6",
+        "case7_capture_route_summary_sha256": "a04fa805e5cb7978695d6b378b35f471c43daa7c65688703f1172d4d09469a50",
         "generic_conversion_proposals_summary_sha256": "8d6218b4cfad511b08f7d69d5cc84c6c67ac0ec60111a7c06c3c3669ef54bd28",
         "generic_conversion_execution_summary_sha256": "71c75d32fc6f80fd1247fcaabf301b437ca684ef8b3580f364101e293ca9e52f",
         "host_independent_lf_evidence": true,

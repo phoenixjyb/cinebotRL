@@ -10266,3 +10266,28 @@ and must state whether its candidate was accepted or rejected.
 - After that capture, use the generic finalizer result and generic conversion
   proposal path; do not infer conversion or learning authorization from the
   capture authorization.
+
+## Round 266: case-7 capture identity repaired and end-goal audit refreshed
+
+- The generic finalizer changed the shared archive-finalizer blob, which made
+  the pending case-7 capture contract correctly fail its old identity check.
+  No runtime was attempted under the stale contract.
+- Commit `2743c64f8c118dd3a549968fb603ae64ec9c59d1` reseals only the
+  shared-finalizer SHA-256 and Git blob. Plan, profiles, controller arguments,
+  dynamic gates, namespace, and authorization semantics remain unchanged.
+- The canonical `.98` preflight now passes all 19 identities at contract
+  SHA-256
+  `0ae5a2a0b8a5a7addc509993c315eca474e378afb48990f1cc77a88ceed9ea6b`.
+  Tokenless execute exits `4` before runtime and leaves the namespace absent.
+- Completion audit v7 at
+  `29ac155bcd9d7f34cdde58301273851330170630` binds the repaired route.
+  macOS and Windows reports are byte-identical at SHA-256
+  `e87a1aab9b89aab46114a65ae2a53929632c8b48a41a3d2eb85190c75dd6871e`.
+- Goal status remains `6/10`; the same four learning gates remain open. No
+  Isaac/GPU process, token, capture, conversion, corpus merge, BC, PPO,
+  checkpoint, or training run was created.
+
+## Next round after Round 266
+
+- The next data-producing operation still requires separate authorization:
+  `Authorize exactly one case-7 corrective-label capture.`

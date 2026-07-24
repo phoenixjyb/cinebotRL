@@ -11,7 +11,7 @@ GOAL = (
 GOAL_COMPLETION_AUDIT = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260724_riser_goal_completion_audit_v6/summary.json"
+    "evidence_20260724_riser_goal_completion_audit_v7/summary.json"
 )
 GENERIC_CAPTURE_FINALIZER_EVIDENCE = (
     ROOT
@@ -2965,9 +2965,9 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     audit = _goal()["current_stage"]["status_refresh_20260723"][
         "goal_completion_audit"
     ]
-    assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v6"
+    assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v7"
     assert audit["implementation_commit"] == (
-        "32fc83eef26e2ec6048e1f2469fe0e15c006237c"
+        "29ac155bcd9d7f34cdde58301273851330170630"
     )
     assert audit["host_independent_lf_evidence"] is True
     assert audit["mac_and_windows_report_byte_parity_verified"] is True
@@ -3284,12 +3284,12 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "1413_passed_12_skipped_2_warnings_in_246.74s"
     )
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
-        "f58f95f2e06ec3583b798be762ed0fb7edbed23b010a8ef7ad9cc5e625c3ca2a"
+        "e87a1aab9b89aab46114a65ae2a53929632c8b48a41a3d2eb85190c75dd6871e"
     )
     report = json.loads(GOAL_COMPLETION_AUDIT.read_text())
-    assert report["git"]["head"] == "32fc83eef26e2ec6048e1f2469fe0e15c006237c"
+    assert report["git"]["head"] == "29ac155bcd9d7f34cdde58301273851330170630"
     assert report["inputs"]["auditor"]["sha256"] == (
-        "9d5464e767c9d794eb620b29f31cb90e9785023888feb5657d34ffa3791dc70f"
+        "f7d84fb73109fe0ff8438cc6fa5cf8dd6b308556166926469ae9d5ed44d0182e"
     )
     assert report["required_gate_pass_count"] == audit["required_gate_pass_count"]
     assert report["required_gate_count"] == audit["required_gate_count"]

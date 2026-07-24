@@ -65,7 +65,7 @@
     },
     "safety_projection_source": {
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_residual_dataset.py",
-      "sha256": "5ed0d62750323ab59c8cf66ce72b95e23d525a014a403574390fa1dd5e58d7b7"
+      "sha256": "574c77204b811caeefd3b2ff872e12db92c05ed776824efb1232b9df5f3170a3"
     },
     "corrective_profile": {
       "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case8_validation_profile_v1.json",

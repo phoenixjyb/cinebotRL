@@ -70,8 +70,8 @@
     },
     "profile_proposal": {
       "path": "docs/03_training/two_wheel_balance/evidence_20260724_case7_pair_profile_cpu_v1/proposal.json",
-      "sha256": "3cc391ffd4ee4d4503e689e7740367bcf6b12d302b2abb688f2b4d25f387e261",
-      "git_blob_sha1": "bc31907ffaedf4103359e15a54b603db1f20469e"
+      "sha256": "7002669ce4cb0d4cabece819c78527c9328e553ca65d95cdef7d0811d2f08c45",
+      "git_blob_sha1": "797776c046d341854dbaf0fa619fabd3495dee94"
     },
     "profile_builder": {
       "path": "scripts/two_wheel_balance/build_model_based_corrective_case7_pair_profiles.py",
@@ -115,8 +115,8 @@
     },
     "playback": {
       "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
-      "sha256": "aae110e4e2f65baf29ab69f7d4ffa953773f1abb9dfaaec5ada8314809052d38",
-      "git_blob_sha1": "a7b59648ea12e7a2bf0494ac336328151f2245e8"
+      "sha256": "ab60ed842d0b4a3fde754076a01e98ea91965a56758bc0601ecf4523c2065c6a",
+      "git_blob_sha1": "05c803465ec8a281e1b96b5eb013e26b685405e6"
     },
     "corrective_teacher_runtime": {
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_corrective_teacher.py",

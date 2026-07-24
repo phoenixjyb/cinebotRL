@@ -93,8 +93,8 @@
     },
     "playback": {
       "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
-      "sha256": "aae110e4e2f65baf29ab69f7d4ffa953773f1abb9dfaaec5ada8314809052d38",
-      "git_blob_sha1": "a7b59648ea12e7a2bf0494ac336328151f2245e8"
+      "sha256": "ab60ed842d0b4a3fde754076a01e98ea91965a56758bc0601ecf4523c2065c6a",
+      "git_blob_sha1": "05c803465ec8a281e1b96b5eb013e26b685405e6"
     },
     "corrective_teacher_runtime": {
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_corrective_teacher.py",

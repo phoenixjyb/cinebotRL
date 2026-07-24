@@ -1,0 +1,127 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_case2_natural_error_pair_final_v1",
+  "runtime_commit": "9363f2818688653c2c6db60699caba496a0c8d3a",
+  "namespace": "20260724_model_based_corrective_teacher_case2_natural_error_pair_v1_exclusive",
+  "case": 2,
+  "split": "train",
+  "baseline_exit_code": 0,
+  "candidate_exit_code": 0,
+  "rollout_checks": {
+    "baseline_exit_zero": true,
+    "candidate_exit_zero": true,
+    "baseline_single_case": true,
+    "candidate_single_case": true,
+    "baseline_source": true,
+    "candidate_source": true,
+    "model_based_command_base": true,
+    "residual_scales": true,
+    "baseline_zero_action": true,
+    "candidate_profile_bound": true,
+    "baseline_profile_absent": true,
+    "external_wrench_absent": true,
+    "perturbation_disabled": true,
+    "perturbation_contract_passed": true,
+    "baseline_projection_closed": false,
+    "candidate_projection_measured": false,
+    "candidate_effective_residual_bounded": false,
+    "baseline_capture_closed": true,
+    "candidate_capture_closed": true,
+    "candidate_labels_not_captured": true,
+    "baseline_heartbeat": true,
+    "candidate_heartbeat": true,
+    "gpu_released": true
+  },
+  "contract_checks": {
+    "namespace": true,
+    "case_split": true,
+    "runtime_commit": true,
+    "admission_passed": true,
+    "runtime_authorized": true,
+    "gpu_launch_authorized": true,
+    "label_capture_closed": true,
+    "dataset_closed": true,
+    "training_closed": true,
+    "contract_identity": true
+  },
+  "baseline_metrics": {
+    "case": 2,
+    "split": "train",
+    "plan_sha256": "a2ad28cf4d353c59a9a642e39c8bbf484a0233df50a0b72b7ec18ca746c2cbe7",
+    "physics_seed": 20260718,
+    "source_duration_s": 9.439314,
+    "execution_duration_s": 18.241927671727208,
+    "dynamic_quality_passed": true,
+    "position_error_p95_m": 0.13982963387387617,
+    "position_error_max_m": 0.15351428534057934,
+    "attitude_error_max_deg": 0.17577708266020106,
+    "pitch_max_deg": 6.632458181748643,
+    "riser_error_max_m": 0.012264779274909543,
+    "action_saturation_ratio": 0.0,
+    "normalized_residual_action_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "dataset_created": false,
+    "training_started": false,
+    "ppo_started": false
+  },
+  "candidate_metrics": {
+    "case": 2,
+    "split": "train",
+    "plan_sha256": "a2ad28cf4d353c59a9a642e39c8bbf484a0233df50a0b72b7ec18ca746c2cbe7",
+    "physics_seed": 20260718,
+    "source_duration_s": 9.439314,
+    "execution_duration_s": 18.241927671727208,
+    "dynamic_quality_passed": true,
+    "position_error_p95_m": 0.13956590169879093,
+    "position_error_max_m": 0.15304455047949395,
+    "attitude_error_max_deg": 0.17850310508322903,
+    "pitch_max_deg": 6.679392680404033,
+    "riser_error_max_m": 0.011668429669996816,
+    "action_saturation_ratio": 0.0,
+    "normalized_residual_action_abs_max": null,
+    "dataset_created": false,
+    "training_started": false,
+    "ppo_started": false
+  },
+  "paired_admission": {
+    "corrective_target_admission_passed": false,
+    "error": "candidate residual-action evidence is missing or invalid"
+  },
+  "baseline": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case2_natural_error_pair_v1_exclusive\\baseline\\case_0002.json",
+    "sha256": "58e0e49ddc9a6c849f679cc243a9cfc6c4ae8d0b0b634f94cef9da5e44455c26"
+  },
+  "candidate": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case2_natural_error_pair_v1_exclusive\\candidate\\case_0002.json",
+    "sha256": "f7d150978463d0fb20b433d1a254a4e3651eca3070ae860afab6f45e9180d9cc"
+  },
+  "baseline_heartbeat": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case2_natural_error_pair_v1_exclusive\\baseline\\runtime_heartbeat.json",
+    "sha256": "f20dfe05f229a7080cf27e4a25698e7d1e25b3e4a40a62447c8eedddb7e7a01b"
+  },
+  "candidate_heartbeat": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case2_natural_error_pair_v1_exclusive\\candidate\\runtime_heartbeat.json",
+    "sha256": "40f8c343d503396bd694357e0f42c03ddbc4fd054c2a150adae59eaff926b90a"
+  },
+  "admission": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case2_natural_error_pair_v1_exclusive\\admission.json",
+    "sha256": "af2e64bf038e4000e962e1ceaea4560ed7073b5a0f2a951d9b3607c02961a4c7"
+  },
+  "contract": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case2_natural_error_pair_v1_exclusive\\contract.json",
+    "sha256": "0c32238a2cb549ec171cc64e81d60134ed634b8e9f933ca7965a460c742b3214"
+  },
+  "dynamic_pair_completed": false,
+  "corrective_target_admission_passed": false,
+  "external_wrench_used": false,
+  "effective_projection_telemetry_required": true,
+  "label_capture_authorized": false,
+  "dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": false
+}

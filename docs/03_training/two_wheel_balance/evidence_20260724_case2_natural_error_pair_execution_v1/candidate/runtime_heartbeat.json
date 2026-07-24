@@ -1,0 +1,38 @@
+{
+  "case": 2,
+  "stage": "execution",
+  "completed_steps": 9204,
+  "maximum_steps": 10947,
+  "policy_hz": 200.0,
+  "elapsed_s": 46.015,
+  "phase_time_s": 18.241927671727208,
+  "source_duration_s": 9.439314,
+  "execution_duration_s": 18.241927671727208,
+  "maximum_simulated_horizon_s": 54.72578301518162,
+  "progress_scale": 0.38945500830210433,
+  "tracking_state": {
+    "position_error_m": 0.05201565747379805,
+    "attitude_error_deg": 0.06313113632228079,
+    "base_xy_error_m": 0.0977676929634925,
+    "commanded_base_xy_error_m": 0.050735412732918955,
+    "base_yaw_error_deg": 1.7260223100938057,
+    "riser_error_m": 0.010684865542237132,
+    "proxy_error_max_deg": 0.03399074544063077
+  },
+  "safety_state": {
+    "pitch_deg": 6.0527249584894784,
+    "peak_position_error_m": 0.15304455047949395,
+    "peak_attitude_error_deg": 0.17850310508322903,
+    "peak_pitch_deg": 6.679392680404033,
+    "action_saturation_ratio": 0.0,
+    "riser_saturation_ratio": 0.0,
+    "proxy_saturation_ratio": 0.0,
+    "termination_pending": false
+  },
+  "gate_result_written": false,
+  "capture_outputs_enabled": false,
+  "schema": "cinebotrl_two_wheel_riser_runtime_heartbeat_v1",
+  "emitted_epoch_s": 1784889280.6679018,
+  "dataset_created": false,
+  "valid_for_training": false
+}

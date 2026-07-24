@@ -10234,3 +10234,35 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-7 corrective-label capture.`
 - A passing case-7 capture must be reopened and proposed through the generic
   route before a separate one-case CPU conversion can be authorized.
+
+## Round 265: corrective-capture finalization is now case-generic
+
+- Added `finalize_model_based_corrective_capture.py` at implementation commit
+  `04a9ccc0a4f1217f225ed61cf02a9d900310cfaf`.
+- The finalizer derives case, split, namespace, archive name, and the unique
+  plan identity from the admitted route. It supports `train` and `validation`
+  while rejecting boolean/nonpositive cases, unknown splits, ambiguous plans,
+  open dataset or learning permissions, and malformed runtime commits.
+- The shared archive finalizer now accepts an explicit expected split. Existing
+  case-specific callers retain the default `train` behavior, so no historical
+  command or archive contract changed.
+- Read-only `.98` re-finalization passed the original case 6, 23, and 30
+  artifacts, covering `7,933`, `3,273`, and `11,411` samples. Their capture
+  archives were reopened and verified, not rewritten.
+- Focused coverage passes `31 passed, 2 warnings in 0.22 s` locally and
+  `31 passed, 2 warnings in 0.84 s` on `.98`. The authoritative `.98`
+  Windows-Python suite at
+  `04a9ccc0a4f1217f225ed61cf02a9d900310cfaf` passes
+  `1427 passed, 12 skipped, 2 warnings in 246.17 s`.
+- No Isaac/GPU process, label capture, conversion, merged corpus, BC, PPO,
+  checkpoint, or training run was started. Case-specific launch wrappers stay
+  authoritative until every controller argument is proposal-bound and proven
+  command-equivalent.
+
+## Next round after Round 265
+
+- The next data-producing operation still requires separate authorization:
+  `Authorize exactly one case-7 corrective-label capture.`
+- After that capture, use the generic finalizer result and generic conversion
+  proposal path; do not infer conversion or learning authorization from the
+  capture authorization.

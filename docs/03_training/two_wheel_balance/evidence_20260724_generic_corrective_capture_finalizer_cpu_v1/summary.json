@@ -1,0 +1,65 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_generic_corrective_capture_finalizer_evidence_v1",
+  "implementation_commit": "04a9ccc0a4f1217f225ed61cf02a9d900310cfaf",
+  "finalizer": {
+    "path": "scripts/two_wheel_balance/finalize_model_based_corrective_capture.py",
+    "sha256": "1f48ccd406bdb124d019e3ab7ee90bef3fee365b2a25f906130eeb751522ac84",
+    "git_blob_sha1": "1cdd385afdf78bfe5f92bcbb6ed72e8e24d61fd1"
+  },
+  "shared_archive_finalizer": {
+    "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case30_capture.py",
+    "sha256": "fc4bb11fe4e502594dd68f805ef9eba4042f930f0812b31256b63375bbdbba4b",
+    "git_blob_sha1": "0e50188242d14b095247fde8d66b98c8e203e98b"
+  },
+  "supported_splits": [
+    "train",
+    "validation"
+  ],
+  "cases": [
+    {
+      "case": 6,
+      "split": "train",
+      "runtime_commit": "c528cd2a3ccfabcb38fffd99a5c1613d306161e9",
+      "sample_count": 7933,
+      "capture_sha256": "c51411a9686909c47af7eeabf46a61672d8b09432cfb35daabc46af5a5913f85",
+      "result_sha256": "0169c34d0542f94a9cb7b901d599505fdc92f99b9fc08e688c15b5cd1e51688c",
+      "passed": true
+    },
+    {
+      "case": 23,
+      "split": "train",
+      "runtime_commit": "31bb9afbf3e9ce6c17e0fc1d2f06b5990e130d1c",
+      "sample_count": 3273,
+      "capture_sha256": "f0ea5c59e1f2f0e5f6f91336788d0e0228d079f74a53a4a50d442751b8b23796",
+      "result_sha256": "8609bb49b13d1c0a85e43611570855e0e8ed407c72e633726db8aec8598c9483",
+      "passed": true
+    },
+    {
+      "case": 30,
+      "split": "train",
+      "runtime_commit": "ca755bdcf4498fe39f19735ed666e96ca11bed96",
+      "sample_count": 11411,
+      "capture_sha256": "ec0f13030ce755c38e31c138507537f461126312b0c268832bc6bf9a40e4e8cb",
+      "result_sha256": "740c32399ab87ac8492c46dc60c2db72d6fccb0bfc70b794aff9cd03db3ddc81",
+      "passed": true
+    }
+  ],
+  "case_count": 3,
+  "total_sample_count": 22617,
+  "train_split_live_reopen_passed": true,
+  "validation_split_synthetic_contract_passed": true,
+  "controller_commands_changed": false,
+  "runtime_started": false,
+  "capture_started": false,
+  "conversion_started": false,
+  "dataset_created": false,
+  "merged_dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "focused_local_cpu_suite": "31_passed_2_warnings_in_0.22s",
+  "focused_windows_cpu_suite": "31_passed_2_warnings_in_0.84s",
+  "authoritative_windows_cpu_suite": "1427_passed_12_skipped_2_warnings_in_246.17s",
+  "passed": true
+}

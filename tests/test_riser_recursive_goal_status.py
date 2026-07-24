@@ -13,6 +13,12 @@ GOAL_COMPLETION_AUDIT = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_riser_goal_completion_audit_v6/summary.json"
 )
+GENERIC_CAPTURE_FINALIZER_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_generic_corrective_capture_finalizer_cpu_v1/"
+    "summary.json"
+)
 CORRECTIVE_ROUTE_CATALOG = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -3215,6 +3221,41 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "authorize_exactly_one_case7_corrective_label_capture"
     )
     assert audit["pre_training_no_hidden_cpu_route_blocker"] is True
+    assert audit["pre_training_generic_capture_finalizer_implemented"] is True
+    assert audit["pre_training_generic_capture_finalizer_cases"] == [6, 23, 30]
+    assert audit["pre_training_generic_capture_finalizer_total_samples"] == 22617
+    assert (
+        audit["pre_training_generic_capture_finalizer_train_live_reopen_passed"]
+        is True
+    )
+    assert (
+        audit["pre_training_generic_capture_finalizer_validation_contract_passed"]
+        is True
+    )
+    assert (
+        audit["pre_training_generic_capture_finalizer_controller_commands_changed"]
+        is False
+    )
+    assert (
+        audit["pre_training_generic_capture_finalizer_runtime_started"] is False
+    )
+    assert audit["pre_training_generic_capture_finalizer_summary_sha256"] == (
+        _sha256(GENERIC_CAPTURE_FINALIZER_EVIDENCE)
+    )
+    generic_capture_finalizer = json.loads(
+        GENERIC_CAPTURE_FINALIZER_EVIDENCE.read_text()
+    )
+    assert generic_capture_finalizer["passed"] is True
+    assert generic_capture_finalizer["case_count"] == 3
+    assert generic_capture_finalizer["total_sample_count"] == 22617
+    assert generic_capture_finalizer["supported_splits"] == [
+        "train",
+        "validation",
+    ]
+    assert generic_capture_finalizer["controller_commands_changed"] is False
+    assert generic_capture_finalizer["runtime_started"] is False
+    assert generic_capture_finalizer["capture_started"] is False
+    assert generic_capture_finalizer["training_started"] is False
     assert audit["pre_training_next_operation_authorized"] is False
     assert audit["focused_local_cpu_suite"] == "23_passed_2_warnings_in_3.12s"
     assert audit["focused_windows_cpu_suite"] == "23_passed_2_warnings_in_10.44s"

@@ -1,0 +1,150 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_capture_final_v2",
+  "namespace": "20260724_model_based_corrective_teacher_case6_capture_v1_exclusive",
+  "runtime_commit": "c528cd2a3ccfabcb38fffd99a5c1613d306161e9",
+  "case": 6,
+  "split": "train",
+  "playback_exit_code": 0,
+  "admission_checks": {
+    "schema": true,
+    "passed": true,
+    "runtime_commit": true,
+    "runtime_authorized": true,
+    "capture_authorized": true,
+    "pair_admitted": true,
+    "dataset_closed": true,
+    "training_closed": true,
+    "contract_identity": true,
+    "plan_identity": true,
+    "profile_identity": true,
+    "pair_identity": true
+  },
+  "gate_checks": {
+    "exit_zero": true,
+    "single_case": true,
+    "passed": true,
+    "dynamic": true,
+    "thermal": true,
+    "controller": true,
+    "perturbation": true,
+    "source": true,
+    "capture_requested": true,
+    "capture_written": true,
+    "legacy_capture_closed": true,
+    "training_closed": true,
+    "heartbeat": true,
+    "gpu_released": true
+  },
+  "archive_checks": {
+    "loaded": true,
+    "sample_count": true,
+    "plan_identity": true,
+    "runtime_identity": true,
+    "profile_identity": true,
+    "pair_identity": true,
+    "source_clock": true,
+    "execution_clock": true,
+    "perturbation_rows": true,
+    "requested_reserved_margin": true,
+    "effective_reserved_margin": true,
+    "supervisor_contract": true,
+    "clipping_telemetry": true,
+    "initialization_excluded": true,
+    "training_closed": true
+  },
+  "contract_checks": {
+    "namespace": true,
+    "case_split": true,
+    "runtime_commit_descends_reviewed_parent": true
+  },
+  "capture_error": null,
+  "capture_metrics": {
+    "sample_count": 7933,
+    "source_clock_end_s": 15.942736,
+    "execution_clock_end_s": 17.737274605869224,
+    "perturbation_active_rows": 20,
+    "requested_normalized_action_abs_max": [
+      0.4620293080806732,
+      0.15905605256557465,
+      0.08932578563690186
+    ],
+    "effective_normalized_action_abs_max": [
+      0.4620293080806732,
+      0.15905605256557465,
+      0.08932578563690186
+    ],
+    "command_clipped_rows": [
+      0,
+      146,
+      0
+    ],
+    "requested_vs_effective_residual_delta_abs_max": [
+      4.1723252630632146e-10,
+      0.0029090659227222204,
+      7.402051194205228e-11
+    ],
+    "amplitude_limited_rows": [
+      0,
+      1250,
+      7705
+    ],
+    "slew_limited_rows": [
+      0,
+      185,
+      64
+    ]
+  },
+  "gate": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case6_capture_v1_exclusive\\case_0006.json",
+    "sha256": "82648e0ef192c3f561aff772e6827b5280a67c24df982605f9ae923e6d304451",
+    "size_bytes": 244278
+  },
+  "heartbeat": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case6_capture_v1_exclusive\\runtime_heartbeat.json",
+    "sha256": "fb8a2b248097248f96c303afc80b4d8e022bd49f3b559045f5128d458cf9829d",
+    "size_bytes": 1333
+  },
+  "capture": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case6_capture_v1_exclusive\\capture\\case_0006_corrective_teacher_capture_v2.npz",
+    "sha256": "c51411a9686909c47af7eeabf46a61672d8b09432cfb35daabc46af5a5913f85",
+    "size_bytes": 2292671
+  },
+  "admission": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case6_capture_v1_exclusive\\admission.json",
+    "sha256": "a39027b8588836eb6e86688d87539eb407d1cd3927eebbc555fdab92b1de0a00",
+    "size_bytes": 11538
+  },
+  "contract": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_teacher_case6_capture_v1_exclusive\\contract.json",
+    "sha256": "14b3fd0ddf155da66a04a26c7041716e5c0072029508b4fcf1bf95f0aca81455",
+    "size_bytes": 7764
+  },
+  "dynamic_quality_passed": true,
+  "capture_admitted_for_dataset_conversion": true,
+  "normalized_training_dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true,
+  "generic_finalizer": {
+    "schema": "cinebotrl_two_wheel_riser_generic_corrective_capture_finalizer_v1",
+    "case": 6,
+    "split": "train",
+    "namespace": "20260724_model_based_corrective_teacher_case6_capture_v1_exclusive",
+    "plan_identity_name": "case6_plan",
+    "capture_name": "case_0006_corrective_teacher_capture_v2.npz",
+    "checks": {
+      "admission_schema": true,
+      "case_is_positive_integer": true,
+      "split_is_allowed": true,
+      "namespace_is_nonempty": true,
+      "contract_case_split": true,
+      "contract_namespace": true,
+      "exactly_one_plan_identity": true,
+      "capture_is_authorized": true,
+      "normalized_dataset_is_closed": true,
+      "learning_is_closed": true
+    }
+  }
+}

@@ -157,6 +157,7 @@ def _isolated_repo(
     _git(repo, "init", "-q")
     _git(repo, "config", "user.email", "tests@example.invalid")
     _git(repo, "config", "user.name", "Tests")
+    _git(repo, "config", "core.autocrlf", "false")
     _git(repo, "add", ".")
     _git(repo, "commit", "-qm", "fixture")
     return repo, contract, proposal
@@ -207,7 +208,7 @@ def test_one_generic_preflight_accepts_all_existing_proposals(
 ) -> None:
     repo, contract, proposal = _isolated_repo(tmp_path, case)
     result = _validate(repo, contract, proposal)
-    assert result["passed"] is True
+    assert result["passed"] is True, json.dumps(result, indent=2)
     assert result["cpu_contract_ready"] is True
     assert result["case"] == case
     assert result["split"] == "train"

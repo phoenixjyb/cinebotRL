@@ -8,6 +8,7 @@ import ast
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -62,30 +63,52 @@ def _git_blob(path: Path) -> str:
     ).hexdigest()
 
 
-def _git(repo: Path, *args: str, check: bool = True) -> str:
-    result = subprocess.run(
-        ["git", "-C", str(repo), *args],
+def _windows_path_to_wsl(value: str) -> str:
+    if len(value) >= 3 and value[1:3] in (":\\", ":/"):
+        return f"/mnt/{value[0].lower()}/{value[3:].replace(chr(92), '/')}"
+    raise ValueError(f"cannot map Windows path into WSL: {value}")
+
+
+def _git_command(repo: Path, *args: str) -> list[str]:
+    if os.name == "nt":
+        windir = Path(os.environ.get("WINDIR", r"C:\Windows"))
+        return [
+            str(windir / "System32/wsl.exe"),
+            "git",
+            "-C",
+            _windows_path_to_wsl(str(repo)),
+            *args,
+        ]
+    return ["git", "-C", str(repo), *args]
+
+
+def _git_result(
+    repo: Path,
+    *args: str,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        _git_command(repo, *args),
         check=check,
         capture_output=True,
         text=True,
     )
+
+
+def _git(repo: Path, *args: str, check: bool = True) -> str:
+    result = _git_result(repo, *args, check=check)
     return result.stdout.strip()
 
 
 def _identity(repo: Path, relative: str) -> dict[str, Any]:
     path = repo / relative
     tracked = (
-        subprocess.run(
-            [
-                "git",
-                "-C",
-                str(repo),
-                "ls-files",
-                "--error-unmatch",
-                relative,
-            ],
+        _git_result(
+            repo,
+            "ls-files",
+            "--error-unmatch",
+            relative,
             check=False,
-            capture_output=True,
         ).returncode
         == 0
     )
@@ -501,14 +524,10 @@ def build_report(
         "head": _git(repo, "rev-parse", "HEAD"),
         "upstream": _git(repo, "rev-parse", "@{upstream}"),
         "tracked_worktree_clean": (
-            subprocess.run(
-                ["git", "-C", str(repo), "diff", "--quiet"],
-                check=False,
-            ).returncode
+            _git_result(repo, "diff", "--quiet", check=False).returncode
             == 0
-            and subprocess.run(
-                ["git", "-C", str(repo), "diff", "--cached", "--quiet"],
-                check=False,
+            and _git_result(
+                repo, "diff", "--cached", "--quiet", check=False
             ).returncode
             == 0
         ),

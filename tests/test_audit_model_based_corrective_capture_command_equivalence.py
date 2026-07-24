@@ -58,6 +58,12 @@ def test_current_routes_are_command_compatible_and_case30_is_quarantined() -> No
     assert report["training_started"] is False
 
 
+def test_windows_repository_path_maps_to_wsl() -> None:
+    assert MODULE._windows_path_to_wsl(
+        r"G:\wSpace\cinebotRL-two-wheel-riser"
+    ) == "/mnt/g/wSpace/cinebotRL-two-wheel-riser"
+
+
 def test_case7_every_option_and_identity_is_bound() -> None:
     manifest = _manifest()
     defaults = MODULE.parse_playback_defaults(ROOT / manifest["playback"])

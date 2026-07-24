@@ -86,6 +86,10 @@ IDENTITY_PATHS = {
     "projection_telemetry_engine": (
         "scripts/two_wheel_balance/smoke_riser_case2_natural_error_pair.py"
     ),
+    "projection_evidence_engine": (
+        "src/rl_platform/tasks/two_wheel_balance/"
+        "riser_projection_evidence.py"
+    ),
     "case16_playback_adapter": (
         "scripts/two_wheel_balance/"
         "smoke_riser_case16_validation_natural_error_pair.py"

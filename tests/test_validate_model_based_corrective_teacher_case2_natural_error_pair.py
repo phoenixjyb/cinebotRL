@@ -83,6 +83,7 @@ def _fixture_repo(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
         "robot_usd": "assets/robot.usd",
         "playback": "scripts/playback.py",
         "case2_playback_adapter": "scripts/case2_playback_adapter.py",
+        "projection_evidence_engine": "src/projection_evidence.py",
         "corrective_teacher_runtime": "src/corrective.py",
         "preflight_wrapper": "scripts/wrapper.sh",
         "contract_validator": "scripts/validator.py",

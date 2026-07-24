@@ -16,6 +16,9 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from rl_platform.tasks.two_wheel_balance.riser_corrective_teacher import (  # noqa: E402
     assess_paired_corrective_rollouts,
 )
+from rl_platform.tasks.two_wheel_balance.riser_projection_evidence import (  # noqa: E402
+    audit_runtime_projection_evidence,
+)
 
 
 NAMESPACE = (
@@ -67,7 +70,8 @@ def _projection_closed(
     telemetry: dict[str, object], *, enabled: bool
 ) -> bool:
     return bool(
-        telemetry.get("enabled") is enabled
+        telemetry.get("passed") is True
+        and telemetry.get("enabled") is enabled
         and telemetry.get("applied_to_commands") is False
         and telemetry.get("labels_captured") is False
         and telemetry.get("dataset_created") is False
@@ -82,8 +86,9 @@ def _rollout_metrics(
     plan_sha256: str,
     physics_seed: int,
     candidate: bool,
+    projection: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    projection = result.get("corrective_teacher_projection_telemetry", {})
+    projection = projection or {}
     normalized_max = (
         projection.get("effective_normalized_action_abs_max")
         if candidate
@@ -138,12 +143,19 @@ def summarize(
     controller = contract.get("controller_arguments", {})
     split = contract.get("split")
     physics_seed = controller.get("reset_seed")
+    baseline_projection = audit_runtime_projection_evidence(
+        baseline, baseline_result, enabled=False
+    )
+    candidate_projection = audit_runtime_projection_evidence(
+        candidate, candidate_result, enabled=True
+    )
     baseline_metrics = _rollout_metrics(
         baseline_result,
         split=split,
         plan_sha256=plan_sha,
         physics_seed=physics_seed,
         candidate=False,
+        projection=baseline_projection,
     )
     candidate_metrics = _rollout_metrics(
         candidate_result,
@@ -151,6 +163,7 @@ def summarize(
         plan_sha256=plan_sha,
         physics_seed=physics_seed,
         candidate=True,
+        projection=candidate_projection,
     )
     try:
         pair_report = assess_paired_corrective_rollouts(
@@ -162,12 +175,6 @@ def summarize(
             "error": str(exc),
         }
 
-    baseline_projection = baseline_result.get(
-        "corrective_teacher_projection_telemetry", {}
-    )
-    candidate_projection = candidate_result.get(
-        "corrective_teacher_projection_telemetry", {}
-    )
     candidate_effective_max = candidate_projection.get(
         "effective_normalized_action_abs_max"
     )
@@ -284,6 +291,8 @@ def summarize(
         "baseline_metrics": baseline_metrics,
         "candidate_metrics": candidate_metrics,
         "paired_admission": pair_report,
+        "baseline_projection_evidence": baseline_projection,
+        "candidate_projection_evidence": candidate_projection,
         "baseline": _identity(baseline_path),
         "candidate": _identity(candidate_path),
         "baseline_heartbeat": _identity(baseline_heartbeat_path),

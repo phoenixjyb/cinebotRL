@@ -47,6 +47,7 @@ REQUIRED_IDENTITIES = {
     "robot_usd",
     "playback",
     "case2_playback_adapter",
+    "projection_evidence_engine",
     "corrective_teacher_runtime",
     "preflight_wrapper",
     "contract_validator",

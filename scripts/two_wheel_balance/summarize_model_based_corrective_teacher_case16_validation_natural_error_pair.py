@@ -27,6 +27,9 @@ from summarize_model_based_corrective_teacher_case2_natural_error_pair import ( 
     _rollout_metrics,
     _single_result,
 )
+from rl_platform.tasks.two_wheel_balance.riser_projection_evidence import (  # noqa: E402
+    audit_runtime_projection_evidence,
+)
 
 
 NAMESPACE = (
@@ -63,12 +66,19 @@ def summarize(
     plan_sha = identities.get("case16_plan", {}).get("sha256")
     corrective_sha = identities.get("corrective_profile", {}).get("sha256")
     physics_seed = contract.get("controller_arguments", {}).get("reset_seed")
+    baseline_projection = audit_runtime_projection_evidence(
+        baseline, baseline_result, enabled=False
+    )
+    candidate_projection = audit_runtime_projection_evidence(
+        candidate, candidate_result, enabled=True
+    )
     baseline_metrics = _rollout_metrics(
         baseline_result,
         split=SPLIT,
         plan_sha256=plan_sha,
         physics_seed=physics_seed,
         candidate=False,
+        projection=baseline_projection,
     )
     candidate_metrics = _rollout_metrics(
         candidate_result,
@@ -76,6 +86,7 @@ def summarize(
         plan_sha256=plan_sha,
         physics_seed=physics_seed,
         candidate=True,
+        projection=candidate_projection,
     )
     try:
         pair_report = assess_paired_corrective_validation(
@@ -87,12 +98,6 @@ def summarize(
             "error": str(exc),
         }
 
-    baseline_projection = baseline_result.get(
-        "corrective_teacher_projection_telemetry", {}
-    )
-    candidate_projection = candidate_result.get(
-        "corrective_teacher_projection_telemetry", {}
-    )
     candidate_effective_max = candidate_projection.get(
         "effective_normalized_action_abs_max"
     )
@@ -216,6 +221,8 @@ def summarize(
         "baseline_metrics": baseline_metrics,
         "candidate_metrics": candidate_metrics,
         "paired_admission": pair_report,
+        "baseline_projection_evidence": baseline_projection,
+        "candidate_projection_evidence": candidate_projection,
         "baseline": _identity(baseline_path),
         "candidate": _identity(candidate_path),
         "baseline_heartbeat": _identity(baseline_heartbeat_path),

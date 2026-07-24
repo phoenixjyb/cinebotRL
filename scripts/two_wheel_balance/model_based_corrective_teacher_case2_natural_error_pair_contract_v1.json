@@ -124,6 +124,11 @@
       "sha256": "b825502a5b8259e823e8f3943b7175debfb3d81a56dd4c88d5dc52e7917f6e32",
       "git_blob_sha1": "c9857865922d42688492c602250427b7d8705aca"
     },
+    "projection_evidence_engine": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_projection_evidence.py",
+      "sha256": "da2ec6c2a47eafc4f1d1bac18af2b7a1c531558017f446e9f7c4cb82c56c396d",
+      "git_blob_sha1": "56d39fe33745593e4096b2ae692ac3ca12aa4c08"
+    },
     "corrective_teacher_runtime": {
       "path": "src/rl_platform/tasks/two_wheel_balance/riser_corrective_teacher.py",
       "sha256": "921112be40d49ae19ad06a377450c09455ac8afb5c1c8b9240591043ac47afd0",
@@ -136,13 +141,13 @@
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case2_natural_error_pair.py",
-      "sha256": "8ae8efa40f46c79014f5929b9714a5acdf3029faefbf5f2802227da473f6d86d",
-      "git_blob_sha1": "7427ddae2352b6043dec966db34d0ae63df741a0"
+      "sha256": "d16fb17df3b5847e3b296a0c2018134eef362319fa321628a17ccfab6b030b23",
+      "git_blob_sha1": "008094842882f4eb82182b188752d92bfb8b8260"
     },
     "paired_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case2_natural_error_pair.py",
-      "sha256": "da618eaf738ccbdf4534c0cbe2ff488648be7675761ec1c94fd25638e61141b9",
-      "git_blob_sha1": "85383e44ec31da06081f4a16352b67c4f9f2520b"
+      "sha256": "7731a5b6c41e6057419db3ce4e9586ae60bcf5192d4462a5d8169ba1e2e3ab8d",
+      "git_blob_sha1": "02bc047f22b5ffb2800fec1736640cd5453bedde"
     }
   },
   "validation_cases": [8, 16, 22, 32, 78],

@@ -111,7 +111,7 @@ def test_contract_is_hash_bound_validation_only_and_tokenless() -> None:
     assert contract["split"] == "validation"
     assert contract["selected_validation_cases"] == [8, 16]
     assert set(contract["identities"]) == VALIDATOR_MODULE.REQUIRED_IDENTITIES
-    assert len(contract["identities"]) == 24
+    assert len(contract["identities"]) == 25
     for identity in contract["identities"].values():
         path = ROOT / identity["path"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == identity["sha256"]
@@ -274,6 +274,17 @@ def _gate(
         "residual_action_abs_max": (
             [0.06, 0.10, 0.05] if candidate else [0.0, 0.0, 0.0]
         ),
+        "completed_steps": 200,
+        "requested_policy_residual_action_abs_max": (
+            [0.084, 0.14, 0.05] if candidate else [0.0, 0.0, 0.0]
+        ),
+        "effective_policy_residual_action_abs_max": (
+            [0.06, 0.10, 0.05] if candidate else [0.0, 0.0, 0.0]
+        ),
+        "policy_residual_projection_delta_abs_max": (
+            [0.024, 0.04, 0.0] if candidate else [0.0, 0.0, 0.0]
+        ),
+        "policy_residual_projection_sample_count": 120 if candidate else 0,
         "corrective_teacher_projection_telemetry": projection,
         "corrective_teacher_labels_captured": False,
         "deterministic_wrench_perturbation": perturbation,
@@ -398,7 +409,7 @@ def test_finalizer_rejects_weak_improvement_or_clock_drift(
     assert result["passed"] is False
 
 
-def test_finalizer_rejects_wrench_capture_or_missing_projection(
+def test_finalizer_rejects_wrench_capture_or_missing_projection_aggregate(
     tmp_path: Path,
 ) -> None:
     root, admission = _fixture(tmp_path)
@@ -406,7 +417,9 @@ def test_finalizer_rejects_wrench_capture_or_missing_projection(
     payload = json.loads(candidate_path.read_text(encoding="utf-8"))
     payload["deterministic_wrench_profile"] = {"sha256": "d" * 64}
     payload["corrective_teacher_capture_started"] = True
-    payload["results"][0]["corrective_teacher_projection_telemetry"] = {}
+    del payload["results"][0][
+        "effective_policy_residual_action_abs_max"
+    ]
     candidate_path.write_text(json.dumps(payload), encoding="utf-8")
     result = _summarize(root, admission, gpu_release_passed=False)
     assert result["rollout_checks"]["external_wrench_absent"] is False

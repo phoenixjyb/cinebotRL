@@ -18,6 +18,11 @@ SPEC.loader.exec_module(MODULE)
 
 
 CORRECTIVE_SHA = "c" * 64
+REAL_REJECTED_PAIR = (
+    Path(__file__).parents[1]
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case2_natural_error_pair_execution_v1"
+)
 
 
 def _gate(
@@ -76,6 +81,17 @@ def _gate(
         "residual_action_abs_max": (
             [0.20, 0.08, 0.03] if candidate else [0.0, 0.0, 0.0]
         ),
+        "completed_steps": 100,
+        "requested_policy_residual_action_abs_max": (
+            [0.20, 0.08, 0.03] if candidate else [0.0, 0.0, 0.0]
+        ),
+        "effective_policy_residual_action_abs_max": (
+            [0.16, 0.06, 0.03] if candidate else [0.0, 0.0, 0.0]
+        ),
+        "policy_residual_projection_delta_abs_max": (
+            [0.04, 0.02, 0.0] if candidate else [0.0, 0.0, 0.0]
+        ),
+        "policy_residual_projection_sample_count": 15 if candidate else 0,
         "corrective_teacher_telemetry": {
             "normalized_action_abs_max": [0.20, 0.08, 0.03]
         },
@@ -187,11 +203,24 @@ def test_summary_rejects_weak_improvement(tmp_path) -> None:
     assert result["passed"] is False
 
 
-def test_summary_rejects_missing_effective_projection_telemetry(tmp_path) -> None:
+def test_summary_ignores_missing_unreliable_adapter_telemetry(tmp_path) -> None:
     root, admission = _fixture(tmp_path)
     path = root / "candidate/case_0002.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     payload["results"][0]["corrective_teacher_projection_telemetry"] = {}
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    result = _summarize(root, admission)
+    assert result["rollout_checks"]["candidate_projection_measured"] is True
+    assert result["passed"] is True
+
+
+def test_summary_rejects_missing_runtime_projection_aggregate(tmp_path) -> None:
+    root, admission = _fixture(tmp_path)
+    path = root / "candidate/case_0002.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    del payload["results"][0][
+        "effective_policy_residual_action_abs_max"
+    ]
     path.write_text(json.dumps(payload), encoding="utf-8")
     result = _summarize(root, admission)
     assert result["rollout_checks"]["candidate_projection_measured"] is False
@@ -235,3 +264,31 @@ def test_summary_rejects_capture_or_failed_gpu_release(tmp_path) -> None:
     assert result["rollout_checks"]["candidate_capture_closed"] is False
     assert result["rollout_checks"]["gpu_released"] is False
     assert result["passed"] is False
+
+
+def test_real_case2_archive_is_reclassified_as_weak_improvement() -> None:
+    result = MODULE.summarize(
+        REAL_REJECTED_PAIR,
+        REAL_REJECTED_PAIR / "admission.json",
+        runtime_commit="9363f2818688653c2c6db60699caba496a0c8d3a",
+        baseline_exit_code=0,
+        candidate_exit_code=0,
+        gpu_release_passed=True,
+    )
+    assert result["rollout_checks"]["candidate_projection_measured"] is True
+    assert result["dynamic_pair_completed"] is True
+    assert result["corrective_target_admission_passed"] is False
+    assert result["paired_admission"]["checks"][
+        "minimum_position_p95_improvement"
+    ] is False
+    assert (
+        result["paired_admission"]["position_p95_absolute_improvement_m"]
+        < 0.003
+    )
+    assert (
+        result["paired_admission"]["position_p95_relative_improvement"]
+        < 0.02
+    )
+    assert result["passed"] is False
+    assert result["label_capture_authorized"] is False
+    assert result["training_started"] is False

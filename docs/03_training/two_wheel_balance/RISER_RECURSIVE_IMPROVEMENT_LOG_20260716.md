@@ -10082,3 +10082,40 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-7 corrective-label capture.`
 - A successful capture would still require a separately authorized CPU
   conversion before case 7 could join the train corpus.
+
+## Round 261: riser vendor sources and drive safety boundary reconciled
+
+- Re-audited the explicit `1 m/s`, `0.60--1.80 m` riser recommendation against
+  current official Leadshine motor/drive-family material and igus fixed-axis
+  technical data. Source snapshots and extracted model facts are pinned in
+  `RISER_VENDOR_SOURCE_RECONCILIATION_20260724.json`.
+- Confirmed the `ELVM8075V48EH-M17-HD` design-review candidate remains
+  `48 V / 750 W / 2.39 N m / 3000 rpm`, with brake, multi-turn absolute
+  encoder, and IP65 motor enclosure.
+- Closed a safety-documentation ambiguity: the dedicated CN6 STO interface in
+  the ELD2-CAN family manual belongs to the `7040B/7060B` group. It must not be
+  attributed to the selected `ELD2-CAN7020B`, so an independent safety-rated
+  power-removal architecture remains mandatory.
+- Retained `igus drylin ZLW-1080 Standard` only as a fixed-axis concept
+  reference. Its catalog `70 mm/rev`, `2.0 m`, `5 m/s at 60% duty`, and
+  `300 N` radial figures do not constitute vertical mobile-axis approval.
+- The audit fails closed if the camera ceiling is raised above `1.8 m`, a
+  catalog axis is promoted without vertical approval, STO is misattributed,
+  or an exact gearbox/axis/safety component is claimed before selection.
+- The first Windows output exposed CRLF drift; commit
+  `3718ff4ae3bc2ca051fe3283f666491dd0fd57a6` forces LF. macOS and `.98`
+  then produced byte-identical reports at SHA-256
+  `4d4946fb3c9cb1f388beabdbcd8d8b4f4d3f619bdaaafc0d222ca96efde2853c`.
+- Focused hardware coverage passes `26 passed, 2 warnings in 0.32 s` locally
+  and `26 passed, 2 warnings in 3.65 s` on `.98`. The authoritative `.98`
+  CPU suite passes `1388 passed, 12 skipped, 2 warnings in 221.23 s`.
+- No simulation plant, controller, profile, runtime, capture, dataset, BC,
+  PPO, checkpoint, or training state changed. Supplier approval and real
+  bench evidence remain missing. Goal completion remains `6/10`.
+
+## Next round after Round 261
+
+- The next data-producing operation still requires separate authorization:
+  `Authorize exactly one case-7 corrective-label capture.`
+- Hardware procurement and plant switching remain separately blocked on the
+  signed supplier package and calibrated 750 W bench campaign.

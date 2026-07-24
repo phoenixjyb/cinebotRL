@@ -615,6 +615,21 @@ EXTERNAL_EVIDENCE_CHECKLIST_CN = (
     / "docs/03_training/two_wheel_balance/"
     "RISER_750W_EXTERNAL_EVIDENCE_CHECKLIST_CN_20260723.md"
 )
+VENDOR_SOURCE_RECONCILIATION = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "RISER_VENDOR_SOURCE_RECONCILIATION_20260724.json"
+)
+VENDOR_SOURCE_RECONCILIATION_AUDITOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "audit_riser_vendor_source_reconciliation.py"
+)
+VENDOR_SOURCE_RECONCILIATION_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_riser_vendor_source_reconciliation_v1/summary.json"
+)
 
 
 def _goal() -> dict:
@@ -2693,6 +2708,54 @@ def test_hardware_status_remains_measurement_blocked() -> None:
     )
     assert hardware["external_evidence_real_supplier_response_collected"] is False
     assert hardware["external_evidence_real_bench_measurements_collected"] is False
+    assert hardware["vendor_source_reconciliation_schema"] == (
+        "cinebotrl_two_wheel_riser_vendor_source_reconciliation_audit_v1"
+    )
+    assert hardware["vendor_source_reconciliation_initial_commit"] == (
+        "96aa349615bd8333a2e0e382fb6cbd9601dbf837"
+    )
+    assert hardware["vendor_source_reconciliation_parity_commit"] == (
+        "3718ff4ae3bc2ca051fe3283f666491dd0fd57a6"
+    )
+    assert hardware["vendor_source_reconciliation_contract_sha256"] == _sha256(
+        VENDOR_SOURCE_RECONCILIATION
+    )
+    assert hardware["vendor_source_reconciliation_auditor_sha256"] == _sha256(
+        VENDOR_SOURCE_RECONCILIATION_AUDITOR
+    )
+    assert hardware["vendor_source_reconciliation_summary_sha256"] == _sha256(
+        VENDOR_SOURCE_RECONCILIATION_EVIDENCE
+    )
+    reconciliation = json.loads(
+        VENDOR_SOURCE_RECONCILIATION_EVIDENCE.read_text()
+    )
+    assert reconciliation["passed"] is True
+    assert all(reconciliation["checks"].values())
+    assert (
+        hardware["vendor_source_motor_model"]
+        == reconciliation["selected_motor"]
+        == "ELVM8075V48EH-M17-HD"
+    )
+    assert (
+        hardware["vendor_source_drive_model"]
+        == reconciliation["selected_drive"]
+        == "ELD2-CAN7020B"
+    )
+    assert hardware["vendor_source_selected_drive_has_dedicated_cn6_sto"] is False
+    assert hardware["vendor_source_external_safety_power_removal_required"] is True
+    assert hardware["vendor_source_fixed_axis_reference"] == (
+        "igus_drylin_ZLW_1080_standard"
+    )
+    assert hardware["vendor_source_camera_height_ceiling_m"] == 1.8
+    assert hardware["vendor_source_target_speed_mps"] == 1.0
+    assert hardware["vendor_source_mac_windows_byte_parity"] is True
+    assert hardware["vendor_source_real_supplier_evidence_collected"] is False
+    assert hardware["vendor_source_real_bench_evidence_collected"] is False
+    assert hardware["vendor_source_simulation_profile_changed"] is False
+    assert hardware["vendor_source_runtime_or_training_authorized"] is False
+    assert hardware["vendor_source_authoritative_windows_cpu_suite"] == (
+        "1388_passed_12_skipped_2_warnings_in_221.23s"
+    )
     assert hardware["ready_for_production_design_review"] is False
     assert hardware["valid_for_production_procurement"] is False
     assert hardware["valid_for_hardware_transfer"] is False

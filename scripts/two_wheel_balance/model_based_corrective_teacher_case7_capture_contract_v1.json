@@ -133,8 +133,8 @@
     },
     "capture_finalizer_runtime": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case30_capture.py",
-      "sha256": "f0a993fbb912314852253548d7188df377d97f3e5cad2c9386bf6c2fa1131b63",
-      "git_blob_sha1": "b3da16fb59f41ce650d2e4bf90e42ac45913d55a"
+      "sha256": "fc4bb11fe4e502594dd68f805ef9eba4042f930f0812b31256b63375bbdbba4b",
+      "git_blob_sha1": "0e50188242d14b095247fde8d66b98c8e203e98b"
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case7_capture.py",

@@ -1,0 +1,82 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_vendor_source_reconciliation_audit_v1",
+  "checks": {
+    "schema": true,
+    "retrieval_date": true,
+    "inputs_are_mapping": true,
+    "vendor_snapshot_identity": true,
+    "mass_drive_traceability_identity": true,
+    "external_evidence_checklist_identity": true,
+    "motor_product_page_official_url": true,
+    "motor_product_page_retrieval_hash": true,
+    "drive_family_manual_official_url": true,
+    "drive_family_manual_retrieval_hash": true,
+    "fixed_axis_technical_page_official_url": true,
+    "fixed_axis_technical_page_retrieval_hash": true,
+    "drive_manual_shape": true,
+    "motor_matches_vendor_snapshot": true,
+    "drive_matches_vendor_snapshot": true,
+    "selected_7020b_has_no_dedicated_sto": true,
+    "larger_drive_sto_not_misattributed": true,
+    "axis_reference_matches_concept": true,
+    "axis_vertical_boundary_fail_closed": true,
+    "recommendation_matches_mass_and_external_contracts": true,
+    "unselected_components_remain_explicit": true,
+    "external_evidence_remains_missing": true,
+    "classification_is_fail_closed": true
+  },
+  "identities": {
+    "vendor_snapshot": {
+      "path": "docs/03_training/two_wheel_balance/RISER_PRODUCTION_CANDIDATE_VENDOR_SNAPSHOT_20260723.json",
+      "sha256": "11b08b6a179b395eceb5e797b28d224d8dfcf35c1921a4d6123d6f5a0e363512",
+      "checks": {
+        "path_is_relative": true,
+        "inside_repository": true,
+        "file_exists": true,
+        "sha256_matches": true
+      },
+      "passed": true
+    },
+    "mass_drive_traceability": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_riser_mass_drive_traceability_v1/summary.json",
+      "sha256": "52ddff232c339d5cd3057cf680a98ce19939150943d9c45e21f14836d28c507a",
+      "checks": {
+        "path_is_relative": true,
+        "inside_repository": true,
+        "file_exists": true,
+        "sha256_matches": true
+      },
+      "passed": true
+    },
+    "external_evidence_checklist": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_riser_750w_external_checklist_v1/summary.json",
+      "sha256": "e50d656c7d0e66ea051b4a478515ee582102c0e3fe5978ad426c131bda35cabe",
+      "checks": {
+        "path_is_relative": true,
+        "inside_repository": true,
+        "file_exists": true,
+        "sha256_matches": true
+      },
+      "passed": true
+    }
+  },
+  "selected_motor": "ELVM8075V48EH-M17-HD",
+  "selected_drive": "ELD2-CAN7020B",
+  "selected_drive_has_dedicated_cn6_sto": false,
+  "external_safety_rated_power_removal_required": true,
+  "fixed_axis_reference": "igus_drylin_ZLW_1080_standard",
+  "camera_height_ceiling_m": 1.8,
+  "target_riser_speed_mps": 1.0,
+  "supplier_vertical_axis_approval_collected": false,
+  "real_bench_evidence_collected": false,
+  "ready_for_production_procurement": false,
+  "valid_for_hardware_transfer": false,
+  "simulation_profile_changed": false,
+  "runtime_authorized": false,
+  "capture_authorized": false,
+  "valid_for_training": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "passed": true
+}

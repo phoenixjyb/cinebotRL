@@ -1,0 +1,120 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_vendor_source_reconciliation_v1",
+  "retrieved_date": "2026-07-24",
+  "inputs": {
+    "vendor_snapshot": {
+      "path": "docs/03_training/two_wheel_balance/RISER_PRODUCTION_CANDIDATE_VENDOR_SNAPSHOT_20260723.json",
+      "sha256": "11b08b6a179b395eceb5e797b28d224d8dfcf35c1921a4d6123d6f5a0e363512"
+    },
+    "mass_drive_traceability": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_riser_mass_drive_traceability_v1/summary.json",
+      "sha256": "52ddff232c339d5cd3057cf680a98ce19939150943d9c45e21f14836d28c507a"
+    },
+    "external_evidence_checklist": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_riser_750w_external_checklist_v1/summary.json",
+      "sha256": "e50d656c7d0e66ea051b4a478515ee582102c0e3fe5978ad426c131bda35cabe"
+    }
+  },
+  "official_sources": {
+    "motor_product_page": {
+      "url": "https://www.leadshine.com/product-detail/ELVM8075V48EH-M17-HD.html",
+      "retrieved_sha256": "f16f76b88fd9c274e3833c53e8ade276490de4074354015bb79ebb4b1dedea46",
+      "retrieved_size_bytes": 429694
+    },
+    "drive_family_manual": {
+      "url": "https://www.leadshine.com/upfiles/downloads/102cba4505ce95fc14ba6c717d6c56d2_1755252592346.pdf",
+      "retrieved_sha256": "2c6d0ee4d73dc7d8a80d14baffc7b8489c9afbfa684a83bfb4e56870b18dfa12",
+      "retrieved_size_bytes": 7121869,
+      "pdf_pages": 182,
+      "pdf_creation_date": "2025-08-15"
+    },
+    "fixed_axis_technical_page": {
+      "url": "https://www.igus.com/info/linear-guides-toothed-belt-axis-technical-data?C=IN&L=en",
+      "retrieved_sha256": "4c268fb8a301459625d6db03959637713bdd03d83a6da58e6a664a081dc2826a"
+    }
+  },
+  "motor_contract": {
+    "model": "ELVM8075V48EH-M17-HD",
+    "rated_voltage_vdc": 48.0,
+    "rated_power_w": 750.0,
+    "rated_torque_nm": 2.39,
+    "peak_torque_nm": 7.17,
+    "rated_speed_rpm": 3000.0,
+    "peak_speed_rpm": 3900.0,
+    "rated_current_a": 19.0,
+    "peak_current_a": 59.0,
+    "brake": true,
+    "encoder": "17_bit_magnetic_multi_turn_absolute",
+    "protection": "IP65"
+  },
+  "drive_contract": {
+    "selected_model": "ELD2-CAN7020B",
+    "rated_current_arms": 20.0,
+    "peak_current_apeak": 80.0,
+    "main_power_voltage_vdc": [
+      24.0,
+      70.0
+    ],
+    "direct_holding_brake_output": true,
+    "regenerative_resistor_port": true,
+    "selected_model_has_dedicated_cn6_sto": false,
+    "models_without_dedicated_cn6_sto": [
+      "ELD2-CAN7005B",
+      "ELD2-CAN7010B",
+      "ELD2-CAN7015B",
+      "ELD2-CAN7020B",
+      "ELD2-CAN7030B"
+    ],
+    "models_with_published_cn6_sto": [
+      "ELD2-CAN7040B",
+      "ELD2-CAN7060B"
+    ],
+    "manual_interpretation": "family_table_sto_sil3_and_cn6_apply_to_7040b_7060b_group_not_selected_7020b",
+    "external_safety_rated_power_removal_required": true
+  },
+  "fixed_axis_reference": {
+    "model": "igus_drylin_ZLW_1080_standard",
+    "linear_lead_m_per_rev": 0.07,
+    "maximum_catalog_stroke_m": 2.0,
+    "maximum_catalog_speed_mps_at_60pct_duty": 5.0,
+    "maximum_catalog_radial_load_n": 300.0,
+    "catalog_load_evidence_is_horizontal_installation_only": true,
+    "vertical_mobile_axis_supplier_approval_available": false,
+    "approved_as_production_axis": false
+  },
+  "consolidated_recommendation": {
+    "motor_and_drive": "ELVM8075V48EH-M17-HD_plus_ELD2-CAN7020B",
+    "reduction_ratio": 3.0,
+    "linear_lead_m_per_rev": 0.07,
+    "software_camera_height_range_m": [
+      0.6,
+      1.8
+    ],
+    "software_working_stroke_m": 1.2,
+    "recommended_mechanical_stroke_m": 1.5,
+    "maximum_linear_speed_mps": 1.0,
+    "fixed_height_prototype_mechanism": "supplier_qualified_dual_guided_timing_belt_axis",
+    "collapsed_height_mechanism": "supplier_qualified_two_stage_mechanically_synchronized_timing_belt_or_wire_rope_telescoping_mast",
+    "exact_gearbox_model_selected": false,
+    "exact_vertical_axis_model_selected": false,
+    "regenerative_absorption_selected": false,
+    "independent_anti_fall_selected": false,
+    "safety_power_removal_selected": false
+  },
+  "classification": {
+    "vendor_source_reconciliation_passed": true,
+    "motor_drive_pair_verified_for_design_review": true,
+    "fixed_axis_reference_verified_for_concept_screening": true,
+    "supplier_vertical_axis_approval_collected": false,
+    "real_bench_evidence_collected": false,
+    "ready_for_production_procurement": false,
+    "valid_for_hardware_transfer": false,
+    "simulation_profile_changed": false,
+    "runtime_authorized": false,
+    "capture_authorized": false,
+    "valid_for_training": false,
+    "bc_authorized": false,
+    "ppo_authorized": false,
+    "training_started": false
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_corrective_route_catalog_v1",
+  "canonical_teacher_contract": {
+    "dataset_schema": "cinebotrl_two_wheel_riser_executed_residual_v2",
+    "observation_dimension": 65,
+    "action_dimension": 3,
+    "action_names": [
+      "residual_vx_normalized",
+      "residual_wz_normalized",
+      "residual_riser_target_normalized"
+    ],
+    "residual_action_scales": [
+      0.05,
+      0.05,
+      0.02
+    ],
+    "residual_contract": "model_based_planner_plus_bounded_policy_residual_v1",
+    "control_ownership_contract": "frozen_lqr_high_level_residual_control_ownership_v1",
+    "previous_action_contract": "previous_effective_post_supervisor_action_v1",
+    "training_target": "effective_post_supervisor_residual_action",
+    "source_execution_and_elapsed_clocks_required": true
+  },
+  "shared_controller_contract": {
+    "configuration_seed": 20260716,
+    "controller_wz_kp": 1.05,
+    "maximum_duration_scale": 3.0,
+    "camera_lever_arm_compensation_enabled": true,
+    "camera_lever_arm_compensation_gain": 1.0,
+    "maximum_camera_lever_arm_correction_m": 0.05,
+    "policy_command_base": "model_based_planner",
+    "zero_policy_action": true
+  },
+  "shared_dynamic_thresholds": {
+    "maximum_pitch_deg": 12.0,
+    "maximum_position_p95_m": 0.15,
+    "maximum_position_error_m": 0.25,
+    "maximum_attitude_p95_deg": 5.0,
+    "maximum_attitude_error_deg": 10.0,
+    "maximum_riser_servo_error_m": 0.03,
+    "maximum_proxy_servo_error_deg": 5.0,
+    "maximum_internal_proxy_rate_deg_s": 360.0,
+    "maximum_saturation_ratio": 0.2
+  },
+  "shared_pair_gates": {
+    "rollout_order": [
+      "baseline",
+      "candidate"
+    ],
+    "candidate_requires_baseline_dynamic_pass": true,
+    "label_capture_during_pair": false,
+    "dataset_creation_during_pair": false,
+    "minimum_position_p95_improvement_m": 0.003,
+    "minimum_position_p95_relative_improvement": 0.02,
+    "maximum_position_error_regression_m": 0.005,
+    "maximum_attitude_error_regression_deg": 0.1,
+    "maximum_pitch_regression_deg": 0.5,
+    "maximum_riser_error_regression_m": 0.002,
+    "saturation_regression_allowed": false,
+    "maximum_runtime_seconds_per_rollout": 600
+  },
+  "operation_boundaries": {
+    "cpu_preflight_requires_authorization": false,
+    "gpu_pair_requires_explicit_authorization": true,
+    "label_capture_requires_separate_authorization": true,
+    "dataset_conversion_requires_separate_authorization": true,
+    "corpus_merge_requires_separate_authorization": true,
+    "bc_requires_separate_authorization": true,
+    "ppo_requires_separate_authorization": true
+  },
+  "routes": [
+    {
+      "key": "case7_pair",
+      "case": 7,
+      "split": "train",
+      "role": "fourth_train_case_candidate",
+      "contract_schema": "cinebotrl_two_wheel_riser_corrective_teacher_case7_pair_contract_v1",
+      "preflight_schema": "cinebotrl_two_wheel_riser_corrective_teacher_case7_pair_admission_v1",
+      "namespace": "20260724_model_based_corrective_teacher_case7_pair_v1_exclusive",
+      "contract": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_pair_contract_v1.json",
+      "wrapper": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case7_pair.sh",
+      "validator": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case7_pair.py",
+      "finalizer": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case7_pair.py",
+      "corrective_profile": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_profile_v1.json",
+      "plan_identity": "case7_plan",
+      "perturbation_mode": "deterministic_wrench",
+      "identity_count": 18
+    },
+    {
+      "key": "case8_validation_pair",
+      "case": 8,
+      "split": "validation",
+      "role": "first_validation_case_candidate",
+      "contract_schema": "cinebotrl_two_wheel_riser_corrective_teacher_case8_validation_pair_contract_v1",
+      "preflight_schema": "cinebotrl_two_wheel_riser_corrective_teacher_case8_validation_pair_admission_v1",
+      "namespace": "20260724_model_based_corrective_teacher_case8_validation_pair_v1_exclusive",
+      "contract": "scripts/two_wheel_balance/model_based_corrective_teacher_case8_validation_pair_contract_v1.json",
+      "wrapper": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case8_validation_pair.sh",
+      "validator": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case8_validation_pair.py",
+      "finalizer": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case8_validation_pair.py",
+      "corrective_profile": "scripts/two_wheel_balance/model_based_corrective_teacher_case8_validation_profile_v1.json",
+      "plan_identity": "case8_plan",
+      "perturbation_mode": "deterministic_wrench",
+      "identity_count": 19
+    },
+    {
+      "key": "case16_validation_pair",
+      "case": 16,
+      "split": "validation",
+      "role": "second_validation_case_candidate",
+      "contract_schema": "cinebotrl_two_wheel_riser_corrective_teacher_case16_validation_natural_error_pair_contract_v1",
+      "preflight_schema": "cinebotrl_two_wheel_riser_corrective_teacher_case16_validation_natural_error_pair_admission_v1",
+      "namespace": "20260724_model_based_corrective_teacher_case16_validation_natural_error_pair_v1_exclusive",
+      "contract": "scripts/two_wheel_balance/model_based_corrective_teacher_case16_validation_natural_error_pair_contract_v1.json",
+      "wrapper": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case16_validation_natural_error_pair.sh",
+      "validator": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case16_validation_natural_error_pair.py",
+      "finalizer": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case16_validation_natural_error_pair.py",
+      "corrective_profile": "scripts/two_wheel_balance/model_based_corrective_teacher_case16_validation_natural_error_profile_v1.json",
+      "plan_identity": "case16_plan",
+      "perturbation_mode": "natural_error_no_external_wrench",
+      "identity_count": 24
+    }
+  ],
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false
+}

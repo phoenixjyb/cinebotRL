@@ -91,10 +91,54 @@ def _validate(
 
 
 def _secure_token(tmp_path: Path) -> Path:
+    if os.name == "nt":
+        wsl_root = "/home/yanbo/.codex_case6_conversion_tests"
+        executable = str(
+            Path(os.environ.get("WINDIR", r"C:\Windows"))
+            / "System32/wsl.exe"
+        )
+        created = subprocess.run(
+            [
+                executable,
+                "sh",
+                "-lc",
+                f"umask 077; mkdir -p {wsl_root}; mktemp {wsl_root}/token.XXXXXX",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        windows_path = subprocess.run(
+            [executable, "wslpath", "-w", created],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        token = Path(windows_path)
+        token.write_bytes(b"one-case6-cpu-conversion\n")
+        return token
     token = tmp_path / "case6-conversion-authorization"
     token.write_bytes(b"one-case6-cpu-conversion\n")
     token.chmod(0o600)
     return token
+
+
+def _chmod(token: Path, mode: int) -> None:
+    if os.name != "nt":
+        token.chmod(mode)
+        return
+    executable = str(
+        Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32/wsl.exe"
+    )
+    subprocess.run(
+        [
+            executable,
+            "chmod",
+            f"{mode:o}",
+            MODULE._windows_path_to_wsl(str(token)),
+        ],
+        check=True,
+    )
 
 
 def test_execution_contract_is_closed_and_pins_route_files() -> None:
@@ -156,16 +200,19 @@ def test_external_mode_0600_token_opens_exactly_conversion(tmp_path) -> None:
 
 def test_bad_token_or_repository_check_fails_closed(tmp_path) -> None:
     token = _secure_token(tmp_path)
-    token.chmod(0o644)
-    assert _validate(
-        authorization_file=token,
-        authorization_sha256=_sha256(token),
-    )["passed"] is False
-    token.chmod(0o600)
-    assert _validate(
-        authorization_file=token,
-        authorization_sha256="0" * 64,
-    )["passed"] is False
+    try:
+        _chmod(token, 0o644)
+        assert _validate(
+            authorization_file=token,
+            authorization_sha256=_sha256(token),
+        )["passed"] is False
+        _chmod(token, 0o600)
+        assert _validate(
+            authorization_file=token,
+            authorization_sha256="0" * 64,
+        )["passed"] is False
+    finally:
+        token.unlink(missing_ok=True)
 
     checks = _repository_checks()
     checks["head_matches_upstream"] = False

@@ -10283,6 +10283,12 @@ and must state whether its candidate was accepted or rejected.
   `29ac155bcd9d7f34cdde58301273851330170630` binds the repaired route.
   macOS and Windows reports are byte-identical at SHA-256
   `e87a1aab9b89aab46114a65ae2a53929632c8b48a41a3d2eb85190c75dd6871e`.
+- Focused verification at synchronized commit
+  `acbf4f26685e40099c5d5df106698627017136ee` passes
+  `30 passed, 2 warnings in 2.89 s` locally and
+  `30 passed, 2 warnings in 14.83 s` with Windows Python on `.98`. The
+  authoritative `.98` Windows-Python suite passes
+  `1427 passed, 12 skipped, 2 warnings in 244.41 s`.
 - Goal status remains `6/10`; the same four learning gates remain open. No
   Isaac/GPU process, token, capture, conversion, corpus merge, BC, PPO,
   checkpoint, or training run was created.

@@ -1500,13 +1500,13 @@
         "pre_training_no_hidden_cpu_route_blocker": true,
         "pre_training_next_operation": "authorize_exactly_one_case7_corrective_label_capture",
         "pre_training_next_operation_authorized": false,
-        "focused_local_cpu_suite": "23_passed_2_warnings_in_3.12s",
-        "focused_windows_cpu_suite": "23_passed_2_warnings_in_10.44s",
-        "goal_binding_commit": "8ccc7fc3d482f03de85951d0da603320e2b3ec4b",
-        "combined_focused_local_cpu_suite": "23_passed_2_warnings_in_3.12s",
-        "combined_focused_windows_cpu_suite": "23_passed_2_warnings_in_10.44s",
-        "authoritative_windows_cpu_commit": "8ccc7fc3d482f03de85951d0da603320e2b3ec4b",
-        "authoritative_windows_cpu_suite": "1413_passed_12_skipped_2_warnings_in_246.74s"
+        "focused_local_cpu_suite": "30_passed_2_warnings_in_2.89s",
+        "focused_windows_cpu_suite": "30_passed_2_warnings_in_14.83s",
+        "goal_binding_commit": "acbf4f26685e40099c5d5df106698627017136ee",
+        "combined_focused_local_cpu_suite": "30_passed_2_warnings_in_2.89s",
+        "combined_focused_windows_cpu_suite": "30_passed_2_warnings_in_14.83s",
+        "authoritative_windows_cpu_commit": "acbf4f26685e40099c5d5df106698627017136ee",
+        "authoritative_windows_cpu_suite": "1427_passed_12_skipped_2_warnings_in_244.41s"
       },
       "completion_gap": [
         "capture_and_convert_case7_as_the_fourth_model_based_corrective_train_case",

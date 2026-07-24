@@ -3266,22 +3266,22 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert generic_capture_finalizer["capture_started"] is False
     assert generic_capture_finalizer["training_started"] is False
     assert audit["pre_training_next_operation_authorized"] is False
-    assert audit["focused_local_cpu_suite"] == "23_passed_2_warnings_in_3.12s"
-    assert audit["focused_windows_cpu_suite"] == "23_passed_2_warnings_in_10.44s"
+    assert audit["focused_local_cpu_suite"] == "30_passed_2_warnings_in_2.89s"
+    assert audit["focused_windows_cpu_suite"] == "30_passed_2_warnings_in_14.83s"
     assert audit["goal_binding_commit"] == (
-        "8ccc7fc3d482f03de85951d0da603320e2b3ec4b"
+        "acbf4f26685e40099c5d5df106698627017136ee"
     )
     assert audit["combined_focused_local_cpu_suite"] == (
-        "23_passed_2_warnings_in_3.12s"
+        "30_passed_2_warnings_in_2.89s"
     )
     assert audit["combined_focused_windows_cpu_suite"] == (
-        "23_passed_2_warnings_in_10.44s"
+        "30_passed_2_warnings_in_14.83s"
     )
     assert audit["authoritative_windows_cpu_commit"] == (
-        "8ccc7fc3d482f03de85951d0da603320e2b3ec4b"
+        "acbf4f26685e40099c5d5df106698627017136ee"
     )
     assert audit["authoritative_windows_cpu_suite"] == (
-        "1413_passed_12_skipped_2_warnings_in_246.74s"
+        "1427_passed_12_skipped_2_warnings_in_244.41s"
     )
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
         "e87a1aab9b89aab46114a65ae2a53929632c8b48a41a3d2eb85190c75dd6871e"

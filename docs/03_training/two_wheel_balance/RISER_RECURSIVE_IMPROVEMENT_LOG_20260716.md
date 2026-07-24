@@ -9820,3 +9820,45 @@ and must state whether its candidate was accepted or rejected.
 - Conversion must reopen the sealed capture and final status, preserve all
   clocks and provenance, use effective post-supervisor labels, reconstruct
   previous-action channels, and remain separate from corpus merge or training.
+
+## Round 254: case-6 corrective labels are converted exactly once
+
+- Added a dedicated tokenless case-6 conversion route bound to the sealed
+  capture/final status, generic converter and dataset modules, wrapper,
+  finalizer, fresh namespace, clean `HEAD == upstream`, and reviewed parent
+  `18c000aa23316dfa98eeb25348c5cadd06d59f27`.
+- Route commits
+  `fd395eb63e698499920fe9b11865586652d0da77` and
+  `1283e1b0da405653564382d0aa47d767ce2f925b` are pushed and synchronized.
+  The focused suite passes `20 passed, 2 warnings` on macOS and `.98`.
+  The authoritative `.98` Windows-Isaac Python CPU suite passes
+  `1356 passed, 12 skipped, 2 warnings in 204.52 s`.
+- The real tokenless wrapper preflight passed every repository, identity,
+  source, conversion, previous-action, clock, and closed-learning check.
+  No output namespace existed before authorization.
+- Consumed exactly one external mode-`0600` authorization at clean synchronized
+  runtime commit `1283e1b0da405653564382d0aa47d767ce2f925b`. The token was
+  deleted before conversion, and the converter was invoked exactly once.
+- The converter and finalizer both exited `0`. The finalizer reopened 7,933
+  rows with 65 observation features and three effective post-supervisor
+  residual targets. Effective labels, requested-action audit values,
+  non-history observations, case IDs, and source/execution/elapsed clocks are
+  exact. Previous-action channels contain zero initially and the prior
+  effective action thereafter; clipped rows remain `[0, 146, 0]`.
+- Dataset SHA-256 is
+  `ac138c9790eda983643ae17cc5b3dcf33cfe4634841760aada929df367acb809`.
+  Final-status SHA-256 is
+  `5a8662dbb883ae084c8ef8c3a174d6aa8c166b7f27bbae9122109607ba9e2a02`.
+  Evidence is preserved under
+  `evidence_20260724_case6_corrective_conversion_execution_cpu_v1` at commit
+  `63545b6de0cc3e7b7148f6704bd69923c8cca1b3`.
+- Case 6 is eligible only for a later reviewed case-merge operation. No corpus
+  merge, Isaac/GPU workload, capture, BC, PPO, checkpoint, or training run was
+  created. Goal completion remains `6/10`.
+
+## Next round after Round 254
+
+- Reopen the CPU-only corrective corpus-intake audit against converted train
+  cases 6, 23, and 30. This audit must not merge a corpus or authorize BC.
+- If intake passes, the next data-producing operation requires separate
+  authorization: `Authorize exactly one case-2 paired canary.`

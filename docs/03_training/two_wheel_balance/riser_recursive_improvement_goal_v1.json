@@ -775,7 +775,7 @@
         "case7_corrective_capture_route_implementation_commit": "93d9b60eea2a4fa4bdd9748e5e4864d52f456514",
         "case7_corrective_capture_route_reseal_commit": "2743c64f8c118dd3a549968fb603ae64ec9c59d1",
         "case7_corrective_capture_route_evidence_schema": "cinebotrl_two_wheel_riser_case7_corrective_capture_route_cpu_evidence_v2",
-        "case7_corrective_capture_route_summary_sha256": "afbc71d529e870486678652c09c69d89916189b931f5ef6c016275f7ff38a427",
+        "case7_corrective_capture_route_summary_sha256": "a04fa805e5cb7978695d6b378b35f471c43daa7c65688703f1172d4d09469a50",
         "case7_corrective_capture_route_reviewed_parent_commit": "b3cffb43d877e0d59eaaed818a9f88e6daa1f968",
         "case7_corrective_capture_route_namespace": "20260724_model_based_corrective_teacher_case7_capture_v1_exclusive",
         "case7_corrective_capture_route_contract_sha256": "0ae5a2a0b8a5a7addc509993c315eca474e378afb48990f1cc77a88ceed9ea6b",

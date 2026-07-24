@@ -63,7 +63,7 @@ DEFAULT_PENDING_ROUTE_QUEUE = (
 )
 DEFAULT_CASE7_CAPTURE_ROUTE = (
     DOC_ROOT
-    / "evidence_20260724_case7_corrective_capture_route_cpu_v1/summary.json"
+    / "evidence_20260724_case7_corrective_capture_route_cpu_v2/summary.json"
 )
 DEFAULT_GENERIC_CONVERSION_PROPOSALS = (
     DOC_ROOT
@@ -115,7 +115,7 @@ REQUIRED_COMPLETION_GATES = (
     "learned_policy_render_audit",
 )
 GOAL_COMPLETION_AUDIT_SCHEMA = (
-    "cinebotrl_two_wheel_riser_goal_completion_audit_v6"
+    "cinebotrl_two_wheel_riser_goal_completion_audit_v7"
 )
 ROLLOUT_METRICS = (
     "position_error_p95_m",
@@ -1029,7 +1029,7 @@ def build_report(
     )
     case7_capture_route_ready = (
         case7_capture_route.get("schema")
-        == "cinebotrl_two_wheel_riser_case7_corrective_capture_route_cpu_evidence_v1"
+        == "cinebotrl_two_wheel_riser_case7_corrective_capture_route_cpu_evidence_v2"
         and case7_capture_route.get("case") == 7
         and case7_capture_route.get("split") == "train"
         and case7_capture_route.get("passed") is True

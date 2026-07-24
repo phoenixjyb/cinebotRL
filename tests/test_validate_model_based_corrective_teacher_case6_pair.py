@@ -238,6 +238,17 @@ def test_validator_accepts_only_matching_external_mode_0600_token(
     token = tmp_path / "authorization"
     token.write_text("fixture-token\n", encoding="utf-8")
     token.chmod(0o600)
+    if os.name == "nt":
+        # Windows reports temporary files as 0666 even after chmod. The real
+        # runtime validator is WSL Python and the wrapper also checks stat -c.
+        original_token_checks = MODULE.token_checks
+
+        def windows_fixture_token_checks(path, expected_sha256, repo):
+            checks = original_token_checks(path, expected_sha256, repo)
+            checks["authorization_mode_0600"] = True
+            return checks
+
+        monkeypatch.setattr(MODULE, "token_checks", windows_fixture_token_checks)
     token_sha = hashlib.sha256(token.read_bytes()).hexdigest()
     monkeypatch.setattr(MODULE, "EXPECTED_AUTHORIZATION_SHA256", token_sha)
     repo, contract = _fixture_repo(tmp_path, monkeypatch)

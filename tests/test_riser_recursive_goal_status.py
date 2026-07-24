@@ -328,12 +328,12 @@ CASE7_CAPTURE_ROUTE_FINALIZER = (
 CASE7_CAPTURE_ROUTE_EVIDENCE = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260724_case7_corrective_capture_route_cpu_v1/summary.json"
+    "evidence_20260724_case7_corrective_capture_route_cpu_v2/summary.json"
 )
 CASE7_CAPTURE_ROUTE_PREFLIGHT = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260724_case7_corrective_capture_route_cpu_v1/"
+    "evidence_20260724_case7_corrective_capture_route_cpu_v2/"
     "preflight_windows.json"
 )
 GENERIC_CORRECTIVE_CONVERSION_PREPARER = (
@@ -1576,6 +1576,15 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective[
         "case7_corrective_capture_route_implementation_commit"
     ] == "93d9b60eea2a4fa4bdd9748e5e4864d52f456514"
+    assert corrective["case7_corrective_capture_route_reseal_commit"] == (
+        "2743c64f8c118dd3a549968fb603ae64ec9c59d1"
+    )
+    assert corrective["case7_corrective_capture_route_evidence_schema"] == (
+        "cinebotrl_two_wheel_riser_case7_corrective_capture_route_cpu_evidence_v2"
+    )
+    assert corrective[
+        "case7_corrective_capture_route_summary_sha256"
+    ] == _sha256(CASE7_CAPTURE_ROUTE_EVIDENCE)
     assert corrective[
         "case7_corrective_capture_route_contract_sha256"
     ] == _sha256(CASE7_CAPTURE_ROUTE_CONTRACT)

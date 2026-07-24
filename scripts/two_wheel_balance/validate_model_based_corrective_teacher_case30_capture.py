@@ -106,6 +106,7 @@ def validate(
     required_identities: set[str] = REQUIRED_IDENTITIES,
     tracked_identities: set[str] = TRACKED_IDENTITIES,
     expected_execution: dict[str, object] = EXPECTED_EXECUTION,
+    expected_profile_maximum_residuals: list[float] = [0.045, 0.045, 0.018],
 ) -> dict[str, object]:
     if reviewed_parent is None:
         reviewed_parent = REVIEWED_PARENT
@@ -182,7 +183,8 @@ def validate(
         "schema": profile.get("schema")
         == "cinebotrl_two_wheel_riser_corrective_teacher_profile_v1",
         "case": profile.get("case") == expected_case,
-        "limits": profile.get("maximum_residuals") == [0.045, 0.045, 0.018],
+        "limits": profile.get("maximum_residuals")
+        == expected_profile_maximum_residuals,
     }
     checks = {
         "schema": contract.get("schema") == SCHEMA,

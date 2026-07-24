@@ -25,6 +25,11 @@ WRAPPER = (
     / "scripts/two_wheel_balance/"
     "run_model_based_corrective_conversion_v2.sh"
 )
+CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_conversion_execution_contract_v2.json"
+)
 PROPOSAL_ROOT = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
@@ -360,6 +365,31 @@ def test_contract_builder_is_closed_and_output_free(monkeypatch) -> None:
     assert result["bc_authorized"] is False
     assert result["ppo_authorized"] is False
     assert result["training_started"] is False
+
+
+def test_canonical_contract_pins_generic_route_and_stays_closed() -> None:
+    contract = json.loads(CONTRACT.read_text())
+    assert contract["schema"] == MODULE.SCHEMA
+    assert contract["reviewed_parent_commit"] == MODULE.REVIEWED_PARENT
+    assert contract["implementation_commit"] == (
+        "e12f63d104ebb6c3e3132e4018206cf2a24dbbfe"
+    )
+    assert contract["allowed_splits"] == ["train", "validation"]
+    assert set(contract["identities"]) == set(MODULE.CODE_PATHS)
+    for name, relative in MODULE.CODE_PATHS.items():
+        path = ROOT / relative
+        assert contract["identities"][name] == _identity(path, relative)
+    assert contract["contract_ready"] is True
+    assert contract["conversion_execution_implemented"] is True
+    assert contract["conversion_authorized"] is False
+    assert contract["authorization_token_issued"] is False
+    assert contract["authorization_token_sha256"] == ""
+    assert contract["output_created"] is False
+    assert contract["merged_dataset_created"] is False
+    assert contract["bc_authorized"] is False
+    assert contract["ppo_authorized"] is False
+    assert contract["training_started"] is False
+    assert contract["valid_for_training"] is False
 
 
 def test_windows_paths_and_wrapper_authorization_boundary() -> None:

@@ -99,6 +99,27 @@ CASE23_CONVERSION_EXECUTION_FINALIZER = (
     / "scripts/two_wheel_balance/"
     "finalize_model_based_corrective_case23_conversion.py"
 )
+CASE23_CONVERSION_EXECUTION_V5 = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case23_corrective_conversion_execution_cpu_v5"
+)
+CASE23_CONVERSION_EXECUTION_V5_ADMISSION = (
+    CASE23_CONVERSION_EXECUTION_V5 / "admission.json"
+)
+CASE23_CONVERSION_EXECUTION_V5_RESULT = (
+    CASE23_CONVERSION_EXECUTION_V5 / "conversion_result.json"
+)
+CASE23_CONVERSION_EXECUTION_V5_DATASET = (
+    CASE23_CONVERSION_EXECUTION_V5
+    / "case_0023_model_based_corrective_case_dataset_v1.npz"
+)
+CASE23_CONVERSION_EXECUTION_V5_FINAL = (
+    CASE23_CONVERSION_EXECUTION_V5 / "final_status.json"
+)
+CASE23_CONVERSION_EXECUTION_V5_RECOVERY = (
+    CASE23_CONVERSION_EXECUTION_V5 / "recovery_audit.json"
+)
 CORRECTIVE_CORPUS_INTAKE_SCRIPT = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -819,6 +840,60 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ] is False
     assert corrective[
         "case23_capture_v4_conversion_execution_output_created"
+    ] is True
+    assert corrective[
+        "case23_capture_v4_conversion_execution_runtime_commit"
+    ] == "11fd27698955d277f4b926151bcca0cda2f4b27c"
+    assert corrective[
+        "case23_capture_v4_conversion_execution_evidence_commit"
+    ] == "3052ca41a56a6cc4b5014787c8480aaded531224"
+    assert corrective[
+        "case23_capture_v4_conversion_execution_admission_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_V5_ADMISSION)
+    assert corrective[
+        "case23_capture_v4_conversion_execution_result_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_V5_RESULT)
+    assert corrective[
+        "case23_capture_v4_conversion_execution_dataset_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_V5_DATASET)
+    assert corrective[
+        "case23_capture_v4_conversion_execution_final_status_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_V5_FINAL)
+    assert corrective[
+        "case23_capture_v4_conversion_execution_recovery_audit_sha256"
+    ] == _sha256(CASE23_CONVERSION_EXECUTION_V5_RECOVERY)
+    assert corrective[
+        "case23_capture_v4_conversion_execution_sample_count"
+    ] == 3273
+    assert corrective[
+        "case23_capture_v4_conversion_execution_observation_shape"
+    ] == [3273, 65]
+    assert corrective[
+        "case23_capture_v4_conversion_execution_clipped_rows"
+    ] == [0, 0, 0]
+    assert corrective[
+        "case23_capture_v4_conversion_execution_single_converter_invocation"
+    ] is True
+    assert corrective[
+        "case23_capture_v4_conversion_execution_path_recovered_without_retry"
+    ] is True
+    assert corrective[
+        "case23_capture_v4_conversion_execution_valid_for_case_merge"
+    ] is True
+    assert corrective[
+        "case23_capture_v4_conversion_execution_merged_dataset_created"
+    ] is False
+    assert corrective[
+        "case23_capture_v4_conversion_execution_bc_authorized"
+    ] is False
+    assert corrective[
+        "case23_capture_v4_conversion_execution_ppo_authorized"
+    ] is False
+    assert corrective[
+        "case23_capture_v4_conversion_execution_training_started"
+    ] is False
+    assert corrective[
+        "case23_capture_v4_conversion_execution_valid_for_training"
     ] is False
     assert corrective[
         "case23_capture_v4_conversion_execution_authoritative_cpu_commit"

@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "G:\wSpace\cinebotRL-two-wheel-riser\scripts\two_wheel_balance\finalize_model_based_corrective_case23_conversion.py", line 252, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "G:\wSpace\cinebotRL-two-wheel-riser\scripts\two_wheel_balance\finalize_model_based_corrective_case23_conversion.py", line 234, in main
+    result = finalize(
+             ^^^^^^^^^
+  File "G:\wSpace\cinebotRL-two-wheel-riser\scripts\two_wheel_balance\finalize_model_based_corrective_case23_conversion.py", line 68, in finalize
+    admission = _load_object(admission_path)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\wSpace\cinebotRL-two-wheel-riser\scripts\two_wheel_balance\finalize_model_based_corrective_case23_conversion.py", line 52, in _load_object
+    payload = json.loads(path.read_text(encoding="utf-8"))
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Python311\Lib\pathlib.py", line 1058, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Python311\Lib\pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser$NAMESPACE\\admission.json'

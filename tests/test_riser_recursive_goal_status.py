@@ -1203,6 +1203,9 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["case2_pair_execution_capture_eligible"] is False
     assert corrective["case2_pair_execution_dataset_created"] is False
     assert corrective["case2_pair_execution_training_started"] is False
+    assert corrective[
+        "case2_pair_execution_authoritative_windows_cpu_suite"
+    ] == "1362_passed_12_skipped_2_warnings_in_188.10s"
     case2_route = json.loads(CASE2_NATURAL_ERROR_PAIR_EVIDENCE.read_text())
     assert case2_route["passed"] is True
     assert case2_route["execution_route_complete"] is True

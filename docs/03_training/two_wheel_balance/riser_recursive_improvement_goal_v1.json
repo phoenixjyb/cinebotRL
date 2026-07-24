@@ -638,6 +638,8 @@
         "case2_pair_execution_ppo_authorized": false,
         "case2_pair_execution_training_started": false,
         "case2_pair_execution_valid_for_training": false,
+        "case2_pair_execution_authoritative_cpu_commit": "b03ae2adf77a11d1ac5d2e35bb2656f6410b1bd1",
+        "case2_pair_execution_authoritative_windows_cpu_suite": "1362_passed_12_skipped_2_warnings_in_188.10s",
         "case7_pair_readiness_schema": "cinebotrl_two_wheel_riser_case7_pair_readiness_cpu_v1",
         "case7_pair_readiness_implementation_commit": "b98d1fe1c008372373b300502fb6f0bdbd6200d4",
         "case7_pair_readiness_script_sha256": "066fcebf0fffc59f63e459ff8c5554e551b8496005f34e32d1441fcff6ceaeb2",

@@ -9928,6 +9928,10 @@ and must state whether its candidate was accepted or rejected.
 - Case 2 is not eligible for corrective-label capture. The three converted
   train datasets `[6, 23, 30]` remain unchanged. No capture, conversion, merge,
   BC, PPO, checkpoint, or training run was created.
+- At synchronized closure commit
+  `b03ae2adf77a11d1ac5d2e35bb2656f6410b1bd1`, the authoritative `.98`
+  Windows-Python CPU suite passed `1362 passed, 12 skipped, 2 warnings in
+  188.10s`.
 
 ## Next round after Round 256
 

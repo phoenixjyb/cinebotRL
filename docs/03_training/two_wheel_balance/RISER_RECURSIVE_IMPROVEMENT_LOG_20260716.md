@@ -9643,3 +9643,53 @@ and must state whether its candidate was accepted or rejected.
 - After conversion, reopen corpus intake and then proceed in order through
   train cases 6/2/7 and validation cases 8/16. BC remains closed until the
   real case-disjoint corpus gate passes.
+
+## Round 250: case-23 v4 is converted exactly once
+
+- Consumed one ephemeral mode-`0600` authorization outside the repository at
+  clean synchronized runtime commit
+  `11fd27698955d277f4b926151bcca0cda2f4b27c`. The token was deleted before
+  conversion and no second token or converter invocation was created.
+- The converter succeeded once and produced 3,273 rows with 65 observation
+  features and three effective post-supervisor residual targets. The dataset
+  SHA-256 is
+  `ee55db1c02e504e035a47532df8141ab142bb68a2c47b2795b6fd5ad7283ef01`.
+  Effective actions, requested-action audit values, non-history observations,
+  case IDs, and all three clocks reopen exactly; clipped rows are `[0, 0, 0]`.
+- The original wrapper escaped `$NAMESPACE` in its Windows output path. The
+  converter therefore wrote to a literal-dollar directory and the first
+  finalizer exited `1`. The converter was not retried. Its output was copied
+  byte-for-byte into the authorized namespace and only the finalizer was run
+  again. The final status passes all provenance and data checks at SHA-256
+  `31dc0e6126772fad3958b4759d9c3fe03ee0be7157b6f5b356e08060952a1943`.
+- Preserved the complete admission, contract, original failure, finalizer-only
+  recovery, canonical NPZ, and checksums under
+  `evidence_20260724_case23_corrective_conversion_execution_cpu_v5`.
+  The recovery audit SHA-256 is
+  `17679574397ff911bfe971d5f3f906f3229b53ee9ee903ecc0edd89421fa3e0f`.
+- Fixed the wrapper path construction and added a regression that rejects
+  escaped namespace interpolation. The first authoritative post-conversion
+  suite correctly exposed three tests that depended on the runtime namespace
+  being absent. Their preflight fixtures are now isolated, while production
+  still rejects namespace reuse.
+- Evidence/fix commit `3052ca41a56a6cc4b5014787c8480aaded531224`,
+  goal-binding commit `21686033153670ffecf73ddc073d7f7ec21b690e`,
+  and test-isolation commit
+  `224af37e3c6d870b0997a5ed67fec9e0096024cd` are pushed and synchronized to
+  `.98`.
+- Focused coverage passes `29 passed, 2 warnings in 1.01 s` on macOS and
+  `29 passed, 2 warnings in 6.56 s` on `.98`. The final authoritative `.98`
+  Windows-Isaac Python CPU suite passes:
+  `1337 passed, 12 skipped, 2 warnings in 175.33 s`.
+- The converted case is valid only for a later reviewed case-merge operation.
+  No corpus merge, Isaac/GPU workload, capture, BC, PPO, checkpoint, or
+  training run was created. Goal completion remains `6/10`.
+
+## Next round after Round 250
+
+- Reopen the CPU-only corrective corpus-intake audit against the sealed
+  case-23 v4 conversion and the existing case-30 conversion. Do not merge a
+  corpus during that audit.
+- Continue the pending paired routes in order: train cases 6, 2, and 7, then
+  validation cases 8 and 16. BC remains closed until the case-disjoint corpus
+  gate passes and receives separate authorization.

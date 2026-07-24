@@ -897,10 +897,10 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ] is False
     assert corrective[
         "case23_capture_v4_conversion_execution_authoritative_cpu_commit"
-    ] == "3040a6db2b70b1fced0fd306ea17e2a008009bd3"
+    ] == "224af37e3c6d870b0997a5ed67fec9e0096024cd"
     assert corrective[
         "case23_capture_v4_conversion_execution_authoritative_cpu_suite"
-    ] == "1096_passed_12_skipped_2_warnings_in_130.96s"
+    ] == "1337_passed_12_skipped_2_warnings_in_175.33s"
     assert corrective["corrective_corpus_intake_schema"] == (
         "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v1"
     )

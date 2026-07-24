@@ -343,6 +343,39 @@ GENERIC_CORRECTIVE_CONVERSION_EVIDENCE = (
 GENERIC_CORRECTIVE_CONVERSION_SUMMARY = (
     GENERIC_CORRECTIVE_CONVERSION_EVIDENCE / "summary.json"
 )
+GENERIC_CORRECTIVE_CONVERSION_EXECUTION_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_conversion_execution_contract_v2.json"
+)
+GENERIC_CORRECTIVE_CONVERSION_EXECUTION_VALIDATOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "validate_model_based_corrective_conversion_execution.py"
+)
+GENERIC_CORRECTIVE_CONVERSION_EXECUTION_WRAPPER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "run_model_based_corrective_conversion_v2.sh"
+)
+GENERIC_CORRECTIVE_CONVERSION_EXECUTION_FINALIZER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "finalize_model_based_corrective_conversion.py"
+)
+GENERIC_CORRECTIVE_CONVERSION_EXECUTION_BUILDER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "build_model_based_corrective_conversion_execution_contract.py"
+)
+GENERIC_CORRECTIVE_CONVERSION_EXECUTION_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_generic_corrective_conversion_execution_route_cpu_v2"
+)
+GENERIC_CORRECTIVE_CONVERSION_EXECUTION_SUMMARY = (
+    GENERIC_CORRECTIVE_CONVERSION_EXECUTION_EVIDENCE / "summary.json"
+)
 CASE8_VALIDATION_PAIR_READINESS_SCRIPT = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -1645,7 +1678,75 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective[
         "generic_corrective_conversion_proposal_authoritative_windows_cpu_commit"
     ] == "34f83bcac0a78460b5cc8409624a9495deb08b5e"
-    assert corrective["generic_corrective_conversion_execution_implemented"] is False
+    generic_execution = json.loads(
+        GENERIC_CORRECTIVE_CONVERSION_EXECUTION_SUMMARY.read_text()
+    )
+    assert corrective["generic_corrective_conversion_execution_schema"] == (
+        "cinebotrl_two_wheel_riser_generic_corrective_conversion_execution_"
+        "contract_v2"
+    )
+    assert corrective[
+        "generic_corrective_conversion_execution_contract_sha256"
+    ] == _sha256(GENERIC_CORRECTIVE_CONVERSION_EXECUTION_CONTRACT)
+    assert corrective[
+        "generic_corrective_conversion_execution_contract_git_blob_sha1"
+    ] == _git_blob_sha1(
+        GENERIC_CORRECTIVE_CONVERSION_EXECUTION_CONTRACT
+    )
+    assert corrective[
+        "generic_corrective_conversion_execution_validator_sha256"
+    ] == _sha256(GENERIC_CORRECTIVE_CONVERSION_EXECUTION_VALIDATOR)
+    assert corrective[
+        "generic_corrective_conversion_execution_wrapper_sha256"
+    ] == _sha256(GENERIC_CORRECTIVE_CONVERSION_EXECUTION_WRAPPER)
+    assert corrective[
+        "generic_corrective_conversion_execution_finalizer_sha256"
+    ] == _sha256(GENERIC_CORRECTIVE_CONVERSION_EXECUTION_FINALIZER)
+    assert corrective[
+        "generic_corrective_conversion_execution_builder_sha256"
+    ] == _sha256(GENERIC_CORRECTIVE_CONVERSION_EXECUTION_BUILDER)
+    assert corrective[
+        "generic_corrective_conversion_execution_summary_sha256"
+    ] == _sha256(GENERIC_CORRECTIVE_CONVERSION_EXECUTION_SUMMARY)
+    assert corrective[
+        "generic_corrective_conversion_execution_preflight_cases"
+    ] == [6, 23, 30]
+    for case, field in [
+        (6, "generic_corrective_conversion_execution_case6_preflight_sha256"),
+        (
+            23,
+            "generic_corrective_conversion_execution_case23_preflight_sha256",
+        ),
+        (
+            30,
+            "generic_corrective_conversion_execution_case30_preflight_sha256",
+        ),
+    ]:
+        report = (
+            GENERIC_CORRECTIVE_CONVERSION_EXECUTION_EVIDENCE
+            / f"case_{case:04d}_preflight.json"
+        )
+        assert corrective[field] == _sha256(report)
+        payload = json.loads(report.read_text())
+        assert payload["passed"] is True
+        assert payload["cpu_contract_ready"] is True
+        assert payload["conversion_authorized"] is False
+        assert payload["output_created"] is False
+        assert payload["training_started"] is False
+    assert generic_execution["passed"] is True
+    assert generic_execution["preflight_case_count"] == 3
+    assert generic_execution["preflight_total_samples"] == 22617
+    assert generic_execution["mac_windows_byte_parity"] is True
+    assert generic_execution["wrapper_execute_without_token_exit_code"] == 4
+    assert generic_execution[
+        "wrapper_execute_without_token_namespace_created"
+    ] is False
+    assert generic_execution["conversion_execution_implemented"] is True
+    assert generic_execution["authorization_token_issued"] is False
+    assert generic_execution["conversion_authorized"] is False
+    assert generic_execution["output_created"] is False
+    assert generic_execution["training_started"] is False
+    assert corrective["generic_corrective_conversion_execution_implemented"] is True
     assert corrective["generic_corrective_conversion_authorized"] is False
     assert corrective["generic_corrective_conversion_output_created"] is False
     assert corrective["generic_corrective_conversion_training_started"] is False

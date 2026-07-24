@@ -10159,3 +10159,46 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-7 corrective-label capture.`
 - If case 7 capture passes, use the generic proposal path to audit it before
   creating a separately authorized CPU conversion route.
+
+## Round 263: generic conversion execution route replaces per-case scaffolding
+
+- Implemented one proposal-driven CPU conversion route at
+  `e12f63d104ebb6c3e3132e4018206cf2a24dbbfe`. The proposal supplies the
+  case, split, source capture, final status, clocks, metrics, and expected
+  output name; the validator recomputes all of them before admission.
+- The namespace and output filename are derived from the committed proposal.
+  The operator cannot override case, split, source files, namespace, or output
+  path. The finalizer reopens the produced case dataset and compares effective
+  and requested actions, non-recurrent observations, previous effective-action
+  recurrence, clocks, case IDs, clipping, and source hashes.
+- Sealed the eight-identity generic contract at
+  `994d50e1a1f138e9d9e8b0cf31bb98eb3b7a444c`. It pins the builder,
+  proposal preparer, converter, dataset module, capture module, validator,
+  wrapper, and finalizer. No token or token hash is committed.
+- A cross-host audit initially exposed nondeterministic JSON ordering from a
+  Python set. Commit `bf9894e7b0ec48bec06ca7b7848fe8f326257be7`
+  replaces it with a canonical tuple. Cases 6, 23, and 30 then produced
+  byte-identical macOS/Windows preflights at SHA-256
+  `71099cf7f64baf615e3dcbce0ff27ec43c5ad5e7764e482eb601b3c6b78206b2`,
+  `874a66eb7beab94dbf4434e2efe054292fe6bd41f3d953ec6ecb907888af212d`,
+  and `bc53ad1f5d869d0ece2f2023802eae4e0156f556fda31053519e8a8c792d043e`.
+- The actual `.98` wrapper reproduced the case-6 preflight hash. Tokenless
+  `--execute` returned code `4` with
+  `conversion_authorization_not_issued` and created no namespace.
+- Focused compatibility passes `51 passed, 2 warnings in 5.61 s` locally and
+  `51 passed, 2 warnings in 34.50 s` on `.98`. The authoritative `.98`
+  Windows-Python suite at
+  `c68405f3fc5468f9e91551601be0c0cecdee0d0b` passes
+  `1410 passed, 12 skipped, 2 warnings in 241.46 s`.
+- Evidence is preserved under
+  `evidence_20260724_generic_corrective_conversion_execution_route_cpu_v2`.
+  Generic execution is now implemented, but no token was issued and no
+  conversion output, corpus merge, BC, PPO, checkpoint, or training artifact
+  was created. Goal completion remains `6/10`.
+
+## Next round after Round 263
+
+- The next data-producing operation still requires separate authorization:
+  `Authorize exactly one case-7 corrective-label capture.`
+- After a passing capture, generate and commit its generic proposal, then
+  require a separate authorization for exactly one generic CPU conversion.

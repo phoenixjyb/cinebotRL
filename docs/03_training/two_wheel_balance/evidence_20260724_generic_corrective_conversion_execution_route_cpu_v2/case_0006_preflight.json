@@ -1,0 +1,351 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_generic_corrective_conversion_execution_admission_v2",
+  "case": 6,
+  "split": "train",
+  "namespace": "model_based_corrective_case0006_conversion_execution_v2_cpu",
+  "git": {
+    "head": "c68405f3fc5468f9e91551601be0c0cecdee0d0b",
+    "upstream": "c68405f3fc5468f9e91551601be0c0cecdee0d0b"
+  },
+  "repository_checks": {
+    "canonical_contract": true,
+    "contract_committed": true,
+    "proposal_committed": true,
+    "head_matches_upstream": true,
+    "tracked_worktree_clean": true,
+    "reviewed_parent_is_ancestor": true,
+    "proposal_commit_is_ancestor": true
+  },
+  "contract_checks": {
+    "schema": true,
+    "canonical_contract": true,
+    "contract_file_committed": true,
+    "proposal_file_committed": true,
+    "reviewed_parent": true,
+    "allowed_splits": true,
+    "identity_set": true,
+    "identity_hashes": true,
+    "proposal_identity_set": true,
+    "proposal_identity_hashes": true,
+    "case_split": true,
+    "source_ready": true,
+    "proposal_ready": true,
+    "execution_contract": true,
+    "fresh_namespace": true,
+    "authorization_state_closed": true
+  },
+  "proposal_checks": {
+    "schema": true,
+    "case_split": true,
+    "proposal_passed": true,
+    "proposal_commit_is_ancestor": true,
+    "proposal_repository_was_clean": true,
+    "proposal_checks": true,
+    "metrics_exact": true,
+    "dataset_contract": true,
+    "proposal_stage_only": true,
+    "authorization_state_closed": true
+  },
+  "authorization_checks": {
+    "authorization_file_present": false,
+    "authorization_mode_0600": false,
+    "authorization_not_symlink": false,
+    "authorization_file_outside_repository": false,
+    "authorization_hash_is_out_of_band": false,
+    "authorization_hash_matches": false
+  },
+  "contract_identities": {
+    "proposal_preparer": {
+      "path": "scripts/two_wheel_balance/prepare_model_based_corrective_conversion_route.py",
+      "sha256": "997feb6803f9f9cb9f01dc89fea9357344c4de00fc716ec8bc1d7b9e7efdcb9c",
+      "git_blob_sha1": "4e8843008f963ce6c8cfcb8bb904111d7183d387",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "converter_cli": {
+      "path": "scripts/two_wheel_balance/convert_model_based_corrective_capture.py",
+      "sha256": "09a58ec62fede0800afc70df1f8e6c47e618ed097ef96a0fedfcba8a6c88b706",
+      "git_blob_sha1": "b91dd36b633cd2c166c9f140b807fb9477a503d6",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "dataset_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_dataset.py",
+      "sha256": "c14866a50dfc4f7616e15ff35239be04cc243c63e02810d9250549c72659958a",
+      "git_blob_sha1": "2fd9eed66bae327b7ca2ea1a719c64112cd07fc2",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "capture_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_corrective_capture.py",
+      "sha256": "9d2a9bbced92c53849df9fbe0809bc5dd98f26e54feb5f5595edb96ceedebbe6",
+      "git_blob_sha1": "0edd3b569efc917b8fed8d163ad58905299f75df",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "contract_builder": {
+      "path": "scripts/two_wheel_balance/build_model_based_corrective_conversion_execution_contract.py",
+      "sha256": "7a56ab5fc4ca2254fb60836c439d408851c056f4e28e294acc5eaa938fdd4986",
+      "git_blob_sha1": "f51df4e4123c419caa935824bbe3c6298ea54e25",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "execution_validator": {
+      "path": "scripts/two_wheel_balance/validate_model_based_corrective_conversion_execution.py",
+      "sha256": "65adf4da749d5529e767bd2204b98ba1fe7d7c468d5f5413af130cd5f7c86d91",
+      "git_blob_sha1": "89ac668314ea0574bbf3d4ee9883093e8df644a2",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "execution_wrapper": {
+      "path": "scripts/two_wheel_balance/run_model_based_corrective_conversion_v2.sh",
+      "sha256": "075bafeba8bcc9ed647da71aca46747306f936010366f9850347b33e0cb915c7",
+      "git_blob_sha1": "6959b8afbafd1f7a46c9ab7983160ac57d4201c3",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "conversion_finalizer": {
+      "path": "scripts/two_wheel_balance/finalize_model_based_corrective_conversion.py",
+      "sha256": "03406a7a91ba0d852912231b49728ecf91e14f15ff104ca456cb0b065151073d",
+      "git_blob_sha1": "95a01f0ecb49985f3cdac209c2fb351710de8a73",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    }
+  },
+  "proposal_identities": {
+    "capture_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_corrective_capture.py",
+      "sha256": "9d2a9bbced92c53849df9fbe0809bc5dd98f26e54feb5f5595edb96ceedebbe6",
+      "git_blob_sha1": "0edd3b569efc917b8fed8d163ad58905299f75df",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "converter_cli": {
+      "path": "scripts/two_wheel_balance/convert_model_based_corrective_capture.py",
+      "sha256": "09a58ec62fede0800afc70df1f8e6c47e618ed097ef96a0fedfcba8a6c88b706",
+      "git_blob_sha1": "b91dd36b633cd2c166c9f140b807fb9477a503d6",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "dataset_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_dataset.py",
+      "sha256": "c14866a50dfc4f7616e15ff35239be04cc243c63e02810d9250549c72659958a",
+      "git_blob_sha1": "2fd9eed66bae327b7ca2ea1a719c64112cd07fc2",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "proposal_preparer": {
+      "path": "scripts/two_wheel_balance/prepare_model_based_corrective_conversion_route.py",
+      "sha256": "997feb6803f9f9cb9f01dc89fea9357344c4de00fc716ec8bc1d7b9e7efdcb9c",
+      "git_blob_sha1": "4e8843008f963ce6c8cfcb8bb904111d7183d387",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "source_capture": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_corrective_capture_v1/capture/case_0006_corrective_teacher_capture_v2.npz",
+      "sha256": "c51411a9686909c47af7eeabf46a61672d8b09432cfb35daabc46af5a5913f85",
+      "git_blob_sha1": "b8971af85958e083c78b80db6b4e6f0ebf371860",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "source_final_status": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_corrective_capture_v1/final_status.json",
+      "sha256": "843981c82609d8d07cf1b532ce5978e279872649f4f7cd499092a0c7261376f9",
+      "git_blob_sha1": "75e1849ba023fa252173532a0b018393bb1da613",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true,
+        "path_exact": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    }
+  },
+  "contract": {
+    "path": "scripts/two_wheel_balance/model_based_corrective_conversion_execution_contract_v2.json",
+    "sha256": "f7931b5e2d10b61c65aa384b7a832bd3fd45bfb9801964babbdbf570f4d68f99",
+    "git_blob_sha1": "6b27d04d0e87b59cb863cf913f64895e324aef17",
+    "checks": {
+      "inside_repository": true,
+      "file_exists": true,
+      "tracked": true,
+      "committed_blob_matches": true
+    },
+    "passed": true
+  },
+  "proposal": {
+    "path": "docs/03_training/two_wheel_balance/evidence_20260724_generic_corrective_conversion_proposals_v1/case_0006.json",
+    "sha256": "26bf8c09c4c071ce850945daaa9feaed2f05b0d8da3185940500ec226d039c2d",
+    "git_blob_sha1": "ae1697bbf1a010725789b0584bce0f3283600298",
+    "checks": {
+      "inside_repository": true,
+      "file_exists": true,
+      "tracked": true,
+      "committed_blob_matches": true
+    },
+    "passed": true
+  },
+  "source_checks": {
+    "case_split": true,
+    "shape": true,
+    "effective_only": true,
+    "previous_action_rebuilt": true,
+    "clipping_audited": true,
+    "three_clocks_preserved": true,
+    "learning_closed": true
+  },
+  "source_metrics": {
+    "sample_count": 7933,
+    "observation_shape": [
+      7933,
+      65
+    ],
+    "action_shape": [
+      7933,
+      3
+    ],
+    "action_abs_max": [
+      0.4620293080806732,
+      0.15905605256557465,
+      0.08932578563690186
+    ],
+    "requested_action_abs_max": [
+      0.4620293080806732,
+      0.15905605256557465,
+      0.08932578563690186
+    ],
+    "clipped_rows": [
+      0,
+      146,
+      0
+    ],
+    "elapsed_clock_end_s": 39.66,
+    "execution_clock_end_s": 17.737274605869224,
+    "source_clock_end_s": 15.942736
+  },
+  "source_error": null,
+  "source_capture_relative_path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_corrective_capture_v1/capture/case_0006_corrective_teacher_capture_v2.npz",
+  "source_final_status_relative_path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_corrective_capture_v1/final_status.json",
+  "source_capture_sha256": "c51411a9686909c47af7eeabf46a61672d8b09432cfb35daabc46af5a5913f85",
+  "source_final_status_sha256": "843981c82609d8d07cf1b532ce5978e279872649f4f7cd499092a0c7261376f9",
+  "output_relative_path": "artifacts/two_wheel_riser/model_based_corrective_case0006_conversion_execution_v2_cpu/case_0006_model_based_corrective_case_dataset_v1.npz",
+  "dataset_name": "case_0006_model_based_corrective_case_dataset_v1.npz",
+  "cpu_contract_ready": true,
+  "authorization_consumed_before_conversion": false,
+  "conversion_authorized": false,
+  "output_created": false,
+  "valid_for_case_merge": false,
+  "merged_dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

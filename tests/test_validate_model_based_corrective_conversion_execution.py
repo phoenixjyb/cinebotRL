@@ -215,6 +215,9 @@ def test_one_generic_preflight_accepts_all_existing_proposals(
     assert result["dataset_name"] == MODULE.dataset_name_for(case)
     assert result["source_metrics"]["sample_count"] == sample_count
     assert result["source_metrics"]["clipped_rows"] == clipped_rows
+    assert list(result["proposal_identities"]) == list(
+        MODULE.PROPOSAL_IDENTITY_NAMES
+    )
     assert all(result["contract_checks"].values())
     assert all(result["proposal_checks"].values())
     assert result["conversion_authorized"] is False

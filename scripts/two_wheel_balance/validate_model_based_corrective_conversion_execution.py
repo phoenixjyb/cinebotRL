@@ -51,14 +51,14 @@ CONTRACT_RELATIVE_PATH = (
     "model_based_corrective_conversion_execution_contract_v2.json"
 )
 ALLOWED_SPLITS = ("train", "validation")
-PROPOSAL_IDENTITY_NAMES = {
-    "source_capture",
-    "source_final_status",
+PROPOSAL_IDENTITY_NAMES = (
+    "capture_module",
     "converter_cli",
     "dataset_module",
-    "capture_module",
     "proposal_preparer",
-}
+    "source_capture",
+    "source_final_status",
+)
 CODE_PATHS = {
     "proposal_preparer": (
         "scripts/two_wheel_balance/"
@@ -625,8 +625,8 @@ def validate(
         "proposal_identity_set": isinstance(
             proposal.get("identities"), Mapping
         )
-        and set(proposal["identities"]) == PROPOSAL_IDENTITY_NAMES
-        and set(proposal_rows) == PROPOSAL_IDENTITY_NAMES,
+        and set(proposal["identities"]) == set(PROPOSAL_IDENTITY_NAMES)
+        and set(proposal_rows) == set(PROPOSAL_IDENTITY_NAMES),
         "proposal_identity_hashes": bool(proposal_rows)
         and all(row["passed"] is True for row in proposal_rows.values()),
         "case_split": case > 0 and split in ALLOWED_SPLITS,

@@ -1463,6 +1463,9 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["case7_pair_execution_capture_eligible"] is True
     assert corrective["case7_pair_execution_label_capture_authorized"] is False
     assert corrective["case7_pair_execution_training_started"] is False
+    assert corrective[
+        "case7_pair_execution_authoritative_windows_cpu_suite"
+    ] == "1375_passed_12_skipped_2_warnings_in_222.39s"
     assert corrective["case8_validation_pair_readiness_schema"] == (
         "cinebotrl_two_wheel_riser_case8_validation_pair_readiness_cpu_v1"
     )

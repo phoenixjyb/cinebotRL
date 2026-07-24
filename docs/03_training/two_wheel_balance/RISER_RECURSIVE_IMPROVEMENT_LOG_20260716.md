@@ -10035,6 +10035,11 @@ and must state whether its candidate was accepted or rejected.
 - Evidence/status commit
   `69516b4273ec9b363f328eade80835b2422f748d` preserves the complete
   hash-bound result.
+- Closure commit `1f524236fbf51dc62c79a6e6e6641b3470daed3b` is synchronized
+  to `.98`. Focused coverage passes `37 passed, 2 warnings in 8.03 s` on
+  macOS and `37 passed, 2 warnings in 47.22 s` on `.98`; the authoritative
+  `.98` Windows-Isaac Python CPU suite passes
+  `1375 passed, 12 skipped, 2 warnings in 222.39 s`.
 - The consumed route is closed again in source. GPU ownership is released,
   and no label capture, dataset, conversion, corpus merge, BC, PPO,
   checkpoint, or training output was created. Goal completion remains `6/10`.

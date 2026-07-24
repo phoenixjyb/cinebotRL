@@ -96,6 +96,30 @@ def test_windows_git_paths_are_converted_for_wsl() -> None:
     )
 
 
+def test_windows_preflight_uses_wsl_bash(monkeypatch) -> None:
+    repo = Path("/placeholder")
+    route = {"wrapper": "scripts/two_wheel_balance/run_pair.sh"}
+    monkeypatch.setattr(
+        MODULE,
+        "_windows_to_wsl",
+        lambda value: (
+            "/mnt/g/wSpace/cinebotRL-two-wheel-riser/"
+            "scripts/two_wheel_balance/run_pair.sh"
+        ),
+    )
+    monkeypatch.setattr(MODULE.os, "name", "nt")
+    assert MODULE._preflight_command(repo, route) == [
+        "wsl.exe",
+        "--exec",
+        "bash",
+        (
+            "/mnt/g/wSpace/cinebotRL-two-wheel-riser/"
+            "scripts/two_wheel_balance/run_pair.sh"
+        ),
+        "--preflight",
+    ]
+
+
 def test_unknown_route_fails_before_any_runtime_authorization(
     monkeypatch,
 ) -> None:

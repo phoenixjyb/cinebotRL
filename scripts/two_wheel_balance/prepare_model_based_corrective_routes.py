@@ -344,12 +344,28 @@ def validate_catalog(
     }
 
 
+def _preflight_command(
+    repo: Path,
+    route: Mapping[str, object],
+) -> list[str]:
+    wrapper = str(repo / str(route["wrapper"]))
+    if os.name == "nt":
+        return [
+            "wsl.exe",
+            "--exec",
+            "bash",
+            _windows_to_wsl(wrapper),
+            "--preflight",
+        ]
+    return ["bash", wrapper, "--preflight"]
+
+
 def _run_preflight(
     repo: Path,
     route: Mapping[str, object],
 ) -> dict[str, object]:
     result = subprocess.run(
-        ["bash", str(repo / str(route["wrapper"])), "--preflight"],
+        _preflight_command(repo, route),
         cwd=repo,
         capture_output=True,
         text=True,

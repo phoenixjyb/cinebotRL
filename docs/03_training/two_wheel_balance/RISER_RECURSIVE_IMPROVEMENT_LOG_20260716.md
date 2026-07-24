@@ -10009,3 +10009,36 @@ and must state whether its candidate was accepted or rejected.
 - The shared projection-evidence blocker is closed.
 - The next data-producing operation requires separate authorization:
   `Authorize exactly one case-7 paired canary.`
+
+## Round 259: case-7 paired corrective target passes
+
+- Consumed exactly one external mode-`0600` authorization and ran the pinned
+  case-7 wrapper once at clean synchronized runtime commit
+  `4b1f3fe3868bf380aa4fc1cf84f6095d9bf41861`. The token was removed before
+  Isaac started; baseline and candidate each ran once with no retry.
+- Both rollouts used the same plan, source/execution clocks, reset seed,
+  controller, safety gates, and deterministic 20-step `20 N` body-x wrench.
+  Both dynamic-quality gates passed without termination or saturation.
+- Candidate position p95 improved from `0.130825693 m` to `0.124908848 m`:
+  `0.005916844 m` absolute and `4.5227%` relative. Position max improved from
+  `0.142947680 m` to `0.141102227 m`; attitude max improved, while pitch
+  remained within the allowed non-regression margin.
+- The repaired projection evidence passed over `6,597` candidate steps.
+  Nine samples were projection-affected; effective normalized maxima remained
+  `[0.383306444, 0.201544181, 0.063141920]`. The evidence observer did not
+  modify commands.
+- Preserved the complete namespace and checksums under
+  `evidence_20260724_case7_corrective_pair_execution_v1`. Final-status SHA-256
+  is `7c2f7ac0ff1b8bc1e50d95d317dabcb097e2cef35f2c5ab817bc0b73e62179d4`;
+  projection-audit SHA-256 is
+  `9ca2080d71c2bfae344ed172c4882ec94bc0d82e7160f4b02df94be020a6d9c3`.
+- The consumed route is closed again in source. GPU ownership is released,
+  and no label capture, dataset, conversion, corpus merge, BC, PPO,
+  checkpoint, or training output was created. Goal completion remains `6/10`.
+
+## Next round after Round 259
+
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-7 corrective-label capture.`
+- Do not reuse the consumed paired-canary authorization and do not proceed
+  directly to conversion, corpus merge, BC, PPO, validation, or training.

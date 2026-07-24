@@ -290,6 +290,15 @@ CASE7_PAIR_ROUTE_EVIDENCE = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_case7_pair_route_cpu_v1/summary.json"
 )
+CASE7_PAIR_EXECUTION_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case7_corrective_pair_execution_v1"
+)
+CASE7_PAIR_EXECUTION_FINAL = CASE7_PAIR_EXECUTION_EVIDENCE / "final_status.json"
+CASE7_PAIR_EXECUTION_PROJECTION = (
+    CASE7_PAIR_EXECUTION_EVIDENCE / "projection_audit.json"
+)
 CASE8_VALIDATION_PAIR_READINESS_SCRIPT = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -1429,6 +1438,28 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case7_route["label_capture_authorized"] is False
     assert case7_route["dataset_creation_authorized"] is False
     assert case7_route["training_started"] is False
+    case7_execution = json.loads(CASE7_PAIR_EXECUTION_FINAL.read_text())
+    case7_projection = json.loads(CASE7_PAIR_EXECUTION_PROJECTION.read_text())
+    assert (
+        corrective["case7_pair_execution_final_status_sha256"]
+        == _sha256(CASE7_PAIR_EXECUTION_FINAL)
+    )
+    assert (
+        corrective["case7_pair_execution_projection_audit_sha256"]
+        == _sha256(CASE7_PAIR_EXECUTION_PROJECTION)
+    )
+    assert case7_execution["dynamic_pair_completed"] is True
+    assert case7_execution["corrective_target_admission_passed"] is True
+    assert case7_execution["label_capture_authorized"] is False
+    assert case7_execution["dataset_created"] is False
+    assert case7_execution["training_started"] is False
+    assert case7_projection["passed"] is True
+    assert case7_projection["candidate"][
+        "projection_affected_sample_count"
+    ] == 9
+    assert corrective["case7_pair_execution_capture_eligible"] is True
+    assert corrective["case7_pair_execution_label_capture_authorized"] is False
+    assert corrective["case7_pair_execution_training_started"] is False
     assert corrective["case8_validation_pair_readiness_schema"] == (
         "cinebotrl_two_wheel_riser_case8_validation_pair_readiness_cpu_v1"
     )
@@ -2432,7 +2463,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "exactly_one_case7_paired_canary" in (
+    assert "exactly_one_case7_corrective_label_capture" in (
         goal["next_iteration"]["required_change"]
     )
 
@@ -2840,7 +2871,7 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         is False
     )
     assert audit["pre_training_next_operation"] == (
-        "authorize_exactly_one_case7_paired_canary"
+        "authorize_exactly_one_case7_corrective_label_capture"
     )
     assert audit["pre_training_next_operation_authorized"] is False
     assert audit["focused_local_cpu_suite"] == "14_passed_2_warnings_in_2.89s"

@@ -18,8 +18,8 @@ readonly CORRECTIVE_PROFILE="$WIN_ROOT\\scripts\\two_wheel_balance\\model_based_
 readonly GAINS="$WIN_ROOT\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json"
 readonly PLAYBACK="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 readonly FINALIZER="$WIN_ROOT\\scripts\\two_wheel_balance\\summarize_model_based_corrective_teacher_case7_pair.py"
-# This one-use authorization opens only the paired canary namespace.
-readonly AUTHORIZATION_SHA256="c9a19cfaa1bb5f518bde8c2223ef0cfe6bfc87099e5daa7f7acc90f37b7bae9d"
+# A future reviewed authorization-only commit must replace this empty value.
+readonly AUTHORIZATION_SHA256=""
 
 reject() {
   printf '{"reason":"%s","python_started":false,"isaac_started":false,"runtime_started":false,"passed":false}\n' "$1" >&2

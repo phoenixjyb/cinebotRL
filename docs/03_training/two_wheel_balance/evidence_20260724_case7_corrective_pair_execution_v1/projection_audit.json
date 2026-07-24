@@ -1,0 +1,99 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case7_pair_projection_audit_v1",
+  "case": 7,
+  "baseline": {
+    "schema": "cinebotrl_two_wheel_riser_corrective_projection_evidence_v2",
+    "evidence_source": "runtime_requested_effective_post_supervisor_aggregates_v1",
+    "enabled": false,
+    "sample_count": 0,
+    "requested_residual_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "effective_residual_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "effective_normalized_action_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "requested_effective_delta_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "projection_affected_sample_count": 0,
+    "runtime_aggregate_fields_complete": true,
+    "observer_modified_commands": false,
+    "applied_to_commands": false,
+    "labels_captured": false,
+    "dataset_created": false,
+    "training_started": false,
+    "valid_for_training": false,
+    "checks": {
+      "action_scales_valid": true,
+      "completed_steps_valid": true,
+      "requested_action_aggregate_valid": true,
+      "effective_action_aggregate_valid": true,
+      "projection_delta_aggregate_valid": true,
+      "affected_sample_count_valid": true,
+      "normalized_actions_bounded": true,
+      "disabled_route_is_exact_zero": true
+    },
+    "passed": true
+  },
+  "candidate": {
+    "schema": "cinebotrl_two_wheel_riser_corrective_projection_evidence_v2",
+    "evidence_source": "runtime_requested_effective_post_supervisor_aggregates_v1",
+    "enabled": true,
+    "sample_count": 6597,
+    "requested_residual_abs_max": [
+      0.019165322184562683,
+      0.010077209025621415,
+      0.0012628383934497835
+    ],
+    "effective_residual_abs_max": [
+      0.019165322184562683,
+      0.010077209025621425,
+      0.0012628383934498166
+    ],
+    "effective_normalized_action_abs_max": [
+      0.38330644369125366,
+      0.2015441805124285,
+      0.06314191967249083
+    ],
+    "requested_effective_delta_abs_max": [
+      2.2204460492503132e-17,
+      2.7755575615628914e-17,
+      9.020274505019189e-05
+    ],
+    "projection_affected_sample_count": 9,
+    "runtime_aggregate_fields_complete": true,
+    "observer_modified_commands": false,
+    "applied_to_commands": false,
+    "labels_captured": false,
+    "dataset_created": false,
+    "training_started": false,
+    "valid_for_training": false,
+    "checks": {
+      "action_scales_valid": true,
+      "completed_steps_valid": true,
+      "requested_action_aggregate_valid": true,
+      "effective_action_aggregate_valid": true,
+      "projection_delta_aggregate_valid": true,
+      "affected_sample_count_valid": true,
+      "normalized_actions_bounded": true,
+      "disabled_route_is_exact_zero": true
+    },
+    "passed": true
+  },
+  "labels_captured": false,
+  "dataset_created": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

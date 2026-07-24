@@ -1173,8 +1173,11 @@
         "pre_training_next_operation_authorized": false,
         "focused_local_cpu_suite": "14_passed_2_warnings_in_2.89s",
         "focused_windows_cpu_suite": "14_passed_2_warnings_in_9.76s",
-        "authoritative_windows_cpu_commit": "90f1aad2849e0a9e1029f2834c0db8301e98d0f3",
-        "authoritative_windows_cpu_suite": "1301_passed_12_skipped_2_warnings_in_173.12s"
+        "goal_binding_commit": "4ee77623d64091af572cd21cf6ab255f0a23c20c",
+        "combined_focused_local_cpu_suite": "20_passed_2_warnings_in_3.17s",
+        "combined_focused_windows_cpu_suite": "20_passed_2_warnings_in_9.80s",
+        "authoritative_windows_cpu_commit": "4ee77623d64091af572cd21cf6ab255f0a23c20c",
+        "authoritative_windows_cpu_suite": "1332_passed_12_skipped_2_warnings_in_173.50s"
       },
       "completion_gap": [
         "separately_authorize_and_convert_the_reviewed_case23_v4_capture",

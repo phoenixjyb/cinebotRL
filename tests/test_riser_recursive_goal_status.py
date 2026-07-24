@@ -2543,11 +2543,20 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["pre_training_next_operation_authorized"] is False
     assert audit["focused_local_cpu_suite"] == "14_passed_2_warnings_in_2.89s"
     assert audit["focused_windows_cpu_suite"] == "14_passed_2_warnings_in_9.76s"
+    assert audit["goal_binding_commit"] == (
+        "4ee77623d64091af572cd21cf6ab255f0a23c20c"
+    )
+    assert audit["combined_focused_local_cpu_suite"] == (
+        "20_passed_2_warnings_in_3.17s"
+    )
+    assert audit["combined_focused_windows_cpu_suite"] == (
+        "20_passed_2_warnings_in_9.80s"
+    )
     assert audit["authoritative_windows_cpu_commit"] == (
-        "90f1aad2849e0a9e1029f2834c0db8301e98d0f3"
+        "4ee77623d64091af572cd21cf6ab255f0a23c20c"
     )
     assert audit["authoritative_windows_cpu_suite"] == (
-        "1301_passed_12_skipped_2_warnings_in_173.12s"
+        "1332_passed_12_skipped_2_warnings_in_173.50s"
     )
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
         "c27491ba9392396d76dc7797231186220dde75f6676c44c12df44ec6666651af"

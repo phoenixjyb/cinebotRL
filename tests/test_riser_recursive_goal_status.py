@@ -11,7 +11,7 @@ GOAL = (
 GOAL_COMPLETION_AUDIT = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260724_riser_goal_completion_audit_v4/summary.json"
+    "evidence_20260724_riser_goal_completion_audit_v5/summary.json"
 )
 CASE23_CAPTURE_CONTRACT = (
     ROOT
@@ -2431,9 +2431,9 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     audit = _goal()["current_stage"]["status_refresh_20260723"][
         "goal_completion_audit"
     ]
-    assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v4"
+    assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v5"
     assert audit["implementation_commit"] == (
-        "20694e8d5d238d1965a22e3eef4e14fe57682f05"
+        "5b269a729a8006a7bec5fd5d9bb6fa594e1e58e7"
     )
     assert audit["host_independent_lf_evidence"] is True
     assert audit["mac_and_windows_report_byte_parity_verified"] is True
@@ -2657,12 +2657,12 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "1332_passed_12_skipped_2_warnings_in_173.50s"
     )
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
-        "6ff6ca603a9ee487025841da9db981316e7e8ff3b240b27ad1b8a4d3e100cabc"
+        "25ce15bb02bd5c43b4619d1b0ddf85f62a72ca4018d23bb587f74c46acd50ed1"
     )
     report = json.loads(GOAL_COMPLETION_AUDIT.read_text())
-    assert report["git"]["head"] == "20694e8d5d238d1965a22e3eef4e14fe57682f05"
+    assert report["git"]["head"] == "5b269a729a8006a7bec5fd5d9bb6fa594e1e58e7"
     assert report["inputs"]["auditor"]["sha256"] == (
-        "0d5dc2c4f4d7a8180e5661201fdafed13fc8453915348c69e53cebead6e36fb1"
+        "67d2b453a2b15f90b8f6d0ac27fc3512b6a822cfda7eec3217826cac8a26e1f3"
     )
     assert report["required_gate_pass_count"] == audit["required_gate_pass_count"]
     assert report["required_gate_count"] == audit["required_gate_count"]
@@ -2686,6 +2686,6 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "pending_route_queue_all_authorization_closed"
     ] is True
     assert report["inputs"]["pending_route_queue"]["sha256"] == (
-        "ef32652ac98d1103d431f7b3ae96d63c3311e3a7fba0b9a92061a1e1b16892cd"
+        "244377cb46a69d744f26449f74a4fa5301c0416c3142857f8213dfbacd05f041"
     )
     assert report["pre_training_readiness"]["ready_for_bc_execution"] is False

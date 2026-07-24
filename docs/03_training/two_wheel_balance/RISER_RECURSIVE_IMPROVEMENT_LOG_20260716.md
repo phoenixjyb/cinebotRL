@@ -9769,3 +9769,48 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-6 corrective-label capture.`
 - Do not reuse the consumed paired-canary authorization and do not proceed
   directly to conversion, corpus merge, BC, PPO, or case 2.
+
+## Round 253: case-6 corrective labels are captured exactly once
+
+- Added a fresh, tokenless, fail-closed case-6 capture route bound to the
+  sealed passing pair, exact case-6 plan/profile/wrench, current 400 W drive
+  profile, LQR gains, robot assets, playback, capture runtime, and finalizer.
+  The only generic change allows the existing capture validator to receive the
+  expected case-specific corrective-profile envelope instead of assuming the
+  case-30 envelope.
+- Route commit `c528cd2a3ccfabcb38fffd99a5c1613d306161e9` is pushed and synchronized.
+  Focused route coverage passed `27 passed, 2 warnings` on macOS and
+  `26 passed, 1 skipped, 2 warnings` on `.98`; the real tokenless WSL
+  preflight passed with all identities and authorization states closed.
+- Consumed exactly one external mode-`0600` authorization and executed the
+  case-6 capture wrapper once. The token was removed before Isaac started;
+  there was no retry.
+- The rollout passed dynamic, thermal, controller, perturbation, heartbeat,
+  archive, clock, identity, and GPU-release checks. Position p95/max was
+  `0.110559691/0.126411242 m`, attitude p95/max was
+  `0.158318448/0.453032403 degrees`, and peak pitch was
+  `6.383016685 degrees`.
+- Preserved 7,933 aligned samples. Source/execution clocks end at
+  `15.942736/17.737274606 s`, exactly 20 rows carry the deterministic wrench,
+  and initialization contributes no capture samples. Requested/effective
+  normalized maxima are `[0.462029308, 0.159056053, 0.089325786]`.
+- The safety supervisor changed yaw residuals on 146 rows; requested intent,
+  effective post-supervisor targets, clipping flags, amplitude/slew flags, and
+  both clocks are retained. Future conversion must use only effective
+  post-supervisor residuals as labels.
+- Preserved all evidence under
+  `evidence_20260724_case6_corrective_capture_v1`. Capture SHA-256 is
+  `c51411a9686909c47af7eeabf46a61672d8b09432cfb35daabc46af5a5913f85`;
+  final-status SHA-256 is
+  `843981c82609d8d07cf1b532ce5978e279872649f4f7cd499092a0c7261376f9`.
+- The raw capture is admitted only for a separately authorized CPU conversion.
+  No normalized dataset, corpus merge, BC, PPO, checkpoint, or training output
+  was created. Goal completion remains `6/10`.
+
+## Next round after Round 253
+
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-6 CPU conversion.`
+- Conversion must reopen the sealed capture and final status, preserve all
+  clocks and provenance, use effective post-supervisor labels, reconstruct
+  previous-action channels, and remain separate from corpus merge or training.

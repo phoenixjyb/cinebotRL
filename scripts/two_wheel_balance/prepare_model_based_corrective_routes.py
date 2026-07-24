@@ -6,7 +6,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from pathlib import Path
+import os
+from pathlib import Path, PureWindowsPath
 import subprocess
 import sys
 from typing import Mapping, Sequence
@@ -75,9 +76,29 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _windows_to_wsl(value: str) -> str:
+    path = PureWindowsPath(value)
+    if not path.is_absolute() or not path.drive:
+        return value
+    drive = path.drive[0].lower()
+    relative = path.as_posix().split(":/", 1)[1]
+    return f"/mnt/{drive}/{relative}"
+
+
 def _git(repo: Path, *args: str, check: bool = True) -> str:
+    if os.name == "nt":
+        command = [
+            "wsl.exe",
+            "--exec",
+            "git",
+            "-C",
+            _windows_to_wsl(str(repo.resolve())),
+            *(_windows_to_wsl(value) for value in args),
+        ]
+    else:
+        command = ["git", "-C", str(repo), *args]
     result = subprocess.run(
-        ["git", "-C", str(repo), *args],
+        command,
         check=check,
         capture_output=True,
         text=True,

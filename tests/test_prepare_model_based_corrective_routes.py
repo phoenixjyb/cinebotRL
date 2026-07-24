@@ -84,6 +84,18 @@ def test_catalog_rejects_duplicate_case(tmp_path: Path) -> None:
     assert result["passed"] is False
 
 
+def test_windows_git_paths_are_converted_for_wsl() -> None:
+    assert MODULE._windows_to_wsl(
+        r"G:\wSpace\cinebotRL-two-wheel-riser\contract.json"
+    ) == (
+        "/mnt/g/wSpace/cinebotRL-two-wheel-riser/contract.json"
+    )
+    assert MODULE._windows_to_wsl("hash-object") == "hash-object"
+    assert MODULE._windows_to_wsl("/mnt/g/wSpace/repo") == (
+        "/mnt/g/wSpace/repo"
+    )
+
+
 def test_unknown_route_fails_before_any_runtime_authorization(
     monkeypatch,
 ) -> None:

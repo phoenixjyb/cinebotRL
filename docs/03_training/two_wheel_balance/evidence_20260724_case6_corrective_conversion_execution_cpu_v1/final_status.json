@@ -1,0 +1,72 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case6_conversion_final_v1",
+  "namespace": "20260724_model_based_corrective_case6_conversion_v1_cpu",
+  "case": 6,
+  "split": "train",
+  "runtime_commit": "1283e1b0da405653564382d0aa47d767ce2f925b",
+  "converter_exit_code": 0,
+  "checks": {
+    "namespace": true,
+    "converter_exit_zero": true,
+    "admission_schema": true,
+    "admission_passed": true,
+    "admission_case_split": true,
+    "admission_runtime_commit": true,
+    "authorization_consumed": true,
+    "conversion_result": true,
+    "dataset_loaded": true,
+    "source_capture_hash": true,
+    "source_final_status_hash": true,
+    "runtime_identity": true,
+    "case_split": true,
+    "sample_count": true,
+    "effective_actions_exact": true,
+    "requested_actions_audit_exact": true,
+    "previous_action_recurrence": true,
+    "non_previous_observations_exact": true,
+    "elapsed_clock_exact": true,
+    "execution_clock_exact": true,
+    "source_clock_exact": true,
+    "case_ids_exact": true,
+    "training_closed": true
+  },
+  "conversion_result_error": null,
+  "dataset_error": null,
+  "metrics": {
+    "sample_count": 7933,
+    "observation_shape": [
+      7933,
+      65
+    ],
+    "action_abs_max": [
+      0.4620293080806732,
+      0.15905605256557465,
+      0.08932578563690186
+    ],
+    "requested_action_abs_max": [
+      0.4620293080806732,
+      0.15905605256557465,
+      0.08932578563690186
+    ],
+    "clipped_rows": [
+      0,
+      146,
+      0
+    ],
+    "elapsed_clock_end_s": 39.66,
+    "execution_clock_end_s": 17.737274605869224,
+    "source_clock_end_s": 15.942736
+  },
+  "dataset": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260724_model_based_corrective_case6_conversion_v1_cpu\\case_0006_model_based_corrective_case_dataset_v1.npz",
+    "sha256": "ac138c9790eda983643ae17cc5b3dcf33cfe4634841760aada929df367acb809",
+    "size_bytes": 2277874
+  },
+  "valid_for_case_merge": true,
+  "merged_dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

@@ -9750,6 +9750,15 @@ and must state whether its candidate was accepted or rejected.
   `evidence_20260724_case6_corrective_pair_execution_v2`. The final-status
   SHA-256 is
   `c723407d40072b0e0753036b65f66e64963268d5f2d01934a2b4a13d1aa96458`.
+- Authorization implementation commit
+  `f83041e3ee609a0a2bd9df96d0ac4033835a9479`, cross-platform test fix commit
+  `1a331133832bdf45cf4d8035f7b411e08c664522`, evidence/status commit
+  `0eb88c8aae225d9f4280ee76398279003910d1a6`, and evidence-mode commit
+  `8109c87636736c868a89cd61e3b23a076d899510` are pushed and synchronized.
+- Focused coverage passes `24 passed, 2 warnings in 4.04 s` on macOS and
+  `24 passed, 2 warnings in 12.27 s` on `.98`. The authoritative `.98`
+  Windows-Isaac Python CPU suite passes:
+  `1339 passed, 12 skipped, 2 warnings in 178.86 s`.
 - No label capture, dataset, conversion, merge, BC, PPO, checkpoint, or
   training output was created. GPU ownership was released and the case-6
   corrective target is admitted only for a separately authorized capture.

@@ -9803,6 +9803,12 @@ and must state whether its candidate was accepted or rejected.
   `c51411a9686909c47af7eeabf46a61672d8b09432cfb35daabc46af5a5913f85`;
   final-status SHA-256 is
   `843981c82609d8d07cf1b532ce5978e279872649f4f7cd499092a0c7261376f9`.
+- Evidence/status commit
+  `96f20f6b5eff85fcba4c6ebebd2d00f784ee5f00` is pushed and synchronized.
+  Final focused coverage passes `33 passed, 2 warnings in 2.42 s` on macOS
+  and `32 passed, 1 skipped, 2 warnings in 6.56 s` on `.98`. The
+  authoritative `.98` Windows-Isaac Python CPU suite passes:
+  `1345 passed, 12 skipped, 2 warnings in 180.40 s`.
 - The raw capture is admitted only for a separately authorized CPU conversion.
   No normalized dataset, corpus merge, BC, PPO, checkpoint, or training output
   was created. Goal completion remains `6/10`.

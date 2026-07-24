@@ -76,6 +76,42 @@ def _identity(path: Path, relative: str) -> dict[str, str]:
     }
 
 
+def _wsl_executable() -> str:
+    return str(
+        Path(os.environ.get("WINDIR", r"C:\Windows"))
+        / "System32/wsl.exe"
+    )
+
+
+def _secure_token(tmp_path: Path) -> Path:
+    if os.name != "nt":
+        token = tmp_path / "generic-conversion-authorization"
+        token.write_bytes(b"one-generic-cpu-conversion\n")
+        token.chmod(0o600)
+        return token
+    wsl_root = "/home/yanbo/.codex_generic_conversion_tests"
+    created = subprocess.run(
+        [
+            _wsl_executable(),
+            "sh",
+            "-lc",
+            f"umask 077; mkdir -p {wsl_root}; mktemp {wsl_root}/token.XXXXXX",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    windows_path = subprocess.run(
+        [_wsl_executable(), "wslpath", "-w", created],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    token = Path(windows_path)
+    token.write_bytes(b"one-generic-cpu-conversion\n")
+    return token
+
+
 def _contract_payload(repo: Path) -> dict[str, object]:
     return {
         "schema": MODULE.SCHEMA,
@@ -232,39 +268,41 @@ def test_one_generic_preflight_accepts_all_existing_proposals(
 
 def test_external_mode_0600_token_opens_only_one_conversion(tmp_path) -> None:
     repo, contract, proposal = _isolated_repo(tmp_path, 6)
-    token = tmp_path / "generic-conversion-authorization"
-    token.write_bytes(b"one-generic-cpu-conversion\n")
-    token.chmod(0o600)
-    result = _validate(
-        repo,
-        contract,
-        proposal,
-        authorization_file=token,
-        authorization_sha256=_sha256(token),
-    )
-    assert result["passed"] is True
-    assert result["conversion_authorized"] is True
-    assert result["authorization_consumed_before_conversion"] is True
-    assert result["output_created"] is False
-    assert result["merged_dataset_created"] is False
-    assert result["bc_authorized"] is False
-    assert result["ppo_authorized"] is False
+    token = _secure_token(tmp_path)
+    try:
+        result = _validate(
+            repo,
+            contract,
+            proposal,
+            authorization_file=token,
+            authorization_sha256=_sha256(token),
+        )
+        assert result["passed"] is True
+        assert result["conversion_authorized"] is True
+        assert result["authorization_consumed_before_conversion"] is True
+        assert result["output_created"] is False
+        assert result["merged_dataset_created"] is False
+        assert result["bc_authorized"] is False
+        assert result["ppo_authorized"] is False
+    finally:
+        token.unlink(missing_ok=True)
 
 
 def test_forged_token_proposal_or_source_fails_closed(tmp_path) -> None:
     repo, contract, proposal = _isolated_repo(tmp_path, 6)
-    token = tmp_path / "generic-conversion-authorization"
-    token.write_bytes(b"one-generic-cpu-conversion\n")
-    token.chmod(0o600)
-    bad_token = _validate(
-        repo,
-        contract,
-        proposal,
-        authorization_file=token,
-        authorization_sha256="0" * 64,
-    )
-    assert bad_token["passed"] is False
-    assert bad_token["conversion_authorized"] is False
+    token = _secure_token(tmp_path)
+    try:
+        bad_token = _validate(
+            repo,
+            contract,
+            proposal,
+            authorization_file=token,
+            authorization_sha256="0" * 64,
+        )
+        assert bad_token["passed"] is False
+        assert bad_token["conversion_authorized"] is False
+    finally:
+        token.unlink(missing_ok=True)
 
     payload = json.loads(proposal.read_text())
     payload["metrics"]["sample_count"] += 1

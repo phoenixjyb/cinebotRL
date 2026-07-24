@@ -1,0 +1,90 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_capture_command_contract_v1",
+  "playback": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+  "canonical_value_options": {
+    "--plan-filename-template": "case_{case:04d}_smoothed_riser_plan_v1.npz",
+    "--controller-wz-kp": "1.05",
+    "--maximum-duration-scale": "3.0",
+    "--maximum-pitch-deg": "12.0",
+    "--maximum-position-p95-m": "0.15",
+    "--maximum-position-error-m": "0.25",
+    "--maximum-attitude-p95-deg": "5.0",
+    "--maximum-attitude-error-deg": "10.0",
+    "--maximum-riser-servo-error-m": "0.03",
+    "--maximum-proxy-servo-error-deg": "5.0",
+    "--maximum-internal-proxy-rate-deg-s": "360.0",
+    "--maximum-saturation-ratio": "0.20",
+    "--camera-lever-arm-compensation-gain": "1.0",
+    "--maximum-camera-lever-arm-correction-m": "0.05",
+    "--residual-action-scales": "0.05,0.05,0.02",
+    "--policy-command-base": "model_based_planner",
+    "--corrective-teacher-capture-split": "train"
+  },
+  "canonical_flag_options": [
+    "--enable-camera-lever-arm-compensation",
+    "--zero-policy-action",
+    "--headless"
+  ],
+  "identity_option_bindings": {
+    "--gains": {
+      "identity": "lqr_gains",
+      "path_mode": "file"
+    },
+    "--plan-dir": {
+      "identity_suffix": "_plan",
+      "path_mode": "parent"
+    },
+    "--corrective-teacher-profile": {
+      "identity": "corrective_profile",
+      "path_mode": "file"
+    },
+    "--deterministic-wrench-profile": {
+      "identity": "perturbation_profile",
+      "path_mode": "file"
+    }
+  },
+  "routes": [
+    {
+      "case": 30,
+      "split": "train",
+      "status": "historical_only",
+      "wrapper": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case30_capture.sh",
+      "contract": "scripts/two_wheel_balance/model_based_corrective_teacher_case30_capture_contract_v2.json",
+      "known_current_incompatibilities": [
+        "--corrective-teacher-capture-split",
+        "playback_identity"
+      ]
+    },
+    {
+      "case": 23,
+      "split": "train",
+      "status": "completed_current_compatible",
+      "wrapper": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case23_capture_v4.sh",
+      "contract": "scripts/two_wheel_balance/model_based_corrective_teacher_case23_capture_contract_v4.json",
+      "known_current_incompatibilities": []
+    },
+    {
+      "case": 6,
+      "split": "train",
+      "status": "completed_current_compatible",
+      "wrapper": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case6_capture.sh",
+      "contract": "scripts/two_wheel_balance/model_based_corrective_teacher_case6_capture_contract_v1.json",
+      "known_current_incompatibilities": []
+    },
+    {
+      "case": 7,
+      "split": "train",
+      "status": "pending_authorization",
+      "wrapper": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case7_capture.sh",
+      "contract": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_capture_contract_v1.json",
+      "known_current_incompatibilities": []
+    }
+  ],
+  "runtime_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_creation_authorized": false,
+  "conversion_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false
+}

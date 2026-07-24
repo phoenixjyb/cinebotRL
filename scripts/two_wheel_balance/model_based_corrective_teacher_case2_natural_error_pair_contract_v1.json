@@ -131,13 +131,13 @@
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case2_natural_error_pair.sh",
-      "sha256": "da65d1d418b05339ee59765c9dba671ab36bd095ec8446848c215fff80fe7783",
-      "git_blob_sha1": "97372a0dde99aaa9cf571ec872b266c33598cb14"
+      "sha256": "9185743df37512747724ddafe88af0a9107f7e5492cb07ef66c28bc13a18d288",
+      "git_blob_sha1": "70876e9e8f08ceed5a3dc95715a5ca1c324a58a1"
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case2_natural_error_pair.py",
-      "sha256": "eb0b0e377b815b6650741db8fa4703e2fb1b109cfdcfe92767110d83f067edce",
-      "git_blob_sha1": "98220ad23e24a9722c943e5e9dd96240c773b095"
+      "sha256": "8ae8efa40f46c79014f5929b9714a5acdf3029faefbf5f2802227da473f6d86d",
+      "git_blob_sha1": "7427ddae2352b6043dec966db34d0ae63df741a0"
     },
     "paired_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case2_natural_error_pair.py",
@@ -152,10 +152,10 @@
   "cpu_preflight_ready": true,
   "runtime_route_contract_ready": true,
   "execution_route_complete": true,
-  "runtime_authorized": false,
-  "gpu_launch_authorized": false,
-  "authorization_token_issued": false,
-  "runtime_authorization_token_sha256": "",
+  "runtime_authorized": true,
+  "gpu_launch_authorized": true,
+  "authorization_token_issued": true,
+  "runtime_authorization_token_sha256": "9bcc3e9f57eec5cc3b236c01c833dc558f2b422d480916b506c43066f4624292",
   "label_capture_authorized": false,
   "dataset_creation_authorized": false,
   "bc_authorized": false,

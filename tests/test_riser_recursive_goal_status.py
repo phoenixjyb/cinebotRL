@@ -128,7 +128,7 @@ CORRECTIVE_CORPUS_INTAKE_SCRIPT = (
 CORRECTIVE_CORPUS_INTAKE_EVIDENCE = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260724_model_based_corrective_corpus_intake_v1/summary.json"
+    "evidence_20260724_model_based_corrective_corpus_intake_v2/summary.json"
 )
 CASE6_PAIR_READINESS_SCRIPT = (
     ROOT
@@ -902,10 +902,10 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         "case23_capture_v4_conversion_execution_authoritative_cpu_suite"
     ] == "1337_passed_12_skipped_2_warnings_in_175.33s"
     assert corrective["corrective_corpus_intake_schema"] == (
-        "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v1"
+        "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v2"
     )
     assert corrective["corrective_corpus_intake_implementation_commit"] == (
-        "e6a3688de943864f043691f407de90eb0e51f75d"
+        "4f370b4b6cc71a338386cc6f760a42b7e32ff085"
     )
     assert corrective["corrective_corpus_intake_script_sha256"] == _sha256(
         CORRECTIVE_CORPUS_INTAKE_SCRIPT
@@ -914,12 +914,11 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         CORRECTIVE_CORPUS_INTAKE_EVIDENCE
     )
     assert corrective["corrective_corpus_intake_mac_windows_byte_parity"] is True
-    assert corrective["corrective_corpus_intake_converted_train_cases"] == [30]
+    assert corrective["corrective_corpus_intake_converted_train_cases"] == [23, 30]
     assert corrective["corrective_corpus_intake_converted_validation_cases"] == []
-    assert corrective["corrective_corpus_intake_missing_train_case_count"] == 3
+    assert corrective["corrective_corpus_intake_missing_train_case_count"] == 2
     assert corrective["corrective_corpus_intake_missing_validation_case_count"] == 2
     assert corrective["corrective_corpus_intake_pending_minimum_train_cases"] == [
-        23,
         6,
         2,
     ]

@@ -10050,3 +10050,35 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-7 corrective-label capture.`
 - Do not reuse the consumed paired-canary authorization and do not proceed
   directly to conversion, corpus merge, BC, PPO, validation, or training.
+
+## Round 260: case-7 corrective capture route is CPU-ready and closed
+
+- Added a case-bound capture contract, validator, wrapper, and finalizer at
+  implementation commit
+  `93d9b60eea2a4fa4bdd9748e5e4864d52f456514`. The route pins the successful
+  case-7 pair, its projection audit, exact plan, corrective and wrench
+  profiles, active drive profile, controller/runtime code, and robot assets.
+- The route uses a fresh namespace and accepts only a separate external
+  mode-`0600` token whose SHA-256 is supplied out of band. No token or hash is
+  committed. Running `--execute` without that token rejects before Python or
+  Isaac starts.
+- The tokenless `.98` preflight passed all 19 identity, pair, projection,
+  profile, clean-head/upstream, namespace, and closed-state checks. The
+  preflight SHA-256 is
+  `7ead7a8277c853960ae89bb78a5217df26af4d145c1f0e57f061f8a19eb4490c`.
+- Focused coverage passes `13 passed, 2 warnings in 0.19 s` locally and
+  `13 passed, 2 warnings in 0.65 s` on `.98`. The authoritative `.98`
+  Windows-Isaac Python CPU suite passes
+  `1382 passed, 12 skipped, 2 warnings in 221.90 s`.
+- Evidence is preserved under
+  `evidence_20260724_case7_corrective_capture_route_cpu_v1`. No runtime
+  namespace, authorization token, Isaac/GPU workload, label capture, dataset,
+  conversion, corpus merge, BC, PPO, checkpoint, or training run was created.
+  Goal completion remains `6/10`.
+
+## Next round after Round 260
+
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-7 corrective-label capture.`
+- A successful capture would still require a separately authorized CPU
+  conversion before case 7 could join the train corpus.

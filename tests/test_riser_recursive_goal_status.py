@@ -299,6 +299,37 @@ CASE7_PAIR_EXECUTION_FINAL = CASE7_PAIR_EXECUTION_EVIDENCE / "final_status.json"
 CASE7_PAIR_EXECUTION_PROJECTION = (
     CASE7_PAIR_EXECUTION_EVIDENCE / "projection_audit.json"
 )
+CASE7_CAPTURE_ROUTE_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case7_capture_contract_v1.json"
+)
+CASE7_CAPTURE_ROUTE_VALIDATOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "validate_model_based_corrective_teacher_case7_capture.py"
+)
+CASE7_CAPTURE_ROUTE_WRAPPER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "run_model_based_corrective_teacher_case7_capture.sh"
+)
+CASE7_CAPTURE_ROUTE_FINALIZER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "summarize_model_based_corrective_teacher_case7_capture.py"
+)
+CASE7_CAPTURE_ROUTE_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case7_corrective_capture_route_cpu_v1/summary.json"
+)
+CASE7_CAPTURE_ROUTE_PREFLIGHT = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case7_corrective_capture_route_cpu_v1/"
+    "preflight_windows.json"
+)
 CASE8_VALIDATION_PAIR_READINESS_SCRIPT = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -1466,6 +1497,59 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective[
         "case7_pair_execution_authoritative_windows_cpu_suite"
     ] == "1375_passed_12_skipped_2_warnings_in_222.39s"
+    case7_capture_route = json.loads(
+        CASE7_CAPTURE_ROUTE_EVIDENCE.read_text()
+    )
+    case7_capture_preflight = json.loads(
+        CASE7_CAPTURE_ROUTE_PREFLIGHT.read_text()
+    )
+    assert corrective["case7_corrective_capture_route_schema"] == (
+        "cinebotrl_two_wheel_riser_corrective_teacher_capture_contract_v2"
+    )
+    assert corrective[
+        "case7_corrective_capture_route_implementation_commit"
+    ] == "93d9b60eea2a4fa4bdd9748e5e4864d52f456514"
+    assert corrective[
+        "case7_corrective_capture_route_contract_sha256"
+    ] == _sha256(CASE7_CAPTURE_ROUTE_CONTRACT)
+    assert corrective[
+        "case7_corrective_capture_route_validator_sha256"
+    ] == _sha256(CASE7_CAPTURE_ROUTE_VALIDATOR)
+    assert corrective[
+        "case7_corrective_capture_route_wrapper_sha256"
+    ] == _sha256(CASE7_CAPTURE_ROUTE_WRAPPER)
+    assert corrective[
+        "case7_corrective_capture_route_finalizer_sha256"
+    ] == _sha256(CASE7_CAPTURE_ROUTE_FINALIZER)
+    assert corrective[
+        "case7_corrective_capture_route_preflight_sha256"
+    ] == _sha256(CASE7_CAPTURE_ROUTE_PREFLIGHT)
+    assert corrective["case7_corrective_capture_route_identity_count"] == 19
+    assert corrective[
+        "case7_corrective_capture_route_projection_evidence_passed"
+    ] is True
+    assert corrective[
+        "case7_corrective_capture_route_cpu_preflight_passed"
+    ] is True
+    assert corrective[
+        "case7_corrective_capture_route_authorization_token_issued"
+    ] is False
+    assert corrective[
+        "case7_corrective_capture_route_runtime_authorized"
+    ] is False
+    assert corrective[
+        "case7_corrective_capture_route_label_capture_authorized"
+    ] is False
+    assert corrective["case7_corrective_capture_route_training_started"] is False
+    assert case7_capture_route["passed"] is True
+    assert case7_capture_route["runtime_namespace_created"] is False
+    assert case7_capture_preflight["passed"] is True
+    assert case7_capture_preflight["cpu_contract_ready"] is True
+    assert len(case7_capture_preflight["identities"]) == 19
+    assert case7_capture_preflight["runtime_authorized"] is False
+    assert case7_capture_preflight["label_capture_authorized"] is False
+    assert case7_capture_preflight["dataset_creation_authorized"] is False
+    assert case7_capture_preflight["training_started"] is False
     assert corrective["case8_validation_pair_readiness_schema"] == (
         "cinebotrl_two_wheel_riser_case8_validation_pair_readiness_cpu_v1"
     )

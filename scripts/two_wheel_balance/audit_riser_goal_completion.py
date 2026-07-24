@@ -59,7 +59,7 @@ DEFAULT_BENCH = (
 )
 DEFAULT_PENDING_ROUTE_QUEUE = (
     DOC_ROOT
-    / "evidence_20260724_pending_corrective_route_queue_cpu_v3/summary.json"
+    / "evidence_20260724_pending_corrective_route_queue_cpu_v4/summary.json"
 )
 EXPECTED_BRANCH = "codex/two-wheel-riser-rl"
 EXPECTED_MOVABLE_JOINTS = {
@@ -102,7 +102,7 @@ REQUIRED_COMPLETION_GATES = (
     "learned_policy_render_audit",
 )
 GOAL_COMPLETION_AUDIT_SCHEMA = (
-    "cinebotrl_two_wheel_riser_goal_completion_audit_v4"
+    "cinebotrl_two_wheel_riser_goal_completion_audit_v5"
 )
 ROLLOUT_METRICS = (
     "position_error_p95_m",
@@ -969,7 +969,7 @@ def build_report(
     pending_checks = pending_route_queue.get("checks", {})
     pending_route_queue_bound = (
         inputs.get("pending_route_queue", {}).get("sha256")
-        == corrective.get("pending_corrective_route_queue_v3_summary_sha256")
+        == corrective.get("pending_corrective_route_queue_v4_summary_sha256")
     )
     pending_authorization_closed = all(
         pending_route_queue.get(field) is False

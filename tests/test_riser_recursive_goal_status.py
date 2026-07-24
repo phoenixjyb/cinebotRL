@@ -386,6 +386,11 @@ PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE_V3 = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_pending_corrective_route_queue_cpu_v3/summary.json"
 )
+PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE_V4 = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_pending_corrective_route_queue_cpu_v4/summary.json"
+)
 CASE23_CONVERSION_EXECUTION_EVIDENCE_V3 = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
@@ -1819,6 +1824,34 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         "pending_corrective_route_queue_v3_conversion_started"
     ] is False
     assert corrective[
+        "pending_corrective_route_queue_v4_summary_sha256"
+    ] == _sha256(PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE_V4)
+    assert corrective[
+        "pending_corrective_route_queue_v4_case23_preflight_sha256"
+    ] == _sha256(
+        ROOT
+        / "docs/03_training/two_wheel_balance/"
+        "evidence_20260724_pending_corrective_route_queue_cpu_v4/"
+        "preflights/case23_conversion.json"
+    )
+    assert corrective["pending_corrective_route_queue_v4_ready_count"] == 6
+    assert corrective["pending_corrective_route_queue_v4_identity_count"] == 107
+    assert corrective[
+        "pending_corrective_route_queue_v4_all_preflights_passed"
+    ] is True
+    assert corrective[
+        "pending_corrective_route_queue_v4_all_authorization_closed"
+    ] is True
+    assert corrective[
+        "pending_corrective_route_queue_v4_control_ownership_identities_resealed"
+    ] is True
+    assert corrective[
+        "pending_corrective_route_queue_v4_runtime_started"
+    ] is False
+    assert corrective[
+        "pending_corrective_route_queue_v4_conversion_started"
+    ] is False
+    assert corrective[
         "pending_corrective_route_queue_ready_count"
     ] == 6
     assert corrective[
@@ -1921,6 +1954,35 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert route_queue_v3["ppo_authorized"] is False
     assert route_queue_v3["training_started"] is False
     assert route_queue_v3["valid_for_training"] is False
+    route_queue_v4 = json.loads(
+        PENDING_CORRECTIVE_ROUTE_QUEUE_EVIDENCE_V4.read_text()
+    )
+    assert route_queue_v4["passed"] is True
+    assert route_queue_v4["git"]["head"] == (
+        corrective["pending_corrective_route_queue_v4_preflight_commit"]
+    )
+    assert route_queue_v4["git"]["upstream"] == (
+        corrective["pending_corrective_route_queue_v4_preflight_commit"]
+    )
+    assert route_queue_v4["git"]["tracked_worktree_clean"] is True
+    assert route_queue_v4["ready_route_count"] == 6
+    assert all(route_queue_v4["checks"].values())
+    assert all(route["passed"] for route in route_queue_v4["routes"])
+    assert sum(
+        route["identity_count"] for route in route_queue_v4["routes"]
+    ) == 107
+    assert route_queue_v4["next_bounded_action"] == (
+        "authorize_exactly_one_case23_v4_cpu_conversion"
+    )
+    assert route_queue_v4["runtime_authorized"] is False
+    assert route_queue_v4["gpu_launch_authorized"] is False
+    assert route_queue_v4["label_capture_authorized"] is False
+    assert route_queue_v4["dataset_conversion_authorized"] is False
+    assert route_queue_v4["dataset_merge_authorized"] is False
+    assert route_queue_v4["bc_authorized"] is False
+    assert route_queue_v4["ppo_authorized"] is False
+    assert route_queue_v4["training_started"] is False
+    assert route_queue_v4["valid_for_training"] is False
     conversion_preflight_v4 = json.loads(
         CASE23_CONVERSION_EXECUTION_EVIDENCE_V4.read_text()
     )

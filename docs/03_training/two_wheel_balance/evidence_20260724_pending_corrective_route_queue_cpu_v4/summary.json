@@ -1,0 +1,240 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_corrective_pending_route_queue_v1",
+  "git": {
+    "head": "8c9d1e4b2de2fa0e2007f98004e01b989b6d6883",
+    "upstream": "8c9d1e4b2de2fa0e2007f98004e01b989b6d6883",
+    "tracked_worktree_clean": true
+  },
+  "corpus_intake": {
+    "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/docs/03_training/two_wheel_balance/evidence_20260724_model_based_corrective_corpus_intake_v1/summary.json",
+    "sha256": "3d8f3da9c23ddb9d63a26afb3bec15324d8ce61a3e0b900c7cdf67f91c9e20bf",
+    "checks": {
+      "schema_and_passed": true,
+      "converted_state": true,
+      "case23_is_next": true,
+      "learning_closed": true
+    }
+  },
+  "checks": {
+    "exact_route_set_and_order": true,
+    "head_matches_upstream": true,
+    "tracked_worktree_clean": true,
+    "corpus_state": true,
+    "all_six_preflights_pass": true,
+    "namespaces_unique": true,
+    "train_before_validation": true
+  },
+  "routes": [
+    {
+      "key": "case23_conversion",
+      "priority": 1,
+      "case": 23,
+      "split": "train",
+      "kind": "cpu_conversion",
+      "namespace": "20260723_model_based_corrective_case23_conversion_v1_cpu",
+      "preflight": {
+        "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/docs/03_training/two_wheel_balance/evidence_20260724_pending_corrective_route_queue_cpu_v4/preflights/case23_conversion.json",
+        "sha256": "a722519aa6a45854de61e84abcb35c21b2b389c4fd94dd1fdec73d0769eae5cc",
+        "size_bytes": 6710
+      },
+      "identity_count": 9,
+      "check_groups": {
+        "repository_checks": true,
+        "contract_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    },
+    {
+      "key": "case6_pair",
+      "priority": 2,
+      "case": 6,
+      "split": "train",
+      "kind": "train_paired_canary",
+      "namespace": "20260724_model_based_corrective_teacher_case6_pair_v2_exclusive",
+      "preflight": {
+        "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/docs/03_training/two_wheel_balance/evidence_20260724_pending_corrective_route_queue_cpu_v4/preflights/case6_pair.json",
+        "sha256": "0de2d2d3f1b128688c412c3c03facbfd852c793f3d5add09cfae6b2446ca16ff",
+        "size_bytes": 11444
+      },
+      "identity_count": 18,
+      "check_groups": {
+        "checks": true,
+        "selection_checks": true,
+        "readiness_checks": true,
+        "profile_proposal_checks": true,
+        "corrective_profile_checks": true,
+        "perturbation_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    },
+    {
+      "key": "case2_pair",
+      "priority": 3,
+      "case": 2,
+      "split": "train",
+      "kind": "train_paired_canary",
+      "namespace": "20260724_model_based_corrective_teacher_case2_natural_error_pair_v1_exclusive",
+      "preflight": {
+        "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/docs/03_training/two_wheel_balance/evidence_20260724_pending_corrective_route_queue_cpu_v4/preflights/case2_pair.json",
+        "sha256": "d57ca31dff29a638e25420e27503d084b2e1d1de11fe119512c14daed7986109",
+        "size_bytes": 12135
+      },
+      "identity_count": 19,
+      "check_groups": {
+        "checks": true,
+        "selection_checks": true,
+        "readiness_checks": true,
+        "profile_proposal_checks": true,
+        "corrective_profile_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    },
+    {
+      "key": "case7_pair",
+      "priority": 4,
+      "case": 7,
+      "split": "train",
+      "kind": "train_paired_canary",
+      "namespace": "20260724_model_based_corrective_teacher_case7_pair_v1_exclusive",
+      "preflight": {
+        "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/docs/03_training/two_wheel_balance/evidence_20260724_pending_corrective_route_queue_cpu_v4/preflights/case7_pair.json",
+        "sha256": "97e6e52dede58900d4bbacadf126c82e04213a7331013cc3d1af3945d92f9bac",
+        "size_bytes": 11484
+      },
+      "identity_count": 18,
+      "check_groups": {
+        "checks": true,
+        "selection_checks": true,
+        "readiness_checks": true,
+        "profile_proposal_checks": true,
+        "corrective_profile_checks": true,
+        "perturbation_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    },
+    {
+      "key": "case8_validation_pair",
+      "priority": 5,
+      "case": 8,
+      "split": "validation",
+      "kind": "validation_paired_canary",
+      "namespace": "20260724_model_based_corrective_teacher_case8_validation_pair_v1_exclusive",
+      "preflight": {
+        "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/docs/03_training/two_wheel_balance/evidence_20260724_pending_corrective_route_queue_cpu_v4/preflights/case8_validation_pair.json",
+        "sha256": "9ccca87a95e4b493aac6acb66b65fd959fa6c4b4733c32fcd37d6c547cc20290",
+        "size_bytes": 10930
+      },
+      "identity_count": 19,
+      "check_groups": {
+        "checks": true,
+        "document_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    },
+    {
+      "key": "case16_validation_pair",
+      "priority": 6,
+      "case": 16,
+      "split": "validation",
+      "kind": "validation_paired_canary",
+      "namespace": "20260724_model_based_corrective_teacher_case16_validation_natural_error_pair_v1_exclusive",
+      "preflight": {
+        "path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/docs/03_training/two_wheel_balance/evidence_20260724_pending_corrective_route_queue_cpu_v4/preflights/case16_validation_pair.json",
+        "sha256": "1407467db5d0ca4a0da8560ddea763415b9c2e4a5520cc2536b80de237d142f1",
+        "size_bytes": 13478
+      },
+      "identity_count": 24,
+      "check_groups": {
+        "checks": true,
+        "document_checks": true
+      },
+      "checks": {
+        "schema_case_split_namespace": true,
+        "preflight_passed": true,
+        "cpu_contract_ready": true,
+        "route_complete_if_runtime": true,
+        "head_and_upstream_current": true,
+        "all_check_groups_passed": true,
+        "identity_count_and_checks": true,
+        "authorization_and_learning_closed": true,
+        "namespace_absent": true
+      },
+      "passed": true
+    }
+  ],
+  "ready_route_count": 6,
+  "execution_order": [
+    "case23_conversion",
+    "case6_pair",
+    "case2_pair",
+    "case7_pair",
+    "case8_validation_pair",
+    "case16_validation_pair"
+  ],
+  "next_bounded_action": "authorize_exactly_one_case23_v4_cpu_conversion",
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

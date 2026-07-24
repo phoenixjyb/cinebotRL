@@ -29,6 +29,11 @@ EVIDENCE_V3 = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_pending_corrective_route_queue_cpu_v3"
 )
+EVIDENCE_V4 = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_pending_corrective_route_queue_cpu_v4"
+)
 CASE23_PREFLIGHT_V3 = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
@@ -229,6 +234,26 @@ def test_committed_v3_queue_refreshes_head_without_route_identity_drift() -> Non
     assert CASE23_PREFLIGHT_V4.read_bytes() == (
         EVIDENCE_V3 / "preflights/case23_conversion.json"
     ).read_bytes()
+    assert MODULE._closed(result) is True
+
+
+def test_committed_v4_queue_reseals_control_ownership_identities() -> None:
+    result = json.loads((EVIDENCE_V4 / "summary.json").read_text())
+    assert result["passed"] is True
+    assert result["git"]["head"] == "8c9d1e4b2de2fa0e2007f98004e01b989b6d6883"
+    assert result["git"]["upstream"] == result["git"]["head"]
+    assert result["git"]["tracked_worktree_clean"] is True
+    assert result["ready_route_count"] == 6
+    assert all(result["checks"].values())
+    assert sum(route["identity_count"] for route in result["routes"]) == 107
+    for route in result["routes"]:
+        path = EVIDENCE_V4 / "preflights" / f"{route['key']}.json"
+        payload = path.read_bytes()
+        preflight = json.loads(payload)
+        assert hashlib.sha256(payload).hexdigest() == route["preflight"]["sha256"]
+        assert route["passed"] is True
+        assert preflight["passed"] is True
+        assert MODULE._closed(preflight) is True
     assert MODULE._closed(result) is True
 
 

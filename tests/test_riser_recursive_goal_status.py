@@ -2590,6 +2590,27 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         ROOT
         / "src/rl_platform/tasks/two_wheel_balance/riser_residual_dataset.py"
     )
+    assert audit["learned_policy_control_ownership_implementation_commit"] == (
+        "20694e8d5d238d1965a22e3eef4e14fe57682f05"
+    )
+    assert audit["learned_policy_control_ownership_route_reseal_commit"] == (
+        "8c9d1e4b2de2fa0e2007f98004e01b989b6d6883"
+    )
+    assert audit["learned_policy_control_ownership_queue_evidence_commit"] == (
+        "5b269a729a8006a7bec5fd5d9bb6fa594e1e58e7"
+    )
+    assert audit["learned_policy_control_ownership_goal_binding_commit"] == (
+        "011b3e2f1c4c460de28318866c80662a91415953"
+    )
+    assert audit["learned_policy_control_ownership_focused_local_cpu_suite"] == (
+        "214_passed_2_warnings_in_16.45s"
+    )
+    assert audit["learned_policy_control_ownership_focused_windows_cpu_suite"] == (
+        "214_passed_2_warnings_in_79.74s"
+    )
+    assert audit[
+        "learned_policy_control_ownership_authoritative_windows_cpu_suite"
+    ] == "1337_passed_12_skipped_2_warnings_in_180.63s"
     assert audit["learned_policy_validation_gate_schema"].endswith(
         "residual_validation_canary_gate_v3"
     )

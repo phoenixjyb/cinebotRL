@@ -9592,3 +9592,54 @@ and must state whether its candidate was accepted or rejected.
 - After conversion, reopen the corpus intake and the remaining case
   6/2/7 plus validation 8/16 routes against the then-current synchronized
   commit. BC remains closed until the real case-disjoint corpus gate passes.
+
+## Round 249: learned authority is pinned above the inner loops
+
+- Audited the learned action path from policy output through playback,
+  validation, holdout, all-79, render, and final goal admission.
+- Added the explicit contract
+  `frozen_lqr_high_level_residual_control_ownership_v1`. The learned policy may
+  output only normalized residual `vx`, `wz`, and riser-target commands. It
+  cannot directly command wheel effort or physical gimbal joints.
+- Pinned the deterministic owners: the frozen cascaded LQR owns wheel effort,
+  the semantic attitude adapter owns gimbal attitude, the command supervisor
+  owns riser hard limits, and runtime gates own safety enforcement.
+- Runtime evidence and all downstream learned-policy gates now fail closed if
+  this ownership record is absent or altered. Validation, holdout, and all-79
+  report schemas advanced to v3. No controller command, source plan,
+  trajectory, residual scale, physics parameter, or dynamic threshold changed.
+- Implementation commit
+  `20694e8d5d238d1965a22e3eef4e14fe57682f05`, route-identity reseal commit
+  `8c9d1e4b2de2fa0e2007f98004e01b989b6d6883`, queue evidence commit
+  `5b269a729a8006a7bec5fd5d9bb6fa594e1e58e7`, and goal-binding commit
+  `011b3e2f1c4c460de28318866c80662a91415953` are pushed and synchronized.
+- The first authoritative run intentionally exposed eight stale playback or
+  residual-dataset identities:
+  `1328 passed, 12 skipped, 8 failed`. These were identity-only failures in
+  active case-23/2/6/7/8/16 contracts and case-7/8 profile proposals; no
+  behavioral test failed. The contracts were resealed with every token and
+  authorization field still closed.
+- Refreshed all six pending no-token routes on `.98` at clean commit
+  `8c9d1e4b2de2fa0e2007f98004e01b989b6d6883`. All `107` current identities
+  pass. Queue summary SHA-256 is
+  `244377cb46a69d744f26449f74a4fa5301c0416c3142857f8213dfbacd05f041`.
+- Preserved the byte-identical macOS/`.98` completion audit v5 at summary
+  SHA-256
+  `25ce15bb02bd5c43b4619d1b0ddf85f62a72ca4018d23bb587f74c46acd50ed1`.
+  It still reports six of ten required gates complete.
+- Final focused coverage passes
+  `214 passed, 2 warnings in 16.45 s` on macOS and
+  `214 passed, 2 warnings in 79.74 s` on `.98`. The authoritative `.98`
+  Windows-Isaac Python CPU suite passes:
+  `1337 passed, 12 skipped, 2 warnings in 180.63 s`.
+- No authorization token, CPU conversion output, runtime namespace,
+  Isaac/GPU workload, capture, corpus merge, BC, checkpoint, PPO, or training
+  run was created. Goal completion remains `6/10`.
+
+## Next round after Round 249
+
+- The exact next data-producing operation remains separately authorized:
+  `Authorize exactly one case-23 v4 CPU conversion.`
+- After conversion, reopen corpus intake and then proceed in order through
+  train cases 6/2/7 and validation cases 8/16. BC remains closed until the
+  real case-disjoint corpus gate passes.

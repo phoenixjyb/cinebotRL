@@ -199,10 +199,18 @@ def _fixture_repo(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
         "cpu_preflight_ready": True,
         "runtime_route_contract_ready": True,
         "execution_route_complete": True,
-        "authorization_token_issued": False,
-        "runtime_authorization_token_sha256": "",
+        "runtime_authorized": True,
+        "gpu_launch_authorized": True,
+        "authorization_token_issued": True,
+        "runtime_authorization_token_sha256": (
+            MODULE.EXPECTED_AUTHORIZATION_SHA256
+        ),
         "dataset_creation_authorized": False,
-        **_closed_payload(),
+        "label_capture_authorized": False,
+        "bc_authorized": False,
+        "ppo_authorized": False,
+        "training_started": False,
+        "valid_for_training": False,
     }
     contract_path = repo / MODULE.CONTRACT_RELATIVE_PATH
     _write(contract_path, json.dumps(contract))
@@ -224,19 +232,57 @@ def test_validator_accepts_clean_pushed_cpu_only_contract(tmp_path, monkeypatch)
     assert result["gpu_launch_authorized"] is False
 
 
-def test_validator_rejects_any_authorization_file(tmp_path, monkeypatch) -> None:
+def test_validator_accepts_only_matching_external_mode_0600_token(
+    tmp_path, monkeypatch
+) -> None:
+    token = tmp_path / "authorization"
+    token.write_text("fixture-token\n", encoding="utf-8")
+    token.chmod(0o600)
+    token_sha = hashlib.sha256(token.read_bytes()).hexdigest()
+    monkeypatch.setattr(MODULE, "EXPECTED_AUTHORIZATION_SHA256", token_sha)
     repo, contract = _fixture_repo(tmp_path, monkeypatch)
-    token = tmp_path / "token"
-    token.write_text("not accepted\n", encoding="utf-8")
     result = MODULE.validate(
         contract,
         repo,
         namespace=MODULE.NAMESPACE,
         authorization_file=token,
     )
-    assert result["checks"]["authorization_file_absent"] is False
-    assert result["passed"] is False
-    assert result["runtime_authorized"] is False
+    assert result["passed"] is True
+    assert all(result["authorization_checks"].values())
+    assert result["authorization_consumed_before_isaac"] is True
+    assert result["runtime_authorized"] is True
+    assert result["gpu_launch_authorized"] is True
+    assert result["label_capture_authorized"] is False
+    assert result["dataset_creation_authorized"] is False
+    assert result["bc_authorized"] is False
+    assert result["ppo_authorized"] is False
+
+
+def test_validator_rejects_bad_token_mode_or_hash(tmp_path, monkeypatch) -> None:
+    token = tmp_path / "authorization"
+    token.write_text("fixture-token\n", encoding="utf-8")
+    token_sha = hashlib.sha256(token.read_bytes()).hexdigest()
+    monkeypatch.setattr(MODULE, "EXPECTED_AUTHORIZATION_SHA256", token_sha)
+    repo, contract = _fixture_repo(tmp_path, monkeypatch)
+    token.chmod(0o644)
+    bad_mode = MODULE.validate(
+        contract,
+        repo,
+        namespace=MODULE.NAMESPACE,
+        authorization_file=token,
+    )
+    assert bad_mode["authorization_checks"]["authorization_mode_0600"] is False
+    assert bad_mode["runtime_authorized"] is False
+    token.chmod(0o600)
+    token.write_text("wrong-token\n", encoding="utf-8")
+    bad_hash = MODULE.validate(
+        contract,
+        repo,
+        namespace=MODULE.NAMESPACE,
+        authorization_file=token,
+    )
+    assert bad_hash["authorization_checks"]["authorization_hash_matches"] is False
+    assert bad_hash["runtime_authorized"] is False
 
 
 def test_validator_rejects_alternate_contract_path(tmp_path, monkeypatch) -> None:
@@ -272,13 +318,13 @@ def test_wrapper_execute_fails_before_python_or_isaac() -> None:
     result = _run("bash", str(WRAPPER), "--execute", check=False)
     assert result.returncode == 4
     payload = json.loads(result.stderr)
-    assert payload["reason"] == "runtime_authorization_not_issued"
+    assert payload["reason"] == "authorization_file_missing"
     assert payload["python_started"] is False
     assert payload["isaac_started"] is False
     assert payload["runtime_started"] is False
 
 
-def test_wrapper_rejects_supplied_token_while_hash_is_empty(tmp_path) -> None:
+def test_wrapper_rejects_wrong_supplied_token_before_isaac(tmp_path) -> None:
     token = tmp_path / "token"
     token.write_text("not authorized\n", encoding="utf-8")
     result = subprocess.run(
@@ -290,8 +336,7 @@ def test_wrapper_rejects_supplied_token_while_hash_is_empty(tmp_path) -> None:
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 4
-    assert json.loads(result.stderr)["reason"] == "runtime_authorization_not_issued"
+    assert result.returncode != 0
     assert token.exists()
 
 
@@ -306,13 +351,15 @@ def test_wrapper_rejects_environment_override_before_python() -> None:
     assert "conflicting_environment_override:RISER_ROOT" in result.stderr
 
 
-def test_wrapper_has_complete_but_unauthorized_runtime_route() -> None:
+def test_wrapper_has_one_pinned_authorized_runtime_route() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
-    empty_token = source.index('readonly AUTHORIZATION_SHA256=""')
+    pinned_token = source.index(
+        f'readonly AUTHORIZATION_SHA256="{MODULE.EXPECTED_AUTHORIZATION_SHA256}"'
+    )
     execute_reject = source.index('reject "runtime_authorization_not_issued" 4')
     python_start = source.index('python3 "$VALIDATOR"')
     playback_start = source.index("timeout --signal=TERM --kill-after=30s 600")
-    assert empty_token < execute_reject < python_start < playback_start
+    assert pinned_token < execute_reject < python_start < playback_start
     assert "ISAAC_PYTHON" in source
     assert "smoke_riser_reference_playback.py" in source
     assert "summarize_model_based_corrective_teacher_case6_pair.py" in source
@@ -331,11 +378,13 @@ def test_committed_contract_is_cpu_only_and_tokenless() -> None:
     assert payload["cpu_preflight_ready"] is True
     assert payload["runtime_route_contract_ready"] is True
     assert payload["execution_route_complete"] is True
-    assert payload["runtime_authorization_token_sha256"] == ""
+    assert payload["runtime_authorization_token_sha256"] == (
+        MODULE.EXPECTED_AUTHORIZATION_SHA256
+    )
+    assert payload["runtime_authorized"] is True
+    assert payload["gpu_launch_authorized"] is True
+    assert payload["authorization_token_issued"] is True
     for field in (
-        "runtime_authorized",
-        "gpu_launch_authorized",
-        "authorization_token_issued",
         "label_capture_authorized",
         "dataset_creation_authorized",
         "bc_authorized",

@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import stat
 import subprocess
 
 
@@ -84,6 +85,9 @@ EXPECTED_PAIR_CONTRACT = {
     "saturation_regression_allowed": False,
     "maximum_runtime_seconds_per_rollout": 600,
 }
+EXPECTED_AUTHORIZATION_SHA256 = (
+    "1b765e84d41cbbffc7119575fefd4e7fd07da2e169ad4c4502720cb80a60f970"
+)
 
 
 def sha256_file(path: Path) -> str:
@@ -126,6 +130,26 @@ def _load_json(rows: dict[str, dict[str, object]], name: str) -> dict[str, objec
     if row.get("passed") is not True:
         return {}
     return json.loads(Path(str(row["path"])).read_text(encoding="utf-8"))
+
+
+def token_checks(
+    path: Path | None,
+    expected_sha256: object,
+    repo: Path,
+) -> dict[str, bool]:
+    exists = path is not None and path.is_file()
+    mode = stat.S_IMODE(path.stat().st_mode) if exists else None
+    actual_sha = sha256_file(path) if exists else None
+    return {
+        "authorization_file_present": exists,
+        "authorization_mode_0600": mode == 0o600,
+        "authorization_not_symlink": exists and not path.is_symlink(),
+        "authorization_file_outside_repository": exists
+        and not path.resolve().is_relative_to(repo),
+        "authorization_hash_matches": exists
+        and isinstance(expected_sha256, str)
+        and actual_sha == expected_sha256,
+    }
 
 
 def validate(
@@ -334,10 +358,11 @@ def validate(
         "runtime_route_contract_ready": contract.get("runtime_route_contract_ready")
         is True,
         "execution_route_complete": contract.get("execution_route_complete") is True,
-        "runtime_authorization_absent": contract.get("runtime_authorized") is False
-        and contract.get("gpu_launch_authorized") is False
-        and contract.get("authorization_token_issued") is False
-        and contract.get("runtime_authorization_token_sha256") == "",
+        "runtime_authorization_issued": contract.get("runtime_authorized") is True
+        and contract.get("gpu_launch_authorized") is True
+        and contract.get("authorization_token_issued") is True
+        and contract.get("runtime_authorization_token_sha256")
+        == EXPECTED_AUTHORIZATION_SHA256,
         "capture_and_training_closed": contract.get("label_capture_authorized") is False
         and contract.get("dataset_creation_authorized") is False
         and contract.get("bc_authorized") is False
@@ -349,9 +374,21 @@ def validate(
         and contract.get("validation_opened") is False
         and contract.get("holdout_cases") == EXPECTED_HOLDOUT
         and contract.get("holdout_opened") is False,
-        "authorization_file_absent": authorization_file is None,
     }
+    authorization_checks = token_checks(
+        authorization_file,
+        contract.get("runtime_authorization_token_sha256"),
+        repo,
+    )
     cpu_passed = all(checks.values())
+    runtime_authorized = bool(
+        cpu_passed
+        and authorization_file is not None
+        and all(authorization_checks.values())
+    )
+    passed = cpu_passed and (
+        authorization_file is None or all(authorization_checks.values())
+    )
     return {
         "schema": ADMISSION_SCHEMA,
         "contract": str(contract_path),
@@ -370,23 +407,29 @@ def validate(
         "corrective_profile_checks": corrective_checks,
         "perturbation_checks": perturbation_checks,
         "checks": checks,
+        "authorization_checks": authorization_checks,
         "authorization_file": (
             None if authorization_file is None else str(authorization_file.resolve())
         ),
-        "authorization_token_issued": False,
-        "authorization_consumed_before_isaac": False,
+        "authorization_token_issued": contract.get("authorization_token_issued"),
+        "authorization_consumed_before_isaac": runtime_authorized,
+        "authorization_sha256": (
+            contract.get("runtime_authorization_token_sha256")
+            if runtime_authorized
+            else None
+        ),
         "cpu_contract_ready": cpu_passed,
         "runtime_route_contract_ready": cpu_passed,
         "execution_route_complete": cpu_passed,
-        "runtime_authorized": False,
-        "gpu_launch_authorized": False,
+        "runtime_authorized": runtime_authorized,
+        "gpu_launch_authorized": runtime_authorized,
         "label_capture_authorized": False,
         "dataset_creation_authorized": False,
         "bc_authorized": False,
         "ppo_authorized": False,
         "training_started": False,
         "valid_for_training": False,
-        "passed": cpu_passed,
+        "passed": passed,
     }
 
 

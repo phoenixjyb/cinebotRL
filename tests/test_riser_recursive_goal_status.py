@@ -3307,6 +3307,18 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit[
         "pre_training_capture_command_generic_runtime_wrapper_created"
     ] is False
+    assert audit[
+        "pre_training_capture_command_audit_focused_local_cpu_suite"
+    ] == "52_passed_2_warnings_in_4.05s"
+    assert audit[
+        "pre_training_capture_command_audit_focused_windows_cpu_suite"
+    ] == "52_passed_2_warnings_in_17.98s"
+    assert audit[
+        "pre_training_capture_command_audit_authoritative_windows_cpu_commit"
+    ] == "ee07678edc00b0b74f9e59abcd18bc9ded79954b"
+    assert audit[
+        "pre_training_capture_command_audit_authoritative_windows_cpu_suite"
+    ] == "1435_passed_12_skipped_2_warnings_in_256.25s"
     capture_command_audit = json.loads(CAPTURE_COMMAND_AUDIT.read_text())
     assert capture_command_audit["passed"] is True
     assert all(capture_command_audit["checks"].values())

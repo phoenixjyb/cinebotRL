@@ -10312,6 +10312,11 @@ and must state whether its candidate was accepted or rejected.
 - The macOS and `.98` Windows-Python reports are byte-identical at SHA-256
   `6a7de89133a5b6177f6d42e7558f272b611481f231d0494f05263b605c4b9bd2`.
   All eight top-level checks pass.
+- Focused verification passes `52 passed, 2 warnings in 4.05 s` locally and
+  `52 passed, 2 warnings in 17.98 s` with Windows Python on `.98`. The
+  authoritative Windows-Python suite at evidence commit
+  `ee07678edc00b0b74f9e59abcd18bc9ded79954b` passes
+  `1435 passed, 12 skipped, 2 warnings in 256.25 s`.
 - No generic runtime wrapper, authorization token, Isaac/GPU process, capture,
   conversion, corpus merge, BC, PPO, checkpoint, or training run was created.
 

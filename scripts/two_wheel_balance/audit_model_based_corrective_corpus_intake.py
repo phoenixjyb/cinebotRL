@@ -24,7 +24,7 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_dataset im
 )
 
 
-SCHEMA = "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v1"
+SCHEMA = "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v2"
 TRAIN_SELECTION_SCHEMA = (
     "cinebotrl_two_wheel_riser_model_based_pair_tranche_selection_v1"
 )
@@ -42,6 +42,9 @@ CASE23_PREFLIGHT_SCHEMA = (
 )
 CASE23_CONVERSION_FINAL_SCHEMA = (
     "cinebotrl_two_wheel_riser_case23_conversion_final_v1"
+)
+CASE23_RECOVERY_SCHEMA = (
+    "cinebotrl_two_wheel_riser_case23_conversion_path_recovery_audit_v1"
 )
 TRAIN_TRANCHE = [30, 23, 6, 2, 7]
 MINIMUM_TRAIN_TRANCHE = TRAIN_TRANCHE[:MINIMUM_TRAIN_CASES]
@@ -75,6 +78,20 @@ DEFAULT_CASE23_PREFLIGHT = (
     DOC_ROOT
     / "evidence_20260724_case23_corrective_conversion_execution_cpu_v2/"
     "summary.json"
+)
+DEFAULT_CASE23_CONVERSION_ROOT = (
+    DOC_ROOT
+    / "evidence_20260724_case23_corrective_conversion_execution_cpu_v5"
+)
+DEFAULT_CASE23_DATASET = (
+    DEFAULT_CASE23_CONVERSION_ROOT
+    / "case_0023_model_based_corrective_case_dataset_v1.npz"
+)
+DEFAULT_CASE23_CONVERSION_FINAL = (
+    DEFAULT_CASE23_CONVERSION_ROOT / "final_status.json"
+)
+DEFAULT_CASE23_RECOVERY_AUDIT = (
+    DEFAULT_CASE23_CONVERSION_ROOT / "recovery_audit.json"
 )
 
 
@@ -146,6 +163,7 @@ def audit_intake(
     case23_preflight_path: Path,
     case23_dataset_path: Path | None = None,
     case23_conversion_final_path: Path | None = None,
+    case23_recovery_audit_path: Path | None = None,
 ) -> dict[str, object]:
     train_selection = _load_object(train_selection_path)
     validation_selection = _load_object(validation_selection_path)
@@ -209,19 +227,33 @@ def audit_intake(
     if not all(checks.values()):
         raise ValueError(f"corrective corpus intake source checks failed: {checks}")
 
-    if (case23_dataset_path is None) != (case23_conversion_final_path is None):
+    case23_conversion_inputs = (
+        case23_dataset_path,
+        case23_conversion_final_path,
+        case23_recovery_audit_path,
+    )
+    if any(path is None for path in case23_conversion_inputs) != all(
+        path is None for path in case23_conversion_inputs
+    ):
         raise ValueError(
-            "case23 dataset and conversion final status must be supplied together"
+            "case23 dataset, conversion final status, and recovery audit "
+            "must be supplied together"
         )
     rows = [_dataset_row(case30_dataset_path, case=30, split="train")]
     if (
         case23_dataset_path is not None
         and case23_conversion_final_path is not None
+        and case23_recovery_audit_path is not None
     ):
         conversion_final = _load_object(case23_conversion_final_path)
+        recovery_audit = _load_object(case23_recovery_audit_path)
         dataset_sha = _sha256(case23_dataset_path)
+        final_sha = _sha256(case23_conversion_final_path)
         conversion_checks = conversion_final.get("checks")
         conversion_dataset = conversion_final.get("dataset")
+        recovery_execution = recovery_audit.get("execution")
+        recovery_result = recovery_audit.get("result")
+        recovery = recovery_audit.get("recovery")
         final_checks = {
             "schema": conversion_final.get("schema")
             == CASE23_CONVERSION_FINAL_SCHEMA,
@@ -237,6 +269,22 @@ def audit_intake(
             "training_closed": conversion_final.get("merged_dataset_created")
             is False
             and _closed(conversion_final),
+            "recovery_audit": (
+                recovery_audit.get("schema") == CASE23_RECOVERY_SCHEMA
+                and recovery_audit.get("case") == 23
+                and recovery_audit.get("split") == "train"
+                and recovery_audit.get("passed") is True
+                and isinstance(recovery_execution, Mapping)
+                and recovery_execution.get("converter_invocations") == 1
+                and recovery_execution.get("converter_retry_performed") is False
+                and isinstance(recovery, Mapping)
+                and recovery.get("canonical_sha256") == dataset_sha
+                and recovery.get("final_status_sha256") == final_sha
+                and isinstance(recovery_result, Mapping)
+                and recovery_result.get("valid_for_case_merge") is True
+                and recovery_result.get("merged_dataset_created") is False
+                and _closed(recovery_result)
+            ),
         }
         if not all(final_checks.values()):
             raise ValueError(
@@ -319,9 +367,13 @@ def audit_intake(
                     "case23_conversion_final": _identity(
                         case23_conversion_final_path
                     ),
+                    "case23_recovery_audit": _identity(
+                        case23_recovery_audit_path
+                    ),
                 }
                 if case23_dataset_path is not None
                 and case23_conversion_final_path is not None
+                and case23_recovery_audit_path is not None
                 else {}
             ),
         },
@@ -380,8 +432,19 @@ def main() -> int:
     parser.add_argument(
         "--case23-preflight", type=Path, default=DEFAULT_CASE23_PREFLIGHT
     )
-    parser.add_argument("--case23-dataset", type=Path)
-    parser.add_argument("--case23-conversion-final", type=Path)
+    parser.add_argument(
+        "--case23-dataset", type=Path, default=DEFAULT_CASE23_DATASET
+    )
+    parser.add_argument(
+        "--case23-conversion-final",
+        type=Path,
+        default=DEFAULT_CASE23_CONVERSION_FINAL,
+    )
+    parser.add_argument(
+        "--case23-recovery-audit",
+        type=Path,
+        default=DEFAULT_CASE23_RECOVERY_AUDIT,
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     result = audit_intake(
@@ -393,6 +456,7 @@ def main() -> int:
         case23_preflight_path=args.case23_preflight,
         case23_dataset_path=args.case23_dataset,
         case23_conversion_final_path=args.case23_conversion_final,
+        case23_recovery_audit_path=args.case23_recovery_audit,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes((json.dumps(result, indent=2) + "\n").encode())

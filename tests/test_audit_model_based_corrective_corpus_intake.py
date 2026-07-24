@@ -32,27 +32,28 @@ def _audit(**overrides):
         "case30_audit_path": MODULE.DEFAULT_CASE30_AUDIT,
         "case23_final_path": MODULE.DEFAULT_CASE23_FINAL,
         "case23_preflight_path": MODULE.DEFAULT_CASE23_PREFLIGHT,
+        "case23_dataset_path": MODULE.DEFAULT_CASE23_DATASET,
+        "case23_conversion_final_path": MODULE.DEFAULT_CASE23_CONVERSION_FINAL,
+        "case23_recovery_audit_path": MODULE.DEFAULT_CASE23_RECOVERY_AUDIT,
     }
     inputs.update(overrides)
     return MODULE.audit_intake(**inputs)
 
 
-def test_current_intake_reports_real_one_of_four_train_gap() -> None:
+def test_current_intake_reports_real_two_of_four_train_gap() -> None:
     result = _audit()
     assert result["passed"] is True
-    assert result["converted_train_cases"] == [30]
+    assert result["converted_train_cases"] == [23, 30]
     assert result["converted_validation_cases"] == []
-    assert result["converted_train_case_count"] == 1
+    assert result["converted_train_case_count"] == 2
     assert result["converted_validation_case_count"] == 0
-    assert result["missing_train_case_count"] == 3
+    assert result["missing_train_case_count"] == 2
     assert result["missing_validation_case_count"] == 2
-    assert result["pending_minimum_train_cases"] == [23, 6, 2]
+    assert result["pending_minimum_train_cases"] == [6, 2]
     assert result["pending_validation_cases"] == [8, 16]
-    assert result["next_bounded_action"] == (
-        "authorize_exactly_one_case23_v4_cpu_conversion"
-    )
+    assert result["next_bounded_action"] == "continue_train_case_acquisition"
     assert result["case23_conversion_authorized"] is False
-    assert result["case23_conversion_output_created"] is False
+    assert result["case23_conversion_output_created"] is True
     assert result["corpus_manifest_ready"] is False
     assert result["runtime_authorized"] is False
     assert result["gpu_launch_authorized"] is False
@@ -66,22 +67,23 @@ def test_current_intake_reports_real_one_of_four_train_gap() -> None:
     assert result["valid_for_training"] is False
 
 
-def test_real_case30_dataset_is_reopened_and_case23_stays_capture_only() -> None:
+def test_real_case23_and_case30_datasets_are_reopened() -> None:
     result = _audit()
     rows = {row["case"]: row for row in result["cases"]}
     assert rows[30]["state"] == "converted_admitted_for_case_merge"
     assert rows[30]["sample_count"] == 11411
     assert rows[30]["valid_for_case_merge"] is True
-    assert rows[23]["state"] == (
-        "capture_passed_conversion_authorization_required"
-    )
-    assert rows[23]["valid_for_case_merge"] is False
+    assert rows[23]["state"] == "converted_admitted_for_case_merge"
+    assert rows[23]["sample_count"] == 3273
+    assert rows[23]["valid_for_case_merge"] is True
     for case in (6, 2, 7, 8, 16):
         assert rows[case]["state"] == "paired_canary_and_capture_required"
         assert rows[case]["valid_for_case_merge"] is False
 
 
-def _synthetic_case23_conversion(tmp_path: Path) -> tuple[Path, Path]:
+def _synthetic_case23_conversion(
+    tmp_path: Path,
+) -> tuple[Path, Path, Path]:
     metadata, payload = MODULE.load_case_dataset(
         MODULE.DEFAULT_CASE30_DATASET,
         expected_case=30,
@@ -123,14 +125,43 @@ def _synthetic_case23_conversion(tmp_path: Path) -> tuple[Path, Path]:
         ),
         encoding="utf-8",
     )
-    return dataset, final
+    recovery = tmp_path / "recovery_audit.json"
+    recovery.write_text(
+        json.dumps(
+            {
+                "schema": MODULE.CASE23_RECOVERY_SCHEMA,
+                "case": 23,
+                "split": "train",
+                "execution": {
+                    "converter_invocations": 1,
+                    "converter_retry_performed": False,
+                },
+                "recovery": {
+                    "canonical_sha256": MODULE._sha256(dataset),
+                    "final_status_sha256": MODULE._sha256(final),
+                },
+                "result": {
+                    "valid_for_case_merge": True,
+                    "merged_dataset_created": False,
+                    "bc_authorized": False,
+                    "ppo_authorized": False,
+                    "training_started": False,
+                    "valid_for_training": False,
+                },
+                "passed": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return dataset, final, recovery
 
 
 def test_valid_case23_dataset_advances_only_partial_intake(tmp_path: Path) -> None:
-    dataset, final = _synthetic_case23_conversion(tmp_path)
+    dataset, final, recovery = _synthetic_case23_conversion(tmp_path)
     result = _audit(
         case23_dataset_path=dataset,
         case23_conversion_final_path=final,
+        case23_recovery_audit_path=recovery,
     )
     assert result["converted_train_cases"] == [23, 30]
     assert result["missing_train_case_count"] == 2
@@ -144,11 +175,15 @@ def test_valid_case23_dataset_advances_only_partial_intake(tmp_path: Path) -> No
 
 def test_intake_rejects_case_identity_substitution() -> None:
     with pytest.raises(ValueError, match="supplied together"):
-        _audit(case23_dataset_path=MODULE.DEFAULT_CASE30_DATASET)
+        _audit(
+            case23_dataset_path=MODULE.DEFAULT_CASE30_DATASET,
+            case23_conversion_final_path=None,
+            case23_recovery_audit_path=None,
+        )
 
 
 def test_intake_rejects_conversion_final_hash_mismatch(tmp_path: Path) -> None:
-    dataset, final = _synthetic_case23_conversion(tmp_path)
+    dataset, final, recovery = _synthetic_case23_conversion(tmp_path)
     payload = json.loads(final.read_text())
     payload["dataset"]["sha256"] = "0" * 64
     final.write_text(json.dumps(payload), encoding="utf-8")
@@ -156,6 +191,20 @@ def test_intake_rejects_conversion_final_hash_mismatch(tmp_path: Path) -> None:
         _audit(
             case23_dataset_path=dataset,
             case23_conversion_final_path=final,
+            case23_recovery_audit_path=recovery,
+        )
+
+
+def test_intake_rejects_recovery_audit_hash_mismatch(tmp_path: Path) -> None:
+    dataset, final, recovery = _synthetic_case23_conversion(tmp_path)
+    payload = json.loads(recovery.read_text())
+    payload["recovery"]["canonical_sha256"] = "0" * 64
+    recovery.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="conversion final checks failed"):
+        _audit(
+            case23_dataset_path=dataset,
+            case23_conversion_final_path=final,
+            case23_recovery_audit_path=recovery,
         )
 
 

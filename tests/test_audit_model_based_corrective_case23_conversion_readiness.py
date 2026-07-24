@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 
 
 ROOT = Path(__file__).parents[1]
@@ -31,13 +32,27 @@ def _repository_checks() -> dict[str, bool]:
     }
 
 
-def _review(contract: Path = CONTRACT):
+def _review(contract: Path = CONTRACT, repo: Path = ROOT):
     return MODULE.audit_readiness(
         contract,
-        ROOT,
+        repo,
         repository_checks=_repository_checks(),
         git_state={"head": "a" * 40, "upstream": "a" * 40},
     )
+
+
+def _isolated_repo(tmp_path: Path) -> tuple[Path, Path]:
+    repo = tmp_path / "repo"
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    contract = repo / MODULE.CONTRACT_RELATIVE_PATH
+    contract.parent.mkdir(parents=True)
+    shutil.copy2(CONTRACT, contract)
+    for identity in payload["identities"].values():
+        relative = Path(identity["path"])
+        destination = repo / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / relative, destination)
+    return repo, contract
 
 
 def test_windows_repository_path_maps_to_wsl_git_path() -> None:
@@ -46,8 +61,11 @@ def test_windows_repository_path_maps_to_wsl_git_path() -> None:
     ) == "/mnt/g/wSpace/cinebotRL-two-wheel-riser"
 
 
-def test_real_case23_v4_source_is_ready_for_separate_conversion() -> None:
-    result = _review()
+def test_real_case23_v4_source_is_ready_for_separate_conversion(
+    tmp_path: Path,
+) -> None:
+    repo, contract = _isolated_repo(tmp_path)
+    result = _review(contract, repo)
     assert result["passed"] is True
     assert result["case"] == 23
     assert result["split"] == "train"

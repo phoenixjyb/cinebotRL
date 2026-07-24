@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 
 import pytest
@@ -58,16 +59,35 @@ def _repository_checks() -> dict[str, bool]:
     }
 
 
-def _validate(**kwargs):
+def _validate(
+    *,
+    contract: Path = CONTRACT,
+    repo: Path = ROOT,
+    **kwargs,
+):
     return MODULE.validate(
-        CONTRACT,
-        ROOT,
+        contract,
+        repo,
         namespace=MODULE.NAMESPACE,
         repository_checks=_repository_checks(),
         git_state={"head": "a" * 40, "upstream": "a" * 40},
         review_result=json.loads(REVIEW.read_text()),
         **kwargs,
     )
+
+
+def _isolated_repo(tmp_path: Path) -> tuple[Path, Path]:
+    repo = tmp_path / "repo"
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    contract = repo / MODULE.CONTRACT_RELATIVE_PATH
+    contract.parent.mkdir(parents=True)
+    shutil.copy2(CONTRACT, contract)
+    for identity in payload["identities"].values():
+        relative = Path(identity["path"])
+        destination = repo / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / relative, destination)
+    return repo, contract
 
 
 def _sha256(path: Path) -> str:
@@ -153,8 +173,11 @@ def test_execution_contract_is_closed_and_pins_route_files() -> None:
         assert contract["identities"][name]["git_blob_sha1"] == _git_blob(path)
 
 
-def test_no_token_preflight_is_ready_but_not_authorized() -> None:
-    result = _validate()
+def test_no_token_preflight_is_ready_but_not_authorized(
+    tmp_path: Path,
+) -> None:
+    repo, contract = _isolated_repo(tmp_path)
+    result = _validate(contract=contract, repo=repo)
     assert result["passed"] is True
     assert result["cpu_contract_ready"] is True
     assert result["conversion_authorized"] is False
@@ -167,9 +190,12 @@ def test_no_token_preflight_is_ready_but_not_authorized() -> None:
 
 
 def test_external_mode_0600_token_opens_only_one_conversion(tmp_path) -> None:
+    repo, contract = _isolated_repo(tmp_path)
     token = _secure_token(tmp_path)
     try:
         result = _validate(
+            contract=contract,
+            repo=repo,
             authorization_file=token,
             authorization_sha256=_sha256(token),
         )

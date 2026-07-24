@@ -10297,3 +10297,25 @@ and must state whether its candidate was accepted or rejected.
 
 - The next data-producing operation still requires separate authorization:
   `Authorize exactly one case-7 corrective-label capture.`
+
+## Round 267: corrective-capture commands are mechanically bound
+
+- Added a CPU-only command-equivalence auditor at implementation commit
+  `bce0f1ba2a4df99ef321290ab33391e68953f72a`. It parses each authoritative
+  wrapper without sourcing or executing it, resolves playback defaults, and
+  binds every controller, dynamic gate, plan, profile, gains, capture split,
+  namespace, and output path to the route contract.
+- Cases 6, 23-v4, and pending case 7 are current-command-compatible. Case 30
+  is explicitly historical-only because it binds an older playback identity
+  and omits the now-required explicit capture split; its existing accepted
+  archive was not modified.
+- The macOS and `.98` Windows-Python reports are byte-identical at SHA-256
+  `6a7de89133a5b6177f6d42e7558f272b611481f231d0494f05263b605c4b9bd2`.
+  All eight top-level checks pass.
+- No generic runtime wrapper, authorization token, Isaac/GPU process, capture,
+  conversion, corpus merge, BC, PPO, checkpoint, or training run was created.
+
+## Next round after Round 267
+
+- The next data-producing operation remains separately authorized:
+  `Authorize exactly one case-7 corrective-label capture.`

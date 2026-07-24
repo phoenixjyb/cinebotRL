@@ -1,0 +1,863 @@
+{
+  "bc_started": false,
+  "capture_started": false,
+  "checks": {
+    "all_routes_fail_closed": true,
+    "authorization_closed": true,
+    "contract_identity": true,
+    "four_routes_classified": true,
+    "one_pending_route": true,
+    "pending_case7_command_compatible": true,
+    "playback_identity": true,
+    "repository": true
+  },
+  "command_contract": {
+    "checks": {
+      "committed_blob_matches": true,
+      "file_exists": true,
+      "tracked": true
+    },
+    "git_blob_sha1": "686e5e02056963e8efb9568ebc4c51f8b0128d17",
+    "passed": true,
+    "path": "scripts/two_wheel_balance/model_based_corrective_capture_command_contract_v1.json",
+    "sha256": "6602e14e5860d16e041d13c6689fcd50f105c6d00262d895ccfb771bd0c5fe9a"
+  },
+  "conversion_started": false,
+  "dataset_created": false,
+  "generic_runtime_wrapper_created": false,
+  "next_operation": "authorize_exactly_one_case7_corrective_label_capture",
+  "passed": true,
+  "playback": {
+    "checks": {
+      "committed_blob_matches": true,
+      "file_exists": true,
+      "tracked": true
+    },
+    "git_blob_sha1": "05c803465ec8a281e1b96b5eb013e26b685405e6",
+    "passed": true,
+    "path": "scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+    "sha256": "ab60ed842d0b4a3fde754076a01e98ea91965a56758bc0601ecf4523c2065c6a"
+  },
+  "ppo_started": false,
+  "repository": {
+    "head": "bce0f1ba2a4df99ef321290ab33391e68953f72a",
+    "passed": true,
+    "tracked_worktree_clean": true,
+    "upstream": "bce0f1ba2a4df99ef321290ab33391e68953f72a"
+  },
+  "routes": [
+    {
+      "capture_contract": {
+        "checks": {
+          "committed_blob_matches": true,
+          "file_exists": true,
+          "tracked": true
+        },
+        "git_blob_sha1": "868da616e9c921608befc19f33c80b376838f156",
+        "passed": true,
+        "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case30_capture_contract_v2.json",
+        "sha256": "9d2df8b7659979a323737f88f322d326ab63edb21ce36e82dede587a5fa2d014"
+      },
+      "capture_started": false,
+      "case": 30,
+      "classification_passed": true,
+      "contract_checks": {
+        "authorization_closed": true,
+        "capture_only": true,
+        "case_split": true,
+        "contract_path": true,
+        "namespace": true,
+        "runtime_limit": true,
+        "schema": true
+      },
+      "current_command_compatible": false,
+      "dataset_created": false,
+      "identity_option_bindings": {
+        "--corrective-teacher-profile": {
+          "actual_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case30_profile_v1.json",
+          "expected_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case30_profile_v1.json",
+          "identity": "corrective_profile",
+          "passed": true
+        },
+        "--deterministic-wrench-profile": {
+          "actual_path": "artifacts/two_wheel_riser/20260721_case30_perturbation_proposal_v1_cpu/case30_wrench_profile.json",
+          "expected_path": "artifacts/two_wheel_riser/20260721_case30_perturbation_proposal_v1_cpu/case30_wrench_profile.json",
+          "identity": "perturbation_profile",
+          "passed": true
+        },
+        "--gains": {
+          "actual_path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+          "expected_path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+          "identity": "lqr_gains",
+          "passed": true
+        },
+        "--plan-dir": {
+          "actual_path": "artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu",
+          "expected_path": "artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu",
+          "identity": "case30_plan",
+          "passed": true
+        }
+      },
+      "io_checks": {
+        "capture_admission": true,
+        "capture_dir": true,
+        "case": true,
+        "output": true,
+        "runtime_heartbeat": true
+      },
+      "known_current_incompatibilities": [
+        "--corrective-teacher-capture-split",
+        "playback_identity"
+      ],
+      "mismatches": [
+        "--corrective-teacher-capture-split",
+        "playback_identity"
+      ],
+      "playback_binding_passed": false,
+      "runtime_authorized": false,
+      "semantic_options": {
+        "--camera-lever-arm-compensation-gain": {
+          "actual": "1.0",
+          "expected": "1.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--controller-wz-kp": {
+          "actual": "1.05",
+          "expected": "1.05",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--corrective-teacher-capture-split": {
+          "actual": null,
+          "expected": "train",
+          "passed": false,
+          "source": "playback_default"
+        },
+        "--enable-camera-lever-arm-compensation": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        },
+        "--headless": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-attitude-error-deg": {
+          "actual": 10.0,
+          "expected": "10.0",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-attitude-p95-deg": {
+          "actual": 5.0,
+          "expected": "5.0",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-camera-lever-arm-correction-m": {
+          "actual": "0.05",
+          "expected": "0.05",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-duration-scale": {
+          "actual": "3.0",
+          "expected": "3.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-internal-proxy-rate-deg-s": {
+          "actual": 360.0,
+          "expected": "360.0",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-pitch-deg": {
+          "actual": 12.0,
+          "expected": "12.0",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-position-error-m": {
+          "actual": 0.25,
+          "expected": "0.25",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-position-p95-m": {
+          "actual": 0.15,
+          "expected": "0.15",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-proxy-servo-error-deg": {
+          "actual": 5.0,
+          "expected": "5.0",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-riser-servo-error-m": {
+          "actual": 0.03,
+          "expected": "0.03",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-saturation-ratio": {
+          "actual": 0.2,
+          "expected": "0.20",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--plan-filename-template": {
+          "actual": "case_{case:04d}_smoothed_riser_plan_v1.npz",
+          "expected": "case_{case:04d}_smoothed_riser_plan_v1.npz",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--policy-command-base": {
+          "actual": "model_based_planner",
+          "expected": "model_based_planner",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--residual-action-scales": {
+          "actual": "0.05,0.05,0.02",
+          "expected": "0.05,0.05,0.02",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--zero-policy-action": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        }
+      },
+      "split": "train",
+      "status": "historical_only",
+      "training_started": false,
+      "unknown_options": [],
+      "wrapper": {
+        "checks": {
+          "committed_blob_matches": true,
+          "file_exists": true,
+          "tracked": true
+        },
+        "git_blob_sha1": "229be406c6454465170ad24ba9295555c6f9746c",
+        "passed": true,
+        "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case30_capture.sh",
+        "sha256": "280cee3da4d5152047fec6bd325b0ae9f23fbbd824d1ed571c19bf6b78e27eb6"
+      }
+    },
+    {
+      "capture_contract": {
+        "checks": {
+          "committed_blob_matches": true,
+          "file_exists": true,
+          "tracked": true
+        },
+        "git_blob_sha1": "7e8ffbd8645ae36de14b115f93183a982e7fa3c7",
+        "passed": true,
+        "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case23_capture_contract_v4.json",
+        "sha256": "f1a383cd2930088f9955fa047461d615225e2d7f3fc579dedfb91bb6ab0ee7ff"
+      },
+      "capture_started": false,
+      "case": 23,
+      "classification_passed": true,
+      "contract_checks": {
+        "authorization_closed": true,
+        "capture_only": true,
+        "case_split": true,
+        "contract_path": true,
+        "namespace": true,
+        "runtime_limit": true,
+        "schema": true
+      },
+      "current_command_compatible": true,
+      "dataset_created": false,
+      "identity_option_bindings": {
+        "--corrective-teacher-profile": {
+          "actual_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case23_profile_v1.json",
+          "expected_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case23_profile_v1.json",
+          "identity": "corrective_profile",
+          "passed": true
+        },
+        "--deterministic-wrench-profile": {
+          "actual_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case23_wrench_profile_v1.json",
+          "expected_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case23_wrench_profile_v1.json",
+          "identity": "perturbation_profile",
+          "passed": true
+        },
+        "--gains": {
+          "actual_path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+          "expected_path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+          "identity": "lqr_gains",
+          "passed": true
+        },
+        "--plan-dir": {
+          "actual_path": "artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu",
+          "expected_path": "artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v16_case36_explicit_preview055_g125_cpu",
+          "identity": "case23_plan",
+          "passed": true
+        }
+      },
+      "io_checks": {
+        "capture_admission": true,
+        "capture_dir": true,
+        "case": true,
+        "output": true,
+        "runtime_heartbeat": true
+      },
+      "known_current_incompatibilities": [],
+      "mismatches": [],
+      "playback_binding_passed": true,
+      "runtime_authorized": false,
+      "semantic_options": {
+        "--camera-lever-arm-compensation-gain": {
+          "actual": "1.0",
+          "expected": "1.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--controller-wz-kp": {
+          "actual": "1.05",
+          "expected": "1.05",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--corrective-teacher-capture-split": {
+          "actual": "train",
+          "expected": "train",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--enable-camera-lever-arm-compensation": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        },
+        "--headless": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-attitude-error-deg": {
+          "actual": 10.0,
+          "expected": "10.0",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-attitude-p95-deg": {
+          "actual": 5.0,
+          "expected": "5.0",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-camera-lever-arm-correction-m": {
+          "actual": "0.05",
+          "expected": "0.05",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-duration-scale": {
+          "actual": "3.0",
+          "expected": "3.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-internal-proxy-rate-deg-s": {
+          "actual": 360.0,
+          "expected": "360.0",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-pitch-deg": {
+          "actual": 12.0,
+          "expected": "12.0",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-position-error-m": {
+          "actual": 0.25,
+          "expected": "0.25",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-position-p95-m": {
+          "actual": 0.15,
+          "expected": "0.15",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-proxy-servo-error-deg": {
+          "actual": 5.0,
+          "expected": "5.0",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-riser-servo-error-m": {
+          "actual": 0.03,
+          "expected": "0.03",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--maximum-saturation-ratio": {
+          "actual": 0.2,
+          "expected": "0.20",
+          "passed": true,
+          "source": "playback_default"
+        },
+        "--plan-filename-template": {
+          "actual": "case_{case:04d}_smoothed_riser_plan_v1.npz",
+          "expected": "case_{case:04d}_smoothed_riser_plan_v1.npz",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--policy-command-base": {
+          "actual": "model_based_planner",
+          "expected": "model_based_planner",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--residual-action-scales": {
+          "actual": "0.05,0.05,0.02",
+          "expected": "0.05,0.05,0.02",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--zero-policy-action": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        }
+      },
+      "split": "train",
+      "status": "completed_current_compatible",
+      "training_started": false,
+      "unknown_options": [],
+      "wrapper": {
+        "checks": {
+          "committed_blob_matches": true,
+          "file_exists": true,
+          "tracked": true
+        },
+        "git_blob_sha1": "53f604f9699483c2391683e23a1dd6b2783c8d24",
+        "passed": true,
+        "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case23_capture_v4.sh",
+        "sha256": "774cdda3826153a53387245ad1ffe6d420609c9d4b5600e805616565c949d103"
+      }
+    },
+    {
+      "capture_contract": {
+        "checks": {
+          "committed_blob_matches": true,
+          "file_exists": true,
+          "tracked": true
+        },
+        "git_blob_sha1": "b4dbaa13a96a78582ae27f92227645858787c13e",
+        "passed": true,
+        "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case6_capture_contract_v1.json",
+        "sha256": "14b3fd0ddf155da66a04a26c7041716e5c0072029508b4fcf1bf95f0aca81455"
+      },
+      "capture_started": false,
+      "case": 6,
+      "classification_passed": true,
+      "contract_checks": {
+        "authorization_closed": true,
+        "capture_only": true,
+        "case_split": true,
+        "contract_path": true,
+        "namespace": true,
+        "runtime_limit": true,
+        "schema": true
+      },
+      "current_command_compatible": true,
+      "dataset_created": false,
+      "identity_option_bindings": {
+        "--corrective-teacher-profile": {
+          "actual_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case6_profile_v1.json",
+          "expected_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case6_profile_v1.json",
+          "identity": "corrective_profile",
+          "passed": true
+        },
+        "--deterministic-wrench-profile": {
+          "actual_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case6_wrench_profile_v1.json",
+          "expected_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case6_wrench_profile_v1.json",
+          "identity": "perturbation_profile",
+          "passed": true
+        },
+        "--gains": {
+          "actual_path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+          "expected_path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+          "identity": "lqr_gains",
+          "passed": true
+        },
+        "--plan-dir": {
+          "actual_path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_pair_readiness_cpu_v1/source",
+          "expected_path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_pair_readiness_cpu_v1/source",
+          "identity": "case6_plan",
+          "passed": true
+        }
+      },
+      "io_checks": {
+        "capture_admission": true,
+        "capture_dir": true,
+        "case": true,
+        "output": true,
+        "runtime_heartbeat": true
+      },
+      "known_current_incompatibilities": [],
+      "mismatches": [],
+      "playback_binding_passed": true,
+      "runtime_authorized": false,
+      "semantic_options": {
+        "--camera-lever-arm-compensation-gain": {
+          "actual": "1.0",
+          "expected": "1.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--controller-wz-kp": {
+          "actual": "1.05",
+          "expected": "1.05",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--corrective-teacher-capture-split": {
+          "actual": "train",
+          "expected": "train",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--enable-camera-lever-arm-compensation": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        },
+        "--headless": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-attitude-error-deg": {
+          "actual": "10.0",
+          "expected": "10.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-attitude-p95-deg": {
+          "actual": "5.0",
+          "expected": "5.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-camera-lever-arm-correction-m": {
+          "actual": "0.05",
+          "expected": "0.05",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-duration-scale": {
+          "actual": "3.0",
+          "expected": "3.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-internal-proxy-rate-deg-s": {
+          "actual": "360.0",
+          "expected": "360.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-pitch-deg": {
+          "actual": "12.0",
+          "expected": "12.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-position-error-m": {
+          "actual": "0.25",
+          "expected": "0.25",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-position-p95-m": {
+          "actual": "0.15",
+          "expected": "0.15",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-proxy-servo-error-deg": {
+          "actual": "5.0",
+          "expected": "5.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-riser-servo-error-m": {
+          "actual": "0.03",
+          "expected": "0.03",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-saturation-ratio": {
+          "actual": "0.20",
+          "expected": "0.20",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--plan-filename-template": {
+          "actual": "case_{case:04d}_smoothed_riser_plan_v1.npz",
+          "expected": "case_{case:04d}_smoothed_riser_plan_v1.npz",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--policy-command-base": {
+          "actual": "model_based_planner",
+          "expected": "model_based_planner",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--residual-action-scales": {
+          "actual": "0.05,0.05,0.02",
+          "expected": "0.05,0.05,0.02",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--zero-policy-action": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        }
+      },
+      "split": "train",
+      "status": "completed_current_compatible",
+      "training_started": false,
+      "unknown_options": [],
+      "wrapper": {
+        "checks": {
+          "committed_blob_matches": true,
+          "file_exists": true,
+          "tracked": true
+        },
+        "git_blob_sha1": "e20fa2841c7d364438e998944f37daf8c569b54a",
+        "passed": true,
+        "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case6_capture.sh",
+        "sha256": "b4d2492039ae3936f9c9bec1cfc15c6876e8e9ade3b0a3ae27c427fee3047da9"
+      }
+    },
+    {
+      "capture_contract": {
+        "checks": {
+          "committed_blob_matches": true,
+          "file_exists": true,
+          "tracked": true
+        },
+        "git_blob_sha1": "4f84ab9250cb339b420461688b53e64f013d5629",
+        "passed": true,
+        "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_capture_contract_v1.json",
+        "sha256": "0ae5a2a0b8a5a7addc509993c315eca474e378afb48990f1cc77a88ceed9ea6b"
+      },
+      "capture_started": false,
+      "case": 7,
+      "classification_passed": true,
+      "contract_checks": {
+        "authorization_closed": true,
+        "capture_only": true,
+        "case_split": true,
+        "contract_path": true,
+        "namespace": true,
+        "runtime_limit": true,
+        "schema": true
+      },
+      "current_command_compatible": true,
+      "dataset_created": false,
+      "identity_option_bindings": {
+        "--corrective-teacher-profile": {
+          "actual_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_profile_v1.json",
+          "expected_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_profile_v1.json",
+          "identity": "corrective_profile",
+          "passed": true
+        },
+        "--deterministic-wrench-profile": {
+          "actual_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_wrench_profile_v1.json",
+          "expected_path": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_wrench_profile_v1.json",
+          "identity": "perturbation_profile",
+          "passed": true
+        },
+        "--gains": {
+          "actual_path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+          "expected_path": "docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+          "identity": "lqr_gains",
+          "passed": true
+        },
+        "--plan-dir": {
+          "actual_path": "docs/03_training/two_wheel_balance/evidence_20260724_case7_pair_readiness_cpu_v1/source",
+          "expected_path": "docs/03_training/two_wheel_balance/evidence_20260724_case7_pair_readiness_cpu_v1/source",
+          "identity": "case7_plan",
+          "passed": true
+        }
+      },
+      "io_checks": {
+        "capture_admission": true,
+        "capture_dir": true,
+        "case": true,
+        "output": true,
+        "runtime_heartbeat": true
+      },
+      "known_current_incompatibilities": [],
+      "mismatches": [],
+      "playback_binding_passed": true,
+      "runtime_authorized": false,
+      "semantic_options": {
+        "--camera-lever-arm-compensation-gain": {
+          "actual": "1.0",
+          "expected": "1.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--controller-wz-kp": {
+          "actual": "1.05",
+          "expected": "1.05",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--corrective-teacher-capture-split": {
+          "actual": "train",
+          "expected": "train",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--enable-camera-lever-arm-compensation": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        },
+        "--headless": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-attitude-error-deg": {
+          "actual": "10.0",
+          "expected": "10.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-attitude-p95-deg": {
+          "actual": "5.0",
+          "expected": "5.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-camera-lever-arm-correction-m": {
+          "actual": "0.05",
+          "expected": "0.05",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-duration-scale": {
+          "actual": "3.0",
+          "expected": "3.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-internal-proxy-rate-deg-s": {
+          "actual": "360.0",
+          "expected": "360.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-pitch-deg": {
+          "actual": "12.0",
+          "expected": "12.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-position-error-m": {
+          "actual": "0.25",
+          "expected": "0.25",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-position-p95-m": {
+          "actual": "0.15",
+          "expected": "0.15",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-proxy-servo-error-deg": {
+          "actual": "5.0",
+          "expected": "5.0",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-riser-servo-error-m": {
+          "actual": "0.03",
+          "expected": "0.03",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--maximum-saturation-ratio": {
+          "actual": "0.20",
+          "expected": "0.20",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--plan-filename-template": {
+          "actual": "case_{case:04d}_smoothed_riser_plan_v1.npz",
+          "expected": "case_{case:04d}_smoothed_riser_plan_v1.npz",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--policy-command-base": {
+          "actual": "model_based_planner",
+          "expected": "model_based_planner",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--residual-action-scales": {
+          "actual": "0.05,0.05,0.02",
+          "expected": "0.05,0.05,0.02",
+          "passed": true,
+          "source": "explicit"
+        },
+        "--zero-policy-action": {
+          "actual": true,
+          "expected": true,
+          "passed": true,
+          "source": "explicit"
+        }
+      },
+      "split": "train",
+      "status": "pending_authorization",
+      "training_started": false,
+      "unknown_options": [],
+      "wrapper": {
+        "checks": {
+          "committed_blob_matches": true,
+          "file_exists": true,
+          "tracked": true
+        },
+        "git_blob_sha1": "d371d614bac54d216b90ac9b880273e255fd853e",
+        "passed": true,
+        "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case7_capture.sh",
+        "sha256": "70ede04bacb3048f2c6058017b6847060579c489df01ac1684f8051139242e90"
+      }
+    }
+  ],
+  "runtime_authorized": false,
+  "schema": "cinebotrl_two_wheel_riser_corrective_capture_command_audit_v1",
+  "training_started": false
+}

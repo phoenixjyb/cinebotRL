@@ -19,6 +19,22 @@ GENERIC_CAPTURE_FINALIZER_EVIDENCE = (
     "evidence_20260724_generic_corrective_capture_finalizer_cpu_v1/"
     "summary.json"
 )
+CAPTURE_COMMAND_AUDIT = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260725_corrective_capture_command_equivalence_cpu_v1/"
+    "summary.json"
+)
+CAPTURE_COMMAND_AUDITOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "audit_model_based_corrective_capture_command_equivalence.py"
+)
+CAPTURE_COMMAND_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_capture_command_contract_v1.json"
+)
 CORRECTIVE_ROUTE_CATALOG = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -3265,6 +3281,49 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert generic_capture_finalizer["runtime_started"] is False
     assert generic_capture_finalizer["capture_started"] is False
     assert generic_capture_finalizer["training_started"] is False
+    assert audit["pre_training_capture_command_audit_implemented"] is True
+    assert audit["pre_training_capture_command_audit_commit"] == (
+        "bce0f1ba2a4df99ef321290ab33391e68953f72a"
+    )
+    assert audit["pre_training_capture_command_audit_summary_sha256"] == (
+        _sha256(CAPTURE_COMMAND_AUDIT)
+    )
+    assert audit["pre_training_capture_command_auditor_sha256"] == _sha256(
+        CAPTURE_COMMAND_AUDITOR
+    )
+    assert audit["pre_training_capture_command_contract_sha256"] == _sha256(
+        CAPTURE_COMMAND_CONTRACT
+    )
+    assert audit[
+        "pre_training_capture_command_audit_mac_windows_byte_parity"
+    ] is True
+    assert audit[
+        "pre_training_capture_command_current_compatible_cases"
+    ] == [6, 7, 23]
+    assert audit["pre_training_capture_command_historical_only_cases"] == [30]
+    assert audit[
+        "pre_training_capture_command_pending_case7_compatible"
+    ] is True
+    assert audit[
+        "pre_training_capture_command_generic_runtime_wrapper_created"
+    ] is False
+    capture_command_audit = json.loads(CAPTURE_COMMAND_AUDIT.read_text())
+    assert capture_command_audit["passed"] is True
+    assert all(capture_command_audit["checks"].values())
+    capture_routes = {
+        route["case"]: route for route in capture_command_audit["routes"]
+    }
+    assert capture_routes[7]["current_command_compatible"] is True
+    assert capture_routes[7]["mismatches"] == []
+    assert capture_routes[30]["current_command_compatible"] is False
+    assert capture_routes[30]["mismatches"] == [
+        "--corrective-teacher-capture-split",
+        "playback_identity",
+    ]
+    assert capture_command_audit["runtime_authorized"] is False
+    assert capture_command_audit["capture_started"] is False
+    assert capture_command_audit["dataset_created"] is False
+    assert capture_command_audit["training_started"] is False
     assert audit["pre_training_next_operation_authorized"] is False
     assert audit["focused_local_cpu_suite"] == "30_passed_2_warnings_in_2.89s"
     assert audit["focused_windows_cpu_suite"] == "30_passed_2_warnings_in_14.83s"

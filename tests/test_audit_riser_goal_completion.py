@@ -50,6 +50,13 @@ def _current_inputs():
         "hardware": MODULE.DEFAULT_HARDWARE,
         "bench": MODULE.DEFAULT_BENCH,
         "pending_route_queue": MODULE.DEFAULT_PENDING_ROUTE_QUEUE,
+        "case7_capture_route": MODULE.DEFAULT_CASE7_CAPTURE_ROUTE,
+        "generic_conversion_proposals": (
+            MODULE.DEFAULT_GENERIC_CONVERSION_PROPOSALS
+        ),
+        "generic_conversion_execution": (
+            MODULE.DEFAULT_GENERIC_CONVERSION_EXECUTION
+        ),
     }
     payloads = {name: MODULE._load_json(path) for name, path in paths.items()}
     identities = {name: MODULE._identity(path) for name, path in paths.items()}
@@ -123,7 +130,7 @@ def test_current_goal_audit_passes_foundations_but_not_learning() -> None:
         "corrective_training_corpus_cases_available": 0,
         "minimum_train_cases": 4,
         "minimum_validation_cases": 2,
-        "next_case": 23,
+        "historical_next_case": 23,
         "pending_route_queue_passed": True,
         "pending_route_queue_bound_to_goal": True,
         "pending_route_queue_ready_count": 6,
@@ -137,7 +144,17 @@ def test_current_goal_audit_passes_foundations_but_not_learning() -> None:
             "case16_validation_pair",
         ],
         "pending_route_queue_all_authorization_closed": True,
-        "next_operation": "authorize_exactly_one_case23_v4_cpu_conversion",
+        "case7_corrective_capture_route_ready": True,
+        "case7_corrective_capture_authorization_closed": True,
+        "generic_conversion_proposals_ready": True,
+        "generic_conversion_proposal_cases": [6, 23, 30],
+        "generic_conversion_proposal_total_samples": 22617,
+        "generic_conversion_execution_ready": True,
+        "generic_conversion_execution_cases": [6, 23, 30],
+        "generic_conversion_execution_total_samples": 22617,
+        "no_hidden_cpu_route_blocker": True,
+        "next_case": 7,
+        "next_operation": "authorize_exactly_one_case7_corrective_label_capture",
         "next_operation_authorized": False,
         "bc_authorized": False,
         "training_authorized": False,
@@ -154,6 +171,38 @@ def test_current_goal_audit_passes_foundations_but_not_learning() -> None:
     assert report["gates"]["isolated_worktree_and_branch"]["evidence"] == [
         f"git:{MODULE.EXPECTED_BRANCH}@{'a' * 40}"
     ]
+
+
+def test_pre_training_readiness_fails_closed_on_case7_capture_route_drift() -> None:
+    payloads, _ = _current_inputs()
+    capture = json.loads(json.dumps(payloads["case7_capture_route"]))
+    capture["runtime_authorized"] = True
+    report = _build_current(case7_capture_route=capture)
+    readiness = report["pre_training_readiness"]
+    assert readiness["case7_corrective_capture_route_ready"] is False
+    assert readiness["case7_corrective_capture_authorization_closed"] is False
+    assert readiness["no_hidden_cpu_route_blocker"] is False
+    assert readiness["next_operation_authorized"] is False
+
+
+def test_pre_training_readiness_fails_closed_on_generic_proposal_drift() -> None:
+    payloads, _ = _current_inputs()
+    proposals = json.loads(json.dumps(payloads["generic_conversion_proposals"]))
+    proposals["cases"][0]["sample_count"] -= 1
+    report = _build_current(generic_conversion_proposals=proposals)
+    readiness = report["pre_training_readiness"]
+    assert readiness["generic_conversion_proposals_ready"] is False
+    assert readiness["no_hidden_cpu_route_blocker"] is False
+
+
+def test_pre_training_readiness_fails_closed_on_generic_execution_drift() -> None:
+    payloads, _ = _current_inputs()
+    execution = json.loads(json.dumps(payloads["generic_conversion_execution"]))
+    execution["wrapper_execute_without_token_exit_code"] = 0
+    report = _build_current(generic_conversion_execution=execution)
+    readiness = report["pre_training_readiness"]
+    assert readiness["generic_conversion_execution_ready"] is False
+    assert readiness["no_hidden_cpu_route_blocker"] is False
 
 
 def test_goal_audit_rejects_arm_or_1p9m_contract_drift() -> None:
@@ -193,7 +242,10 @@ def test_goal_audit_rejects_pending_route_queue_drift() -> None:
     assert readiness["pending_route_queue_passed"] is False
     assert readiness["pending_route_queue_bound_to_goal"] is True
     assert readiness["pending_route_queue_all_authorization_closed"] is False
-    assert readiness["next_operation_authorized"] is True
+    assert readiness["next_operation_authorized"] is False
+    assert readiness["next_operation"] == (
+        "authorize_exactly_one_case7_corrective_label_capture"
+    )
     assert readiness["ready_for_bc_execution"] is False
 
 

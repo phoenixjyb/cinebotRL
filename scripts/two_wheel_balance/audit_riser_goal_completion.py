@@ -61,6 +61,19 @@ DEFAULT_PENDING_ROUTE_QUEUE = (
     DOC_ROOT
     / "evidence_20260724_pending_corrective_route_queue_cpu_v4/summary.json"
 )
+DEFAULT_CASE7_CAPTURE_ROUTE = (
+    DOC_ROOT
+    / "evidence_20260724_case7_corrective_capture_route_cpu_v1/summary.json"
+)
+DEFAULT_GENERIC_CONVERSION_PROPOSALS = (
+    DOC_ROOT
+    / "evidence_20260724_generic_corrective_conversion_proposals_v1/summary.json"
+)
+DEFAULT_GENERIC_CONVERSION_EXECUTION = (
+    DOC_ROOT
+    / "evidence_20260724_generic_corrective_conversion_execution_route_cpu_v2/"
+    "summary.json"
+)
 EXPECTED_BRANCH = "codex/two-wheel-riser-rl"
 EXPECTED_MOVABLE_JOINTS = {
     "joint1_gimbal_pitch",
@@ -102,7 +115,7 @@ REQUIRED_COMPLETION_GATES = (
     "learned_policy_render_audit",
 )
 GOAL_COMPLETION_AUDIT_SCHEMA = (
-    "cinebotrl_two_wheel_riser_goal_completion_audit_v5"
+    "cinebotrl_two_wheel_riser_goal_completion_audit_v6"
 )
 ROLLOUT_METRICS = (
     "position_error_p95_m",
@@ -880,6 +893,9 @@ def build_report(
     hardware: Mapping[str, Any],
     bench: Mapping[str, Any],
     pending_route_queue: Mapping[str, Any],
+    case7_capture_route: Mapping[str, Any],
+    generic_conversion_proposals: Mapping[str, Any],
+    generic_conversion_execution: Mapping[str, Any],
     git_state: Mapping[str, Any],
     learning: Mapping[str, Any],
     inputs: Mapping[str, Any],
@@ -997,6 +1013,119 @@ def build_report(
         == "authorize_exactly_one_case23_v4_cpu_conversion"
         and pending_authorization_closed
     )
+    case7_capture_authorization_closed = all(
+        case7_capture_route.get(field) is False
+        for field in (
+            "authorization_token_issued",
+            "runtime_authorized",
+            "gpu_launch_authorized",
+            "label_capture_authorized",
+            "dataset_creation_authorized",
+            "bc_authorized",
+            "ppo_authorized",
+            "training_started",
+            "valid_for_training",
+        )
+    )
+    case7_capture_route_ready = (
+        case7_capture_route.get("schema")
+        == "cinebotrl_two_wheel_riser_case7_corrective_capture_route_cpu_evidence_v1"
+        and case7_capture_route.get("case") == 7
+        and case7_capture_route.get("split") == "train"
+        and case7_capture_route.get("passed") is True
+        and case7_capture_route.get("cpu_contract_ready") is True
+        and case7_capture_route.get("identity_count") == 19
+        and case7_capture_route.get("paired_projection_evidence_bound") is True
+        and case7_capture_route.get("paired_projection_evidence_passed") is True
+        and case7_capture_route.get("runtime_namespace_created") is False
+        and case7_capture_authorization_closed
+    )
+    proposal_cases = generic_conversion_proposals.get("cases", [])
+    proposal_case_ids = (
+        [row.get("case") for row in proposal_cases]
+        if isinstance(proposal_cases, list)
+        and all(isinstance(row, Mapping) for row in proposal_cases)
+        else []
+    )
+    proposal_samples = (
+        sum(int(row.get("sample_count", -1)) for row in proposal_cases)
+        if proposal_case_ids
+        else -1
+    )
+    generic_proposals_ready = (
+        generic_conversion_proposals.get("schema")
+        == "cinebotrl_two_wheel_riser_generic_corrective_conversion_proposals_summary_v1"
+        and generic_conversion_proposals.get("passed") is True
+        and generic_conversion_proposals.get("all_proposals_passed") is True
+        and generic_conversion_proposals.get("case_count") == 3
+        and proposal_case_ids == [6, 23, 30]
+        and generic_conversion_proposals.get("total_sample_count") == 22617
+        and proposal_samples == 22617
+        and generic_conversion_proposals.get("observation_dimension") == 65
+        and generic_conversion_proposals.get("action_dimension") == 3
+        and generic_conversion_proposals.get("mac_windows_byte_parity") is True
+        and generic_conversion_proposals.get("conversion_authorized") is False
+        and generic_conversion_proposals.get("output_created") is False
+        and generic_conversion_proposals.get("merged_dataset_created") is False
+        and generic_conversion_proposals.get("bc_authorized") is False
+        and generic_conversion_proposals.get("ppo_authorized") is False
+        and generic_conversion_proposals.get("training_started") is False
+        and generic_conversion_proposals.get("valid_for_training") is False
+    )
+    execution_preflights = generic_conversion_execution.get("preflights", [])
+    execution_case_ids = (
+        [row.get("case") for row in execution_preflights]
+        if isinstance(execution_preflights, list)
+        and all(isinstance(row, Mapping) for row in execution_preflights)
+        else []
+    )
+    execution_samples = (
+        sum(int(row.get("sample_count", -1)) for row in execution_preflights)
+        if execution_case_ids
+        else -1
+    )
+    generic_execution_ready = (
+        generic_conversion_execution.get("schema")
+        == (
+            "cinebotrl_two_wheel_riser_generic_corrective_conversion_"
+            "execution_route_summary_v2"
+        )
+        and generic_conversion_execution.get("passed") is True
+        and generic_conversion_execution.get("conversion_execution_implemented")
+        is True
+        and generic_conversion_execution.get("preflight_case_count") == 3
+        and execution_case_ids == [6, 23, 30]
+        and generic_conversion_execution.get("preflight_total_samples") == 22617
+        and execution_samples == 22617
+        and generic_conversion_execution.get("mac_windows_byte_parity") is True
+        and generic_conversion_execution.get(
+            "wrapper_execute_without_token_exit_code"
+        )
+        == 4
+        and generic_conversion_execution.get(
+            "wrapper_execute_without_token_namespace_created"
+        )
+        is False
+        and generic_conversion_execution.get(
+            "wrapper_execute_without_token_reason"
+        )
+        == "conversion_authorization_not_issued"
+        and generic_conversion_execution.get("authorization_token_issued")
+        is False
+        and generic_conversion_execution.get("conversion_authorized") is False
+        and generic_conversion_execution.get("output_created") is False
+        and generic_conversion_execution.get("merged_dataset_created") is False
+        and generic_conversion_execution.get("bc_authorized") is False
+        and generic_conversion_execution.get("ppo_authorized") is False
+        and generic_conversion_execution.get("training_started") is False
+        and generic_conversion_execution.get("valid_for_training") is False
+    )
+    no_hidden_cpu_route_blocker = (
+        architecture_contract_ready
+        and case7_capture_route_ready
+        and generic_proposals_ready
+        and generic_execution_ready
+    )
     pre_training_readiness = {
         "architecture_contract_passed": architecture_contract_ready,
         "policy_architecture": admitted_architecture["policy_architecture"],
@@ -1018,7 +1147,7 @@ def build_report(
         "corrective_training_corpus_cases_available": corpus_case_count,
         "minimum_train_cases": 4,
         "minimum_validation_cases": 2,
-        "next_case": next_case,
+        "historical_next_case": next_case,
         "pending_route_queue_passed": pending_route_queue_ready,
         "pending_route_queue_bound_to_goal": pending_route_queue_bound,
         "pending_route_queue_ready_count": (
@@ -1029,10 +1158,20 @@ def build_report(
         "pending_route_queue_all_authorization_closed": (
             pending_authorization_closed
         ),
-        "next_operation": pending_route_queue.get("next_bounded_action"),
-        "next_operation_authorized": (
-            pending_route_queue.get("dataset_conversion_authorized") is True
+        "case7_corrective_capture_route_ready": case7_capture_route_ready,
+        "case7_corrective_capture_authorization_closed": (
+            case7_capture_authorization_closed
         ),
+        "generic_conversion_proposals_ready": generic_proposals_ready,
+        "generic_conversion_proposal_cases": proposal_case_ids,
+        "generic_conversion_proposal_total_samples": proposal_samples,
+        "generic_conversion_execution_ready": generic_execution_ready,
+        "generic_conversion_execution_cases": execution_case_ids,
+        "generic_conversion_execution_total_samples": execution_samples,
+        "no_hidden_cpu_route_blocker": no_hidden_cpu_route_blocker,
+        "next_case": 7,
+        "next_operation": "authorize_exactly_one_case7_corrective_label_capture",
+        "next_operation_authorized": False,
         "bc_authorized": current_stage.get("bc_authorized") is True,
         "training_authorized": current_stage.get("training_authorized") is True,
         "ppo_authorized": current_stage.get("ppo_authorized") is True,
@@ -1201,6 +1340,21 @@ def main() -> int:
         type=Path,
         default=DEFAULT_PENDING_ROUTE_QUEUE,
     )
+    parser.add_argument(
+        "--case7-capture-route",
+        type=Path,
+        default=DEFAULT_CASE7_CAPTURE_ROUTE,
+    )
+    parser.add_argument(
+        "--generic-conversion-proposals",
+        type=Path,
+        default=DEFAULT_GENERIC_CONVERSION_PROPOSALS,
+    )
+    parser.add_argument(
+        "--generic-conversion-execution",
+        type=Path,
+        default=DEFAULT_GENERIC_CONVERSION_EXECUTION,
+    )
     parser.add_argument("--training-dataset", type=Path)
     parser.add_argument("--bc-admission", type=Path)
     parser.add_argument("--bc-report", type=Path)
@@ -1230,6 +1384,9 @@ def main() -> int:
         "hardware": args.hardware,
         "bench": args.bench,
         "pending_route_queue": args.pending_route_queue,
+        "case7_capture_route": args.case7_capture_route,
+        "generic_conversion_proposals": args.generic_conversion_proposals,
+        "generic_conversion_execution": args.generic_conversion_execution,
     }
     inputs = {name: _identity(path) for name, path in fixed_paths.items()}
     learning, optional_identities = _optional_learning_evidence(
@@ -1259,6 +1416,9 @@ def main() -> int:
         hardware=_load_json(args.hardware),
         bench=_load_json(args.bench),
         pending_route_queue=_load_json(args.pending_route_queue),
+        case7_capture_route=_load_json(args.case7_capture_route),
+        generic_conversion_proposals=_load_json(args.generic_conversion_proposals),
+        generic_conversion_execution=_load_json(args.generic_conversion_execution),
         git_state=_git_state(),
         learning=learning,
         inputs=inputs,

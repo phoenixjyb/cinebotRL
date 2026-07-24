@@ -35,25 +35,34 @@ def _audit(**overrides):
         "case23_dataset_path": MODULE.DEFAULT_CASE23_DATASET,
         "case23_conversion_final_path": MODULE.DEFAULT_CASE23_CONVERSION_FINAL,
         "case23_recovery_audit_path": MODULE.DEFAULT_CASE23_RECOVERY_AUDIT,
+        "case6_dataset_path": MODULE.DEFAULT_CASE6_DATASET,
+        "case6_conversion_final_path": MODULE.DEFAULT_CASE6_CONVERSION_FINAL,
+        "case6_admission_path": MODULE.DEFAULT_CASE6_ADMISSION,
+        "case6_contract_path": MODULE.DEFAULT_CASE6_CONTRACT,
+        "case6_conversion_result_path": MODULE.DEFAULT_CASE6_CONVERSION_RESULT,
     }
     inputs.update(overrides)
     return MODULE.audit_intake(**inputs)
 
 
-def test_current_intake_reports_real_two_of_four_train_gap() -> None:
+def test_current_intake_reports_real_three_of_four_train_gap() -> None:
     result = _audit()
     assert result["passed"] is True
-    assert result["converted_train_cases"] == [23, 30]
+    assert result["converted_train_cases"] == [6, 23, 30]
     assert result["converted_validation_cases"] == []
-    assert result["converted_train_case_count"] == 2
+    assert result["converted_train_case_count"] == 3
     assert result["converted_validation_case_count"] == 0
-    assert result["missing_train_case_count"] == 2
+    assert result["missing_train_case_count"] == 1
     assert result["missing_validation_case_count"] == 2
-    assert result["pending_minimum_train_cases"] == [6, 2]
+    assert result["pending_minimum_train_cases"] == [2]
     assert result["pending_validation_cases"] == [8, 16]
-    assert result["next_bounded_action"] == "continue_train_case_acquisition"
+    assert result["next_bounded_action"] == (
+        "authorize_exactly_one_case2_paired_canary"
+    )
     assert result["case23_conversion_authorized"] is False
     assert result["case23_conversion_output_created"] is True
+    assert result["case6_conversion_authorized"] is False
+    assert result["case6_conversion_output_created"] is True
     assert result["corpus_manifest_ready"] is False
     assert result["runtime_authorized"] is False
     assert result["gpu_launch_authorized"] is False
@@ -67,7 +76,7 @@ def test_current_intake_reports_real_two_of_four_train_gap() -> None:
     assert result["valid_for_training"] is False
 
 
-def test_real_case23_and_case30_datasets_are_reopened() -> None:
+def test_real_case6_case23_and_case30_datasets_are_reopened() -> None:
     result = _audit()
     rows = {row["case"]: row for row in result["cases"]}
     assert rows[30]["state"] == "converted_admitted_for_case_merge"
@@ -76,7 +85,10 @@ def test_real_case23_and_case30_datasets_are_reopened() -> None:
     assert rows[23]["state"] == "converted_admitted_for_case_merge"
     assert rows[23]["sample_count"] == 3273
     assert rows[23]["valid_for_case_merge"] is True
-    for case in (6, 2, 7, 8, 16):
+    assert rows[6]["state"] == "converted_admitted_for_case_merge"
+    assert rows[6]["sample_count"] == 7933
+    assert rows[6]["valid_for_case_merge"] is True
+    for case in (2, 7, 8, 16):
         assert rows[case]["state"] == "paired_canary_and_capture_required"
         assert rows[case]["valid_for_case_merge"] is False
 
@@ -163,10 +175,12 @@ def test_valid_case23_dataset_advances_only_partial_intake(tmp_path: Path) -> No
         case23_conversion_final_path=final,
         case23_recovery_audit_path=recovery,
     )
-    assert result["converted_train_cases"] == [23, 30]
-    assert result["missing_train_case_count"] == 2
-    assert result["pending_minimum_train_cases"] == [6, 2]
-    assert result["next_bounded_action"] == "continue_train_case_acquisition"
+    assert result["converted_train_cases"] == [6, 23, 30]
+    assert result["missing_train_case_count"] == 1
+    assert result["pending_minimum_train_cases"] == [2]
+    assert result["next_bounded_action"] == (
+        "authorize_exactly_one_case2_paired_canary"
+    )
     assert result["case23_conversion_output_created"] is True
     assert result["corpus_manifest_ready"] is False
     assert result["dataset_merge_authorized"] is False
@@ -206,6 +220,54 @@ def test_intake_rejects_recovery_audit_hash_mismatch(tmp_path: Path) -> None:
             case23_conversion_final_path=final,
             case23_recovery_audit_path=recovery,
         )
+
+
+@pytest.mark.parametrize(
+    ("argument", "field_path", "value"),
+    [
+        (
+            "case6_conversion_final_path",
+            ("dataset", "sha256"),
+            "0" * 64,
+        ),
+        (
+            "case6_admission_path",
+            ("authorization_consumed_before_conversion",),
+            False,
+        ),
+        (
+            "case6_contract_path",
+            ("conversion_authorized",),
+            True,
+        ),
+        (
+            "case6_conversion_result_path",
+            ("effective_actions_used_as_training_targets",),
+            False,
+        ),
+    ],
+)
+def test_intake_rejects_case6_conversion_contract_drift(
+    tmp_path: Path,
+    argument: str,
+    field_path: tuple[str, ...],
+    value: object,
+) -> None:
+    source = {
+        "case6_conversion_final_path": MODULE.DEFAULT_CASE6_CONVERSION_FINAL,
+        "case6_admission_path": MODULE.DEFAULT_CASE6_ADMISSION,
+        "case6_contract_path": MODULE.DEFAULT_CASE6_CONTRACT,
+        "case6_conversion_result_path": MODULE.DEFAULT_CASE6_CONVERSION_RESULT,
+    }[argument]
+    payload = json.loads(source.read_text())
+    target = payload
+    for field in field_path[:-1]:
+        target = target[field]
+    target[field_path[-1]] = value
+    changed = tmp_path / source.name
+    changed.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="case6 conversion final checks failed"):
+        _audit(**{argument: changed})
 
 
 @pytest.mark.parametrize(

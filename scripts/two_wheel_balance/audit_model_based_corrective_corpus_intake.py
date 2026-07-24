@@ -24,7 +24,7 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_dataset im
 )
 
 
-SCHEMA = "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v2"
+SCHEMA = "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v3"
 TRAIN_SELECTION_SCHEMA = (
     "cinebotrl_two_wheel_riser_model_based_pair_tranche_selection_v1"
 )
@@ -45,6 +45,18 @@ CASE23_CONVERSION_FINAL_SCHEMA = (
 )
 CASE23_RECOVERY_SCHEMA = (
     "cinebotrl_two_wheel_riser_case23_conversion_path_recovery_audit_v1"
+)
+CASE6_ADMISSION_SCHEMA = (
+    "cinebotrl_two_wheel_riser_case6_conversion_execution_admission_v1"
+)
+CASE6_CONTRACT_SCHEMA = (
+    "cinebotrl_two_wheel_riser_case6_conversion_execution_contract_v1"
+)
+CASE6_RESULT_SCHEMA = (
+    "cinebotrl_two_wheel_riser_corrective_conversion_result_v1"
+)
+CASE6_CONVERSION_FINAL_SCHEMA = (
+    "cinebotrl_two_wheel_riser_case6_conversion_final_v1"
 )
 TRAIN_TRANCHE = [30, 23, 6, 2, 7]
 MINIMUM_TRAIN_TRANCHE = TRAIN_TRANCHE[:MINIMUM_TRAIN_CASES]
@@ -92,6 +104,24 @@ DEFAULT_CASE23_CONVERSION_FINAL = (
 )
 DEFAULT_CASE23_RECOVERY_AUDIT = (
     DEFAULT_CASE23_CONVERSION_ROOT / "recovery_audit.json"
+)
+DEFAULT_CASE6_CONVERSION_ROOT = (
+    DOC_ROOT
+    / "evidence_20260724_case6_corrective_conversion_execution_cpu_v1"
+)
+DEFAULT_CASE6_DATASET = (
+    DEFAULT_CASE6_CONVERSION_ROOT
+    / "case_0006_model_based_corrective_case_dataset_v1.npz"
+)
+DEFAULT_CASE6_CONVERSION_FINAL = (
+    DEFAULT_CASE6_CONVERSION_ROOT / "final_status.json"
+)
+DEFAULT_CASE6_ADMISSION = (
+    DEFAULT_CASE6_CONVERSION_ROOT / "admission.json"
+)
+DEFAULT_CASE6_CONTRACT = DEFAULT_CASE6_CONVERSION_ROOT / "contract.json"
+DEFAULT_CASE6_CONVERSION_RESULT = (
+    DEFAULT_CASE6_CONVERSION_ROOT / "conversion_result.json"
 )
 
 
@@ -164,6 +194,11 @@ def audit_intake(
     case23_dataset_path: Path | None = None,
     case23_conversion_final_path: Path | None = None,
     case23_recovery_audit_path: Path | None = None,
+    case6_dataset_path: Path = DEFAULT_CASE6_DATASET,
+    case6_conversion_final_path: Path = DEFAULT_CASE6_CONVERSION_FINAL,
+    case6_admission_path: Path = DEFAULT_CASE6_ADMISSION,
+    case6_contract_path: Path = DEFAULT_CASE6_CONTRACT,
+    case6_conversion_result_path: Path = DEFAULT_CASE6_CONVERSION_RESULT,
 ) -> dict[str, object]:
     train_selection = _load_object(train_selection_path)
     validation_selection = _load_object(validation_selection_path)
@@ -310,6 +345,90 @@ def audit_intake(
                 "valid_for_training": False,
             }
         )
+    case6_conversion_final = _load_object(case6_conversion_final_path)
+    case6_admission = _load_object(case6_admission_path)
+    case6_contract = _load_object(case6_contract_path)
+    case6_conversion_result = _load_object(case6_conversion_result_path)
+    case6_dataset_sha = _sha256(case6_dataset_path)
+    case6_final_checks = case6_conversion_final.get("checks")
+    case6_dataset_identity = case6_conversion_final.get("dataset")
+    case6_git = case6_admission.get("git")
+    case6_source_capture_sha = case6_admission.get("source_capture_sha256")
+    case6_source_final_sha = case6_admission.get("source_final_status_sha256")
+    case6_checks = {
+        "schema": case6_conversion_final.get("schema")
+        == CASE6_CONVERSION_FINAL_SCHEMA,
+        "case_split": case6_conversion_final.get("case") == 6
+        and case6_conversion_final.get("split") == "train",
+        "passed": case6_conversion_final.get("passed") is True
+        and case6_conversion_final.get("valid_for_case_merge") is True,
+        "dataset_hash": isinstance(case6_dataset_identity, Mapping)
+        and case6_dataset_identity.get("sha256") == case6_dataset_sha,
+        "checks": isinstance(case6_final_checks, Mapping)
+        and bool(case6_final_checks)
+        and all(value is True for value in case6_final_checks.values()),
+        "admission": (
+            case6_admission.get("schema") == CASE6_ADMISSION_SCHEMA
+            and case6_admission.get("case") == 6
+            and case6_admission.get("split") == "train"
+            and case6_admission.get("passed") is True
+            and case6_admission.get("conversion_authorized") is True
+            and case6_admission.get("authorization_consumed_before_conversion")
+            is True
+            and isinstance(case6_git, Mapping)
+            and case6_git.get("head") == case6_git.get("upstream")
+            == case6_conversion_final.get("runtime_commit")
+            and case6_admission.get("output_created") is False
+            and case6_admission.get("merged_dataset_created") is False
+            and _closed(case6_admission)
+        ),
+        "contract_closed": (
+            case6_contract.get("schema") == CASE6_CONTRACT_SCHEMA
+            and case6_contract.get("case") == 6
+            and case6_contract.get("split") == "train"
+            and case6_contract.get("conversion_authorized") is False
+            and case6_contract.get("authorization_token_issued") is False
+            and case6_contract.get("authorization_token_sha256") == ""
+            and case6_contract.get("output_created") is False
+            and case6_contract.get("merged_dataset_created") is False
+            and _closed(case6_contract)
+        ),
+        "conversion_result": (
+            case6_conversion_result.get("schema") == CASE6_RESULT_SCHEMA
+            and case6_conversion_result.get("case") == 6
+            and case6_conversion_result.get("split") == "train"
+            and case6_conversion_result.get("passed") is True
+            and case6_conversion_result.get("execute_requested") is True
+            and case6_conversion_result.get("output_created") is True
+            and case6_conversion_result.get("sample_count") == 7933
+            and case6_conversion_result.get("source_capture_sha256")
+            == case6_source_capture_sha
+            and case6_conversion_result.get("source_final_status_sha256")
+            == case6_source_final_sha
+            and case6_conversion_result.get(
+                "requested_actions_used_as_training_targets"
+            )
+            is False
+            and case6_conversion_result.get(
+                "effective_actions_used_as_training_targets"
+            )
+            is True
+            and case6_conversion_result.get("valid_for_case_merge") is True
+            and case6_conversion_result.get("merged_dataset_created") is False
+            and _closed(case6_conversion_result)
+        ),
+        "training_closed": case6_conversion_final.get(
+            "merged_dataset_created"
+        )
+        is False
+        and _closed(case6_conversion_final),
+    }
+    if not all(case6_checks.values()):
+        raise ValueError(
+            f"case6 conversion final checks failed: {case6_checks}"
+        )
+    rows.append(_dataset_row(case6_dataset_path, case=6, split="train"))
+
     converted_train = sorted(
         int(row["case"])
         for row in rows
@@ -346,11 +465,12 @@ def audit_intake(
         len(converted_train) >= MINIMUM_TRAIN_CASES
         and len(converted_validation) >= MINIMUM_VALIDATION_CASES
     )
-    next_action = (
-        "continue_train_case_acquisition"
-        if 23 in converted_train
-        else "authorize_exactly_one_case23_v4_cpu_conversion"
-    )
+    if 23 not in converted_train:
+        next_action = "authorize_exactly_one_case23_v4_cpu_conversion"
+    elif 6 not in converted_train:
+        next_action = "authorize_exactly_one_case6_cpu_conversion"
+    else:
+        next_action = "authorize_exactly_one_case2_paired_canary"
     return {
         "schema": SCHEMA,
         "checks": checks,
@@ -375,6 +495,15 @@ def audit_intake(
                 and case23_conversion_final_path is not None
                 and case23_recovery_audit_path is not None
                 else {}
+            ),
+            "case6_dataset": _identity(case6_dataset_path),
+            "case6_conversion_final": _identity(
+                case6_conversion_final_path
+            ),
+            "case6_admission": _identity(case6_admission_path),
+            "case6_contract": _identity(case6_contract_path),
+            "case6_conversion_result": _identity(
+                case6_conversion_result_path
             ),
         },
         "required": {
@@ -401,6 +530,8 @@ def audit_intake(
         "next_bounded_action": next_action,
         "case23_conversion_authorized": False,
         "case23_conversion_output_created": case23_dataset_path is not None,
+        "case6_conversion_authorized": False,
+        "case6_conversion_output_created": True,
         "corpus_manifest_ready": corpus_ready,
         "runtime_authorized": False,
         "gpu_launch_authorized": False,
@@ -445,6 +576,25 @@ def main() -> int:
         type=Path,
         default=DEFAULT_CASE23_RECOVERY_AUDIT,
     )
+    parser.add_argument(
+        "--case6-dataset", type=Path, default=DEFAULT_CASE6_DATASET
+    )
+    parser.add_argument(
+        "--case6-conversion-final",
+        type=Path,
+        default=DEFAULT_CASE6_CONVERSION_FINAL,
+    )
+    parser.add_argument(
+        "--case6-admission", type=Path, default=DEFAULT_CASE6_ADMISSION
+    )
+    parser.add_argument(
+        "--case6-contract", type=Path, default=DEFAULT_CASE6_CONTRACT
+    )
+    parser.add_argument(
+        "--case6-conversion-result",
+        type=Path,
+        default=DEFAULT_CASE6_CONVERSION_RESULT,
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     result = audit_intake(
@@ -457,6 +607,11 @@ def main() -> int:
         case23_dataset_path=args.case23_dataset,
         case23_conversion_final_path=args.case23_conversion_final,
         case23_recovery_audit_path=args.case23_recovery_audit,
+        case6_dataset_path=args.case6_dataset,
+        case6_conversion_final_path=args.case6_conversion_final,
+        case6_admission_path=args.case6_admission,
+        case6_contract_path=args.case6_contract,
+        case6_conversion_result_path=args.case6_conversion_result,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes((json.dumps(result, indent=2) + "\n").encode())

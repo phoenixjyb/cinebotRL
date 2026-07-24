@@ -1444,6 +1444,9 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         corrective["case7_pair_execution_final_status_sha256"]
         == _sha256(CASE7_PAIR_EXECUTION_FINAL)
     )
+    assert corrective["case7_pair_execution_evidence_commit"] == (
+        "69516b4273ec9b363f328eade80835b2422f748d"
+    )
     assert (
         corrective["case7_pair_execution_projection_audit_sha256"]
         == _sha256(CASE7_PAIR_EXECUTION_PROJECTION)

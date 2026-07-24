@@ -10032,6 +10032,9 @@ and must state whether its candidate was accepted or rejected.
   is `7c2f7ac0ff1b8bc1e50d95d317dabcb097e2cef35f2c5ab817bc0b73e62179d4`;
   projection-audit SHA-256 is
   `9ca2080d71c2bfae344ed172c4882ec94bc0d82e7160f4b02df94be020a6d9c3`.
+- Evidence/status commit
+  `69516b4273ec9b363f328eade80835b2422f748d` preserves the complete
+  hash-bound result.
 - The consumed route is closed again in source. GPU ownership is released,
   and no label capture, dataset, conversion, corpus merge, BC, PPO,
   checkpoint, or training output was created. Goal completion remains `6/10`.

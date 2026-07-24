@@ -743,6 +743,7 @@
         "case7_pair_route_training_authorized": false,
         "case7_pair_execution_authorization_commit": "4b1f3fe3868bf380aa4fc1cf84f6095d9bf41861",
         "case7_pair_execution_runtime_commit": "4b1f3fe3868bf380aa4fc1cf84f6095d9bf41861",
+        "case7_pair_execution_evidence_commit": "69516b4273ec9b363f328eade80835b2422f748d",
         "case7_pair_execution_namespace": "20260724_model_based_corrective_teacher_case7_pair_v1_exclusive",
         "case7_pair_execution_final_status_sha256": "7c2f7ac0ff1b8bc1e50d95d317dabcb097e2cef35f2c5ab817bc0b73e62179d4",
         "case7_pair_execution_baseline_sha256": "5aa8328e411bf37cdc66494b48d26151327b3711e9d149957e92b4dd59df10ff",

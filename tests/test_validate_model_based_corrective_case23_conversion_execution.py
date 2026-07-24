@@ -236,6 +236,17 @@ def test_wrapper_has_no_embedded_token_and_execute_rejects_without_one() -> None
     assert "--expected-split train" in source
     assert "case_0030" not in source
     assert "AUTHORIZATION_SHA256=\"${" in source
+    output_line = next(
+        line for line in source.splitlines()
+        if line.startswith("readonly OUTPUT_WIN=")
+    )
+    dataset_line = next(
+        line for line in source.splitlines()
+        if line.startswith("readonly DATASET_WIN=")
+    )
+    assert r"\$NAMESPACE" not in output_line
+    assert "${NAMESPACE}" in output_line
+    assert "${OUTPUT_WIN}" in dataset_line
     result = subprocess.run(
         ["bash", str(WRAPPER), "--execute"],
         check=False,

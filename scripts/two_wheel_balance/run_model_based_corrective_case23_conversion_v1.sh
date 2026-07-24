@@ -13,8 +13,8 @@ readonly FINALIZER_WIN="$WIN_ROOT\scripts\two_wheel_balance\finalize_model_based
 readonly SOURCE_CAPTURE_WIN="$WIN_ROOT\docs\03_training\two_wheel_balance\evidence_20260723_case23_corrective_capture_v4\capture\case_0023_corrective_teacher_capture_v2.npz"
 readonly SOURCE_FINAL_WIN="$WIN_ROOT\docs\03_training\two_wheel_balance\evidence_20260723_case23_corrective_capture_v4\final_status.json"
 readonly OUTPUT="$ROOT/artifacts/two_wheel_riser/$NAMESPACE"
-readonly OUTPUT_WIN="$WIN_ROOT\artifacts\two_wheel_riser\$NAMESPACE"
-readonly DATASET_WIN="$OUTPUT_WIN\case_0023_model_based_corrective_case_dataset_v1.npz"
+readonly OUTPUT_WIN="${WIN_ROOT}\\artifacts\\two_wheel_riser\\${NAMESPACE}"
+readonly DATASET_WIN="${OUTPUT_WIN}\\case_0023_model_based_corrective_case_dataset_v1.npz"
 readonly TEMP_ROOT="$ROOT/artifacts/two_wheel_riser"
 
 reject() {

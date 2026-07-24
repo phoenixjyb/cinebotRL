@@ -1,0 +1,70 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case23_conversion_final_v1",
+  "namespace": "20260723_model_based_corrective_case23_conversion_v1_cpu",
+  "case": 23,
+  "split": "train",
+  "runtime_commit": "11fd27698955d277f4b926151bcca0cda2f4b27c",
+  "converter_exit_code": 0,
+  "checks": {
+    "namespace": true,
+    "converter_exit_zero": true,
+    "admission_schema": true,
+    "admission_passed": true,
+    "admission_case_split": true,
+    "admission_runtime_commit": true,
+    "authorization_consumed": true,
+    "conversion_result": true,
+    "dataset_loaded": true,
+    "source_hash": true,
+    "runtime_identity": true,
+    "case_split": true,
+    "sample_count": true,
+    "effective_actions_exact": true,
+    "requested_actions_audit_exact": true,
+    "previous_action_recurrence": true,
+    "non_previous_observations_exact": true,
+    "elapsed_clock_exact": true,
+    "execution_clock_exact": true,
+    "source_clock_exact": true,
+    "case_ids_exact": true,
+    "training_closed": true
+  },
+  "dataset_error": null,
+  "metrics": {
+    "sample_count": 3273,
+    "observation_shape": [
+      3273,
+      65
+    ],
+    "action_abs_max": [
+      0.21678735315799713,
+      0.08447515219449997,
+      0.28423506021499634
+    ],
+    "requested_action_abs_max": [
+      0.21678735315799713,
+      0.08447515219449997,
+      0.28423506021499634
+    ],
+    "clipped_rows": [
+      0,
+      0,
+      0
+    ],
+    "elapsed_clock_end_s": 16.36,
+    "execution_clock_end_s": 9.929693999999989,
+    "source_clock_end_s": 9.929694
+  },
+  "dataset": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260723_model_based_corrective_case23_conversion_v1_cpu\\case_0023_model_based_corrective_case_dataset_v1.npz",
+    "sha256": "ee55db1c02e504e035a47532df8141ab142bb68a2c47b2795b6fd5ad7283ef01",
+    "size_bytes": 998931
+  },
+  "valid_for_case_merge": true,
+  "merged_dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

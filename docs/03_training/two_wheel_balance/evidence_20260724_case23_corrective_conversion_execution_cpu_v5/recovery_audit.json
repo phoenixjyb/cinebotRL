@@ -1,0 +1,46 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case23_conversion_path_recovery_audit_v1",
+  "case": 23,
+  "split": "train",
+  "namespace": "20260723_model_based_corrective_case23_conversion_v1_cpu",
+  "runtime_commit": "11fd27698955d277f4b926151bcca0cda2f4b27c",
+  "authorization": {
+    "single_use_token_created": true,
+    "mode_0600": true,
+    "outside_repository": true,
+    "consumed_before_conversion": true,
+    "present_after_execution": false
+  },
+  "execution": {
+    "wrapper_execute_invocations": 1,
+    "converter_invocations": 1,
+    "converter_exit_code": 0,
+    "initial_finalizer_exit_code": 1,
+    "initial_wrapper_exit_code": 1,
+    "failure_reason": "windows_output_path_contained_literal_dollar_namespace",
+    "converter_retry_performed": false
+  },
+  "recovery": {
+    "type": "byte_identical_copy_and_finalizer_only_reopen",
+    "source_path": "artifacts/two_wheel_riser$NAMESPACE/case_0023_model_based_corrective_case_dataset_v1.npz",
+    "canonical_path": "artifacts/two_wheel_riser/20260723_model_based_corrective_case23_conversion_v1_cpu/case_0023_model_based_corrective_case_dataset_v1.npz",
+    "source_sha256": "ee55db1c02e504e035a47532df8141ab142bb68a2c47b2795b6fd5ad7283ef01",
+    "canonical_sha256": "ee55db1c02e504e035a47532df8141ab142bb68a2c47b2795b6fd5ad7283ef01",
+    "size_bytes": 998931,
+    "manual_finalizer_exit_code": 0,
+    "final_status_sha256": "31dc0e6126772fad3958b4759d9c3fe03ee0be7157b6f5b356e08060952a1943"
+  },
+  "result": {
+    "passed": true,
+    "sample_count": 3273,
+    "observation_shape": [3273, 65],
+    "clipped_rows": [0, 0, 0],
+    "valid_for_case_merge": true,
+    "merged_dataset_created": false,
+    "bc_authorized": false,
+    "ppo_authorized": false,
+    "training_started": false,
+    "valid_for_training": false
+  },
+  "passed": true
+}

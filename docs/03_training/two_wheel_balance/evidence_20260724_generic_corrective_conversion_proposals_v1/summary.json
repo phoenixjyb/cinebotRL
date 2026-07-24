@@ -1,0 +1,54 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_generic_corrective_conversion_proposals_summary_v1",
+  "implementation_commit": "8d394ed13cd4724868f167dda8b58f613b2109f8",
+  "proposal_schema": "cinebotrl_two_wheel_riser_corrective_conversion_proposal_v1",
+  "proposal_preparer": {
+    "path": "scripts/two_wheel_balance/prepare_model_based_corrective_conversion_route.py",
+    "sha256": "997feb6803f9f9cb9f01dc89fea9357344c4de00fc716ec8bc1d7b9e7efdcb9c",
+    "git_blob_sha1": "4e8843008f963ce6c8cfcb8bb904111d7183d387"
+  },
+  "cases": [
+    {
+      "case": 6,
+      "split": "train",
+      "sample_count": 7933,
+      "clipped_rows": [0, 146, 0],
+      "proposal_sha256": "26bf8c09c4c071ce850945daaa9feaed2f05b0d8da3185940500ec226d039c2d"
+    },
+    {
+      "case": 23,
+      "split": "train",
+      "sample_count": 3273,
+      "clipped_rows": [0, 0, 0],
+      "proposal_sha256": "00f701873bdb0a605a5c8e3d632e90533452ea190e8a3dca1798f611a5017e65"
+    },
+    {
+      "case": 30,
+      "split": "train",
+      "sample_count": 11411,
+      "clipped_rows": [200, 308, 333],
+      "proposal_sha256": "eaa4c957485ba8b055206ef6f65a95f18e457985e0fdc639fda35a6d9d263b74"
+    }
+  ],
+  "case_count": 3,
+  "total_sample_count": 22617,
+  "observation_dimension": 65,
+  "action_dimension": 3,
+  "training_target_contract": "effective_post_supervisor_residual_v1",
+  "previous_action_contract": "previous_effective_post_supervisor_action_v1",
+  "all_proposals_passed": true,
+  "mac_windows_byte_parity": true,
+  "focused_local_cpu_suite": "17_passed_2_warnings_in_0.80s",
+  "focused_windows_cpu_suite": "17_passed_2_warnings_in_5.26s",
+  "authoritative_windows_cpu_suite": "1396_passed_12_skipped_2_warnings_in_220.47s",
+  "conversion_execution_implemented": false,
+  "authorization_token_issued": false,
+  "conversion_authorized": false,
+  "output_created": false,
+  "merged_dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

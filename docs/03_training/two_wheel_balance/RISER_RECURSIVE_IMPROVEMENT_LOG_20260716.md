@@ -10119,3 +10119,42 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-7 corrective-label capture.`
 - Hardware procurement and plant switching remain separately blocked on the
   signed supplier package and calibrated 750 W bench campaign.
+
+## Round 262: one generic conversion proposal path covers admitted captures
+
+- Added one case-parameterized, output-free corrective-conversion proposal
+  preparer at implementation commit
+  `8d394ed13cd4724868f167dda8b58f613b2109f8`. It uses the existing admitted
+  capture converter in memory and binds the capture, final status, converter,
+  dataset module, capture module, and preparer to clean committed identities.
+- Recomputed the canonical metadata for cases 6, 23, and 30 through the same
+  path. The proposals cover `7,933`, `3,273`, and `11,411` samples,
+  respectively, for `22,617` total rows with `65` observations and three
+  bounded residual actions.
+- Every proposal verifies effective post-supervisor targets, rebuilt previous
+  effective-action observations, requested-versus-effective clipping, source
+  hashes, and source/execution clocks. The case-30 audit preserves clipping
+  counts `[200, 308, 333]`; it does not replace effective targets with the
+  requested actions.
+- macOS and `.98` native Windows Python produced byte-identical case reports:
+  case 6 `26bf8c09c4c071ce850945daaa9feaed2f05b0d8da3185940500ec226d039c2d`,
+  case 23 `00f701873bdb0a605a5c8e3d632e90533452ea190e8a3dca1798f611a5017e65`,
+  and case 30
+  `eaa4c957485ba8b055206ef6f65a95f18e457985e0fdc639fda35a6d9d263b74`.
+- Focused coverage passes `17 passed, 2 warnings in 0.80 s` locally and
+  `17 passed, 2 warnings in 5.26 s` on `.98`. The authoritative `.98`
+  Windows-Python CPU suite passes
+  `1396 passed, 12 skipped, 2 warnings in 220.47 s`.
+- Evidence is preserved under
+  `evidence_20260724_generic_corrective_conversion_proposals_v1`. The
+  preparer intentionally does not implement conversion execution, issue an
+  authorization, write a dataset, merge a corpus, or start BC/PPO/training.
+  The existing three converted train datasets remain unchanged, and goal
+  completion remains `6/10`.
+
+## Next round after Round 262
+
+- The next data-producing operation still requires separate authorization:
+  `Authorize exactly one case-7 corrective-label capture.`
+- If case 7 capture passes, use the generic proposal path to audit it before
+  creating a separately authorized CPU conversion route.

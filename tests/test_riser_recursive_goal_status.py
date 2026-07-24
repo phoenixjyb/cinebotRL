@@ -330,6 +330,19 @@ CASE7_CAPTURE_ROUTE_PREFLIGHT = (
     "evidence_20260724_case7_corrective_capture_route_cpu_v1/"
     "preflight_windows.json"
 )
+GENERIC_CORRECTIVE_CONVERSION_PREPARER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "prepare_model_based_corrective_conversion_route.py"
+)
+GENERIC_CORRECTIVE_CONVERSION_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_generic_corrective_conversion_proposals_v1"
+)
+GENERIC_CORRECTIVE_CONVERSION_SUMMARY = (
+    GENERIC_CORRECTIVE_CONVERSION_EVIDENCE / "summary.json"
+)
 CASE8_VALIDATION_PAIR_READINESS_SCRIPT = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -1565,6 +1578,74 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case7_capture_preflight["label_capture_authorized"] is False
     assert case7_capture_preflight["dataset_creation_authorized"] is False
     assert case7_capture_preflight["training_started"] is False
+    generic_conversion = json.loads(
+        GENERIC_CORRECTIVE_CONVERSION_SUMMARY.read_text()
+    )
+    assert corrective["generic_corrective_conversion_proposal_schema"] == (
+        "cinebotrl_two_wheel_riser_corrective_conversion_proposal_v1"
+    )
+    assert corrective[
+        "generic_corrective_conversion_proposal_implementation_commit"
+    ] == "8d394ed13cd4724868f167dda8b58f613b2109f8"
+    assert corrective[
+        "generic_corrective_conversion_proposal_preparer_sha256"
+    ] == _sha256(GENERIC_CORRECTIVE_CONVERSION_PREPARER)
+    assert corrective[
+        "generic_corrective_conversion_proposal_preparer_git_blob_sha1"
+    ] == _git_blob_sha1(GENERIC_CORRECTIVE_CONVERSION_PREPARER)
+    assert corrective[
+        "generic_corrective_conversion_proposal_summary_sha256"
+    ] == _sha256(GENERIC_CORRECTIVE_CONVERSION_SUMMARY)
+    assert corrective[
+        "generic_corrective_conversion_proposal_cases"
+    ] == [6, 23, 30]
+    for case, expected_sha in zip(
+        [6, 23, 30],
+        [
+            corrective[
+                "generic_corrective_conversion_proposal_case6_sha256"
+            ],
+            corrective[
+                "generic_corrective_conversion_proposal_case23_sha256"
+            ],
+            corrective[
+                "generic_corrective_conversion_proposal_case30_sha256"
+            ],
+        ],
+        strict=True,
+    ):
+        report = (
+            GENERIC_CORRECTIVE_CONVERSION_EVIDENCE
+            / f"case_{case:04d}.json"
+        )
+        assert expected_sha == _sha256(report)
+        payload = json.loads(report.read_text())
+        assert payload["passed"] is True
+        assert payload["case"] == case
+        assert payload["conversion_execution_implemented"] is False
+        assert payload["conversion_authorized"] is False
+        assert payload["output_created"] is False
+        assert payload["merged_dataset_created"] is False
+        assert payload["bc_authorized"] is False
+        assert payload["ppo_authorized"] is False
+        assert payload["training_started"] is False
+    assert generic_conversion["passed"] is True
+    assert generic_conversion["case_count"] == 3
+    assert generic_conversion["total_sample_count"] == 22617
+    assert generic_conversion["observation_dimension"] == 65
+    assert generic_conversion["action_dimension"] == 3
+    assert generic_conversion["mac_windows_byte_parity"] is True
+    assert generic_conversion["conversion_execution_implemented"] is False
+    assert generic_conversion["conversion_authorized"] is False
+    assert generic_conversion["output_created"] is False
+    assert generic_conversion["training_started"] is False
+    assert corrective[
+        "generic_corrective_conversion_proposal_authoritative_windows_cpu_suite"
+    ] == "1396_passed_12_skipped_2_warnings_in_220.47s"
+    assert corrective["generic_corrective_conversion_execution_implemented"] is False
+    assert corrective["generic_corrective_conversion_authorized"] is False
+    assert corrective["generic_corrective_conversion_output_created"] is False
+    assert corrective["generic_corrective_conversion_training_started"] is False
     assert corrective["case8_validation_pair_readiness_schema"] == (
         "cinebotrl_two_wheel_riser_case8_validation_pair_readiness_cpu_v1"
     )

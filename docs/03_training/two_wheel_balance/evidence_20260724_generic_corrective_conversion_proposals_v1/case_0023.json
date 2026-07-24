@@ -1,0 +1,222 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_conversion_proposal_v1",
+  "case": 23,
+  "split": "train",
+  "namespace": "model_based_corrective_case23_conversion_v1_cpu",
+  "repository": {
+    "head": "8d394ed13cd4724868f167dda8b58f613b2109f8",
+    "upstream": "8d394ed13cd4724868f167dda8b58f613b2109f8",
+    "checks": {
+      "head_matches_upstream": true,
+      "tracked_worktree_clean": true
+    },
+    "passed": true
+  },
+  "identities": {
+    "source_capture": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_case23_corrective_capture_v4/capture/case_0023_corrective_teacher_capture_v2.npz",
+      "sha256": "f0ea5c59e1f2f0e5f6f91336788d0e0228d079f74a53a4a50d442751b8b23796",
+      "git_blob_sha1": "04891c35535bddfa5cc748fa57ba092ab9ffc458",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true
+      },
+      "passed": true
+    },
+    "source_final_status": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_case23_corrective_capture_v4/final_status.json",
+      "sha256": "8f7589cdc31b5b6369fea8fda7fbd8b743b57afa78709cf03b2bd600a25833e3",
+      "git_blob_sha1": "541344e2d93fdbac5f49c91644c93999f96eba54",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true
+      },
+      "passed": true
+    },
+    "converter_cli": {
+      "path": "scripts/two_wheel_balance/convert_model_based_corrective_capture.py",
+      "sha256": "09a58ec62fede0800afc70df1f8e6c47e618ed097ef96a0fedfcba8a6c88b706",
+      "git_blob_sha1": "b91dd36b633cd2c166c9f140b807fb9477a503d6",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true
+      },
+      "passed": true
+    },
+    "dataset_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_model_based_corrective_dataset.py",
+      "sha256": "c14866a50dfc4f7616e15ff35239be04cc243c63e02810d9250549c72659958a",
+      "git_blob_sha1": "2fd9eed66bae327b7ca2ea1a719c64112cd07fc2",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true
+      },
+      "passed": true
+    },
+    "capture_module": {
+      "path": "src/rl_platform/tasks/two_wheel_balance/riser_corrective_capture.py",
+      "sha256": "9d2a9bbced92c53849df9fbe0809bc5dd98f26e54feb5f5595edb96ceedebbe6",
+      "git_blob_sha1": "0edd3b569efc917b8fed8d163ad58905299f75df",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true
+      },
+      "passed": true
+    },
+    "proposal_preparer": {
+      "path": "scripts/two_wheel_balance/prepare_model_based_corrective_conversion_route.py",
+      "sha256": "997feb6803f9f9cb9f01dc89fea9357344c4de00fc716ec8bc1d7b9e7efdcb9c",
+      "git_blob_sha1": "4e8843008f963ce6c8cfcb8bb904111d7183d387",
+      "checks": {
+        "inside_repository": true,
+        "file_exists": true,
+        "tracked": true,
+        "committed_blob_matches": true
+      },
+      "passed": true
+    }
+  },
+  "proposal_checks": {
+    "case_split": true,
+    "shape": true,
+    "effective_targets": true,
+    "previous_action_rebuilt": true,
+    "clipping_audited": true,
+    "clocks_preserved": true,
+    "source_hashes": true,
+    "learning_closed": true
+  },
+  "metrics": {
+    "sample_count": 3273,
+    "observation_shape": [
+      3273,
+      65
+    ],
+    "action_shape": [
+      3273,
+      3
+    ],
+    "action_abs_max": [
+      0.21678735315799713,
+      0.08447515219449997,
+      0.28423506021499634
+    ],
+    "requested_action_abs_max": [
+      0.21678735315799713,
+      0.08447515219449997,
+      0.28423506021499634
+    ],
+    "clipped_rows": [
+      0,
+      0,
+      0
+    ],
+    "elapsed_clock_end_s": 16.36,
+    "execution_clock_end_s": 9.929693999999989,
+    "source_clock_end_s": 9.929694
+  },
+  "dataset_contract": {
+    "training_target_contract": "effective_post_supervisor_residual_v1",
+    "previous_action_contract": "previous_effective_post_supervisor_action_v1",
+    "observation_names": [
+      "pitch_rad",
+      "pitch_rate_rad_s",
+      "mean_wheel_position_rad",
+      "mean_wheel_velocity_rad_s",
+      "wheel_velocity_difference_rad_s",
+      "yaw_rate_rad_s",
+      "base_target_longitudinal_error_m",
+      "base_target_lateral_error_m",
+      "base_target_yaw_error_rad",
+      "camera_target_longitudinal_error_m",
+      "camera_target_lateral_error_m",
+      "camera_target_vertical_error_m",
+      "camera_attitude_error_x_rad",
+      "camera_attitude_error_y_rad",
+      "camera_attitude_error_z_rad",
+      "riser_position_m",
+      "riser_velocity_m_s",
+      "riser_target_error_m",
+      "feedforward_vx_m_s",
+      "feedforward_wz_rad_s",
+      "feedforward_riser_velocity_m_s",
+      "phase_fraction",
+      "progress_scale",
+      "previous_residual_vx_normalized",
+      "previous_residual_wz_normalized",
+      "previous_residual_riser_target_normalized",
+      "lookahead_0p25s_base_target_longitudinal_error_m",
+      "lookahead_0p25s_base_target_lateral_error_m",
+      "lookahead_0p25s_base_target_yaw_error_rad",
+      "lookahead_0p25s_camera_target_longitudinal_error_m",
+      "lookahead_0p25s_camera_target_lateral_error_m",
+      "lookahead_0p25s_camera_target_vertical_error_m",
+      "lookahead_0p25s_camera_attitude_error_x_rad",
+      "lookahead_0p25s_camera_attitude_error_y_rad",
+      "lookahead_0p25s_camera_attitude_error_z_rad",
+      "lookahead_0p25s_riser_target_error_m",
+      "lookahead_0p25s_feedforward_vx_m_s",
+      "lookahead_0p25s_feedforward_wz_rad_s",
+      "lookahead_0p25s_feedforward_riser_velocity_m_s",
+      "lookahead_0p50s_base_target_longitudinal_error_m",
+      "lookahead_0p50s_base_target_lateral_error_m",
+      "lookahead_0p50s_base_target_yaw_error_rad",
+      "lookahead_0p50s_camera_target_longitudinal_error_m",
+      "lookahead_0p50s_camera_target_lateral_error_m",
+      "lookahead_0p50s_camera_target_vertical_error_m",
+      "lookahead_0p50s_camera_attitude_error_x_rad",
+      "lookahead_0p50s_camera_attitude_error_y_rad",
+      "lookahead_0p50s_camera_attitude_error_z_rad",
+      "lookahead_0p50s_riser_target_error_m",
+      "lookahead_0p50s_feedforward_vx_m_s",
+      "lookahead_0p50s_feedforward_wz_rad_s",
+      "lookahead_0p50s_feedforward_riser_velocity_m_s",
+      "lookahead_1p00s_base_target_longitudinal_error_m",
+      "lookahead_1p00s_base_target_lateral_error_m",
+      "lookahead_1p00s_base_target_yaw_error_rad",
+      "lookahead_1p00s_camera_target_longitudinal_error_m",
+      "lookahead_1p00s_camera_target_lateral_error_m",
+      "lookahead_1p00s_camera_target_vertical_error_m",
+      "lookahead_1p00s_camera_attitude_error_x_rad",
+      "lookahead_1p00s_camera_attitude_error_y_rad",
+      "lookahead_1p00s_camera_attitude_error_z_rad",
+      "lookahead_1p00s_riser_target_error_m",
+      "lookahead_1p00s_feedforward_vx_m_s",
+      "lookahead_1p00s_feedforward_wz_rad_s",
+      "lookahead_1p00s_feedforward_riser_velocity_m_s"
+    ],
+    "action_names": [
+      "residual_vx_normalized",
+      "residual_wz_normalized",
+      "residual_riser_target_normalized"
+    ],
+    "expected_output_name": "case_0023_model_based_corrective_case_dataset_v1.npz",
+    "source_capture_sha256": "f0ea5c59e1f2f0e5f6f91336788d0e0228d079f74a53a4a50d442751b8b23796",
+    "source_final_status_sha256": "8f7589cdc31b5b6369fea8fda7fbd8b743b57afa78709cf03b2bd600a25833e3",
+    "source_runtime_commit": "31bb9afbf3e9ce6c17e0fc1d2f06b5990e130d1c",
+    "source_plan_sha256": "ad76ada4cdb9f874da615aa0c6e441be62d9a768b813c597c5dc4e20894042b6",
+    "source_corrective_profile_sha256": "808e2e295bb4639288efc84f5bdf7a1954a6e2aa96f6854d808b02306e9324e3",
+    "source_paired_final_status_sha256": "67c8e99a0629a4b1cb4a2981abfe8360c5d9979c4757582dab6d4fb22cd00deb"
+  },
+  "proposal_ready": true,
+  "conversion_execution_implemented": false,
+  "authorization_token_issued": false,
+  "conversion_authorized": false,
+  "output_created": false,
+  "merged_dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

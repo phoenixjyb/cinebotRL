@@ -108,6 +108,12 @@ def audit(args: argparse.Namespace) -> dict:
             == "model_based_planner",
             "rollout_scales": payload.get("residual_action_scales")
             == RENDER_CONFIG["residual_action_scales"],
+            "rollout_control_ownership": all(
+                payload.get(name) == value
+                for name, value in RENDER_CONFIG[
+                    "control_ownership"
+                ].items()
+            ),
         }
         video_rows.append({"case": case, **identity(video), **metadata})
         rollout_rows.append({"case": case, **identity(rollout)})

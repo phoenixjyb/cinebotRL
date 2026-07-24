@@ -164,6 +164,7 @@ def _accept_structural_fixture_dependencies(monkeypatch) -> None:
 
 def test_checked_in_template_is_closed_and_unusable() -> None:
     template = json.loads(TEMPLATE.read_text(encoding="utf-8"))
+    assert template["evaluation_config"] == DEFAULT_EVALUATION_CONFIG
     assert template["mode"] is None
     assert template["cases"] == []
     assert template["execution_commit"] is None

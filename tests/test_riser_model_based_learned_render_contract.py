@@ -326,6 +326,7 @@ def _media_args(tmp_path: Path) -> argparse.Namespace:
                     "tracking_profile": contract.RENDER_CONFIG["tracking_profile"],
                     "policy_command_base": "model_based_planner",
                     "residual_action_scales": [0.05, 0.05, 0.02],
+                    **contract.CONTROL_OWNERSHIP,
                     "results": [{"case": case, "passed": True}],
                 }
             ),
@@ -358,6 +359,10 @@ def test_media_audit_and_explicit_visual_review_finalize(
     )
     media = MEDIA_MODULE.audit(_media_args(tmp_path))
     assert media["passed"] is True
+    assert all(
+        checks["rollout_control_ownership"] is True
+        for checks in media["media_checks"].values()
+    )
     assert media["manual_visual_review_required"] is True
     media_path = tmp_path / "media.json"
     media_path.write_text(json.dumps(media), encoding="utf-8")
@@ -378,6 +383,33 @@ def test_media_audit_and_explicit_visual_review_finalize(
     report = FINALIZER_MODULE.finalize(media_path, review_path)
     assert report["passed"] is True
     assert report["schema"].endswith("learned_render_audit_v2")
+
+
+def test_media_audit_rejects_direct_wheel_policy_ownership(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        MEDIA_MODULE,
+        "probe",
+        lambda path: {
+            "codec": "h264",
+            "width": 1280,
+            "height": 720,
+            "fps": 25.0,
+            "duration_s": 10.0,
+        },
+    )
+    args = _media_args(tmp_path)
+    rollout = Path(args.case_rollout[0].split("=", 1)[1])
+    payload = json.loads(rollout.read_text(encoding="utf-8"))
+    payload["learned_direct_wheel_effort"] = True
+    rollout.write_text(json.dumps(payload), encoding="utf-8")
+    media = MEDIA_MODULE.audit(args)
+    assert media["passed"] is False
+    assert media["media_checks"][str(contract.REPRESENTATIVE_CASES[0])][
+        "rollout_control_ownership"
+    ] is False
 
 
 def test_finalizer_rejects_blank_reviewer(tmp_path: Path, monkeypatch) -> None:

@@ -102,7 +102,7 @@ REQUIRED_COMPLETION_GATES = (
     "learned_policy_render_audit",
 )
 GOAL_COMPLETION_AUDIT_SCHEMA = (
-    "cinebotrl_two_wheel_riser_goal_completion_audit_v3"
+    "cinebotrl_two_wheel_riser_goal_completion_audit_v4"
 )
 ROLLOUT_METRICS = (
     "position_error_p95_m",
@@ -127,6 +127,7 @@ ALL79_REPORT_FIELDS = {
     "policy_command_contract",
     "residual_action_scales",
     "balance_safety_contract",
+    "control_ownership",
     "maximum_pitch_deg",
     "maximum_saturation_ratio",
     "maximum_riser_thermal_load",
@@ -290,6 +291,10 @@ def _validate_all79_report(
         or report.get("residual_action_scales") != [0.05, 0.05, 0.02]
         or report.get("balance_safety_contract")
         != learned_all79_contract.BALANCE_SAFETY_CONTRACT
+        or report.get("control_ownership")
+        != learned_all79_contract.DEFAULT_EVALUATION_CONFIG[
+            "control_ownership"
+        ]
         or report.get("maximum_pitch_deg")
         != learned_all79_contract.DEFAULT_EVALUATION_CONFIG["maximum_pitch_deg"]
         or report.get("maximum_saturation_ratio")
@@ -581,6 +586,10 @@ def _validate_learned_render_report(
             != "model_based_planner"
             or rollout_payload.get("residual_action_scales")
             != [0.05, 0.05, 0.02]
+            or any(
+                rollout_payload.get(name) != value
+                for name, value in learned_all79_contract.CONTROL_OWNERSHIP.items()
+            )
         ):
             raise ValueError(
                 f"learned render rollout {expected_case} contract is invalid"

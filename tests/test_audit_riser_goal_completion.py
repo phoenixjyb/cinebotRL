@@ -401,6 +401,9 @@ def _valid_all79_report(
         "balance_safety_contract": (
             MODULE.learned_all79_contract.BALANCE_SAFETY_CONTRACT
         ),
+        "control_ownership": (
+            MODULE.learned_all79_contract.CONTROL_OWNERSHIP
+        ),
         "maximum_pitch_deg": 12.0,
         "maximum_saturation_ratio": 0.2,
         "maximum_riser_thermal_load": 1.0,
@@ -544,6 +547,7 @@ def _valid_render_report(
                     ),
                     "policy_command_base": "model_based_planner",
                     "residual_action_scales": [0.05, 0.05, 0.02],
+                    **MODULE.learned_all79_contract.CONTROL_OWNERSHIP,
                 }
             ),
             encoding="utf-8",

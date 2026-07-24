@@ -508,7 +508,7 @@ from rl_platform.tasks.two_wheel_balance.camera_attitude import (
     semantic_dfr_to_physical_cam_quat_wxyz,
 )
 from rl_platform.tasks.two_wheel_balance.metrics import (
-    ACTION_NAMES,
+    ACTION_NAMES as LQR_ACTION_NAMES,
     LQR_STATE_NAMES,
     cascaded_lqr_action,
     cascaded_lqr_config,
@@ -529,7 +529,9 @@ from rl_platform.tasks.two_wheel_balance.riser_control import (
     balance_progress_scale,
 )
 from rl_platform.tasks.two_wheel_balance.riser_residual_dataset import (
+    ACTION_NAMES as RESIDUAL_ACTION_NAMES,
     LOOKAHEAD_HORIZONS_S,
+    MODEL_BASED_POLICY_CONTROL_OWNERSHIP_CONTRACT,
     MODEL_BASED_POLICY_PREVIOUS_ACTION_CONTRACT,
     MODEL_BASED_POLICY_RESIDUAL_CONTRACT,
     OBSERVATION_INDEX,
@@ -553,6 +555,29 @@ from rl_platform.tasks.two_wheel_balance.riser_recovery_evidence import (
     RecoveryTelemetryAccumulator,
     VelocityFeedbackTelemetryAccumulator,
 )
+
+
+def control_ownership_evidence(
+    *, semantic_proxy_adapter_enabled: bool
+) -> dict[str, object]:
+    """Describe the fixed control-layer authority exposed by this runtime."""
+
+    return {
+        "control_ownership_contract": (
+            MODEL_BASED_POLICY_CONTROL_OWNERSHIP_CONTRACT
+        ),
+        "learned_action_names": list(RESIDUAL_ACTION_NAMES),
+        "learned_direct_wheel_effort": False,
+        "learned_physical_gimbal_joint_action": False,
+        "wheel_effort_owner": "frozen_cascaded_lqr",
+        "gimbal_attitude_owner": (
+            "deterministic_semantic_attitude_adapter"
+            if semantic_proxy_adapter_enabled
+            else "deterministic_proxy_position_drive_diagnostic"
+        ),
+        "riser_hard_limit_owner": "deterministic_command_supervisor",
+        "safety_supervisor_owner": "deterministic_runtime_gates",
+    }
 from rl_platform.tasks.two_wheel_balance.whole_body_tracking import (
     bounded_base_references,
     bounded_camera_recovery_progress_scale,
@@ -770,7 +795,7 @@ def evaluate_case(
 
     controller_state = np.zeros((1, 6), dtype=np.float64)
     current_states = current_lqr_state(unwrapped)
-    action = np.zeros((1, len(ACTION_NAMES)), dtype=np.float32)
+    action = np.zeros((1, len(LQR_ACTION_NAMES)), dtype=np.float32)
     controller_overrides = {
         name: value
         for name, value in {
@@ -2803,7 +2828,7 @@ def main() -> int:
     gain_data = json.loads(args.gains.read_text(encoding="utf-8"))
     gain = np.asarray(gain_data["selected_gain"], dtype=np.float64)
     control_interval = int(gain_data["control_interval_steps"])
-    if gain.shape != (len(ACTION_NAMES), len(LQR_STATE_NAMES)):
+    if gain.shape != (len(LQR_ACTION_NAMES), len(LQR_STATE_NAMES)):
         raise ValueError(f"invalid LQR gain shape: {gain.shape}")
 
     register_isaac_lab_tasks()
@@ -2915,6 +2940,11 @@ def main() -> int:
     env.close()
     result = {
         "schema": "recomo_two_wheel_riser_reference_playback_v1",
+        **control_ownership_evidence(
+            semantic_proxy_adapter_enabled=(
+                not args.disable_semantic_proxy_state_adapter
+            )
+        ),
         "training_started": False,
         "ppo_authorized": False,
         "controller_profile": "structural_robust_v1",
@@ -3171,6 +3201,11 @@ def write_runtime_failure(exc: Exception) -> None:
     )
     result = {
         "schema": "recomo_two_wheel_riser_reference_playback_failure_v1",
+        **control_ownership_evidence(
+            semantic_proxy_adapter_enabled=(
+                not args.disable_semantic_proxy_state_adapter
+            )
+        ),
         "training_started": False,
         "ppo_authorized": False,
         "raw_teacher_capture_started": args.raw_teacher_dir is not None,

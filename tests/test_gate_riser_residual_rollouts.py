@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from scripts.two_wheel_balance.gate_riser_residual_rollouts import (
+    CONTROL_OWNERSHIP,
     REGRESSION_METRICS,
     gate_rollouts,
 )
@@ -76,6 +77,8 @@ def _write_rollout(
         "residual_action_scales": residual_action_scales or [0.3, 0.4, 0.1],
         "results": [result],
     }
+    if policy_command_base == "model_based_planner":
+        payload.update(CONTROL_OWNERSHIP)
     root.mkdir(parents=True, exist_ok=True)
     (root / f"case_{case:04d}.json").write_text(
         json.dumps(payload), encoding="utf-8"
@@ -196,6 +199,62 @@ def test_model_based_gate_rejects_good_tracking_with_unsafe_balance(
     )
     assert not summary["passed"]
     assert not summary["rows"][0]["checks"][check]
+
+
+def test_model_based_gate_rejects_direct_wheel_ownership_drift(
+    tmp_path: Path,
+) -> None:
+    baseline = tmp_path / "baseline"
+    learned = tmp_path / "learned"
+    policy = tmp_path / "policy.pt"
+    policy.write_bytes(b"policy")
+    profile = "riser_recovery_direction_v4_camera_lever_arm_v1"
+    common = {
+        "tracking_profile": profile,
+        "policy_command_base": "model_based_planner",
+        "residual_action_scales": [0.05, 0.05, 0.02],
+    }
+    _write_rollout(
+        baseline,
+        8,
+        "model_based_planner_plus_zero_policy_residual",
+        0.10,
+        **common,
+    )
+    _write_rollout(
+        learned,
+        8,
+        "model_based_planner_plus_torchscript_residual",
+        0.08,
+        **common,
+    )
+    learned_path = learned / "case_0008.json"
+    learned_payload = json.loads(learned_path.read_text(encoding="utf-8"))
+    learned_payload["learned_direct_wheel_effort"] = True
+    learned_path.write_text(json.dumps(learned_payload), encoding="utf-8")
+    provenance = {}
+    for name in ("admission", "preflight", "plan_manifest"):
+        path = tmp_path / f"{name}.json"
+        path.write_text("{}\n", encoding="utf-8")
+        provenance[name] = path
+    with pytest.raises(ValueError, match="rollout contract mismatch"):
+        gate_rollouts(
+            teacher_dir=baseline,
+            zero_dir=baseline,
+            learned_dir=learned,
+            cases=[8],
+            policy=policy,
+            mode="validation_canary",
+            maximum_regression_fraction=0.05,
+            expected_tracking_profile=profile,
+            policy_command_contract=(
+                "model_based_planner_plus_bounded_policy_residual_v1"
+            ),
+            rollout_admission=provenance["admission"],
+            preflight_receipt=provenance["preflight"],
+            plan_manifest=provenance["plan_manifest"],
+            execution_commit="a" * 40,
+        )
 
 
 def test_all79_mode_requires_the_complete_case_set(tmp_path: Path) -> None:
@@ -352,7 +411,8 @@ def test_model_based_validation_requires_provenance_and_uses_baseline(
         execution_commit="a" * 40,
     )
     assert summary["passed"] is True
-    assert summary["schema"].endswith("validation_canary_gate_v2")
+    assert summary["schema"].endswith("validation_canary_gate_v3")
+    assert summary["control_ownership"] == CONTROL_OWNERSHIP
     assert summary["rows"][0]["teacher_rollout"] == (
         summary["rows"][0]["zero_rollout"]
     )

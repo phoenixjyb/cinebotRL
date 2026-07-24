@@ -111,6 +111,7 @@ def _gate_report(
         ),
         "residual_action_scales": [0.05, 0.05, 0.02],
         "balance_safety_contract": contract.BALANCE_SAFETY_CONTRACT,
+        "control_ownership": copy.deepcopy(contract.CONTROL_OWNERSHIP),
         "maximum_pitch_deg": DEFAULT_EVALUATION_CONFIG["maximum_pitch_deg"],
         "maximum_saturation_ratio": DEFAULT_EVALUATION_CONFIG[
             "maximum_saturation_ratio"
@@ -457,6 +458,23 @@ def test_admission_rejects_gate_report_with_unsafe_balance_snapshot(
     validation = fixture["validation_report"]
     validation["rows"][0]["learned_safety"]["termination_absent"] = False
     validation["rows"][0]["learned_safety"]["passed"] = False
+    fixture["validation_report_path"].write_text(
+        json.dumps(validation),
+        encoding="utf-8",
+    )
+    fixture["admission"]["validation_gate_report"] = _identity(
+        fixture["validation_report_path"]
+    )
+    with pytest.raises(ValueError, match="admission failed"):
+        _validate(fixture)
+
+
+def test_admission_rejects_gate_report_with_direct_wheel_policy_ownership(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    validation = fixture["validation_report"]
+    validation["control_ownership"]["learned_direct_wheel_effort"] = True
     fixture["validation_report_path"].write_text(
         json.dumps(validation),
         encoding="utf-8",

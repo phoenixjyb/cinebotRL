@@ -79,6 +79,20 @@
       0.05,
       0.02
     ],
+    "control_ownership": {
+      "control_ownership_contract": "frozen_lqr_high_level_residual_control_ownership_v1",
+      "learned_action_names": [
+        "residual_vx_normalized",
+        "residual_wz_normalized",
+        "residual_riser_target_normalized"
+      ],
+      "learned_direct_wheel_effort": false,
+      "learned_physical_gimbal_joint_action": false,
+      "wheel_effort_owner": "frozen_cascaded_lqr",
+      "gimbal_attitude_owner": "deterministic_semantic_attitude_adapter",
+      "riser_hard_limit_owner": "deterministic_command_supervisor",
+      "safety_supervisor_owner": "deterministic_runtime_gates"
+    },
     "controller_wz_kp": 1.05,
     "maximum_duration_scale": 3.0,
     "camera_lever_arm_compensation_enabled": true,

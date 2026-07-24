@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from .riser_model_based_learned_all79_contract import (
     ALL79_GATE_SCHEMA,
+    CONTROL_OWNERSHIP,
     DEFAULT_EVALUATION_CONFIG,
     _exact_digest,
     _exact_source_manifest_valid,
@@ -36,6 +37,7 @@ RENDER_CONFIG = {
     "tracking_profile": "riser_recovery_direction_v4_camera_lever_arm_v1",
     "policy_command_contract": "model_based_planner_plus_bounded_policy_residual_v1",
     "residual_action_scales": [0.05, 0.05, 0.02],
+    "control_ownership": CONTROL_OWNERSHIP,
     "controller_wz_kp": 1.05,
     "maximum_duration_scale": 3.0,
     "camera_lever_arm_compensation_gain": 1.0,
@@ -230,6 +232,7 @@ def validate_render_admission(
                 "tracking_profile",
                 "policy_command_contract",
                 "residual_action_scales",
+                "control_ownership",
                 "controller_wz_kp",
                 "maximum_duration_scale",
                 "camera_lever_arm_compensation_gain",
@@ -242,6 +245,7 @@ def validate_render_admission(
                 "tracking_profile",
                 "policy_command_contract",
                 "residual_action_scales",
+                "control_ownership",
                 "controller_wz_kp",
                 "maximum_duration_scale",
                 "camera_lever_arm_compensation_gain",

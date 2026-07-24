@@ -87,6 +87,9 @@ MODEL_BASED_POLICY_RESIDUAL_SCALES = np.array(
 MODEL_BASED_POLICY_RESIDUAL_CONTRACT = (
     "model_based_planner_plus_bounded_policy_residual_v1"
 )
+MODEL_BASED_POLICY_CONTROL_OWNERSHIP_CONTRACT = (
+    "frozen_lqr_high_level_residual_control_ownership_v1"
+)
 MODEL_BASED_POLICY_PREVIOUS_ACTION_CONTRACT = (
     "previous_effective_post_supervisor_action_v1"
 )

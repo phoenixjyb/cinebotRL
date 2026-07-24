@@ -70,6 +70,30 @@ def test_model_based_mode_has_distinct_zero_and_learned_sources() -> None:
     assert '"model_based_planner_plus_torchscript_residual"' in source
 
 
+def test_runtime_records_high_level_policy_control_ownership() -> None:
+    source = PLAYBACK.read_text(encoding="utf-8")
+    assert "ACTION_NAMES as LQR_ACTION_NAMES" in source
+    assert "ACTION_NAMES as RESIDUAL_ACTION_NAMES" in source
+    assert "control_ownership_evidence(" in source
+    assert '"learned_action_names": list(RESIDUAL_ACTION_NAMES)' in source
+    assert '"learned_direct_wheel_effort": False' in source
+    assert '"learned_physical_gimbal_joint_action": False' in source
+    assert '"wheel_effort_owner": "frozen_cascaded_lqr"' in source
+    assert (
+        '"gimbal_attitude_owner": (\n'
+        '            "deterministic_semantic_attitude_adapter"'
+    ) in source
+    assert (
+        '"riser_hard_limit_owner": "deterministic_command_supervisor"'
+        in source
+    )
+    assert '"safety_supervisor_owner": "deterministic_runtime_gates"' in source
+    policy_index = source.index("policy_output = residual_policy(")
+    lqr_index = source.index("cascaded_lqr_action(", policy_index)
+    step_index = source.index("env.step(", lqr_index)
+    assert policy_index < lqr_index < step_index
+
+
 def test_corrective_teacher_capture_requires_separate_pre_app_admission() -> None:
     source = PLAYBACK.read_text(encoding="utf-8")
     pre_app = source.split("app = AppLauncher(args).app", 1)[0]

@@ -23,11 +23,27 @@ MODEL_BASED_LEARNED_ALL79_ADMISSION_SCHEMA = (
 )
 BC_REPORT_SCHEMA = MODEL_BASED_CORRECTIVE_BC_EXECUTION_REPORT_SCHEMA
 VALIDATION_GATE_SCHEMA = (
-    "cinebotrl_two_wheel_riser_residual_validation_canary_gate_v2"
+    "cinebotrl_two_wheel_riser_residual_validation_canary_gate_v3"
 )
-HOLDOUT_GATE_SCHEMA = "cinebotrl_two_wheel_riser_residual_holdout_gate_v2"
-ALL79_GATE_SCHEMA = "cinebotrl_two_wheel_riser_residual_all79_gate_v2"
+HOLDOUT_GATE_SCHEMA = "cinebotrl_two_wheel_riser_residual_holdout_gate_v3"
+ALL79_GATE_SCHEMA = "cinebotrl_two_wheel_riser_residual_all79_gate_v3"
 BALANCE_SAFETY_CONTRACT = "balance_first_rollout_safety_v1"
+CONTROL_OWNERSHIP = {
+    "control_ownership_contract": (
+        "frozen_lqr_high_level_residual_control_ownership_v1"
+    ),
+    "learned_action_names": [
+        "residual_vx_normalized",
+        "residual_wz_normalized",
+        "residual_riser_target_normalized",
+    ],
+    "learned_direct_wheel_effort": False,
+    "learned_physical_gimbal_joint_action": False,
+    "wheel_effort_owner": "frozen_cascaded_lqr",
+    "gimbal_attitude_owner": "deterministic_semantic_attitude_adapter",
+    "riser_hard_limit_owner": "deterministic_command_supervisor",
+    "safety_supervisor_owner": "deterministic_runtime_gates",
+}
 BALANCE_SAFETY_SNAPSHOT_FIELDS = {
     "payload_dynamic_quality_passed",
     "payload_thermal_admission_passed",
@@ -62,6 +78,7 @@ DEFAULT_EVALUATION_CONFIG = {
     "tracking_profile": "riser_recovery_direction_v4_camera_lever_arm_v1",
     "policy_command_contract": "model_based_planner_plus_bounded_policy_residual_v1",
     "residual_action_scales": [0.05, 0.05, 0.02],
+    "control_ownership": CONTROL_OWNERSHIP,
     "controller_wz_kp": 1.05,
     "maximum_duration_scale": 3.0,
     "camera_lever_arm_compensation_enabled": True,
@@ -135,6 +152,7 @@ GATE_REPORT_FIELDS = {
     "policy_command_contract",
     "residual_action_scales",
     "balance_safety_contract",
+    "control_ownership",
     "maximum_pitch_deg",
     "maximum_saturation_ratio",
     "maximum_riser_thermal_load",
@@ -433,6 +451,8 @@ def _gate_report_valid(
         and report.get("residual_action_scales")
         == DEFAULT_EVALUATION_CONFIG["residual_action_scales"]
         and report.get("balance_safety_contract") == BALANCE_SAFETY_CONTRACT
+        and report.get("control_ownership")
+        == DEFAULT_EVALUATION_CONFIG["control_ownership"]
         and report.get("maximum_pitch_deg")
         == DEFAULT_EVALUATION_CONFIG["maximum_pitch_deg"]
         and report.get("maximum_saturation_ratio")

@@ -20,8 +20,24 @@ LEGACY_POLICY_COMMAND_CONTRACT = "legacy_phase_feedforward_residual_v1"
 MODEL_BASED_POLICY_COMMAND_CONTRACT = (
     "model_based_planner_plus_bounded_policy_residual_v1"
 )
-MODEL_BASED_GATE_SCHEMA_VERSION = "v2"
+MODEL_BASED_GATE_SCHEMA_VERSION = "v3"
 BALANCE_SAFETY_CONTRACT = "balance_first_rollout_safety_v1"
+CONTROL_OWNERSHIP = {
+    "control_ownership_contract": (
+        "frozen_lqr_high_level_residual_control_ownership_v1"
+    ),
+    "learned_action_names": [
+        "residual_vx_normalized",
+        "residual_wz_normalized",
+        "residual_riser_target_normalized",
+    ],
+    "learned_direct_wheel_effort": False,
+    "learned_physical_gimbal_joint_action": False,
+    "wheel_effort_owner": "frozen_cascaded_lqr",
+    "gimbal_attitude_owner": "deterministic_semantic_attitude_adapter",
+    "riser_hard_limit_owner": "deterministic_command_supervisor",
+    "safety_supervisor_owner": "deterministic_runtime_gates",
+}
 DEFAULT_MAXIMUM_PITCH_DEG = 12.0
 DEFAULT_MAXIMUM_SATURATION_RATIO = 0.20
 DEFAULT_MAXIMUM_RISER_THERMAL_LOAD = 1.0
@@ -48,6 +64,7 @@ POLICY_COMMAND_CONTRACTS = {
         "zero_source": "model_based_planner_plus_zero_policy_residual",
         "policy_command_base": "model_based_planner",
         "residual_action_scales": [0.05, 0.05, 0.02],
+        "control_ownership": CONTROL_OWNERSHIP,
     },
 }
 REGRESSION_METRICS = (
@@ -85,6 +102,7 @@ def load_result(
     expected_tracking_profile: str = TRACKING_PROFILE,
     expected_policy_command_base: str = "phase_feedforward",
     expected_residual_action_scales: list[float] | None = None,
+    expected_control_ownership: dict[str, object] | None = None,
 ) -> tuple[dict, dict]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if (
@@ -95,6 +113,13 @@ def load_result(
         or payload.get("policy_command_base") != expected_policy_command_base
         or payload.get("residual_action_scales")
         != (expected_residual_action_scales or [0.3, 0.4, 0.1])
+        or (
+            expected_control_ownership is not None
+            and any(
+                payload.get(name) != value
+                for name, value in expected_control_ownership.items()
+            )
+        )
         or len(payload.get("results", [])) != 1
         or payload["results"][0].get("case") != case
     ):
@@ -283,6 +308,7 @@ def gate_rollouts(
             expected_tracking_profile,
             command_contract["policy_command_base"],
             command_contract["residual_action_scales"],
+            command_contract.get("control_ownership"),
         )
         learned_payload, learned = load_result(
             learned_dir / name,
@@ -291,6 +317,7 @@ def gate_rollouts(
             expected_tracking_profile,
             command_contract["policy_command_base"],
             command_contract["residual_action_scales"],
+            command_contract.get("control_ownership"),
         )
         zero = None
         profile_checks = {
@@ -307,6 +334,7 @@ def gate_rollouts(
                 expected_tracking_profile,
                 command_contract["policy_command_base"],
                 command_contract["residual_action_scales"],
+                command_contract.get("control_ownership"),
             )
             profile_checks["zero_tracking_profile"] = (
                 zero_payload.get("tracking_profile") == expected_tracking_profile
@@ -429,6 +457,7 @@ def gate_rollouts(
         **(
             {
                 "balance_safety_contract": BALANCE_SAFETY_CONTRACT,
+                "control_ownership": command_contract["control_ownership"],
                 "maximum_pitch_deg": maximum_pitch_deg,
                 "maximum_saturation_ratio": maximum_saturation_ratio,
                 "maximum_riser_thermal_load": (

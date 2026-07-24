@@ -1641,7 +1641,10 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert generic_conversion["training_started"] is False
     assert corrective[
         "generic_corrective_conversion_proposal_authoritative_windows_cpu_suite"
-    ] == "1396_passed_12_skipped_2_warnings_in_220.47s"
+    ] == "1396_passed_12_skipped_2_warnings_in_214.66s"
+    assert corrective[
+        "generic_corrective_conversion_proposal_authoritative_windows_cpu_commit"
+    ] == "34f83bcac0a78460b5cc8409624a9495deb08b5e"
     assert corrective["generic_corrective_conversion_execution_implemented"] is False
     assert corrective["generic_corrective_conversion_authorized"] is False
     assert corrective["generic_corrective_conversion_output_created"] is False

@@ -10143,8 +10143,9 @@ and must state whether its candidate was accepted or rejected.
   `eaa4c957485ba8b055206ef6f65a95f18e457985e0fdc639fda35a6d9d263b74`.
 - Focused coverage passes `17 passed, 2 warnings in 0.80 s` locally and
   `17 passed, 2 warnings in 5.26 s` on `.98`. The authoritative `.98`
-  Windows-Python CPU suite passes
-  `1396 passed, 12 skipped, 2 warnings in 220.47 s`.
+  Windows-Python CPU suite at
+  `34f83bcac0a78460b5cc8409624a9495deb08b5e` passes
+  `1396 passed, 12 skipped, 2 warnings in 214.66 s`.
 - Evidence is preserved under
   `evidence_20260724_generic_corrective_conversion_proposals_v1`. The
   preparer intentionally does not implement conversion execution, issue an

@@ -52,6 +52,7 @@ def summarize(
     playback_exit_code: int,
     gpu_release_passed: bool,
     expected_case: int = 30,
+    expected_split: str = "train",
     expected_namespace: str = NAMESPACE,
     capture_name: str = CAPTURE_NAME,
     plan_identity_name: str = "case30_plan",
@@ -72,7 +73,7 @@ def summarize(
         capture_metadata, capture_payload = load_corrective_capture(
             capture_path,
             expected_case=expected_case,
-            expected_split="train",
+            expected_split=expected_split,
         )
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         capture_error = str(exc)
@@ -223,7 +224,7 @@ def summarize(
     contract_checks = {
         "namespace": contract.get("namespace") == expected_namespace,
         "case_split": contract.get("case") == expected_case
-        and contract.get("split") == "train",
+        and contract.get("split") == expected_split,
         "runtime_commit_descends_reviewed_parent": admission.get(
             "reviewed_parent_commit"
         )
@@ -240,7 +241,7 @@ def summarize(
         "namespace": expected_namespace,
         "runtime_commit": runtime_commit,
         "case": expected_case,
-        "split": "train",
+        "split": expected_split,
         "playback_exit_code": playback_exit_code,
         "admission_checks": admission_checks,
         "gate_checks": gate_checks,

@@ -9862,3 +9862,44 @@ and must state whether its candidate was accepted or rejected.
   cases 6, 23, and 30. This audit must not merge a corpus or authorize BC.
 - If intake passes, the next data-producing operation requires separate
   authorization: `Authorize exactly one case-2 paired canary.`
+
+## Round 255: corpus intake binds converted cases 6, 23, and 30
+
+- Upgraded the CPU-only intake audit to schema
+  `cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v3`.
+  It now reopens the real case-6 dataset, final status, consumed authorization
+  admission, closed execution contract, and conversion result in addition to
+  the existing case-23 and case-30 evidence.
+- Case 23 retains its exceptional path-recovery requirements: one converter
+  invocation, no converter retry, byte-identical canonical dataset, and closed
+  learning state. Case 6 independently requires matching dataset/source/runtime
+  identities, effective post-supervisor targets, reconstructed previous
+  effective actions, and closed merge/BC/PPO/training state.
+- Converted train cases are `[6, 23, 30]`. The minimum four-case train tranche
+  now lacks only case `2`; validation still lacks cases `8` and `16`. Case `7`
+  remains an additional train candidate. The corpus manifest is not ready.
+- macOS and `.98` Windows/Isaac Python produced byte-identical reports at
+  SHA-256
+  `d151a8c144005737eb2a86d4038fda19b9ed6da2286cc9e1f3132024bb8fdea8`.
+  Evidence is preserved under
+  `evidence_20260724_model_based_corrective_corpus_intake_v3`.
+- Implementation commit
+  `c1e45027ec14f7aeaf4c39b066cd99418d6f116b`, evidence/goal commit
+  `aa7eb27f207c81e1a6a397df6aea18fbc1272217`, and downstream goal-audit fix
+  `7a4eeb3e945e1c76c1fa05c37a42a4267bb4c6d7` are pushed and synchronized.
+- The first full suite correctly exposed one stale expected dataset count:
+  `1359 passed, 1 failed, 12 skipped, 2 warnings in 196.83 s`. After updating
+  that downstream ledger assertion, focused coverage passes
+  `45 passed, 2 warnings in 5.18 s` on macOS and
+  `45 passed, 2 warnings in 12.56 s` on `.98`. The authoritative `.98`
+  Windows-Isaac Python CPU suite passes
+  `1360 passed, 12 skipped, 2 warnings in 190.65 s`.
+- No corpus merge, new conversion, Isaac/GPU workload, capture, BC, PPO,
+  checkpoint, or training run was created. Goal completion remains `6/10`.
+
+## Next round after Round 255
+
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-2 paired canary.`
+- Do not infer capture, conversion, corpus-merge, BC, PPO, validation, or
+  training authorization from this intake audit.

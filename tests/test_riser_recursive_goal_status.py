@@ -932,10 +932,10 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["corrective_corpus_intake_manifest_ready"] is False
     assert corrective["corrective_corpus_intake_merge_authorized"] is False
     assert corrective["corrective_corpus_intake_authoritative_cpu_commit"] == (
-        "c1e45027ec14f7aeaf4c39b066cd99418d6f116b"
+        "7a4eeb3e945e1c76c1fa05c37a42a4267bb4c6d7"
     )
     assert corrective["corrective_corpus_intake_authoritative_cpu_suite"] == (
-        "pending_final_authoritative_windows_cpu_suite"
+        "1360_passed_12_skipped_2_warnings_in_190.65s"
     )
     assert corrective["case6_pair_readiness_schema"] == (
         "cinebotrl_two_wheel_riser_case6_pair_readiness_cpu_v1"

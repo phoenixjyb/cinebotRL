@@ -10202,3 +10202,35 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-7 corrective-label capture.`
 - After a passing capture, generate and commit its generic proposal, then
   require a separate authorization for exactly one generic CPU conversion.
+
+## Round 264: end-goal audit refreshed against the generic data path
+
+- Replaced the historical v5 completion snapshot with a preserved-history v6
+  audit at implementation commit
+  `32fc83eef26e2ec6048e1f2469fe0e15c006237c`.
+- The audit now binds the closed case-7 corrective capture route, generic
+  conversion proposals, and generic conversion execution route. Cases 6, 23,
+  and 30 cover `22,617` proposed samples through one implementation.
+- macOS and native Windows Python produced byte-identical reports at SHA-256
+  `f58f95f2e06ec3583b798be762ed0fb7edbed23b010a8ef7ad9cc5e625c3ca2a`.
+- The report proves there is no hidden CPU-only route blocker before the next
+  capture. It does not claim that missing data exists: only three converted
+  train cases are available, the required fourth train case is case 7, and
+  there are still zero converted validation cases.
+- The completion result therefore remains `6/10`. The four blockers are the
+  model-based corrective training corpus, projection-aware BC policy, learned
+  all-79 dynamic gate, and learned-policy render audit.
+- The combined goal/audit suite passes `23 passed, 2 warnings in 3.12 s`
+  locally and `23 passed, 2 warnings in 10.44 s` on `.98`. The authoritative
+  Windows-Python CPU suite at
+  `8ccc7fc3d482f03de85951d0da603320e2b3ec4b` passes
+  `1413 passed, 12 skipped, 2 warnings in 246.74 s`.
+- No Isaac/GPU process, authorization token, capture, conversion output,
+  merged corpus, BC, PPO, checkpoint, or training run was created.
+
+## Next round after Round 264
+
+- The next data-producing operation still requires separate authorization:
+  `Authorize exactly one case-7 corrective-label capture.`
+- A passing case-7 capture must be reopened and proposed through the generic
+  route before a separate one-case CPU conversion can be authorized.

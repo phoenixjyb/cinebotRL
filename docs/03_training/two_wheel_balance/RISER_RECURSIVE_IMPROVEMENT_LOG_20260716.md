@@ -9693,3 +9693,37 @@ and must state whether its candidate was accepted or rejected.
 - Continue the pending paired routes in order: train cases 6, 2, and 7, then
   validation cases 8 and 16. BC remains closed until the case-disjoint corpus
   gate passes and receives separate authorization.
+
+## Round 251: corpus intake now binds converted cases 23 and 30
+
+- Upgraded the CPU-only corpus-intake audit to schema
+  `cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v2`.
+  The default route now reopens the real case-23 dataset, conversion final
+  status, and path-recovery audit in addition to the existing case-30 dataset.
+- Case-23 intake fails closed unless the recovery evidence proves one converter
+  invocation, no converter retry, byte identity with the canonical NPZ, a
+  matching final-status hash, and closed merge/BC/PPO/training state.
+- Converted train cases are `[23, 30]`. The minimum train tranche still lacks
+  cases `6` and `2`; validation still lacks cases `8` and `16`. Case `7`
+  remains an additional train candidate. The corpus manifest is not ready.
+- Preserved the byte-identical macOS/`.98` report under
+  `evidence_20260724_model_based_corrective_corpus_intake_v2`. Its summary
+  SHA-256 is
+  `dc5ee5f97882c0551521703267d9897ce79731845cbd73e6883bc121183bcb62`.
+- Implementation commit
+  `4f370b4b6cc71a338386cc6f760a42b7e32ff085` and evidence/goal-binding
+  commit `cd83adff011165221ac0fd4f260c2f4eee15c6b0` are pushed and synchronized
+  to `.98`.
+- Focused intake coverage passes `12 passed, 2 warnings in 0.85 s` on macOS
+  and `12 passed, 2 warnings in 1.27 s` on `.98`. The authoritative `.98`
+  Windows-Isaac Python CPU suite passes:
+  `1338 passed, 12 skipped, 2 warnings in 181.34 s`.
+- No dataset merge, new conversion, Isaac/GPU workload, capture, BC, PPO,
+  checkpoint, or training run was created. Goal completion remains `6/10`.
+
+## Next round after Round 251
+
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-6 paired canary.`
+- If case 6 passes its paired dynamic gate, review and authorize its corrective
+  capture separately. Do not skip directly to conversion, merge, or BC.

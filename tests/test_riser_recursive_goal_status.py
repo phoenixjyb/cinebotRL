@@ -11,7 +11,7 @@ GOAL = (
 GOAL_COMPLETION_AUDIT = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260724_riser_goal_completion_audit_v3/summary.json"
+    "evidence_20260724_riser_goal_completion_audit_v4/summary.json"
 )
 CASE23_CAPTURE_CONTRACT = (
     ROOT
@@ -2369,9 +2369,9 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     audit = _goal()["current_stage"]["status_refresh_20260723"][
         "goal_completion_audit"
     ]
-    assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v3"
+    assert audit["schema"] == "cinebotrl_two_wheel_riser_goal_completion_audit_v4"
     assert audit["implementation_commit"] == (
-        "d845d029d12e33cc29543e4cad8627d5b2266f01"
+        "20694e8d5d238d1965a22e3eef4e14fe57682f05"
     )
     assert audit["host_independent_lf_evidence"] is True
     assert audit["mac_and_windows_report_byte_parity_verified"] is True
@@ -2501,6 +2501,42 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["learned_policy_artifact_authoritative_windows_cpu_suite"] == (
         "1309_passed_12_skipped_2_warnings_in_175.46s"
     )
+    assert audit["learned_policy_control_ownership_contract"] == (
+        "frozen_lqr_high_level_residual_control_ownership_v1"
+    )
+    assert audit["learned_policy_action_names"] == [
+        "residual_vx_normalized",
+        "residual_wz_normalized",
+        "residual_riser_target_normalized",
+    ]
+    assert audit["learned_policy_direct_wheel_effort"] is False
+    assert audit["learned_policy_physical_gimbal_joint_action"] is False
+    assert audit["learned_policy_wheel_effort_owner"] == "frozen_cascaded_lqr"
+    assert audit["learned_policy_gimbal_attitude_owner"] == (
+        "deterministic_semantic_attitude_adapter"
+    )
+    assert audit["learned_policy_riser_hard_limit_owner"] == (
+        "deterministic_command_supervisor"
+    )
+    assert audit["learned_policy_safety_supervisor_owner"] == (
+        "deterministic_runtime_gates"
+    )
+    assert audit["learned_policy_playback_sha256"] == _sha256(
+        ROOT / "scripts/two_wheel_balance/smoke_riser_reference_playback.py"
+    )
+    assert audit["learned_policy_residual_dataset_sha256"] == _sha256(
+        ROOT
+        / "src/rl_platform/tasks/two_wheel_balance/riser_residual_dataset.py"
+    )
+    assert audit["learned_policy_validation_gate_schema"].endswith(
+        "residual_validation_canary_gate_v3"
+    )
+    assert audit["learned_policy_holdout_gate_schema"].endswith(
+        "residual_holdout_gate_v3"
+    )
+    assert audit["learned_policy_all79_gate_schema"].endswith(
+        "residual_all79_gate_v3"
+    )
     assert audit["required_gate_pass_count"] == 6
     assert audit["required_gate_count"] == 10
     assert audit["completion_blockers"] == [
@@ -2559,12 +2595,12 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "1332_passed_12_skipped_2_warnings_in_173.50s"
     )
     assert _sha256(GOAL_COMPLETION_AUDIT) == (
-        "c27491ba9392396d76dc7797231186220dde75f6676c44c12df44ec6666651af"
+        "6ff6ca603a9ee487025841da9db981316e7e8ff3b240b27ad1b8a4d3e100cabc"
     )
     report = json.loads(GOAL_COMPLETION_AUDIT.read_text())
-    assert report["git"]["head"] == "d845d029d12e33cc29543e4cad8627d5b2266f01"
+    assert report["git"]["head"] == "20694e8d5d238d1965a22e3eef4e14fe57682f05"
     assert report["inputs"]["auditor"]["sha256"] == (
-        "90218bbab36d456cdd3f47f56e0ebd7499d951e64175b9c62df8eead93ba178f"
+        "0d5dc2c4f4d7a8180e5661201fdafed13fc8453915348c69e53cebead6e36fb1"
     )
     assert report["required_gate_pass_count"] == audit["required_gate_pass_count"]
     assert report["required_gate_count"] == audit["required_gate_count"]

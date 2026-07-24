@@ -9903,3 +9903,35 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-2 paired canary.`
 - Do not infer capture, conversion, corpus-merge, BC, PPO, validation, or
   training authorization from this intake audit.
+
+## Round 256: case-2 paired canary is rejected
+
+- Issued and consumed exactly one external mode-`0600` authorization for the
+  case-2 natural-error paired canary. Authorization commit
+  `b94d40587510cd6e7ccb123f4557c6447e88479d`, Windows test-fix/runtime commit
+  `9363f2818688653c2c6db60699caba496a0c8d3a`, and evidence commit
+  `a24a1fb1305dc71bcd4953025e5a290283b11a7a` are pushed.
+- The token was deleted before Isaac started. Baseline ran first; candidate ran
+  only after the baseline passed. Both exited `0`, passed the unchanged dynamic
+  gates, had zero action saturation, and released the GPU.
+- Baseline position p95/max was `0.1398296339 / 0.1535142853 m`. Candidate
+  position p95/max was `0.1395659017 / 0.1530445505 m`. The improvement was
+  only `0.0002637322 m` (`0.1886096%`), below the required `0.003 m` and `2%`.
+- The finalizer also failed closed because the case-specific projection
+  observer did not inject its expected telemetry block into the runtime JSON.
+  Ordinary corrective telemetry exists, but it does not satisfy that pinned
+  evidence contract.
+- Final-status SHA-256 is
+  `92215fe1ebd95a027768bfc0d0c360bbd89e07d6d89b0ca41d4fe999ec281db8`.
+  The complete namespace is preserved under
+  `evidence_20260724_case2_natural_error_pair_execution_v1`.
+- Case 2 is not eligible for corrective-label capture. The three converted
+  train datasets `[6, 23, 30]` remain unchanged. No capture, conversion, merge,
+  BC, PPO, checkpoint, or training run was created.
+
+## Next round after Round 256
+
+- Repair the shared projection-observer evidence contract CPU-only so later
+  canaries fail for the correct reason.
+- The next data-producing operation requires a new separate authorization:
+  `Authorize exactly one case-7 paired canary.`

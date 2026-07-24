@@ -200,6 +200,12 @@ CASE2_NATURAL_ERROR_PAIR_EVIDENCE = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_case2_natural_error_pair_route_cpu_v1/summary.json"
 )
+CASE2_NATURAL_ERROR_PAIR_EXECUTION = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_case2_natural_error_pair_execution_v1/"
+    "post_run_audit.json"
+)
 CASE7_PAIR_READINESS_SCRIPT = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -1176,12 +1182,27 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["case2_natural_error_runtime_route_implemented"] is True
     assert corrective["case2_natural_error_execution_route_complete"] is True
     assert corrective["case2_natural_error_cpu_preflight_passed"] is True
+    assert corrective["case2_natural_error_authorization_token_issued"] is True
     assert (
-        corrective["case2_natural_error_authorization_token_issued"] is False
+        corrective["case2_natural_error_authorization_token_consumed"] is True
     )
     assert corrective["case2_natural_error_runtime_authorized"] is False
     assert corrective["case2_natural_error_label_capture_authorized"] is False
     assert corrective["case2_natural_error_training_authorized"] is False
+    case2_execution = json.loads(
+        CASE2_NATURAL_ERROR_PAIR_EXECUTION.read_text()
+    )
+    assert case2_execution["baseline_dynamic_quality_passed"] is True
+    assert case2_execution["candidate_dynamic_quality_passed"] is True
+    assert case2_execution["absolute_improvement_gate_passed"] is False
+    assert case2_execution["relative_improvement_gate_passed"] is False
+    assert (
+        corrective["case2_pair_execution_final_status_sha256"]
+        == _sha256(CASE2_NATURAL_ERROR_PAIR_EXECUTION.parent / "final_status.json")
+    )
+    assert corrective["case2_pair_execution_capture_eligible"] is False
+    assert corrective["case2_pair_execution_dataset_created"] is False
+    assert corrective["case2_pair_execution_training_started"] is False
     case2_route = json.loads(CASE2_NATURAL_ERROR_PAIR_EVIDENCE.read_text())
     assert case2_route["passed"] is True
     assert case2_route["execution_route_complete"] is True
@@ -2359,7 +2380,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "exactly_one_case2_paired_canary" in (
+    assert "exactly_one_case7_paired_canary" in (
         goal["next_iteration"]["required_change"]
     )
 
@@ -2719,10 +2740,9 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["pre_training_required_validation_cases"] == 2
     assert audit["pre_training_pending_route_queue_passed"] is True
     assert audit["pre_training_pending_route_queue_bound_to_goal"] is True
-    assert audit["pre_training_pending_route_queue_ready_count"] == 4
+    assert audit["pre_training_pending_route_queue_ready_count"] == 3
     assert audit["pre_training_pending_route_queue_identity_count"] == 107
     assert audit["pre_training_pending_route_queue_execution_order"] == [
-        "case2_pair",
         "case7_pair",
         "case8_validation_pair",
         "case16_validation_pair",
@@ -2732,7 +2752,7 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         is True
     )
     assert audit["pre_training_next_operation"] == (
-        "authorize_exactly_one_case2_paired_canary"
+        "authorize_exactly_one_case7_paired_canary"
     )
     assert audit["pre_training_next_operation_authorized"] is False
     assert audit["focused_local_cpu_suite"] == "14_passed_2_warnings_in_2.89s"

@@ -119,7 +119,7 @@ def test_current_goal_audit_passes_foundations_but_not_learning() -> None:
         "lookahead_channel_count_per_horizon": 13,
         "action_dimension": 3,
         "zero_initialize_action_head": True,
-        "corrective_case_datasets_available": 1,
+        "corrective_case_datasets_available": 3,
         "corrective_training_corpus_cases_available": 0,
         "minimum_train_cases": 4,
         "minimum_validation_cases": 2,

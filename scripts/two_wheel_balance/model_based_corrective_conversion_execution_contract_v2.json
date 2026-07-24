@@ -1,7 +1,7 @@
 {
   "schema": "cinebotrl_two_wheel_riser_generic_corrective_conversion_execution_contract_v2",
   "reviewed_parent_commit": "f891f6ed0389006b783b09e1d88a2dfd91d56f8d",
-  "implementation_commit": "e12f63d104ebb6c3e3132e4018206cf2a24dbbfe",
+  "implementation_commit": "bf9894e7b0ec48bec06ca7b7848fe8f326257be7",
   "allowed_splits": [
     "train",
     "validation"
@@ -34,8 +34,8 @@
     },
     "execution_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_conversion_execution.py",
-      "sha256": "7be8927c14b79ac4faeedb543507cdc00eb7316e8915e0238136e2dddf052809",
-      "git_blob_sha1": "561ac8c3d0498d562efda01785cb518919344463"
+      "sha256": "65adf4da749d5529e767bd2204b98ba1fe7d7c468d5f5413af130cd5f7c86d91",
+      "git_blob_sha1": "89ac668314ea0574bbf3d4ee9883093e8df644a2"
     },
     "execution_wrapper": {
       "path": "scripts/two_wheel_balance/run_model_based_corrective_conversion_v2.sh",

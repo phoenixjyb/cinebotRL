@@ -375,7 +375,7 @@ def test_canonical_contract_pins_generic_route_and_stays_closed() -> None:
     assert contract["schema"] == MODULE.SCHEMA
     assert contract["reviewed_parent_commit"] == MODULE.REVIEWED_PARENT
     assert contract["implementation_commit"] == (
-        "e12f63d104ebb6c3e3132e4018206cf2a24dbbfe"
+        "bf9894e7b0ec48bec06ca7b7848fe8f326257be7"
     )
     assert contract["allowed_splits"] == ["train", "validation"]
     assert set(contract["identities"]) == set(MODULE.CODE_PATHS)

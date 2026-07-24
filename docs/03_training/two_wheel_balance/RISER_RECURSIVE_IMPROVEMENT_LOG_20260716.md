@@ -9971,3 +9971,41 @@ and must state whether its candidate was accepted or rejected.
   canaries fail for the correct reason.
 - The next data-producing operation remains separately authorized:
   `Authorize exactly one case-7 paired canary.`
+
+## Round 258: projection evidence survives Isaac shutdown
+
+- Replaced admission dependence on the unreliable adapter-injected telemetry
+  block with schema
+  `cinebotrl_two_wheel_riser_corrective_projection_evidence_v2`.
+  The extractor reads atomic requested-action, effective post-supervisor
+  action, projection-delta, affected-sample, completed-step, and action-scale
+  fields already written by shared playback.
+- The extractor is evidence-only and fail-closed. It rejects missing,
+  non-finite, out-of-bound, nonzero disabled-route, or inconsistent-count
+  inputs. It does not intercept or modify commands.
+- Reopened the preserved case-2 pair CPU-only. Projection evidence now passes
+  over `9,204` candidate steps with `65` projection-affected samples, and the
+  dynamic pair is complete. Case 2 remains rejected for the correct reason:
+  position p95 improvement is only `0.0002637322 m` (`0.1886096%`), below the
+  unchanged `0.003 m` and `2%` gates.
+- Resealed the pending case-16 validation route with 25 identities, including
+  the new projection evidence engine. The consolidated pending-route catalog
+  now binds 62 identities across cases 7, 8, and 16.
+- The affected suite passes `68 passed, 2 warnings in 11.61s` locally and
+  `68 passed, 2 warnings in 83.31s` on `.98`. Both hosts produced
+  byte-identical route reports at SHA-256
+  `b58ebb7725f483777b732b05ff88ae0ec6aca0477ffc1f7cfe42de2872046f5d`.
+- Evidence is preserved under
+  `evidence_20260724_corrective_projection_evidence_repair_cpu_v2`.
+  Implementation commit
+  `d51702fa25ec90ffc8c64d23bd92ebbfe1b9c620` is pushed and synchronized.
+- No plan, controller, profile, dynamic threshold, action scale, or command
+  path changed. No authorization token, runtime namespace, Isaac/GPU
+  workload, capture, conversion, merge, BC, PPO, checkpoint, or training run
+  was created. Goal completion remains `6/10`.
+
+## Next round after Round 258
+
+- The shared projection-evidence blocker is closed.
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-7 paired canary.`

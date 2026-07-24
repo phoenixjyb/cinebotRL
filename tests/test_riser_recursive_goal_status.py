@@ -26,8 +26,21 @@ CORRECTIVE_ROUTE_PREPARER = (
 CORRECTIVE_ROUTE_PREFLIGHT = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260724_model_based_corrective_route_catalog_cpu_v1/"
-    "summary.json"
+    "evidence_20260724_corrective_projection_evidence_repair_cpu_v2/"
+    "route_preflight.json"
+)
+PROJECTION_EVIDENCE_ENGINE = (
+    ROOT
+    / "src/rl_platform/tasks/two_wheel_balance/"
+    "riser_projection_evidence.py"
+)
+PROJECTION_REPAIR_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260724_corrective_projection_evidence_repair_cpu_v2"
+)
+PROJECTION_REPAIR_CASE2 = (
+    PROJECTION_REPAIR_EVIDENCE / "case2_reclassification.json"
 )
 CASE23_CAPTURE_CONTRACT = (
     ROOT
@@ -1182,6 +1195,23 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         CASE2_NATURAL_ERROR_PAIR_ADAPTER
     )
     assert corrective["case2_natural_error_pair_identity_count"] == 19
+    assert corrective["case2_natural_error_pair_active_identity_count"] == 20
+    assert corrective["corrective_projection_evidence_engine_sha256"] == (
+        _sha256(PROJECTION_EVIDENCE_ENGINE)
+    )
+    assert corrective["case2_projection_reclassification_sha256"] == (
+        _sha256(PROJECTION_REPAIR_CASE2)
+    )
+    assert corrective[
+        "case2_projection_reclassification_evidence_passed"
+    ] is True
+    assert corrective[
+        "case2_projection_reclassification_dynamic_pair_completed"
+    ] is True
+    assert corrective[
+        "case2_projection_reclassification_corrective_target_admitted"
+    ] is False
+    assert corrective["corrective_projection_evidence_runtime_started"] is False
     assert corrective["case2_natural_error_pair_reset_seed"] == (
         corrective["case2_natural_error_pair_configuration_seed"] + 2
     )
@@ -1802,6 +1832,9 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective[
         "case16_validation_natural_error_pair_route_identity_count"
     ] == 24
+    assert corrective[
+        "case16_validation_natural_error_pair_route_active_identity_count"
+    ] == 25
     assert corrective[
         "case16_validation_natural_error_pair_route_reset_seed"
     ] == (
@@ -2788,7 +2821,7 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "case8_validation_pair",
         "case16_validation_pair",
     ]
-    assert audit["pre_training_corrective_route_catalog_identity_count"] == 61
+    assert audit["pre_training_corrective_route_catalog_identity_count"] == 62
     assert (
         audit["pre_training_corrective_route_catalog_observation_dimension"]
         == 65

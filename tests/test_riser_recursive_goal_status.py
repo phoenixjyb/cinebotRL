@@ -209,7 +209,7 @@ CORRECTIVE_CORPUS_INTAKE_SCRIPT = (
 CORRECTIVE_CORPUS_INTAKE_EVIDENCE = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260724_model_based_corrective_corpus_intake_v3/summary.json"
+    "evidence_20260728_model_based_corrective_corpus_intake_v4/summary.json"
 )
 CASE6_PAIR_READINESS_SCRIPT = (
     ROOT
@@ -782,10 +782,10 @@ def test_goal_preserves_robot_and_completion_contract() -> None:
 
 def test_current_status_distinguishes_candidates_from_training_corpus() -> None:
     stage = _goal()["current_stage"]
-    assert stage["status_as_of"] == "2026-07-27"
+    assert stage["status_as_of"] == "2026-07-28"
     assert stage["quality_qualified_exact_source_cases_available"] == 42
     assert stage["quality_qualified_cases_are_candidates_not_training_corpus"]
-    assert stage["model_based_corrective_case_datasets_available"] == 3
+    assert stage["model_based_corrective_case_datasets_available"] == 4
     assert stage["model_based_corrective_training_corpus_cases_available"] == 0
     assert stage["corrected_reference_cases_available"] == 79
     assert "corrected_teacher_cases_available" not in stage
@@ -1113,10 +1113,10 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         "case23_capture_v4_conversion_execution_authoritative_cpu_suite"
     ] == "1337_passed_12_skipped_2_warnings_in_175.33s"
     assert corrective["corrective_corpus_intake_schema"] == (
-        "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v3"
+        "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v4"
     )
     assert corrective["corrective_corpus_intake_implementation_commit"] == (
-        "c1e45027ec14f7aeaf4c39b066cd99418d6f116b"
+        "5302a3408aae5e9ddcd3d915c07b1a81223e9bdf"
     )
     assert corrective["corrective_corpus_intake_script_sha256"] == _sha256(
         CORRECTIVE_CORPUS_INTAKE_SCRIPT
@@ -1127,15 +1127,14 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["corrective_corpus_intake_mac_windows_byte_parity"] is True
     assert corrective["corrective_corpus_intake_converted_train_cases"] == [
         6,
+        7,
         23,
         30,
     ]
     assert corrective["corrective_corpus_intake_converted_validation_cases"] == []
-    assert corrective["corrective_corpus_intake_missing_train_case_count"] == 1
+    assert corrective["corrective_corpus_intake_missing_train_case_count"] == 0
     assert corrective["corrective_corpus_intake_missing_validation_case_count"] == 2
-    assert corrective["corrective_corpus_intake_pending_minimum_train_cases"] == [
-        2,
-    ]
+    assert corrective["corrective_corpus_intake_pending_minimum_train_cases"] == []
     assert corrective["corrective_corpus_intake_pending_validation_cases"] == [
         8,
         16,
@@ -1143,10 +1142,10 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["corrective_corpus_intake_manifest_ready"] is False
     assert corrective["corrective_corpus_intake_merge_authorized"] is False
     assert corrective["corrective_corpus_intake_authoritative_cpu_commit"] == (
-        "7a4eeb3e945e1c76c1fa05c37a42a4267bb4c6d7"
+        "5302a3408aae5e9ddcd3d915c07b1a81223e9bdf"
     )
     assert corrective["corrective_corpus_intake_authoritative_cpu_suite"] == (
-        "1360_passed_12_skipped_2_warnings_in_190.65s"
+        "48_passed_2_warnings_in_14.18s"
     )
     assert corrective["case6_pair_readiness_schema"] == (
         "cinebotrl_two_wheel_riser_case6_pair_readiness_cpu_v1"
@@ -2935,7 +2934,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "exactly_one_hash_bound_case7_cpu_conversion" in (
+    assert "exactly_one_hash_bound_case8_validation_paired_canary" in (
         goal["next_iteration"]["required_change"]
     )
 
@@ -3338,7 +3337,7 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit["pre_training_architecture_contract_passed"] is True
     assert audit["pre_training_observation_dimension"] == 65
     assert audit["pre_training_action_dimension"] == 3
-    assert audit["pre_training_corrective_case_datasets_available"] == 3
+    assert audit["pre_training_corrective_case_datasets_available"] == 4
     assert audit["pre_training_required_train_cases"] == 4
     assert audit["pre_training_required_validation_cases"] == 2
     assert audit["pre_training_pending_route_queue_passed"] is True
@@ -3491,8 +3490,30 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         is True
     )
     assert audit["pre_training_case7_corrective_conversion_authorized"] is False
+    assert audit["pre_training_case7_corrective_conversion_completed"] is True
+    assert (
+        audit["pre_training_case7_corrective_conversion_valid_for_case_merge"]
+        is True
+    )
+    assert (
+        audit["pre_training_case7_corrective_conversion_valid_for_training"]
+        is False
+    )
+    assert audit["pre_training_corrective_corpus_intake_converted_train_cases"] == [
+        6,
+        7,
+        23,
+        30,
+    ]
+    assert (
+        audit[
+            "pre_training_corrective_corpus_intake_converted_validation_cases"
+        ]
+        == []
+    )
+    assert audit["pre_training_corrective_corpus_intake_manifest_ready"] is False
     assert audit["pre_training_next_operation"] == (
-        "authorize_exactly_one_case7_cpu_conversion"
+        "authorize_exactly_one_case8_validation_paired_canary"
     )
     assert audit["pre_training_no_hidden_cpu_route_blocker"] is True
     assert audit["pre_training_generic_capture_finalizer_implemented"] is True

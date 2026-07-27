@@ -10446,3 +10446,45 @@ and must state whether its candidate was accepted or rejected.
 - A passing conversion would provide the fourth converted train case; it would
   not authorize corpus merge or training and would still leave validation
   cases 8 and 16 pending.
+
+## Round 271: case-7 is converted once and the train intake reaches four cases
+
+- Built and committed a generic case-7 conversion proposal at
+  `847597c2e1e9dac199357faf62576ecb634159f7`. It binds the sealed capture and
+  final status, 6,597 samples, `65 -> 3` shapes, effective post-supervisor
+  targets, reconstructed previous effective actions, all three clocks, and
+  closed learning state.
+- The `.98` native Windows focused suite passed
+  `37 passed, 2 warnings in 31.35 s`. Tokenless preflight passed at SHA-256
+  `5c35a367552223e815de1d18bfd561cb11dca831629ee409caa5f6cc419316bc`;
+  no output namespace existed before authorization.
+- Consumed exactly one external mode-`0600` authorization. The wrapper,
+  converter, and finalizer each ran once and exited `0`; the token was removed
+  before conversion and no retry was performed.
+- The finalizer reopened all 6,597 rows. Dataset SHA-256 is
+  `673e7b897dfe6aa3f1c7ab44019f536d5635bff30bf2386510f1135f876d3263`;
+  final-status SHA-256 is
+  `b8b7f2f3cba40a9dc037ade186984014604ac29f3fd4a00b32fb143916de4fce`.
+  Clipped rows are `[0, 0, 9]`; source, execution, and elapsed clock ends are
+  `12.940941`, `18.1173174`, and `32.98 s`.
+- An independent local reopen passed every finalizer check and reproduced the
+  dataset hash. Conversion evidence summary SHA-256 is
+  `ba0f59f4b33d96026cae14b68ac20e3b2cd68f5371cc3e4515ac70dbfd3799d4`.
+- Upgraded the read-only corpus intake to v4 at
+  `5302a3408aae5e9ddcd3d915c07b1a81223e9bdf`. It reopens converted train
+  cases `[6, 7, 23, 30]` and rejects case-7 dataset, admission, contract,
+  result, or proposal drift. The focused suite passes
+  `48 passed, 2 warnings in 10.28 s` locally and
+  `48 passed, 2 warnings in 14.18 s` on `.98`; both hosts produce summary
+  SHA-256
+  `c1591b668f364fd0abcac06ff7ca62c7e33b34e063f3ce0c6fb6e5d55f42bc5d`.
+- The four-case train count is now satisfied, but validation remains `0/2`.
+  No corpus was merged, and BC, PPO, holdout execution, checkpoints, and
+  training remain closed. Goal completion remains `6/10`.
+
+## Next round after Round 271
+
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-8 validation paired canary.`
+- A passing pair would still require separately authorized capture and
+  conversion before case 8 can enter the validation corpus.

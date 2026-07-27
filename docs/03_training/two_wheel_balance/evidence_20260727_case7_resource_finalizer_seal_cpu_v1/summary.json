@@ -1,0 +1,63 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case7_resource_finalizer_seal_cpu_v1",
+  "implementation_commit": "0f2de2b8175e59395cd61b45d37a49a071ad81e5",
+  "case": 7,
+  "split": "train",
+  "passed": true,
+  "checks": {
+    "resource_admission_required_by_finalizer": true,
+    "resource_admission_schema_pinned": true,
+    "resource_admission_thresholds_pinned": true,
+    "resource_admission_observations_revalidated": true,
+    "missing_resource_admission_rejected": true,
+    "tampered_resource_admission_rejected": true,
+    "healthy_resource_admission_accepted": true,
+    "resource_admission_hash_recorded": true,
+    "tokenless_preflight_passed": true,
+    "case7_commands_unchanged": true,
+    "runtime_authorization_closed": true,
+    "dataset_creation_closed": true,
+    "training_closed": true
+  },
+  "identities": {
+    "capture_contract": {
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case7_capture_contract_v1.json",
+      "sha256": "f36f8d892c88b9e396bfde58f8b39ed1f3c4e1072e1bf382792dfa0f944f497d"
+    },
+    "capture_finalizer": {
+      "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case7_capture.py",
+      "sha256": "53832007b2f3b39ec00372b9a351d12537d2a3f552371f299b150942833d5101",
+      "git_blob_sha1": "bc9cef65ae28a7d12c50d8e90292e45cfbb30898"
+    },
+    "tokenless_preflight": {
+      "path": "tokenless_preflight.json",
+      "sha256": "9642943e399e06df7c1802c6a80e4a0e3d293ef2bf3427b8b1e71589f7dab2d7"
+    },
+    "command_equivalence": {
+      "path": "command_equivalence.json",
+      "sha256": "6b8a66551a2477c5023b388f9f4bb5021c889bf30173f3fe9ddda8cb1385a5f9"
+    },
+    "live_resource_admission": {
+      "path": "live_resource_admission.json",
+      "sha256": "3900529de80609fc6acb326f17f80c8c5e97b6ca90bdef47e0c869bf4cadf3f2"
+    }
+  },
+  "focused_local_cpu_suite": "23_passed_2_warnings_in_0.82s",
+  "focused_windows_cpu_suite": "23_passed_2_warnings_in_13.20s",
+  "live_resource_admission_passed": false,
+  "live_resource_blockers": [
+    "active_solidworks_frontends",
+    "active_siemens_nx_frontend",
+    "windows_free_memory_below_12_gib",
+    "gpu_free_memory_below_16384_mib"
+  ],
+  "runtime_started": false,
+  "authorization_token_issued": false,
+  "authorization_consumed": false,
+  "capture_started": false,
+  "dataset_created": false,
+  "bc_started": false,
+  "ppo_started": false,
+  "training_started": false,
+  "next_operation": "wait_for_shared_windows_resource_admission_then_execute_exactly_one_case7_corrective_label_capture"
+}

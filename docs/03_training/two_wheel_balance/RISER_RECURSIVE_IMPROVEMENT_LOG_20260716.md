@@ -10367,3 +10367,38 @@ and must state whether its candidate was accepted or rejected.
   token and execute exactly one case-7 corrective-label capture.
 - A passing capture still does not authorize its CPU conversion or any
   corpus/training stage.
+
+## Round 269: case-7 finalization now seals shared-host admission
+
+- Updated the case-7 finalizer at implementation commit
+  `0f2de2b8175e59395cd61b45d37a49a071ad81e5`. Finalization now fails closed
+  unless the runtime namespace contains a hashable, schema-correct
+  `resource_admission.json` proving the pinned no-CAD, `12 GiB` Windows RAM,
+  and `16,384 MiB` GPU-headroom checks before runtime start and token
+  consumption.
+- Missing, tampered, stale, malformed, or threshold-drifted resource evidence
+  cannot produce an admitted capture. A healthy report is revalidated and its
+  identity plus observed resource snapshot are copied into final status.
+- The synchronized `.98` tokenless preflight passes all `20` pinned identities
+  at SHA-256
+  `9642943e399e06df7c1802c6a80e4a0e3d293ef2bf3427b8b1e71589f7dab2d7`.
+  Focused finalizer/guard/command tests pass `23 passed, 2 warnings in 0.82 s`
+  locally and `23 passed, 2 warnings in 13.20 s` with native Windows Python.
+- Command equivalence remains clean at SHA-256
+  `6b8a66551a2477c5023b388f9f4bb5021c889bf30173f3fe9ddda8cb1385a5f9`.
+  Case 7 has no command mismatch; no plan, controller, profile, gate, action
+  scale, split, or playback option changed.
+- A fresh live `.98` guard remains closed with active `sldworks.exe` and
+  `ugraf.exe`, `5.761 GiB` free Windows RAM, and `10,491 MiB` free GPU memory.
+  Report SHA-256 is
+  `3900529de80609fc6acb326f17f80c8c5e97b6ca90bdef47e0c869bf4cadf3f2`.
+- The user's exact one-case authorization remains unused. No token, runtime
+  namespace, Isaac/GPU workload, capture, conversion, corpus merge, BC, PPO,
+  checkpoint, or training output was created. Goal completion remains `6/10`.
+
+## Next round after Round 269
+
+- Wait until the pinned shared-host guard passes, then issue one out-of-band
+  token and execute exactly one case-7 corrective-label capture.
+- A passing capture still requires separate CPU-conversion authorization and
+  does not authorize corpus merge, BC, PPO, holdout evaluation, or training.

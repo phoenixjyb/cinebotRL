@@ -48,6 +48,23 @@ SHARED_RESOURCE_EVIDENCE = (
 SHARED_RESOURCE_PREFLIGHT = (
     SHARED_RESOURCE_EVIDENCE.parent / "tokenless_preflight.json"
 )
+CASE7_RESOURCE_FINALIZER_SEAL_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260727_case7_resource_finalizer_seal_cpu_v1"
+)
+CASE7_RESOURCE_FINALIZER_SEAL_SUMMARY = (
+    CASE7_RESOURCE_FINALIZER_SEAL_EVIDENCE / "summary.json"
+)
+CASE7_RESOURCE_FINALIZER_SEAL_PREFLIGHT = (
+    CASE7_RESOURCE_FINALIZER_SEAL_EVIDENCE / "tokenless_preflight.json"
+)
+CASE7_RESOURCE_FINALIZER_SEAL_LIVE = (
+    CASE7_RESOURCE_FINALIZER_SEAL_EVIDENCE / "live_resource_admission.json"
+)
+CASE7_RESOURCE_FINALIZER_SEAL_COMMANDS = (
+    CASE7_RESOURCE_FINALIZER_SEAL_EVIDENCE / "command_equivalence.json"
+)
 CORRECTIVE_ROUTE_CATALOG = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -1611,6 +1628,12 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective[
         "case7_corrective_capture_route_shared_resource_guard_commit"
     ] == "2b4bd88791a2e183b2a9bd4b9d4a0e8374b49fe1"
+    assert corrective[
+        "case7_corrective_capture_route_resource_finalizer_seal_commit"
+    ] == "0f2de2b8175e59395cd61b45d37a49a071ad81e5"
+    assert corrective[
+        "case7_corrective_capture_route_resource_finalizer_seal_summary_sha256"
+    ] == _sha256(CASE7_RESOURCE_FINALIZER_SEAL_SUMMARY)
     assert corrective["case7_corrective_capture_route_evidence_schema"] == (
         "cinebotrl_two_wheel_riser_case7_corrective_capture_route_cpu_evidence_v2"
     )
@@ -1634,7 +1657,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ] == _sha256(CASE7_CAPTURE_ROUTE_FINALIZER)
     assert corrective[
         "case7_corrective_capture_route_preflight_sha256"
-    ] == _sha256(SHARED_RESOURCE_PREFLIGHT)
+    ] == _sha256(CASE7_RESOURCE_FINALIZER_SEAL_PREFLIGHT)
     assert corrective[
         "case7_corrective_capture_route_historical_preflight_sha256"
     ] == _sha256(CASE7_CAPTURE_ROUTE_PREFLIGHT)
@@ -1680,6 +1703,33 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert active_preflight["runtime_authorized"] is False
     assert active_preflight["label_capture_authorized"] is False
     assert active_preflight["training_started"] is False
+    sealed_preflight = json.loads(
+        CASE7_RESOURCE_FINALIZER_SEAL_PREFLIGHT.read_text()
+    )
+    sealed_summary = json.loads(
+        CASE7_RESOURCE_FINALIZER_SEAL_SUMMARY.read_text()
+    )
+    sealed_live = json.loads(CASE7_RESOURCE_FINALIZER_SEAL_LIVE.read_text())
+    sealed_commands = json.loads(
+        CASE7_RESOURCE_FINALIZER_SEAL_COMMANDS.read_text()
+    )
+    assert sealed_summary["passed"] is True
+    assert sealed_summary["implementation_commit"] == (
+        "0f2de2b8175e59395cd61b45d37a49a071ad81e5"
+    )
+    assert all(sealed_summary["checks"].values())
+    assert sealed_preflight["passed"] is True
+    assert len(sealed_preflight["identities"]) == 20
+    assert sealed_preflight["runtime_authorized"] is False
+    assert sealed_live["passed"] is False
+    assert sealed_live["runtime_started"] is False
+    assert sealed_live["authorization_consumed"] is False
+    assert sealed_commands["passed"] is True
+    case7_command = next(
+        route for route in sealed_commands["routes"] if route["case"] == 7
+    )
+    assert case7_command["current_command_compatible"] is True
+    assert case7_command["mismatches"] == []
     generic_conversion = json.loads(
         GENERIC_CORRECTIVE_CONVERSION_SUMMARY.read_text()
     )
@@ -3330,6 +3380,32 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         ]
         is False
     )
+    assert audit["pre_training_case7_resource_finalizer_seal_implemented"] is True
+    assert audit["pre_training_case7_resource_finalizer_seal_commit"] == (
+        "0f2de2b8175e59395cd61b45d37a49a071ad81e5"
+    )
+    assert audit[
+        "pre_training_case7_resource_finalizer_seal_summary_sha256"
+    ] == _sha256(CASE7_RESOURCE_FINALIZER_SEAL_SUMMARY)
+    assert (
+        audit[
+            "pre_training_case7_resource_finalizer_requires_admission_evidence"
+        ]
+        is True
+    )
+    assert (
+        audit[
+            "pre_training_case7_resource_finalizer_missing_or_tampered_evidence_rejected"
+        ]
+        is True
+    )
+    assert audit[
+        "pre_training_case7_resource_finalizer_command_equivalence_sha256"
+    ] == _sha256(CASE7_RESOURCE_FINALIZER_SEAL_COMMANDS)
+    assert audit[
+        "pre_training_case7_resource_finalizer_live_report_sha256"
+    ] == _sha256(CASE7_RESOURCE_FINALIZER_SEAL_LIVE)
+    assert audit["pre_training_case7_resource_finalizer_live_passed"] is False
     assert audit["pre_training_next_operation"] == (
         "wait_for_shared_windows_resource_admission_then_execute_exactly_one_"
         "case7_corrective_label_capture"

@@ -1,0 +1,14 @@
+.....................................                                    [100%]
+============================== warnings summary ===============================
+..\..\isaaclab_venv\Lib\site-packages\_pytest\config\__init__.py:1464
+  G:\isaaclab_venv\Lib\site-packages\_pytest\config\__init__.py:1464: PytestConfigWarning: Unknown config option: line-length
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+..\..\isaaclab_venv\Lib\site-packages\_pytest\config\__init__.py:1464
+  G:\isaaclab_venv\Lib\site-packages\_pytest\config\__init__.py:1464: PytestConfigWarning: Unknown config option: target-version
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+37 passed, 2 warnings in 31.35s

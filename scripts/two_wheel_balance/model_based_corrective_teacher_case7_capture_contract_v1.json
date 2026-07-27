@@ -158,8 +158,8 @@
     },
     "capture_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case7_capture.py",
-      "sha256": "0f7946b6a702d82bf222681202f91d1ea46b2b428840877c37408afae9f7378c",
-      "git_blob_sha1": "03f1a1327b239f440fffe9a49561468403f177a7"
+      "sha256": "53832007b2f3b39ec00372b9a351d12537d2a3f552371f299b150942833d5101",
+      "git_blob_sha1": "bc9cef65ae28a7d12c50d8e90292e45cfbb30898"
     }
   },
   "holdout_cases": [

@@ -93,6 +93,45 @@ def _mock_base_result(projection_path: Path) -> dict[str, object]:
     }
 
 
+def _resource_admission() -> dict[str, object]:
+    return {
+        "schema": "cinebotrl_windows_shared_resource_admission_v1",
+        "thresholds": {
+            "minimum_windows_free_memory_gib": 12.0,
+            "minimum_gpu_free_memory_mib": 16_384,
+            "cad_process_names": [
+                "creoparametric.exe",
+                "parametric.exe",
+                "proe.exe",
+                "sldworks.exe",
+                "ugraf.exe",
+                "xtop.exe",
+            ],
+        },
+        "observed": {
+            "windows_total_memory_gib": 32.0,
+            "windows_free_memory_gib": 16.0,
+            "cad_processes": [],
+            "gpu_count": 1,
+            "gpu_total_memory_mib": 24_467,
+            "gpu_used_memory_mib": 6_000,
+            "gpu_free_memory_mib": 18_162,
+            "gpu_unaccounted_memory_mib": 305,
+        },
+        "checks": {
+            "windows_memory_probe_valid": True,
+            "windows_free_memory_sufficient": True,
+            "cad_process_probe_valid": True,
+            "cad_processes_absent": True,
+            "gpu_memory_probe_valid": True,
+            "gpu_free_memory_sufficient": True,
+        },
+        "runtime_started": False,
+        "authorization_consumed": False,
+        "passed": True,
+    }
+
+
 def test_contract_is_fresh_no_token_case7_capture_route() -> None:
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
     assert contract["reviewed_parent_commit"] == MODULE.REVIEWED_PARENT
@@ -271,6 +310,10 @@ def test_finalizer_seals_only_case7_capture(monkeypatch, tmp_path) -> None:
         return {"passed": False}
 
     monkeypatch.setattr(FINALIZER_MODULE, "summarize_capture", fake_summary)
+    (tmp_path / "resource_admission.json").write_text(
+        json.dumps(_resource_admission()),
+        encoding="utf-8",
+    )
     FINALIZER_MODULE.summarize(
         tmp_path,
         tmp_path / "admission.json",
@@ -284,3 +327,76 @@ def test_finalizer_seals_only_case7_capture(monkeypatch, tmp_path) -> None:
         "case_0007_corrective_teacher_capture_v2.npz"
     )
     assert observed["plan_identity_name"] == "case7_plan"
+
+
+def test_finalizer_requires_passing_resource_admission(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        FINALIZER_MODULE,
+        "summarize_capture",
+        lambda *args, **kwargs: {
+            "passed": True,
+            "capture_admitted_for_dataset_conversion": True,
+        },
+    )
+    result = FINALIZER_MODULE.summarize(
+        tmp_path,
+        tmp_path / "admission.json",
+        runtime_commit="a" * 40,
+        playback_exit_code=0,
+        gpu_release_passed=True,
+    )
+    assert result["shared_windows_resource_admission_passed"] is False
+    assert result["capture_admitted_for_dataset_conversion"] is False
+    assert result["passed"] is False
+
+    resource = _resource_admission()
+    resource["observed"]["cad_processes"] = [
+        {"name": "ugraf.exe", "pid": 1}
+    ]
+    (tmp_path / "resource_admission.json").write_text(
+        json.dumps(resource),
+        encoding="utf-8",
+    )
+    result = FINALIZER_MODULE.summarize(
+        tmp_path,
+        tmp_path / "admission.json",
+        runtime_commit="a" * 40,
+        playback_exit_code=0,
+        gpu_release_passed=True,
+    )
+    assert result["resource_admission_checks"]["cad_processes_absent"] is False
+    assert result["capture_admitted_for_dataset_conversion"] is False
+    assert result["passed"] is False
+
+
+def test_finalizer_accepts_exact_resource_admission(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        FINALIZER_MODULE,
+        "summarize_capture",
+        lambda *args, **kwargs: {
+            "passed": True,
+            "capture_admitted_for_dataset_conversion": True,
+        },
+    )
+    resource_path = tmp_path / "resource_admission.json"
+    resource_path.write_text(
+        json.dumps(_resource_admission()),
+        encoding="utf-8",
+    )
+    result = FINALIZER_MODULE.summarize(
+        tmp_path,
+        tmp_path / "admission.json",
+        runtime_commit="a" * 40,
+        playback_exit_code=0,
+        gpu_release_passed=True,
+    )
+    assert result["shared_windows_resource_admission_passed"] is True
+    assert result["capture_admitted_for_dataset_conversion"] is True
+    assert result["resource_admission"]["sha256"] == _sha256(resource_path)
+    assert result["passed"] is True

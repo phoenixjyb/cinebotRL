@@ -27,6 +27,10 @@ FINALIZER = (
     / "scripts/two_wheel_balance/"
     "summarize_model_based_corrective_teacher_case7_capture.py"
 )
+RESOURCE_GUARD = (
+    ROOT
+    / "scripts/two_wheel_balance/check_windows_shared_resource_admission.py"
+)
 
 
 def _module(path: Path, name: str):
@@ -121,6 +125,7 @@ def test_contract_pins_case7_route_and_projection_files() -> None:
         ),
         "contract_validator": VALIDATOR,
         "preflight_wrapper": WRAPPER,
+        "shared_windows_resource_guard": RESOURCE_GUARD,
         "capture_finalizer": FINALIZER,
     }
     for identity, path in paths.items():
@@ -207,6 +212,13 @@ def test_wrapper_is_capture_only_and_has_no_committed_token() -> None:
     assert "--dataset-dir" not in source
     assert "--checkpoint-output" not in source
     assert "--training-metadata" not in source
+    resource_guard = source.index(
+        'python3 "$RESOURCE_GUARD" --output "$RESOURCE_ADMISSION"'
+    )
+    token_consumption = source.index('rm -f "$AUTHORIZATION_FILE"')
+    namespace_creation = source.index('mkdir -p "$OUTPUT/capture"')
+    assert resource_guard < namespace_creation < token_consumption
+    assert 'cp "$RESOURCE_ADMISSION" "$OUTPUT/resource_admission.json"' in source
     result = subprocess.run(
         ["bash", str(WRAPPER), "--execute"],
         check=False,

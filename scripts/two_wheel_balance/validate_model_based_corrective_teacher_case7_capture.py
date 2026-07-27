@@ -46,6 +46,11 @@ EXPECTED_EXECUTION = {
     "authorization_consumed_before_isaac": True,
     "fresh_namespace_required": True,
     "exclusive_gpu_required": True,
+    "shared_windows_resource_admission_required": True,
+    "resource_admission_before_token_consumption": True,
+    "minimum_windows_free_memory_gib": 12.0,
+    "minimum_gpu_free_memory_mib": 16_384,
+    "cad_processes_must_be_absent": True,
     "dynamic_gate_required_before_save": True,
     "finalizer_reopens_archive": True,
     "capture_only": True,
@@ -69,6 +74,7 @@ REQUIRED_IDENTITIES = {
     "capture_finalizer_runtime",
     "contract_validator",
     "preflight_wrapper",
+    "shared_windows_resource_guard",
     "capture_finalizer",
 }
 TRACKED_IDENTITIES = REQUIRED_IDENTITIES

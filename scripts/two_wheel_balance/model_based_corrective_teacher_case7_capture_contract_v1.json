@@ -51,6 +51,11 @@
     "authorization_consumed_before_isaac": true,
     "fresh_namespace_required": true,
     "exclusive_gpu_required": true,
+    "shared_windows_resource_admission_required": true,
+    "resource_admission_before_token_consumption": true,
+    "minimum_windows_free_memory_gib": 12.0,
+    "minimum_gpu_free_memory_mib": 16384,
+    "cad_processes_must_be_absent": true,
     "dynamic_gate_required_before_save": true,
     "finalizer_reopens_archive": true,
     "capture_only": true
@@ -138,13 +143,18 @@
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case7_capture.py",
-      "sha256": "adc62b74fced5e7927a7b47ff539b8f6b97833602b6d8682b70428c0bdc9d058",
-      "git_blob_sha1": "24667c056b58c2da150af8950f325697d3629eaf"
+      "sha256": "5639616950555d49aaa9a23e09f869a4a5c86407a994a8c35890286bfdac1946",
+      "git_blob_sha1": "68932a2a26d23f72f20dc7cf5e9d8229755437ac"
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case7_capture.sh",
-      "sha256": "70ede04bacb3048f2c6058017b6847060579c489df01ac1684f8051139242e90",
-      "git_blob_sha1": "d371d614bac54d216b90ac9b880273e255fd853e"
+      "sha256": "d660c448e886dd9cbdd963556ae7c77da5eff191c8b45389748607fabe020066",
+      "git_blob_sha1": "2031b2b9e48bc3113e823384ecf0e454ac8346df"
+    },
+    "shared_windows_resource_guard": {
+      "path": "scripts/two_wheel_balance/check_windows_shared_resource_admission.py",
+      "sha256": "6f7423d48b22f25a586e90233eb70af62c39d010c5f134f5ba042d482b08373e",
+      "git_blob_sha1": "4b91befdcbdb2b7bde983ec4770b10710bd0765e"
     },
     "capture_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case7_capture.py",

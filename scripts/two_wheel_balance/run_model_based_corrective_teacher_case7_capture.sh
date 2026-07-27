@@ -5,6 +5,7 @@ readonly ROOT="/mnt/g/wSpace/cinebotRL-two-wheel-riser"
 readonly NAMESPACE="20260724_model_based_corrective_teacher_case7_capture_v1_exclusive"
 readonly CONTRACT="$ROOT/scripts/two_wheel_balance/model_based_corrective_teacher_case7_capture_contract_v1.json"
 readonly VALIDATOR="$ROOT/scripts/two_wheel_balance/validate_model_based_corrective_teacher_case7_capture.py"
+readonly RESOURCE_GUARD="$ROOT/scripts/two_wheel_balance/check_windows_shared_resource_admission.py"
 readonly NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
 readonly POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 readonly PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
@@ -73,7 +74,8 @@ wait_gpu_free() {
 }
 
 ADMISSION="$(mktemp)"
-trap 'rm -f "$ADMISSION"' EXIT
+RESOURCE_ADMISSION="$(mktemp)"
+trap 'rm -f "$ADMISSION" "$RESOURCE_ADMISSION"' EXIT
 VALIDATOR_ARGS=(
   --contract "$CONTRACT"
   --repo-root "$ROOT"
@@ -93,6 +95,10 @@ if [[ "$MODE" == --preflight ]]; then
 fi
 
 assert_gpu_free || reject "exclusive_gpu_ownership_failed" 5
+if ! python3 "$RESOURCE_GUARD" --output "$RESOURCE_ADMISSION" >/dev/null; then
+  cat "$RESOURCE_ADMISSION" >&2
+  reject "shared_windows_resource_admission_failed" 5
+fi
 [[ ! -L "$AUTHORIZATION_FILE" ]] || reject "authorization_file_is_symlink" 4
 [[ "$(stat -c '%a' "$AUTHORIZATION_FILE")" == 600 ]] || {
   reject "authorization_file_mode_not_0600" 4
@@ -104,6 +110,7 @@ assert_gpu_free || reject "exclusive_gpu_ownership_failed" 5
 mkdir -p "$OUTPUT/capture" "$OUTPUT/logs"
 cp "$CONTRACT" "$OUTPUT/contract.json"
 cp "$ADMISSION" "$OUTPUT/admission.json"
+cp "$RESOURCE_ADMISSION" "$OUTPUT/resource_admission.json"
 rm -f "$AUTHORIZATION_FILE"
 
 PLAYBACK_STATUS=0

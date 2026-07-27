@@ -26,7 +26,7 @@ from scripts.two_wheel_balance.validate_model_based_corrective_teacher_case30_ca
 
 
 REVIEWED_PARENT = "b3cffb43d877e0d59eaaed818a9f88e6daa1f968"
-NAMESPACE = "20260724_model_based_corrective_teacher_case7_capture_v1_exclusive"
+NAMESPACE = "20260728_model_based_corrective_teacher_case7_capture_v2_coexistence"
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/"
     "model_based_corrective_teacher_case7_capture_contract_v1.json"
@@ -45,12 +45,15 @@ EXPECTED_EXECUTION = {
     "maximum_runtime_seconds": 600,
     "authorization_consumed_before_isaac": True,
     "fresh_namespace_required": True,
-    "exclusive_gpu_required": True,
+    "exclusive_isaac_runtime_required": True,
     "shared_windows_resource_admission_required": True,
     "resource_admission_before_token_consumption": True,
-    "minimum_windows_free_memory_gib": 12.0,
-    "minimum_gpu_free_memory_mib": 16_384,
-    "cad_processes_must_be_absent": True,
+    "launch_minimum_windows_free_memory_gib": 5.0,
+    "launch_minimum_gpu_free_memory_mib": 9_216,
+    "cad_coexistence_allowed": True,
+    "runtime_resource_monitor_required": True,
+    "runtime_minimum_windows_free_memory_gib": 1.5,
+    "runtime_minimum_gpu_free_memory_mib": 2_048,
     "dynamic_gate_required_before_save": True,
     "finalizer_reopens_archive": True,
     "capture_only": True,
@@ -75,6 +78,7 @@ REQUIRED_IDENTITIES = {
     "contract_validator",
     "preflight_wrapper",
     "shared_windows_resource_guard",
+    "shared_windows_resource_monitor",
     "capture_finalizer",
 }
 TRACKED_IDENTITIES = REQUIRED_IDENTITIES

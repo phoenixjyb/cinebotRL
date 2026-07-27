@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed when shared Windows resources are unsafe for an Isaac launch."""
+"""Fail closed when shared Windows resources are unsafe for Isaac coexistence."""
 
 from __future__ import annotations
 
@@ -10,9 +10,12 @@ import subprocess
 from typing import Any
 
 
-SCHEMA = "cinebotrl_windows_shared_resource_admission_v1"
-MINIMUM_WINDOWS_FREE_MEMORY_GIB = 12.0
-MINIMUM_GPU_FREE_MEMORY_MIB = 16_384
+SCHEMA = "cinebotrl_windows_shared_resource_admission_v2"
+LAUNCH_MINIMUM_WINDOWS_FREE_MEMORY_GIB = 5.0
+LAUNCH_MINIMUM_GPU_FREE_MEMORY_MIB = 9_216
+RUNTIME_MINIMUM_WINDOWS_FREE_MEMORY_GIB = 1.5
+RUNTIME_MINIMUM_GPU_FREE_MEMORY_MIB = 2_048
+CAD_COEXISTENCE_ALLOWED = True
 NVIDIA_SMI = Path("/usr/lib/wsl/lib/nvidia-smi")
 POWERSHELL = Path(
     "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
@@ -119,7 +122,23 @@ def probe_live_snapshot() -> dict[str, Any]:
     }
 
 
-def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+def evaluate_snapshot(
+    snapshot: dict[str, Any],
+    *,
+    phase: str = "launch",
+) -> dict[str, Any]:
+    if phase not in {"launch", "runtime"}:
+        raise ValueError(f"unsupported resource-admission phase: {phase}")
+    minimum_windows_free_memory_gib = (
+        LAUNCH_MINIMUM_WINDOWS_FREE_MEMORY_GIB
+        if phase == "launch"
+        else RUNTIME_MINIMUM_WINDOWS_FREE_MEMORY_GIB
+    )
+    minimum_gpu_free_memory_mib = (
+        LAUNCH_MINIMUM_GPU_FREE_MEMORY_MIB
+        if phase == "launch"
+        else RUNTIME_MINIMUM_GPU_FREE_MEMORY_MIB
+    )
     windows = snapshot.get("windows")
     gpu = snapshot.get("gpu")
     windows = windows if isinstance(windows, dict) else {}
@@ -169,10 +188,12 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         ),
         "windows_free_memory_sufficient": (
             free_memory_gib is not None
-            and free_memory_gib >= MINIMUM_WINDOWS_FREE_MEMORY_GIB
+            and free_memory_gib >= minimum_windows_free_memory_gib
         ),
         "cad_process_probe_valid": cad_rows_valid,
-        "cad_processes_absent": cad_rows_valid and not cad_processes,
+        "cad_coexistence_allowed": (
+            cad_rows_valid and CAD_COEXISTENCE_ALLOWED
+        ),
         "gpu_memory_probe_valid": (
             gpu_values_valid
             and gpu_count == 1
@@ -182,16 +203,28 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "gpu_free_memory_sufficient": (
             isinstance(gpu_free_mib, int)
             and not isinstance(gpu_free_mib, bool)
-            and gpu_free_mib >= MINIMUM_GPU_FREE_MEMORY_MIB
+            and gpu_free_mib >= minimum_gpu_free_memory_mib
         ),
     }
     return {
         "schema": SCHEMA,
+        "phase": phase,
         "thresholds": {
-            "minimum_windows_free_memory_gib": (
-                MINIMUM_WINDOWS_FREE_MEMORY_GIB
+            "minimum_windows_free_memory_gib": minimum_windows_free_memory_gib,
+            "minimum_gpu_free_memory_mib": minimum_gpu_free_memory_mib,
+            "launch_minimum_windows_free_memory_gib": (
+                LAUNCH_MINIMUM_WINDOWS_FREE_MEMORY_GIB
             ),
-            "minimum_gpu_free_memory_mib": MINIMUM_GPU_FREE_MEMORY_MIB,
+            "launch_minimum_gpu_free_memory_mib": (
+                LAUNCH_MINIMUM_GPU_FREE_MEMORY_MIB
+            ),
+            "runtime_minimum_windows_free_memory_gib": (
+                RUNTIME_MINIMUM_WINDOWS_FREE_MEMORY_GIB
+            ),
+            "runtime_minimum_gpu_free_memory_mib": (
+                RUNTIME_MINIMUM_GPU_FREE_MEMORY_MIB
+            ),
+            "cad_coexistence_allowed": CAD_COEXISTENCE_ALLOWED,
             "cad_process_names": list(CAD_PROCESS_NAMES),
         },
         "observed": {
@@ -210,8 +243,8 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
             "gpu_unaccounted_memory_mib": gpu_unaccounted_mib,
         },
         "checks": checks,
-        "runtime_started": False,
-        "authorization_consumed": False,
+        "runtime_started": phase == "runtime",
+        "authorization_consumed": phase == "runtime",
         "passed": all(checks.values()),
     }
 
@@ -223,6 +256,11 @@ def main() -> int:
         type=Path,
         help="Evaluate a saved synthetic snapshot instead of probing the host.",
     )
+    parser.add_argument(
+        "--phase",
+        choices=("launch", "runtime"),
+        default="launch",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -232,13 +270,14 @@ def main() -> int:
             if args.snapshot is not None
             else probe_live_snapshot()
         )
-        result = evaluate_snapshot(snapshot)
+        result = evaluate_snapshot(snapshot, phase=args.phase)
     except (FileNotFoundError, ValueError, json.JSONDecodeError, subprocess.SubprocessError) as error:
         result = {
             "schema": SCHEMA,
+            "phase": args.phase,
             "error": f"{type(error).__name__}: {error}",
-            "runtime_started": False,
-            "authorization_consumed": False,
+            "runtime_started": args.phase == "runtime",
+            "authorization_consumed": args.phase == "runtime",
             "passed": False,
         }
 

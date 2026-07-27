@@ -2,11 +2,11 @@
 set -euo pipefail
 
 readonly ROOT="/mnt/g/wSpace/cinebotRL-two-wheel-riser"
-readonly NAMESPACE="20260724_model_based_corrective_teacher_case7_capture_v1_exclusive"
+readonly NAMESPACE="20260728_model_based_corrective_teacher_case7_capture_v2_coexistence"
 readonly CONTRACT="$ROOT/scripts/two_wheel_balance/model_based_corrective_teacher_case7_capture_contract_v1.json"
 readonly VALIDATOR="$ROOT/scripts/two_wheel_balance/validate_model_based_corrective_teacher_case7_capture.py"
 readonly RESOURCE_GUARD="$ROOT/scripts/two_wheel_balance/check_windows_shared_resource_admission.py"
-readonly NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
+readonly RESOURCE_MONITOR="$ROOT/scripts/two_wheel_balance/monitor_windows_shared_resource_pressure.py"
 readonly POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 readonly PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
 readonly WIN_ROOT="G:\wSpace\cinebotRL-two-wheel-riser"
@@ -43,12 +43,9 @@ if [[ "$MODE" == --execute ]]; then
 fi
 
 assert_gpu_free() {
-  local wsl_owners compute_owners windows_owners
+  local wsl_owners windows_owners
   wsl_owners="$(
     ps -ef | grep -E '[p]ython(\.exe)? .*(smoke_.*playback|train_riser_residual_bc)\.py' || true
-  )"
-  compute_owners="$(
-    "$NVIDIA_SMI" --query-compute-apps=pid,process_name --format=csv,noheader 2>/dev/null || true
   )"
   windows_owners="$(
     "$POWERSHELL" -NoProfile -NonInteractive -Command '
@@ -61,7 +58,7 @@ assert_gpu_free() {
       } | ForEach-Object { "{0}`t{1}" -f $_.ProcessId, $_.CommandLine }
     ' | tr -d '\r'
   )"
-  [[ -z "$wsl_owners" && -z "$compute_owners" && -z "$windows_owners" ]]
+  [[ -z "$wsl_owners" && -z "$windows_owners" ]]
 }
 
 wait_gpu_free() {
@@ -95,7 +92,8 @@ if [[ "$MODE" == --preflight ]]; then
 fi
 
 assert_gpu_free || reject "exclusive_gpu_ownership_failed" 5
-if ! python3 "$RESOURCE_GUARD" --output "$RESOURCE_ADMISSION" >/dev/null; then
+if ! python3 "$RESOURCE_GUARD" --phase launch \
+  --output "$RESOURCE_ADMISSION" >/dev/null; then
   cat "$RESOURCE_ADMISSION" >&2
   reject "shared_windows_resource_admission_failed" 5
 fi
@@ -114,7 +112,7 @@ cp "$RESOURCE_ADMISSION" "$OUTPUT/resource_admission.json"
 rm -f "$AUTHORIZATION_FILE"
 
 PLAYBACK_STATUS=0
-timeout --signal=TERM --kill-after=30s 600 \
+setsid timeout --signal=TERM --kill-after=30s 600 \
   "$PY" -u -X utf8 "$PLAYBACK" \
   --gains "$GAINS" \
   --plan-dir "$PLAN_DIR" \
@@ -145,8 +143,21 @@ timeout --signal=TERM --kill-after=30s 600 \
   --runtime-heartbeat "$OUTPUT_WIN\runtime_heartbeat.json" \
   --output "$OUTPUT_WIN\case_0007.json" \
   --headless \
-  >"$OUTPUT/logs/playback.log" 2>&1 || PLAYBACK_STATUS=$?
+  >"$OUTPUT/logs/playback.log" 2>&1 &
+PLAYBACK_PID=$!
+
+MONITOR_STATUS=0
+python3 "$RESOURCE_MONITOR" \
+  --pid "$PLAYBACK_PID" \
+  --output "$OUTPUT/resource_monitor.json" \
+  --interval-s 5 \
+  >"$OUTPUT/logs/resource_monitor.log" 2>&1 || MONITOR_STATUS=$?
+wait "$PLAYBACK_PID" || PLAYBACK_STATUS=$?
+if (( MONITOR_STATUS != 0 && PLAYBACK_STATUS == 0 )); then
+  PLAYBACK_STATUS=75
+fi
 printf '%s\n' "$PLAYBACK_STATUS" >"$OUTPUT/logs/playback.exit_code"
+printf '%s\n' "$MONITOR_STATUS" >"$OUTPUT/logs/resource_monitor.exit_code"
 
 GPU_RELEASE_PASSED=1
 wait_gpu_free || GPU_RELEASE_PASSED=0

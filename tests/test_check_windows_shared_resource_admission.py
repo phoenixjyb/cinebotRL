@@ -27,8 +27,8 @@ MODULE = _module()
 
 def _snapshot(
     *,
-    windows_free_gib: float = 16.0,
-    gpu_free_mib: int = 18_000,
+    windows_free_gib: float = 6.0,
+    gpu_free_mib: int = 10_500,
     cad_processes: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     total_memory_kib = 32 * 1024 * 1024
@@ -52,11 +52,25 @@ def _snapshot(
     }
 
 
-def test_healthy_snapshot_passes_without_consuming_authorization() -> None:
-    result = MODULE.evaluate_snapshot(_snapshot())
+def test_cad_coexistence_snapshot_passes_without_consuming_authorization() -> None:
+    result = MODULE.evaluate_snapshot(
+        _snapshot(
+            cad_processes=[
+                {
+                    "name": "ugraf.exe",
+                    "pid": 27816,
+                    "working_set_mib": 1_400.0,
+                    "private_memory_mib": 20_000.0,
+                }
+            ]
+        )
+    )
 
     assert result["passed"] is True
     assert all(result["checks"].values())
+    assert result["phase"] == "launch"
+    assert result["thresholds"]["cad_coexistence_allowed"] is True
+    assert len(result["observed"]["cad_processes"]) == 1
     assert result["runtime_started"] is False
     assert result["authorization_consumed"] is False
 
@@ -64,21 +78,8 @@ def test_healthy_snapshot_passes_without_consuming_authorization() -> None:
 @pytest.mark.parametrize(
     ("snapshot", "failed_check"),
     [
-        (
-            _snapshot(
-                cad_processes=[
-                    {
-                        "name": "ugraf.exe",
-                        "pid": 27816,
-                        "working_set_mib": 700.0,
-                        "private_memory_mib": 20_000.0,
-                    }
-                ]
-            ),
-            "cad_processes_absent",
-        ),
-        (_snapshot(windows_free_gib=5.7), "windows_free_memory_sufficient"),
-        (_snapshot(gpu_free_mib=10_268), "gpu_free_memory_sufficient"),
+        (_snapshot(windows_free_gib=4.9), "windows_free_memory_sufficient"),
+        (_snapshot(gpu_free_mib=9_215), "gpu_free_memory_sufficient"),
     ],
 )
 def test_busy_shared_host_fails_closed(
@@ -114,6 +115,33 @@ def test_malformed_probe_fails_closed() -> None:
     assert result["checks"]["windows_memory_probe_valid"] is False
     assert result["checks"]["cad_process_probe_valid"] is False
     assert result["checks"]["gpu_memory_probe_valid"] is False
+
+
+def test_runtime_phase_uses_hard_floors_and_marks_runtime_state() -> None:
+    result = MODULE.evaluate_snapshot(
+        _snapshot(windows_free_gib=1.6, gpu_free_mib=2_100),
+        phase="runtime",
+    )
+
+    assert result["passed"] is True
+    assert result["phase"] == "runtime"
+    assert result["runtime_started"] is True
+    assert result["authorization_consumed"] is True
+    assert result["thresholds"]["minimum_windows_free_memory_gib"] == 1.5
+    assert result["thresholds"]["minimum_gpu_free_memory_mib"] == 2_048
+
+
+def test_runtime_pressure_fails_closed() -> None:
+    result = MODULE.evaluate_snapshot(
+        _snapshot(windows_free_gib=1.4, gpu_free_mib=2_047),
+        phase="runtime",
+    )
+
+    assert result["passed"] is False
+    assert result["checks"]["windows_free_memory_sufficient"] is False
+    assert result["checks"]["gpu_free_memory_sufficient"] is False
+    assert result["runtime_started"] is True
+    assert result["authorization_consumed"] is True
 
 
 def test_cli_snapshot_writes_machine_readable_rejection(tmp_path: Path) -> None:

@@ -31,6 +31,10 @@ RESOURCE_GUARD = (
     ROOT
     / "scripts/two_wheel_balance/check_windows_shared_resource_admission.py"
 )
+RESOURCE_MONITOR = (
+    ROOT
+    / "scripts/two_wheel_balance/monitor_windows_shared_resource_pressure.py"
+)
 
 
 def _module(path: Path, name: str):
@@ -95,10 +99,16 @@ def _mock_base_result(projection_path: Path) -> dict[str, object]:
 
 def _resource_admission() -> dict[str, object]:
     return {
-        "schema": "cinebotrl_windows_shared_resource_admission_v1",
+        "schema": "cinebotrl_windows_shared_resource_admission_v2",
+        "phase": "launch",
         "thresholds": {
-            "minimum_windows_free_memory_gib": 12.0,
-            "minimum_gpu_free_memory_mib": 16_384,
+            "minimum_windows_free_memory_gib": 5.0,
+            "minimum_gpu_free_memory_mib": 9_216,
+            "launch_minimum_windows_free_memory_gib": 5.0,
+            "launch_minimum_gpu_free_memory_mib": 9_216,
+            "runtime_minimum_windows_free_memory_gib": 1.5,
+            "runtime_minimum_gpu_free_memory_mib": 2_048,
+            "cad_coexistence_allowed": True,
             "cad_process_names": [
                 "creoparametric.exe",
                 "parametric.exe",
@@ -110,19 +120,26 @@ def _resource_admission() -> dict[str, object]:
         },
         "observed": {
             "windows_total_memory_gib": 32.0,
-            "windows_free_memory_gib": 16.0,
-            "cad_processes": [],
+            "windows_free_memory_gib": 6.0,
+            "cad_processes": [
+                {
+                    "name": "ugraf.exe",
+                    "pid": 27816,
+                    "working_set_mib": 1_400.0,
+                    "private_memory_mib": 20_000.0,
+                }
+            ],
             "gpu_count": 1,
             "gpu_total_memory_mib": 24_467,
-            "gpu_used_memory_mib": 6_000,
-            "gpu_free_memory_mib": 18_162,
+            "gpu_used_memory_mib": 13_662,
+            "gpu_free_memory_mib": 10_500,
             "gpu_unaccounted_memory_mib": 305,
         },
         "checks": {
             "windows_memory_probe_valid": True,
             "windows_free_memory_sufficient": True,
             "cad_process_probe_valid": True,
-            "cad_processes_absent": True,
+            "cad_coexistence_allowed": True,
             "gpu_memory_probe_valid": True,
             "gpu_free_memory_sufficient": True,
         },
@@ -132,11 +149,53 @@ def _resource_admission() -> dict[str, object]:
     }
 
 
+def _resource_monitor() -> dict[str, object]:
+    sample = {
+        "schema": "cinebotrl_windows_shared_resource_admission_v2",
+        "phase": "runtime",
+        "observed": {
+            "windows_free_memory_gib": 2.5,
+            "gpu_free_memory_mib": 3_500,
+        },
+        "runtime_started": True,
+        "authorization_consumed": True,
+        "passed": True,
+    }
+    return {
+        "schema": "cinebotrl_windows_shared_resource_monitor_v1",
+        "monitored_pid": 123,
+        "runtime_thresholds": {
+            "minimum_windows_free_memory_gib": 1.5,
+            "minimum_gpu_free_memory_mib": 2_048,
+        },
+        "sample_count": 1,
+        "minimum_observed_windows_free_memory_gib": 2.5,
+        "minimum_observed_gpu_free_memory_mib": 3_500,
+        "termination_requested": False,
+        "process_exit_observed": True,
+        "samples": [sample],
+        "passed": True,
+    }
+
+
+def _write_resource_evidence(tmp_path: Path) -> None:
+    (tmp_path / "resource_admission.json").write_text(
+        json.dumps(_resource_admission()),
+        encoding="utf-8",
+    )
+    (tmp_path / "resource_monitor.json").write_text(
+        json.dumps(_resource_monitor()),
+        encoding="utf-8",
+    )
+
+
 def test_contract_is_fresh_no_token_case7_capture_route() -> None:
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
     assert contract["reviewed_parent_commit"] == MODULE.REVIEWED_PARENT
     assert contract["namespace"] == MODULE.NAMESPACE
-    assert contract["route_revision"] == "case7_capture_v1"
+    assert contract["route_revision"] == (
+        "case7_capture_v2_monitored_coexistence"
+    )
     assert contract["case"] == 7
     assert contract["split"] == "train"
     assert contract["execution_contract"] == MODULE.EXPECTED_EXECUTION
@@ -165,6 +224,7 @@ def test_contract_pins_case7_route_and_projection_files() -> None:
         "contract_validator": VALIDATOR,
         "preflight_wrapper": WRAPPER,
         "shared_windows_resource_guard": RESOURCE_GUARD,
+        "shared_windows_resource_monitor": RESOURCE_MONITOR,
         "capture_finalizer": FINALIZER,
     }
     for identity, path in paths.items():
@@ -241,7 +301,7 @@ def test_wrapper_is_capture_only_and_has_no_committed_token() -> None:
     assert "--cases 7" in source
     assert "--corrective-teacher-capture-split train" in source
     assert "--corrective-teacher-capture-dir" in source
-    assert "case7_capture_v1_exclusive" in source
+    assert "case7_capture_v2_coexistence" in source
     assert "case7_pair_v1_exclusive" not in source
     assert (
         'AUTHORIZATION_SHA256="${'
@@ -252,12 +312,14 @@ def test_wrapper_is_capture_only_and_has_no_committed_token() -> None:
     assert "--checkpoint-output" not in source
     assert "--training-metadata" not in source
     resource_guard = source.index(
-        'python3 "$RESOURCE_GUARD" --output "$RESOURCE_ADMISSION"'
+        'python3 "$RESOURCE_GUARD" --phase launch'
     )
     token_consumption = source.index('rm -f "$AUTHORIZATION_FILE"')
     namespace_creation = source.index('mkdir -p "$OUTPUT/capture"')
     assert resource_guard < namespace_creation < token_consumption
     assert 'cp "$RESOURCE_ADMISSION" "$OUTPUT/resource_admission.json"' in source
+    assert 'python3 "$RESOURCE_MONITOR"' in source
+    assert '--output "$OUTPUT/resource_monitor.json"' in source
     result = subprocess.run(
         ["bash", str(WRAPPER), "--execute"],
         check=False,
@@ -353,11 +415,13 @@ def test_finalizer_requires_passing_resource_admission(
     assert result["passed"] is False
 
     resource = _resource_admission()
-    resource["observed"]["cad_processes"] = [
-        {"name": "ugraf.exe", "pid": 1}
-    ]
+    resource["observed"]["windows_free_memory_gib"] = 4.9
     (tmp_path / "resource_admission.json").write_text(
         json.dumps(resource),
+        encoding="utf-8",
+    )
+    (tmp_path / "resource_monitor.json").write_text(
+        json.dumps(_resource_monitor()),
         encoding="utf-8",
     )
     result = FINALIZER_MODULE.summarize(
@@ -367,7 +431,9 @@ def test_finalizer_requires_passing_resource_admission(
         playback_exit_code=0,
         gpu_release_passed=True,
     )
-    assert result["resource_admission_checks"]["cad_processes_absent"] is False
+    assert result["resource_admission_checks"][
+        "windows_free_memory_sufficient"
+    ] is False
     assert result["capture_admitted_for_dataset_conversion"] is False
     assert result["passed"] is False
 
@@ -384,11 +450,9 @@ def test_finalizer_accepts_exact_resource_admission(
             "capture_admitted_for_dataset_conversion": True,
         },
     )
+    _write_resource_evidence(tmp_path)
     resource_path = tmp_path / "resource_admission.json"
-    resource_path.write_text(
-        json.dumps(_resource_admission()),
-        encoding="utf-8",
-    )
+    monitor_path = tmp_path / "resource_monitor.json"
     result = FINALIZER_MODULE.summarize(
         tmp_path,
         tmp_path / "admission.json",
@@ -397,6 +461,43 @@ def test_finalizer_accepts_exact_resource_admission(
         gpu_release_passed=True,
     )
     assert result["shared_windows_resource_admission_passed"] is True
+    assert result["shared_windows_resource_monitor_passed"] is True
     assert result["capture_admitted_for_dataset_conversion"] is True
     assert result["resource_admission"]["sha256"] == _sha256(resource_path)
+    assert result["resource_monitor"]["sha256"] == _sha256(monitor_path)
     assert result["passed"] is True
+
+
+def test_finalizer_rejects_runtime_pressure_monitor(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        FINALIZER_MODULE,
+        "summarize_capture",
+        lambda *args, **kwargs: {
+            "passed": True,
+            "capture_admitted_for_dataset_conversion": True,
+        },
+    )
+    _write_resource_evidence(tmp_path)
+    monitor = _resource_monitor()
+    monitor["termination_requested"] = True
+    monitor["process_exit_observed"] = False
+    monitor["passed"] = False
+    (tmp_path / "resource_monitor.json").write_text(
+        json.dumps(monitor),
+        encoding="utf-8",
+    )
+
+    result = FINALIZER_MODULE.summarize(
+        tmp_path,
+        tmp_path / "admission.json",
+        runtime_commit="a" * 40,
+        playback_exit_code=143,
+        gpu_release_passed=True,
+    )
+
+    assert result["shared_windows_resource_monitor_passed"] is False
+    assert result["capture_admitted_for_dataset_conversion"] is False
+    assert result["passed"] is False

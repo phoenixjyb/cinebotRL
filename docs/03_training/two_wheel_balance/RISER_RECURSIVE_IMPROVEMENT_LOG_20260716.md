@@ -10324,3 +10324,46 @@ and must state whether its candidate was accepted or rejected.
 
 - The next data-producing operation remains separately authorized:
   `Authorize exactly one case-7 corrective-label capture.`
+
+## Round 268: shared Windows workloads block capture before token consumption
+
+- Added a fail-closed shared-host admission probe at implementation commit
+  `2b4bd88791a2e183b2a9bd4b9d4a0e8374b49fe1`. The pending case-7 capture
+  wrapper now requires no active NX, SolidWorks, or Creo frontend, at least
+  `12 GiB` free Windows RAM, and at least `16,384 MiB` free GPU memory.
+- The probe runs after static route validation but before namespace creation
+  and authorization-token consumption. Its accepted report is copied into the
+  runtime namespace. Probe failure leaves the token and namespace untouched.
+- The guard and wrapper are pinned by SHA-256 and Git blob in the case-7
+  capture contract. Synthetic healthy, CAD-busy, low-RAM, low-VRAM, malformed,
+  and CLI rejection coverage passes `21 passed, 2 warnings in 0.70 s` locally
+  and `21 passed, 2 warnings in 10.73 s` with native Windows Python on `.98`.
+- The synchronized tokenless `.98` preflight passes with `20` pinned
+  identities at SHA-256
+  `a91d78f4a6c6a4a2e60f6351d86caf3009584d6fb9cb182c91d0eade783634fc`.
+  Runtime and label-capture authorization remain false.
+- The committed command-equivalence audit still passes all eight checks.
+  Case 7 remains command-compatible with no plan, controller, profile, gate,
+  action-scale, split, or playback-option change.
+- A broad local run passed `1,368` tests and failed `16` only because
+  remote-generated URDF, mesh, and hardware-envelope artifacts are absent
+  from this worktree; six unrelated `mobile_mm` modules also cannot collect
+  without local `gymnasium`. The full Windows suite was intentionally
+  deferred rather than competing with active CAD workloads.
+- A live read-only `.98` probe failed closed with active `ugraf.exe` and
+  `sldworks.exe`, `9.60 GiB` free Windows RAM, and `10,268 MiB` free GPU
+  memory. Evidence is preserved under
+  `evidence_20260727_shared_windows_resource_admission_cpu_v1` at report
+  SHA-256
+  `b46b87f3365647746b9a8646ea9985ee1b689e813a6b49d30d49731c218ac5ca`.
+- The user's one-case capture authorization remains unused: no runtime token,
+  namespace, Isaac/GPU workload, label capture, conversion, corpus merge, BC,
+  PPO, checkpoint, or training output was created. Goal completion remains
+  `6/10`.
+
+## Next round after Round 268
+
+- Wait until the pinned shared-host guard passes, then issue one out-of-band
+  token and execute exactly one case-7 corrective-label capture.
+- A passing capture still does not authorize its CPU conversion or any
+  corpus/training stage.

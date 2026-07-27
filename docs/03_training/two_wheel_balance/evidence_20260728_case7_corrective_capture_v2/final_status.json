@@ -1,0 +1,205 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_capture_final_v2",
+  "namespace": "20260728_model_based_corrective_teacher_case7_capture_v2_coexistence",
+  "runtime_commit": "d0365653571d50523584e80e2ec1943febdfe6d4",
+  "case": 7,
+  "split": "train",
+  "playback_exit_code": 0,
+  "admission_checks": {
+    "schema": true,
+    "passed": true,
+    "runtime_commit": true,
+    "runtime_authorized": true,
+    "capture_authorized": true,
+    "pair_admitted": true,
+    "dataset_closed": true,
+    "training_closed": true,
+    "contract_identity": true,
+    "plan_identity": true,
+    "profile_identity": true,
+    "pair_identity": true
+  },
+  "gate_checks": {
+    "exit_zero": true,
+    "single_case": true,
+    "passed": true,
+    "dynamic": true,
+    "thermal": true,
+    "controller": true,
+    "perturbation": true,
+    "source": true,
+    "capture_requested": true,
+    "capture_written": true,
+    "legacy_capture_closed": true,
+    "training_closed": true,
+    "heartbeat": true,
+    "gpu_released": true
+  },
+  "archive_checks": {
+    "loaded": true,
+    "sample_count": true,
+    "plan_identity": true,
+    "runtime_identity": true,
+    "profile_identity": true,
+    "pair_identity": true,
+    "source_clock": true,
+    "execution_clock": true,
+    "perturbation_rows": true,
+    "requested_reserved_margin": true,
+    "effective_reserved_margin": true,
+    "supervisor_contract": true,
+    "clipping_telemetry": true,
+    "initialization_excluded": true,
+    "training_closed": true
+  },
+  "contract_checks": {
+    "namespace": true,
+    "case_split": true,
+    "runtime_commit_descends_reviewed_parent": true
+  },
+  "capture_error": null,
+  "capture_metrics": {
+    "sample_count": 6597,
+    "source_clock_end_s": 12.940941,
+    "execution_clock_end_s": 18.1173174,
+    "perturbation_active_rows": 20,
+    "requested_normalized_action_abs_max": [
+      0.38330644369125366,
+      0.20154418051242828,
+      0.06314191967248917
+    ],
+    "effective_normalized_action_abs_max": [
+      0.38330644369125366,
+      0.20154418051242828,
+      0.06314191967248917
+    ],
+    "command_clipped_rows": [
+      0,
+      0,
+      9
+    ],
+    "requested_vs_effective_residual_delta_abs_max": [
+      7.231108489769156e-10,
+      3.0547381291157194e-10,
+      9.020274592330679e-05
+    ],
+    "amplitude_limited_rows": [
+      861,
+      1822,
+      6387
+    ],
+    "slew_limited_rows": [
+      0,
+      154,
+      74
+    ]
+  },
+  "gate": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case7_capture_v2_coexistence\\case_0007.json",
+    "sha256": "655c2ebddc78e35ed5f356084137afbe48924bc06dea81eea11522fcf2b67c3f",
+    "size_bytes": 206619
+  },
+  "heartbeat": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case7_capture_v2_coexistence\\runtime_heartbeat.json",
+    "sha256": "425ffa30db2d3260a8a759b41e59e28908178a3c9ea5e1ae6c862703c12c40c2",
+    "size_bytes": 1282
+  },
+  "capture": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case7_capture_v2_coexistence\\capture\\case_0007_corrective_teacher_capture_v2.npz",
+    "sha256": "c75d1d7a15b05d4200d7e5687ec7bf160a32adb9a250b61926b9848bf0577a5b",
+    "size_bytes": 1907238
+  },
+  "admission": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case7_capture_v2_coexistence\\admission.json",
+    "sha256": "2be17aea3ac16bc0879141ef8db6cb8ba273c49039fc305990d2c3e66ee46afd",
+    "size_bytes": 13294
+  },
+  "contract": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case7_capture_v2_coexistence\\contract.json",
+    "sha256": "acfb642a80dd63881376475e2f81ffc81404b8da5daf0c9e53d53d81cba6d810",
+    "size_bytes": 9425
+  },
+  "dynamic_quality_passed": true,
+  "capture_admitted_for_dataset_conversion": true,
+  "normalized_training_dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true,
+  "resource_admission_checks": {
+    "schema": true,
+    "phase": true,
+    "passed": true,
+    "generated_before_runtime": true,
+    "minimum_windows_free_memory_gib": true,
+    "minimum_gpu_free_memory_mib": true,
+    "runtime_minimum_windows_free_memory_gib": true,
+    "runtime_minimum_gpu_free_memory_mib": true,
+    "cad_coexistence_allowed": true,
+    "cad_process_names": true,
+    "required_probe_checks": true,
+    "cad_processes_observed": true,
+    "windows_free_memory_sufficient": true,
+    "gpu_free_memory_sufficient": true
+  },
+  "resource_admission": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case7_capture_v2_coexistence\\resource_admission.json",
+    "sha256": "03c11c0586f937c68243bfba4436003da73d4bce7bb586d972f0d9669ee9c9a0",
+    "size_bytes": 1671
+  },
+  "resource_admission_observed": {
+    "windows_total_memory_gib": 31.455806732177734,
+    "windows_free_memory_gib": 5.3853607177734375,
+    "cad_processes": [
+      {
+        "name": "sldworks.exe",
+        "pid": 34244,
+        "working_set_mib": 97.148,
+        "private_memory_mib": 782.258
+      },
+      {
+        "name": "sldworks.exe",
+        "pid": 43236,
+        "working_set_mib": 1.836,
+        "private_memory_mib": 5152.91
+      },
+      {
+        "name": "ugraf.exe",
+        "pid": 27816,
+        "working_set_mib": 1388.934,
+        "private_memory_mib": 20878.293
+      }
+    ],
+    "gpu_count": 1,
+    "gpu_total_memory_mib": 24467,
+    "gpu_used_memory_mib": 13671,
+    "gpu_free_memory_mib": 10491,
+    "gpu_unaccounted_memory_mib": 305
+  },
+  "shared_windows_resource_admission_passed": true,
+  "resource_monitor_checks": {
+    "schema": true,
+    "passed": true,
+    "runtime_thresholds": true,
+    "sample_count": true,
+    "samples": true,
+    "minimum_windows_free_memory_gib": true,
+    "minimum_gpu_free_memory_mib": true,
+    "termination_not_requested": true,
+    "process_exit_observed": true
+  },
+  "resource_monitor": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case7_capture_v2_coexistence\\resource_monitor.json",
+    "sha256": "596b09199ca8f67596508498488592897761ffe9077325778cefe204d392ac1b",
+    "size_bytes": 92404
+  },
+  "resource_monitor_summary": {
+    "sample_count": 46,
+    "minimum_observed_windows_free_memory_gib": 2.8355369567871094,
+    "minimum_observed_gpu_free_memory_mib": 8072,
+    "termination_requested": false,
+    "process_exit_observed": true
+  },
+  "shared_windows_resource_monitor_passed": true
+}

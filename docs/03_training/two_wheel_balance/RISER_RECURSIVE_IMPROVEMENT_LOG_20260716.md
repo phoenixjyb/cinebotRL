@@ -10402,3 +10402,47 @@ and must state whether its candidate was accepted or rejected.
   token and execute exactly one case-7 corrective-label capture.
 - A passing capture still requires separate CPU-conversion authorization and
   does not authorize corpus merge, BC, PPO, holdout evaluation, or training.
+
+## Round 270: case-7 capture passes under monitored CAD coexistence
+
+- Replaced the blanket no-CAD condition with a fresh fail-closed coexistence
+  route at runtime commit
+  `d0365653571d50523584e80e2ec1943febdfe6d4`. Launch requires `5 GiB`
+  Windows RAM and `9,216 MiB` GPU headroom; a five-second runtime monitor
+  terminates the isolated playback group below `1.5 GiB` RAM or `2,048 MiB`
+  GPU headroom. Other Isaac/training processes remain exclusive owners.
+- The focused local suite passed `28 passed, 2 warnings in 0.82 s`; native
+  Windows Python on `.98` passed the same `28` tests in `7.47 s`. The clean
+  tokenless preflight passed `21` pinned identities before authorization.
+- Consumed the user's previously unused authorization exactly once in fresh
+  namespace
+  `20260728_model_based_corrective_teacher_case7_capture_v2_coexistence`.
+  The out-of-band mode-`0600` token was removed before Isaac started.
+- SolidWorks and Siemens NX remained active. Launch admission saw `5.385 GiB`
+  free Windows RAM and `10,491 MiB` free GPU memory. The runtime monitor
+  passed all `46` samples, with minimum headroom `2.836 GiB` RAM and
+  `8,072 MiB` GPU memory; it requested no termination and observed clean
+  process exit.
+- The rollout completed `6,597` samples and the full `18.1173174 s`
+  execution clock. Position p95/max error was
+  `0.12490885/0.14110223 m`; attitude p95/max error was
+  `0.15046139/0.22354177 deg`; maximum pitch was `6.13752218 deg`.
+  Action, riser, and proxy saturation ratios were zero, attitude IK failures
+  were zero, and no runtime termination occurred.
+- Final status passed at SHA-256
+  `8a2f0988cb4c9b131d30b9c0bffcbd7003f63084dc3f7d1516ad1f34bd9949ea`.
+  Capture SHA-256 is
+  `c75d1d7a15b05d4200d7e5687ec7bf160a32adb9a250b61926b9848bf0577a5b`;
+  evidence summary SHA-256 is
+  `20b54b944c626a50c185b527a82f36e680df987a95553e2bfc21c3303148c8fb`.
+- The archive is admitted for a separate CPU conversion, but conversion,
+  corpus merge, BC, PPO, holdout execution, and training remain unauthorized.
+  Goal completion remains `6/10`.
+
+## Next round after Round 270
+
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-7 CPU conversion.`
+- A passing conversion would provide the fourth converted train case; it would
+  not authorize corpus merge or training and would still leave validation
+  cases 8 and 16 pending.

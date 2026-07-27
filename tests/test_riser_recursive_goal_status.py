@@ -42,8 +42,8 @@ SHARED_RESOURCE_GUARD = (
 SHARED_RESOURCE_EVIDENCE = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
-    "evidence_20260727_shared_windows_resource_admission_cpu_v1/"
-    "live_busy_host_report.json"
+    "evidence_20260728_case7_corrective_capture_v2/"
+    "resource_admission.json"
 )
 SHARED_RESOURCE_PREFLIGHT = (
     SHARED_RESOURCE_EVIDENCE.parent / "tokenless_preflight.json"
@@ -371,6 +371,11 @@ CASE7_CAPTURE_ROUTE_FINALIZER = (
     / "scripts/two_wheel_balance/"
     "summarize_model_based_corrective_teacher_case7_capture.py"
 )
+CASE7_CAPTURE_RESOURCE_MONITOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "monitor_windows_shared_resource_pressure.py"
+)
 CASE7_CAPTURE_ROUTE_EVIDENCE = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
@@ -381,6 +386,24 @@ CASE7_CAPTURE_ROUTE_PREFLIGHT = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_case7_corrective_capture_route_cpu_v2/"
     "preflight_windows.json"
+)
+CASE7_CAPTURE_V2_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260728_case7_corrective_capture_v2"
+)
+CASE7_CAPTURE_V2_SUMMARY = CASE7_CAPTURE_V2_EVIDENCE / "summary.json"
+CASE7_CAPTURE_V2_FINAL = CASE7_CAPTURE_V2_EVIDENCE / "final_status.json"
+CASE7_CAPTURE_V2_GATE = CASE7_CAPTURE_V2_EVIDENCE / "case_0007.json"
+CASE7_CAPTURE_V2_ARCHIVE = (
+    CASE7_CAPTURE_V2_EVIDENCE
+    / "capture/case_0007_corrective_teacher_capture_v2.npz"
+)
+CASE7_CAPTURE_V2_PREFLIGHT = (
+    CASE7_CAPTURE_V2_EVIDENCE / "tokenless_preflight.json"
+)
+CASE7_CAPTURE_V2_RESOURCE_MONITOR = (
+    CASE7_CAPTURE_V2_EVIDENCE / "resource_monitor.json"
 )
 GENERIC_CORRECTIVE_CONVERSION_PREPARER = (
     ROOT
@@ -1653,15 +1676,18 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
         "case7_corrective_capture_route_shared_resource_guard_sha256"
     ] == _sha256(SHARED_RESOURCE_GUARD)
     assert corrective[
+        "case7_corrective_capture_route_shared_resource_monitor_sha256"
+    ] == _sha256(CASE7_CAPTURE_RESOURCE_MONITOR)
+    assert corrective[
         "case7_corrective_capture_route_finalizer_sha256"
     ] == _sha256(CASE7_CAPTURE_ROUTE_FINALIZER)
     assert corrective[
         "case7_corrective_capture_route_preflight_sha256"
-    ] == _sha256(CASE7_RESOURCE_FINALIZER_SEAL_PREFLIGHT)
+    ] == _sha256(CASE7_CAPTURE_V2_PREFLIGHT)
     assert corrective[
         "case7_corrective_capture_route_historical_preflight_sha256"
     ] == _sha256(CASE7_CAPTURE_ROUTE_PREFLIGHT)
-    assert corrective["case7_corrective_capture_route_identity_count"] == 20
+    assert corrective["case7_corrective_capture_route_identity_count"] == 21
     assert corrective[
         "case7_corrective_capture_route_projection_evidence_passed"
     ] is True
@@ -1679,7 +1705,10 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ] == "active_shared_windows_cad_and_memory_pressure"
     assert corrective[
         "case7_corrective_capture_route_authorization_token_issued"
-    ] is False
+    ] is True
+    assert corrective[
+        "case7_corrective_capture_route_authorization_token_consumed"
+    ] is True
     assert corrective[
         "case7_corrective_capture_route_runtime_authorized"
     ] is False
@@ -1699,7 +1728,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     active_preflight = json.loads(SHARED_RESOURCE_PREFLIGHT.read_text())
     assert active_preflight["passed"] is True
     assert active_preflight["cpu_contract_ready"] is True
-    assert len(active_preflight["identities"]) == 20
+    assert len(active_preflight["identities"]) == 21
     assert active_preflight["runtime_authorized"] is False
     assert active_preflight["label_capture_authorized"] is False
     assert active_preflight["training_started"] is False
@@ -1730,6 +1759,40 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     )
     assert case7_command["current_command_compatible"] is True
     assert case7_command["mismatches"] == []
+    capture_v2 = json.loads(CASE7_CAPTURE_V2_SUMMARY.read_text())
+    capture_v2_final = json.loads(CASE7_CAPTURE_V2_FINAL.read_text())
+    assert corrective["case7_corrective_capture_v2_runtime_commit"] == (
+        "d0365653571d50523584e80e2ec1943febdfe6d4"
+    )
+    assert corrective[
+        "case7_corrective_capture_v2_evidence_summary_sha256"
+    ] == _sha256(CASE7_CAPTURE_V2_SUMMARY)
+    assert corrective[
+        "case7_corrective_capture_v2_gate_sha256"
+    ] == _sha256(CASE7_CAPTURE_V2_GATE)
+    assert corrective[
+        "case7_corrective_capture_v2_final_status_sha256"
+    ] == _sha256(CASE7_CAPTURE_V2_FINAL)
+    assert corrective[
+        "case7_corrective_capture_v2_capture_sha256"
+    ] == _sha256(CASE7_CAPTURE_V2_ARCHIVE)
+    assert corrective[
+        "case7_corrective_capture_v2_resource_monitor_sha256"
+    ] == _sha256(CASE7_CAPTURE_V2_RESOURCE_MONITOR)
+    assert capture_v2["passed"] is True
+    assert capture_v2["dynamic_quality_passed"] is True
+    assert capture_v2["capture_sample_count"] == 6597
+    assert capture_v2["resource_monitor_sample_count"] == 46
+    assert capture_v2["capture_admitted_for_dataset_conversion"] is True
+    assert capture_v2["conversion_authorized"] is False
+    assert capture_v2["training_started"] is False
+    assert capture_v2_final["passed"] is True
+    assert capture_v2_final["shared_windows_resource_monitor_passed"] is True
+    assert (
+        capture_v2_final["capture_admitted_for_dataset_conversion"] is True
+    )
+    assert capture_v2_final["training_started"] is False
+    assert capture_v2_final["valid_for_training"] is False
     generic_conversion = json.loads(
         GENERIC_CORRECTIVE_CONVERSION_SUMMARY.read_text()
     )
@@ -2872,7 +2935,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "exactly_one_case7_corrective_label_capture" in (
+    assert "exactly_one_hash_bound_case7_cpu_conversion" in (
         goal["next_iteration"]["required_change"]
     )
 
@@ -3335,35 +3398,41 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         audit[
             "pre_training_case7_corrective_capture_route_authorization_token_issued"
         ]
-        is False
+        is True
+    )
+    assert (
+        audit[
+            "pre_training_case7_corrective_capture_route_authorization_token_consumed"
+        ]
+        is True
     )
     assert audit["pre_training_shared_windows_resource_guard_implemented"] is True
     assert audit["pre_training_shared_windows_resource_guard_commit"] == (
-        "2b4bd88791a2e183b2a9bd4b9d4a0e8374b49fe1"
+        "d0365653571d50523584e80e2ec1943febdfe6d4"
     )
     assert audit["pre_training_shared_windows_resource_guard_sha256"] == (
         _sha256(SHARED_RESOURCE_GUARD)
     )
     assert audit[
         "pre_training_shared_windows_resource_guard_minimum_windows_free_memory_gib"
-    ] == 12.0
+    ] == 5.0
     assert audit[
         "pre_training_shared_windows_resource_guard_minimum_gpu_free_memory_mib"
-    ] == 16384
+    ] == 9216
     assert audit[
         "pre_training_shared_windows_resource_guard_cad_processes_must_be_absent"
-    ] is True
+    ] is False
     assert audit[
         "pre_training_shared_windows_resource_guard_live_report_sha256"
     ] == _sha256(SHARED_RESOURCE_EVIDENCE)
     resource_report = json.loads(SHARED_RESOURCE_EVIDENCE.read_text())
-    assert resource_report["passed"] is False
+    assert resource_report["passed"] is True
     assert resource_report["runtime_started"] is False
     assert resource_report["authorization_consumed"] is False
-    assert resource_report["checks"]["cad_processes_absent"] is False
-    assert resource_report["checks"]["windows_free_memory_sufficient"] is False
-    assert resource_report["checks"]["gpu_free_memory_sufficient"] is False
-    assert audit["pre_training_shared_windows_resource_guard_live_passed"] is False
+    assert resource_report["checks"]["cad_coexistence_allowed"] is True
+    assert resource_report["checks"]["windows_free_memory_sufficient"] is True
+    assert resource_report["checks"]["gpu_free_memory_sufficient"] is True
+    assert audit["pre_training_shared_windows_resource_guard_live_passed"] is True
     assert (
         audit["pre_training_shared_windows_resource_guard_runtime_started"]
         is False
@@ -3406,9 +3475,24 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "pre_training_case7_resource_finalizer_live_report_sha256"
     ] == _sha256(CASE7_RESOURCE_FINALIZER_SEAL_LIVE)
     assert audit["pre_training_case7_resource_finalizer_live_passed"] is False
+    assert (
+        audit["pre_training_case7_monitored_cad_coexistence_implemented"]
+        is True
+    )
+    assert audit["pre_training_case7_monitored_cad_coexistence_commit"] == (
+        "d0365653571d50523584e80e2ec1943febdfe6d4"
+    )
+    assert audit["pre_training_case7_corrective_capture_completed"] is True
+    assert audit[
+        "pre_training_case7_corrective_capture_evidence_summary_sha256"
+    ] == _sha256(CASE7_CAPTURE_V2_SUMMARY)
+    assert (
+        audit["pre_training_case7_corrective_capture_admitted_for_conversion"]
+        is True
+    )
+    assert audit["pre_training_case7_corrective_conversion_authorized"] is False
     assert audit["pre_training_next_operation"] == (
-        "wait_for_shared_windows_resource_admission_then_execute_exactly_one_"
-        "case7_corrective_label_capture"
+        "authorize_exactly_one_case7_cpu_conversion"
     )
     assert audit["pre_training_no_hidden_cpu_route_blocker"] is True
     assert audit["pre_training_generic_capture_finalizer_implemented"] is True
@@ -3501,7 +3585,7 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert capture_command_audit["capture_started"] is False
     assert capture_command_audit["dataset_created"] is False
     assert capture_command_audit["training_started"] is False
-    assert audit["pre_training_next_operation_authorized"] is True
+    assert audit["pre_training_next_operation_authorized"] is False
     assert audit["focused_local_cpu_suite"] == "30_passed_2_warnings_in_2.89s"
     assert audit["focused_windows_cpu_suite"] == "30_passed_2_warnings_in_14.83s"
     assert audit["goal_binding_commit"] == (

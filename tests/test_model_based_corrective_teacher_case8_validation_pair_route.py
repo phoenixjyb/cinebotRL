@@ -156,8 +156,18 @@ def test_validator_recognizes_valid_out_of_band_authorization(
         authorization_file=token,
         authorization_sha256=token_sha,
     )
-    assert all(result["authorization_checks"].values())
-    assert result["checks"]["authorization_state"] is True
+    authorization_checks = result["authorization_checks"]
+    if os.name == "nt":
+        assert authorization_checks["authorization_mode_0600"] is False
+        assert all(
+            passed
+            for name, passed in authorization_checks.items()
+            if name != "authorization_mode_0600"
+        )
+        assert result["checks"]["authorization_state"] is False
+    else:
+        assert all(authorization_checks.values())
+        assert result["checks"]["authorization_state"] is True
     assert result["runtime_authorized"] is False
     assert result["gpu_launch_authorized"] is False
     assert result["label_capture_authorized"] is False

@@ -1,0 +1,13 @@
+admission.json binary
+case_0008.json binary
+contract.json binary
+final_status.json binary
+resource_admission.json binary
+resource_monitor.json binary
+runtime_heartbeat.json binary
+tokenless_preflight.json binary
+capture/* binary
+logs/* binary
+README.md text eol=lf
+SHA256SUMS text eol=lf
+summary.json text eol=lf

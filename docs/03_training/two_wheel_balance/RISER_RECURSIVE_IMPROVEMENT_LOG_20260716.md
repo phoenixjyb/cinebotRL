@@ -10531,3 +10531,48 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-8 validation corrective-label capture.`
 - A passing capture would still require a separately authorized CPU
   conversion before case 8 can enter the validation corpus.
+
+## Round 273: case-8 validation capture passes and remains conversion-only
+
+- Added a dedicated validation-only capture route at implementation commit
+  `884af81d0b3ca18fcbd40a04f30c4e50f26d9a71`. It binds the passed case-8
+  pair, exact plan/profile/wrench, frozen controller and plant, validation
+  split, resource guard, capture runtime, and finalizer. It does not modify
+  playback commands or any train-case route.
+- The focused local suite passed `43` tests. Native Windows Python on `.98`
+  passed the same `43` tests after a CRLF reproducibility fix at
+  `83b8fbc251f05e309db41ccb6acb5e373c2a5fa8`. Clean tokenless preflight
+  passed every contract, pair, profile, drive, holdout, and identity check.
+- Consumed exactly one external mode-`0600` token in fresh namespace
+  `20260728_model_based_corrective_teacher_case8_validation_capture_v1_coexistence`.
+  The wrapper ran once, removed the token before Isaac startup, and completed
+  without retry.
+- SolidWorks and Siemens NX remained active. Launch admission saw
+  `5.490 GiB` free Windows RAM and `10,262 MiB` free GPU memory. The runtime
+  monitor passed all `48` samples, with minimum headroom `2.980 GiB` RAM and
+  `7,801 MiB` GPU. It requested no termination and observed clean process
+  exit.
+- The rollout completed `6,607` samples and the full `18.1173174 s`
+  execution clock. Position p95/max error was
+  `0.12587092/0.14144056 m`; attitude p95/max was
+  `0.15106281/0.25800224 deg`; peak pitch was `6.16226497 deg`. Action,
+  riser, and proxy saturation ratios were zero, and attitude IK failures
+  were zero.
+- The finalizer reopened every validation row and verified plan, profile,
+  pair, runtime, source/execution clocks, action margin, initialization
+  exclusion, and supervisor telemetry. Capture SHA-256 is
+  `104ba6d57c57b12af450b015a2f8431a38f19bd7477b7d2badec3836878e0cbc`;
+  final-status SHA-256 is
+  `10bffcdeb9eaebaa42af6e09e5ae68d2fd14d056b38a47e96c58ac1d20a5470a`;
+  evidence summary SHA-256 is
+  `f8114cd75be7786bb6d2f2355ea555138275b08e50aa8fb781fdce2cfaec9928`.
+- The archive is admitted only for a separately authorized CPU conversion.
+  Conversion, corpus merge, BC, PPO, holdout execution, checkpoint creation,
+  and training remain closed. Goal completion remains `6/10`.
+
+## Next round after Round 273
+
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-8 validation CPU conversion.`
+- A passing conversion would provide the first converted validation case; it
+  would not authorize corpus merge, BC, PPO, holdout execution, or training.

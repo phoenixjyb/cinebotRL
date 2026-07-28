@@ -516,6 +516,11 @@ CASE8_VALIDATION_PAIR_EXECUTION_SUMMARY = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260728_case8_validation_pair_v2/summary.json"
 )
+CASE8_VALIDATION_CAPTURE_SUMMARY = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260728_case8_validation_capture_v1/summary.json"
+)
 CASE16_VALIDATION_PAIR_READINESS_SCRIPT = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -2210,6 +2215,27 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case8_execution["label_capture_authorized"] is False
     assert case8_execution["dataset_created"] is False
     assert case8_execution["training_started"] is False
+    case8_capture = json.loads(CASE8_VALIDATION_CAPTURE_SUMMARY.read_text())
+    assert corrective["case8_validation_capture_completed"] is True
+    assert corrective["case8_validation_capture_passed"] is True
+    assert corrective[
+        "case8_validation_capture_evidence_summary_sha256"
+    ] == _sha256(CASE8_VALIDATION_CAPTURE_SUMMARY)
+    assert corrective["case8_validation_capture_sample_count"] == 6607
+    assert corrective[
+        "case8_validation_capture_valid_for_conversion"
+    ] is True
+    assert corrective[
+        "case8_validation_capture_conversion_authorized"
+    ] is False
+    assert corrective["case8_validation_capture_valid_for_training"] is False
+    assert case8_capture["passed"] is True
+    assert case8_capture["split"] == "validation"
+    assert case8_capture["capture_sample_count"] == 6607
+    assert case8_capture["capture_admitted_for_dataset_conversion"] is True
+    assert case8_capture["conversion_authorized"] is False
+    assert case8_capture["normalized_training_dataset_created"] is False
+    assert case8_capture["training_started"] is False
     assert corrective["case16_validation_pair_readiness_script_sha256"] == (
         _sha256(CASE16_VALIDATION_PAIR_READINESS_SCRIPT)
     )
@@ -2965,7 +2991,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "exactly_one_hash_bound_case8_validation_corrective_label_capture" in (
+    assert "exactly_one_hash_bound_case8_validation_cpu_conversion" in (
         goal["next_iteration"]["required_change"]
     )
 
@@ -3550,8 +3576,18 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
     assert audit[
         "pre_training_case8_validation_pair_capture_authorized"
     ] is False
+    assert audit["pre_training_case8_validation_capture_completed"] is True
+    assert audit[
+        "pre_training_case8_validation_capture_evidence_summary_sha256"
+    ] == _sha256(CASE8_VALIDATION_CAPTURE_SUMMARY)
+    assert audit[
+        "pre_training_case8_validation_capture_admitted_for_conversion"
+    ] is True
+    assert audit[
+        "pre_training_case8_validation_capture_conversion_authorized"
+    ] is False
     assert audit["pre_training_next_operation"] == (
-        "authorize_exactly_one_case8_validation_corrective_label_capture"
+        "authorize_exactly_one_case8_validation_cpu_conversion"
     )
     assert audit["pre_training_no_hidden_cpu_route_blocker"] is True
     assert audit["pre_training_generic_capture_finalizer_implemented"] is True

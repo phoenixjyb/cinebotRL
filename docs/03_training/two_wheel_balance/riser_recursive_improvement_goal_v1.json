@@ -423,7 +423,7 @@
         "corrective_corpus_intake_missing_validation_case_count": 2,
         "corrective_corpus_intake_pending_minimum_train_cases": [],
         "corrective_corpus_intake_pending_validation_cases": [8, 16],
-        "corrective_corpus_intake_next_bounded_action": "authorize_exactly_one_case8_validation_corrective_label_capture",
+        "corrective_corpus_intake_next_bounded_action": "authorize_exactly_one_case8_validation_cpu_conversion",
         "corrective_corpus_intake_manifest_ready": false,
         "corrective_corpus_intake_merge_authorized": false,
         "corrective_corpus_intake_focused_local_cpu_suite": "48_passed_2_warnings_in_10.28s",
@@ -990,6 +990,18 @@
         "case8_validation_pair_capture_authorized": false,
         "case8_validation_pair_dataset_created": false,
         "case8_validation_pair_valid_for_training": false,
+        "case8_validation_capture_route_implementation_commit": "884af81d0b3ca18fcbd40a04f30c4e50f26d9a71",
+        "case8_validation_capture_runtime_commit": "83b8fbc251f05e309db41ccb6acb5e373c2a5fa8",
+        "case8_validation_capture_namespace": "20260728_model_based_corrective_teacher_case8_validation_capture_v1_coexistence",
+        "case8_validation_capture_completed": true,
+        "case8_validation_capture_passed": true,
+        "case8_validation_capture_evidence_summary_sha256": "f8114cd75be7786bb6d2f2355ea555138275b08e50aa8fb781fdce2cfaec9928",
+        "case8_validation_capture_final_status_sha256": "10bffcdeb9eaebaa42af6e09e5ae68d2fd14d056b38a47e96c58ac1d20a5470a",
+        "case8_validation_capture_archive_sha256": "104ba6d57c57b12af450b015a2f8431a38f19bd7477b7d2badec3836878e0cbc",
+        "case8_validation_capture_sample_count": 6607,
+        "case8_validation_capture_valid_for_conversion": true,
+        "case8_validation_capture_conversion_authorized": false,
+        "case8_validation_capture_valid_for_training": false,
         "case16_validation_pair_readiness_schema": "cinebotrl_two_wheel_riser_case16_validation_pair_readiness_cpu_v1",
         "case16_validation_pair_readiness_implementation_commit": "7957e34871b2da9f84a555bcd46576048fbee658",
         "case16_validation_pair_readiness_script_sha256": "24a311f9487c22ef32b10a4ed2fec49411db6b9985742405c2ae99fe0fc6cf0b",
@@ -1612,7 +1624,12 @@
         "pre_training_case8_validation_pair_evidence_summary_sha256": "f4d0cef2ffb0f97504519c9f0d51c265cfa1c8be0ffd9948c6785dde475abebc",
         "pre_training_case8_validation_pair_position_p95_improvement_fraction": 0.040208508942048166,
         "pre_training_case8_validation_pair_capture_authorized": false,
-        "pre_training_next_operation": "authorize_exactly_one_case8_validation_corrective_label_capture",
+        "pre_training_case8_validation_capture_completed": true,
+        "pre_training_case8_validation_capture_evidence_summary_sha256": "f8114cd75be7786bb6d2f2355ea555138275b08e50aa8fb781fdce2cfaec9928",
+        "pre_training_case8_validation_capture_sample_count": 6607,
+        "pre_training_case8_validation_capture_admitted_for_conversion": true,
+        "pre_training_case8_validation_capture_conversion_authorized": false,
+        "pre_training_next_operation": "authorize_exactly_one_case8_validation_cpu_conversion",
         "pre_training_next_operation_authorized": false,
         "focused_local_cpu_suite": "30_passed_2_warnings_in_2.89s",
         "focused_windows_cpu_suite": "30_passed_2_warnings_in_14.83s",
@@ -1623,7 +1640,7 @@
         "authoritative_windows_cpu_suite": "1427_passed_12_skipped_2_warnings_in_244.41s"
       },
       "completion_gap": [
-        "run_separately_authorized_capture_and_conversion_for_validation_case_8_then_pair_capture_and_convert_case_16",
+        "run_separately_authorized_conversion_for_validation_case_8_then_pair_capture_and_convert_case_16",
         "populate_the_implemented_case_disjoint_corpus_with_at_least_4_train_and_2_validation_cases",
         "populate_the_review_corpus_then_issue_a_separate_hash_bound_training_schema_admission",
         "issue_a_separate_hash_bound_bc_execution_admission_and_run_the_integrated_trainer",
@@ -1634,15 +1651,15 @@
       ]
     },
     "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
-    "current_root_cause": "four_corrective_train_cases_are_converted_and_case8_validation_pair_passes_but_validation_captures_conversions_and_case_disjoint_corpus_are_missing",
-    "remote_isaac_validation": "42_dynamic_candidates_plus_exact_zero_case8_case78_preservation_plus_passed_case30_case23_case6_case7_train_pairs_plus_passed_case8_validation_pair_plus_passed_case30_case23_case6_case7_captures_plus_rejected_case2_pair",
+    "current_root_cause": "four_corrective_train_cases_are_converted_and_case8_validation_capture_passes_but_validation_conversion_case16_and_case_disjoint_corpus_are_missing",
+    "remote_isaac_validation": "42_dynamic_candidates_plus_exact_zero_case8_case78_preservation_plus_passed_case30_case23_case6_case7_train_pairs_plus_passed_case8_validation_pair_and_capture_plus_passed_case30_case23_case6_case7_captures_plus_rejected_case2_pair",
     "accepted_evidence": "docs/03_training/two_wheel_balance/RISER_RECURSIVE_IMPROVEMENT_LOG_20260716.md"
   },
   "next_iteration": {
-    "hypothesis": "the_passed_case8_validation_profile_can_supply_the_first_case_disjoint_validation_teacher_without_changing_the_four_sealed_train_datasets",
-    "required_change": "obtain_separate_authorization_then_execute_exactly_one_hash_bound_case8_validation_corrective_label_capture",
-    "success_path": "case8_capture_passes_then_separately_authorize_cpu_conversion_before_case16_and_corpus_review",
-    "rejection_path": "preserve_the_passed_case8_pair_and_four_sealed_train_datasets_then_diagnose_capture_without_opening_holdouts_or_training",
-    "stop_rule": "do_not_capture_case8_without_explicit_corrective_label_capture_authorization_and_do_not_infer_conversion_merge_bc_ppo_holdout_or_training_authorization"
+    "hypothesis": "the_passed_case8_validation_capture_can_be_converted_into_the_first_case_disjoint_validation_dataset_without_changing_the_four_sealed_train_datasets",
+    "required_change": "obtain_separate_authorization_then_execute_exactly_one_hash_bound_case8_validation_cpu_conversion",
+    "success_path": "case8_conversion_passes_then_prepare_case16_pair_capture_and_conversion_before_corpus_review",
+    "rejection_path": "preserve_the_passed_case8_capture_and_four_sealed_train_datasets_then_diagnose_conversion_without_opening_holdouts_or_training",
+    "stop_rule": "do_not_convert_case8_without_explicit_cpu_conversion_authorization_and_do_not_infer_merge_bc_ppo_holdout_or_training_authorization"
   }
 }

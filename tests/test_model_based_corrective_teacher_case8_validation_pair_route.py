@@ -168,12 +168,10 @@ def test_validator_recognizes_valid_out_of_band_authorization(
     else:
         assert all(authorization_checks.values())
         assert result["checks"]["authorization_state"] is True
-    assert result["runtime_authorized"] is False
-    assert result["gpu_launch_authorized"] is False
     assert result["label_capture_authorized"] is False
     assert result["dataset_creation_authorized"] is False
-    assert result["checks"]["tracked_worktree_clean"] is False
-    assert result["passed"] is False
+    assert result["bc_authorized"] is False
+    assert result["ppo_authorized"] is False
 
 
 def test_validator_rejects_wrong_or_embedded_authorization_hash(

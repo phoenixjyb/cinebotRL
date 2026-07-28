@@ -1,0 +1,85 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_generic_corrective_conversion_final_v2",
+  "namespace": "model_based_corrective_case0008_conversion_execution_v2_cpu",
+  "case": 8,
+  "split": "validation",
+  "execution_commit": "97076069300512380e99e1d2ab55a95d0b4ebf5e",
+  "converter_exit_code": 0,
+  "checks": {
+    "namespace": true,
+    "execution_commit": true,
+    "converter_exit_zero": true,
+    "admission_schema": true,
+    "admission_passed": true,
+    "admission_case_split": true,
+    "admission_execution_commit": true,
+    "authorization_consumed": true,
+    "proposal": true,
+    "source_paths": true,
+    "conversion_result": true,
+    "dataset_loaded": true,
+    "source_capture_hash": true,
+    "source_final_status_hash": true,
+    "runtime_identity": true,
+    "case_split": true,
+    "sample_count": true,
+    "effective_actions_exact": true,
+    "requested_actions_audit_exact": true,
+    "previous_action_recurrence": true,
+    "non_previous_observations_exact": true,
+    "elapsed_clock_exact": true,
+    "execution_clock_exact": true,
+    "source_clock_exact": true,
+    "case_ids_exact": true,
+    "clipped_rows": true,
+    "training_closed": true,
+    "metrics_exact": true
+  },
+  "conversion_result_error": null,
+  "dataset_error": null,
+  "metrics": {
+    "sample_count": 6607,
+    "observation_shape": [
+      6607,
+      65
+    ],
+    "action_shape": [
+      6607,
+      3
+    ],
+    "action_abs_max": [
+      0.3073228597640991,
+      0.16295172274112701,
+      0.050125692039728165
+    ],
+    "requested_action_abs_max": [
+      0.3073228597640991,
+      0.16295172274112701,
+      0.050125692039728165
+    ],
+    "clipped_rows": [
+      0,
+      0,
+      9
+    ],
+    "elapsed_clock_end_s": 33.03,
+    "execution_clock_end_s": 18.1173174,
+    "source_clock_end_s": 12.940941
+  },
+  "proposal": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\model_based_corrective_case0008_conversion_execution_v2_cpu\\proposal.json",
+    "sha256": "4faf1d8b66c409280cf8c837cd2e0259213b6e7ea528b0c301fdfeb1c164d490"
+  },
+  "dataset": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\model_based_corrective_case0008_conversion_execution_v2_cpu\\case_0008_model_based_corrective_case_dataset_v1.npz",
+    "sha256": "393d841d67afe5b7a5d48182cec23804331c0472191e237275e6b6a199145402",
+    "size_bytes": 1887327
+  },
+  "valid_for_case_merge": true,
+  "merged_dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

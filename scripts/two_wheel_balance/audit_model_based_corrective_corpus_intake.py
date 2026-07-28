@@ -24,7 +24,7 @@ from rl_platform.tasks.two_wheel_balance.riser_model_based_corrective_dataset im
 )
 
 
-SCHEMA = "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v4"
+SCHEMA = "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v5"
 TRAIN_SELECTION_SCHEMA = (
     "cinebotrl_two_wheel_riser_model_based_pair_tranche_selection_v1"
 )
@@ -156,6 +156,25 @@ DEFAULT_CASE7_CONVERSION_RESULT = (
     DEFAULT_CASE7_CONVERSION_ROOT / "conversion_result.json"
 )
 DEFAULT_CASE7_PROPOSAL = DEFAULT_CASE7_CONVERSION_ROOT / "proposal.json"
+DEFAULT_CASE8_CONVERSION_ROOT = (
+    DOC_ROOT
+    / "evidence_20260728_case8_validation_conversion_execution_cpu_v1"
+)
+DEFAULT_CASE8_DATASET = (
+    DEFAULT_CASE8_CONVERSION_ROOT
+    / "case_0008_model_based_corrective_case_dataset_v1.npz"
+)
+DEFAULT_CASE8_CONVERSION_FINAL = (
+    DEFAULT_CASE8_CONVERSION_ROOT / "final_status.json"
+)
+DEFAULT_CASE8_ADMISSION = (
+    DEFAULT_CASE8_CONVERSION_ROOT / "admission.json"
+)
+DEFAULT_CASE8_CONTRACT = DEFAULT_CASE8_CONVERSION_ROOT / "contract.json"
+DEFAULT_CASE8_CONVERSION_RESULT = (
+    DEFAULT_CASE8_CONVERSION_ROOT / "conversion_result.json"
+)
+DEFAULT_CASE8_PROPOSAL = DEFAULT_CASE8_CONVERSION_ROOT / "proposal.json"
 
 
 def _sha256(path: Path) -> str:
@@ -216,6 +235,112 @@ def _dataset_row(path: Path, *, case: int, split: str) -> dict[str, object]:
     }
 
 
+def _generic_conversion_row(
+    *,
+    case: int,
+    split: str,
+    sample_count: int,
+    dataset_path: Path,
+    conversion_final_path: Path,
+    admission_path: Path,
+    contract_path: Path,
+    conversion_result_path: Path,
+    proposal_path: Path,
+) -> dict[str, object]:
+    conversion_final = _load_object(conversion_final_path)
+    admission = _load_object(admission_path)
+    contract = _load_object(contract_path)
+    conversion_result = _load_object(conversion_result_path)
+    proposal = _load_object(proposal_path)
+    dataset_sha = _sha256(dataset_path)
+    final_checks = conversion_final.get("checks")
+    dataset_identity = conversion_final.get("dataset")
+    git = admission.get("git")
+    admission_proposal = admission.get("proposal")
+    source_capture_sha = admission.get("source_capture_sha256")
+    source_final_sha = admission.get("source_final_status_sha256")
+    checks = {
+        "schema": conversion_final.get("schema")
+        == GENERIC_CONVERSION_FINAL_SCHEMA,
+        "case_split": conversion_final.get("case") == case
+        and conversion_final.get("split") == split,
+        "passed": conversion_final.get("passed") is True
+        and conversion_final.get("valid_for_case_merge") is True,
+        "dataset_hash": isinstance(dataset_identity, Mapping)
+        and dataset_identity.get("sha256") == dataset_sha,
+        "checks": isinstance(final_checks, Mapping)
+        and bool(final_checks)
+        and all(value is True for value in final_checks.values()),
+        "admission": (
+            admission.get("schema") == GENERIC_ADMISSION_SCHEMA
+            and admission.get("case") == case
+            and admission.get("split") == split
+            and admission.get("passed") is True
+            and admission.get("conversion_authorized") is True
+            and admission.get("authorization_consumed_before_conversion") is True
+            and isinstance(git, Mapping)
+            and git.get("head") == git.get("upstream")
+            == conversion_final.get("execution_commit")
+            and admission.get("output_created") is False
+            and admission.get("merged_dataset_created") is False
+            and _closed(admission)
+        ),
+        "contract_closed": (
+            contract.get("schema") == GENERIC_CONTRACT_SCHEMA
+            and contract.get("conversion_authorized") is False
+            and contract.get("authorization_token_issued") is False
+            and contract.get("authorization_token_sha256") == ""
+            and contract.get("output_created") is False
+            and contract.get("merged_dataset_created") is False
+            and _closed(contract)
+        ),
+        "proposal": (
+            proposal.get("schema") == GENERIC_PROPOSAL_SCHEMA
+            and proposal.get("case") == case
+            and proposal.get("split") == split
+            and proposal.get("passed") is True
+            and proposal.get("proposal_ready") is True
+            and isinstance(admission_proposal, Mapping)
+            and admission_proposal.get("sha256") == _sha256(proposal_path)
+            and proposal.get("output_created") is False
+            and proposal.get("merged_dataset_created") is False
+            and _closed(proposal)
+        ),
+        "conversion_result": (
+            conversion_result.get("schema") == CASE6_RESULT_SCHEMA
+            and conversion_result.get("case") == case
+            and conversion_result.get("split") == split
+            and conversion_result.get("passed") is True
+            and conversion_result.get("execute_requested") is True
+            and conversion_result.get("output_created") is True
+            and conversion_result.get("sample_count") == sample_count
+            and conversion_result.get("source_capture_sha256")
+            == source_capture_sha
+            and conversion_result.get("source_final_status_sha256")
+            == source_final_sha
+            and conversion_result.get(
+                "requested_actions_used_as_training_targets"
+            )
+            is False
+            and conversion_result.get(
+                "effective_actions_used_as_training_targets"
+            )
+            is True
+            and conversion_result.get("valid_for_case_merge") is True
+            and conversion_result.get("merged_dataset_created") is False
+            and _closed(conversion_result)
+        ),
+        "training_closed": conversion_final.get("merged_dataset_created")
+        is False
+        and _closed(conversion_final),
+    }
+    if not all(checks.values()):
+        raise ValueError(
+            f"case{case} conversion final checks failed: {checks}"
+        )
+    return _dataset_row(dataset_path, case=case, split=split)
+
+
 def audit_intake(
     *,
     train_selection_path: Path,
@@ -238,6 +363,12 @@ def audit_intake(
     case7_contract_path: Path = DEFAULT_CASE7_CONTRACT,
     case7_conversion_result_path: Path = DEFAULT_CASE7_CONVERSION_RESULT,
     case7_proposal_path: Path = DEFAULT_CASE7_PROPOSAL,
+    case8_dataset_path: Path = DEFAULT_CASE8_DATASET,
+    case8_conversion_final_path: Path = DEFAULT_CASE8_CONVERSION_FINAL,
+    case8_admission_path: Path = DEFAULT_CASE8_ADMISSION,
+    case8_contract_path: Path = DEFAULT_CASE8_CONTRACT,
+    case8_conversion_result_path: Path = DEFAULT_CASE8_CONVERSION_RESULT,
+    case8_proposal_path: Path = DEFAULT_CASE8_PROPOSAL,
 ) -> dict[str, object]:
     train_selection = _load_object(train_selection_path)
     validation_selection = _load_object(validation_selection_path)
@@ -468,111 +599,44 @@ def audit_intake(
         )
     rows.append(_dataset_row(case6_dataset_path, case=6, split="train"))
 
-    case7_conversion_final = _load_object(case7_conversion_final_path)
-    case7_admission = _load_object(case7_admission_path)
-    case7_contract = _load_object(case7_contract_path)
-    case7_conversion_result = _load_object(case7_conversion_result_path)
-    case7_proposal = _load_object(case7_proposal_path)
-    case7_dataset_sha = _sha256(case7_dataset_path)
-    case7_final_checks = case7_conversion_final.get("checks")
-    case7_dataset_identity = case7_conversion_final.get("dataset")
-    case7_git = case7_admission.get("git")
-    case7_admission_proposal = case7_admission.get("proposal")
-    case7_source_capture_sha = case7_admission.get("source_capture_sha256")
-    case7_source_final_sha = case7_admission.get(
-        "source_final_status_sha256"
+    rows.append(
+        _generic_conversion_row(
+            case=7,
+            split="train",
+            sample_count=6597,
+            dataset_path=case7_dataset_path,
+            conversion_final_path=case7_conversion_final_path,
+            admission_path=case7_admission_path,
+            contract_path=case7_contract_path,
+            conversion_result_path=case7_conversion_result_path,
+            proposal_path=case7_proposal_path,
+        )
     )
-    case7_checks = {
-        "schema": case7_conversion_final.get("schema")
-        == GENERIC_CONVERSION_FINAL_SCHEMA,
-        "case_split": case7_conversion_final.get("case") == 7
-        and case7_conversion_final.get("split") == "train",
-        "passed": case7_conversion_final.get("passed") is True
-        and case7_conversion_final.get("valid_for_case_merge") is True,
-        "dataset_hash": isinstance(case7_dataset_identity, Mapping)
-        and case7_dataset_identity.get("sha256") == case7_dataset_sha,
-        "checks": isinstance(case7_final_checks, Mapping)
-        and bool(case7_final_checks)
-        and all(value is True for value in case7_final_checks.values()),
-        "admission": (
-            case7_admission.get("schema") == GENERIC_ADMISSION_SCHEMA
-            and case7_admission.get("case") == 7
-            and case7_admission.get("split") == "train"
-            and case7_admission.get("passed") is True
-            and case7_admission.get("conversion_authorized") is True
-            and case7_admission.get("authorization_consumed_before_conversion")
-            is True
-            and isinstance(case7_git, Mapping)
-            and case7_git.get("head") == case7_git.get("upstream")
-            == case7_conversion_final.get("execution_commit")
-            and case7_admission.get("output_created") is False
-            and case7_admission.get("merged_dataset_created") is False
-            and _closed(case7_admission)
-        ),
-        "contract_closed": (
-            case7_contract.get("schema") == GENERIC_CONTRACT_SCHEMA
-            and case7_contract.get("conversion_authorized") is False
-            and case7_contract.get("authorization_token_issued") is False
-            and case7_contract.get("authorization_token_sha256") == ""
-            and case7_contract.get("output_created") is False
-            and case7_contract.get("merged_dataset_created") is False
-            and _closed(case7_contract)
-        ),
-        "proposal": (
-            case7_proposal.get("schema") == GENERIC_PROPOSAL_SCHEMA
-            and case7_proposal.get("case") == 7
-            and case7_proposal.get("split") == "train"
-            and case7_proposal.get("passed") is True
-            and case7_proposal.get("proposal_ready") is True
-            and isinstance(case7_admission_proposal, Mapping)
-            and case7_admission_proposal.get("sha256")
-            == _sha256(case7_proposal_path)
-            and case7_proposal.get("output_created") is False
-            and case7_proposal.get("merged_dataset_created") is False
-            and _closed(case7_proposal)
-        ),
-        "conversion_result": (
-            case7_conversion_result.get("schema") == CASE6_RESULT_SCHEMA
-            and case7_conversion_result.get("case") == 7
-            and case7_conversion_result.get("split") == "train"
-            and case7_conversion_result.get("passed") is True
-            and case7_conversion_result.get("execute_requested") is True
-            and case7_conversion_result.get("output_created") is True
-            and case7_conversion_result.get("sample_count") == 6597
-            and case7_conversion_result.get("source_capture_sha256")
-            == case7_source_capture_sha
-            and case7_conversion_result.get("source_final_status_sha256")
-            == case7_source_final_sha
-            and case7_conversion_result.get(
-                "requested_actions_used_as_training_targets"
-            )
-            is False
-            and case7_conversion_result.get(
-                "effective_actions_used_as_training_targets"
-            )
-            is True
-            and case7_conversion_result.get("valid_for_case_merge") is True
-            and case7_conversion_result.get("merged_dataset_created") is False
-            and _closed(case7_conversion_result)
-        ),
-        "training_closed": case7_conversion_final.get(
-            "merged_dataset_created"
+    rows.append(
+        _generic_conversion_row(
+            case=8,
+            split="validation",
+            sample_count=6607,
+            dataset_path=case8_dataset_path,
+            conversion_final_path=case8_conversion_final_path,
+            admission_path=case8_admission_path,
+            contract_path=case8_contract_path,
+            conversion_result_path=case8_conversion_result_path,
+            proposal_path=case8_proposal_path,
         )
-        is False
-        and _closed(case7_conversion_final),
-    }
-    if not all(case7_checks.values()):
-        raise ValueError(
-            f"case7 conversion final checks failed: {case7_checks}"
-        )
-    rows.append(_dataset_row(case7_dataset_path, case=7, split="train"))
+    )
 
     converted_train = sorted(
         int(row["case"])
         for row in rows
         if row["split"] == "train" and row["valid_for_case_merge"] is True
     )
-    converted_validation: list[int] = []
+    converted_validation = sorted(
+        int(row["case"])
+        for row in rows
+        if row["split"] == "validation"
+        and row["valid_for_case_merge"] is True
+    )
     pending_train = (
         []
         if len(converted_train) >= MINIMUM_TRAIN_CASES
@@ -598,13 +662,16 @@ def audit_intake(
             },
         )
     for case in VALIDATION_TRANCHE:
-        state_by_case[case] = {
-            "case": case,
-            "split": "validation",
-            "state": "paired_canary_and_capture_required",
-            "valid_for_case_merge": False,
-            "valid_for_training": False,
-        }
+        state_by_case.setdefault(
+            case,
+            {
+                "case": case,
+                "split": "validation",
+                "state": "paired_canary_and_capture_required",
+                "valid_for_case_merge": False,
+                "valid_for_training": False,
+            },
+        )
     corpus_ready = (
         len(converted_train) >= MINIMUM_TRAIN_CASES
         and len(converted_validation) >= MINIMUM_VALIDATION_CASES
@@ -613,8 +680,12 @@ def audit_intake(
         next_action = "authorize_exactly_one_case23_v4_cpu_conversion"
     elif 6 not in converted_train:
         next_action = "authorize_exactly_one_case6_cpu_conversion"
-    elif len(converted_train) >= MINIMUM_TRAIN_CASES:
+    elif 8 not in converted_validation:
         next_action = "authorize_exactly_one_case8_validation_paired_canary"
+    elif 16 not in converted_validation:
+        next_action = "authorize_exactly_one_case16_validation_paired_canary"
+    elif corpus_ready:
+        next_action = "review_case_disjoint_corpus_before_merge_authorization"
     else:
         next_action = "authorize_exactly_one_case2_paired_canary"
     return {
@@ -661,6 +732,16 @@ def audit_intake(
                 case7_conversion_result_path
             ),
             "case7_proposal": _identity(case7_proposal_path),
+            "case8_dataset": _identity(case8_dataset_path),
+            "case8_conversion_final": _identity(
+                case8_conversion_final_path
+            ),
+            "case8_admission": _identity(case8_admission_path),
+            "case8_contract": _identity(case8_contract_path),
+            "case8_conversion_result": _identity(
+                case8_conversion_result_path
+            ),
+            "case8_proposal": _identity(case8_proposal_path),
         },
         "required": {
             "minimum_train_cases": MINIMUM_TRAIN_CASES,
@@ -690,6 +771,8 @@ def audit_intake(
         "case6_conversion_output_created": True,
         "case7_conversion_authorized": False,
         "case7_conversion_output_created": True,
+        "case8_conversion_authorized": False,
+        "case8_conversion_output_created": True,
         "corpus_manifest_ready": corpus_ready,
         "runtime_authorized": False,
         "gpu_launch_authorized": False,
@@ -775,6 +858,28 @@ def main() -> int:
     parser.add_argument(
         "--case7-proposal", type=Path, default=DEFAULT_CASE7_PROPOSAL
     )
+    parser.add_argument(
+        "--case8-dataset", type=Path, default=DEFAULT_CASE8_DATASET
+    )
+    parser.add_argument(
+        "--case8-conversion-final",
+        type=Path,
+        default=DEFAULT_CASE8_CONVERSION_FINAL,
+    )
+    parser.add_argument(
+        "--case8-admission", type=Path, default=DEFAULT_CASE8_ADMISSION
+    )
+    parser.add_argument(
+        "--case8-contract", type=Path, default=DEFAULT_CASE8_CONTRACT
+    )
+    parser.add_argument(
+        "--case8-conversion-result",
+        type=Path,
+        default=DEFAULT_CASE8_CONVERSION_RESULT,
+    )
+    parser.add_argument(
+        "--case8-proposal", type=Path, default=DEFAULT_CASE8_PROPOSAL
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     result = audit_intake(
@@ -798,6 +903,12 @@ def main() -> int:
         case7_contract_path=args.case7_contract,
         case7_conversion_result_path=args.case7_conversion_result,
         case7_proposal_path=args.case7_proposal,
+        case8_dataset_path=args.case8_dataset,
+        case8_conversion_final_path=args.case8_conversion_final,
+        case8_admission_path=args.case8_admission,
+        case8_contract_path=args.case8_contract,
+        case8_conversion_result_path=args.case8_conversion_result,
+        case8_proposal_path=args.case8_proposal,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes((json.dumps(result, indent=2) + "\n").encode())

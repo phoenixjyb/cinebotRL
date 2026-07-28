@@ -1,0 +1,271 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_corrective_corpus_intake_v5",
+  "checks": {
+    "train_selection": true,
+    "validation_selection": true,
+    "case30_conversion": true,
+    "case23_capture": true,
+    "case23_conversion_preflight": true,
+    "tranches_disjoint": true
+  },
+  "inputs": {
+    "train_selection": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_model_based_pair_tranche_v1/selection.json",
+      "sha256": "93aa25e99409ad926d4c4cf0b15075e6ea3532dd1c01d5217a45daffc37db7c0",
+      "size_bytes": 14077
+    },
+    "validation_selection": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_model_based_corrective_validation_tranche_v1/selection.json",
+      "sha256": "5576c696e304eb9b9a173970e5fed06e887eccefe2d65a20678415148e22fa0b",
+      "size_bytes": 7258
+    },
+    "case30_dataset": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_case30_effective_label_conversion_v1/case_0030_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "191a44147bc44038a0645bf48a63609463bf280d97b37ddaf884200bd8b52447",
+      "size_bytes": 3557893
+    },
+    "case30_audit": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_case30_effective_label_conversion_v1/independent_audit.json",
+      "sha256": "765d3eea2d72fc9660020508e80016d74c3c291b3c7d7e3cb2ed591bd72f69b5",
+      "size_bytes": 1560
+    },
+    "case23_final_status": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_case23_corrective_capture_v4/final_status.json",
+      "sha256": "8f7589cdc31b5b6369fea8fda7fbd8b743b57afa78709cf03b2bd600a25833e3",
+      "size_bytes": 4335
+    },
+    "case23_conversion_preflight": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case23_corrective_conversion_execution_cpu_v2/summary.json",
+      "sha256": "b1d76609bac8982d3bd4af818c15e18ad58dc88b24093617a8fe90018069f739",
+      "size_bytes": 6710
+    },
+    "case23_dataset": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case23_corrective_conversion_execution_cpu_v5/case_0023_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "ee55db1c02e504e035a47532df8141ab142bb68a2c47b2795b6fd5ad7283ef01",
+      "size_bytes": 998931
+    },
+    "case23_conversion_final": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case23_corrective_conversion_execution_cpu_v5/final_status.json",
+      "sha256": "31dc0e6126772fad3958b4759d9c3fe03ee0be7157b6f5b356e08060952a1943",
+      "size_bytes": 2118
+    },
+    "case23_recovery_audit": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case23_corrective_conversion_execution_cpu_v5/recovery_audit.json",
+      "sha256": "17679574397ff911bfe971d5f3f906f3229b53ee9ee903ecc0edd89421fa3e0f",
+      "size_bytes": 1803
+    },
+    "case6_dataset": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_corrective_conversion_execution_cpu_v1/case_0006_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "ac138c9790eda983643ae17cc5b3dcf33cfe4634841760aada929df367acb809",
+      "size_bytes": 2277874
+    },
+    "case6_conversion_final": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_corrective_conversion_execution_cpu_v1/final_status.json",
+      "sha256": "5a8662dbb883ae084c8ef8c3a174d6aa8c166b7f27bbae9122109607ba9e2a02",
+      "size_bytes": 2200
+    },
+    "case6_admission": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_corrective_conversion_execution_cpu_v1/admission.json",
+      "sha256": "fe693e2ed7ea1415c554eb163422577e33aee6f8b4029f3c67787e0c78809b1b",
+      "size_bytes": 8732
+    },
+    "case6_contract": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_corrective_conversion_execution_cpu_v1/contract.json",
+      "sha256": "53185a52fb023e2e1a76a542b15bee70e2a5b8816d5d42e0a9a7e20bb770c0af",
+      "size_bytes": 4289
+    },
+    "case6_conversion_result": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_corrective_conversion_execution_cpu_v1/conversion_result.json",
+      "sha256": "f49ddfb5d4662f9bd8d7de84a1401360683631f94e1181dbe5e0c0f261c4546b",
+      "size_bytes": 1053
+    },
+    "case7_dataset": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case7_corrective_conversion_execution_cpu_v1/case_0007_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "673e7b897dfe6aa3f1c7ab44019f536d5635bff30bf2386510f1135f876d3263",
+      "size_bytes": 1894572
+    },
+    "case7_conversion_final": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case7_corrective_conversion_execution_cpu_v1/final_status.json",
+      "sha256": "b8b7f2f3cba40a9dc037ade186984014604ac29f3fd4a00b32fb143916de4fce",
+      "size_bytes": 2584
+    },
+    "case7_admission": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case7_corrective_conversion_execution_cpu_v1/admission.json",
+      "sha256": "3cea3807e002d3b1e266671bea9774a743dc84e77b8f4ba23f9883b34a361d78",
+      "size_bytes": 12326
+    },
+    "case7_contract": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case7_corrective_conversion_execution_cpu_v1/contract.json",
+      "sha256": "f7931b5e2d10b61c65aa384b7a832bd3fd45bfb9801964babbdbf570f4d68f99",
+      "size_bytes": 3352
+    },
+    "case7_conversion_result": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case7_corrective_conversion_execution_cpu_v1/conversion_result.json",
+      "sha256": "5532f4b9588c457ab89235b16ad8ae81356c103c68ee44498802936f8c04f45b",
+      "size_bytes": 1057
+    },
+    "case7_proposal": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case7_corrective_conversion_execution_cpu_v1/proposal.json",
+      "sha256": "3533c6610db6184a094c81310ff55324520b86b2bb6047d9645194d1bac7aa7e",
+      "size_bytes": 8330
+    },
+    "case8_dataset": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case8_validation_conversion_execution_cpu_v1/case_0008_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "393d841d67afe5b7a5d48182cec23804331c0472191e237275e6b6a199145402",
+      "size_bytes": 1887327
+    },
+    "case8_conversion_final": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case8_validation_conversion_execution_cpu_v1/final_status.json",
+      "sha256": "d49cac24ef1eebb66bec8b6b47c503c058a2a16dc1e360871f0f055c66a15436",
+      "size_bytes": 2589
+    },
+    "case8_admission": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case8_validation_conversion_execution_cpu_v1/admission.json",
+      "sha256": "731466982768b4b8b8dbc6ae51e7db8d569c1335caafa70f061c958c099e57eb",
+      "size_bytes": 12331
+    },
+    "case8_contract": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case8_validation_conversion_execution_cpu_v1/contract.json",
+      "sha256": "f7931b5e2d10b61c65aa384b7a832bd3fd45bfb9801964babbdbf570f4d68f99",
+      "size_bytes": 3352
+    },
+    "case8_conversion_result": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case8_validation_conversion_execution_cpu_v1/conversion_result.json",
+      "sha256": "a054024e096ad2f74a9e559426fb96d3fa0ce082e70eef1a417c20b2a1661069",
+      "size_bytes": 1062
+    },
+    "case8_proposal": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case8_validation_conversion_execution_cpu_v1/proposal.json",
+      "sha256": "4faf1d8b66c409280cf8c837cd2e0259213b6e7ea528b0c301fdfeb1c164d490",
+      "size_bytes": 8335
+    }
+  },
+  "required": {
+    "minimum_train_cases": 4,
+    "minimum_validation_cases": 2,
+    "minimum_train_tranche": [
+      30,
+      23,
+      6,
+      2
+    ],
+    "additional_train_candidate": [
+      7
+    ],
+    "validation_tranche": [
+      8,
+      16
+    ],
+    "reserved_holdout_cases": [
+      3,
+      5,
+      13,
+      19,
+      24
+    ]
+  },
+  "cases": [
+    {
+      "case": 30,
+      "split": "train",
+      "state": "converted_admitted_for_case_merge",
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_case30_effective_label_conversion_v1/case_0030_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "191a44147bc44038a0645bf48a63609463bf280d97b37ddaf884200bd8b52447",
+      "sample_count": 11411,
+      "valid_for_case_merge": true,
+      "valid_for_training": false
+    },
+    {
+      "case": 23,
+      "split": "train",
+      "state": "converted_admitted_for_case_merge",
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case23_corrective_conversion_execution_cpu_v5/case_0023_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "ee55db1c02e504e035a47532df8141ab142bb68a2c47b2795b6fd5ad7283ef01",
+      "sample_count": 3273,
+      "valid_for_case_merge": true,
+      "valid_for_training": false
+    },
+    {
+      "case": 6,
+      "split": "train",
+      "state": "converted_admitted_for_case_merge",
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case6_corrective_conversion_execution_cpu_v1/case_0006_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "ac138c9790eda983643ae17cc5b3dcf33cfe4634841760aada929df367acb809",
+      "sample_count": 7933,
+      "valid_for_case_merge": true,
+      "valid_for_training": false
+    },
+    {
+      "case": 2,
+      "split": "train",
+      "state": "paired_canary_and_capture_required",
+      "valid_for_case_merge": false,
+      "valid_for_training": false
+    },
+    {
+      "case": 7,
+      "split": "train",
+      "state": "converted_admitted_for_case_merge",
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case7_corrective_conversion_execution_cpu_v1/case_0007_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "673e7b897dfe6aa3f1c7ab44019f536d5635bff30bf2386510f1135f876d3263",
+      "sample_count": 6597,
+      "valid_for_case_merge": true,
+      "valid_for_training": false
+    },
+    {
+      "case": 8,
+      "split": "validation",
+      "state": "converted_admitted_for_case_merge",
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case8_validation_conversion_execution_cpu_v1/case_0008_model_based_corrective_case_dataset_v1.npz",
+      "sha256": "393d841d67afe5b7a5d48182cec23804331c0472191e237275e6b6a199145402",
+      "sample_count": 6607,
+      "valid_for_case_merge": true,
+      "valid_for_training": false
+    },
+    {
+      "case": 16,
+      "split": "validation",
+      "state": "paired_canary_and_capture_required",
+      "valid_for_case_merge": false,
+      "valid_for_training": false
+    }
+  ],
+  "converted_train_cases": [
+    6,
+    7,
+    23,
+    30
+  ],
+  "converted_validation_cases": [
+    8
+  ],
+  "converted_train_case_count": 4,
+  "converted_validation_case_count": 1,
+  "missing_train_case_count": 0,
+  "missing_validation_case_count": 1,
+  "pending_minimum_train_cases": [],
+  "pending_validation_cases": [
+    16
+  ],
+  "next_bounded_action": "authorize_exactly_one_case16_validation_paired_canary",
+  "case23_conversion_authorized": false,
+  "case23_conversion_output_created": true,
+  "case6_conversion_authorized": false,
+  "case6_conversion_output_created": true,
+  "case7_conversion_authorized": false,
+  "case7_conversion_output_created": true,
+  "case8_conversion_authorized": false,
+  "case8_conversion_output_created": true,
+  "corpus_manifest_ready": false,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "valid_for_bc_admission_review": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

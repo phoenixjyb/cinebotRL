@@ -1,0 +1,22 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_conversion_result_v1",
+  "passed": true,
+  "execute_requested": true,
+  "output_created": true,
+  "output": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\model_based_corrective_case0008_conversion_execution_v2_cpu\\case_0008_model_based_corrective_case_dataset_v1.npz",
+  "case": 8,
+  "split": "validation",
+  "sample_count": 6607,
+  "source_capture_sha256": "104ba6d57c57b12af450b015a2f8431a38f19bd7477b7d2badec3836878e0cbc",
+  "source_final_status_sha256": "10bffcdeb9eaebaa42af6e09e5ae68d2fd14d056b38a47e96c58ac1d20a5470a",
+  "training_target_contract": "effective_post_supervisor_residual_v1",
+  "previous_action_contract": "previous_effective_post_supervisor_action_v1",
+  "requested_actions_used_as_training_targets": false,
+  "effective_actions_used_as_training_targets": true,
+  "valid_for_case_merge": true,
+  "merged_dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false
+}

@@ -10707,3 +10707,39 @@ and must state whether its candidate was accepted or rejected.
   profile on CPU only.
 - Do not retry case 16. A case-32 runtime, capture, conversion, corpus merge,
   BC, PPO, holdout, or training still requires its own explicit admission.
+
+## Round 277: case-32 replacement selection and structural profile pass on CPU
+
+- Replaced the retired `[8,16]` selection with a hash-bound CPU-only
+  `[8,32]` amendment. The case-8 row is unchanged; case 16 remains a
+  calibration diagnostic and its profile is forbidden for reuse.
+- Reopened the exact-source case-32 plan and historical zero-residual dynamic
+  evidence. The plan preserves `1,099/1,099` anchors, `21.648708 s` source
+  time, `29.592866387 s` execution time, and a `9.575589 m` source path.
+- Historical playback passed at `0.10241882/0.13399631 m` p95/max position
+  error with zero action saturation. This is selection/readiness evidence,
+  not a current runtime admission or reusable dataset.
+- Case 32 has no qualifying low-motion perturbation window and reaches the
+  base linear, base yaw, and proxy-rate ceilings. External perturbation is
+  therefore forbidden; the profile uses existing natural tracking error.
+- The trace contains `59/67` samples above `0.03 m`. Retention is derived
+  from the unchanged p95 margin:
+  `(0.15 - 0.10241882) / 0.15 = 0.31720785`.
+- The resulting maximum residuals are
+  `[0.01400753 m/s, 0.00630393 rad/s, 0.00086814 m/s]`; slew limits are
+  `[0.03501882, 0.01575981, 0.00217034]` per second. Safety projection is
+  contractive in both base-command directions and does not clip riser
+  residuals.
+- Focused selection/readiness/profile tests pass
+  `22 passed, 2 warnings in 0.50s`.
+- No runtime route or authorization token was created. Isaac, capture,
+  conversion, corpus merge, BC, PPO, checkpointing, and training remain
+  closed. Converted intake remains train `[6,7,23,30]`, validation `[8]`;
+  goal completion remains `6/10`.
+
+## Next round after Round 277
+
+- Implement and validate a tokenless, hash-bound case-32 same-seed paired
+  runtime contract on CPU only.
+- Do not launch it. Exactly one paired canary still requires separate user
+  authorization after the preflight contract passes.

@@ -1,0 +1,152 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_model_based_corrective_validation_selection_v2",
+  "inputs": {
+    "original_selection": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260723_model_based_corrective_validation_tranche_v1/selection.json",
+      "sha256": "5576c696e304eb9b9a173970e5fed06e887eccefe2d65a20678415148e22fa0b",
+      "size_bytes": 7258
+    },
+    "case16_disposition": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_disposition_cpu_v1/summary.json",
+      "sha256": "eb083d54bc528358311c7ff38acf73bcf5f31581cd02bf5dec1f3415189b3da1",
+      "size_bytes": 11317
+    },
+    "case32_plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_disposition_cpu_v1/source/case_0032_smoothed_riser_plan_v1.npz",
+      "sha256": "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f",
+      "size_bytes": 268852
+    },
+    "case32_historical_dynamic_gate": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_disposition_cpu_v1/source/case_0032_historical_dynamic_gate.json",
+      "sha256": "d2a7477254d6a80426370217d8f08db8fe2bdf65e5f4b892a33247f90cf1ce75",
+      "size_bytes": 331627
+    }
+  },
+  "checks": {
+    "original_schema": true,
+    "original_passed": true,
+    "original_selected_cases": true,
+    "case8_row_preserved": true,
+    "case16_retired": true,
+    "case32_selected": true,
+    "case32_selection_checks": true,
+    "case32_plan_identity": true,
+    "case32_dynamic_identity": true,
+    "disposition_closed": true
+  },
+  "source_validation_cases": [
+    8,
+    16,
+    22,
+    32,
+    78
+  ],
+  "eligible_validation_cases": [
+    8,
+    16,
+    22,
+    32
+  ],
+  "minimum_validation_corpus_cases": 2,
+  "same_seed_pair_required_before_capture": true,
+  "selected_cases": [
+    8,
+    32
+  ],
+  "selected_rows": [
+    {
+      "case": 8,
+      "plan_sha256": "f07ff020128dee70ea9c8c2d806dc75c8e0ef3964dccb4e0aabfd1b0048f3655",
+      "dynamic_gate_sha256": "19506045f9b6ec04cee58efa1b5d2d5600824ce166b1534db05a4895596cf1e0",
+      "features": {
+        "log1p_source_duration_s": 2.6348299066409138,
+        "execution_source_duration_ratio": 1.4000000000000001,
+        "log1p_source_path_length_m": 1.5703076810235237,
+        "position_error_p95_m": 0.013000636755208364,
+        "maximum_abs_base_linear_velocity_mps": 0.29987049776940694,
+        "maximum_abs_base_yaw_rate_radps": 0.29987049776946223,
+        "maximum_abs_riser_rate_mps": 0.6859824221163003,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.3140236509402306,
+        "target_camera_height_span_m": 1.005452,
+        "dynamic_raw_residual_vx_fraction": 0.7683071716210526,
+        "dynamic_raw_residual_wz_fraction": 0.4073792973451225,
+        "dynamic_raw_residual_riser_fraction": 0.12531422692375283
+      },
+      "checks": {
+        "portfolio_passed": true,
+        "plan_file_hash": true,
+        "dynamic_plan_hash": true,
+        "dynamic_checks": true,
+        "individual_dynamic_quality": true,
+        "validation_case_only": true
+      },
+      "selection_rank": 1,
+      "selection_role": "same_seed_validation_paired_canary_required",
+      "minimum_normalized_distance_at_selection": 2.6496234766298192,
+      "normalized_features": {
+        "log1p_source_duration_s": 0.0,
+        "execution_source_duration_ratio": 0.24982476272498552,
+        "log1p_source_path_length_m": 0.3344984121771907,
+        "position_error_p95_m": 0.0,
+        "maximum_abs_base_linear_velocity_mps": 0.0,
+        "maximum_abs_base_yaw_rate_radps": 0.0,
+        "maximum_abs_riser_rate_mps": 1.0,
+        "maximum_abs_raw_proxy_target_rate_radps": 0.0,
+        "target_camera_height_span_m": 1.0,
+        "dynamic_raw_residual_vx_fraction": 0.8286571893462606,
+        "dynamic_raw_residual_wz_fraction": 0.31155619356137265,
+        "dynamic_raw_residual_riser_fraction": 0.40392864585250815
+      }
+    },
+    {
+      "case": 32,
+      "plan_sha256": "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f",
+      "dynamic_gate_sha256": "d2a7477254d6a80426370217d8f08db8fe2bdf65e5f4b892a33247f90cf1ce75",
+      "features": {
+        "log1p_source_duration_s": 3.120102808359485,
+        "execution_source_duration_ratio": 1.3669576210846937,
+        "log1p_source_path_length_m": 2.3585484547047875,
+        "position_error_p95_m": 0.10241882262348277,
+        "maximum_abs_base_linear_velocity_mps": 0.40000000000006447,
+        "maximum_abs_base_yaw_rate_radps": 0.4000000000000285,
+        "maximum_abs_riser_rate_mps": 0.13198280951085728,
+        "target_camera_height_span_m": 0.1365679999999998,
+        "dynamic_raw_residual_vx_fraction": 0.8831767412720528,
+        "dynamic_raw_residual_wz_fraction": 0.397463403512782,
+        "dynamic_raw_residual_riser_fraction": 0.13684031683247833
+      },
+      "checks": {
+        "disposition_passed": true,
+        "plan_file_hash": true,
+        "dynamic_gate_hash": true,
+        "exact_source_plan": true,
+        "individual_dynamic_quality": true,
+        "zero_action_saturation": true,
+        "validation_case_only": true
+      },
+      "selection_rank": 2,
+      "selection_role": "same_seed_validation_paired_canary_required",
+      "replaces_case": 16,
+      "replacement_reason": "case16_ceiling_limited_and_case32_has_zero_saturation_with_corrective_headroom",
+      "historical_evidence_is_selection_only": true,
+      "fresh_pair_required": true
+    }
+  ],
+  "retired_validation_cases": [
+    16
+  ],
+  "case16_profile_reuse_authorized": false,
+  "case8_profile_reuse_authorized": false,
+  "case30_profile_reuse_authorized": false,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "next_bounded_action": "audit_case32_validation_pair_readiness_cpu_only",
+  "passed": true
+}

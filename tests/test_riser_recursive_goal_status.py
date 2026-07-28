@@ -1,7 +1,6 @@
-import json
 import hashlib
+import json
 from pathlib import Path
-
 
 ROOT = Path(__file__).parents[1]
 GOAL = (
@@ -608,6 +607,41 @@ CASE16_VALIDATION_DISPOSITION_SUMMARY = (
     ROOT
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260728_case16_validation_disposition_cpu_v1/summary.json"
+)
+CASE32_VALIDATION_SELECTION_BUILDER = (
+    ROOT / "scripts/two_wheel_balance/prepare_case32_validation_selection.py"
+)
+CASE32_VALIDATION_SELECTION = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260728_case32_validation_selection_cpu_v1/selection.json"
+)
+CASE32_VALIDATION_READINESS_AUDITOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "audit_model_based_corrective_case32_validation_pair_readiness.py"
+)
+CASE32_VALIDATION_READINESS = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260728_case32_validation_pair_readiness_cpu_v1/summary.json"
+)
+CASE32_VALIDATION_PROFILE_BUILDER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "build_model_based_corrective_case32_validation_natural_error_profile.py"
+)
+CASE32_VALIDATION_PROFILE = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case32_validation_natural_error_"
+    "profile_v1.json"
+)
+CASE32_VALIDATION_PROFILE_PROPOSAL = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260728_case32_validation_natural_error_profile_cpu_v1/"
+    "proposal.json"
 )
 PENDING_CORRECTIVE_ROUTE_QUEUE_AUDITOR = (
     ROOT
@@ -2578,6 +2612,51 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case16_disposition["runtime_authorized"] is False
     assert case16_disposition["label_capture_authorized"] is False
     assert case16_disposition["training_started"] is False
+    case32_selection = json.loads(CASE32_VALIDATION_SELECTION.read_text())
+    case32_readiness = json.loads(CASE32_VALIDATION_READINESS.read_text())
+    case32_proposal = json.loads(
+        CASE32_VALIDATION_PROFILE_PROPOSAL.read_text()
+    )
+    assert corrective["case32_validation_selection_builder_sha256"] == (
+        _sha256(CASE32_VALIDATION_SELECTION_BUILDER)
+    )
+    assert corrective["case32_validation_selection_sha256"] == _sha256(
+        CASE32_VALIDATION_SELECTION
+    )
+    assert corrective["case32_validation_selection_selected_cases"] == [8, 32]
+    assert corrective["case32_validation_selection_retired_cases"] == [16]
+    assert corrective["case32_validation_readiness_auditor_sha256"] == (
+        _sha256(CASE32_VALIDATION_READINESS_AUDITOR)
+    )
+    assert corrective["case32_validation_readiness_summary_sha256"] == (
+        _sha256(CASE32_VALIDATION_READINESS)
+    )
+    assert corrective["case32_validation_profile_builder_sha256"] == (
+        _sha256(CASE32_VALIDATION_PROFILE_BUILDER)
+    )
+    assert corrective["case32_validation_profile_sha256"] == _sha256(
+        CASE32_VALIDATION_PROFILE
+    )
+    assert corrective["case32_validation_profile_proposal_sha256"] == (
+        _sha256(CASE32_VALIDATION_PROFILE_PROPOSAL)
+    )
+    assert corrective["case32_validation_profile_cpu_ready"] is True
+    assert corrective[
+        "case32_validation_profile_runtime_route_implemented"
+    ] is False
+    assert corrective["case32_validation_profile_runtime_authorized"] is False
+    assert corrective["case32_validation_profile_capture_authorized"] is False
+    assert corrective["case32_validation_profile_training_authorized"] is False
+    assert case32_selection["selected_cases"] == [8, 32]
+    assert case32_selection["runtime_authorized"] is False
+    assert case32_readiness["case"] == 32
+    assert case32_readiness["passed"] is True
+    assert case32_readiness["runtime_authorized"] is False
+    assert case32_proposal["case"] == 32
+    assert case32_proposal["passed"] is True
+    assert case32_proposal["runtime_route_implemented"] is False
+    assert case32_proposal["runtime_authorized"] is False
+    assert case32_proposal["training_started"] is False
     assert corrective[
         "pending_corrective_route_queue_auditor_sha256"
     ] == _sha256(PENDING_CORRECTIVE_ROUTE_QUEUE_AUDITOR)
@@ -3112,7 +3191,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "cpu_only_prepare_case32_validation_pair_readiness" in (
+    assert "case32_validation_natural_error_pair_contract" in (
         goal["next_iteration"]["required_change"]
     )
 

@@ -10488,3 +10488,46 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-8 validation paired canary.`
 - A passing pair would still require separately authorized capture and
   conversion before case 8 can enter the validation corpus.
+
+## Round 272: case-8 held-out validation pair passes under monitored coexistence
+
+- Replaced the disabled case-8 route with a fresh, tokenless coexistence
+  contract at implementation commit
+  `6399c04522bf36e698ae7d4cce0c6e13243e3121`. The plan, seed, controller
+  arguments, wrench, residual scales, and dynamic thresholds were unchanged.
+  The route added an out-of-band one-use token, a `5 GiB` Windows RAM /
+  `9,216 MiB` GPU launch guard, and per-rollout `1.5 GiB` RAM / `2,048 MiB`
+  GPU runtime monitors.
+- Local and native-Windows focused suites each passed `43` tests. The clean
+  `.98` tokenless preflight passed at runtime commit
+  `b9bf4b7192d80d92ecbd83951e5f10b9d4aeba9c`, with all `21` identities
+  bound and learning/capture routes closed.
+- Consumed exactly one external mode-`0600` token in fresh namespace
+  `20260728_model_based_corrective_teacher_case8_validation_pair_v2_coexistence`.
+  The wrapper was invoked once, removed the token before Isaac startup, and
+  completed both the baseline and candidate without retry.
+- SolidWorks and Siemens NX remained active. Launch admission saw
+  `5.280 GiB` free Windows RAM and `10,253 MiB` free GPU memory. Baseline and
+  candidate monitors passed `45` and `41` samples; minimum headroom was
+  `2.957/2.979 GiB` RAM and `7,803 MiB` GPU. No pressure termination was
+  requested, both processes exited cleanly, and the GPU was released.
+- Baseline position p95/max error was
+  `0.13114402/0.14333130 m`; candidate p95/max was
+  `0.12587092/0.14144056 m`. The candidate improved p95 by
+  `0.00527311 m` or `4.0209%`. Both dynamic gates passed, candidate peak
+  pitch was `6.1623 deg`, and action saturation was zero.
+- Preserved the complete evidence under
+  `evidence_20260728_case8_validation_pair_v2`. Final-status SHA-256 is
+  `86747a0f4538d1c9d8324c4e42b1517028f57af0c8de6157bf22b78d62b266c6`;
+  summary SHA-256 is
+  `f4d0cef2ffb0f97504519c9f0d51c265cfa1c8be0ffd9948c6785dde475abebc`.
+- This pair created no labels or dataset. Capture, CPU conversion, corpus
+  merge, BC, PPO, holdout execution, checkpoints, and training remain closed.
+  Goal completion remains `6/10`.
+
+## Next round after Round 272
+
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-8 validation corrective-label capture.`
+- A passing capture would still require a separately authorized CPU
+  conversion before case 8 can enter the validation corpus.

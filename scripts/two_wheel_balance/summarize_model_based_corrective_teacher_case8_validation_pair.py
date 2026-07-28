@@ -19,7 +19,7 @@ from rl_platform.tasks.two_wheel_balance.riser_corrective_validation import (  #
 
 
 NAMESPACE = (
-    "20260724_model_based_corrective_teacher_case8_validation_pair_v1_exclusive"
+    "20260728_model_based_corrective_teacher_case8_validation_pair_v2_coexistence"
 )
 CASE = 8
 SPLIT = "validation"
@@ -61,6 +61,48 @@ def _capture_closed(payload: dict[str, object], result: dict[str, object]) -> bo
         and result.get("executed_policy_trace") is None
         and result.get("executed_shadow_teacher_trace") is None
         and result.get("executed_corrective_teacher_capture") is None
+    )
+
+
+def _resource_admission_passed(payload: dict[str, object]) -> bool:
+    thresholds = payload.get("thresholds", {})
+    observed = payload.get("observed", {})
+    checks = payload.get("checks", {})
+    return bool(
+        payload.get("schema") == "cinebotrl_windows_shared_resource_admission_v2"
+        and payload.get("phase") == "launch"
+        and payload.get("passed") is True
+        and isinstance(checks, dict)
+        and checks
+        and all(checks.values())
+        and thresholds.get("minimum_windows_free_memory_gib") == 5.0
+        and thresholds.get("minimum_gpu_free_memory_mib") == 9216
+        and thresholds.get("cad_coexistence_allowed") is True
+        and observed.get("windows_free_memory_gib", 0.0) >= 5.0
+        and observed.get("gpu_free_memory_mib", 0) >= 9216
+    )
+
+
+def _resource_monitor_passed(payload: dict[str, object]) -> bool:
+    thresholds = payload.get("runtime_thresholds", {})
+    minimum_windows_free = payload.get(
+        "minimum_observed_windows_free_memory_gib"
+    )
+    minimum_gpu_free = payload.get("minimum_observed_gpu_free_memory_mib")
+    return bool(
+        payload.get("schema") == "cinebotrl_windows_shared_resource_monitor_v1"
+        and payload.get("passed") is True
+        and payload.get("sample_count", 0) > 0
+        and payload.get("termination_requested") is False
+        and payload.get("process_exit_observed") is True
+        and thresholds.get("minimum_windows_free_memory_gib") == 1.5
+        and thresholds.get("minimum_gpu_free_memory_mib") == 2048
+        and isinstance(minimum_windows_free, (int, float))
+        and not isinstance(minimum_windows_free, bool)
+        and minimum_windows_free >= 1.5
+        and isinstance(minimum_gpu_free, int)
+        and not isinstance(minimum_gpu_free, bool)
+        and minimum_gpu_free >= 2048
     )
 
 
@@ -112,6 +154,9 @@ def summarize(
     candidate_path = root / "candidate/case_0008.json"
     baseline_heartbeat_path = root / "baseline/runtime_heartbeat.json"
     candidate_heartbeat_path = root / "candidate/runtime_heartbeat.json"
+    resource_admission_path = root / "resource_admission.json"
+    baseline_resource_monitor_path = root / "baseline/resource_monitor.json"
+    candidate_resource_monitor_path = root / "candidate/resource_monitor.json"
     contract_path = root / "contract.json"
     baseline = _load(baseline_path)
     candidate = _load(candidate_path)
@@ -119,6 +164,9 @@ def summarize(
     candidate_result = _single_result(candidate)
     baseline_heartbeat = _load(baseline_heartbeat_path)
     candidate_heartbeat = _load(candidate_heartbeat_path)
+    resource_admission = _load(resource_admission_path)
+    baseline_resource_monitor = _load(baseline_resource_monitor_path)
+    candidate_resource_monitor = _load(candidate_resource_monitor_path)
     admission = _load(admission_path)
     contract = _load(contract_path)
     identities = contract.get("identities", {})
@@ -214,6 +262,15 @@ def summarize(
         "candidate_heartbeat": candidate_heartbeat.get("case") == CASE
         and int(candidate_heartbeat.get("completed_steps", 0)) > 0,
         "gpu_released": gpu_release_passed,
+        "shared_resource_admission": _resource_admission_passed(
+            resource_admission
+        ),
+        "baseline_resource_monitor": _resource_monitor_passed(
+            baseline_resource_monitor
+        ),
+        "candidate_resource_monitor": _resource_monitor_passed(
+            candidate_resource_monitor
+        ),
     }
     contract_checks = {
         "namespace": contract.get("namespace") == NAMESPACE,
@@ -257,6 +314,13 @@ def summarize(
         "candidate": _identity(candidate_path),
         "baseline_heartbeat": _identity(baseline_heartbeat_path),
         "candidate_heartbeat": _identity(candidate_heartbeat_path),
+        "resource_admission": _identity(resource_admission_path),
+        "baseline_resource_monitor": _identity(
+            baseline_resource_monitor_path
+        ),
+        "candidate_resource_monitor": _identity(
+            candidate_resource_monitor_path
+        ),
         "admission": _identity(admission_path),
         "contract": _identity(contract_path),
         "dynamic_pair_completed": all(rollout_checks.values()),

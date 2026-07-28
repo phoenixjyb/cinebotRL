@@ -5,7 +5,7 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 readonly CONTRACT="$SCRIPT_DIR/model_based_corrective_teacher_case8_validation_pair_contract_v1.json"
 readonly VALIDATOR="$SCRIPT_DIR/validate_model_based_corrective_teacher_case8_validation_pair.py"
-readonly NAMESPACE="20260724_model_based_corrective_teacher_case8_validation_pair_v1_exclusive"
+readonly NAMESPACE="20260728_model_based_corrective_teacher_case8_validation_pair_v2_coexistence"
 readonly NVIDIA_SMI="/usr/lib/wsl/lib/nvidia-smi"
 readonly POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 readonly PY="/mnt/g/isaaclab_venv/Scripts/python.exe"
@@ -18,8 +18,8 @@ readonly CORRECTIVE_PROFILE="$WIN_ROOT\\scripts\\two_wheel_balance\\model_based_
 readonly GAINS="$WIN_ROOT\\docs\\03_training\\two_wheel_balance\\evidence_20260714_28kg\\lqr_gains.json"
 readonly PLAYBACK="$WIN_ROOT\\scripts\\two_wheel_balance\\smoke_riser_reference_playback.py"
 readonly FINALIZER="$WIN_ROOT\\scripts\\two_wheel_balance\\summarize_model_based_corrective_teacher_case8_validation_pair.py"
-# A future reviewed authorization-only commit must replace this empty value.
-readonly AUTHORIZATION_SHA256=""
+readonly RESOURCE_GUARD="$SCRIPT_DIR/check_windows_shared_resource_admission.py"
+readonly RESOURCE_MONITOR="$SCRIPT_DIR/monitor_windows_shared_resource_pressure.py"
 
 reject() {
   printf '{"reason":"%s","python_started":false,"isaac_started":false,"runtime_started":false,"passed":false}\n' "$1" >&2
@@ -41,6 +41,7 @@ MODE="${1:---preflight}"
   reject "unsupported_mode" 2
 }
 AUTHORIZATION_FILE="${RISER_CORRECTIVE_CASE8_VALIDATION_AUTHORIZATION_FILE:-}"
+AUTHORIZATION_SHA256="${RISER_CORRECTIVE_CASE8_VALIDATION_AUTHORIZATION_SHA256:-}"
 if [[ "$MODE" == --execute ]]; then
   [[ -n "$AUTHORIZATION_SHA256" ]] || {
     reject "runtime_authorization_not_issued" 4
@@ -82,7 +83,8 @@ wait_gpu_free() {
 }
 
 ADMISSION="$(mktemp)"
-trap 'rm -f "$ADMISSION"' EXIT
+RESOURCE_ADMISSION="$(mktemp)"
+trap 'rm -f "$ADMISSION" "$RESOURCE_ADMISSION"' EXIT
 VALIDATOR_ARGS=(
   --contract "$CONTRACT"
   --repo-root "$ROOT"
@@ -90,7 +92,10 @@ VALIDATOR_ARGS=(
   --output "$ADMISSION"
 )
 if [[ "$MODE" == --execute ]]; then
-  VALIDATOR_ARGS+=(--authorization-file "$AUTHORIZATION_FILE")
+  VALIDATOR_ARGS+=(
+    --authorization-file "$AUTHORIZATION_FILE"
+    --authorization-sha256 "$AUTHORIZATION_SHA256"
+  )
 fi
 python3 "$VALIDATOR" "${VALIDATOR_ARGS[@]}" >/dev/null
 if [[ "$MODE" == --preflight ]]; then
@@ -99,6 +104,11 @@ if [[ "$MODE" == --preflight ]]; then
 fi
 
 assert_gpu_free || reject "exclusive_gpu_ownership_failed" 5
+if ! python3 "$RESOURCE_GUARD" --phase launch \
+  --output "$RESOURCE_ADMISSION" >/dev/null; then
+  cat "$RESOURCE_ADMISSION" >&2
+  reject "shared_windows_resource_admission_failed" 5
+fi
 [[ ! -L "$AUTHORIZATION_FILE" ]] || reject "authorization_file_is_symlink" 4
 [[ "$(stat -c '%a' "$AUTHORIZATION_FILE")" == 600 ]] || {
   reject "authorization_file_mode_not_0600" 4
@@ -110,6 +120,7 @@ assert_gpu_free || reject "exclusive_gpu_ownership_failed" 5
 mkdir -p "$OUTPUT/baseline" "$OUTPUT/candidate" "$OUTPUT/logs"
 cp "$CONTRACT" "$OUTPUT/contract.json"
 cp "$ADMISSION" "$OUTPUT/admission.json"
+cp "$RESOURCE_ADMISSION" "$OUTPUT/resource_admission.json"
 rm -f "$AUTHORIZATION_FILE"
 
 COMMON_ARGS=(
@@ -139,12 +150,26 @@ COMMON_ARGS=(
 )
 
 BASELINE_STATUS=0
-timeout --signal=TERM --kill-after=30s 600 \
+setsid timeout --signal=TERM --kill-after=30s 600 \
   "$PY" -u -X utf8 "$PLAYBACK" "${COMMON_ARGS[@]}" \
   --runtime-heartbeat "$OUTPUT_WIN\\baseline\\runtime_heartbeat.json" \
   --output "$OUTPUT_WIN\\baseline\\case_0008.json" \
-  >"$OUTPUT/logs/baseline.log" 2>&1 || BASELINE_STATUS=$?
+  >"$OUTPUT/logs/baseline.log" 2>&1 &
+BASELINE_PID=$!
+BASELINE_MONITOR_STATUS=0
+python3 "$RESOURCE_MONITOR" \
+  --pid "$BASELINE_PID" \
+  --output "$OUTPUT/baseline/resource_monitor.json" \
+  --interval-s 5 \
+  >"$OUTPUT/logs/baseline_resource_monitor.log" 2>&1 \
+  || BASELINE_MONITOR_STATUS=$?
+wait "$BASELINE_PID" || BASELINE_STATUS=$?
+if (( BASELINE_MONITOR_STATUS != 0 && BASELINE_STATUS == 0 )); then
+  BASELINE_STATUS=75
+fi
 printf '%s\n' "$BASELINE_STATUS" >"$OUTPUT/logs/baseline.exit_code"
+printf '%s\n' "$BASELINE_MONITOR_STATUS" \
+  >"$OUTPUT/logs/baseline_resource_monitor.exit_code"
 BASELINE_GPU_RELEASE_PASSED=1
 wait_gpu_free || BASELINE_GPU_RELEASE_PASSED=0
 
@@ -161,14 +186,30 @@ raise SystemExit(0 if passed else 1)
 PY
 then
   CANDIDATE_STATUS=0
-  timeout --signal=TERM --kill-after=30s 600 \
+  setsid timeout --signal=TERM --kill-after=30s 600 \
     "$PY" -u -X utf8 "$PLAYBACK" "${COMMON_ARGS[@]}" \
     --corrective-teacher-profile "$CORRECTIVE_PROFILE" \
     --runtime-heartbeat "$OUTPUT_WIN\\candidate\\runtime_heartbeat.json" \
     --output "$OUTPUT_WIN\\candidate\\case_0008.json" \
-    >"$OUTPUT/logs/candidate.log" 2>&1 || CANDIDATE_STATUS=$?
+    >"$OUTPUT/logs/candidate.log" 2>&1 &
+  CANDIDATE_PID=$!
+  CANDIDATE_MONITOR_STATUS=0
+  python3 "$RESOURCE_MONITOR" \
+    --pid "$CANDIDATE_PID" \
+    --output "$OUTPUT/candidate/resource_monitor.json" \
+    --interval-s 5 \
+    >"$OUTPUT/logs/candidate_resource_monitor.log" 2>&1 \
+    || CANDIDATE_MONITOR_STATUS=$?
+  wait "$CANDIDATE_PID" || CANDIDATE_STATUS=$?
+  if (( CANDIDATE_MONITOR_STATUS != 0 && CANDIDATE_STATUS == 0 )); then
+    CANDIDATE_STATUS=75
+  fi
+else
+  CANDIDATE_MONITOR_STATUS=125
 fi
 printf '%s\n' "$CANDIDATE_STATUS" >"$OUTPUT/logs/candidate.exit_code"
+printf '%s\n' "$CANDIDATE_MONITOR_STATUS" \
+  >"$OUTPUT/logs/candidate_resource_monitor.exit_code"
 GPU_RELEASE_PASSED=1
 wait_gpu_free || GPU_RELEASE_PASSED=0
 [[ "$BASELINE_GPU_RELEASE_PASSED" == 1 ]] || GPU_RELEASE_PASSED=0

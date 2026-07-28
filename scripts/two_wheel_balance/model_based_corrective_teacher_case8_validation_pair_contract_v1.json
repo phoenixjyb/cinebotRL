@@ -3,7 +3,7 @@
   "reviewed_parent_commit": "2e83ff1b102f2860988ff6f3f4e6bfc7a399defa",
   "case": 8,
   "split": "validation",
-  "namespace": "20260724_model_based_corrective_teacher_case8_validation_pair_v1_exclusive",
+  "namespace": "20260728_model_based_corrective_teacher_case8_validation_pair_v2_coexistence",
   "residual_action_scales": [
     0.05,
     0.05,
@@ -52,6 +52,16 @@
     "maximum_riser_error_regression_m": 0.002,
     "saturation_regression_allowed": false,
     "maximum_runtime_seconds_per_rollout": 600
+  },
+  "shared_resource_contract": {
+    "shared_windows_resource_admission_required": true,
+    "resource_admission_before_token_consumption": true,
+    "launch_minimum_windows_free_memory_gib": 5.0,
+    "launch_minimum_gpu_free_memory_mib": 9216,
+    "cad_coexistence_allowed": true,
+    "runtime_resource_monitor_required_per_rollout": true,
+    "runtime_minimum_windows_free_memory_gib": 1.5,
+    "runtime_minimum_gpu_free_memory_mib": 2048
   },
   "identities": {
     "selection": {
@@ -136,18 +146,28 @@
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case8_validation_pair.sh",
-      "sha256": "1d470c08811153c6c69ce1aea0b779395b3da98aca0db608b18112479be10541",
-      "git_blob_sha1": "bf5bc54cd8252dbc88ac009419bb305ca56837db"
+      "sha256": "c0ec784b180afe5092e22c56c0c2564cf9505b4a0b47a798d2d0a58e04611ab4",
+      "git_blob_sha1": "74afbb5b6b96bc9e8724cf27605b2cf4bec8af9a"
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case8_validation_pair.py",
-      "sha256": "3d4b7ad641447692818a191d1b9033f728058138390de9dc357563fd7af74f7f",
-      "git_blob_sha1": "988afa9c7af05e95f0a773ea40009bd9060f8ec7"
+      "sha256": "9c39f6d513a3f4f324e065cdf6474452f1a6eabb60a9bdf3e0caed5d1e34147f",
+      "git_blob_sha1": "5a78b4380c322633b586c1ca45180a494b6bd892"
     },
     "paired_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case8_validation_pair.py",
-      "sha256": "3430c7bffdd457aee65d158a44ecbc804c4d3ee41c1241e2d66094226fc5b95e",
-      "git_blob_sha1": "a508eedfdd0c75d2e09592b927ede2133ea789be"
+      "sha256": "100d1dff48c3d439ba038c1aec1e64155245a8ff36305394125204627cacbec2",
+      "git_blob_sha1": "fcecd88d0ae227fbe6046b3d6a138871421ee64c"
+    },
+    "shared_windows_resource_guard": {
+      "path": "scripts/two_wheel_balance/check_windows_shared_resource_admission.py",
+      "sha256": "5526a2bcb9d6ebd1efebe6529e61f5d69b6d0a368739d4bd92b0ee8090107864",
+      "git_blob_sha1": "4aedfc7c295fd94ffa3b4e82d846b7802ebec0d0"
+    },
+    "shared_windows_resource_monitor": {
+      "path": "scripts/two_wheel_balance/monitor_windows_shared_resource_pressure.py",
+      "sha256": "a0969dd4733c485b8ffff48198ba22bf4a5d308a4ac895f095adc0630161eff2",
+      "git_blob_sha1": "825e04ba5678763c830532d7378f52ea148acc43"
     }
   },
   "source_validation_cases": [

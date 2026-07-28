@@ -106,11 +106,19 @@ def test_wrapper_rejects_conflicting_environment_before_python() -> None:
 
 def test_wrapper_contains_complete_validation_route_without_capture() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
-    empty_token = source.index('readonly AUTHORIZATION_SHA256=""')
+    token_hash = source.index(
+        'RISER_CORRECTIVE_CASE8_VALIDATION_AUTHORIZATION_SHA256'
+    )
     execute_reject = source.index('reject "runtime_authorization_not_issued" 4')
     validator = source.index('python3 "$VALIDATOR"')
+    resource_guard = source.index('python3 "$RESOURCE_GUARD"')
+    token_consumption = source.index('rm -f "$AUTHORIZATION_FILE"')
     playback = source.index("timeout --signal=TERM --kill-after=30s 600")
-    assert empty_token < execute_reject < validator < playback
+    assert token_hash < execute_reject < validator < resource_guard
+    assert resource_guard < token_consumption < playback
+    assert 'readonly AUTHORIZATION_SHA256="' not in source
+    assert source.count('python3 "$RESOURCE_MONITOR"') == 2
+    assert "20260728_model_based_corrective_teacher_case8_validation_pair_v2" in source
     assert "--cases 8" in source
     assert "case_0008.json" in source
     assert "case8_validation_profile_v1.json" in source
@@ -134,15 +142,58 @@ def test_validator_rejects_alternate_contract_path(tmp_path: Path) -> None:
     assert result["passed"] is False
 
 
-def test_validator_rejects_any_authorization_file(tmp_path: Path) -> None:
+def test_validator_recognizes_valid_out_of_band_authorization(
+    tmp_path: Path,
+) -> None:
     token = tmp_path / "token"
-    token.write_text("not authorized\n", encoding="utf-8")
+    token.write_text("one bounded case-8 validation pair\n", encoding="utf-8")
+    token.chmod(0o600)
+    token_sha = hashlib.sha256(token.read_bytes()).hexdigest()
     result = MODULE.validate(
         CONTRACT,
         ROOT,
         namespace=MODULE.NAMESPACE,
         authorization_file=token,
+        authorization_sha256=token_sha,
     )
-    assert result["checks"]["authorization_file_absent"] is False
+    assert all(result["authorization_checks"].values())
+    assert result["checks"]["authorization_state"] is True
+    assert result["runtime_authorized"] is False
+    assert result["gpu_launch_authorized"] is False
+    assert result["label_capture_authorized"] is False
+    assert result["dataset_creation_authorized"] is False
+    assert result["checks"]["tracked_worktree_clean"] is False
+    assert result["passed"] is False
+
+
+def test_validator_rejects_wrong_or_embedded_authorization_hash(
+    tmp_path: Path,
+) -> None:
+    token = tmp_path / "token"
+    token.write_text("one bounded case-8 validation pair\n", encoding="utf-8")
+    token.chmod(0o600)
+    wrong = "f" * 64
+    result = MODULE.validate(
+        CONTRACT,
+        ROOT,
+        namespace=MODULE.NAMESPACE,
+        authorization_file=token,
+        authorization_sha256=wrong,
+    )
+    assert result["authorization_checks"]["authorization_hash_matches"] is False
     assert result["runtime_authorized"] is False
     assert result["passed"] is False
+
+    embedded = tmp_path / "embedded-contract.json"
+    token_sha = hashlib.sha256(token.read_bytes()).hexdigest()
+    embedded.write_text(
+        CONTRACT.read_text(encoding="utf-8") + token_sha,
+        encoding="utf-8",
+    )
+    checks = MODULE._authorization_checks(
+        token,
+        token_sha,
+        ROOT,
+        embedded.read_text(encoding="utf-8"),
+    )
+    assert checks["authorization_hash_is_out_of_band"] is False

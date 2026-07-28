@@ -115,6 +115,44 @@ def _fixture(tmp_path: Path, *, candidate_p95: float = 0.120):
     }
     admission_path = root / "admission.json"
     admission_path.write_text(json.dumps(admission), encoding="utf-8")
+    resource_admission = {
+        "schema": "cinebotrl_windows_shared_resource_admission_v2",
+        "phase": "launch",
+        "thresholds": {
+            "minimum_windows_free_memory_gib": 5.0,
+            "minimum_gpu_free_memory_mib": 9216,
+            "cad_coexistence_allowed": True,
+        },
+        "observed": {
+            "windows_free_memory_gib": 12.0,
+            "gpu_free_memory_mib": 12000,
+        },
+        "checks": {
+            "windows_memory_probe_valid": True,
+            "windows_free_memory_sufficient": True,
+            "cad_process_probe_valid": True,
+            "cad_coexistence_allowed": True,
+            "gpu_memory_probe_valid": True,
+            "gpu_free_memory_sufficient": True,
+        },
+        "passed": True,
+    }
+    (root / "resource_admission.json").write_text(
+        json.dumps(resource_admission), encoding="utf-8"
+    )
+    resource_monitor = {
+        "schema": "cinebotrl_windows_shared_resource_monitor_v1",
+        "runtime_thresholds": {
+            "minimum_windows_free_memory_gib": 1.5,
+            "minimum_gpu_free_memory_mib": 2048,
+        },
+        "sample_count": 2,
+        "minimum_observed_windows_free_memory_gib": 7.0,
+        "minimum_observed_gpu_free_memory_mib": 9000,
+        "termination_requested": False,
+        "process_exit_observed": True,
+        "passed": True,
+    }
     (root / "baseline/case_0008.json").write_text(
         json.dumps(_gate(candidate=False)), encoding="utf-8"
     )
@@ -126,6 +164,9 @@ def _fixture(tmp_path: Path, *, candidate_p95: float = 0.120):
         (root / name / "runtime_heartbeat.json").write_text(
             json.dumps({"case": 8, "completed_steps": 100}),
             encoding="utf-8",
+        )
+        (root / name / "resource_monitor.json").write_text(
+            json.dumps(resource_monitor), encoding="utf-8"
         )
     return root, admission_path
 
@@ -171,6 +212,21 @@ def test_summary_rejects_capture_or_gpu_release_drift(tmp_path) -> None:
     result = _summarize(root, admission, gpu_release_passed=False)
     assert result["rollout_checks"]["candidate_capture_closed"] is False
     assert result["rollout_checks"]["gpu_released"] is False
+    assert result["passed"] is False
+
+
+def test_summary_rejects_missing_or_failed_resource_evidence(
+    tmp_path: Path,
+) -> None:
+    root, admission = _fixture(tmp_path)
+    (root / "baseline/resource_monitor.json").unlink()
+    candidate_monitor = root / "candidate/resource_monitor.json"
+    payload = json.loads(candidate_monitor.read_text(encoding="utf-8"))
+    payload["minimum_observed_windows_free_memory_gib"] = 1.0
+    candidate_monitor.write_text(json.dumps(payload), encoding="utf-8")
+    result = _summarize(root, admission)
+    assert result["rollout_checks"]["baseline_resource_monitor"] is False
+    assert result["rollout_checks"]["candidate_resource_monitor"] is False
     assert result["passed"] is False
 
 

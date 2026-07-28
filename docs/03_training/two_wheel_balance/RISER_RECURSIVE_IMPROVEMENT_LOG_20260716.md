@@ -10576,3 +10576,47 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-8 validation CPU conversion.`
 - A passing conversion would provide the first converted validation case; it
   would not authorize corpus merge, BC, PPO, holdout execution, or training.
+
+## Round 274: case-8 validation conversion passes and validation intake reaches 1/2
+
+- Generated and committed a validation-only conversion proposal at
+  `97076069300512380e99e1d2ab55a95d0b4ebf5e`. It binds the sealed case-8
+  capture and final status, 6,607 samples, `65 -> 3` shapes, effective
+  post-supervisor targets, reconstructed previous effective actions, all
+  three clocks, and closed learning state.
+- The native Windows proposal/admission/finalizer suite passed
+  `25 passed, 2 warnings in 33.34s`. Tokenless preflight passed every
+  repository, contract, proposal, source, validation-split, and fresh
+  namespace check at SHA-256
+  `8e42463a4f4e747bcf37e016f08f3c452e6ebf891651e96b93a74ecd542ee761`.
+- Consumed exactly one external mode-`0600` authorization. The wrapper,
+  converter, and finalizer each ran once and exited `0`; the token was removed
+  before conversion and no retry was performed.
+- The finalizer reopened all 6,607 validation rows. Dataset SHA-256 is
+  `393d841d67afe5b7a5d48182cec23804331c0472191e237275e6b6a199145402`;
+  final-status SHA-256 is
+  `d49cac24ef1eebb66bec8b6b47c503c058a2a16dc1e360871f0f055c66a15436`.
+  Clipped rows are `[0, 0, 9]`; source, execution, and elapsed clock ends are
+  `12.940941`, `18.1173174`, and `33.03 s`.
+- An independent local reopen under the original namespace basename passed
+  every finalizer check and reproduced the dataset hash. Conversion evidence
+  summary SHA-256 is
+  `3b36f8f26601ed64cf8712cb7d05e4be586c7e8ce84aba9cac6ae7971644b078`.
+- Upgraded the read-only corpus intake to v5 at
+  `7a52a05d9cadb92b19190119ed93fabaee7af55e`. It reopens converted train
+  cases `[6, 7, 23, 30]` and validation case `[8]`, and rejects any case-8
+  dataset, admission, contract, result, proposal, split, or hash drift.
+  The focused suite passes `51 passed, 2 warnings in 5.59s` locally and
+  `51 passed, 2 warnings in 35.82s` on `.98`; both hosts produce summary
+  SHA-256
+  `afbb95222d838017d7f713370884897be2de7218cc1197c0cdb9d393307e7c86`.
+- The four-case train count remains satisfied and validation intake is now
+  `1/2`. No corpus was merged, and BC, PPO, holdout policy execution,
+  checkpoints, and training remain closed. Goal completion remains `6/10`.
+
+## Next round after Round 274
+
+- The next data-producing operation requires separate authorization:
+  `Authorize exactly one case-16 validation paired canary.`
+- A passing pair would still require separately authorized capture and CPU
+  conversion before the case-disjoint corpus can be reviewed.

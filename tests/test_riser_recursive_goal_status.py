@@ -595,6 +595,11 @@ CASE16_VALIDATION_NATURAL_ERROR_PAIR_EVIDENCE = (
     "evidence_20260724_case16_validation_natural_error_pair_route_cpu_v1/"
     "summary.json"
 )
+CASE16_VALIDATION_NATURAL_ERROR_PAIR_EXECUTION_SUMMARY = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260728_case16_validation_pair_v2_rejected/summary.json"
+)
 PENDING_CORRECTIVE_ROUTE_QUEUE_AUDITOR = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -2417,7 +2422,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     ] == 24
     assert corrective[
         "case16_validation_natural_error_pair_route_active_identity_count"
-    ] == 25
+    ] == 27
     assert corrective[
         "case16_validation_natural_error_pair_route_reset_seed"
     ] == (
@@ -2481,6 +2486,43 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case16_route["ppo_authorized"] is False
     assert case16_route["training_started"] is False
     assert case16_route["valid_for_training"] is False
+    case16_execution = json.loads(
+        CASE16_VALIDATION_NATURAL_ERROR_PAIR_EXECUTION_SUMMARY.read_text()
+    )
+    assert corrective[
+        "case16_validation_natural_error_pair_executed"
+    ] is True
+    assert corrective["case16_validation_natural_error_pair_passed"] is False
+    assert corrective[
+        "case16_validation_natural_error_pair_evidence_summary_sha256"
+    ] == _sha256(CASE16_VALIDATION_NATURAL_ERROR_PAIR_EXECUTION_SUMMARY)
+    assert corrective[
+        "case16_validation_natural_error_pair_authorization_token_consumed"
+    ] is True
+    assert corrective[
+        "case16_validation_natural_error_pair_retry_authorized"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_pair_capture_authorized"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_pair_dataset_created"
+    ] is False
+    assert corrective[
+        "case16_validation_natural_error_pair_valid_for_training"
+    ] is False
+    assert case16_execution["passed"] is False
+    assert case16_execution["dynamic_pair_completed"] is True
+    assert case16_execution["baseline_dynamic_quality_passed"] is True
+    assert case16_execution["candidate_dynamic_quality_passed"] is True
+    assert case16_execution["validation_pair_passed"] is False
+    assert case16_execution["failed_paired_checks"] == [
+        "minimum_position_p95_improvement",
+        "saturation_not_regressed",
+    ]
+    assert case16_execution["label_capture_authorized"] is False
+    assert case16_execution["dataset_created"] is False
+    assert case16_execution["training_started"] is False
     assert corrective[
         "pending_corrective_route_queue_auditor_sha256"
     ] == _sha256(PENDING_CORRECTIVE_ROUTE_QUEUE_AUDITOR)
@@ -3015,7 +3057,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "exactly_one_hash_bound_case16_validation_paired_canary" in (
+    assert "diagnose_case16_candidate_projection_and_saturation" in (
         goal["next_iteration"]["required_change"]
     )
 
@@ -3621,7 +3663,7 @@ def test_goal_completion_audit_preserves_the_real_end_state() -> None:
         "pre_training_case8_validation_conversion_valid_for_training"
     ] is False
     assert audit["pre_training_next_operation"] == (
-        "authorize_exactly_one_case16_validation_paired_canary"
+        "cpu_only_diagnose_case16_absolute_improvement_and_saturation_regression"
     )
     assert audit["pre_training_no_hidden_cpu_route_blocker"] is True
     assert audit["pre_training_generic_capture_finalizer_implemented"] is True

@@ -1,0 +1,9 @@
+admission.json binary
+contract.json binary
+final_status.json binary
+resource_admission.json binary
+baseline/* binary
+candidate/* binary
+README.md text eol=lf
+SHA256SUMS text eol=lf
+summary.json text eol=lf

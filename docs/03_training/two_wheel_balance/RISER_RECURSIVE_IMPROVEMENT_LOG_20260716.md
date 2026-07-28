@@ -10620,3 +10620,48 @@ and must state whether its candidate was accepted or rejected.
   `Authorize exactly one case-16 validation paired canary.`
 - A passing pair would still require separately authorized capture and CPU
   conversion before the case-disjoint corpus can be reviewed.
+
+## Round 275: case-16 validation pair is dynamically healthy but rejected
+
+- Replaced the disabled case-16 route with a fresh, tokenless coexistence
+  contract at implementation commit
+  `16bb0ef1fd9172fd76e9d75d7811317ba52840fd`. The plan, corrective profile,
+  seed, controller arguments, residual scales, and dynamic thresholds were
+  unchanged. The route added the existing one-use out-of-band token contract,
+  shared Windows launch admission, and per-rollout resource monitors.
+- Local and native-Windows focused suites each passed `37` tests. Clean
+  tokenless preflight passed with `HEAD == upstream`, 27 bound identities, a
+  fresh namespace, and every capture/training route closed.
+- Consumed exactly one external mode-`0600` token in namespace
+  `20260728_model_based_corrective_teacher_case16_validation_natural_error_pair_v2_coexistence`.
+  The wrapper was invoked once, removed the token before Isaac startup, and
+  ran one baseline plus one candidate without retry.
+- SolidWorks and Siemens NX remained active. Launch admission saw
+  `6.457 GiB` free Windows RAM and `10,182 MiB` free GPU memory. Baseline and
+  candidate monitors passed `67` and `62` samples; minimum headroom was
+  `2.986/3.126 GiB` RAM and `7,748 MiB` GPU. No pressure termination was
+  requested, both processes exited cleanly, and the GPU was released.
+- Both rollouts passed the dynamic gates and completed the full
+  `26.028629743 s` execution clock. Baseline position p95/max error was
+  `0.08059953/0.08149219 m`; candidate p95/max was
+  `0.07803205/0.07857883 m`. Candidate improvement was `0.00256747 m` or
+  `3.1855%`.
+- The frozen paired gate rejected the candidate. Absolute p95 improvement
+  missed the `0.003 m` minimum by `0.00043253 m`, and candidate action
+  saturation was `0.00019146` while baseline saturation was zero. No
+  thresholds were relaxed.
+- Preserved the rejection under
+  `evidence_20260728_case16_validation_pair_v2_rejected`. Final-status
+  SHA-256 is
+  `89b7060366c836fd41b460b97f7cd9a58bcdfb2ae920d06ccc2ba79320b53c9d`.
+- No label capture or dataset was created. Capture, conversion, corpus merge,
+  BC, PPO, holdout execution, checkpoints, and training remain closed. Goal
+  completion remains `6/10`, with validation intake still `1/2`.
+
+## Next round after Round 275
+
+- Perform CPU-only localization of the candidate projection/saturation and
+  the `0.433 mm` absolute-improvement shortfall.
+- Propose at most one bounded profile or evidence-contract change without
+  changing the source plan, controller, plant, or gates. A new case-16
+  runtime requires separate explicit authorization.

@@ -600,6 +600,15 @@ CASE16_VALIDATION_NATURAL_ERROR_PAIR_EXECUTION_SUMMARY = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260728_case16_validation_pair_v2_rejected/summary.json"
 )
+CASE16_VALIDATION_DISPOSITION_AUDITOR = (
+    ROOT
+    / "scripts/two_wheel_balance/audit_case16_validation_disposition.py"
+)
+CASE16_VALIDATION_DISPOSITION_SUMMARY = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260728_case16_validation_disposition_cpu_v1/summary.json"
+)
 PENDING_CORRECTIVE_ROUTE_QUEUE_AUDITOR = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -2523,6 +2532,52 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert case16_execution["label_capture_authorized"] is False
     assert case16_execution["dataset_created"] is False
     assert case16_execution["training_started"] is False
+    case16_disposition = json.loads(
+        CASE16_VALIDATION_DISPOSITION_SUMMARY.read_text()
+    )
+    assert corrective["case16_validation_disposition_auditor_sha256"] == (
+        _sha256(CASE16_VALIDATION_DISPOSITION_AUDITOR)
+    )
+    assert corrective["case16_validation_disposition_auditor_git_blob_sha1"] == (
+        "63184520b5422b32bc396b453784931d0c8b2c69"
+    )
+    assert corrective["case16_validation_disposition_summary_sha256"] == (
+        _sha256(CASE16_VALIDATION_DISPOSITION_SUMMARY)
+    )
+    assert corrective["case16_validation_disposition_ceiling_limited"] is True
+    assert corrective[
+        "case16_validation_disposition_intrinsically_hard"
+    ] is False
+    assert corrective[
+        "case16_validation_disposition_further_tuning_recommended"
+    ] is False
+    assert corrective[
+        "case16_validation_disposition_teacher_capture_recommended"
+    ] is False
+    assert corrective[
+        "case16_validation_disposition_selected_replacement_case"
+    ] == 32
+    assert corrective[
+        "case16_validation_disposition_case32_currently_admitted"
+    ] is False
+    assert corrective[
+        "case16_validation_disposition_case32_fresh_readiness_required"
+    ] is True
+    assert corrective[
+        "corrective_corpus_intake_frozen_pending_case16_superseded"
+    ] is True
+    assert corrective[
+        "corrective_corpus_intake_selected_pending_validation_case"
+    ] == 32
+    assert case16_disposition["passed"] is True
+    assert case16_disposition["selected_replacement_case"] == 32
+    assert case16_disposition["case16"]["ceiling_limited"] is True
+    assert case16_disposition["case16"][
+        "intrinsically_hard_in_realized_dynamics"
+    ] is False
+    assert case16_disposition["runtime_authorized"] is False
+    assert case16_disposition["label_capture_authorized"] is False
+    assert case16_disposition["training_started"] is False
     assert corrective[
         "pending_corrective_route_queue_auditor_sha256"
     ] == _sha256(PENDING_CORRECTIVE_ROUTE_QUEUE_AUDITOR)
@@ -3057,7 +3112,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "diagnose_case16_candidate_projection_and_saturation" in (
+    assert "cpu_only_prepare_case32_validation_pair_readiness" in (
         goal["next_iteration"]["required_change"]
     )
 

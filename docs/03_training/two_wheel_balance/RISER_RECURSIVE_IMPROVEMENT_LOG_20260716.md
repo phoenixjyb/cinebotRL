@@ -10665,3 +10665,45 @@ and must state whether its candidate was accepted or rejected.
 - Propose at most one bounded profile or evidence-contract change without
   changing the source plan, controller, plant, or gates. A new case-16
   runtime requires separate explicit authorization.
+
+## Round 276: case-16 is retired from tuning as a ceiling-limited diagnostic
+
+- Added a deterministic CPU-only disposition audit over the sealed case-16
+  pair and hash-pinned historical case-22/case-32 exact-source evidence.
+  Focused tests pass `6 passed, 2 warnings in 0.19s`.
+- A temporary dependency-complete Mac environment ran the broad suite:
+  `1472 passed, 19 failed`. The failures are existing repository/worktree
+  gaps: absent generated hardware/URDF/mesh artifacts, stale route-catalog
+  expectations, and one stale goal-audit dataset count. The new disposition
+  and goal-binding tests are not among the failures.
+- Case 16 is not intrinsically hard in realized dynamics. Its zero-residual
+  baseline already passed at `0.08059953 m` p95, leaving `0.06940047 m`
+  margin to the unchanged `0.15 m` dynamic gate. The candidate improved p95
+  by `3.1855%`, but the strong baseline limited absolute improvement to
+  `0.00256747 m`, only `0.00043253 m` below the frozen paired threshold.
+- The saturation regression corresponds to two estimated saturated
+  action samples across `10,446` candidate projection samples. It remains a
+  valid pair rejection; no gate was relaxed and no retry was authorized.
+- Further case-specific tuning would reuse held-out validation feedback.
+  Case 16 is therefore preserved as
+  `calibration_diagnostic_only_pair_rejection_preserved`, not admitted as a
+  teacher and not scheduled for capture.
+- Historical exact-source evidence compared cases 22 and 32. Both passed
+  dynamic playback, but case 22 had `0.00104877` action saturation. Case 32
+  had zero action saturation, `0.10241882 m` p95 error, and a `9.575589 m`
+  source path, providing more corrective headroom without failing the
+  dynamic gate.
+- Case 32 is selected only as the next validation candidate. Its historical
+  files are selection evidence, not a current admission. Fresh CPU
+  provenance/readiness and a bounded case-specific profile are required
+  before any separately authorized runtime.
+- No Isaac process, capture, conversion, dataset merge, BC, PPO, checkpoint,
+  or training was started. Converted intake remains train `[6,7,23,30]` and
+  validation `[8]`; goal completion remains `6/10`.
+
+## Next round after Round 276
+
+- Prepare case-32 validation-pair provenance, readiness, and one bounded
+  profile on CPU only.
+- Do not retry case 16. A case-32 runtime, capture, conversion, corpus merge,
+  BC, PPO, holdout, or training still requires its own explicit admission.

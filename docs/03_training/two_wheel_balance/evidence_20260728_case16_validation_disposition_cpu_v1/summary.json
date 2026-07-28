@@ -1,0 +1,282 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case16_validation_disposition_cpu_v1",
+  "auditor": {
+    "path": "scripts/two_wheel_balance/audit_case16_validation_disposition.py",
+    "sha256": "79163acc7048d974a2e20f536d06f883df22c2ac4118f66fa2fadbf21503ca1d",
+    "size_bytes": 20641
+  },
+  "inputs": {
+    "case16_plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case16_validation_pair_readiness_cpu_v1/source/case_0016_smoothed_riser_plan_v1.npz",
+      "sha256": "742d1f705d3559916c3e1d7d35caffd5ea9e7200b6e321d1f9f70c8e5a7dad16",
+      "size_bytes": 218363
+    },
+    "case16_pair_summary": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_pair_v2_rejected/summary.json",
+      "sha256": "1e7fc0f630465b7de54949c2f687d3c77f04ef3063d125e303eca63965e6493b",
+      "size_bytes": 3441
+    },
+    "case16_pair_final": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_pair_v2_rejected/final_status.json",
+      "sha256": "89b7060366c836fd41b460b97f7cd9a58bcdfb2ae920d06ccc2ba79320b53c9d",
+      "size_bytes": 10607
+    },
+    "case22_plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_disposition_cpu_v1/source/case_0022_smoothed_riser_plan_v1.npz",
+      "sha256": "8f1638cd771cfac32ca251906e2c095bd7091edb2561974f12ae09b0a65d4a79",
+      "size_bytes": 172484
+    },
+    "case22_gate": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_disposition_cpu_v1/source/case_0022_historical_dynamic_gate.json",
+      "sha256": "115623a6f1239b9e4fc78a7a60087a176b340f275f817f123c90f593e943892a",
+      "size_bytes": 156334
+    },
+    "case32_plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_disposition_cpu_v1/source/case_0032_smoothed_riser_plan_v1.npz",
+      "sha256": "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f",
+      "size_bytes": 268852
+    },
+    "case32_gate": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_disposition_cpu_v1/source/case_0032_historical_dynamic_gate.json",
+      "sha256": "d2a7477254d6a80426370217d8f08db8fe2bdf65e5f4b892a33247f90cf1ce75",
+      "size_bytes": 331627
+    },
+    "source_manifest": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_disposition_cpu_v1/source/source_manifest.json",
+      "sha256": "11b25f51fc44c0838cf78599aa48fbed6d1d96f8b6cfbe1743c8d340e5a0c45e",
+      "size_bytes": 1715
+    }
+  },
+  "thresholds": {
+    "dynamic_position_p95_limit_m": 0.15,
+    "strong_baseline_position_p95_m": 0.1,
+    "minimum_absolute_improvement_m": 0.003,
+    "minimum_relative_improvement": 0.02
+  },
+  "case16": {
+    "plan": {
+      "case": 16,
+      "checks": {
+        "schema": true,
+        "case": true,
+        "exact_source_contract": true,
+        "raw_source_preserved": true,
+        "trajectory_integrity": true,
+        "timing_transition_kinematic_gate": true,
+        "source_anchor_identity": true,
+        "same_state_count": true,
+        "transition_count": true,
+        "riser_transition_count": true,
+        "execution_clock_alias": true,
+        "execution_clock_strict": true,
+        "source_clock_strict": true,
+        "execution_duration": true,
+        "source_duration": true,
+        "anchor_map_identity_array": true,
+        "target_shape": true,
+        "source_target_shape": true,
+        "path_geometry_preserved": true,
+        "learning_closed": true
+      },
+      "state_count": 896,
+      "transition_count": 895,
+      "source_duration_s": 17.548706,
+      "execution_duration_s": 26.028629743189363,
+      "source_path_length_m": 8.73893186661927,
+      "planning_position_p95_m": 0.0425677547135301,
+      "planning_position_max_m": 0.058537053269756716,
+      "maximum_abs_base_linear_velocity_mps": 0.4000000000000404,
+      "maximum_abs_base_yaw_rate_radps": 0.4000000000000509,
+      "maximum_abs_riser_rate_mps": 0.02559104683406727,
+      "camera_height_span_m": 0.05252600000000007
+    },
+    "pair_checks": {
+      "summary_schema": true,
+      "final_schema": true,
+      "validation_identity": true,
+      "dynamic_pair_healthy": true,
+      "frozen_pair_rejected": true,
+      "expected_failed_checks": true,
+      "absolute_gate_unchanged": true,
+      "learning_closed": true
+    },
+    "baseline_position_p95_m": 0.08059952749099941,
+    "candidate_position_p95_m": 0.07803205319222484,
+    "dynamic_position_p95_margin_m": 0.06940047250900058,
+    "absolute_improvement_m": 0.0025674742987745747,
+    "relative_improvement": 0.03185470658077103,
+    "absolute_improvement_shortfall_m": 0.0004325257012254254,
+    "candidate_projection_sample_count": 10446,
+    "candidate_action_saturation_ratio": 0.00019146084625694046,
+    "estimated_saturated_action_samples": 2,
+    "baseline_is_strong": true,
+    "relative_gate_passed": true,
+    "ceiling_limited": true,
+    "intrinsically_hard_in_realized_dynamics": false,
+    "validation_profile_selection_already_observed": true,
+    "further_case_specific_tuning_recommended": false,
+    "teacher_capture_recommended": false,
+    "disposition": "calibration_diagnostic_only_pair_rejection_preserved"
+  },
+  "replacement_candidates": {
+    "22": {
+      "plan": {
+        "case": 22,
+        "checks": {
+          "schema": true,
+          "case": true,
+          "exact_source_contract": true,
+          "raw_source_preserved": true,
+          "trajectory_integrity": true,
+          "timing_transition_kinematic_gate": true,
+          "source_anchor_identity": true,
+          "same_state_count": true,
+          "transition_count": true,
+          "riser_transition_count": true,
+          "execution_clock_alias": true,
+          "execution_clock_strict": true,
+          "source_clock_strict": true,
+          "execution_duration": true,
+          "source_duration": true,
+          "anchor_map_identity_array": true,
+          "target_shape": true,
+          "source_target_shape": true,
+          "path_geometry_preserved": true,
+          "learning_closed": true
+        },
+        "state_count": 693,
+        "transition_count": 692,
+        "source_duration_s": 13.49578,
+        "execution_duration_s": 20.23314121100052,
+        "source_path_length_m": 2.2352860928085994,
+        "planning_position_p95_m": 0.0971080268424981,
+        "planning_position_max_m": 0.11934409978982845,
+        "maximum_abs_base_linear_velocity_mps": 0.4000000000000224,
+        "maximum_abs_base_yaw_rate_radps": 0.4000000000000292,
+        "maximum_abs_riser_rate_mps": 0.5495065447251541,
+        "camera_height_span_m": 0.5606599999999999
+      },
+      "historical_dynamic_gate": {
+        "case": 22,
+        "checks": {
+          "schema": true,
+          "case": true,
+          "top_level_passed": true,
+          "dynamic_quality": true,
+          "thermal_admission": true,
+          "controller_evidence": true,
+          "completed_without_termination": true,
+          "no_normalized_dataset": true,
+          "training_closed": true
+        },
+        "historical_raw_capture_present": true,
+        "completed_steps": 5721,
+        "position_error_p95_m": 0.09929961592941522,
+        "position_error_max_m": 0.11360658332463043,
+        "attitude_error_max_deg": 0.21670996901734,
+        "pitch_max_deg": 6.529206212065561,
+        "riser_error_max_m": 0.011712037615351667,
+        "action_saturation_ratio": 0.001048767697954903,
+        "dynamic_quality_passed": true,
+        "dataset_created": false,
+        "training_started": false
+      },
+      "selection_checks": {
+        "exact_source_plan_passed": true,
+        "historical_dynamic_quality_passed": true,
+        "position_p95_below_dynamic_limit": true,
+        "zero_action_saturation": false,
+        "meaningful_corrective_headroom": false,
+        "normalized_dataset_absent": true,
+        "training_absent": true
+      }
+    },
+    "32": {
+      "plan": {
+        "case": 32,
+        "checks": {
+          "schema": true,
+          "case": true,
+          "exact_source_contract": true,
+          "raw_source_preserved": true,
+          "trajectory_integrity": true,
+          "timing_transition_kinematic_gate": true,
+          "source_anchor_identity": true,
+          "same_state_count": true,
+          "transition_count": true,
+          "riser_transition_count": true,
+          "execution_clock_alias": true,
+          "execution_clock_strict": true,
+          "source_clock_strict": true,
+          "execution_duration": true,
+          "source_duration": true,
+          "anchor_map_identity_array": true,
+          "target_shape": true,
+          "source_target_shape": true,
+          "path_geometry_preserved": true,
+          "learning_closed": true
+        },
+        "state_count": 1099,
+        "transition_count": 1098,
+        "source_duration_s": 21.648708,
+        "execution_duration_s": 29.592866387237176,
+        "source_path_length_m": 9.575589358765875,
+        "planning_position_p95_m": 0.06691645709410456,
+        "planning_position_max_m": 0.10933711537359574,
+        "maximum_abs_base_linear_velocity_mps": 0.40000000000006447,
+        "maximum_abs_base_yaw_rate_radps": 0.4000000000000285,
+        "maximum_abs_riser_rate_mps": 0.13198280951085728,
+        "camera_height_span_m": 0.1365679999999998
+      },
+      "historical_dynamic_gate": {
+        "case": 32,
+        "checks": {
+          "schema": true,
+          "case": true,
+          "top_level_passed": true,
+          "dynamic_quality": true,
+          "thermal_admission": true,
+          "controller_evidence": true,
+          "completed_without_termination": true,
+          "no_normalized_dataset": true,
+          "training_closed": true
+        },
+        "historical_raw_capture_present": true,
+        "completed_steps": 13037,
+        "position_error_p95_m": 0.10241882262348277,
+        "position_error_max_m": 0.133996309804517,
+        "attitude_error_max_deg": 0.21904509553309137,
+        "pitch_max_deg": 7.4185186132292005,
+        "riser_error_max_m": 0.013584691025953166,
+        "action_saturation_ratio": 0.0,
+        "dynamic_quality_passed": true,
+        "dataset_created": false,
+        "training_started": false
+      },
+      "selection_checks": {
+        "exact_source_plan_passed": true,
+        "historical_dynamic_quality_passed": true,
+        "position_p95_below_dynamic_limit": true,
+        "zero_action_saturation": true,
+        "meaningful_corrective_headroom": true,
+        "normalized_dataset_absent": true,
+        "training_absent": true
+      }
+    }
+  },
+  "selected_replacement_case": 32,
+  "selection_reason": "exact_source_historical_dynamic_pass_with_zero_action_saturation_and_meaningful_corrective_headroom",
+  "selected_candidate_is_currently_admitted": false,
+  "fresh_readiness_and_provenance_review_required": true,
+  "next_bounded_action": "cpu_only_prepare_case32_validation_pair_readiness_and_profile",
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "label_capture_authorized": false,
+  "cpu_conversion_authorized": false,
+  "dataset_merge_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

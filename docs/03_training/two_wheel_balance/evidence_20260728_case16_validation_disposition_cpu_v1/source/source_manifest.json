@@ -1,0 +1,36 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_case16_validation_alternative_source_manifest_v1",
+  "machine": "192.168.100.98",
+  "remote_repository": "/mnt/g/wSpace/cinebotRL-two-wheel-riser",
+  "files": [
+    {
+      "case": 22,
+      "role": "historical_exact_source_plan",
+      "remote_path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v20_case42_initialization_preroll2s_cpu/case_0022_smoothed_riser_plan_v1.npz",
+      "sha256": "8f1638cd771cfac32ca251906e2c095bd7091edb2561974f12ae09b0a65d4a79"
+    },
+    {
+      "case": 22,
+      "role": "historical_dynamic_gate",
+      "remote_path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/20260721_initial_teacher42_raw_capture_v1_exclusive/gates/case_0022.json",
+      "sha256": "115623a6f1239b9e4fc78a7a60087a176b340f275f817f123c90f593e943892a"
+    },
+    {
+      "case": 32,
+      "role": "historical_exact_source_plan",
+      "remote_path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/20260720_smoothed_plan_all79_v20_case42_initialization_preroll2s_cpu/case_0032_smoothed_riser_plan_v1.npz",
+      "sha256": "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f"
+    },
+    {
+      "case": 32,
+      "role": "historical_dynamic_gate",
+      "remote_path": "/mnt/g/wSpace/cinebotRL-two-wheel-riser/artifacts/two_wheel_riser/20260721_initial_teacher42_raw_capture_v1_exclusive/gates/case_0032.json",
+      "sha256": "d2a7477254d6a80426370217d8f08db8fe2bdf65e5f4b892a33247f90cf1ce75"
+    }
+  ],
+  "selection_only": true,
+  "fresh_runtime_authorized": false,
+  "capture_authorized": false,
+  "conversion_authorized": false,
+  "training_authorized": false
+}

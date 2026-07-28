@@ -35,6 +35,11 @@ PROPOSAL_ROOT = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_generic_corrective_conversion_proposals_v1"
 )
+CASE8_PROPOSAL = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260728_case8_validation_conversion_proposal_v1/proposal.json"
+)
 
 
 def _module(path: Path, name: str):
@@ -153,6 +158,8 @@ def _contract_payload(repo: Path) -> dict[str, object]:
 
 
 def _proposal_relative(case: int) -> str:
+    if case == 8:
+        return CASE8_PROPOSAL.relative_to(ROOT).as_posix()
     return (
         "docs/03_training/two_wheel_balance/"
         "evidence_20260724_generic_corrective_conversion_proposals_v1/"
@@ -171,7 +178,11 @@ def _isolated_repo(
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / relative, destination)
 
-    proposal_source = PROPOSAL_ROOT / f"case_{case:04d}.json"
+    proposal_source = (
+        CASE8_PROPOSAL
+        if case == 8
+        else PROPOSAL_ROOT / f"case_{case:04d}.json"
+    )
     proposal_payload = json.loads(proposal_source.read_text())
     proposal = repo / _proposal_relative(case)
     proposal.parent.mkdir(parents=True, exist_ok=True)
@@ -229,16 +240,18 @@ def _validate(
 
 
 @pytest.mark.parametrize(
-    ("case", "sample_count", "clipped_rows"),
+    ("case", "split", "sample_count", "clipped_rows"),
     [
-        (6, 7933, [0, 146, 0]),
-        (23, 3273, [0, 0, 0]),
-        (30, 11411, [200, 308, 333]),
+        (6, "train", 7933, [0, 146, 0]),
+        (23, "train", 3273, [0, 0, 0]),
+        (30, "train", 11411, [200, 308, 333]),
+        (8, "validation", 6607, [0, 0, 9]),
     ],
 )
 def test_one_generic_preflight_accepts_all_existing_proposals(
     tmp_path,
     case,
+    split,
     sample_count,
     clipped_rows,
 ) -> None:
@@ -247,7 +260,7 @@ def test_one_generic_preflight_accepts_all_existing_proposals(
     assert result["passed"] is True, json.dumps(result, indent=2)
     assert result["cpu_contract_ready"] is True
     assert result["case"] == case
-    assert result["split"] == "train"
+    assert result["split"] == split
     assert result["namespace"] == MODULE.namespace_for(case)
     assert result["dataset_name"] == MODULE.dataset_name_for(case)
     assert result["source_metrics"]["sample_count"] == sample_count

@@ -12,6 +12,11 @@ SCRIPT = (
     "prepare_model_based_corrective_conversion_route.py"
 )
 CAPTURES = {
+    8: (
+        ROOT
+        / "docs/03_training/two_wheel_balance/"
+        "evidence_20260728_case8_validation_capture_v1"
+    ),
     30: (
         ROOT
         / "docs/03_training/two_wheel_balance/"
@@ -81,16 +86,18 @@ def _capture_paths(case: int):
 
 
 @pytest.mark.parametrize(
-    ("case", "sample_count", "clipped_rows"),
+    ("case", "split", "sample_count", "clipped_rows"),
     [
-        (30, 11411, [200, 308, 333]),
-        (23, 3273, [0, 0, 0]),
-        (6, 7933, [0, 146, 0]),
+        (30, "train", 11411, [200, 308, 333]),
+        (23, "train", 3273, [0, 0, 0]),
+        (6, "train", 7933, [0, 146, 0]),
+        (8, "validation", 6607, [0, 0, 9]),
     ],
 )
 def test_existing_admitted_captures_share_one_proposal_path(
     monkeypatch,
     case,
+    split,
     sample_count,
     clipped_rows,
 ) -> None:
@@ -106,10 +113,11 @@ def test_existing_admitted_captures_share_one_proposal_path(
         capture,
         final,
         case=case,
-        split="train",
+        split=split,
     )
     assert result["passed"] is True
     assert result["proposal_ready"] is True
+    assert result["split"] == split
     assert all(result["proposal_checks"].values())
     assert result["metrics"]["sample_count"] == sample_count
     assert result["metrics"]["clipped_rows"] == clipped_rows

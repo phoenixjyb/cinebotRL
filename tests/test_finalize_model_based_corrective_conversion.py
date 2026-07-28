@@ -22,7 +22,17 @@ PROPOSAL_ROOT = (
     / "docs/03_training/two_wheel_balance/"
     "evidence_20260724_generic_corrective_conversion_proposals_v1"
 )
+CASE8_PROPOSAL = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260728_case8_validation_conversion_proposal_v1/proposal.json"
+)
 CAPTURES = {
+    8: (
+        ROOT
+        / "docs/03_training/two_wheel_balance/"
+        "evidence_20260728_case8_validation_capture_v1"
+    ),
     6: (
         ROOT
         / "docs/03_training/two_wheel_balance/"
@@ -47,14 +57,18 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _fixture(tmp_path: Path, case: int):
+def _fixture(tmp_path: Path, case: int, split: str = "train"):
     evidence = CAPTURES[case]
     capture = (
         evidence
         / f"capture/case_{case:04d}_corrective_teacher_capture_v2.npz"
     )
     source_final = evidence / "final_status.json"
-    proposal = PROPOSAL_ROOT / f"case_{case:04d}.json"
+    proposal = (
+        CASE8_PROPOSAL
+        if case == 8
+        else PROPOSAL_ROOT / f"case_{case:04d}.json"
+    )
     proposal_payload = json.loads(proposal.read_text())
     root = tmp_path / MODULE.namespace_for(case)
     root.mkdir(parents=True)
@@ -62,7 +76,7 @@ def _fixture(tmp_path: Path, case: int):
         capture,
         source_final,
         expected_case=case,
-        expected_split="train",
+        expected_split=split,
     )
     dataset = root / MODULE.dataset_name_for(case)
     save_case_dataset(
@@ -70,13 +84,13 @@ def _fixture(tmp_path: Path, case: int):
         metadata,
         payload,
         expected_case=case,
-        expected_split="train",
+        expected_split=split,
     )
     execution_commit = "a" * 40
     admission = {
         "schema": MODULE.ADMISSION_SCHEMA,
         "case": case,
-        "split": "train",
+        "split": split,
         "passed": True,
         "git": {
             "head": execution_commit,
@@ -106,7 +120,7 @@ def _fixture(tmp_path: Path, case: int):
         "execute_requested": True,
         "output_created": True,
         "case": case,
-        "split": "train",
+        "split": split,
         "source_capture_sha256": _sha256(capture),
         "source_final_status_sha256": _sha256(source_final),
     }
@@ -124,19 +138,21 @@ def _fixture(tmp_path: Path, case: int):
 
 
 @pytest.mark.parametrize(
-    ("case", "sample_count", "clipped_rows"),
+    ("case", "split", "sample_count", "clipped_rows"),
     [
-        (6, 7933, [0, 146, 0]),
-        (23, 3273, [0, 0, 0]),
+        (6, "train", 7933, [0, 146, 0]),
+        (23, "train", 3273, [0, 0, 0]),
+        (8, "validation", 6607, [0, 0, 9]),
     ],
 )
 def test_generic_finalizer_reopens_and_seals_dataset(
     tmp_path,
     case,
+    split,
     sample_count,
     clipped_rows,
 ) -> None:
-    fixture = _fixture(tmp_path, case)
+    fixture = _fixture(tmp_path, case, split)
     result = MODULE.finalize(
         fixture["root"],
         fixture["admission"],
@@ -149,7 +165,7 @@ def test_generic_finalizer_reopens_and_seals_dataset(
     )
     assert result["passed"] is True
     assert result["case"] == case
-    assert result["split"] == "train"
+    assert result["split"] == split
     assert result["metrics"]["sample_count"] == sample_count
     assert result["metrics"]["clipped_rows"] == clipped_rows
     assert all(result["checks"].values())

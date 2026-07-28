@@ -10743,3 +10743,41 @@ and must state whether its candidate was accepted or rejected.
   runtime contract on CPU only.
 - Do not launch it. Exactly one paired canary still requires separate user
   authorization after the preflight contract passes.
+
+## Round 278: case-32 natural-error pair route passes CPU preflight
+
+- Added a hash-bound case-32 validation pair route at implementation commit
+  `904cbf087cd8be0f89e4da53fb042ad5ad58bb3a`. The contract binds 27 exact
+  identities, including the `[8,32]` selection, source plan, historical
+  dynamic gate, case-specific profile, robot assets, playback, projection
+  telemetry, wrapper, validator, and finalizer.
+- The pair is baseline exact-zero residual versus the bounded case-32
+  natural-error corrective profile under the same plan, seed, physics, and
+  reset. External wrench is forbidden. Candidate execution requires the
+  baseline to pass unchanged dynamic gates.
+- The route preserves the existing `0.003 m` absolute and `2%` relative p95
+  improvement requirements, no saturation regression, and the unchanged
+  physical quality thresholds. Projection telemetry is observational and
+  does not alter commands or create labels.
+- Focused route tests pass `14 passed, 2 warnings in 1.13s`. They cover exact
+  contract regeneration, command-preserving telemetry, alternate-contract
+  rejection, forged or embedded authorization rejection, and synthetic
+  paired pass/fail assessment.
+- The canonical tokenless preflight passed at clean pushed commit `904cbf0`;
+  `HEAD == upstream`, the contract blob matches `HEAD`, all 27 identities
+  pass, and the namespace is fresh.
+- A deliberate unauthorised `--execute` attempt exited `4` before Python or
+  Isaac. It reported `python_started=false`, `isaac_started=false`, and
+  created no runtime namespace.
+- No authorization token, Isaac process, capture, conversion, corpus merge,
+  BC, PPO, checkpoint, or training was created or started. Converted intake
+  remains train `[6,7,23,30]`, validation `[8]`; goal completion remains
+  `6/10`.
+
+## Next round after Round 278
+
+- Request separate explicit authorization for exactly one case-32 validation
+  paired canary.
+- If the pair passes, stop and request a separate capture authorization. If
+  it fails, preserve the rejection and diagnose one bounded root cause
+  without retrying or relaxing gates.

@@ -1,0 +1,361 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_case32_validation_natural_error_pair_admission_v1",
+  "contract": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/model_based_corrective_teacher_case32_validation_natural_error_pair_contract_v1.json",
+  "contract_sha256": "55d6004b454813f72d33b0e9145bcbb670a55fbf728609c4cba0afd23b37bb54",
+  "contract_git_blob_sha1": "2899d87731e0c5292bec7489135b85182bb93300",
+  "reviewed_parent_commit": "da20ebb9158a9251e3919f3e6b04032c17827afe",
+  "runtime_commit": "904cbf087cd8be0f89e4da53fb042ad5ad58bb3a",
+  "upstream_commit": "904cbf087cd8be0f89e4da53fb042ad5ad58bb3a",
+  "case": 32,
+  "split": "validation",
+  "namespace": "20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence",
+  "identities": {
+    "selection": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/docs/03_training/two_wheel_balance/evidence_20260728_case32_validation_selection_cpu_v1/selection.json",
+      "sha256": "4e23401230ca1d236a769cee57e4eea552d8c8b67a311fa45c317e9a706ca9d7",
+      "git_blob_sha1": "f317bb7286210f4f5d9e7948dfe86de668aaa09c",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "readiness_audit": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/docs/03_training/two_wheel_balance/evidence_20260728_case32_validation_pair_readiness_cpu_v1/summary.json",
+      "sha256": "20773b27d86114dc6da74a52571058f44a53290778fb562ce7450bb0d4752782",
+      "git_blob_sha1": "699e91621630ced0d7a42e84a2a3cfcf131e48d7",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "readiness_auditor": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/audit_model_based_corrective_case32_validation_pair_readiness.py",
+      "sha256": "e39aad43ffcd1eff3132c852bbc330c331cfdfce69a7211258b43ae1711599d6",
+      "git_blob_sha1": "dfb82a3fea669708d5e897b5c8298fd303809377",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "profile_proposal": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/docs/03_training/two_wheel_balance/evidence_20260728_case32_validation_natural_error_profile_cpu_v1/proposal.json",
+      "sha256": "e50706d45969ed91ed00488ffc211c0d17d07efe53e20d2f28c57deb120e2d13",
+      "git_blob_sha1": "364c9c4fabf61d1231bff7edca59ca96fedd367e",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "profile_builder": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/build_model_based_corrective_case32_validation_natural_error_profile.py",
+      "sha256": "de56c4332a183a35400480b4e8f8d25d594288ac2d53f1029c0d41599a89af2e",
+      "git_blob_sha1": "0ef6b76d45ccacf60112e75c50faa3a127294f40",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "case32_plan": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_disposition_cpu_v1/source/case_0032_smoothed_riser_plan_v1.npz",
+      "sha256": "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f",
+      "git_blob_sha1": "d34c559dca4bd99747d3ee60dbfa526b9b8c702f",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "baseline_dynamic_gate": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_disposition_cpu_v1/source/case_0032_historical_dynamic_gate.json",
+      "sha256": "d2a7477254d6a80426370217d8f08db8fe2bdf65e5f4b892a33247f90cf1ce75",
+      "git_blob_sha1": "1ed8f86d53beb702eac4b03fa40e510cce06e9d7",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "safety_projection_source": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/src/rl_platform/tasks/two_wheel_balance/riser_residual_policy.py",
+      "sha256": "5ecbaefa054d80ca8d1e85fa3ed732d993ca0fb25a0ca4e3fea22206c54cc257",
+      "git_blob_sha1": "4de0ab3870261c527e493b0d20c751dea73a6a0a",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "corrective_profile": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/model_based_corrective_teacher_case32_validation_natural_error_profile_v1.json",
+      "sha256": "cb6924955e32feea4712dbd2c0d0d8c2592f9373759039a8ba98ec0e9fe666f3",
+      "git_blob_sha1": "41732626a4afeb3dd1ef9200966b7d7d06c2ee66",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "lqr_gains": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/docs/03_training/two_wheel_balance/evidence_20260714_28kg/lqr_gains.json",
+      "sha256": "2d955a8878b1086836cfffdaf89e2cd2ecf7c2c4ab2467c24bbfa43cbbd4d5e6",
+      "git_blob_sha1": "70ecdd8ae6b7ce09574a97a8581229cb90add623",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "robot_build_audit": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/assets_own/recomoProto2_two_wheel_riser/build_audit.json",
+      "sha256": "8be2b59a03a6c22838795ad361a86bf0f60a7534aeacd62893013f0ee27b40d9",
+      "git_blob_sha1": "83f8715d05be714dd8dcb2b0a9f47ef3f4bec8e9",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "robot_urdf": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.urdf",
+      "sha256": "603cecfc5b54e659f5d030023a69a3b42d6567f66d2771fbb7127d186f1a9afa",
+      "git_blob_sha1": "c70bf24a3189ccd24553287590dcfd191737ab33",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "robot_usd": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/assets_own/recomoProto2_two_wheel_riser/recomoProto2_two_wheel_riser.usd",
+      "sha256": "89f8e38f9290c4a0fcf206dd6966f067f543888f5422f978e566dbb655efa9d0",
+      "git_blob_sha1": "b25242c27c781b5aad4fadefb0cbf54398a9a75a",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "playback": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/smoke_riser_reference_playback.py",
+      "sha256": "ab60ed842d0b4a3fde754076a01e98ea91965a56758bc0601ecf4523c2065c6a",
+      "git_blob_sha1": "05c803465ec8a281e1b96b5eb013e26b685405e6",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "projection_telemetry_engine": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/smoke_riser_case2_natural_error_pair.py",
+      "sha256": "b825502a5b8259e823e8f3943b7175debfb3d81a56dd4c88d5dc52e7917f6e32",
+      "git_blob_sha1": "c9857865922d42688492c602250427b7d8705aca",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "projection_evidence_engine": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/src/rl_platform/tasks/two_wheel_balance/riser_projection_evidence.py",
+      "sha256": "da2ec6c2a47eafc4f1d1bac18af2b7a1c531558017f446e9f7c4cb82c56c396d",
+      "git_blob_sha1": "56d39fe33745593e4096b2ae692ac3ca12aa4c08",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "case32_playback_adapter": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/smoke_riser_case32_validation_natural_error_pair.py",
+      "sha256": "9724b19ddb5f4e3f2aaf801379d5544d74587bf9029c23c1124e897b05a84999",
+      "git_blob_sha1": "5ca541e8dbc261e2ae5f4141613644a8834470f7",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "corrective_teacher_runtime": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/src/rl_platform/tasks/two_wheel_balance/riser_corrective_teacher.py",
+      "sha256": "921112be40d49ae19ad06a377450c09455ac8afb5c1c8b9240591043ac47afd0",
+      "git_blob_sha1": "932ef1d6aed6f060acae7aaecc14f67dc481cb17",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "validation_assessment": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/src/rl_platform/tasks/two_wheel_balance/riser_corrective_validation.py",
+      "sha256": "8f0eab36a4b034850f2a637035d179f5283c61b369dc4453919778b7f4cb4778",
+      "git_blob_sha1": "d0f979d27416094e07f88eabe21576cdd3e368fe",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "natural_error_finalizer_engine": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case2_natural_error_pair.py",
+      "sha256": "7731a5b6c41e6057419db3ce4e9586ae60bcf5192d4462a5d8169ba1e2e3ab8d",
+      "git_blob_sha1": "02bc047f22b5ffb2800fec1736640cd5453bedde",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "preflight_wrapper": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/run_model_based_corrective_teacher_case32_validation_natural_error_pair.sh",
+      "sha256": "6db9bd77d17ee174c3a659741205d42665b0ff44068c2f843dfec87908b37634",
+      "git_blob_sha1": "712556bdb314f5bc5ff0fe51196c1332825f34a9",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "route_validator_engine": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/validate_model_based_corrective_teacher_case8_validation_pair.py",
+      "sha256": "9c39f6d513a3f4f324e065cdf6474452f1a6eabb60a9bdf3e0caed5d1e34147f",
+      "git_blob_sha1": "5a78b4380c322633b586c1ca45180a494b6bd892",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "contract_builder": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/build_model_based_corrective_teacher_case32_validation_natural_error_pair_contract.py",
+      "sha256": "ddb1706d380c1ee12bdd40b51b43bd550cbfdb91a32ba73e3ad446895adde215",
+      "git_blob_sha1": "dca3b7764f93052f95e0c86c527cc17f7403e0ab",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "contract_validator": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/validate_model_based_corrective_teacher_case32_validation_natural_error_pair.py",
+      "sha256": "1270eeda1e86d10ed48003ca612709160c3c5b7c135c299edf42a8426b511617",
+      "git_blob_sha1": "9d41b418a98f35d81d86b907664a483232a2164c",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "paired_finalizer": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case32_validation_natural_error_pair.py",
+      "sha256": "bf00e896d76a083eb1786ce93845d1e0224b93bd42b29f8ee37f61a479236c91",
+      "git_blob_sha1": "4934365e45296e06f8f32a3b507b101dd6d38ac7",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "shared_windows_resource_guard": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/check_windows_shared_resource_admission.py",
+      "sha256": "5526a2bcb9d6ebd1efebe6529e61f5d69b6d0a368739d4bd92b0ee8090107864",
+      "git_blob_sha1": "4aedfc7c295fd94ffa3b4e82d846b7802ebec0d0",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    },
+    "shared_windows_resource_monitor": {
+      "path": "/Users/yanbo/Projects/cinebotRL-two-wheel-riser-contract2/scripts/two_wheel_balance/monitor_windows_shared_resource_pressure.py",
+      "sha256": "a0969dd4733c485b8ffff48198ba22bf4a5d308a4ac895f095adc0630161eff2",
+      "git_blob_sha1": "825e04ba5678763c830532d7378f52ea148acc43",
+      "checks": {
+        "file_exists": true,
+        "sha256_matches": true,
+        "git_blob_matches": true
+      },
+      "passed": true
+    }
+  },
+  "document_checks": {
+    "selection": true,
+    "readiness": true,
+    "proposal": true,
+    "corrective": true
+  },
+  "checks": {
+    "schema_case_split": true,
+    "reviewed_parent_exact": true,
+    "reviewed_parent_is_ancestor": true,
+    "head_matches_upstream": true,
+    "tracked_worktree_clean": true,
+    "canonical_contract_path": true,
+    "contract_is_tracked": true,
+    "contract_blob_matches_head": true,
+    "namespace_exact_and_fresh": true,
+    "identity_set_and_hashes": true,
+    "documents": true,
+    "residual_scales": true,
+    "controller_arguments": true,
+    "dynamic_thresholds": true,
+    "pair_contract": true,
+    "resource_contract": true,
+    "route_complete": true,
+    "runtime_authorization_absent": true,
+    "validation_learning_closed": true,
+    "authorization_state": true
+  },
+  "authorization_checks": {
+    "authorization_file_present": false,
+    "authorization_mode_0600": false,
+    "authorization_not_symlink": false,
+    "authorization_file_outside_repository": false,
+    "authorization_hash_is_out_of_band": false,
+    "authorization_hash_matches": false
+  },
+  "authorization_token_issued": false,
+  "cpu_contract_ready": true,
+  "runtime_route_contract_ready": true,
+  "execution_route_complete": true,
+  "runtime_authorized": false,
+  "gpu_launch_authorized": false,
+  "teacher_admission_authorized": false,
+  "label_capture_authorized": false,
+  "dataset_creation_authorized": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

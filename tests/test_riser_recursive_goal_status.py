@@ -643,6 +643,47 @@ CASE32_VALIDATION_PROFILE_PROPOSAL = (
     "evidence_20260728_case32_validation_natural_error_profile_cpu_v1/"
     "proposal.json"
 )
+CASE32_VALIDATION_PAIR_CONTRACT = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "model_based_corrective_teacher_case32_validation_natural_error_"
+    "pair_contract_v1.json"
+)
+CASE32_VALIDATION_PAIR_BUILDER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "build_model_based_corrective_teacher_case32_validation_natural_error_"
+    "pair_contract.py"
+)
+CASE32_VALIDATION_PAIR_VALIDATOR = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "validate_model_based_corrective_teacher_case32_validation_natural_error_"
+    "pair.py"
+)
+CASE32_VALIDATION_PAIR_WRAPPER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "run_model_based_corrective_teacher_case32_validation_natural_error_"
+    "pair.sh"
+)
+CASE32_VALIDATION_PAIR_ADAPTER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "smoke_riser_case32_validation_natural_error_pair.py"
+)
+CASE32_VALIDATION_PAIR_FINALIZER = (
+    ROOT
+    / "scripts/two_wheel_balance/"
+    "summarize_model_based_corrective_teacher_case32_validation_natural_error_"
+    "pair.py"
+)
+CASE32_VALIDATION_PAIR_EVIDENCE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260728_case32_validation_natural_error_pair_route_cpu_v1/"
+    "summary.json"
+)
 PENDING_CORRECTIVE_ROUTE_QUEUE_AUDITOR = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -2643,6 +2684,43 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["case32_validation_profile_cpu_ready"] is True
     assert corrective[
         "case32_validation_profile_runtime_route_implemented"
+    ] is True
+    assert corrective["case32_validation_pair_route_contract_sha256"] == (
+        _sha256(CASE32_VALIDATION_PAIR_CONTRACT)
+    )
+    assert corrective["case32_validation_pair_route_builder_sha256"] == (
+        _sha256(CASE32_VALIDATION_PAIR_BUILDER)
+    )
+    assert corrective["case32_validation_pair_route_validator_sha256"] == (
+        _sha256(CASE32_VALIDATION_PAIR_VALIDATOR)
+    )
+    assert corrective["case32_validation_pair_route_wrapper_sha256"] == (
+        _sha256(CASE32_VALIDATION_PAIR_WRAPPER)
+    )
+    assert corrective["case32_validation_pair_route_adapter_sha256"] == (
+        _sha256(CASE32_VALIDATION_PAIR_ADAPTER)
+    )
+    assert corrective["case32_validation_pair_route_finalizer_sha256"] == (
+        _sha256(CASE32_VALIDATION_PAIR_FINALIZER)
+    )
+    assert corrective[
+        "case32_validation_pair_route_preflight_summary_sha256"
+    ] == _sha256(CASE32_VALIDATION_PAIR_EVIDENCE)
+    assert corrective["case32_validation_pair_route_identity_count"] == 27
+    assert corrective[
+        "case32_validation_pair_route_canonical_preflight_passed"
+    ] is True
+    assert corrective[
+        "case32_validation_pair_route_authorization_token_issued"
+    ] is False
+    assert corrective[
+        "case32_validation_pair_route_unauthorized_python_started"
+    ] is False
+    assert corrective[
+        "case32_validation_pair_route_unauthorized_isaac_started"
+    ] is False
+    assert corrective[
+        "case32_validation_pair_route_namespace_created"
     ] is False
     assert corrective["case32_validation_profile_runtime_authorized"] is False
     assert corrective["case32_validation_profile_capture_authorized"] is False
@@ -3191,7 +3269,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "case32_validation_natural_error_pair_contract" in (
+    assert "run_exactly_one_case32_validation_natural_error_pair" in (
         goal["next_iteration"]["required_change"]
     )
 

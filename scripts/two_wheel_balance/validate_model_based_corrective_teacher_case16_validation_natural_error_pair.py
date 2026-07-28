@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import hmac
 import json
 from pathlib import Path
+import re
+import stat
 import subprocess
 import sys
 from typing import Mapping
@@ -33,8 +36,8 @@ ADMISSION_SCHEMA = (
 )
 REVIEWED_PARENT = "c92c428785be987ab13e558aa07abc2713a7a0c5"
 NAMESPACE = (
-    "20260724_model_based_corrective_teacher_case16_validation_"
-    "natural_error_pair_v1_exclusive"
+    "20260728_model_based_corrective_teacher_case16_validation_"
+    "natural_error_pair_v2_coexistence"
 )
 CONTRACT_RELATIVE_PATH = (
     "scripts/two_wheel_balance/model_based_corrective_teacher_"
@@ -96,6 +99,16 @@ EXPECTED_PAIR_CONTRACT = {
     "saturation_regression_allowed": False,
     "maximum_runtime_seconds_per_rollout": 600,
 }
+EXPECTED_RESOURCE_CONTRACT = {
+    "shared_windows_resource_admission_required": True,
+    "resource_admission_before_token_consumption": True,
+    "launch_minimum_windows_free_memory_gib": 5.0,
+    "launch_minimum_gpu_free_memory_mib": 9216,
+    "cad_coexistence_allowed": True,
+    "runtime_resource_monitor_required_per_rollout": True,
+    "runtime_minimum_windows_free_memory_gib": 1.5,
+    "runtime_minimum_gpu_free_memory_mib": 2048,
+}
 REQUIRED_IDENTITIES = {
     "selection",
     "readiness_audit",
@@ -122,7 +135,51 @@ REQUIRED_IDENTITIES = {
     "contract_builder",
     "contract_validator",
     "paired_finalizer",
+    "shared_windows_resource_guard",
+    "shared_windows_resource_monitor",
 }
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _authorization_checks(
+    authorization_file: Path | None,
+    authorization_sha256: str | None,
+    repo: Path,
+    contract_text: str,
+) -> dict[str, bool]:
+    present = authorization_file is not None and authorization_file.is_file()
+    mode = (
+        stat.S_IMODE(authorization_file.stat().st_mode)
+        if present and authorization_file is not None
+        else None
+    )
+    is_symlink = (
+        authorization_file.is_symlink()
+        if present and authorization_file is not None
+        else False
+    )
+    actual_hash = _sha256(authorization_file) if present else None
+    return {
+        "authorization_file_present": present,
+        "authorization_mode_0600": mode == 0o600,
+        "authorization_not_symlink": present and not is_symlink,
+        "authorization_file_outside_repository": present
+        and authorization_file is not None
+        and not authorization_file.resolve().is_relative_to(repo),
+        "authorization_hash_is_out_of_band": (
+            isinstance(authorization_sha256, str)
+            and re.fullmatch(r"[0-9a-f]{64}", authorization_sha256) is not None
+            and authorization_sha256 not in contract_text
+        ),
+        "authorization_hash_matches": (
+            present
+            and isinstance(authorization_sha256, str)
+            and hmac.compare_digest(str(actual_hash), authorization_sha256)
+        ),
+    }
 
 
 def validate(
@@ -131,11 +188,13 @@ def validate(
     *,
     namespace: str,
     authorization_file: Path | None = None,
+    authorization_sha256: str | None = None,
 ) -> dict[str, object]:
     repo = repo.resolve()
     contract_path = contract_path.resolve()
     canonical_path = (repo / CONTRACT_RELATIVE_PATH).resolve()
-    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    contract_text = contract_path.read_text(encoding="utf-8")
+    contract = json.loads(contract_text)
     identities = contract.get("identities", {})
     rows = {
         name: _identity(repo, value)
@@ -246,6 +305,15 @@ def validate(
         == EXPECTED_MAXIMUM_RESIDUALS,
     }
     namespace_path = repo / "artifacts/two_wheel_riser" / namespace
+    authorization_requested = (
+        authorization_file is not None or authorization_sha256 is not None
+    )
+    authorization_checks = _authorization_checks(
+        authorization_file,
+        authorization_sha256,
+        repo,
+        contract_text,
+    )
     checks = {
         "schema_case_split": contract.get("schema") == SCHEMA
         and contract.get("case") == 16
@@ -292,6 +360,8 @@ def validate(
         == EXPECTED_DYNAMIC_THRESHOLDS,
         "pair_contract": contract.get("paired_experiment_contract")
         == EXPECTED_PAIR_CONTRACT,
+        "resource_contract": contract.get("shared_resource_contract")
+        == EXPECTED_RESOURCE_CONTRACT,
         "route_complete": contract.get("cpu_preflight_ready") is True
         and contract.get("runtime_route_contract_ready") is True
         and contract.get("execution_route_complete") is True,
@@ -310,9 +380,14 @@ def validate(
         and contract.get("ppo_authorized") is False
         and contract.get("training_started") is False
         and contract.get("valid_for_training") is False,
-        "authorization_file_absent": authorization_file is None,
+        "authorization_state": (
+            all(authorization_checks.values())
+            if authorization_requested
+            else authorization_file is None and authorization_sha256 is None
+        ),
     }
     passed = all(checks.values())
+    runtime_authorized = authorization_requested and passed
     return {
         "schema": ADMISSION_SCHEMA,
         "contract": str(contract_path),
@@ -329,12 +404,13 @@ def validate(
         "identities": rows,
         "document_checks": document_checks,
         "checks": checks,
-        "authorization_token_issued": False,
+        "authorization_checks": authorization_checks,
+        "authorization_token_issued": runtime_authorized,
         "cpu_contract_ready": passed,
         "runtime_route_contract_ready": passed,
         "execution_route_complete": passed,
-        "runtime_authorized": False,
-        "gpu_launch_authorized": False,
+        "runtime_authorized": runtime_authorized,
+        "gpu_launch_authorized": runtime_authorized,
         "teacher_admission_authorized": False,
         "label_capture_authorized": False,
         "dataset_creation_authorized": False,
@@ -352,6 +428,7 @@ def main() -> int:
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--namespace", required=True)
     parser.add_argument("--authorization-file", type=Path)
+    parser.add_argument("--authorization-sha256")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     result = validate(
@@ -359,6 +436,7 @@ def main() -> int:
         args.repo_root,
         namespace=args.namespace,
         authorization_file=args.authorization_file,
+        authorization_sha256=args.authorization_sha256,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

@@ -19,6 +19,7 @@ from validate_model_based_corrective_teacher_case16_validation_natural_error_pai
     EXPECTED_CONTROLLER_ARGUMENTS,
     EXPECTED_DYNAMIC_THRESHOLDS,
     EXPECTED_PAIR_CONTRACT,
+    EXPECTED_RESOURCE_CONTRACT,
     EXPECTED_RESIDUAL_SCALES,
     NAMESPACE,
     REVIEWED_PARENT,
@@ -124,6 +125,13 @@ IDENTITY_PATHS = {
         "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_"
         "case16_validation_natural_error_pair.py"
     ),
+    "shared_windows_resource_guard": (
+        "scripts/two_wheel_balance/check_windows_shared_resource_admission.py"
+    ),
+    "shared_windows_resource_monitor": (
+        "scripts/two_wheel_balance/"
+        "monitor_windows_shared_resource_pressure.py"
+    ),
 }
 
 
@@ -176,6 +184,7 @@ def build_contract() -> dict[str, object]:
         "controller_arguments": EXPECTED_CONTROLLER_ARGUMENTS,
         "unchanged_dynamic_gate_thresholds": EXPECTED_DYNAMIC_THRESHOLDS,
         "paired_experiment_contract": EXPECTED_PAIR_CONTRACT,
+        "shared_resource_contract": EXPECTED_RESOURCE_CONTRACT,
         "identities": {
             name: _identity(path) for name, path in IDENTITY_PATHS.items()
         },

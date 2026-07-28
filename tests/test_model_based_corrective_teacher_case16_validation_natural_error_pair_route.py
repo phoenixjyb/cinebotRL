@@ -111,7 +111,7 @@ def test_contract_is_hash_bound_validation_only_and_tokenless() -> None:
     assert contract["split"] == "validation"
     assert contract["selected_validation_cases"] == [8, 16]
     assert set(contract["identities"]) == VALIDATOR_MODULE.REQUIRED_IDENTITIES
-    assert len(contract["identities"]) == 25
+    assert len(contract["identities"]) == 27
     for identity in contract["identities"].values():
         path = ROOT / identity["path"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == identity["sha256"]
@@ -173,11 +173,19 @@ def test_wrapper_rejects_conflicting_environment_before_python() -> None:
 
 def test_wrapper_has_no_wrench_capture_or_dataset_route() -> None:
     source = WRAPPER.read_text(encoding="utf-8")
-    empty_token = source.index('readonly AUTHORIZATION_SHA256=""')
+    token_hash = source.index(
+        "RISER_CORRECTIVE_CASE16_VALIDATION_AUTHORIZATION_SHA256"
+    )
     execute_reject = source.index('reject "runtime_authorization_not_issued" 4')
     validator = source.index('python3 "$VALIDATOR"')
+    resource_guard = source.index('python3 "$RESOURCE_GUARD"')
+    token_consumption = source.index('rm -f "$AUTHORIZATION_FILE"')
     playback = source.index("timeout --signal=TERM --kill-after=30s 600")
-    assert empty_token < execute_reject < validator < playback
+    assert token_hash < execute_reject < validator < resource_guard
+    assert resource_guard < token_consumption < playback
+    assert 'readonly AUTHORIZATION_SHA256="' not in source
+    assert source.count('python3 "$RESOURCE_MONITOR"') == 2
+    assert "case16_validation_natural_error_pair_v2_coexistence" in source
     assert "--cases 16" in source
     assert "case_0016.json" in source
     assert "case16_validation_natural_error_profile_v1.json" in source
@@ -190,7 +198,7 @@ def test_wrapper_has_no_wrench_capture_or_dataset_route() -> None:
     assert "--corrective-teacher-capture-dir" not in source
 
 
-def test_validator_rejects_alternate_contract_or_authorization(
+def test_validator_rejects_alternate_contract(
     tmp_path: Path,
 ) -> None:
     alternate = tmp_path / "contract.json"
@@ -202,17 +210,71 @@ def test_validator_rejects_alternate_contract_or_authorization(
     )
     assert result["checks"]["canonical_contract_path"] is False
     assert result["passed"] is False
+
+
+def test_validator_recognizes_valid_out_of_band_authorization(
+    tmp_path: Path,
+) -> None:
     token = tmp_path / "token"
-    token.write_text("not authorized\n", encoding="utf-8")
+    token.write_text(
+        "one bounded case-16 validation natural-error pair\n",
+        encoding="utf-8",
+    )
+    token.chmod(0o600)
+    token_sha = hashlib.sha256(token.read_bytes()).hexdigest()
     result = VALIDATOR_MODULE.validate(
         CONTRACT,
         ROOT,
         namespace=VALIDATOR_MODULE.NAMESPACE,
         authorization_file=token,
+        authorization_sha256=token_sha,
     )
-    assert result["checks"]["authorization_file_absent"] is False
+    authorization_checks = result["authorization_checks"]
+    if os.name == "nt":
+        assert authorization_checks["authorization_mode_0600"] is False
+        assert all(
+            passed
+            for name, passed in authorization_checks.items()
+            if name != "authorization_mode_0600"
+        )
+        assert result["checks"]["authorization_state"] is False
+    else:
+        assert all(authorization_checks.values())
+        assert result["checks"]["authorization_state"] is True
+    assert result["label_capture_authorized"] is False
+    assert result["dataset_creation_authorized"] is False
+    assert result["bc_authorized"] is False
+    assert result["ppo_authorized"] is False
+
+
+def test_validator_rejects_wrong_or_embedded_authorization_hash(
+    tmp_path: Path,
+) -> None:
+    token = tmp_path / "token"
+    token.write_text(
+        "one bounded case-16 validation natural-error pair\n",
+        encoding="utf-8",
+    )
+    token.chmod(0o600)
+    result = VALIDATOR_MODULE.validate(
+        CONTRACT,
+        ROOT,
+        namespace=VALIDATOR_MODULE.NAMESPACE,
+        authorization_file=token,
+        authorization_sha256="f" * 64,
+    )
+    assert result["authorization_checks"]["authorization_hash_matches"] is False
     assert result["runtime_authorized"] is False
     assert result["passed"] is False
+
+    token_sha = hashlib.sha256(token.read_bytes()).hexdigest()
+    checks = VALIDATOR_MODULE._authorization_checks(
+        token,
+        token_sha,
+        ROOT,
+        CONTRACT.read_text(encoding="utf-8") + token_sha,
+    )
+    assert checks["authorization_hash_is_out_of_band"] is False
 
 
 CORRECTIVE_SHA = "c" * 64
@@ -351,6 +413,44 @@ def _fixture(tmp_path: Path, *, candidate_p95: float = 0.070):
     }
     admission_path = root / "admission.json"
     admission_path.write_text(json.dumps(admission), encoding="utf-8")
+    resource_admission = {
+        "schema": "cinebotrl_windows_shared_resource_admission_v2",
+        "phase": "launch",
+        "thresholds": {
+            "minimum_windows_free_memory_gib": 5.0,
+            "minimum_gpu_free_memory_mib": 9216,
+            "cad_coexistence_allowed": True,
+        },
+        "observed": {
+            "windows_free_memory_gib": 12.0,
+            "gpu_free_memory_mib": 12000,
+        },
+        "checks": {
+            "windows_memory_probe_valid": True,
+            "windows_free_memory_sufficient": True,
+            "cad_process_probe_valid": True,
+            "cad_coexistence_allowed": True,
+            "gpu_memory_probe_valid": True,
+            "gpu_free_memory_sufficient": True,
+        },
+        "passed": True,
+    }
+    (root / "resource_admission.json").write_text(
+        json.dumps(resource_admission), encoding="utf-8"
+    )
+    resource_monitor = {
+        "schema": "cinebotrl_windows_shared_resource_monitor_v1",
+        "runtime_thresholds": {
+            "minimum_windows_free_memory_gib": 1.5,
+            "minimum_gpu_free_memory_mib": 2048,
+        },
+        "sample_count": 2,
+        "minimum_observed_windows_free_memory_gib": 7.0,
+        "minimum_observed_gpu_free_memory_mib": 9000,
+        "termination_requested": False,
+        "process_exit_observed": True,
+        "passed": True,
+    }
     (root / "baseline/case_0016.json").write_text(
         json.dumps(_gate(candidate=False)), encoding="utf-8"
     )
@@ -362,6 +462,9 @@ def _fixture(tmp_path: Path, *, candidate_p95: float = 0.070):
         (root / name / "runtime_heartbeat.json").write_text(
             json.dumps({"case": 16, "completed_steps": 100}),
             encoding="utf-8",
+        )
+        (root / name / "resource_monitor.json").write_text(
+            json.dumps(resource_monitor), encoding="utf-8"
         )
     return root, admission_path
 
@@ -426,4 +529,19 @@ def test_finalizer_rejects_wrench_capture_or_missing_projection_aggregate(
     assert result["rollout_checks"]["candidate_capture_closed"] is False
     assert result["rollout_checks"]["candidate_projection_measured"] is False
     assert result["rollout_checks"]["gpu_released"] is False
+    assert result["passed"] is False
+
+
+def test_finalizer_rejects_missing_or_failed_resource_evidence(
+    tmp_path: Path,
+) -> None:
+    root, admission = _fixture(tmp_path)
+    (root / "baseline/resource_monitor.json").unlink()
+    candidate_monitor = root / "candidate/resource_monitor.json"
+    payload = json.loads(candidate_monitor.read_text(encoding="utf-8"))
+    payload["minimum_observed_gpu_free_memory_mib"] = 1024
+    candidate_monitor.write_text(json.dumps(payload), encoding="utf-8")
+    result = _summarize(root, admission)
+    assert result["rollout_checks"]["baseline_resource_monitor"] is False
+    assert result["rollout_checks"]["candidate_resource_monitor"] is False
     assert result["passed"] is False

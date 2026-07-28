@@ -3,7 +3,7 @@
   "reviewed_parent_commit": "c92c428785be987ab13e558aa07abc2713a7a0c5",
   "case": 16,
   "split": "validation",
-  "namespace": "20260724_model_based_corrective_teacher_case16_validation_natural_error_pair_v1_exclusive",
+  "namespace": "20260728_model_based_corrective_teacher_case16_validation_natural_error_pair_v2_coexistence",
   "residual_action_scales": [
     0.05,
     0.05,
@@ -55,6 +55,16 @@
     "maximum_riser_error_regression_m": 0.002,
     "saturation_regression_allowed": false,
     "maximum_runtime_seconds_per_rollout": 600
+  },
+  "shared_resource_contract": {
+    "shared_windows_resource_admission_required": true,
+    "resource_admission_before_token_consumption": true,
+    "launch_minimum_windows_free_memory_gib": 5.0,
+    "launch_minimum_gpu_free_memory_mib": 9216,
+    "cad_coexistence_allowed": true,
+    "runtime_resource_monitor_required_per_rollout": true,
+    "runtime_minimum_windows_free_memory_gib": 1.5,
+    "runtime_minimum_gpu_free_memory_mib": 2048
   },
   "identities": {
     "selection": {
@@ -159,28 +169,38 @@
     },
     "preflight_wrapper": {
       "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case16_validation_natural_error_pair.sh",
-      "sha256": "657da5fac9c5f0f6032d570430abe9cce4ac2a8f572a16ed2d32efa3d876e4be",
-      "git_blob_sha1": "6822debcd1031c5cd41e541bdda3dfa3c48746a0"
+      "sha256": "02ed2a6ed7e439ea11fc5c0e8102179dca8537ce021e4a9af837b3b8abe33e7f",
+      "git_blob_sha1": "6b39d5ad20794088924d9bb42590690cce00150d"
     },
     "route_validator_engine": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case8_validation_pair.py",
-      "sha256": "3d4b7ad641447692818a191d1b9033f728058138390de9dc357563fd7af74f7f",
-      "git_blob_sha1": "988afa9c7af05e95f0a773ea40009bd9060f8ec7"
+      "sha256": "9c39f6d513a3f4f324e065cdf6474452f1a6eabb60a9bdf3e0caed5d1e34147f",
+      "git_blob_sha1": "5a78b4380c322633b586c1ca45180a494b6bd892"
     },
     "contract_builder": {
       "path": "scripts/two_wheel_balance/build_model_based_corrective_teacher_case16_validation_natural_error_pair_contract.py",
-      "sha256": "4f4c23600b955124b83c27b36eee0fc36472a96722eeb286359f941ba02b4489",
-      "git_blob_sha1": "dec75e9d07d9e9f5c4a70913bf655703617f86df"
+      "sha256": "09237cbad23b0df8406e9ca76f8946c79bd970c7529b85c5f9beb295a55531d8",
+      "git_blob_sha1": "17018fda14f09f1b27e1f0eb5b64f4e10bcbe286"
     },
     "contract_validator": {
       "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case16_validation_natural_error_pair.py",
-      "sha256": "680e279db9d0cf8a361982a64c199d3c12edc7727fc1e070d10a81ee1a1f8a80",
-      "git_blob_sha1": "36888b197b963dc0860c6e1d1444b9de4e0d0190"
+      "sha256": "0cb748ba731fd4dc2fe57eb8824f4f5389bf6f2443f86b210fac112dc065d5eb",
+      "git_blob_sha1": "92cad5d94e78d1cfae3031c033ea20587a181f78"
     },
     "paired_finalizer": {
       "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case16_validation_natural_error_pair.py",
-      "sha256": "d157b3beb1c86919d7be3f5a5348dbc3e52be677432b3b2eccbe0f259e09c75a",
-      "git_blob_sha1": "be714c84bf96157bfff324799055be7b7d9d84d6"
+      "sha256": "93408f1461eda3f7704087a49a25906d1564ae3a9b629722141a99ed80fbc1a5",
+      "git_blob_sha1": "7792da23a05a4633c0b5b8e767bec0d60ae6e4f1"
+    },
+    "shared_windows_resource_guard": {
+      "path": "scripts/two_wheel_balance/check_windows_shared_resource_admission.py",
+      "sha256": "5526a2bcb9d6ebd1efebe6529e61f5d69b6d0a368739d4bd92b0ee8090107864",
+      "git_blob_sha1": "4aedfc7c295fd94ffa3b4e82d846b7802ebec0d0"
+    },
+    "shared_windows_resource_monitor": {
+      "path": "scripts/two_wheel_balance/monitor_windows_shared_resource_pressure.py",
+      "sha256": "a0969dd4733c485b8ffff48198ba22bf4a5d308a4ac895f095adc0630161eff2",
+      "git_blob_sha1": "825e04ba5678763c830532d7378f52ea148acc43"
     }
   },
   "source_validation_cases": [

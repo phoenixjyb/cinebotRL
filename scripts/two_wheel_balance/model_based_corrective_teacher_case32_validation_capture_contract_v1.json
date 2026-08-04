@@ -1,13 +1,13 @@
 {
   "schema": "cinebotrl_two_wheel_riser_corrective_teacher_capture_contract_v2",
-  "route_revision": "case8_validation_capture_v1_monitored_coexistence",
-  "reviewed_parent_commit": "07e48850c2e41140eb8751bc37d772a670d6de29",
-  "case": 8,
+  "route_revision": "case32_validation_capture_v1_monitored_coexistence",
+  "reviewed_parent_commit": "93cbe5c9f17ec92d2871ec0a5ed15b45f7989cc0",
+  "case": 32,
   "split": "validation",
-  "namespace": "20260728_model_based_corrective_teacher_case8_validation_capture_v1_coexistence",
+  "namespace": "20260804_model_based_corrective_teacher_case32_validation_capture_v1_coexistence",
   "paired_canary": {
-    "namespace": "20260728_model_based_corrective_teacher_case8_validation_pair_v2_coexistence",
-    "final_status_sha256": "86747a0f4538d1c9d8324c4e42b1517028f57af0c8de6157bf22b78d62b266c6",
+    "namespace": "20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence",
+    "final_status_sha256": "ca725adcf38550b3c581380d566612fc46c61608cc4075b432142b76a2d825e2",
     "dynamic_pair_completed": true,
     "validation_pair_passed": true,
     "label_capture_authorized_by_pair": false
@@ -35,7 +35,7 @@
     "normalized_training_dataset_created": false
   },
   "execution_contract": {
-    "case": 8,
+    "case": 32,
     "split": "validation",
     "rollout": "complete_model_based_planner_plus_corrective_teacher",
     "maximum_runtime_seconds": 600,
@@ -52,33 +52,24 @@
     "runtime_minimum_gpu_free_memory_mib": 2048,
     "dynamic_gate_required_before_save": true,
     "finalizer_reopens_archive": true,
+    "external_wrench_forbidden": true,
     "capture_only": true
   },
   "identities": {
     "paired_final_status": {
-      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case8_validation_pair_v2/final_status.json",
-      "sha256": "86747a0f4538d1c9d8324c4e42b1517028f57af0c8de6157bf22b78d62b266c6",
-      "git_blob_sha1": "5b8793751e1e05d73f0e50bd43485f2830d827e5"
+      "path": "docs/03_training/two_wheel_balance/evidence_20260804_case32_validation_pair_v1/final_status.json",
+      "sha256": "ca725adcf38550b3c581380d566612fc46c61608cc4075b432142b76a2d825e2",
+      "git_blob_sha1": "e1f56e924c5657ac01075fbc2f88aec1a5fed9b3"
     },
-    "case8_plan": {
-      "path": "docs/03_training/two_wheel_balance/evidence_20260724_case8_validation_pair_readiness_cpu_v1/source/case_0008_smoothed_riser_plan_v1.npz",
-      "sha256": "f07ff020128dee70ea9c8c2d806dc75c8e0ef3964dccb4e0aabfd1b0048f3655",
-      "git_blob_sha1": "a8450006c367ed4b0f8b172c106c471aa07b45c8"
-    },
-    "perturbation_profile": {
-      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case8_validation_wrench_profile_v1.json",
-      "sha256": "7fecccc20e485bd3148434a8aa3c7571d6b83ff33530b7e0ee848d5c9d070ac5",
-      "git_blob_sha1": "808ff686092e65376df3c25bbd296ee762f873a6"
-    },
-    "perturbation_runtime": {
-      "path": "src/rl_platform/tasks/two_wheel_balance/riser_perturbation.py",
-      "sha256": "789bc8b17d7f44b1063bdb3434ef16792449bd4ef3260cbf5f7bdf1ed2ed8779",
-      "git_blob_sha1": "6c5a8a592873d4c06a5fc8de10662890e6602395"
+    "case32_plan": {
+      "path": "docs/03_training/two_wheel_balance/evidence_20260728_case16_validation_disposition_cpu_v1/source/case_0032_smoothed_riser_plan_v1.npz",
+      "sha256": "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f",
+      "git_blob_sha1": "d34c559dca4bd99747d3ee60dbfa526b9b8c702f"
     },
     "corrective_profile": {
-      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case8_validation_profile_v1.json",
-      "sha256": "26e5fc5caf9cf041294bbd856862d8ec19e2c6cf2daa5aa2c0138523db3f5ce0",
-      "git_blob_sha1": "a39470082cce83ea8fd9d1c3086692417cb94570"
+      "path": "scripts/two_wheel_balance/model_based_corrective_teacher_case32_validation_natural_error_profile_v1.json",
+      "sha256": "cb6924955e32feea4712dbd2c0d0d8c2592f9373759039a8ba98ec0e9fe666f3",
+      "git_blob_sha1": "41732626a4afeb3dd1ef9200966b7d7d06c2ee66"
     },
     "drive_profile_selection": {
       "path": "docs/03_training/two_wheel_balance/evidence_20260723_riser_drive_profile_selection_v1/summary.json",
@@ -136,14 +127,14 @@
       "git_blob_sha1": "deecae366237c5c7656d905da831e79cba283ff3"
     },
     "contract_validator": {
-      "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case8_validation_capture.py",
-      "sha256": "663ab25d15cbe1c0dd0edbb2f4cd86cfd4ba7c0b0eccd8da2b8b37c9ad99c17f",
-      "git_blob_sha1": "2a2e87829853b67439bb8d449ec3b438fd839716"
+      "path": "scripts/two_wheel_balance/validate_model_based_corrective_teacher_case32_validation_capture.py",
+      "sha256": "fe707d2bda37db022b3965f80c971b93bc4f50415eb3a5fc989c12910c181f6a",
+      "git_blob_sha1": "21cfae1b512c890ccf38ad4b9478e4cdec0f2272"
     },
     "preflight_wrapper": {
-      "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case8_validation_capture.sh",
-      "sha256": "12f6813fc7fcb6bf92d67fae282764b2ba6958fe19fe028bd99b0bc291dabedb",
-      "git_blob_sha1": "d89bf3006f7b1aa1f85c563c58cc40b4fa4aa0e5"
+      "path": "scripts/two_wheel_balance/run_model_based_corrective_teacher_case32_validation_capture.sh",
+      "sha256": "d87970bf87fb8b177ab100943777955fb40fdf0ffdc555b42cfb83efb1e73223",
+      "git_blob_sha1": "f203b7ccdd690419d4a87853ce6ef86ce34659a2"
     },
     "shared_windows_resource_guard": {
       "path": "scripts/two_wheel_balance/check_windows_shared_resource_admission.py",
@@ -156,9 +147,9 @@
       "git_blob_sha1": "825e04ba5678763c830532d7378f52ea148acc43"
     },
     "capture_finalizer": {
-      "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case8_validation_capture.py",
-      "sha256": "a0c1d1d4ee986f383b582c8b9c9f0ef30cb0ebf7f3b1b70bac2fc6f1b23635c6",
-      "git_blob_sha1": "2762ef64fb6f573cb0d8cf7396c513ac2be75e34"
+      "path": "scripts/two_wheel_balance/summarize_model_based_corrective_teacher_case32_validation_capture.py",
+      "sha256": "3230eec968ba60415d21cec130cb841c7944776fc6af498bd79dfade5a0c87d5",
+      "git_blob_sha1": "0b187c5f58ed5ef1b55ec05bb722fbdb974c620a"
     }
   },
   "holdout_cases": [
@@ -170,7 +161,7 @@
   ],
   "holdout_opened": false,
   "validation_cases_opened": [
-    8
+    32
   ],
   "cpu_preflight_ready": true,
   "runtime_authorized": false,

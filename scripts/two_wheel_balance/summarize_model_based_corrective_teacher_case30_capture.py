@@ -56,6 +56,7 @@ def summarize(
     expected_namespace: str = NAMESPACE,
     capture_name: str = CAPTURE_NAME,
     plan_identity_name: str = "case30_plan",
+    expected_perturbation_rows: int = 20,
 ) -> dict[str, object]:
     contract_path = root / "contract.json"
     gate_path = root / f"case_{expected_case:04d}.json"
@@ -202,7 +203,8 @@ def summarize(
         "execution_clock": execution_clock_end is not None
         and isinstance(execution_duration, (int, float))
         and abs(execution_clock_end - float(execution_duration)) <= 1e-6,
-        "perturbation_rows": perturbation_rows == 20,
+        "perturbation_rows": perturbation_rows
+        == expected_perturbation_rows,
         "requested_reserved_margin": requested_normalized_max is not None
         and max(requested_normalized_max) < 0.95 - 1e-6,
         "effective_reserved_margin": effective_normalized_max is not None

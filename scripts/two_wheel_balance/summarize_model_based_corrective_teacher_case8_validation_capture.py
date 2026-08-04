@@ -56,6 +56,11 @@ def summarize(
     runtime_commit: str,
     playback_exit_code: int,
     gpu_release_passed: bool,
+    expected_case: int = 8,
+    expected_namespace: str = NAMESPACE,
+    capture_name: str = CAPTURE_NAME,
+    plan_identity_name: str = "case8_plan",
+    expected_perturbation_rows: int = 20,
 ) -> dict[str, object]:
     result = summarize_capture(
         root,
@@ -63,11 +68,12 @@ def summarize(
         runtime_commit=runtime_commit,
         playback_exit_code=playback_exit_code,
         gpu_release_passed=gpu_release_passed,
-        expected_case=8,
+        expected_case=expected_case,
         expected_split="validation",
-        expected_namespace=NAMESPACE,
-        capture_name=CAPTURE_NAME,
-        plan_identity_name="case8_plan",
+        expected_namespace=expected_namespace,
+        capture_name=capture_name,
+        plan_identity_name=plan_identity_name,
+        expected_perturbation_rows=expected_perturbation_rows,
     )
     resource_checks, resource_payload = validate_resource_admission(root)
     monitor_checks, monitor_payload = validate_resource_monitor(root)
@@ -80,7 +86,7 @@ def summarize(
     admission = _load(admission_path)
     split_checks = {
         "admission_validation_split": admission.get("split") == "validation",
-        "case8_only": admission.get("case") == 8,
+        "single_expected_case": admission.get("case") == expected_case,
         "validation_case_opened": admission.get(
             "corrective_target_admission_passed"
         )

@@ -2759,6 +2759,24 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective["case32_validation_pair_capture_authorized"] is False
     assert corrective["case32_validation_pair_dataset_created"] is False
     assert corrective["case32_validation_pair_valid_for_training"] is False
+    assert corrective[
+        "case32_validation_capture_route_implementation_commit"
+    ] == "aaa4e1879fe6f5ae318f97305fea3d58599208b6"
+    assert corrective[
+        "case32_validation_capture_route_canonical_preflight_passed"
+    ] is True
+    assert corrective[
+        "case32_validation_capture_route_external_wrench_forbidden"
+    ] is True
+    assert corrective["case32_validation_capture_user_authorization_received"] is True
+    assert corrective["case32_validation_capture_resource_gate_blocked"] is True
+    assert corrective["case32_validation_capture_authorization_token_issued"] is False
+    assert corrective["case32_validation_capture_namespace_created"] is False
+    assert corrective["case32_validation_capture_runtime_started"] is False
+    assert corrective["case32_validation_capture_labels_created"] is False
+    assert corrective["case32_validation_capture_dataset_created"] is False
+    assert corrective["case32_validation_capture_conversion_started"] is False
+    assert corrective["case32_validation_capture_training_started"] is False
     assert corrective["case32_validation_profile_runtime_authorized"] is False
     assert corrective["case32_validation_profile_capture_authorized"] is False
     assert corrective["case32_validation_profile_training_authorized"] is False
@@ -3306,7 +3324,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "run_exactly_one_case32_corrective_label_capture" in (
+    assert "run_exactly_one_case32_corrective_label_capture_without_retry" in (
         goal["next_iteration"]["required_change"]
     )
 

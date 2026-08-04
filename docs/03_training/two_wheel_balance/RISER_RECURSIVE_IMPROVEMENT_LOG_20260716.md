@@ -10814,3 +10814,32 @@ and must state whether its candidate was accepted or rejected.
   corrective-label capture.
 - A successful capture must stop before CPU conversion. Conversion, corpus
   merge, BC, PPO, holdout, and training remain separately gated.
+
+## Round 280: case-32 capture route ready but resource blocked
+
+- Added and pushed the tokenless case-32 validation corrective-label capture
+  route at commit `aaa4e1879fe6f5ae318f97305fea3d58599208b6`.
+  The contract binds 19 identities and reuses the validated natural-error
+  profile without deterministic wrench injection.
+- Focused and adjacent CPU checks pass `26 passed, 2 warnings in 0.67s`.
+  Canonical preflight on `.98` passed with clean
+  `HEAD == upstream == aaa4e18`, a matching committed contract blob, a fresh
+  namespace, and all runtime, label, dataset, conversion, BC, PPO, and
+  training fields closed.
+- The user authorized exactly one case-32 corrective-label capture, but no
+  single-use token was issued. Ten resource checks consistently observed one
+  GPU compute owner and only `3,693 MiB` free, below the frozen `9,216 MiB`
+  launch threshold. SolidWorks and NX were active; Windows free memory stayed
+  above the `5 GiB` threshold.
+- No Isaac process, runtime namespace, label archive, normalized dataset,
+  conversion, corpus merge, BC, PPO, checkpoint, or training was created.
+  Converted intake remains train `[6,7,23,30]`, validation `[8]`; goal
+  completion remains `6/10`.
+
+## Next round after Round 280
+
+- Wait until the existing GPU owner releases the device and all frozen
+  resource gates pass. Then issue one out-of-band single-use token and run
+  exactly one case-32 validation corrective-label capture without retry.
+- Stop after sealing the capture. CPU conversion and every learning stage
+  remain separately gated.

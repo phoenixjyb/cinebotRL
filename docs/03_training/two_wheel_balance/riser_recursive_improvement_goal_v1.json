@@ -1228,6 +1228,27 @@
         "case32_validation_pair_capture_authorized": false,
         "case32_validation_pair_dataset_created": false,
         "case32_validation_pair_valid_for_training": false,
+        "case32_validation_capture_route_implementation_commit": "aaa4e1879fe6f5ae318f97305fea3d58599208b6",
+        "case32_validation_capture_route_contract_sha256": "d39b198bd089f8bc514872e2128acbf7e2f3083bbb08c9b71e936b9d13ea71a0",
+        "case32_validation_capture_route_contract_git_blob_sha1": "a824f7dd31e8f59293f072244121273588067dcd",
+        "case32_validation_capture_route_identity_count": 19,
+        "case32_validation_capture_route_focused_cpu_suite": "26_passed_2_warnings_in_0.67s",
+        "case32_validation_capture_route_canonical_preflight_passed": true,
+        "case32_validation_capture_route_head_matches_upstream": true,
+        "case32_validation_capture_route_external_wrench_forbidden": true,
+        "case32_validation_capture_user_authorization_received": true,
+        "case32_validation_capture_resource_monitor_checks": 10,
+        "case32_validation_capture_last_observed_gpu_free_mib": 3693,
+        "case32_validation_capture_last_observed_compute_owner_count": 1,
+        "case32_validation_capture_minimum_gpu_free_mib": 9216,
+        "case32_validation_capture_resource_gate_blocked": true,
+        "case32_validation_capture_authorization_token_issued": false,
+        "case32_validation_capture_namespace_created": false,
+        "case32_validation_capture_runtime_started": false,
+        "case32_validation_capture_labels_created": false,
+        "case32_validation_capture_dataset_created": false,
+        "case32_validation_capture_conversion_started": false,
+        "case32_validation_capture_training_started": false,
         "case32_validation_profile_runtime_authorized": false,
         "case32_validation_profile_capture_authorized": false,
         "case32_validation_profile_conversion_authorized": false,
@@ -1797,15 +1818,15 @@
       ]
     },
     "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
-    "current_root_cause": "case32_validation_pair_passed_but_no_separately_authorized_corrective_label_capture_or_validation_dataset_exists",
+    "current_root_cause": "case32_validation_capture_is_cpu_ready_and_user_authorized_but_resource_blocked_by_active_cad_gpu_owner_and_only_3693_mib_free",
     "remote_isaac_validation": "42_dynamic_candidates_plus_exact_zero_case8_case78_preservation_plus_passed_case30_case23_case6_case7_train_pairs_plus_passed_case8_and_case32_validation_pairs_plus_case8_validation_capture_and_cpu_conversion_plus_rejected_case16_validation_pair_and_cpu_disposition_plus_passed_case30_case23_case6_case7_captures_plus_rejected_case2_pair",
     "accepted_evidence": "docs/03_training/two_wheel_balance/RISER_RECURSIVE_IMPROVEMENT_LOG_20260716.md"
   },
   "next_iteration": {
     "hypothesis": "the_passed_case32_profile_can_generate_effective_projected_corrective_labels_without_changing_the_validated_dynamic_behavior",
-    "required_change": "obtain_separate_explicit_authorization_then_run_exactly_one_case32_corrective_label_capture",
+    "required_change": "wait_for_frozen_resource_gates_then_run_exactly_one_case32_corrective_label_capture_without_retry",
     "success_path": "seal_the_capture_then_prepare_a_cpu_only_conversion_contract_without_authorizing_dataset_merge_or_training",
     "rejection_path": "preserve_the_capture_rejection_and_diagnose_one_bounded_root_cause_without_retrying_or_relaxing_gates",
-    "stop_rule": "do_not_capture_convert_merge_or_start_bc_ppo_holdout_or_training_without_the_next_explicit_authorization"
+    "stop_rule": "do_not_issue_the_single_use_token_until_resource_gates_pass_and_do_not_convert_merge_or_start_bc_ppo_holdout_or_training"
   }
 }

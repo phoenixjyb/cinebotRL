@@ -684,6 +684,21 @@ CASE32_VALIDATION_PAIR_EVIDENCE = (
     "evidence_20260728_case32_validation_natural_error_pair_route_cpu_v1/"
     "summary.json"
 )
+CASE32_VALIDATION_PAIR_EXECUTION_FINAL = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260804_case32_validation_pair_v1/final_status.json"
+)
+CASE32_VALIDATION_PAIR_EXECUTION_BASELINE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260804_case32_validation_pair_v1/baseline/case_0032.json"
+)
+CASE32_VALIDATION_PAIR_EXECUTION_CANDIDATE = (
+    ROOT
+    / "docs/03_training/two_wheel_balance/"
+    "evidence_20260804_case32_validation_pair_v1/candidate/case_0032.json"
+)
 PENDING_CORRECTIVE_ROUTE_QUEUE_AUDITOR = (
     ROOT
     / "scripts/two_wheel_balance/"
@@ -2722,6 +2737,28 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert corrective[
         "case32_validation_pair_route_namespace_created"
     ] is False
+    assert corrective["case32_validation_pair_executed"] is True
+    assert corrective["case32_validation_pair_passed"] is True
+    assert corrective["case32_validation_pair_final_status_sha256"] == (
+        _sha256(CASE32_VALIDATION_PAIR_EXECUTION_FINAL)
+    )
+    assert corrective["case32_validation_pair_baseline_result_sha256"] == (
+        _sha256(CASE32_VALIDATION_PAIR_EXECUTION_BASELINE)
+    )
+    assert corrective["case32_validation_pair_candidate_result_sha256"] == (
+        _sha256(CASE32_VALIDATION_PAIR_EXECUTION_CANDIDATE)
+    )
+    assert corrective[
+        "case32_validation_pair_p95_absolute_improvement_m"
+    ] >= 0.003
+    assert corrective[
+        "case32_validation_pair_p95_relative_improvement"
+    ] >= 0.02
+    assert corrective["case32_validation_pair_authorization_token_consumed"] is True
+    assert corrective["case32_validation_pair_retry_authorized"] is False
+    assert corrective["case32_validation_pair_capture_authorized"] is False
+    assert corrective["case32_validation_pair_dataset_created"] is False
+    assert corrective["case32_validation_pair_valid_for_training"] is False
     assert corrective["case32_validation_profile_runtime_authorized"] is False
     assert corrective["case32_validation_profile_capture_authorized"] is False
     assert corrective["case32_validation_profile_training_authorized"] is False
@@ -3269,7 +3306,7 @@ def test_case23_v4_capture_is_preserved_and_learning_stays_closed() -> None:
     assert stage["bc_authorized"] is False
     assert stage["training_authorized"] is False
     assert stage["ppo_authorized"] is False
-    assert "run_exactly_one_case32_validation_natural_error_pair" in (
+    assert "run_exactly_one_case32_corrective_label_capture" in (
         goal["next_iteration"]["required_change"]
     )
 

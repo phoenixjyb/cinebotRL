@@ -1,0 +1,265 @@
+{
+  "schema": "cinebotrl_two_wheel_riser_corrective_teacher_case32_validation_natural_error_pair_final_v1",
+  "runtime_commit": "ef21116db96259318ab838064d97ece626aaab95",
+  "namespace": "20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence",
+  "case": 32,
+  "split": "validation",
+  "baseline_exit_code": 0,
+  "candidate_exit_code": 0,
+  "rollout_checks": {
+    "baseline_exit_zero": true,
+    "candidate_exit_zero": true,
+    "baseline_single_case": true,
+    "candidate_single_case": true,
+    "baseline_source": true,
+    "candidate_source": true,
+    "model_based_command_base": true,
+    "residual_scales": true,
+    "baseline_zero_action": true,
+    "candidate_profile_bound": true,
+    "baseline_profile_absent": true,
+    "external_wrench_absent": true,
+    "perturbation_disabled": true,
+    "perturbation_contract_passed": true,
+    "baseline_projection_closed": true,
+    "candidate_projection_measured": true,
+    "candidate_effective_residual_bounded": true,
+    "baseline_capture_closed": true,
+    "candidate_capture_closed": true,
+    "candidate_labels_not_captured": true,
+    "baseline_heartbeat": true,
+    "candidate_heartbeat": true,
+    "gpu_released": true,
+    "shared_resource_admission": true,
+    "baseline_resource_monitor": true,
+    "candidate_resource_monitor": true
+  },
+  "contract_checks": {
+    "namespace": true,
+    "case_split": true,
+    "runtime_commit": true,
+    "admission_passed": true,
+    "runtime_authorized": true,
+    "gpu_launch_authorized": true,
+    "teacher_admission_closed": true,
+    "label_capture_closed": true,
+    "dataset_closed": true,
+    "training_closed": true,
+    "contract_identity": true
+  },
+  "baseline_metrics": {
+    "case": 32,
+    "split": "validation",
+    "plan_sha256": "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f",
+    "physics_seed": 20260748,
+    "source_duration_s": 21.648708,
+    "execution_duration_s": 29.592866387237176,
+    "dynamic_quality_passed": true,
+    "position_error_p95_m": 0.10241882262348277,
+    "position_error_max_m": 0.133996309804517,
+    "attitude_error_max_deg": 0.21904509553309137,
+    "pitch_max_deg": 7.4185186132292005,
+    "riser_error_max_m": 0.013584691025953166,
+    "action_saturation_ratio": 0.0,
+    "normalized_residual_action_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "dataset_created": false,
+    "training_started": false,
+    "ppo_started": false
+  },
+  "candidate_metrics": {
+    "case": 32,
+    "split": "validation",
+    "plan_sha256": "71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f",
+    "physics_seed": 20260748,
+    "source_duration_s": 21.648708,
+    "execution_duration_s": 29.592866387237176,
+    "dynamic_quality_passed": true,
+    "position_error_p95_m": 0.09919890439758103,
+    "position_error_max_m": 0.13088941012710245,
+    "attitude_error_max_deg": 0.2120688450676135,
+    "pitch_max_deg": 7.425663844874681,
+    "riser_error_max_m": 0.012673782412908396,
+    "action_saturation_ratio": 0.0,
+    "normalized_residual_action_abs_max": [
+      0.28015059232711803,
+      0.12607851624488853,
+      0.04340682178735622
+    ],
+    "dataset_created": false,
+    "training_started": false,
+    "ppo_started": false
+  },
+  "paired_admission": {
+    "schema": "cinebotrl_two_wheel_riser_corrective_validation_pair_assessment_v1",
+    "contract": "same_seed_held_out_validation_improvement_without_teacher_admission_v1",
+    "case": 32,
+    "split": "validation",
+    "position_p95_absolute_improvement_m": 0.003219918225901744,
+    "position_p95_relative_improvement": 0.03143873502372674,
+    "checks": {
+      "same_case_plan_seed_and_clocks": true,
+      "validation_split_only": true,
+      "baseline_dynamic_quality": true,
+      "candidate_dynamic_quality": true,
+      "baseline_zero_residual": true,
+      "candidate_nonzero_bounded_residual": true,
+      "minimum_position_p95_improvement": true,
+      "position_max_not_regressed": true,
+      "attitude_max_not_regressed": true,
+      "pitch_not_regressed": true,
+      "riser_not_regressed": true,
+      "saturation_not_regressed": true,
+      "no_dataset_or_training": true
+    },
+    "validation_pair_passed": true,
+    "teacher_admission_opened": false,
+    "label_capture_authorized": false,
+    "dataset_created": false,
+    "bc_authorized": false,
+    "ppo_authorized": false,
+    "training_started": false,
+    "valid_for_training": false
+  },
+  "baseline_projection_evidence": {
+    "schema": "cinebotrl_two_wheel_riser_corrective_projection_evidence_v2",
+    "evidence_source": "runtime_requested_effective_post_supervisor_aggregates_v1",
+    "enabled": false,
+    "sample_count": 0,
+    "requested_residual_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "effective_residual_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "effective_normalized_action_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "requested_effective_delta_abs_max": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "projection_affected_sample_count": 0,
+    "runtime_aggregate_fields_complete": true,
+    "observer_modified_commands": false,
+    "applied_to_commands": false,
+    "labels_captured": false,
+    "dataset_created": false,
+    "training_started": false,
+    "valid_for_training": false,
+    "checks": {
+      "action_scales_valid": true,
+      "completed_steps_valid": true,
+      "requested_action_aggregate_valid": true,
+      "effective_action_aggregate_valid": true,
+      "projection_delta_aggregate_valid": true,
+      "affected_sample_count_valid": true,
+      "normalized_actions_bounded": true,
+      "disabled_route_is_exact_zero": true
+    },
+    "passed": true
+  },
+  "candidate_projection_evidence": {
+    "schema": "cinebotrl_two_wheel_riser_corrective_projection_evidence_v2",
+    "evidence_source": "runtime_requested_effective_post_supervisor_aggregates_v1",
+    "enabled": true,
+    "sample_count": 12991,
+    "requested_residual_abs_max": [
+      0.014007529616355896,
+      0.006303925812244416,
+      0.0008681364357471466
+    ],
+    "effective_residual_abs_max": [
+      0.014007529616355902,
+      0.006303925812244426,
+      0.0008681364357471244
+    ],
+    "effective_normalized_action_abs_max": [
+      0.28015059232711803,
+      0.12607851624488853,
+      0.04340682178735622
+    ],
+    "requested_effective_delta_abs_max": [
+      0.014007529616355896,
+      0.006303925812244416,
+      5.329070518200751e-17
+    ],
+    "projection_affected_sample_count": 374,
+    "runtime_aggregate_fields_complete": true,
+    "observer_modified_commands": false,
+    "applied_to_commands": false,
+    "labels_captured": false,
+    "dataset_created": false,
+    "training_started": false,
+    "valid_for_training": false,
+    "checks": {
+      "action_scales_valid": true,
+      "completed_steps_valid": true,
+      "requested_action_aggregate_valid": true,
+      "effective_action_aggregate_valid": true,
+      "projection_delta_aggregate_valid": true,
+      "affected_sample_count_valid": true,
+      "normalized_actions_bounded": true,
+      "disabled_route_is_exact_zero": true
+    },
+    "passed": true
+  },
+  "baseline": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence\\baseline\\case_0032.json",
+    "sha256": "02899adcd37962f776bcdac999c393959753e9bfbacdbe71798c6ce99f3d4713"
+  },
+  "candidate": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence\\candidate\\case_0032.json",
+    "sha256": "779659703901dc0cb4c83e067955f0c9853bb4535ad0be4700fb4cd891d80aed"
+  },
+  "baseline_heartbeat": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence\\baseline\\runtime_heartbeat.json",
+    "sha256": "cc9c884877f8da07c8a5fc000263f43494e50dfa23b0bb202b707bfe3b3daaec"
+  },
+  "candidate_heartbeat": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence\\candidate\\runtime_heartbeat.json",
+    "sha256": "57b0480a5d58783ca3cab3b7d63e33132fa0a79a4fb7e15a771fb4abd02c09d0"
+  },
+  "resource_admission": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence\\resource_admission.json",
+    "sha256": "0fcededc663117fa62189be7955d42dad19aed5313805d907f44d9637f366439"
+  },
+  "baseline_resource_monitor": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence\\baseline\\resource_monitor.json",
+    "sha256": "7dd65929c70ab0efbb13bd7cb6245ca78e8080ed2161e79dced899d13c6d436f"
+  },
+  "candidate_resource_monitor": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence\\candidate\\resource_monitor.json",
+    "sha256": "f81c51f5efd863cba4f59d6e31e123009e126000dfa0b786b7cb486cf066250e"
+  },
+  "admission": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence\\admission.json",
+    "sha256": "b76894882b5763169cdd2f8dec0bc7bb84e3ddf5d8b725a55bb0ba437d80c933"
+  },
+  "contract": {
+    "path": "G:\\wSpace\\cinebotRL-two-wheel-riser\\artifacts\\two_wheel_riser\\20260728_model_based_corrective_teacher_case32_validation_natural_error_pair_v1_coexistence\\contract.json",
+    "sha256": "55d6004b454813f72d33b0e9145bcbb670a55fbf728609c4cba0afd23b37bb54"
+  },
+  "dynamic_pair_completed": true,
+  "validation_pair_passed": true,
+  "external_wrench_used": false,
+  "effective_projection_telemetry_required": true,
+  "teacher_admission_opened": false,
+  "label_capture_authorized": false,
+  "dataset_created": false,
+  "bc_authorized": false,
+  "ppo_authorized": false,
+  "training_started": false,
+  "valid_for_training": false,
+  "passed": true
+}

@@ -1,0 +1,55 @@
+{
+  "schema": "cinebotrl_windows_shared_resource_admission_v2",
+  "phase": "launch",
+  "thresholds": {
+    "minimum_windows_free_memory_gib": 5.0,
+    "minimum_gpu_free_memory_mib": 9216,
+    "launch_minimum_windows_free_memory_gib": 5.0,
+    "launch_minimum_gpu_free_memory_mib": 9216,
+    "runtime_minimum_windows_free_memory_gib": 1.5,
+    "runtime_minimum_gpu_free_memory_mib": 2048,
+    "cad_coexistence_allowed": true,
+    "cad_process_names": [
+      "creoparametric.exe",
+      "parametric.exe",
+      "proe.exe",
+      "sldworks.exe",
+      "ugraf.exe",
+      "xtop.exe"
+    ]
+  },
+  "observed": {
+    "windows_total_memory_gib": 31.455806732177734,
+    "windows_free_memory_gib": 9.855545043945312,
+    "cad_processes": [
+      {
+        "name": "sldworks.exe",
+        "pid": 27496,
+        "working_set_mib": 106.527,
+        "private_memory_mib": 912.93
+      },
+      {
+        "name": "ugraf.exe",
+        "pid": 29072,
+        "working_set_mib": 1773.508,
+        "private_memory_mib": 11788.75
+      }
+    ],
+    "gpu_count": 1,
+    "gpu_total_memory_mib": 24467,
+    "gpu_used_memory_mib": 7311,
+    "gpu_free_memory_mib": 16851,
+    "gpu_unaccounted_memory_mib": 305
+  },
+  "checks": {
+    "windows_memory_probe_valid": true,
+    "windows_free_memory_sufficient": true,
+    "cad_process_probe_valid": true,
+    "cad_coexistence_allowed": true,
+    "gpu_memory_probe_valid": true,
+    "gpu_free_memory_sufficient": true
+  },
+  "runtime_started": false,
+  "authorization_consumed": false,
+  "passed": true
+}

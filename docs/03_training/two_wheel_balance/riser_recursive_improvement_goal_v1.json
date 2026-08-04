@@ -1206,6 +1206,28 @@
         "case32_validation_pair_route_unauthorized_isaac_started": false,
         "case32_validation_pair_route_namespace_created": false,
         "case32_validation_pair_route_authorization_token_issued": false,
+        "case32_validation_pair_executed": true,
+        "case32_validation_pair_runtime_commit": "ef21116db96259318ab838064d97ece626aaab95",
+        "case32_validation_pair_final_status_sha256": "ca725adcf38550b3c581380d566612fc46c61608cc4075b432142b76a2d825e2",
+        "case32_validation_pair_baseline_result_sha256": "02899adcd37962f776bcdac999c393959753e9bfbacdbe71798c6ce99f3d4713",
+        "case32_validation_pair_candidate_result_sha256": "779659703901dc0cb4c83e067955f0c9853bb4535ad0be4700fb4cd891d80aed",
+        "case32_validation_pair_admission_sha256": "b76894882b5763169cdd2f8dec0bc7bb84e3ddf5d8b725a55bb0ba437d80c933",
+        "case32_validation_pair_passed": true,
+        "case32_validation_pair_baseline_p95_m": 0.10241882262348277,
+        "case32_validation_pair_baseline_max_m": 0.133996309804517,
+        "case32_validation_pair_candidate_p95_m": 0.09919890439758103,
+        "case32_validation_pair_candidate_max_m": 0.13088941012710245,
+        "case32_validation_pair_p95_absolute_improvement_m": 0.003219918225901744,
+        "case32_validation_pair_p95_relative_improvement": 0.03143873502372674,
+        "case32_validation_pair_baseline_saturation_ratio": 0.0,
+        "case32_validation_pair_candidate_saturation_ratio": 0.0,
+        "case32_validation_pair_projection_sample_count": 12991,
+        "case32_validation_pair_projection_affected_sample_count": 374,
+        "case32_validation_pair_authorization_token_consumed": true,
+        "case32_validation_pair_retry_authorized": false,
+        "case32_validation_pair_capture_authorized": false,
+        "case32_validation_pair_dataset_created": false,
+        "case32_validation_pair_valid_for_training": false,
         "case32_validation_profile_runtime_authorized": false,
         "case32_validation_profile_capture_authorized": false,
         "case32_validation_profile_conversion_authorized": false,
@@ -1764,7 +1786,6 @@
         "authoritative_windows_cpu_suite": "1427_passed_12_skipped_2_warnings_in_244.41s"
       },
       "completion_gap": [
-        "authorize_and_run_exactly_one_case32_validation_paired_canary",
         "run_separately_authorized_pair_capture_and_conversion_for_validation_case_32",
         "populate_the_implemented_case_disjoint_corpus_with_at_least_4_train_and_2_validation_cases",
         "populate_the_review_corpus_then_issue_a_separate_hash_bound_training_schema_admission",
@@ -1776,15 +1797,15 @@
       ]
     },
     "remote_gate_runner": "scripts/two_wheel_balance/run_riser_remote_gates.sh",
-    "current_root_cause": "case32_hash_bound_pair_route_passes_cpu_preflight_but_no_separate_runtime_authorization_or_fresh_paired_canary_exists",
-    "remote_isaac_validation": "42_dynamic_candidates_plus_exact_zero_case8_case78_preservation_plus_passed_case30_case23_case6_case7_train_pairs_plus_passed_case8_validation_pair_capture_and_cpu_conversion_plus_rejected_case16_validation_pair_and_cpu_disposition_plus_cpu_ready_case32_validation_profile_and_pair_route_plus_passed_case30_case23_case6_case7_captures_plus_rejected_case2_pair",
+    "current_root_cause": "case32_validation_pair_passed_but_no_separately_authorized_corrective_label_capture_or_validation_dataset_exists",
+    "remote_isaac_validation": "42_dynamic_candidates_plus_exact_zero_case8_case78_preservation_plus_passed_case30_case23_case6_case7_train_pairs_plus_passed_case8_and_case32_validation_pairs_plus_case8_validation_capture_and_cpu_conversion_plus_rejected_case16_validation_pair_and_cpu_disposition_plus_passed_case30_case23_case6_case7_captures_plus_rejected_case2_pair",
     "accepted_evidence": "docs/03_training/two_wheel_balance/RISER_RECURSIVE_IMPROVEMENT_LOG_20260716.md"
   },
   "next_iteration": {
-    "hypothesis": "one_same_seed_case32_pair_can_show_at_least_0_003_m_and_2_percent_p95_improvement_without_regression_or_saturation",
-    "required_change": "obtain_separate_explicit_authorization_then_run_exactly_one_case32_validation_natural_error_pair",
-    "success_path": "seal_the_pair_then_request_separate_authorization_for_corrective_label_capture_before_any_dataset_conversion",
-    "rejection_path": "preserve_the_pair_rejection_and_diagnose_one_bounded_root_cause_without_retrying_or_relaxing_gates",
-    "stop_rule": "do_not_launch_case32_or_open_capture_conversion_merge_bc_ppo_holdout_or_training_without_new_explicit_authorization"
+    "hypothesis": "the_passed_case32_profile_can_generate_effective_projected_corrective_labels_without_changing_the_validated_dynamic_behavior",
+    "required_change": "obtain_separate_explicit_authorization_then_run_exactly_one_case32_corrective_label_capture",
+    "success_path": "seal_the_capture_then_prepare_a_cpu_only_conversion_contract_without_authorizing_dataset_merge_or_training",
+    "rejection_path": "preserve_the_capture_rejection_and_diagnose_one_bounded_root_cause_without_retrying_or_relaxing_gates",
+    "stop_rule": "do_not_capture_convert_merge_or_start_bc_ppo_holdout_or_training_without_the_next_explicit_authorization"
   }
 }

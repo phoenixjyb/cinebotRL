@@ -10781,3 +10781,36 @@ and must state whether its candidate was accepted or rejected.
 - If the pair passes, stop and request a separate capture authorization. If
   it fails, preserve the rejection and diagnose one bounded root cause
   without retrying or relaxing gates.
+
+## Round 279: case-32 validation pair passes
+
+- Executed exactly one explicitly authorized case-32 same-seed validation
+  pair on `.98` at runtime commit
+  `ef21116db96259318ab838064d97ece626aaab95`. The single-use out-of-band
+  token was consumed before playback and no retry was launched.
+- Baseline and candidate used the same plan SHA-256
+  `71b1986633613fdb13585ac4c12870addc553ad12e895b05cc424a83cf4e037f`,
+  source/execution clocks, physics seed `20260748`, and unchanged gates.
+- Baseline p95/max position error was `0.10241882/0.13399631 m`; candidate
+  p95/max was `0.09919890/0.13088941 m`. Absolute p95 improvement was
+  `0.00321992 m`, or `3.1439%`, passing both frozen improvement thresholds.
+- Both dynamic rollouts passed. Baseline/candidate saturation remained zero;
+  candidate pitch, attitude, riser error, and maximum position error did not
+  regress beyond their frozen limits.
+- Runtime projection evidence covered `12,991` samples and affected `374`
+  samples. Maximum effective normalized action was
+  `[0.280151, 0.126079, 0.043407]`, bounded below one. The telemetry observer
+  did not modify commands.
+- Final-status SHA-256 is
+  `ca725adcf38550b3c581380d566612fc46c61608cc4075b432142b76a2d825e2`.
+  GPU ownership was released and both resource monitors passed.
+- No external wrench, label capture, dataset, BC, PPO, checkpoint, or
+  training admission was created. Converted intake remains train
+  `[6,7,23,30]`, validation `[8]`; goal completion remains `6/10`.
+
+## Next round after Round 279
+
+- Request separate explicit authorization for exactly one case-32
+  corrective-label capture.
+- A successful capture must stop before CPU conversion. Conversion, corpus
+  merge, BC, PPO, holdout, and training remain separately gated.

@@ -6,6 +6,7 @@ with its end-effector while avoiding obstacles and maintaining stability.
 
 from __future__ import annotations
 
+import os
 import sys
 import torch
 from dataclasses import dataclass, field
@@ -181,6 +182,11 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
 
         # Get robot USD path
         robot_usd_path = str(get_mobile_mm_usd_path())
+        robot_uses_proto2_assets = "recomoProto2" in robot_usd_path
+        film_brain_self_collision_enabled = (
+            robot_uses_proto2_assets
+            and os.environ.get("FILM_BRAIN_ENABLE_SELF_COLLISION") == "1"
+        )
 
         # Configure robot articulation
         robot_cfg = ArticulationCfg(
@@ -188,6 +194,13 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
             spawn=sim_utils.UsdFileCfg(
                 usd_path=robot_usd_path,
                 activate_contact_sensors=True,  # Enable for self-collision detection
+                articulation_props=(
+                    sim_utils.ArticulationRootPropertiesCfg(
+                        enabled_self_collisions=True,
+                    )
+                    if film_brain_self_collision_enabled
+                    else None
+                ),
             ),
             init_state=ArticulationCfg.InitialStateCfg(
                 pos=(0.0, 0.0, 0.0),
@@ -325,6 +338,43 @@ class MobileMMTrackEEEnvCfg(DirectRLEnvCfg):
             history_length=1,
             debug_vis=False,
         )
+
+        # Pairwise diagnostics are expensive and are never enabled by normal
+        # training or evaluation. The Film Brain probe opts in explicitly so a
+        # single-body sensor can produce reliable one-to-many contact matrices.
+        if (
+            film_brain_self_collision_enabled
+            and os.environ.get("FILM_BRAIN_COLLISION_PAIR_PROBE") == "1"
+        ):
+            diagnostic_body_names = (
+                "base_link",
+                "arm_base_link",
+                "arm_link_1",
+                "arm_link_2",
+                "arm_link_3",
+                "arm_link_4",
+                "arm_link_5",
+                "arm_link_6",
+                "cam_link",
+                "ee_tool",
+            )
+            for body_index, body_name in enumerate(diagnostic_body_names):
+                filters = [
+                    f"{{ENV_REGEX_NS}}/Robot/base_root/{other_body_name}"
+                    for other_body_name in diagnostic_body_names
+                    if other_body_name != body_name
+                ]
+                setattr(
+                    scene_cfg,
+                    f"film_brain_pair_sensor_{body_index}",
+                    ContactSensorCfg(
+                        prim_path=f"{{ENV_REGEX_NS}}/Robot/base_root/{body_name}",
+                        filter_prim_paths_expr=filters,
+                        update_period=0.0,
+                        history_length=1,
+                        debug_vis=False,
+                    ),
+                )
 
         return scene_cfg
 
@@ -923,6 +973,94 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         print("[MobileMMTrackEE] WARNING: use_chassis_only requested but no chassis indices found. Using all trajectories.")
         return None
 
+    def _configure_proto2_self_collision_filters(self) -> None:
+        """Exclude invariant articulated-body overlaps from Proto2 PhysX.
+
+        Directly joint-connected collision hulls commonly overlap at their
+        mating surfaces and must not count as self-collisions. Proto2's
+        ``arm_link_1`` also rotates inside the chassis mounting volume, so the
+        two-hop ``base_link``/``arm_link_1`` pair is invariantly overlapping.
+        All other non-adjacent pairs remain active.
+        """
+        if os.environ.get("FILM_BRAIN_ENABLE_SELF_COLLISION") != "1":
+            return
+
+        from pxr import UsdPhysics
+
+        source_env_path = self.scene.env_prim_paths[0]
+        robot_root_path = f"{source_env_path}/Robot/base_root"
+        base_path = f"{source_env_path}/Robot/base_root/base_link"
+        arm_mount_path = f"{source_env_path}/Robot/base_root/arm_link_1"
+        stage = self.sim.get_initial_stage()
+        robot_root_prim = stage.GetPrimAtPath(robot_root_path)
+        base_prim = stage.GetPrimAtPath(base_path)
+        arm_mount_prim = stage.GetPrimAtPath(arm_mount_path)
+
+        # Proto1/legacy fallback assets do not share the Proto2 hierarchy.
+        if (
+            not robot_root_prim.IsValid()
+            or not base_prim.IsValid()
+            or not arm_mount_prim.IsValid()
+        ):
+            return
+
+        # These bodies exist only to expose planar PPR control joints. Their
+        # placeholder cubes are not exterior robot geometry and otherwise
+        # collide with the physical chassis and arm when self-collision is on.
+        virtual_base_bodies = (
+            "base_root",
+            "base_vx_link",
+            "base_vy_link",
+            "base_wz_link",
+        )
+        for body_name in virtual_base_bodies:
+            body_prim = stage.GetPrimAtPath(f"{robot_root_path}/{body_name}")
+            if not body_prim.IsValid():
+                continue
+            for prim in stage.Traverse():
+                if not prim.GetPath().HasPrefix(body_prim.GetPath()):
+                    continue
+                if prim.HasAPI(UsdPhysics.CollisionAPI):
+                    UsdPhysics.CollisionAPI(prim).CreateCollisionEnabledAttr().Set(False)
+
+        def exclude_pair(first_path, second_path) -> None:
+            first_prim = stage.GetPrimAtPath(first_path)
+            second_prim = stage.GetPrimAtPath(second_path)
+            if not first_prim.IsValid() or not second_prim.IsValid():
+                return
+            filtered_pairs = UsdPhysics.FilteredPairsAPI.Apply(first_prim)
+            filtered_pairs.CreateFilteredPairsRel().AddTarget(second_prim.GetPath())
+
+        # Exclude every parent-child body pair declared by a USD physics joint.
+        for prim in stage.Traverse():
+            if not prim.GetPath().HasPrefix(robot_root_prim.GetPath()):
+                continue
+            if not prim.IsA(UsdPhysics.Joint):
+                continue
+            joint = UsdPhysics.Joint(prim)
+            body0_targets = joint.GetBody0Rel().GetTargets()
+            body1_targets = joint.GetBody1Rel().GetTargets()
+            if body0_targets and body1_targets:
+                exclude_pair(body0_targets[0], body1_targets[0])
+
+        # These fixed mounting envelopes overlap a body two joints away in
+        # every valid pose, so direct parent-child filtering does not cover
+        # them. Pairwise probe evidence is retained by the Film Brain worker.
+        invariant_two_hop_pairs = (
+            ("base_link", "arm_link_1"),
+            ("arm_base_link", "arm_link_2"),
+            ("arm_link_5", "cam_link"),
+        )
+        for first_body_name, second_body_name in invariant_two_hop_pairs:
+            exclude_pair(
+                stage.GetPrimAtPath(
+                    f"{robot_root_path}/{first_body_name}"
+                ).GetPath(),
+                stage.GetPrimAtPath(
+                    f"{robot_root_path}/{second_body_name}"
+                ).GetPath(),
+            )
+
     def _setup_scene(self):
         """Setup the scene entities."""
         # Get robot articulation
@@ -951,6 +1089,7 @@ class MobileMMTrackEEEnv(DirectRLEnv):
         self._ee_body_idx_initialized = False
 
         # Clone environments
+        self._configure_proto2_self_collision_filters()
         self.scene.clone_environments(copy_from_source=False)
 
         # Trajectory visualization bookkeeping

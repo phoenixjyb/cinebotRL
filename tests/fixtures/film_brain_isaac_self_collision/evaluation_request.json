@@ -1,0 +1,56 @@
+{
+  "authority": {
+    "motion_authority": false,
+    "physical_feasibility_claimed": false,
+    "pnc_execution_semantics_claimed": false,
+    "robot_transport": false
+  },
+  "collision_policy": {
+    "contact_threshold_n": 1.0,
+    "expected_policy_sha256": "7352a83f916769895952545595f52002110622fb4e2d91835192347abe3debe5",
+    "policy_id": "recomo-proto2-isaac-discrete-self-collision-v1"
+  },
+  "continuous_collision_required": false,
+  "coordinate_order": [
+    "base_joint_vx",
+    "base_joint_vy",
+    "base_joint_wz",
+    "joint6_arm_yaw",
+    "joint5_arm_pitch",
+    "joint4_elbow_pitch",
+    "ee1_level_pitch",
+    "ee1_gimbal_pitch",
+    "ee1_gimbal_roll",
+    "ee1_gimbal_yaw"
+  ],
+  "environment_collision_required": false,
+  "operation": "EVALUATE_DISCRETE_SELF_COLLISION_ONLY",
+  "request_id": "fixture-isaac-clean-and-collision-v1",
+  "robot_model": {
+    "expected_usd_sha256": "f9b7516fe489fc8f812f15d3da906a9261583cfd9c10dab2655a59a104fdc5af",
+    "robot_model_id": "recomo-proto2-isaac-usd",
+    "robot_model_version": "recomoProto2-1190-wrapper-baked-scaled"
+  },
+  "samples": [
+    {
+      "positions": [0, 0, 0, 0, 1, -1.2, 0, 0, 0, 0],
+      "timestamp_ns": 0
+    },
+    {
+      "positions": [
+        0,
+        0,
+        0,
+        3.1415998936,
+        -1.5699999332,
+        2.3561997414,
+        0,
+        -3.1999998093,
+        1.569999814,
+        -3.1415998936
+      ],
+      "timestamp_ns": 1000000000
+    }
+  ],
+  "schema_version": "film-brain-isaac-self-collision-request/0.1.0"
+}

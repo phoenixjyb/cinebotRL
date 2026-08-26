@@ -1,0 +1,142 @@
+{
+  "schema_version": "film-brain-isaac-self-collision-gate-evidence/0.1.0",
+  "captured_at": "2026-08-26T13:40:33+08:00",
+  "evidence_scope": "simulator-only discrete Proto2 self-collision",
+  "repository": {
+    "branch": "codex/film-brain-isaac-collision-probe-20260826",
+    "base_commit": "e97cb15ac479b0f8b1f4acf6311323b440c2a56b"
+  },
+  "execution": {
+    "host_alias": "gw98-direct",
+    "device": "cuda:0",
+    "gpu": "NVIDIA RTX PRO 4000 Blackwell 24GB",
+    "runtime": {
+      "gymnasium": "1.2.1",
+      "isaaclab": "0.54.2",
+      "isaacsim": "5.1.0.0",
+      "torch": "2.7.0+cu128"
+    },
+    "cold_call_elapsed_seconds_observed": "6-9"
+  },
+  "backend_identity": {
+    "robot_model_id": "recomo-proto2-isaac-usd",
+    "robot_model_version": "recomoProto2-1190-wrapper-baked-scaled",
+    "usd_sha256": "f9b7516fe489fc8f812f15d3da906a9261583cfd9c10dab2655a59a104fdc5af",
+    "collision_policy_sha256": "7352a83f916769895952545595f52002110622fb4e2d91835192347abe3debe5",
+    "worker_source_sha256": "c7981a8665171d2e54245167a186595c5e256efc98aa3a9a53e2c353b6b53bfb",
+    "environment_source_sha256": "4ade6ee3aac79211edda738fb2b399423e28bf8ff5e50da67e47e57e4a04a5b7"
+  },
+  "identity_protocol": {
+    "request_fixture": "tests/fixtures/film_brain_isaac_self_collision/identity_request.json",
+    "request_sha256": "8a6ae2d8b201b41a2b524fa4e8811b1a26af04ddf56f6deff6af8b48d503aa2e",
+    "response_sha256": "181d596c3a35a2048ec3e11a77fe35e0d27f3ffb1dee0461c5db516870ed41c2",
+    "response_status": "IDENTITY_READY",
+    "canonical_compact_json": true,
+    "trailing_newline": false,
+    "response_hash_valid": true
+  },
+  "default_stack_compatibility": {
+    "film_brain_enable_flag_present": false,
+    "film_brain_pair_flag_present": false,
+    "enabled_self_collisions": false,
+    "film_brain_pair_sensors": [],
+    "status": "ok"
+  },
+  "model_identity_mismatch_gate": {
+    "mismatch": "expected_usd_sha256",
+    "response_status": "REJECTED",
+    "error_code": "ROBOT_MODEL_SHA256_MISMATCH",
+    "evaluation_present": false
+  },
+  "evaluation": {
+    "request_fixture": "tests/fixtures/film_brain_isaac_self_collision/evaluation_request.json",
+    "request_sha256": "51b93cf703ae9073467be62780c493dbebea178847d938b8c1d7a38c74d89227",
+    "response_sha256": "47a590f6d613257e37aa1608990a646f4126cce05d00e793ff4f4a073f1d9763",
+    "response_status": "EVALUATION_COMPLETED",
+    "result_status": "SAMPLED_COLLISION",
+    "canonical_compact_json": true,
+    "trailing_newline": false,
+    "response_hash_valid": true,
+    "evaluated_sample_count": 2,
+    "collision_sample_count": 1,
+    "first_collision_timestamp_ns": 1000000000,
+    "maximum_contact_force_n": 217448.703125,
+    "sample_results": [
+      {
+        "timestamp_ns": 0,
+        "collision": false,
+        "max_contact_force_n": 0.0,
+        "contact_pairs": []
+      },
+      {
+        "timestamp_ns": 1000000000,
+        "collision": true,
+        "max_contact_force_n": 217448.703125,
+        "contact_pairs": [
+          {
+            "bodies": ["arm_link_3", "base_link"],
+            "max_contact_force_n": 79842.046875
+          },
+          {
+            "bodies": ["arm_link_4", "base_link"],
+            "max_contact_force_n": 217448.703125
+          },
+          {
+            "bodies": ["arm_link_5", "base_link"],
+            "max_contact_force_n": 8059.13232421875
+          },
+          {
+            "bodies": ["arm_link_6", "base_link"],
+            "max_contact_force_n": 42682.85546875
+          },
+          {
+            "bodies": ["base_link", "cam_link"],
+            "max_contact_force_n": 73810.0546875
+          },
+          {
+            "bodies": ["base_link", "ee_tool"],
+            "max_contact_force_n": 28644.625
+          }
+        ]
+      }
+    ]
+  },
+  "coordinate_contract": {
+    "order": [
+      "base_joint_vx",
+      "base_joint_vy",
+      "base_joint_wz",
+      "joint6_arm_yaw",
+      "joint5_arm_pitch",
+      "joint4_elbow_pitch",
+      "ee1_level_pitch",
+      "ee1_gimbal_pitch",
+      "ee1_gimbal_roll",
+      "ee1_gimbal_yaw"
+    ],
+    "isaac_six_joint_source_indices": [3, 4, 5, 9, 8, 7],
+    "base_coordinates_elided_by_rigid_transform_invariance": true,
+    "ee1_level_pitch_required_zero": true
+  },
+  "capabilities": {
+    "discrete_self_collision": true,
+    "continuous_or_swept_collision": false,
+    "environment_collision": false,
+    "minimum_clearance": false,
+    "attached_body_policy_equivalent_to_pnc": false,
+    "robot_model_equivalent_to_pnc": false
+  },
+  "authority": {
+    "robot_transport": false,
+    "motion_authority": false,
+    "physical_feasibility_claimed": false,
+    "pnc_execution_semantics_claimed": false
+  },
+  "remaining_gates": [
+    "review Isaac collision exclusions against the authoritative PnC model and SRDF",
+    "add swept or continuous collision evaluation",
+    "add environment and attached-body collision evaluation",
+    "define a bounded Cloud timeout above measured Isaac cold-start latency",
+    "keep physical robot validation as a separate later gate"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "authority": {
+    "motion_authority": false,
+    "physical_feasibility_claimed": false,
+    "pnc_execution_semantics_claimed": false,
+    "robot_transport": false
+  },
+  "operation": "IDENTITY",
+  "request_id": "fixture-isaac-identity-v1",
+  "schema_version": "film-brain-isaac-self-collision-request/0.1.0"
+}
